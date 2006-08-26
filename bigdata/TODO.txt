@@ -1,0 +1,77 @@
+Some big data design and implementation questions.
+
+1. How far does jini scale?  We will have 1000s of hosts, but up to
+   32-bits of distinct segments.  Does each host or each segment
+   register as a service?
+
+2. How do we identify a segment server?  With a jini lookup (double
+   indirection), with an IP address (host resolves to server for
+   segment), or with a service string (e.g.,
+   bigdata://hostname:port/database/partition/segment)?
+
+3. Measure interhost transfer rates.  Should be 100Mbits/sec
+   (~12M/sec) on a 100BaseT switched network.  With full duplex in
+   the network and the protocol, that rate should be bidirectional.
+   Can that rate be sustained with a fully connected bi-directional
+   transfer?
+
+4. We will use non-blocking I/O for the page transfer protocol.
+   Review options to secure that protocol since we can not use jini
+   for that purpose.  For example, using SSL or an SSH tunnel.  For
+   most purposes I expect bigdata to operate on a private network,
+   but replicate across gateways is also a common use case.  Do we
+   have to handle it specially?
+
+5. Support filtered row scans of bigdata database, partition, segment
+   or page using a striterator pattern.  When scanning more than one
+   segment, use a pool of N~100 non-blocking I/O connections to
+   scatter the iterator over the distinct segments, apply the filter
+   or update in place, an optionally gather up the results or simply
+   report termination and optional statistics.  Transfer pages on
+   which there are matching rows to the client when necessary, but in
+   place operations are nicer.
+
+6. Consider whether the PageServer supports servers or clients or
+   both.  This could easily be a peer component in which storing
+   segments on a client was optional.  Normally a client PageServer
+   will not serve local segments and a server PageServer is always
+   available to store and serve local segments.  There may be page
+   cache policy dimensions that differ between clients and servers as
+   well.
+
+7. Explore use of object transfer extension to the page server
+   protocol and buffer of objects at page servers in a stable log to
+   reduce installation reads.
+
+
+Application layer.
+
+
+1. Support b-link trees (concurrent traversal and modification) in
+   jdbm.
+
+2. Support containers (many objects in the same record).
+
+3. Support clustering.
+
+4. Support distributed link sets so that we can efficiently parallize
+   link set scans across multiple segments and leverage bigtable row
+   scans to scan link sets in parallel. Link set jump tables need to
+   identify the head/tail/count of each segment in the database in
+   which there are members for that link set.  A distributed link set
+   partitions the link set into a link set generic objects (one per
+   segment), each of which maintains the link set members for that
+   segment.  A two level iterator can scan the top-level link set and
+   assign the nexted link sets to workers in a thread pool.  With 20
+   workers, you can scan 20 segments in parallel.  When workers become
+   free they are assigned to the next nexted link set.  All of this
+   should be more or less transparent.  Some declarative options can
+   be placed on the top-level link set indicating the degree of
+   scatter that is desired and a data distribution policy.  Iterators
+   of the top level link set will transparently traverse the nexted
+   link sets.  If the iterator is written to perform an operation in
+   place then we do not even need to send objects or data back to the
+   client that requested the iterator.
+
+5. Support schema constraints on link sets and generic objects in GOM.
+   

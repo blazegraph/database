@@ -1,0 +1,348 @@
+<html>
+<head>
+<title>BigData</title>
+</head>
+<body>
+<!-- 
+
+@todo Consider use of custom data structures for very high performance
+on specialized data models, e.g., quads/quints or inverted term
+indices (e.g., lucene).  Investigate whether the proposed storage /
+oid model is ammenable to such data structures and how they can be
+made to interoperate with the standard storage model - perhaps by
+making the choice of how to interpret and manage the data on a per
+segment basis?  Consider whether such high performance data structures
+loose out over the long term to more generalized mechanisms with their
+flexible ad-hoc data models and query mechanisms.  Finally, consider
+very large (multi-segment) consistent data structures as an
+alternative to segmenting data on load and federating on query.
+
+@todo Support automagic smart data partitioning.  E.g., allocating by
+segment for a very large link sets and supporting "DROP" semantics by
+facoring dependencies into the object collecting the link set.  Sets
+may span segments, so "consistent" add/remove semantics require a
+special handling for non-local updates to the object collecting the
+link set.
+
+@todo talk about tradeoffs that can be made with respect to QOS.
+E.g., concurrent reads can be distributed across replications of a
+segment to obtain very high IO rates - higher than are possible with a
+single machine.  Replicated segments can also serve concurrent readers
+by timesharing the replicated segments across the readers.  Look at
+QOS paper and see how it trades off these dimensions.
+
+@todo Provide a security feature for operations on a segment and
+provide for partitioning a database where the segments in each
+partition allow different principles.  This provides a means to share
+the resources of a cluster across customers in a data 2.0 service.
+Each partition is secured and the customers must be unable to sniff
+packets for the page server protocol from their filters (code running
+on the page server hosts).  Customer threads need resource management
+to avoid malicious consumption of resources.  This is a degenerate
+case of the broader concern of job scheduling.  Data 2.0 can be
+delivered as a high performance media and streaming media service
+(streaming media requires special cache logic since the most recently
+read page typically will not be re-read), as GOM (custom computing
+service vs utility computing?), as relational data (with SQL+ language
+with extensions for GOM), as a federated RDFS database, or as a web
+cache capable of handling a network blitze (requires massive RAM cache
+ala squid).
+
+@todo Examine the literature on the use of bitmaps for free space or
+other purposes.  This could play a role in a persistent object journel
+(vs the page journel used by dbCache).  Note that the BFIM for append
+operations on the store do not need to be logged, since they are
+logically non-existent, if a reversable trace of their allocation is
+made.
+
+@todo Examine a policy using translation pages in which they are
+allocated in blocks (e.g. 20 pages at a time) and loaded into memory
+when the store is opened or incrementally as a translation page in
+each block is accessed.  The point is to explore the design tradeoffs
+between an on page slot map and the use of translation pages.  The on
+page slot map is clearly more efficient when records do not grow over
+time, but might degrade performance if frequently used records were
+migrated onto overflow pages.  If the translation pages fit nicely
+into cache for a store (test in worksheet) then there is really no
+performance cost for their use.  This design choice also interacts
+with the choice of whether or not to update records in place vs
+creating MROW semantics by never overwriting committed data during a
+transaction.  The latter requires a means to provide different oid
+resolution for the last committed state of the store and all
+transactions begun from that state.  A record update by a transaction
+must be installed onto a different slot and the translation from oid
+to slot must be scoped to the transaction.  If we accept that we will
+hold a hash map for each _pre-existing_ record _updated_ by a
+transaction having MROW semantics, then we can use that map to resolve
+the oids of updated records to their new locations.  Very long running
+transactions that are inserting new records do not pose an overhead
+since new records are installed whereever we like and updated in place
+or moved around as space constraints require.  The only case that
+would impose a significant memory burden is updating large numbers of
+pre-existing records.  E.g., a row scan in which we compute x++.  In
+this case, disabling MROW semantics might be an option.  Readers would
+be forced to accept dirty reads to operate concurrently in a segment
+locked by a non-MROW writer.
+
+@todo migrating between versions or from other stores requires the
+ability to accept arbitrary logical oids, either with or without
+translation to new logical oids in the target store.  migration with
+oid translation is must be done at the application layer since records
+are opaque (well, unless you use extser, store all pointers in a
+designated part of the record ala Texas, etc).  migration without
+translation may not be possible since logical oids may be assigned
+using incompatible schemes.  For example, if logical oids are assigned
+one up then you can not import them into a store in which they are
+assigned based on the segment and page# in which the record is stored.
+In fact, logical oid translation at the application layer during
+migration may be the only valid approach when migrating to a
+distributed database since the source oids will never be legal for the
+distributed database.
+
+@todo consider per-segment consistent data structures that could be
+used to achieve MROW semantics.  The necessary trick is that updates
+either move the records they replace or are never written into the
+same location as the records that they replace.  CTC does this on a
+record level, but other stores do this on a page level.  Update in
+place is required to maintain clustering while moving the data results
+in twice as much IO. dbCache allows MROW until a transaction becomes
+very long lived, at which point the before images from the DB are
+stored in the log.  Supporting MROW concurrent with very long
+transactions either requires logging AFIMs or using a translation map
+for the log so that BFIM pages can be located.
+
+@todo Compute the tree depth for per row and per page logical to
+physical translation maps and compare with expectations of #s of rows
+and segment size for bigdata.  This sort of scheme can support MROW
+semantics, but it may cost too much for translation for large #s of
+objects or pages.
+
+@todo The page cache needs to be scan resistant so that linear scans
+of pages do not cause the page cache to be flushed. See
+http://linux-mm.org/MemoryHierarchy and
+http://linux-mm.org/AdvancedPageReplacement
+
+@todo update to define handling for long records.  there are two options:
+(1) force people to explicitly define data structures that can scale over
+more than one page, e.g., by managing head/tail/count distributed lists,
+jump tables, etc.  (2) support chaining of long records. 
+
+jdbm appears to handle this by flowing long records over a page boundaries.
+I believe that the jdbm record allocator is constrained so that at most one
+long record starts on a given data page and that page.next is always the
+continuation of the record starting at the first offset after the page header.
+I think that a starting record on page offset of zero is used to flag that
+condition, but I am not clear what happens if subsequent records are then
+allocated on the overflow page.  I am assuming that the record growth strategy
+is such that a record that grows long is forced (by updating its translation
+table entry) to an allocation on a new page.  All of this needs to be better
+documented in jdbm and some row scanners need to be written.
+
+@todo talk about index support.  the basic access path will be btrees that
+support concurrent traversal and modification (b-link trees).  the indices
+need to support smart allocation strategies to distribute the data over and
+within segments and to cluster nodes and values with nodes.  key range scans
+can read ahead, optionally resolving values.  read ahead with concurrent 
+modification is the trickest case.  the jdbm btree support can be reused for
+this with b-link modifications and suitable feature adds.  persistent hash
+tables are a secondary feature.
+
+@todo talk about distributed client cache.  this provides a massive RAM
+cache that also reduces server burdens.  discuss two forms of a page: the
+page image and the slot map view.  the latter allows us to send only the
+rows of interest to a client, e.g., from a filtered row scan, do to cache
+updates on the row level, etc.
+
+@todo talk about clustering and effect of clustering index nodes with the
+indexed values (clustered index).
+
+@todo review decision for connecting to a host vs a segment in light of
+UDP vs TCP performance and write all available requirement.  Do more 
+benchmarks here to identify a scalable design.  If we connect to a host
+then the host needs to map requests onto the segment and redirect if the
+segment is not available (either because it is not on the host or because
+it has been temporarily shed for load balancing purposes).  A segment that
+has been shed temporarily should NOT be closed on the host since writes will
+still have to write through.  The page cache should be per host not per
+segment so that we get the maximum benefit of the servers memory focused on
+the hot segments.
+
+@todo review decision for page oriented vs row oriented protocol.  The main
+drawback of the row oriented protocol is that it requires more features to
+support a store, e.g., named roots per segment, and that object insertion
+rates may be dragged down unless they can be performed locally (which should
+be possible).  A row view of page images could be supported as well using
+Buffer views, but the client will have to be knowledgable about handling of
+long rows.
+
+@todo handle parallelism in link sets using a two level data
+structure.  A link set of segments in which there are link sets local
+to that segment.  The segment-local link sets can be scanned
+concurrently.  For even higher concurrent each segment-local link set
+could be split either in half and scanned front to back and back to
+front on different copies of the same segment or split by a table of
+jump points into the middle of the link set (generalizing from head +
+tail to N+2 entries, or simply increase N by one for every M link set
+members).  E.g., if there are 10k link set members, and M is 1k, then
+the jump table would have 1(head)+10 places from which concurrent
+foward scans could be started Concurrent modification of link sets
+with generalized jump tables will require more sophistication in the
+iterators and some of the entries may have more than M entries.  In
+fact, we probably need to track the #of entries in each part of the
+jump table with head/tail/count so that we can easily rebalance the
+jump table whether or not it is ordered.
+
+An alternative data structure that may be worth exploring is skip
+lists.  Skip lists provide an ordered linked list data structure with
+more opportunities for concurrency and parallel scans (high IO
+concurrency).  Skip lists might be a viable alternative to btrees for
+some applications, e.g., the SPO index for an RDF graph.
+
+An simpler approach would use Page, Segment and Partition layers above
+the normal doubly linked list.  The segment layer is the obvious win
+and enables concurrent scans over multiple segments, which implies
+multiple hosts with redundent segments.  While the parition layer
+might enable faster branchout of the scan and the page layer might
+enable more concurrent within a segment, those layers are less obvious
+wins.
+
+ -->
+
+<p>Welcome to BigData. BigData is a scalable persistence platform for
+Data 2.0 applications. It provides high availability and hot backup on
+commodity hardware. BigData uses jini for service discovery,
+non-blocking I/O and client cache sharing for performance, and
+replication for high availability and hot backup. If things get too hot,
+segments are tranparently replicated and the load is redistributed. If a
+server goes down, your data stays up. If you need more capacity, just
+add more hardware.</p>
+<p>BigData provides a single coherent view with ACID semantics for a
+distributed database. Locking is performed at a coarse grained level
+(the segment) to minimize the overhead of distributed concurrency
+control. A Read One Write All Available (ROWAA) strategy provides higher
+availability than quorum-based models and should out-perform
+quorum-based models unless the update rate is 80-90% of all
+transactions. BigData provides a 64-bit address space and can scale to
+thousands of machines and petabytes of data.</p>
+<p>BigData operates at several granularities. They are:
+<dl>
+	<dt>partition</dt>
+	<dd>A namespace for segments. Partitions may be used for a variety of
+	purposes but they have no intrinsic semantics. There may be 65535
+	partitions in a database.</dd>
+	<dt>segment</dt>
+	<dd>A random access channel containing up to 65535 pages and supporting
+	atomic state change using a two phase commit protocol.</dd>
+	<dt>page</dt>
+	<dd>A block of data. Page size may vary by segment up to 65535 bytes.
+	All pages in the same segment (and in all copies of that segment) have
+	the same page size.</dd>
+	<dt>slot</dt>
+	<dd>A row identifier on a page. A page may have up to 65535 slots. The
+	page is divided into a slot map and rows. The slot map is dense, is
+	maintained by an insertion sort, and is allocated from the top down. A
+	slot maps a slot identifer to a row offset or optionally to a slot on
+	another page. The rows are dense and are allocated from the bottom
+	(offset zero) up. There are many possible orderings of rows on a page
+	and all such orderings are <i>consistent</i>. <br>
+	A slot may redirect to another page, but redirections may not be
+	chained. Redirection is a technique to handle overflow when the rows on
+	a page grow beyond the space available on the page. When a row is on
+	the same page, it may be read in a single operation. When the slot is
+	redirected, an additional I/O is required. A request for a slot that
+	has been redirected will trigger prefetch of the page containing the
+	row. Prefetched pages may be piggybacked with requested pages or arrive
+	asynchronously.<br>
+	A slot counter is maintained as part of the slot map. When a new slot
+	is required, the value of the counter provides the new slot identifer
+	and the counter is incremented. A check is made to verify that the
+	identified slot is not defined in the slot map. If it is, then the
+	counter is read again and incremented and the check is repeated until
+	an available slot is identified. The counter will eventually overflow
+	and be reset to zero. Depending on the requirements of the application,
+	deleted slots may be left in the slot map and marked as deleted. This
+	has minimal storage impact on the page and makes it possible to
+	differentiate between a slot which was never created, one that exists,
+	and one that has been deleted.<br>
+	A segment maintains page lists based on the amount of space free on the
+	page. A page with no data is handled just like a page with only 100
+	bytes of free space. In each case the page shows up on the appropriate
+	free list. Allocators pop off the first page from the free list that
+	provides the best fit for an allocation request. After the allocation
+	request the page is placed onto the appropriate free list based on the
+	remaining free space on the page. One of the free lists contains pages
+	that are filled within a minimum allocation threshold and the allocator
+	never attempts to place new allocation requests on those pages.</dd>
+</dl>
+These distinctions are directly captured by the object identifier, which
+is a 64-bit unsigned long integer. The 64-bit long integer is divided
+into four 16-bit unsigned integer components corresponding to the
+Partition, the Segment, the Page, and the Slot. Object identifers may be
+written as a dotted quad much like IP addresses, e.g., 12.99.3.18. The
+long value zero (0) is reserved to indicate a null reference and is
+never a legal object identifier.
+</p>
+<!-- Consider having the client connect to the host instead and the host
+(de)mux for the segments on that host.  This is fewer sockets and allows
+reuse of server cache for the active segments. -->
+<p>Clients communicate directly with segment servers. A segment server
+uses non-blocking I/O to provide high throughput and handle large
+numbers of concurrent connections. Clients locate segment servers using
+the catalog. Segment servers report statistics to a load balancer. If
+the load grows too heavy for a server, the server will temporarily shed
+clients for less hot segments and focus its resources on requests for
+the hotter segments. Clients that are redirected can query the load
+balancer for another copy of the segment. (This applies to reads only.
+BigData writes all available copies of a segement.) From time to time a
+server may shed a segment entirely. If there is sufficient redundency
+the copy of the segment is simply deleted. Otherwise it is first
+replicated on another server.</p>
+<!-- elaborate on passing the transaction context among clients. -->
+<!-- elaborate on map/reduce (filtered scan) and relation to tx, clients,
+and sending rows rather than pages. -->
+<p>Clients are responsible for obtaining locks from the lock server. A
+client must provide a lock when connecting to a segment server. Segment
+servers allow write operations iff the client connects with a write lock
+or upgrades to a write lock after connecting. The lock server handles
+deadlock detection and can abort a transactions whose lock requests
+conflict with existing locks by other transactions.</p>
+<p>A BigData client that registers as a jini server can particpate in a
+distributed caching protocol. Distributed caching leverages RAM in
+clients to reduce server load and disk I/O. If a page is available in
+RAM in another BigData client, then the page is fetched over the network
+rather than reading it from disk on a server. Distributed page caching
+makes it possible to reduce the page cache on servers. Without
+distributed page cache the number of live pages requested by clients can
+quickly defeat server page caches and lead to disk thrashing.</p>
+<p>Applications may be written directly over BigData. A BigData client
+is implemented for Java, but the page server protocol can be implemented
+for other languages as well. Higher level APIs are available from the
+following sources:
+<dl>
+	<dt><a href="http://www.sourceforge.net/projects/jdbm"> jdbm </a></dt>
+	<dd>jdbm provides a simple API for serializing Java objects and
+	supports persistent b+trees and hash tables. jdbm treats Java objects
+	as opaque records and applications must manage their own indices.</dd>
+	<dt><a
+		href="http://proto.cognitiveweb.org/projects/cweb/multiproject/cweb-generic-native/index.html">
+	GOM</a></dt>
+	<dd>The Generic Object Model provides a high performance data
+	extensible and schema flexible object oriented framework. Applications
+	work with <em>generic data objects</em>. A generic object may have any
+	number of attributes, and each attribute may have any data type.
+	Generic objects may be collected in scalable collections known as link
+	sets and indices may be registered over attributes or computed formulas
+	for collection members. Constraints may be imposed on property clases
+	or collections.</dd>
+</dl>
+</p>
+<p>
+<dl>
+	<dt><b>Version: </b></dt>
+	<dd>$Id$</dd>
+	<dt><b>Author: </b></dt>
+	<dd><a href="mailto:thompsonbry@users.sourceforce.net">Bryan Thompson</a></dd>
+</dl>
+</p>
+</body>
+</html>

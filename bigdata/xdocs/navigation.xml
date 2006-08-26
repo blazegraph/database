@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project name="BigData">
+
+  <!--                                                           -->
+  <!-- This navigation model is merged into the generated site.  -->
+  <!--                                                           -->
+  <!-- You can also author and reference Anakia (XML) docs using -->
+  <!-- a very similar XML model - in fact the distinctions are   -->
+  <!-- pretty blurry.                                            -->
+  <!--                                                           -->
+  <!-- See http://maven.apache.org/start/anakia.html             -->
+  <!-- See http://maven.apache.org/site.html                     -->
+  <!-- See http://maven.apache.org/reference/plugins/xdoc/       -->
+  <!-- See http://jakarta.apache.org/site/jakarta-site-tags.html -->
+  <!--                                                           -->
+
+  <properties>
+     <author>thompsonbry@users.sourceforge.com</author>
+     <title>BigData</title>
+  </properties>
+
+  <body>
+
+    <!-- horizontal links at top of page. -->
+    <links>
+      <item name="Wiki"
+            href="http://wiki.cognitiveweb.org/BigData"
+	    />
+      <item name="Javadoc"
+            href="/apidocs/index.html"
+	    />
+    </links>
+
+    <!-- A top-level, hierarchical menu -->
+   <menu name="CognitiveWeb">
+     <item name="CognitiveWeb"
+           href="http://www.cognitiveweb.org" 
+            img="http://www.cognitiveweb.org/Images/tagline.gif"
+	    />
+     <item name="CognitiveWebWiki"
+           href="http://wiki.cognitiveweb.org"
+	    img="http://www.cognitiveweb.org/wiki/img/moinmoin.gif"
+	    />
+   </menu>
+
+   <!-- Architecture. -->
+     <!-- 
+   <menu name="Architecture">
+     <item name="PDF of UML"
+           href="/architecture/DBCache.pdf"
+	    />
+     <item name="UML (IBM System Architect)"
+           href="/architecture/DBCache.emx" 
+	    />
+   </menu>
+     -->
+
+   <!-- References. -->
+   <!--
+   <menu name="References">
+     <item name="DBCache paper (ACM portal - full text available)"
+           href="http://portal.acm.org/citation.cfm?id=1995"
+	    />
+	    -->
+
+   </menu>
+
+   <!-- Add the google(tm) search widget.  There is no way to
+        position where this will appear at present. -->
+
+   <search/>
+
+  </body>
+
+</project>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+  <id>cweb-bigdata</id>
+  <name>BigData</name>
+  <package>org.CognitiveWeb</package>
+  <extends>../cweb/project.xml</extends>
+  <groupId>org.CognitiveWeb</groupId>
+  <currentVersion>0.1-b1-dev</currentVersion>
+
+  <organization>
+    <name>CognitiveWeb</name>
+    <url>http://www.cognitiveweb.org/</url>
+    <logo>http://www.cognitiveweb.org/Images/cogweb-logo.jpg</logo>
+  </organization>
+
+  <!-- required per-POM metadata. -->
+  <inceptionYear>2002</inceptionYear>
+  <url>http://www.cognitiveweb.org/</url>
+  <logo>http://www.cognitiveweb.org/Images/tagline.gif</logo>
+
+  <!-- The short description is used in the JAR manifest.  For -->
+  <!-- compatibility reasons, no leading/trailing newlines and -->
+  <!-- 72 character length limit.                              -->
+
+  <shortDescription>Big Data</shortDescription>
+
+  <description>
+
+<![CDATA[
+
+  <p>
+
+	  A distributed store based on a replicated segment architecture using
+	  a Read One Write All Available (ROWAA) strategy.  This project is
+	  designed to layer over the <code>dbCache</code> module and provide
+	  the foundation for a distributed database.  This module provides the
+	  peer discover, lock server, client/server partition, and replication
+	  features of a distributed database.  An integration with jdbm(2.x) is
+	  planned to support a Data2.0 GOM distributed high availabilty platform.
+
+  </p>
+
+]]>
+
+  </description>
+
+  <versions>
+  </versions>
+
+  <!-- copy down inheritance applies. -->
+  <siteAddress>www.cognitiveweb.org</siteAddress>
+  <siteDirectory>
+    /home/groups/c/cw/cweb/htdocs/technology/projects/${pom.artifactId}
+  </siteDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <distributionSite>www.sourceforge.net</distributionSite>
+  <distributionDirectory>/projects/cweb</distributionDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <issueTrackingUrl>
+  http://jira.cognitiveweb.org/browse/BigData
+  </issueTrackingUrl>
+
+  <!-- copy down inheritance applies. -->
+  <repository>
+    <connection>
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/cweb:bigdata
+    </connection>
+    <developerConnection>
+    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/cweb:bigdata
+    </developerConnection>
+    <url>http://cweb.cvs.sourceforge.net/cweb/bigdata</url>
+  </repository>
+
+  <!-- copy down inheritance applies. -->
+  <licenses>
+    <license>
+      <name>CognitiveWeb Open Source License</name>
+      <url>http://www.cognitiveweb.org/legal/license/</url>
+      <distribution>manual</distribution>
+    </license>
+  </licenses>
+
+  <!-- copy down inheritance applies. -->
+  <mailingLists>
+    <mailingList>
+      <name>Announce List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=cweb-announce
+      </archive>
+    </mailingList>
+    <mailingList>
+      <name>Developer List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=cweb-developer
+      </archive>
+    </mailingList>
+  </mailingLists>
+
+  <!-- copy down inheritance applies. -->
+  <developers>
+
+    <developer>
+      <name>Bryan Thompson</name>
+      <id>bryan</id>
+      <email>thompsonbry@users.sourceforge.net</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+  </developers>
+
+  <contributors>
+    <!--
+    <contributor>
+      <name>...</name>
+      <id>...</id>
+      <email>...</email>
+      <organization>...</organization>
+    </contributor>
+    -->
+  </contributors>
+
+  <!-- project-specific data. -->
+  <dependencies>
+
+    <!-- log4j integration. -->
+    <dependency> 
+      <id>log4j</id> 
+      <version>1.2.8</version> 
+      <url>http://logging.apache.org</url>
+    </dependency>
+
+    <!-- junit extensions. -->
+    <dependency> 
+      <id>junit</id> 
+      <version>3.8.1</version> 
+      <url>http://www.junit.org/</url>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <nagEmailAddress>
+      thompsonbry@users.sourceforge.net
+    </nagEmailAddress>
+
+    <sourceDirectory>${basedir}/src/java</sourceDirectory>
+
+    <unitTestSourceDirectory>${basedir}/src/test</unitTestSourceDirectory>
+
+    <aspectSourceDirectory/>
+
+    <!-- Unit test cases -->
+
+    <unitTest>
+
+      <includes>
+        <include>org/CognitiveWeb/dbcache/TestAll.java</include>
+      </includes>
+
+      <!-- Resources for test cases are declared here. -->
+
+      <resources>
+      </resources>
+
+    </unitTest>
+              
+    <!-- J A R  R E S O U R C E S -->
+    <resources>
+      <resource>
+        <directory>${basedir}/src/resources/logging</directory>
+        <includes>
+          <include>log4j.properties</include>
+        </includes>
+      </resource>
+
+    </resources>
+
+    <jars>
+    </jars>
+
+  </build>
+
+</project>
