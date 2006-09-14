@@ -5,6 +5,161 @@
 <body>
 <!-- 
 
+@todo Client cache update policies.  A distributed database
+architecture where there are large numbers of clients can benefit from
+a row-based cache update policy in which clients send or receieve
+patches to pages in their cache.  However, a system like bigtable uses
+a different approach in that all operations occur local to the data,
+and in fact there is only one host running any given segment.  Under
+this model there is no requirement for row-based cache updates since
+there are no remote clients of the data.  bigdata probably still
+requires row-based updates in order to support clients that are not
+mapping behaviors across data, but using the more general GOM
+mechanisms.  However, it might be possible to distribute the
+transaction across the hosts such that the GOM model executed in a
+distributed environment - and always close to the data.  The tradeoffs
+here demand more careful thinking as the ability to run at a remove
+from the data goes hand in hand with higher costs while the
+requirement to run only close to the data is clearly more efficient,
+if more restricted.
+
+@todo Correlated link sets.  One thing that bigtable attempts to do is
+to gain the advantages of a column store (ala the recent C-Store by
+Stonebreaker et al).  My hypothesis is that their column families
+allow them to define data structures that can be mapped onto different
+storage segments, providing fast access to specific subsets of the
+data.
+
+I have a notion that the same advantage can be captured in GOM using
+"correlated link sets".  In the simplest case, a correlated link set
+would impose a one-to-one constraint between members of two link sets
+and would order their data on pages of "share-nothing" segments in a
+correlated order.  This would provide for very rapid scan of any of
+the correlated link sets, or very rapid parallel scan of all mutually
+correlated link sets.  (There may or may not be a requirement for a
+variant for blobs.)
+
+From an object model perspective, this is saying that we have two
+objects with a one-to-one correspondence.  Rather than combining their
+properties into a single object, we maintain a link between the
+objects and each object has only its portion of the properties.  We
+then add a declaration to the link property, indicating both a 1:1
+constraint and that the link sets should be correlated.  This is used
+to inform the storage layer, which allocates the objects onto
+correlated page sequences for fast scans.
+
+GOM would also support an alternative where a single object is
+validated against multiple schemas, in which case all properties are
+stored on the single object.
+
+Google is also providing history retention policies (last N version or
+all versions in the last M units of time) and access control policies
+on a per column family basis.  Without commenting on access control
+policies, I think that history retention is most easily treated on a
+per object basis, which could be a good reason to divide an object
+into correlated link sets if you wanted different history policies for
+different parts of the schema.
+
+It is clear that we could handle history with the object journal and
+an object index into the journal so that objects were expunged from
+the journal once their history policy had been exceeded and only one
+version, probably the most recent version, of the object was migrated
+onto the database.  However, this could result in very large object
+journals.  An alternative is to move the object version information
+into the serialized state or the on page slot map.  The allocator for
+slots on the page would have to be aware of the history policy in
+order to leave enough room on the page for historical versions to
+accumulate without strong likelihood of overflowing onto continuation
+pages.
+
+Most literature that I see on distributed databases uses relatively
+small segments, perhaps because they can be wired into memory on a
+server, much like I expect that Google does with a tablet.  If we hold
+this assumption, then some of the design issues for scale change since
+scale is achieved through having more segments, each of which is
+smaller.
+
+Finally, Google appears quite concerned with helping programmers to
+have good intuition for locality.  They use the primary key index for
+a table to organize rows so that they have good locality with respect
+to the key.  This is a bit hard to do in GOM since we have object
+identifiers, not primary keys, but this is definitely something that I
+want to think about more.
+
+@todo Below is a somewhat rambling summary of some points from the
+conversation with MartynC.  It outlines an approach to support
+federated query at scale in the bigdata architecture.  Based on
+discussions with MartynC and MikeP, it appears that higher write rates
+can be achieved using an append-only object journal to buffer writes,
+that high read rates are maintained using an update in place database,
+and that very large federated graphs are supported using state-based
+validation techniques to provide very high concurrency with
+compensating actions during the commit.  MartynC and I are still
+working through the details to support full-transactional isolation
+with this model.  The object journal uses an object index to provide a
+consistent view (full isolation) of the database per transaction, but
+we need to work through the policy that will permit efficient
+migration from the object journal to the update-in-place database.
+
+The notion is to use object journal for very fast writes and an OID
+translation tree for indexing into the journal.  An index hit is the
+most current consistent state of the object in the journal.  An index
+miss means that the object is in the database, which is organized for
+read performance, especially with row or link set scans.  The index is
+wired into memory and reloaded on restart.  The journal retains
+historical states of objects while they are required by concurrent
+transactions (or notionally by a declared history retention policy).
+Journal slots that are no longer required are marked as inactive.  The
+journal is logically append only and writes are buffered for maximum
+IO performance.  The actual implementation may be a ring buffer on
+disk (ala dbCache) or a wandering journal (aka ReiserFS).
+
+The index can be used to read the journal in a historically consistent
+state, which is how CTC supports fully isolated transactions (never
+overwrite data while the database is running and use the object index
+to thread a consistent view of the persistent state).  However, I
+think that we need to blend in some MVCC semantics so that objects may
+be updated (in place) on the database and deleted on the journal.
+
+Updates on the database may require installation reads.  Depending on
+the load balancing policy, the segment may be wired into memory, in
+which case installation reads are not an issue.  Installation reads
+are most likely to be an issue when there are large numbers of clients
+reading through a large amount of data from multiple segments on the
+same machine.  In this case the system is essentially overburdened and
+must read the page from the database before writing the melded back
+back on the database.  However, installation reads can also be
+required when a large number of objects are written on the journal
+before updating the database.  This situation arises because we want
+to minimize the #of random IOs, so we would like to maximize the #of
+objects that we migrate from the journal to a given page of the
+database at a time.  When there are only a few objects in the journal
+to update on a given page, the update may be deferred to minimize IOs.
+
+Very large graph models, e.g., RDFS databases, would be supported
+using state-based validation for very high concurrency.  There are a
+few cases that need to be treated.  One is index race conditions.
+This occurs both when inserting a lexical form into an index to map it
+to the corresponding persistent object, e.g., a URI or Literal.  This
+also occurs when inserting statements into the store.  In either case
+it is possible for concurrency (either within or across transactions)
+to result in violations of uniqueness constraints.  E.g., there can
+only be one object for a given URI and there can be only one object
+for a given SPO or SPOC.  These violations will be treated by melding
+the objects during the transaction commit.  One object will be choosen
+as the survivor and duplicate objects will be melded.  Melding
+requires that we chase references to melded objects, updating those
+references to point at the survivor.  This is easy to do for the GOM
+since back-references are maintained for all forward references (this
+is the principle behind the link set).
+
+The second place in which state-based validation is required is the
+link set membership (head, tail, and size).  This is already supported
+in the CTC GOM.  However, there may be advantages (higher concurrency)
+to supporting data-type specific state-based validation rules for
+generic objects based on their declared class.
+
+
 @todo Consider use of custom data structures for very high performance
 on specialized data models, e.g., quads/quints or inverted term
 indices (e.g., lucene).  Investigate whether the proposed storage /
@@ -49,8 +204,8 @@ cache capable of handling a network blitze (requires massive RAM cache
 ala squid).
 
 @todo Examine the literature on the use of bitmaps for free space or
-other purposes.  This could play a role in a persistent object journel
-(vs the page journel used by dbCache).  Note that the BFIM for append
+other purposes.  This could play a role in a persistent object journal
+(vs the page journal used by dbCache).  Note that the BFIM for append
 operations on the store do not need to be logged, since they are
 logically non-existent, if a reversable trace of their allocation is
 made.

@@ -67,37 +67,17 @@ import junit.framework.TestCase;
  *       larger than the #of pages to be written, and the #of pages to be
  *       written should be at least 5x the disk cache (8-32M).
  * 
- * @todo Write tests for assumptions described in this excerpt:
- *       <p>
- *       I’ve been doing some more thinking, of course, on bigdata, and I am
- *       tempted to start writing some performance tests based on assumptions
- *       for different strategies. E.g., how to maintain read committed
- *       isolation levels. I’ve attached an article on split caching in Thor.
- *       This was a distributed object database that also used validation rather
- *       than locking and explored the use of a persistent object cache to
- *       absorb write operations. They investigated the cost of the installation
- *       read required to update the database and used the clients of the store
- *       as a distributed cache from which page views were assembled in
- *       preference to reading the disk. As far as I recall, they do not discuss
- *       the read committed issue and they do not prove a performance win over a
- *       page-based network protocol. They do argue that read page caches on the
- *       server are quickly flushed by reads from other clients, suggesting that
- *       read cache is nearly useless for the server. The is an article on “why
- *       your cache is mostly trash” that they reference on this issue, as well
- *       as another article that first developed the notion of split caching.
- *       <p>
- *       I think that installation reads (defined in the article as reading the
- *       page from the database prior to updating it from the journal and then
- *       writing back on the database) might be optimized by ordered reads from
- *       a region of the database to get the pages into memory followed by
- *       updating those pages from the journal and then an ordered write to
- *       install the dirty pages back onto the database – that is the
- *       performance test that I would be interested in writing. Unfortunately
- *       you can not use nio to directly communicate an ordered write, e.g.,
- *       with an array of buffers together with their target file offsets. That
- *       is a situation then where not writing through the disk cache and
- *       letting the drive optimize a series of queued write operations would be
- *       advantageous.
+ * @todo Installation reads are when you need to read a page from the database
+ *       so that you can update some rows on that page from a journal. Write
+ *       tests to determine if installation reads might be optimized by ordered
+ *       reads from a <em>region</em> of the database to get the pages into
+ *       memory followed by updating those pages from the journal and then an
+ *       ordered write to install the dirty pages back onto the database.
+ *       Unfortunately you can not use nio to directly communicate an ordered
+ *       write, e.g., with an array of buffers together with their target file
+ *       offsets. That is a situation then where not writing through the disk
+ *       cache and letting the drive optimize a series of queued write
+ *       operations would be advantageous.
  *       <p>
  *       Explore the possibility of asynchronous IO vs synchronous IO for the
  *       database. I think that you would have to use the FileChannel directly
@@ -113,6 +93,11 @@ import junit.framework.TestCase;
  *       since you are just waiting for the right part of the disk to come
  *       around again. If I can identify AIO support for FileChannel then
  *       refactor appropriate tests into a TestAIO class.
+ * 
+ * @see Detailed information about storage hardware is available under windows
+ *      using
+ *      <code>Programs > Accessories > System Tools > System Information</code>.
+ *      See the <code> Components > Storage > Disks </code> view.
  * 
  * @see http://www.jroller.com/page/cpurdy/20040907
  * @see http://alphaworks.ibm.com/tech/aio4j
@@ -262,12 +247,30 @@ public class TestIO extends TestCase {
         final int pagesInDiskCache = diskCacheSize / pageSize;
         System.err.println("pagesInDiskCache=" + nf.format(pagesInDiskCache));
         
-        // #of pages to write.
-        final int pagesToWrite = 5 * pagesInDiskCache;
+        /*
+         * #of pages to write. This value effects the utility of the disk cache.
+         * If all pages fit in the cache, then the writes can be absorbed
+         * directly by the cache without pausing for disk IO. As the #of pages
+         * written begins to exceed the cache, the cache becomes less effective.
+         * Since this benchmark is meant to indicate sustained load, this value
+         * should be at least 5x.
+         */
+        final int pagesToWrite = 10 * pagesInDiskCache;
         System.err.println("pagesToWrite=" + nf.format(pagesToWrite));
 
-        // maximum file length (in pages).
-        final int maxPages = pagesToWrite * 100;
+        /*
+         * maximum file length (in pages). This value effects the amount that
+         * the head must move when seeking within the file. In order to be
+         * effective, this value should be choosen based on knowledge of the
+         * format of the disk, including the sector size and the #of sectors per
+         * track. When IOs are located within the same track, the head stays
+         * still and waits for the right sector to come around. When IOs cover
+         * multiple tracks, the head must seek among those tracks. The maximum
+         * value is limited by the free space on the drive. The drive should be
+         * defragmented before running this test so that the allocated file will
+         * be a contiguous extent to the greatest extent possible.
+         */
+        final int maxPages = pagesToWrite * 10;
         System.err.println("maxPages=" + nf.format(maxPages) + ", maxLength="
                 + nf.format(((long) maxPages * pageSize)));
 
@@ -279,21 +282,40 @@ public class TestIO extends TestCase {
 
         Random r = new Random();
 
-        File file = File.createTempFile("test", ".dbCache");
+        /*
+         * Create a temporary file for the test. You can specify the directory
+         * using an optional argument as a means of choosing which disk drive or
+         * partition to use for the test.
+         */
+        File file = File.createTempFile("test", ".dbCache", new File("D:/"));
+        
         file.deleteOnExit();
         System.err.println("file=" + file);
 
+        RandomAccessFile raf = new RandomAccessFile(file,
+                (writeThrough ? "rwd" : "rw"));
+        
         try {
 
-            RandomAccessFile raf = new RandomAccessFile(file,
-                    (writeThrough ? "rwd" : "rw"));
-
             FileChannel fileChannel = raf.getChannel();
-
+            
             /*
              * Allocate direct buffer.
              */
             ByteBuffer buf = ByteBuffer.allocateDirect(pageSize);
+
+            /*
+             * Extend the file to its maximum size. We set the limit to one
+             * before extending the file so that we only write the very last
+             * byte of the extent. We then restore the limit to the capacity of
+             * the buffer, since that is its initial condition and the
+             * assumption through the rest of this code.
+             */
+            assert buf.limit() == buf.capacity();
+            long maxOffset = (long) maxPages * pageSize - 1; 
+            buf.limit(1);
+            fileChannel.write( buf, maxOffset );
+            buf.limit(buf.capacity());
 
             long startNanos = System.nanoTime();
 
@@ -301,7 +323,8 @@ public class TestIO extends TestCase {
 
                 // offset of page.
                 long pos = r.nextInt(maxPages) * (long) pageSize;
-
+                assert pos <= maxOffset;
+                
                 /*
                  * Reset position so that the next write will transfer the
                  * entire buffer contents. If you don't do this then it will
@@ -354,7 +377,12 @@ public class TestIO extends TestCase {
 
         } finally {
 
-            file.delete();
+            raf.close();
+            
+            if(! file.delete() ) {
+                throw new RuntimeException("Could not delete file: "+file);
+            }
+            
             System.err.println("deleted: " + file);
 
         }
