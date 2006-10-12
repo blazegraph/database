@@ -5,6 +5,187 @@
 <body>
 <!-- 
 
+Priority list:
+
+User Application layer
+
+x. workflow process for semantic merging
+x. XML view of GOM for RESTful navigation
+
+Database Application layer
+
+x. Outrageous RDF(S) performance with quad store
+x. full text indexing (lucene integration and generic property indexing).
+x. xpath indexing (formulas that use xpath to index into generic properties)
+x. Job scripting model
+x. Job scheduler
+x. C# bindings for GOM and extser packages.
+
+GOM layer
+
+x. clustered indices
+x. multiple schema
+x. high concurrency using state-based validation and merge rules
+x. optimized data record
+x. synchronization option for native transactions
+x. correlated link sets? (free when using clustered indices)
+
+Message layer
+
+x. distributed transactions with batched async updates.
+
+Distributed database layer
+
+x. network protocol
+x. load monitoring instrumentation
+x. segment assignment protocol for load balancing
+x. specification of load balancing policies
+x. update buffering and routing (writes chain through replicas).
+x. robustness under failures  
+x. 3-phase commit.
+x. co-existence with other applications
+x. grid enabled, rock-n-roll.
+
+Store layer
+
+x. journal (persistent object buffer)
+x. object index integrated with journal.
+x. rw store (clustered data access)
+x. btree support (from jdbm)
+x. migration from journal to rw store
+x.   when migration is allowable
+x.   history retention support (retention in data record)
+x. full isolation support 
+
+Hardware layer
+
+x. test server platform
+
+@see http://www.javaperformancetuning.com/tips/patterns.shtml,
+     http://www.ddj.com/184405016 (prototypes in Java)
+
+@todo Segment size and scaling strategy.  Use a write through object
+journal to buffer writes since random updates on a read-write DB are
+to expensive.  Use lots of small segments to manage load and reduce
+the scale problems associated with any single segment.  Depending on
+the access pattern, either scan from disk or wire the segment into
+memory on a host.  Cluster data judiciously so that not all segments
+are required all the time.  Write large objects, e.g., video streams,
+through directly into the file system or into specially provisioned
+segments with a large page size and without an object buffer.  Large
+objects segments are never wired into memory since repeat reads are
+rare and they are too big to move around all the time.  Instead, large
+objects are read directly from disk and large object reads are not
+cached (but index structures for the DB SHOULD be cached).
+
+In a way, this greatly simplifies the design since we can use RAM for
+hot segments and we can avoid the scale up problems that we have seen
+with very large segments (having to do with the cost of managing the
+object index).  This does, of course, presume a distributed database
+architecture and load balancing.
+
+With this approach, we can use the object index mechanisms that Martyn
+has been using to provide full transactional isolation.  If we wire
+segments into RAM, then data locality does not matter, but it would be
+a good idea to make the RW store have good locality (clustering) so
+that the system can degrade smoothly if there is not enough RAM for
+the access patterns.  This suggests that we still need a new RW store
+design, but that we could go a long way by buffering writes with a
+journal and wiring the RW store into RAM.
+
+So, there are still issues to solve with RW store design and with
+mechanisms to release historical object states that can no longer be
+read by any current transaction.
+
+@todo Clustered indices.  A clustered index is where the rows are
+organized on disk according to some key found in or computed for each
+row.  Clustered indices provides maximum read rates when scanning data
+in key order and they can be used to effectively pre-fetch rows when a
+known key range is being scanned.  Unfortunately clustered indices are
+at odds with object identifiers (OIDs) since the object identity must
+be the basis for referencing (and dereferencing) objects.  This means
+that we must generalize the notion of object identity.  I am thinking
+of allowing two kinds of OIDs: the existing 64-bit long integers and
+{index,byte[]} tuples.  The byte[] can probably be generalized as a
+(possibly computed) simple Java object for which tuned serialization
+has ideally been specified.  The key could be a property or a computed
+property.  Either the properties that go into the key are implictly
+'final' or the data model must accomodate identity change for such
+objects.  The index would include a comparator function and probably
+should use strongly typed keys.  Locating an object by key then
+requires dereferencing the index (using its 64-bit long OID), locating
+the index node containing that key, and finally locating the object
+within that index node.  The most obvious kind of index is a btree,
+but really other data structures (persistent hash maps, rtrees, etc.)
+are also viable.  Depending on the kind of index used objects within
+the index may have some navigation options in terms of the index
+topology.  Again, the most obvious is the prior or next object in a
+btree.  A hash map might not define any local navigation options.  An
+rtree could define options for scanning spatial neighbors.  When
+object identity is based on an index, the API should share some
+abstractions across the set of members in an index and a link set.
+This abstraction would facilitate navigation but also make it possible
+to maintain secondary indices on objects clustered by a primary
+index. See [clusteredIndices.txt] for some code analysis on the scope
+of changes (relatively extension).
+
+@todo The use of expected counters on native transactions means that
+concurrent threads can not operate at the native transaction level w/o
+a locking mechanism.  If you want concurrency within a native
+transaction then you must sync before entering the native transaction
+and join on commit/rollback.
+
+@todo Latency and transience.  I think that we need to capture two
+additional pieces of metadata for link sets, perhaps on a per-link set
+basis as well as on a per property class that is used to create that
+link set.  One is latency. This is clearly an important tradeoff for
+bigdata as low latency means more hosts are required.  The other is
+whether the link set is transient or not - right now GOM lacks a means
+to declare that something is the GOM equivalent of a temporary table.
+Different SQL implementations actually have different sense of
+temporary tables: generally they are memory resident (latency) but can
+spill over to disk; also, some in some models the table is scoped by
+the Connection to the database, not by the transaction.  This last is
+quite useful for building up complex results.  However, a temporary
+table with a longer lived lease is extremely good for caching things
+such as search results.  In the past I have explicitly managed
+relational tables with a lease for this purpose.  
+
+  Generic objects are often interlinked.  It can easily occur that one
+  end of the link is transient data and the other end is persistent
+  data.  We need to manage that situation efficiently, e.g., by never
+  storing the link to transient data in a persistent object.  This
+  might imply that supporting transient data in GOM requires a
+  parallel generic data record for transient data.  On the other hand,
+  very large scale transient data can not be handled that way.  It
+  needs to use the same persistence mechanisms.  At the same time,
+  applications need a mechanism for decoupling large scale transient
+  data from persistent data.  One such mechanism is to reference by
+  value rather than identity, e.g., the transient data is like a table
+  with foreign keys.  Another is to simply forsake referential
+  integrity for the transient data and only store the link targets,
+  but not thread the link sets within the persistent data (or move the
+  threading information local to the transient data so that it can be
+  easily deleted with the transient data).
+
+@todo Work out an efficient data structure for maintaining full text
+indices (inverted term indices), ideally for use with a lucene
+integration.
+
+@todo Add interface that can be used to customize merge rules for
+objects when they are determined to be identical in their identifying
+attributes, e.g., they have the same key in a clustered index.
+
+@todo Rename interfaces IOI (object identifier), IOM (object manager),
+IPO (persistent object), IGPO (generic persistent object).
+
+@todo Rename packages into com.bigdata.gom?
+
+@todo Run with BCE skins created on access and update property
+versions using timestamps (bitcoding distinct timestamps like OIDs).
+This lets us know which fields have been changed so that we can create
+diffs on write.
+
 @todo Client cache update policies.  A distributed database
 architecture where there are large numbers of clients can benefit from
 a row-based cache update policy in which clients send or receieve
