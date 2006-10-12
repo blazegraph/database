@@ -124,6 +124,24 @@ import java.util.Properties;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo Develop abstraction for {@link BufferMode} implementations of the
+ *       journal. The code currently uses a direct buffer without writing
+ *       through to disk, even though it sets up the disk file. The mode should
+ *       be transparently convertable, e.g., from direct to mapped or disk, from
+ *       mapped to disk or disk, and from disk to direct or mapped iff the size
+ *       on disk permits. There is also a notional mode for transient journals.
+ *       You should not be able to convert from a restart safe journal to a
+ *       transient journal, but conversion in the other direction makes sense.
+ *       One approach is to define an interface for journal implementations and
+ *       then have the {@link Journal} delegate that interface to the
+ *       appropriate implementation object. There are three strategies concerned
+ *       with restart safe journals and they all have a file on disk. There are
+ *       three strategies that use a buffer - two use a direct buffer in exactly
+ *       the same manner ({@link BufferMode#Transient} and
+ *       {@link BufferMode#Direct}) while the other uses a memory-mapped
+ *       buffer. There is also an interaction between locking the file and using
+ *       a memory mapped disk image (the two do not work well together).
+ * 
  * @todo There is a dependency in a distributed database architecture on
  *       transaction begin time. A very long running transaction could force the
  *       journal to hold onto historical states. If a decision is made to
@@ -568,11 +586,6 @@ public class Journal /*implements IStore*/ {
             // verify valid index.
             assertSlot( thisSlot );
             
-            // Position the buffer on the current slot.
-            int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-            directBuffer.limit( pos + slotSize );
-            directBuffer.position( pos );
-            
             int nextSlot;
             
             final int thisCopy;
@@ -608,13 +621,10 @@ public class Journal /*implements IStore*/ {
             // Verify that this slot has been allocated.
             assert( allocationIndex.get(thisSlot) );
             
-            // Write the slot header.
-            directBuffer.putInt(nextSlot); // nextSlot or -1 iff last
-            directBuffer.putInt(priorSlot); // priorSlot or -size iff first
-            
-            // Write the slot data, advances data.position().
+            // Set limit on data to be written on the slot.
             data.limit( data.position() + thisCopy );
-            directBuffer.put(data);
+
+            writeSlot( thisSlot, priorSlot, nextSlot, data );
 
             // Update #of bytes remaining in data.
             remaining -= thisCopy;
@@ -641,6 +651,22 @@ public class Journal /*implements IStore*/ {
         
     }
 
+    private void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data) {
+        
+        // Position the buffer on the current slot.
+        int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+        directBuffer.limit( pos + slotSize );
+        directBuffer.position( pos );
+        
+        // Write the slot header.
+        directBuffer.putInt(nextSlot); // nextSlot or -1 iff last
+        directBuffer.putInt(priorSlot); // priorSlot or -size iff first
+
+        // Write the slot data, advances data.position().
+        directBuffer.put(data);
+
+    }
+    
     /**
      * Update the object index for the transaction to map id onto slot.
      * 
@@ -809,9 +835,9 @@ public class Journal /*implements IStore*/ {
      */
     int releaseSlots(long tx,int nslots) {
 
-        nextSlot = nextFreeSlot( tx );
+        _nextSlot = nextFreeSlot( tx );
         
-        return nextSlot;
+        return _nextSlot;
         
 //        // first slot found.  this will be our return value.
 //        int firstSlot = -1;
@@ -838,14 +864,14 @@ public class Journal /*implements IStore*/ {
 //        
 //        while( nfree < nslots ) {
 //            
-//            if( nextSlot == slotLimit ) {
+//            if( _nextSlot == slotLimit ) {
 //                
 //                if( wrapped ) {
 //                    
 //                } else {
 //                
 //                    // restart search from front of journal.
-//                    nextSlot = 0;
+//                    _nextSlot = 0;
 //
 //                    wrapped = true;
 //                    
@@ -853,11 +879,11 @@ public class Journal /*implements IStore*/ {
 //                
 //            }
 //            
-//            if( nextSlot == -1 ) {
+//            if( _nextSlot == -1 ) {
 //                
 //                int nrequired = nslots - nfree;
 //                
-//                nextSlot = release(fromSlot, nrequired );
+//                _nextSlot = release(fromSlot, nrequired );
 //                
 //            }
 //            
@@ -865,7 +891,7 @@ public class Journal /*implements IStore*/ {
 //            
 //        }
 //        
-//        return nextSlot;
+//        return _nextSlot;
         
     }
 
@@ -897,10 +923,10 @@ public class Journal /*implements IStore*/ {
     int releaseNextSlot(long tx) {
 
         // Required to prevent inadvertant extension of the BitSet.
-        assertSlot(nextSlot);
+        assertSlot(_nextSlot);
         
         // Mark this slot as in use.
-        allocationIndex.set(nextSlot);
+        allocationIndex.set(_nextSlot);
 
         return nextFreeSlot( tx );
         
@@ -913,17 +939,17 @@ public class Journal /*implements IStore*/ {
     {
 
         // Required to prevent inadvertant extension of the BitSet.
-        assertSlot(nextSlot);
+        assertSlot(_nextSlot);
 
-        // Determine whether [nextSlot] has been consumed.
-        if( ! allocationIndex.get(nextSlot) ) {
+        // Determine whether [_nextSlot] has been consumed.
+        if( ! allocationIndex.get(_nextSlot) ) {
             
             /*
-             * The current [nextSlot] has not been allocated and is still
+             * The current [_nextSlot] has not been allocated and is still
              * available.
              */
             
-            return nextSlot;
+            return _nextSlot;
             
         }
         
@@ -933,9 +959,9 @@ public class Journal /*implements IStore*/ {
          * BitSet is logically infinite, so there is always another clear bit
          * beyond the current position.
          */
-        nextSlot = allocationIndex.nextClearBit(nextSlot);
+        _nextSlot = allocationIndex.nextClearBit(_nextSlot);
         
-        if( nextSlot == slotLimit ) {
+        if( _nextSlot == slotLimit ) {
             
             /*
              * No more free slots, try wrapping and looking again.
@@ -948,9 +974,9 @@ public class Journal /*implements IStore*/ {
             
             System.err.println("Journal is wrapping around.");
             
-            nextSlot = allocationIndex.nextClearBit( 0 );
+            _nextSlot = allocationIndex.nextClearBit( 0 );
             
-            if( nextSlot == slotLimit ) {
+            if( _nextSlot == slotLimit ) {
 
                 // The journal is full.
                 throw new IllegalStateException("Journal is full");
@@ -959,7 +985,7 @@ public class Journal /*implements IStore*/ {
             
         }
         
-        return nextSlot;
+        return _nextSlot;
         
     }
 
@@ -975,7 +1001,7 @@ public class Journal /*implements IStore*/ {
      *            The minimum #of slots that must be made available by this
      *            operation.
      * 
-     * @return nextSlot The index of the next free slot.
+     * @return The index of the next free slot.
      */
     int release(int fromSlot, int minSlots ) {
        
@@ -985,15 +1011,15 @@ public class Journal /*implements IStore*/ {
     
     /**
      * <p>
-     * The nextSlot that is known to be available. Slot indices begin at 0 and
+     * The next slot that is known to be available. Slot indices begin at 0 and
      * run up to {@link Integer#MAX_VALUE}. A -1 is used to indicate an invalid
      * slot index.
      * </p>
      * 
-     * @todo This MUST be initialized on startup.  The default is valid only for
-     * a new journal.
+     * @todo This MUST be initialized on startup. The default is valid only for
+     *       a new journal.
      */
-    int nextSlot = 0;
+    int _nextSlot = 0;
 
     final int SIZE_JOURNAL_HEADER = 0;
     
@@ -1074,8 +1100,8 @@ public class Journal /*implements IStore*/ {
 
         assertOpen();
 
-        final int headerSize = slotMath.headerSize;
-        final int dataSize = slotMath.dataSize;
+//        final int headerSize = slotMath.headerSize;
+//        final int dataSize = slotMath.dataSize;
         
         final int firstSlot = getFirstSlot(tx, id);
 
@@ -1085,42 +1111,69 @@ public class Journal /*implements IStore*/ {
         /*
          * Position the buffer on the current slot and permit reading of the
          * header.
+         * 
+         * FIXME Refactor to abstract reading a slot from the BufferMode. This
+         * is a bit awkward since there are three data items to return:
+         * priorSlot, nextSlot, and byte[]. However, since this is all single
+         * threaded we can have an instance of a data structure that gets passed
+         * in and populated by the header fields and we can break the call down
+         * into a readFirstSlot( int slot, SlotHeader ) : ByteBuffer that
+         * allocates the destination buffer and a readNextSlot( int slot,
+         * ByteBuffer ) that appends the data into the buffer. We don't really
+         * even need to pass the slot header data out of readFirstSlot() since
+         * we only use the information to make the allocation (the exception is
+         * of course dumpSlot which exposes the header information).
          */
-        int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
-        directBuffer.limit( pos + headerSize );
-        directBuffer.position( pos );
-        
-        int nextSlot = directBuffer.getInt();
-        final int size = -directBuffer.getInt();
-        if( size <= 0 ) {
-            
-            dumpSlot( firstSlot, true );
-            throw new RuntimeException("Journal is corrupt: tx=" + tx + ", id="
-                    + id +", slot=" + firstSlot+" reports size="+size );
-            
-        }
+//        int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
+//        directBuffer.limit( pos + headerSize );
+//        directBuffer.position( pos );
+//        
+//        int nextSlot = directBuffer.getInt();
+//        final int size = -directBuffer.getInt();
+//        if( size <= 0 ) {
+//            
+//            dumpSlot( firstSlot, true );
+//            throw new RuntimeException("Journal is corrupt: tx=" + tx + ", id="
+//                    + id +", slot=" + firstSlot+" reports size="+size );
+//            
+//        }
+//
+//        // Allocate destination buffer to size.
+//        ByteBuffer dst = ByteBuffer.allocate(size);
+//
+//        int remaining = size;
+//        
+//        /*
+//         * We copy no more than the remaining bytes and no more than the data
+//         * available in the slot.
+//         */
+//        int thisCopy = (remaining > dataSize ? dataSize : remaining);
+//        
+//        // Set limit on source for copy.
+//        directBuffer.limit(directBuffer.position() + thisCopy);
+//        
+//        // Copy data from slot.
+//        dst.put(directBuffer);
+//        
+//        remaining -= thisCopy;
+//        
+//        assert( remaining >= 0 );
 
-        // Allocate destination buffer to size.
-        ByteBuffer dst = ByteBuffer.allocate(size);
-
-        int remaining = size;
-        
         /*
-         * We copy no more than the remaining bytes and no more than the data
-         * available in the slot.
+         * Read the first slot, returning a new buffer with the data from that
+         * slot and returning the header information as a side effect.
          */
-        int thisCopy = (remaining > dataSize ? dataSize : remaining);
-        
-        // Set limit on source for copy.
-        directBuffer.limit(directBuffer.position() + thisCopy);
-        
-        // Copy data from slot.
-        dst.put(directBuffer);
-        
-        remaining -= thisCopy;
-        
-        assert( remaining >= 0 );
+        final ByteBuffer dst = readFirstSlot(id, firstSlot, _slotHeader);
 
+        // #of bytes in the data version.
+        final int size = dst.capacity();
+        
+//        // #of bytes that still need to be read.
+//        int remaining = size - dst.position();
+        
+        // The next slot to be read.
+        int nextSlot = _slotHeader.nextSlot;
+        
         // #of slots read. @todo verify that the #of slots read is the lowest
         // number that would contain the expected data length.
         int slotsRead = 1;
@@ -1133,39 +1186,42 @@ public class Journal /*implements IStore*/ {
             // The current slot being read.
             final int thisSlot = nextSlot; 
 
-            // #of bytes to read from this slot (header + data).
-            thisCopy = (remaining > dataSize ? dataSize : remaining);
-
-            // Verify that this slot has been allocated.
-            assert( allocationIndex.get(thisSlot) );
-
-            // Position the buffer on the current slot and set limit for copy.
-            pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-            directBuffer.limit( pos + headerSize + thisCopy );
-            directBuffer.position( pos );
-                        
-            // read the header.
-            nextSlot = directBuffer.getInt();
-            int priorSlot2 = directBuffer.getInt();
-            if( thisSlot != firstSlot && priorSlot != priorSlot2 ) {
-                
-                dumpSlot( firstSlot, true );
-                throw new RuntimeException("Journal is corrupt: tx=" + tx
-                        + ", id=" + id + ", size=" + size + ", slotsRead="
-                        + slotsRead + ", slot=" + thisSlot
-                        + ", expected priorSlot=" + priorSlot
-                        + ", actual priorSlot=" + priorSlot2);
-
-            }
-
-            // Copy data from slot.
-            dst.put(directBuffer);
-
-            remaining -= thisCopy;
+            nextSlot = readNextSlot( id, thisSlot, priorSlot, slotsRead, dst );
+//            // #of bytes to read from this slot (header + data).
+//            int thisCopy = (remaining > dataSize ? dataSize : remaining);
+//
+//            // Verify that this slot has been allocated.
+//            assert( allocationIndex.get(thisSlot) );
+//
+//            // Position the buffer on the current slot and set limit for copy.
+//            int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+//            directBuffer.limit( pos + headerSize + thisCopy );
+//            directBuffer.position( pos );
+//                        
+//            // read the header.
+//            nextSlot = directBuffer.getInt();
+//            int priorSlot2 = directBuffer.getInt();
+//            if( thisSlot != firstSlot && priorSlot != priorSlot2 ) {
+//                
+//                dumpSlot( firstSlot, true );
+//                throw new RuntimeException("Journal is corrupt: tx=" + tx
+//                        + ", id=" + id + ", size=" + size + ", slotsRead="
+//                        + slotsRead + ", slot=" + thisSlot
+//                        + ", expected priorSlot=" + priorSlot
+//                        + ", actual priorSlot=" + priorSlot2);
+//
+//            }
+//
+//            // Copy data from slot.
+//            dst.put(directBuffer);
+//
+//            remaining -= thisCopy;
+//
+//            priorSlot = thisSlot;
+//
+//            assert (remaining >= 0);
 
             priorSlot = thisSlot;
-
-            assert (remaining >= 0);
 
             slotsRead++;
             
@@ -1185,6 +1241,157 @@ public class Journal /*implements IStore*/ {
         
     }
 
+    /**
+     * A data structure used to get the header fields from a slot.
+     * 
+     * @see Journal#readFirstSlot(long, int, com.bigdata.journal.Journal.SlotHeader)
+     */
+    static class SlotHeader {
+        /**
+         * The prior slot# or -size iff this is the first slot in a chain of
+         * slots for some data version.
+         */
+        int priorSlot;
+        /**
+         * The next slot# or {@link Journal#LAST_SLOT_MARKER} iff this is the
+         * last slot in a chain of slots for some data version.
+         */
+        int nextSlot;
+    }
+
+    /**
+     * A single instance is used by {@link #read(long, long)} since the journal
+     * is single threaded.
+     */
+    final SlotHeader _slotHeader = new SlotHeader();
+    
+    /**
+     * Read the first slot for some data version.
+     * 
+     * @param id
+     *            The persistent identifier.
+     * @param firstSlot
+     *            The first slot for that data version.
+     * @param slotHeader
+     *            The structure into which the header data will be copied.
+     * @return A newly allocated buffer containing the data from the first slot.
+     *         The {@link ByteBuffer#position()} will be the #of bytes read from
+     *         the slot. The limit will be equal to the position. Data from
+     *         remaining slots for this data version should be appended starting
+     *         at the current position. You must examine
+     *         {@link SlotHeader#nextSlot} to determine if more slots should be
+     *         read.
+     * 
+     * @exception RuntimeException
+     *                if the slot is corrupt.
+     */
+    private ByteBuffer readFirstSlot(long id, int firstSlot, SlotHeader slotHeader) {
+
+        assert slotHeader != null;
+        
+        final int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
+        directBuffer.limit( pos + slotMath.headerSize );
+        directBuffer.position( pos );
+        
+        int nextSlot = directBuffer.getInt();
+        final int size = -directBuffer.getInt();
+        if( size <= 0 ) {
+            
+            dumpSlot( firstSlot, true ); // FIXME Abstract or drop dumpSlot or make it impl specific.
+            throw new RuntimeException("Journal is corrupt: id=" + id
+                    + ", firstSlot=" + firstSlot + " reports size=" + size);
+            
+        }
+
+        // Allocate destination buffer to size.
+        ByteBuffer dst = ByteBuffer.allocate(size);
+        
+        /*
+         * We copy no more than the remaining bytes and no more than the data
+         * available in the slot.
+         */
+        
+        final int dataSize = slotMath.dataSize;
+        
+        int thisCopy = (size > dataSize ? dataSize : size);
+        
+        // Set limit on source for copy.
+        directBuffer.limit(directBuffer.position() + thisCopy);
+        
+        // Copy data from slot.
+        dst.put(directBuffer);
+
+        // Copy out the header fields.
+        slotHeader.nextSlot = nextSlot;
+        slotHeader.priorSlot = size;
+        
+        return dst;
+
+    }
+
+    /**
+     * Read another slot in a chain of slots for some data version.
+     * 
+     * @param id
+     *            The persistent identifier.
+     * @param thisSlot
+     *            The slot being read.
+     * @param priorSlot
+     *            The previous slot read.
+     * @param slotsRead
+     *            The #of slots read so far in the chain for the data version.
+     * @param dst
+     *            The data from the slot is appended into this buffer starting
+     *            at the current position.
+     * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
+     *         was the last slot in the chain.
+     */
+    private int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
+
+        final int dataSize = slotMath.dataSize;
+        final int headerSize = slotMath.headerSize;
+        
+        final int size = dst.capacity();
+        final int remaining = size - dst.position();
+        
+        // #of bytes to read from this slot (header + data).
+        int thisCopy = (remaining > dataSize ? dataSize : remaining);
+
+        // Verify that this slot has been allocated.
+        assert( allocationIndex.get(thisSlot) );
+
+        // Position the buffer on the current slot and set limit for copy.
+        int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+        directBuffer.limit( pos + headerSize + thisCopy );
+        directBuffer.position( pos );
+                    
+        // read the header.
+        int nextSlot = directBuffer.getInt();
+        int priorSlot2 = directBuffer.getInt();
+        if( priorSlot != priorSlot2 ) {
+            
+            dumpSlot( thisSlot, true ); // FIXME Abstract or remove dumpSlot or make it impl specific.
+            throw new RuntimeException("Journal is corrupt:  id=" + id
+                    + ", size=" + size + ", slotsRead=" + slotsRead + ", slot="
+                    + thisSlot
+                    + ", expected priorSlot=" + priorSlot
+                    + ", actual priorSlot=" + priorSlot2);
+
+        }
+
+        // Copy data from slot.
+        dst.put(directBuffer);
+
+//        remaining -= thisCopy;
+
+//        priorSlot = thisSlot;
+
+//        assert (remaining >= 0);
+
+        return nextSlot;
+        
+    }
+    
     /**
      * <p>
      * Delete the data from the store.

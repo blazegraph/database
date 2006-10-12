@@ -22,6 +22,15 @@ public enum BufferMode {
 
     /**
      * <p>
+     * A variant on the {@link #Direct} mode that is not restart-safe. This mode
+     * is useful for segments whose contents do not require persistence, applets,
+     * etc.
+     * </p>
+     */
+    Transient("transient"),
+    
+    /**
+     * <p>
      * A direct buffer is allocated for the file image. Writes are applied
      * to the buffer. The buffer tracks dirty slots regardless of the
      * transaction that wrote them and periodically writes dirty slots
@@ -77,15 +86,17 @@ public enum BufferMode {
     public String toString() { return name; }
 
     /**
-     * Parse a string whose contents must be "direct", "mapped", or "disk".
+     * Parse a string whose contents must be "transient", "direct", "mapped", or
+     * "disk".
      * 
      * @param s
      *            The string.
-     *            
+     * 
      * @return The named {@link BufferMode}.
      */
     public static BufferMode parse(String s) {
         if( s == null ) throw new IllegalArgumentException();
+        if( s.equals(Transient.name)) return Transient;
         if( s.equals(Direct.name)) return Direct;
         if( s.equals(Mapped.name)) return Mapped;
         if( s.equals(Disk.name)) return Disk;
