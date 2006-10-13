@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <project>
   <id>cweb-bigdata</id>
-  <name>BigData</name>
+  <name>bigdata</name>
   <package>org.CognitiveWeb</package>
   <extends>../cweb/project.xml</extends>
   <groupId>org.CognitiveWeb</groupId>
@@ -22,7 +22,7 @@
   <!-- compatibility reasons, no leading/trailing newlines and -->
   <!-- 72 character length limit.                              -->
 
-  <shortDescription>Big Data</shortDescription>
+  <shortDescription>bigdata</shortDescription>
 
   <description>
 

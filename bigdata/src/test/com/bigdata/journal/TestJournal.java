@@ -56,9 +56,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.journal.Journal.DirectBufferStrategy;
+import junit.framework.TestCase2;
 
-import junit.framework.TestCase;
 
 /**
  * Test suite for {@link Journal} initialization.
@@ -76,20 +75,19 @@ import junit.framework.TestCase;
  * @todo tests of creating a new journal, including with bad properties.
  * @todo tests of opening an existing journal, including with incomplete writes
  *       of a root block.
- * @todo tests when the journal is buffered by a direct buffer in memory and
- *       when it is not (buffered is the preferred case since all journal
- *       operations are then at memory speed except for actually appending data
- *       or flushing during a commit).
- * @todo tests when the journal is memory mapped.
- * @todo tests when the journal is using a non-mapped file channel.
  * @todo tests when the journal is very large (NOT the normal use case for
  *       bigdata).
  * @todo tests of the exclusive lock mechanism during startup/shutdown (the
- *       advisory file locking mechanism).
+ *       advisory file locking mechanism). This is not used for the
+ *       memory-mapped mode, but it is used for both "Direct" and "Disk" modes.
  * 
  * @todo test ability to extend the journal.
  * 
- * @todo test ability to compact and truncate the journal.
+ * @todo test ability to compact and truncate the journal. Compaction moves
+ *       slots from the end of the journal to fill holes earlier in the journal.
+ *       Truncation chops off the tail. Compaction is done in order to
+ *       facilitate truncation for a journal whose size requirements have
+ *       decreased based on observed load characteristics.
  * 
  * @todo write tests for correct migration of committed records to a database.
  * 
@@ -100,7 +98,7 @@ import junit.framework.TestCase;
  *       visible).
  */
 
-public class TestJournal extends TestCase {
+public class TestJournal extends TestCase2 {
 
     Random r = new Random();
     
@@ -151,87 +149,6 @@ public class TestJournal extends TestCase {
     }
 
     /**
-     * <p>
-     * Compares byte[]s by value (not reference).
-     * </p>
-     * <p>
-     * Note: This method will only be invoked if both arguments can be typed as
-     * byte[] by the compiler. If either argument is not strongly typed, you
-     * MUST case it to a byte[] or {@link #assertEquals(Object, Object)} will be
-     * invoked instead.
-     * </p>
-     * 
-     * @param expected
-     * @param actual
-     */
-    public void assertEquals( byte[] expected, byte[] actual )
-    {
-
-        assertEquals( null, expected, actual );
-        
-    }
-
-    /**
-     * <p>
-     * Compares byte[]s by value (not reference).
-     * </p>
-     * <p>
-     * Note: This method will only be invoked if both arguments can be typed as
-     * byte[] by the compiler. If either argument is not strongly typed, you
-     * MUST case it to a byte[] or {@link #assertEquals(Object, Object)} will be
-     * invoked instead.
-     * </p>
-     * 
-     * @param msg
-     * @param expected
-     * @param actual
-     */
-    public void assertEquals( String msg, byte[] expected, byte[] actual )
-    {
-
-        if( msg == null ) {
-            msg = "";
-        } else {
-            msg = msg + " : ";
-        }
-    
-        if( expected == null && actual == null ) {
-            
-            return;
-            
-        }
-        
-        if( expected == null && actual != null ) {
-            
-            fail( msg+"Expected a null array." );
-            
-        }
-        
-        if( expected != null && actual == null ) {
-            
-            fail( msg+"Not expecting a null array." );
-            
-        }
-        
-        assertEquals
-            ( msg+"length differs.",
-              expected.length,
-              actual.length
-              );
-        
-        for( int i=0; i<expected.length; i++ ) {
-            
-            assertEquals
-                ( msg+"values differ: index="+i,
-                   expected[ i ],
-                   actual[ i ]
-                 );
-            
-        }
-        
-    }
-
-    /**
      * Helper method verifies that the contents of <i>actual</i> from
      * position() to limit() are consistent with the expected byte[]. A
      * read-only view of <i>actual</i> is used to avoid side effects on the
@@ -276,6 +193,36 @@ public class TestJournal extends TestCase {
 
     /**
      * Verify normal operation and basic assumptions when creating a new journal
+     * using {@link BufferMode#Transient}.
+     * 
+     * @throws IOException
+     */
+    public void test_create_transient01() throws IOException {
+
+        final Properties properties = new Properties();
+        
+        properties.setProperty("bufferMode",BufferMode.Transient.toString());
+        
+        Journal journal = new Journal(properties);
+
+        assertEquals("slotSize", 128, journal.slotSize);
+        assertNotNull("slotMath", journal.slotMath);
+
+        TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
+
+        assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+                bufferStrategy.getExtent());
+        assertEquals("bufferMode", BufferMode.Transient, journal.getBufferMode());
+        assertEquals("bufferMode", BufferMode.Transient, bufferStrategy
+                .getBufferMode());
+        assertNotNull("directBuffer", bufferStrategy.directBuffer);
+        assertEquals("", bufferStrategy.getExtent(),
+                bufferStrategy.directBuffer.capacity());
+        
+    }
+        
+    /**
+     * Verify normal operation and basic assumptions when creating a new journal
      * using {@link BufferMode#Direct}.
      * 
      * @throws IOException
@@ -285,7 +232,9 @@ public class TestJournal extends TestCase {
         final Properties properties = new Properties();
         
         final String filename = getTestJournalFile();
-        
+
+        properties.setProperty("bufferMode",BufferMode.Direct.toString());
+
         properties.setProperty("file",filename);
 
         try {
@@ -316,21 +265,89 @@ public class TestJournal extends TestCase {
     }
     
     public void test_create_mapped01() throws IOException {
+
+        final Properties properties = new Properties();
         
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("bufferMode",BufferMode.Mapped.toString());
+
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            assertEquals("slotSize", 128, journal.slotSize);
+            assertNotNull("slotMath", journal.slotMath);
+            
+            MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
+            
+            assertEquals("file", filename, bufferStrategy.file.toString());
+            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+                    bufferStrategy.getExtent());
+            assertNotNull("raf", bufferStrategy.raf);
+            assertEquals("bufferMode", BufferMode.Mapped, journal.getBufferMode());
+            assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
+            assertNotNull("directBuffer", bufferStrategy.directBuffer);
+            assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
+            assertEquals("mappedBuffer",bufferStrategy.directBuffer,bufferStrategy.directBuffer);
+            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
+                    .capacity());
+
+        } finally {
+            
+            deleteTestJournalFile(filename);
+            
+        }
+
     }
     
     public void test_create_disk01() throws IOException {
         
+        final Properties properties = new Properties();
+        
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("bufferMode",BufferMode.Disk.toString());
+
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            assertEquals("slotSize", 128, journal.slotSize);
+            assertNotNull("slotMath", journal.slotMath);
+            
+            DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
+            
+            assertEquals("file", filename, bufferStrategy.file.toString());
+            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+                    bufferStrategy.getExtent());
+            assertNotNull("raf", bufferStrategy.raf);
+            assertEquals("bufferMode", BufferMode.Disk, journal.getBufferMode());
+            assertEquals("bufferMode", BufferMode.Disk, bufferStrategy.getBufferMode());
+
+        } finally {
+            
+            deleteTestJournalFile(filename);
+            
+        }
+
     }
-    
+
+    // FIXME Test re-open of a journal in direct mode.
     public void test_open_direct() throws IOException {
         
     }
     
+    // FIXME Test re-open of a journal in mapped mode.
     public void test_open_mapped() throws IOException {
         
     }
     
+    // FIXME Test re-open of a journal in disk mode.
     public void test_open_disk() throws IOException {
         
     }
@@ -339,23 +356,27 @@ public class TestJournal extends TestCase {
      * Test ability to release and consume slots on the journal.
      * 
      * @throws IOException
+     * 
+     * @todo Isolate and test this aspect of the API.
      */
     public void test_releaseSlots001() throws IOException {
        
-        throw new UnsupportedOperationException();
-        
     }
     
+    //
+    // Under one slot.
+    //
+
     /**
      * Test of write with read back where the write fits in one slot.
      * 
      * @throws IOException
      * 
-     * @todo test write that spans multiple slots (2, 10, 100).
-     * @todo test correct detection of corrupt states in slot chain.
-     * @todo test of multiple writes with interleaved and final read back. This
-     *       should be tested both where we are overwritting new versions of the
-     *       same object and where we are writing distinct objects.
+     * @todo test correct detection of corrupt states in slot chain. to do this
+     *       right requires that we diddle the journal into a corrupt state and
+     *       then verify that the corrupt condition is correctly detected by the
+     *       various methods.
+     *       
      * @todo test of write that wraps the journal.
      * @todo test of write that triggers reuse of slots already written on the
      *       journal by the same tx.
@@ -366,7 +387,7 @@ public class TestJournal extends TestCase {
      * @todo etc.
      */
 
-    public void test_write_001() throws IOException {
+    public void test_write_underOneSlot01() throws IOException {
 
         final Properties properties = new Properties();
         
@@ -382,7 +403,13 @@ public class TestJournal extends TestCase {
             assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, 0, 0, 10);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(1,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -391,16 +418,12 @@ public class TestJournal extends TestCase {
         
     }
 
-    //
-    // Under one slot.
-    //
-
     /**
      * Writes an object that does not fill a slot.
      * 
      * @throws IOException
      */
-    public void test_write_fitsInOneSlot01() throws IOException {
+    public void test_write_underOneSlot02() throws IOException {
 
         final Properties properties = new Properties();
         
@@ -422,7 +445,13 @@ public class TestJournal extends TestCase {
             assertTrue("dataSize",journal.slotMath.dataSize>nbytes);
             
             doWriteRoundTripTest(journal, tx, id, nbytes);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(1,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -456,7 +485,13 @@ public class TestJournal extends TestCase {
             assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(1,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -486,7 +521,13 @@ public class TestJournal extends TestCase {
             assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize-1);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(1,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -516,7 +557,13 @@ public class TestJournal extends TestCase {
             assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize+1);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(2,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -550,7 +597,13 @@ public class TestJournal extends TestCase {
             assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize * 2);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(2,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -581,7 +634,13 @@ public class TestJournal extends TestCase {
 
             doWriteRoundTripTest(journal, 0, 0,
                     (journal.slotMath.dataSize * 2) - 1);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(2,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -612,7 +671,13 @@ public class TestJournal extends TestCase {
 
             doWriteRoundTripTest(journal, 0, 0,
                     (journal.slotMath.dataSize * 2) + 1);
-            
+
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(3,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -647,6 +712,12 @@ public class TestJournal extends TestCase {
 
             doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize * 3);
             
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(3,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -678,6 +749,12 @@ public class TestJournal extends TestCase {
             doWriteRoundTripTest(journal, 0, 0,
                     (journal.slotMath.dataSize * 3) - 1);
             
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(3,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -709,6 +786,12 @@ public class TestJournal extends TestCase {
             doWriteRoundTripTest(journal, 0, 0,
                     (journal.slotMath.dataSize * 3) + 1);
             
+            /*
+             * Verify that the #of allocated slots (this relies on the fact that
+             * there is only one object in the journal).
+             */
+            assertEquals(4,journal.allocationIndex.cardinality());
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -806,13 +889,7 @@ public class TestJournal extends TestCase {
     //
 
     /**
-     * Simple test verifies that an object written on the store may be deleted.
-     * 
-     * @todo Write tests that demonstrate the distinction between NOTFOUND on
-     *       the journal (the object MUST be resolved against the database) and
-     *       DELETED on the journal (the current version is known to have been
-     *       deleted and the application MUST NOT resolve the reference against
-     *       the database).
+     * Test verifies that an object written on the store may be deleted.
      * 
      * @todo Do some more simple tests where a few objects are written, read
      *       back, deleted one by one, and verify that they can no longer be
@@ -822,13 +899,8 @@ public class TestJournal extends TestCase {
      * 
      * @todo Verify that the slots are released once there is no active
      *       transaction that could read the deleted version (testing this is
-     *       complex - it is really a concurrency control test).
-     * 
-     * @todo Verify that the deleted firstSlot is computed correctly. Since zero
-     *       is a valid slot index, we can not just use -firstSlot to indicate a
-     *       deleted object in the object index. Instead we have to offset the
-     *       slot by -1 so that it is always a negative integer when the
-     *       original value was a non-negative integer.
+     *       complex - it is really a concurrency control test and can't be
+     *       written without building out the transaction model further).
      */
     
     public void test_delete001() throws IOException {
@@ -853,6 +925,13 @@ public class TestJournal extends TestCase {
             byte[] expected = doWriteRoundTripTest(journal, tx, id,
                     (journal.slotMath.dataSize * 3) + 1);
 
+            /*
+             * #of slots allocated to that object (this relies on the fact that
+             * it is the only object in the journal).
+             */
+            final int nallocated = journal.allocationIndex.cardinality();
+            System.err.println("Allocated "+nallocated+" slots to tx="+tx+", id="+id);
+
             ByteBuffer actual = journal.read(tx, id);
 
             assertEquals("acutal.position()",0,actual.position());
@@ -868,6 +947,9 @@ public class TestJournal extends TestCase {
             // Verify the object is now correctly marked as deleted in the
             // object index.
             assertEquals(-(firstSlot+1),journal.objectIndex.get(id).intValue());
+
+            // Verify that the #of allocated slots has not changed.
+            assertEquals(nallocated,journal.allocationIndex.cardinality());
 
             /*
              * Test read after delete.
@@ -898,19 +980,21 @@ public class TestJournal extends TestCase {
                 System.err.println("Ignoring expected exception: " + ex);
                 
             }
-            
+
+            // Verify that the #of allocated slots has not changed.
+            assertEquals(nallocated,journal.allocationIndex.cardinality());
+
             /*
              * Deallocate the slots for that object.
-             * 
-             * @todo This is not really a correctness test since we do not
-             * verify the changes to the allocation index -- it only tests for
-             * normal execution.
              */
-            
-            journal.deallocateSlots(tx, id);
 
+            journal.deallocateSlots(tx, id);
+            
             // Verify the entry in the object index is gone.
             assertNull(journal.objectIndex.get(id));
+
+            // Verify that there are no more allocated slots.
+            assertEquals("nallocated", 0, journal.allocationIndex.cardinality());
 
             /*
              * Verify that read now reports "NOTFOUND" (vs DELETED).
