@@ -708,6 +708,14 @@ public class Journal /*implements IStore*/ {
      * @see #DELETED
      * 
      * @todo Transactions are not isolated.
+     * 
+     * @todo Consider simply throwning a specific exception for the "DELETED"
+     *       case as this indicates an error (a bad reference was provided by
+     *       the application). In contrast, the NOTFOUND condition merely
+     *       indicates that the current version is not on the journal and that
+     *       the application MUST resolve the object against the database (which
+     *       will result either in the current version or a "not found"
+     *       semantics, indicating a bad reference).
      */
     int getFirstSlot( long tx, long id ) {
 
@@ -1078,7 +1086,11 @@ public class Journal /*implements IStore*/ {
      * 
      * @return The data. The position will be zero (0). The limit will be the
      *         capacity. The buffer will be entirely filled with the read data
-     *         version.
+     *         version. A <code>null</code> return indicates that the object
+     *         was not found in the journal, in which case the application MUST
+     *         attempt to resolve the object against the database (i.e., the
+     *         object MAY have been migrated onto the database and the version
+     *         logically deleted on the journal).
      * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
@@ -1091,10 +1103,13 @@ public class Journal /*implements IStore*/ {
      *       and size the buffer to the maximum data length that the journal
      *       will accept.
      * 
-     * @todo reads that fail on the journal must still be resolved against the
-     *       read-write database. However, there is a difference between "not
-     *       found" and "deleted". The caller MUST NOT read through to the
-     *       database if the data were deleted.
+     * FIXME Reads that fail on the journal must still be resolved against the
+     * read-write database. However, there is a difference between "not found"
+     * and "deleted". The caller MUST NOT read through to the database if the
+     * data were deleted. This semantic distinction MUST be passed back. Since
+     * DELETED may be a very common outcome, it should not be modeled as a
+     * thrown exception (the overhead is too high) (but NOTFOUND could be
+     * modeled as a thrown exception).
      */
     public ByteBuffer read(long tx,long id) {
 
@@ -1105,24 +1120,24 @@ public class Journal /*implements IStore*/ {
         
         final int firstSlot = getFirstSlot(tx, id);
 
+        if( firstSlot == NOTFOUND ) {
+            
+            return null;
+            
+        }
+        
+        if( firstSlot == DELETED ) {
+
+            throw new IllegalArgumentException("Deleted: tx="+tx+", id="+id);
+
+        }
+        
         // Verify that this slot has been allocated.
         assert( allocationIndex.get(firstSlot) );
 
         /*
          * Position the buffer on the current slot and permit reading of the
          * header.
-         * 
-         * FIXME Refactor to abstract reading a slot from the BufferMode. This
-         * is a bit awkward since there are three data items to return:
-         * priorSlot, nextSlot, and byte[]. However, since this is all single
-         * threaded we can have an instance of a data structure that gets passed
-         * in and populated by the header fields and we can break the call down
-         * into a readFirstSlot( int slot, SlotHeader ) : ByteBuffer that
-         * allocates the destination buffer and a readNextSlot( int slot,
-         * ByteBuffer ) that appends the data into the buffer. We don't really
-         * even need to pass the slot header data out of readFirstSlot() since
-         * we only use the information to make the allocation (the exception is
-         * of course dumpSlot which exposes the header information).
          */
 //        int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
 //        directBuffer.limit( pos + headerSize );
@@ -1163,7 +1178,7 @@ public class Journal /*implements IStore*/ {
          * Read the first slot, returning a new buffer with the data from that
          * slot and returning the header information as a side effect.
          */
-        final ByteBuffer dst = readFirstSlot(id, firstSlot, _slotHeader);
+        final ByteBuffer dst = readFirstSlot(id, firstSlot, true, _slotHeader);
 
         // #of bytes in the data version.
         final int size = dst.capacity();
@@ -1272,11 +1287,17 @@ public class Journal /*implements IStore*/ {
      *            The persistent identifier.
      * @param firstSlot
      *            The first slot for that data version.
+     * @param readData
+     *            When true, a buffer will be allocated sized to exactly hold
+     *            the data version and the data from the first slot will be read
+     *            into that buffer. The buffer is returned to the caller.
      * @param slotHeader
      *            The structure into which the header data will be copied.
-     * @return A newly allocated buffer containing the data from the first slot.
-     *         The {@link ByteBuffer#position()} will be the #of bytes read from
-     *         the slot. The limit will be equal to the position. Data from
+     * 
+     * @return A newly allocated buffer containing the data from the first slot
+     *         or <code>null</code> iff <i>readData</i> is false. The
+     *         {@link ByteBuffer#position()} will be the #of bytes read from the
+     *         slot. The limit will be equal to the position. Data from
      *         remaining slots for this data version should be appended starting
      *         at the current position. You must examine
      *         {@link SlotHeader#nextSlot} to determine if more slots should be
@@ -1285,7 +1306,9 @@ public class Journal /*implements IStore*/ {
      * @exception RuntimeException
      *                if the slot is corrupt.
      */
-    private ByteBuffer readFirstSlot(long id, int firstSlot, SlotHeader slotHeader) {
+
+    private ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+            SlotHeader slotHeader) {
 
         assert slotHeader != null;
         
@@ -1303,6 +1326,12 @@ public class Journal /*implements IStore*/ {
             
         }
 
+        // Copy out the header fields.
+        slotHeader.nextSlot = nextSlot;
+        slotHeader.priorSlot = size;
+
+        if( ! readData ) return null;
+        
         // Allocate destination buffer to size.
         ByteBuffer dst = ByteBuffer.allocate(size);
         
@@ -1320,10 +1349,6 @@ public class Journal /*implements IStore*/ {
         
         // Copy data from slot.
         dst.put(directBuffer);
-
-        // Copy out the header fields.
-        slotHeader.nextSlot = nextSlot;
-        slotHeader.priorSlot = size;
         
         return dst;
 
@@ -1341,8 +1366,8 @@ public class Journal /*implements IStore*/ {
      * @param slotsRead
      *            The #of slots read so far in the chain for the data version.
      * @param dst
-     *            The data from the slot is appended into this buffer starting
-     *            at the current position.
+     *            When non-null, the data from the slot is appended into this
+     *            buffer starting at the current position.
      * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
      *         was the last slot in the chain.
      */
@@ -1351,42 +1376,42 @@ public class Journal /*implements IStore*/ {
         final int dataSize = slotMath.dataSize;
         final int headerSize = slotMath.headerSize;
         
-        final int size = dst.capacity();
-        final int remaining = size - dst.position();
-        
-        // #of bytes to read from this slot (header + data).
-        int thisCopy = (remaining > dataSize ? dataSize : remaining);
-
         // Verify that this slot has been allocated.
         assert( allocationIndex.get(thisSlot) );
 
         // Position the buffer on the current slot and set limit for copy.
-        int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-        directBuffer.limit( pos + headerSize + thisCopy );
+        final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+        directBuffer.limit( pos + headerSize );
         directBuffer.position( pos );
                     
         // read the header.
-        int nextSlot = directBuffer.getInt();
-        int priorSlot2 = directBuffer.getInt();
+        final int nextSlot = directBuffer.getInt();
+        final int priorSlot2 = directBuffer.getInt();
         if( priorSlot != priorSlot2 ) {
             
             dumpSlot( thisSlot, true ); // FIXME Abstract or remove dumpSlot or make it impl specific.
             throw new RuntimeException("Journal is corrupt:  id=" + id
-                    + ", size=" + size + ", slotsRead=" + slotsRead + ", slot="
-                    + thisSlot
+                    + ", slotsRead=" + slotsRead + ", slot=" + thisSlot
                     + ", expected priorSlot=" + priorSlot
                     + ", actual priorSlot=" + priorSlot2);
 
         }
 
         // Copy data from slot.
-        dst.put(directBuffer);
+        if( dst != null ) {
+            
+            final int size = dst.capacity();
+            
+            final int remaining = size - dst.position();
+            
+            // #of bytes to read from this slot (header + data).
+            final int thisCopy = (remaining > dataSize ? dataSize : remaining);
 
-//        remaining -= thisCopy;
+            directBuffer.limit( pos + headerSize + thisCopy );
 
-//        priorSlot = thisSlot;
-
-//        assert (remaining >= 0);
+            dst.put(directBuffer);
+            
+        }
 
         return nextSlot;
         
@@ -1409,15 +1434,52 @@ public class Journal /*implements IStore*/ {
      *                if the transaction identifier is bad.
      * @exception IllegalArgumentException
      *                if the persistent identifier is bad.
+     * 
+     * @todo This implementation does not support transactional isolation or the
+     *       reuse of slots first allocated within the same transaction. The
+     *       slots occupied by the data are immediately marked as "free" in a
+     *       global scope.
      */
     public void delete(long tx,long id) {
 
         assertOpen();
 
-        // FIXME delete the data from the store.
+        // Remove the object index entry.
+        Integer firstSlot = objectIndex.remove(id);
+
+        if( firstSlot == null ) {
+            
+            throw new IllegalArgumentException("Not found: tx="+tx+", id="+id);
+            
+        }
+
+        // read just the header for the first slot in the chain.
+        readFirstSlot(id, firstSlot, false, _slotHeader);
+
+        // mark slot as available in the allocation index.
+        allocationIndex.clear(firstSlot);
         
-        throw new UnsupportedOperationException();
+        int nextSlot = _slotHeader.nextSlot; 
+
+        int priorSlot = firstSlot;
         
+        int slotsRead = 1;
+        
+        while( nextSlot != LAST_SLOT_MARKER ) {
+
+            final int thisSlot = nextSlot;
+            
+            nextSlot = readNextSlot(id, thisSlot, priorSlot, slotsRead, null );
+            
+            priorSlot = thisSlot;
+            
+            // mark slot as available in the allocation index.
+            allocationIndex.clear(thisSlot);
+            
+            slotsRead++;
+            
+        }
+                
     }
 
     /**

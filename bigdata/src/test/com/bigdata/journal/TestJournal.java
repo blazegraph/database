@@ -786,6 +786,69 @@ public class TestJournal extends TestCase {
     }
 
     //
+    // Delete object.
+    //
+
+    /**
+     * Simple test verifies that an object written on the store may be deleted.
+     * 
+     * @todo Write tests that demonstrate the distinction between NOTFOUND on
+     *       the journal (the object MUST be resolved against the database) and
+     *       DELETED on the journal (the current version is known to have been
+     *       deleted and the application MUST NOT resolve the reference against
+     *       the database).
+     * 
+     * @todo Do some more simple tests where a few objects are written, read
+     *       back, deleted one by one, and verify that they can no longer be
+     *       read.
+     * 
+     * @todo Do stress test with writes, reads, and deletes.
+     * 
+     * @todo Verify that the slots are released once there is no active
+     *       transaction that could read the deleted version (testing this is
+     *       complex - it is really a concurrency control test).
+     */
+    public void test_delete001() throws IOException {
+
+        final Properties properties = new Properties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+        properties.setProperty("slotSize", "128");
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            assertEquals("slotSize", 128, journal.slotSize);
+
+            long tx = 0;
+            
+            long id = 0;
+            
+            byte[] expected = doWriteRoundTripTest(journal, tx, id,
+                    (journal.slotMath.dataSize * 3) + 1);
+
+            ByteBuffer actual = journal.read(tx, id);
+
+            assertEquals("acutal.position()",0,actual.position());
+            assertEquals("acutal.limit()",expected.length,actual.limit());
+            assertEquals("acutal.capacity()",expected.length,actual.capacity());
+            assertEquals(expected,actual);
+
+            journal.delete(tx, id);
+
+            assertNull("Read returns non-null", journal.read(tx, id));
+            
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+    }
+    
+    //
     // Test helper.
     //
 
