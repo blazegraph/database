@@ -34,13 +34,33 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
     }
 
     /**
-     * The index of the first slot that MUST NOT be addressed (e.g.,
-     * nslots).
+     * The index of the first slot that MUST NOT be addressed (e.g., nslots).
      * 
      * FIXME This must be a long integer for the {@link BufferMode#Disk}
-     * strategy. The other strategies all use an int limit. That means that
-     * we need to hide the actual field a little more, but we also need to
-     * change the APIs to pass a long slot value everywhere.
+     * strategy. The other strategies all use an int limit. That means that we
+     * need to hide the actual field a little more, but we also need to change
+     * the APIs to pass a long slot value everywhere.
+     * 
+     * The problem with changing to a long integer is that the priorSlot and
+     * nextSlot fields in the slot header then need to be changed from int32 to
+     * int64 fields. That will have a significiant impact on the journal size.
+     * 
+     * My preference is to have two {@link SlotMath} implementations, one of
+     * which supports int32 slot indices and the other of which supports int64
+     * slot indices. The APIs could then use int64 (long) throughout, and it
+     * will be downcast to int32 (int) when using a disk-based journal.
+     * 
+     * However, this introduces another complication - the disk-based journal
+     * would have to have a different binary format when the intention was to
+     * address more than {@link Integer#MAX_VALUE} slots. Since that is
+     * definately NOT the sweet spot for the journal or bigdata, the "right"
+     * thing may be to keep the slot index as an int32. Hence, I am not changing
+     * anything right now. The {@link BufferMode#Disk} SHOULD still be able to
+     * address files with more than {@link Integer#MAX_VALUE} bytes, just not
+     * files with more than {@link Integer#MAX_VALUE} slots.
+     * 
+     * @todo Add test cases that verify correct fence post semantics for
+     *       {@link BufferMode#Disk} as outlined above.
      */
     final int slotLimit;
 
