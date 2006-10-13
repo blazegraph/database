@@ -133,6 +133,47 @@ import java.util.Properties;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * FIXME Priority items are:
+ * <ol>
+ * <li> Segment server (mixture of journal server and read-optimized database
+ * server).</li>
+ * <li> Persistence capable data structures for the object index (basically, a
+ * btree) and the allocation indices. The allocation index is less clear, but a
+ * BitSet will do until I settle on something better - one of the tricks no
+ * matter how you approach it is getting closure on the self-referential issue
+ * with slots and a slot allocation index; maybe the per-tx data structure is
+ * just transient will the committed data structure is persistent?</li>
+ * <li> Transaction isolation. (Also, will there be a "non-transactional mode"?)
+ * The API in {@link Journal} should probably be modified to use "Tx" objects
+ * rather than just long ids for transactions.</li>
+ * <li> Commit protocol, including plan for PREPARE in support of distributed
+ * transactions.</li>
+ * <li> Migration of data to a read-optimized database (have to implement the
+ * read-optimized database as well).</li>
+ * <li>Support primary key indices in GPO/PO layer.</li>
+ * <li>Implement forward validation and state-based conflict resolution with
+ * custom merge rules for persistent objects, generic objects, and primary key
+ * indices, and secondary indexes.</li>
+ * <li> Architecture using queues from GOM to journal/database segment server
+ * supporting both embedded and remote scenarios.</li>
+ * <li> Distributed database protocols.</li>
+ * </ol>
+ * 
+ * FIXME Convert from int64 persistent identifer to int32 persistent identifier.
+ * This conversion can probably happen in the client side of the distributed
+ * interface, i.e., once the client has the segment server that will handle a
+ * given segment, it can strip off the high end of the persisent identifier and
+ * deal with int32 identifiers (actually, that depends on how many segments a
+ * server handles - if it handles more than one, then the client needs to use
+ * int64 identifiers throughout and we convert to int32 in the server). Both
+ * {@link Journal} and {@link JournalServer} currently assume int64 identifiers,
+ * which is wrong. This change has no effect on the binary form of the journal.
+ * The journal and database segments need to know what their segment identifier
+ * is so that they can reconstruct the full int64 identifier when required.
+ * 
+ * @todo Benchmark write absorption rates for single and concurrent writers and
+ *       with and without concurrent readers.
+ * 
  * @todo Work out protocol for shutdown with the single-threaded journal server.
  * 
  * @todo Implement thread-checking using thread local variables or the ability
@@ -148,10 +189,6 @@ import java.util.Properties;
  * 
  * @todo Define distributed protocol for robust startup, operation, and
  *       failover.
- * 
- * @todo Implement forward validation and state-based conflict resolution with
- *       custom merge rules for persistent objects, generic objects, and btree
- *       index nodes.
  * 
  * @todo Divide into API layers. The network facing layer uses a single threaded
  *       nio interface to receive writes into direct buffers. Writes on the

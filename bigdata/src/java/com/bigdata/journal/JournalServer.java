@@ -47,7 +47,13 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 /**
@@ -64,9 +70,119 @@ import java.nio.ByteBuffer;
  * @version $Id$
  * 
  * @todo There needs to be an API for streaming large objects.
+ * 
+ * @todo Refactor code from the nio test suites.
+ * 
+ * @todo Support both row oriented operations on the journal and page oriented
+ * operations on the read-optimized database from a single server (and rename
+ * this class).
+ * 
+ * @todo Support replicated segments, e.g., via chaining or ROWAA.
  */
 
 public class JournalServer {
+    
+
+    /**
+     * Open journals (indexed by segment).
+     * 
+     * @todo Change to int32 keys?
+     * @todo Define Segment object to encapsulate both the Journal and the
+     *       database as well as any metadata associated with the segment, e.g.,
+     *       load stats.
+     */
+    Map<Long,Journal> journals = new HashMap<Long, Journal>();
+
+    /**
+     * 
+     * @param segment
+     * @param properties
+     * @throws IOException
+     * 
+     * @todo Define protocol for journal startup.
+     */
+    public void openSegment(long segment, Properties properties) throws IOException {
+        
+        if( journals.containsKey(segment)) {
+        
+            throw new IllegalStateException();
+            
+        }
+        
+        // @todo pass segment in when creating/opening a journal.
+        Journal journal = new Journal(properties);
+
+        journals.put(segment, journal);
+        
+    }
+
+    /**
+     * 
+     * @param segment
+     * @param properties
+     * @throws IOException
+     * 
+     * @todo Define protocol for journal shutdown.
+     */
+    public void closeSegment(long segment,Properties properties) throws IOException {
+        
+        Journal journal = journals.remove(segment);
+
+        if( journal == null ) throw new IllegalArgumentException();
+        
+        /*
+         * @todo This is far to abupt. We have to gracefully shutdown the
+         * segment.
+         */
+        journal._bufferStrategy.close();
+        
+    }
+    
+    /**
+     * Models a request from a client that has been read from the wire and is
+     * ready for processing.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo define this and define how it relates to client responses. 
+     */
+    public static class ClientRequest {
+        
+    }
+    
+    /**
+     * Models a response that is read to be send down the wire to a client.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo define this and define how it relates to client requests. 
+     */
+    public static class ClientResponse {
+        
+    }
+    
+    /**
+     * @todo create with NO open segments, and then accept requests to receive,
+     *       open, create, send, close, or delete a segment. When opening a
+     *       segment, open both the journal and the database. Keep properties
+     *       for defaults? Server options only?
+     * 
+     * @todo Work out relationship between per-segment and per-transaction
+     *       request processing. If requests are FIFO per transaction, then that
+     *       has to dominate the queues but we may want to have a set of worker
+     *       threads that allow greater parallism when processing requests in
+     *       different transactions against different segments.
+     */
+    public JournalServer(Properties properties) {
+
+        Queue<ClientRequest> requests = new ConcurrentLinkedQueue<ClientRequest>();
+
+        Queue<ClientResponse> responses = new ConcurrentLinkedQueue<ClientResponse>();
+        
+        
+    }
     
     /**
      * The {@link ClientAcceptor} accepts new clients.
@@ -85,10 +201,15 @@ public class JournalServer {
     }
 
     /**
-     * The {@link ClientResponder} handles client requests.
+     * The {@link ClientResponder} buffers Read, Write, and Delete requests from
+     * the client, places them into a per-transaction queue, and notices when
+     * results are available to send back to the client.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo Delete requests are basically a special case of write requests, but
+     * they probably deserve distinction in the protocol.
      */
     public class ClientResponder extends Thread {
         
@@ -101,8 +222,9 @@ public class JournalServer {
     }
     
     /**
-     * The {@link JournalWriter} consumes buffered client requests from a FIFO
-     * queue and writes them onto the journal.
+     * The {@link ClientRequestHandler} consumes buffered client requests from a
+     * per-transaction FIFO queue and places responses onto a queue where they
+     * are picked up by the {@link ClientResponder} and sent to the client.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -116,7 +238,7 @@ public class JournalServer {
      *       introduce unacceptable latency.
      */
     
-    public class JournalWriter extends Thread {
+    public class ClientRequestHandler extends Thread {
 
         final Journal journal;
         
@@ -124,7 +246,7 @@ public class JournalServer {
          * @todo handshake with journal to make sure that the writer is
          * exclusive, e.g., obtaining an exclusive file lock might work.
          */
-        public JournalWriter(Journal journal) {
+        public ClientRequestHandler(Journal journal) {
 
             super("Journal-Writer");
 
@@ -141,7 +263,7 @@ public class JournalServer {
          * @param tx
          *            The transaction identifier.
          * @param id
-         *            The int64 persistent identifier.
+         *            The persistent identifier.
          * @param data
          *            The data to be written. The bytes from
          *            {@link ByteBuffer#position()} to
@@ -153,9 +275,29 @@ public class JournalServer {
             
         }
 
-        public byte[] read(long tx, long id) {
+        /**
+         * Read request from the client.
+         * 
+         * @param tx The transaction identifier.
+         * 
+         * @param id The persistent identifier.
+         */
+        public void read(long tx, long id) {
 
-            return null;
+            ByteBuffer data = journal.read(tx, id);
+            
+            if( data == null ) {
+                
+                /*
+                 * FIXME Resolve the object against the database.
+                 */
+                throw new UnsupportedOperationException("Read from database");
+                
+            }
+            
+            /*
+             * FIXME Write the data onto a socket to get it back to the client.
+             */
 
         }
 
