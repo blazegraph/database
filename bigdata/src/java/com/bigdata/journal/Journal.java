@@ -124,24 +124,6 @@ import java.util.Properties;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Develop abstraction for {@link BufferMode} implementations of the
- *       journal. The code currently uses a direct buffer without writing
- *       through to disk, even though it sets up the disk file. The mode should
- *       be transparently convertable, e.g., from direct to mapped or disk, from
- *       mapped to disk or disk, and from disk to direct or mapped iff the size
- *       on disk permits. There is also a notional mode for transient journals.
- *       You should not be able to convert from a restart safe journal to a
- *       transient journal, but conversion in the other direction makes sense.
- *       One approach is to define an interface for journal implementations and
- *       then have the {@link Journal} delegate that interface to the
- *       appropriate implementation object. There are three strategies concerned
- *       with restart safe journals and they all have a file on disk. There are
- *       three strategies that use a buffer - two use a direct buffer in exactly
- *       the same manner ({@link BufferMode#Transient} and
- *       {@link BufferMode#Direct}) while the other uses a memory-mapped
- *       buffer. There is also an interaction between locking the file and using
- *       a memory mapped disk image (the two do not work well together).
- * 
  * @todo There is a dependency in a distributed database architecture on
  *       transaction begin time. A very long running transaction could force the
  *       journal to hold onto historical states. If a decision is made to
@@ -186,32 +168,673 @@ public class Journal /*implements IStore*/ {
     
     final int slotSize;
     final SlotMath slotMath;
-    final long initialExtent;
-    final File file;
-    final RandomAccessFile raf;
-    final FileLock fileLock;
+//    final long initialExtent;
+//    final File file;
+//    final RandomAccessFile raf;
+//    final FileLock fileLock;
     
     /**
      * The buffer mode in which the file is opened.
      */
-    final BufferMode bufferMode;
+    public BufferMode getBufferMode() {
+        
+        return _bufferStrategy.getBufferMode();
+        
+    }
+//    final BufferMode bufferMode;
+    
+//    /**
+//     * Optional buffer image of the journal. There are two strategies for using
+//     * the buffer. One is as a memory mapped image of the journal, so the OS
+//     * controls which pages of the journal are currently materialized in the
+//     * buffer and writes on the buffer are written through to disk by the OS.
+//     * The other option is a direct buffer. This is the fastest option and the
+//     * one where the journal has the most control over IO and latency. When
+//     * allocated as a direct buffer, data are written on the buffer before
+//     * writing to disk and reads are performed from the buffer.
+//     * 
+//     * @todo The buffer and the {@link RandomAccessFile} should be encapsulated
+//     *       so that the journal is, in the most part, unaware of the specific
+//     *       strategy in use and so that the strategy may be changed
+//     *       dynamically.
+//     */
+//    final ByteBuffer directBuffer;
     
     /**
-     * Optional buffer image of the journal. There are two strategies for using
-     * the buffer. One is as a memory mapped image of the journal, so the OS
-     * controls which pages of the journal are currently materialized in the
-     * buffer and writes on the buffer are written through to disk by the OS.
-     * The other option is a direct buffer. This is the fastest option and the
-     * one where the journal has the most control over IO and latency. When
-     * allocated as a direct buffer, data are written on the buffer before
-     * writing to disk and reads are performed from the buffer.
+     * Interface for implementations of a buffer strategy as identified by a
+     * {@link BufferMode}. This interface is designed to encapsulate the
+     * specifics of reading and writing slots and performing operations to make
+     * an atomic commit.
      * 
-     * @todo The buffer and the {@link RandomAccessFile} should be encapsulated
-     *       so that the journal is, in the most part, unaware of the specific
-     *       strategy in use and so that the strategy may be changed
-     *       dynamically.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo Develop abstraction for {@link BufferMode} implementations of the
+     *       journal. The code currently uses a direct buffer without writing
+     *       through to disk, even though it sets up the disk file. The mode
+     *       should be transparently convertable, e.g., from direct to mapped or
+     *       disk, from mapped to disk or disk, and from disk to direct or
+     *       mapped iff the size on disk permits. There is also a notional mode
+     *       for transient journals. You should not be able to convert from a
+     *       restart safe journal to a transient journal, but conversion in the
+     *       other direction makes sense. One approach is to define an interface
+     *       for journal implementations and then have the {@link Journal}
+     *       delegate that interface to the appropriate implementation object.
+     *       There are three strategies concerned with restart safe journals and
+     *       they all have a file on disk. There are three strategies that use a
+     *       buffer - two use a direct buffer in exactly the same manner ({@link BufferMode#Transient}
+     *       and {@link BufferMode#Direct}) while the other uses a
+     *       memory-mapped buffer. There is also an interaction between locking
+     *       the file and using a memory mapped disk image (the two do not work
+     *       well together).
      */
-    final ByteBuffer directBuffer;
+    public interface IBufferStrategy {
+        
+        /**
+         * The buffer mode supported by the implementation
+         * 
+         * @return The implemented buffer mode.
+         */
+        public BufferMode getBufferMode();
+
+        /**
+         * True iff the journal is open.
+         */
+        public boolean isOpen();
+        
+        /**
+         * The index of the first slot that MUST NOT be addressed (e.g., nslots).
+         */
+        public int getSlotLimit();
+        
+        /**
+         * The current size of the journal in bytes.
+         */
+        public long getExtent();
+        
+        /**
+         * Read the first slot for some data version.
+         * 
+         * @param id
+         *            The persistent identifier.
+         * @param firstSlot
+         *            The first slot for that data version.
+         * @param readData
+         *            When true, a buffer will be allocated sized to exactly hold
+         *            the data version and the data from the first slot will be read
+         *            into that buffer. The buffer is returned to the caller.
+         * @param slotHeader
+         *            The structure into which the header data will be copied.
+         * 
+         * @return A newly allocated buffer containing the data from the first slot
+         *         or <code>null</code> iff <i>readData</i> is false. The
+         *         {@link ByteBuffer#position()} will be the #of bytes read from the
+         *         slot. The limit will be equal to the position. Data from
+         *         remaining slots for this data version should be appended starting
+         *         at the current position. You must examine
+         *         {@link SlotHeader#nextSlot} to determine if more slots should be
+         *         read.
+         * 
+         * @exception RuntimeException
+         *                if the slot is corrupt.
+         */
+
+        public ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+                SlotHeader slotHeader);
+        
+        /**
+         * Read another slot in a chain of slots for some data version.
+         * 
+         * @param id
+         *            The persistent identifier.
+         * @param thisSlot
+         *            The slot being read.
+         * @param priorSlot
+         *            The previous slot read.
+         * @param slotsRead
+         *            The #of slots read so far in the chain for the data version.
+         * @param dst
+         *            When non-null, the data from the slot is appended into this
+         *            buffer starting at the current position.
+         * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
+         *         was the last slot in the chain.
+         */
+        public int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst );
+
+        /**
+         * Write a slot.
+         * 
+         * @param thisSlot
+         *            The slot index.
+         * @param priorSlot
+         *            The value to be written into the priorSlot header field.
+         * @param nextSlot
+         *            The value to be written into the nextSlot header field.
+         * @param data
+         *            The data to be written on the slot.
+         */
+        public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data);
+
+    }
+
+    /**
+     * The implementation logic for the current {@link BufferMode}.
+     * 
+     * @todo Support dynamically changing the buffer mode or just require that
+     * the journal be closed and opened under a new buffer mode?
+     */
+    final IBufferStrategy _bufferStrategy;
+
+    /**
+     * Abstract base class for {@link IBufferStrategy} implementation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public abstract static class AbstractBufferStrategy implements IBufferStrategy {
+        
+        /**
+         * The size of the journal root blocks.  There are two root blocks
+         * and they are written in an alternating order using the Challis
+         * algorithm.
+         */
+        final int SIZE_JOURNAL_HEADER = 0;
+
+        /**
+         * The size of a slot. 
+         */
+        final int slotSize;
+        
+        /**
+         * The size of the per-slot header.
+         */
+        final int slotHeaderSize;
+
+        /**
+         * The size of the per-slot data region.
+         */
+        final int slotDataSize;
+
+        AbstractBufferStrategy(SlotMath slotMath) {
+            
+            if( slotMath == null ) throw new IllegalArgumentException();
+            
+            this.slotSize = slotMath.slotSize;
+            
+            this.slotHeaderSize = slotMath.headerSize;
+            
+            this.slotDataSize = slotMath.dataSize;
+            
+        }
+
+        /**
+         * Throws an exception if the extent is too large for an in-memory
+         * buffer.
+         * 
+         * @param extent The extent.
+         */
+        void assertNonDiskExtent(long extent) {
+
+            if( extent > Integer.MAX_VALUE ) {
+                
+                /*
+                 * The file image is too large to address with an int32. This
+                 * rules out both the use of a direct buffer image and the use
+                 * of a memory-mapped file. Therefore, the journal must use a
+                 * disk-based strategy.
+                 */
+               
+                throw new RuntimeException(
+                        "The extent requires the 'disk' mode: extent=" + extent);
+                
+            }
+
+        }
+        
+    }
+    
+    /**
+     * Transient buffer strategy uses a direct buffer but never writes on disk.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see BufferMode#Transient
+     * 
+     * @todo Refactor implementation from {@link DirectBufferStrategy}.
+     */
+    abstract public static class TransientBufferStrategy {
+        
+        final BufferMode bufferMode = BufferMode.Transient;
+
+//        final ByteBuffer directBuffer;
+
+        public BufferMode getBufferMode() {return bufferMode;}
+        
+    }
+
+    /**
+     * Direct buffer strategy uses a direct {@link ByteBuffer} as a write
+     * through cache and writes through to disk for persistence.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see BufferMode#Direct
+     * 
+     * FIXME Add logic to write on the backing file.
+     * 
+     * @todo Support extension of the journal. This will require removing the
+     *       'final' declaration from some fields. Those fields should probably
+     *       become private at that time.
+     */
+    public static class DirectBufferStrategy extends AbstractBufferStrategy {
+
+        final BufferMode bufferMode = BufferMode.Direct;
+
+        /**
+         * The index of the first slot that MUST NOT be addressed (e.g.,
+         * nslots).
+         * 
+         * FIXME This must be a long integer for the {@link BufferMode#Disk}
+         * strategy. The other strategies all use an int limit. That means that
+         * we need to hide the actual field a little more, but we also need to
+         * change the APIs to pass a long slot value everywhere.
+         */
+        final int slotLimit;
+        
+        final File file;
+        final RandomAccessFile raf;
+        final FileLock fileLock;
+        final ByteBuffer directBuffer;
+        final long extent;
+
+        public long getExtent() {
+            
+            return extent;
+            
+        }
+        
+        public BufferMode getBufferMode() {return bufferMode;}
+
+        // FIXME Track open vs closed state.
+        public boolean isOpen() {
+            
+            return true;
+            
+        }
+        
+        public int getSlotLimit() {return slotLimit;}
+
+        /**
+         * Asserts that the slot index is in the legal range for the journal
+         * <code>[0:slotLimit)</code>
+         * 
+         * @param slot The slot index.
+         */
+        
+        void assertSlot( int slot ) {
+            
+            if( slot>=0 && slot<slotLimit ) return;
+            
+            throw new AssertionError("slot=" + slot + " is not in [0:"
+                    + slotLimit + ")");
+            
+        }
+        
+        DirectBufferStrategy(File file, SlotMath slotMath, long initialExtent)
+                throws IOException {
+            
+            super( slotMath );
+            
+            if( file == null ) throw new IllegalArgumentException();
+
+            this.file = file;
+
+            /*
+             * Note: We do not choose the options for writing synchronously
+             * to the underlying storage device since we only need to write
+             * through to disk on commit, not on incremental write.
+             */
+
+            final String fileMode = "rw";
+
+            final boolean exists = file.exists();
+
+            if( exists ) {
+
+                System.err.println("Opening existing file: "+file);
+                
+            } else {
+                
+                System.err.println("Will create file: "+file);
+                
+            }
+
+            /*
+             * Open/create the file.
+             */
+            this.raf = new RandomAccessFile(file, fileMode);
+            
+            /*
+             * Obtain exclusive lock on the file.
+             * 
+             * FIXME Once we have a lock, we must be sure to release it.
+             */
+            this.fileLock = this.raf.getChannel().tryLock();
+
+            if (fileLock == null) {
+
+                throw new RuntimeException("Could not lock file: " + file);
+
+            }
+
+            if( exists ) {
+                
+                /*
+                 * The file already exists.
+                 * 
+                 * FIXME Check root blocks (magic, timestamps), choose root
+                 * block, figure out whether the journal is empty or not, read
+                 * constants (slotSize, segmentId), make decision whether to
+                 * compact and truncate the journal, read root nodes of indices,
+                 * etc. Do this before we read the file image into memory since
+                 * that is a potentially lengthy operation?
+                 * 
+                 * Those operations should probably be factored into our
+                 * abstract base class.
+                 * 
+                 * Note: There should be no processing required on restart since
+                 * the intention of transactions that did not commit will not be
+                 * visible.
+                 */
+
+                this.extent = raf.length();
+                
+                /*
+                 * Verify that we can address this many bytes with this
+                 * strategy.
+                 */
+                assertNonDiskExtent(extent);
+                
+                    /*
+                     * Read the file image into a direct buffer.
+                     */
+                    
+                    this.directBuffer = ByteBuffer.allocateDirect((int) extent );
+                    
+                    raf.getChannel().read(directBuffer, 0L);
+
+                    // @todo verify/set initial position and limit.
+
+                /*
+                 * FIXME Read the root index and allocation nodes.
+                 */
+                
+            } else {
+
+                /*
+                 * Create a new journal.
+                 */
+                
+                /*
+                 * Set the initial extent.
+                 */
+                
+                this.extent = initialExtent;
+                
+                /*
+                 * Verify that we can address this many bytes with this
+                 * strategy.
+                 */
+                assertNonDiskExtent(extent);
+                
+                raf.setLength(extent);
+
+//                this.initialExtent = raf.length();
+
+                    /*
+                     * Allocate the direct buffer.
+                     */
+                    
+                    this.directBuffer = ByteBuffer.allocateDirect((int) extent);
+
+                    /*
+                 * FIXME Format the journal, e.g., write the root blocks and the
+                 * root index and allocation nodes.  That logic should be factored
+                 * into the abstract base class.
+                 */
+
+            }
+            
+            /*
+             * The first slot index that MUST NOT be addressed.
+             */
+            
+            slotLimit = (int) (extent - SIZE_JOURNAL_HEADER) / slotSize;
+            
+            System.err.println("slotLimit="+slotLimit);
+
+        }
+        
+        public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data) {
+            
+            // Position the buffer on the current slot.
+            int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+            directBuffer.limit( pos + slotSize );
+            directBuffer.position( pos );
+            
+            // Write the slot header.
+            directBuffer.putInt(nextSlot); // nextSlot or -1 iff last
+            directBuffer.putInt(priorSlot); // priorSlot or -size iff first
+
+            // Write the slot data, advances data.position().
+            directBuffer.put(data);
+
+        }
+
+        public ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+                SlotHeader slotHeader) {
+
+            assert slotHeader != null;
+            
+            final int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
+            directBuffer.limit( pos + slotHeaderSize );
+            directBuffer.position( pos );
+            
+            int nextSlot = directBuffer.getInt();
+            final int size = -directBuffer.getInt();
+            if( size <= 0 ) {
+                
+                dumpSlot( firstSlot, true ); // FIXME Abstract or drop dumpSlot or make it impl specific.
+                throw new RuntimeException("Journal is corrupt: id=" + id
+                        + ", firstSlot=" + firstSlot + " reports size=" + size);
+                
+            }
+
+            // Copy out the header fields.
+            slotHeader.nextSlot = nextSlot;
+            slotHeader.priorSlot = size;
+
+            if( ! readData ) return null;
+            
+            // Allocate destination buffer to size.
+            ByteBuffer dst = ByteBuffer.allocate(size);
+            
+            /*
+             * We copy no more than the remaining bytes and no more than the data
+             * available in the slot.
+             */
+            
+            final int dataSize = slotDataSize;
+            
+            int thisCopy = (size > dataSize ? dataSize : size);
+            
+            // Set limit on source for copy.
+            directBuffer.limit(directBuffer.position() + thisCopy);
+            
+            // Copy data from slot.
+            dst.put(directBuffer);
+            
+            return dst;
+
+        }
+
+        public int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
+
+            // Position the buffer on the current slot and set limit for copy.
+            final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+            directBuffer.limit( pos + slotHeaderSize );
+            directBuffer.position( pos );
+                        
+            // read the header.
+            final int nextSlot = directBuffer.getInt();
+            final int priorSlot2 = directBuffer.getInt();
+            if( priorSlot != priorSlot2 ) {
+                
+                dumpSlot( thisSlot, true );
+                throw new RuntimeException("Journal is corrupt:  id=" + id
+                        + ", slotsRead=" + slotsRead + ", slot=" + thisSlot
+                        + ", expected priorSlot=" + priorSlot
+                        + ", actual priorSlot=" + priorSlot2);
+
+            }
+
+            // Copy data from slot.
+            if( dst != null ) {
+                
+                final int size = dst.capacity();
+                
+                final int remaining = size - dst.position();
+                
+                // #of bytes to read from this slot (header + data).
+                final int thisCopy = (remaining > slotDataSize ? slotDataSize : remaining);
+
+                directBuffer.limit( pos + slotHeaderSize + thisCopy );
+
+                dst.put(directBuffer);
+                
+            }
+
+            return nextSlot;
+            
+        }
+        
+        /**
+         * Utility shows the contents of the slot on stderr.
+         * 
+         * @param slot
+         *            The slot.
+         * @param showData
+         *            When true, the data in the slot will also be dumped.
+         * 
+         * @todo Abstract, remove dumpSlot, or make it impl specific (more code
+         * duplication).
+         */
+        void dumpSlot(int slot, boolean showData) {
+            
+            System.err.println("slot="+slot);
+            assertSlot( slot );
+            
+            ByteBuffer view = directBuffer.asReadOnlyBuffer();
+            
+            int pos = SIZE_JOURNAL_HEADER + slotSize * slot;
+
+            view.limit( pos + slotSize );
+
+            view.position( pos );
+
+            int nextSlot = view.getInt();
+            int priorSlot = view.getInt();
+
+            System.err.println("nextSlot="
+                    + nextSlot
+                    + (nextSlot == -1 ? " (last slot)"
+                            : (nextSlot < 0 ? "(error: negative slotId)"
+                                    : "(more slots)")));
+            System.err.println(priorSlot<0?"size="+(-priorSlot):"priorSlot="+priorSlot);
+            
+            if( showData ) {
+            
+                byte[] data = new byte[slotDataSize];
+
+                view.get(data);
+                
+                System.err.println(Arrays.toString(data));
+                
+            }
+            
+        }
+
+    }
+
+    /**
+     * Memory-mapped journal strategy.
+     * 
+     * Note: the use of {@link FileLock} with a memory-mapped file is NOT
+     * recommended by the JDK as this combination is not permitted on some
+     * platforms.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see BufferMode#Mapped
+     * 
+     * @todo Implement.
+     */
+    abstract public static class MappedBufferStrategy {
+
+        final BufferMode bufferMode = BufferMode.Mapped;
+
+//        final File file;
+//        final RandomAccessFile raf;
+//        //final FileLock fileLock;
+//
+//        final ByteBuffer mappedBuffer;
+
+        public BufferMode getBufferMode() {return bufferMode;}
+
+    }
+
+    /**
+     * Disk-based journal strategy.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see BufferMode#Disk
+     * 
+     * @todo Implement.
+     */
+    abstract public static class DiskBufferStrategy {
+
+        final BufferMode bufferMode = BufferMode.Disk;
+
+//        final File file;
+//        final RandomAccessFile raf;
+//        final FileLock fileLock;
+
+        // @todo Uses a page cache, not a directBufffer.
+        
+        public BufferMode getBufferMode() {return bufferMode;}
+
+    }
+
+    /**
+     * Asserts that the slot index is in the legal range for the journal
+     * <code>[0:slotLimit)</code>
+     * 
+     * @param slot The slot index.
+     */
+    
+    void assertSlot( int slot ) {
+        
+        if( slot>=0 && slot<slotLimit ) return;
+        
+        throw new AssertionError("slot=" + slot + " is not in [0:"
+                + slotLimit + ")");
+        
+    }
     
     /**
      * Create or open a journal.
@@ -245,274 +868,131 @@ public class Journal /*implements IStore*/ {
     
     public Journal(Properties properties) throws IOException {
         
-        String val;
         int slotSize = 128;
         long initialExtent = DEFAULT_INITIAL_EXTENT;
+        String val;
 
         if( properties == null ) throw new IllegalArgumentException();
 
         /*
-         * "buffer" mode.
+         * "buffer" mode. Note that very large journals MUST use the disk-based
+         * mode.
          */
-        
+
         val = properties.getProperty("buffer");
-        
-        if( val == null ) val = BufferMode.Direct.toString();
 
-        // Note: final assignment depends on actual file size.
+        if (val == null)
+            val = BufferMode.Direct.toString();
+
         BufferMode bufferMode = BufferMode.parse(val);
-        
+
         /*
-         * "file"
-         */
-        
-        val = properties.getProperty("file");
-        
-        if ( val == null) {
-            throw new RuntimeException("Required property: 'file'");
-        }
-        
-        this.file = new File( val );
-        
-        /*
-         * Note: We do not choose the options for writing synchronously
-         * to the underlying storage device since we only need to write
-         * through to disk on commit, not on incremental write.
+         * "slotSize"
          */
 
-        final String fileMode = "rw";
+        val = properties.getProperty("slotSize");
 
-        final boolean exists = file.exists();
+        if (val != null) {
 
-        if( exists ) {
-            System.err.println("Opening existing file: "+file);
-        } else {
-            System.err.println("Will create file: "+file);
+            slotSize = Integer.parseInt(val);
+
+            if( slotSize < 32 ) {
+                
+                throw new RuntimeException("slotSize >= 32");
+                
+            }
+            
         }
 
+        this.slotSize = slotSize;
+
         /*
-         * Open/create the file.
+         * Helper object for slot-based computations. 
          */
-        this.raf = new RandomAccessFile(file, fileMode);
         
+        this.slotMath = new SlotMath(slotSize);
+
         /*
-         * Obtain exclusive lock on the file.
-         * 
-         * @todo Note that exclusive locks may interact poorly with memory-mapped
-         * files.
-         * 
-         * FIXME Once we have a lock, we must be sure to release it.
+         * "initialExtent"
          */
-        this.fileLock = this.raf.getChannel().tryLock();
 
-        if (fileLock == null) {
+        val = properties.getProperty("initialExtent");
 
-            throw new RuntimeException("Could not lock file: " + file);
+        if (val != null) {
 
+            initialExtent = Long.parseLong(val);
+
+            if( initialExtent <= Bytes.megabyte ) {
+                
+                throw new RuntimeException(
+                        "The initialExtent must be at least one megabyte("
+                                + Bytes.megabyte + ")");
+                
+            }
+            
         }
 
-        if( exists ) {
+        switch (bufferMode) {
+        
+        case Transient: {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        case Direct: {
+
+            /*
+             * "file"
+             */
+
+            val = properties.getProperty("file");
+
+            if (val == null) {
+                throw new RuntimeException("Required property: 'file'");
+            }
+
+            File file = new File(val);
+
+            /*
+             * Setup the buffer strategy.
+             */
+
+            _bufferStrategy = new DirectBufferStrategy(file, slotMath,
+                    initialExtent);
+
+            this.slotLimit = _bufferStrategy.getSlotLimit();
             
             /*
-             * The file already exists.
+             * An index of the free and used slots in the journal.
              * 
-             * FIXME Check root blocks (magic, timestamps), choose root block,
-             * figure out whether the journal is empty or not, read constants
-             * (slotSize, segmentId), make decision whether to compact and
-             * truncate the journal, read root nodes of indices, etc. Do this
-             * before we read the file image into memory since that is a
-             * potentially lengthy operation.
-             * 
-             * There should be no processing required on restart since the
-             * intention of transactions that did not commit will not be
-             * visible.
+             * FIXME This needs to be part of the IBufferStrategy interface
+             * since the allocation index needs to be a persistent data
+             * structure.
              */
+            allocationIndex = new BitSet(_bufferStrategy.getSlotLimit());
 
-            this.slotSize = slotSize;
+            break;
+        
+        }
 
-            /*
-             * Helper object for slot-based computations. 
-             */
+        case Mapped: {
             
-            this.slotMath = new SlotMath(slotSize);
-
-            this.initialExtent = initialExtent = raf.length();
-
-            if( bufferMode != BufferMode.Disk && initialExtent > Integer.MAX_VALUE ) {
-                
-                /*
-                 * The file image is too large to address with an int32. This
-                 * rules out both the use of a direct buffer image and the use
-                 * of a memory-mapped file. Therefore, the journal must use a
-                 * disk-based strategy.
-                 */
-               
-                System.err.println("Warning: file too large for direct or mapped modes.");
-                
-                bufferMode = BufferMode.Disk;
-                
-            }
-
-            switch(bufferMode) {
-
-            case Direct: {
-                
-                /*
-                 * Read the file image into a direct buffer.
-                 */
-                
-                this.directBuffer = ByteBuffer.allocateDirect((int) initialExtent );
-                
-                raf.getChannel().read(directBuffer, 0L);
-
-                // @todo verify/set initial position and limit.
-                
-                break;
-            }
-            case Mapped: {
-                // FIXME memory map the file.
-                this.directBuffer = null;
-                throw new UnsupportedOperationException();
-            }
-            case Disk: {
-                // FIXME setup page cache for the file.
-                this.directBuffer = null;
-                throw new UnsupportedOperationException();
-            }
-            default:
-                throw new AssertionError();
-            }
-
-            // The actual mode choosen.
-            this.bufferMode = bufferMode;
-
-            /*
-             * FIXME Read the root index and allocation nodes.
-             */
-            
-        } else {
-
-            /*
-             * Create a new journal.
-             */
-            
-            /*
-             * "slotSize"
-             */
-
-            val = properties.getProperty("slotSize");
-
-            if (val != null) {
-
-                slotSize = Integer.parseInt(val);
-
-                if( slotSize < 32 ) {
-                    
-                    throw new RuntimeException("slotSize >= 32");
-                    
-                }
-                
-            }
-
-            this.slotSize = slotSize;
-
-            /*
-             * Helper object for slot-based computations. 
-             */
-            
-            this.slotMath = new SlotMath(slotSize);
-
-            /*
-             * "initialExtent"
-             */
-
-            val = properties.getProperty("initialExtent");
-
-            if (val != null) {
-
-                initialExtent = Long.parseLong(val);
-
-                if( initialExtent <= Bytes.megabyte ) {
-                    
-                    throw new RuntimeException(
-                            "The initialExtent must be at least one megabyte("
-                                    + Bytes.megabyte + ")");
-                    
-                }
-                
-            }
-
-            if( bufferMode != BufferMode.Disk && initialExtent > Integer.MAX_VALUE ) {
-                
-                /*
-                 * The file image is too large to address with an int32. This
-                 * rules out both the use of a direct buffer image and the use
-                 * of a memory-mapped file. Therefore, the journal must use a
-                 * disk-based strategy.
-                 */
-               
-                System.err.println("Warning: file too large for direct or mapped modes.");
-                
-                bufferMode = BufferMode.Disk;
-                
-            }
-
-            /*
-             * Set the initial extent.
-             */
-            
-            raf.setLength(initialExtent);
-
-            this.initialExtent = raf.length();
-
-            switch(bufferMode) {
-
-            case Direct: {
-                
-                /*
-                 * Allocate the direct buffer.
-                 */
-                
-                this.directBuffer = ByteBuffer.allocateDirect((int) initialExtent);
-                
-                // @todo verify initial position and limit.
-                
-                break;
-            }
-            case Mapped: {
-                // FIXME memory map the file.
-                this.directBuffer = null;
-                throw new UnsupportedOperationException();
-            }
-            case Disk: {
-                // FIXME setup page cache for the file.
-                this.directBuffer = null;
-                throw new UnsupportedOperationException();
-            }
-            default:
-                throw new AssertionError();
-            }
-
-            // The actual mode choosen.
-            this.bufferMode = bufferMode;
-            
-            /*
-             * FIXME Format the journal, e.g., write the root blocks and the
-             * root index and allocation nodes.
-             */
+            throw new UnsupportedOperationException();
 
         }
         
-        /*
-         * The first slot index that MUST NOT be addressed.
-         */
-        slotLimit = (directBuffer.capacity() - SIZE_JOURNAL_HEADER) / slotSize;
-        System.err.println("slotLimit="+slotLimit);
+        case Disk: {
+
+            throw new UnsupportedOperationException();
         
-        /*
-         * An index of the free and used slots in the journal.
-         */
-        allocationIndex = new BitSet(slotLimit);
+        }
+        
+        default:
+            
+            throw new AssertionError();
+        
+        }
         
     }
 
@@ -525,8 +1005,13 @@ public class Journal /*implements IStore*/ {
      */
     
     private void assertOpen() {
-        // FIXME Throw exception if the store is closed.
-        if( false ) throw new IllegalStateException();
+        
+        if( ! _bufferStrategy.isOpen() ) {
+
+            throw new IllegalStateException();
+
+        }
+        
     }
     
     /**
@@ -624,7 +1109,7 @@ public class Journal /*implements IStore*/ {
             // Set limit on data to be written on the slot.
             data.limit( data.position() + thisCopy );
 
-            writeSlot( thisSlot, priorSlot, nextSlot, data );
+            _bufferStrategy.writeSlot( thisSlot, priorSlot, nextSlot, data );
 
             // Update #of bytes remaining in data.
             remaining -= thisCopy;
@@ -650,22 +1135,6 @@ public class Journal /*implements IStore*/ {
         return firstSlot;
         
     }
-
-    private void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data) {
-        
-        // Position the buffer on the current slot.
-        int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-        directBuffer.limit( pos + slotSize );
-        directBuffer.position( pos );
-        
-        // Write the slot header.
-        directBuffer.putInt(nextSlot); // nextSlot or -1 iff last
-        directBuffer.putInt(priorSlot); // priorSlot or -size iff first
-
-        // Write the slot data, advances data.position().
-        directBuffer.put(data);
-
-    }
     
     /**
      * Update the object index for the transaction to map id onto slot.
@@ -677,6 +1146,12 @@ public class Journal /*implements IStore*/ {
      * @param slot
      *            The first slot on which the current version of the identified
      *            data is written within this transaction scope.
+     * 
+     * @todo This needs to use a persistence capable data structure for the
+     *       object index.
+     * 
+     * @todo This needs to isolate changes to the object index within the
+     *       specified transaction.
      */
     void mapIdToSlot( long tx, long id, int slot ) {
         
@@ -754,63 +1229,6 @@ public class Journal /*implements IStore*/ {
      * @see SlotMath#headerSize
      */
     public static final int LAST_SLOT_MARKER = -1;
-
-    /**
-     * Utility shows the contents of the slot on stderr.
-     * 
-     * @param slot The slot.
-     * @param showData When true, the data in the slot will also be dumped.
-     */
-    void dumpSlot(int slot, boolean showData) {
-        
-        System.err.println("slot="+slot);
-        assertSlot( slot );
-        
-        ByteBuffer view = directBuffer.asReadOnlyBuffer();
-        
-        int pos = SIZE_JOURNAL_HEADER + slotSize * slot;
-
-        view.limit( pos + slotSize );
-
-        view.position( pos );
-
-        int nextSlot = view.getInt();
-        int priorSlot = view.getInt();
-
-        System.err.println("nextSlot="
-                + nextSlot
-                + (nextSlot == -1 ? " (last slot)"
-                        : (nextSlot < 0 ? "(error: negative slotId)"
-                                : "(more slots)")));
-        System.err.println(priorSlot<0?"size="+(-priorSlot):"priorSlot="+priorSlot);
-        
-        if( showData ) {
-        
-            byte[] data = new byte[slotMath.dataSize];
-
-            view.get(data);
-            
-            System.err.println(Arrays.toString(data));
-            
-        }
-        
-    }
-    
-    /**
-     * Asserts that the slot index is in the legal range for the journal
-     * <code>[0:slotLimit)</code>
-     * 
-     * @param slot The slot index.
-     */
-    
-    void assertSlot( int slot ) {
-        
-        if( slot>=0 && slot<slotLimit ) return;
-        
-        throw new AssertionError("slot=" + slot + " is not in [0:" + slotLimit
-                + ")");
-        
-    }
     
     /**
      * Ensure that at least this many slots are available for writing data in
@@ -1029,8 +1447,6 @@ public class Journal /*implements IStore*/ {
      */
     int _nextSlot = 0;
 
-    final int SIZE_JOURNAL_HEADER = 0;
-    
     /**
      * The index of the first slot that MUST NOT be addressed ([0:slotLimit-1]
      * is the valid range of slot indices).
@@ -1044,9 +1460,17 @@ public class Journal /*implements IStore*/ {
      * </p>
      * <p>
      * Note: A deleted version is internally coded as a negative slot
-     * identifier. The negative value is the slot at which the deleted data
-     * version was stored on the journal. This distinction is not leveraged at
-     * this time.
+     * identifier. The negative value is computed as
+     * 
+     * <pre>
+     * negIndex = -(firstSlot + 1)
+     * </pre>
+     * 
+     * The actual slot where the deleted version was written is recovered using:
+     * 
+     * <pre>
+     * firstSlot = (-negIndex - 1);
+     * </pre>
      * </p>
      * 
      * @todo This map is not persistent.
@@ -1178,7 +1602,8 @@ public class Journal /*implements IStore*/ {
          * Read the first slot, returning a new buffer with the data from that
          * slot and returning the header information as a side effect.
          */
-        final ByteBuffer dst = readFirstSlot(id, firstSlot, true, _slotHeader);
+        final ByteBuffer dst = _bufferStrategy.readFirstSlot(id, firstSlot,
+                true, _slotHeader);
 
         // #of bytes in the data version.
         final int size = dst.capacity();
@@ -1201,7 +1626,12 @@ public class Journal /*implements IStore*/ {
             // The current slot being read.
             final int thisSlot = nextSlot; 
 
-            nextSlot = readNextSlot( id, thisSlot, priorSlot, slotsRead, dst );
+            // Verify that this slot has been allocated.
+            assert( allocationIndex.get(thisSlot) );
+
+            nextSlot = _bufferStrategy.readNextSlot(id, thisSlot, priorSlot,
+                    slotsRead, dst);
+            
 //            // #of bytes to read from this slot (header + data).
 //            int thisCopy = (remaining > dataSize ? dataSize : remaining);
 //
@@ -1281,143 +1711,6 @@ public class Journal /*implements IStore*/ {
     final SlotHeader _slotHeader = new SlotHeader();
     
     /**
-     * Read the first slot for some data version.
-     * 
-     * @param id
-     *            The persistent identifier.
-     * @param firstSlot
-     *            The first slot for that data version.
-     * @param readData
-     *            When true, a buffer will be allocated sized to exactly hold
-     *            the data version and the data from the first slot will be read
-     *            into that buffer. The buffer is returned to the caller.
-     * @param slotHeader
-     *            The structure into which the header data will be copied.
-     * 
-     * @return A newly allocated buffer containing the data from the first slot
-     *         or <code>null</code> iff <i>readData</i> is false. The
-     *         {@link ByteBuffer#position()} will be the #of bytes read from the
-     *         slot. The limit will be equal to the position. Data from
-     *         remaining slots for this data version should be appended starting
-     *         at the current position. You must examine
-     *         {@link SlotHeader#nextSlot} to determine if more slots should be
-     *         read.
-     * 
-     * @exception RuntimeException
-     *                if the slot is corrupt.
-     */
-
-    private ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
-            SlotHeader slotHeader) {
-
-        assert slotHeader != null;
-        
-        final int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
-        directBuffer.limit( pos + slotMath.headerSize );
-        directBuffer.position( pos );
-        
-        int nextSlot = directBuffer.getInt();
-        final int size = -directBuffer.getInt();
-        if( size <= 0 ) {
-            
-            dumpSlot( firstSlot, true ); // FIXME Abstract or drop dumpSlot or make it impl specific.
-            throw new RuntimeException("Journal is corrupt: id=" + id
-                    + ", firstSlot=" + firstSlot + " reports size=" + size);
-            
-        }
-
-        // Copy out the header fields.
-        slotHeader.nextSlot = nextSlot;
-        slotHeader.priorSlot = size;
-
-        if( ! readData ) return null;
-        
-        // Allocate destination buffer to size.
-        ByteBuffer dst = ByteBuffer.allocate(size);
-        
-        /*
-         * We copy no more than the remaining bytes and no more than the data
-         * available in the slot.
-         */
-        
-        final int dataSize = slotMath.dataSize;
-        
-        int thisCopy = (size > dataSize ? dataSize : size);
-        
-        // Set limit on source for copy.
-        directBuffer.limit(directBuffer.position() + thisCopy);
-        
-        // Copy data from slot.
-        dst.put(directBuffer);
-        
-        return dst;
-
-    }
-
-    /**
-     * Read another slot in a chain of slots for some data version.
-     * 
-     * @param id
-     *            The persistent identifier.
-     * @param thisSlot
-     *            The slot being read.
-     * @param priorSlot
-     *            The previous slot read.
-     * @param slotsRead
-     *            The #of slots read so far in the chain for the data version.
-     * @param dst
-     *            When non-null, the data from the slot is appended into this
-     *            buffer starting at the current position.
-     * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
-     *         was the last slot in the chain.
-     */
-    private int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
-
-        final int dataSize = slotMath.dataSize;
-        final int headerSize = slotMath.headerSize;
-        
-        // Verify that this slot has been allocated.
-        assert( allocationIndex.get(thisSlot) );
-
-        // Position the buffer on the current slot and set limit for copy.
-        final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-        directBuffer.limit( pos + headerSize );
-        directBuffer.position( pos );
-                    
-        // read the header.
-        final int nextSlot = directBuffer.getInt();
-        final int priorSlot2 = directBuffer.getInt();
-        if( priorSlot != priorSlot2 ) {
-            
-            dumpSlot( thisSlot, true ); // FIXME Abstract or remove dumpSlot or make it impl specific.
-            throw new RuntimeException("Journal is corrupt:  id=" + id
-                    + ", slotsRead=" + slotsRead + ", slot=" + thisSlot
-                    + ", expected priorSlot=" + priorSlot
-                    + ", actual priorSlot=" + priorSlot2);
-
-        }
-
-        // Copy data from slot.
-        if( dst != null ) {
-            
-            final int size = dst.capacity();
-            
-            final int remaining = size - dst.position();
-            
-            // #of bytes to read from this slot (header + data).
-            final int thisCopy = (remaining > dataSize ? dataSize : remaining);
-
-            directBuffer.limit( pos + headerSize + thisCopy );
-
-            dst.put(directBuffer);
-            
-        }
-
-        return nextSlot;
-        
-    }
-    
-    /**
      * <p>
      * Delete the data from the store.
      * </p>
@@ -1444,8 +1737,8 @@ public class Journal /*implements IStore*/ {
 
         assertOpen();
 
-        // Remove the object index entry.
-        Integer firstSlot = objectIndex.remove(id);
+        // Get the object index entry.
+        Integer firstSlot = objectIndex.get(id);
 
         if( firstSlot == null ) {
             
@@ -1453,8 +1746,76 @@ public class Journal /*implements IStore*/ {
             
         }
 
+        // Convert to int.
+        final int firstSlot2 = firstSlot.intValue();
+        
+        if( firstSlot2 < 0 ) {
+            
+            /*
+             * A negative slot index is used to mark objects that have been
+             * deleted from the object index but whose slots have not yet been
+             * released.  It is an error to double-delete an object.
+             */
+            
+            throw new IllegalStateException("Already deleted: tx=" + tx
+                    + ", id=" + id);
+            
+        }
+        
+        // Update the index to store the negative slot index.
+        objectIndex.put(id, -(firstSlot+1));
+
+    }
+    
+    /**
+     * Deallocates slots storing a logically deleted data version. The data
+     * version MUST have been previsously deleted using
+     * {@link #delete(long, long)}
+     * 
+     * @param tx
+     *            The transaction.
+     * @param id
+     *            The persistent identifier.
+     * 
+     * @todo This does not return anything and there is no logic to invoke this
+     *       method at this time. Possible return values of interest are the
+     *       first slot that was deallocated, an array or list of the
+     *       deallocated slots, or the #of slots that were deallocated.
+     * 
+     * @todo Write test.
+     */
+    void deallocateSlots(long tx, long id) {
+        
+        // Remove the object index entry, recovering its contents. 
+        Integer negIndex = objectIndex.remove(id);
+        
+        if( negIndex == null ) {
+
+            throw new IllegalArgumentException("Not found: tx="+tx+", id="+id);
+            
+        }
+
+        // Convert to int.
+        final int negIndex2 = negIndex.intValue();
+        
+        if( negIndex2 >= 0 ) {
+            
+            /*
+             * A negative slot index is used to mark objects that have been
+             * deleted from the object index but whose slots have not yet been
+             * released.
+             */
+            
+            throw new IllegalStateException("Not deleted: tx=" + tx
+                    + ", id=" + id);
+            
+        }
+        
+        // Convert back to a non-negative slot index.
+        final int firstSlot = (-negIndex - 1);
+
         // read just the header for the first slot in the chain.
-        readFirstSlot(id, firstSlot, false, _slotHeader);
+        _bufferStrategy.readFirstSlot(id, firstSlot, false, _slotHeader);
 
         // mark slot as available in the allocation index.
         allocationIndex.clear(firstSlot);
@@ -1469,7 +1830,8 @@ public class Journal /*implements IStore*/ {
 
             final int thisSlot = nextSlot;
             
-            nextSlot = readNextSlot(id, thisSlot, priorSlot, slotsRead, null );
+            nextSlot = _bufferStrategy.readNextSlot(id, thisSlot, priorSlot,
+                    slotsRead, null);
             
             priorSlot = thisSlot;
             
@@ -1479,7 +1841,10 @@ public class Journal /*implements IStore*/ {
             slotsRead++;
             
         }
-                
+
+        System.err.println("Dealloacted " + slotsRead + " slots: tx=" + tx
+                + ", id=" + id);
+        
     }
 
     /**

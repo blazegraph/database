@@ -56,6 +56,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
+import com.bigdata.journal.Journal.DirectBufferStrategy;
+
 import junit.framework.TestCase;
 
 /**
@@ -63,6 +65,10 @@ import junit.framework.TestCase;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME Refactor to use junit-ext and parameterize the test suite for various
+ * configurations of the journal, especially the different buffering mechanisms.
+ * Reuse the various helper method in place from TestCase2.
  * 
  * FIXME Work through basic operations for writing and committing a transaction
  * without concurrency support, then modify to add in concurrency.
@@ -81,7 +87,7 @@ import junit.framework.TestCase;
  * @todo tests of the exclusive lock mechanism during startup/shutdown (the
  *       advisory file locking mechanism).
  * 
- * @todo test ability to extent the journal.
+ * @todo test ability to extend the journal.
  * 
  * @todo test ability to compact and truncate the journal.
  * 
@@ -268,6 +274,12 @@ public class TestJournal extends TestCase {
         super(arg0);
     }
 
+    /**
+     * Verify normal operation and basic assumptions when creating a new journal
+     * using {@link BufferMode#Direct}.
+     * 
+     * @throws IOException
+     */
     public void test_create_direct01() throws IOException {
 
         final Properties properties = new Properties();
@@ -282,13 +294,17 @@ public class TestJournal extends TestCase {
 
             assertEquals("slotSize", 128, journal.slotSize);
             assertNotNull("slotMath", journal.slotMath);
-            assertEquals("file", filename, journal.file.toString());
+            
+            DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
+            
+            assertEquals("file", filename, bufferStrategy.file.toString());
             assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
-                    journal.initialExtent);
-            assertNotNull("raf", journal.raf);
-            assertEquals("bufferMode", BufferMode.Direct, journal.bufferMode);
-            assertNotNull("directBuffer", journal.directBuffer);
-            assertEquals("", journal.initialExtent, journal.directBuffer
+                    bufferStrategy.getExtent());
+            assertNotNull("raf", bufferStrategy.raf);
+            assertEquals("bufferMode", BufferMode.Direct, journal.getBufferMode());
+            assertEquals("bufferMode", BufferMode.Direct, bufferStrategy.getBufferMode());
+            assertNotNull("directBuffer", bufferStrategy.directBuffer);
+            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
                     .capacity());
 
         } finally {
@@ -807,7 +823,14 @@ public class TestJournal extends TestCase {
      * @todo Verify that the slots are released once there is no active
      *       transaction that could read the deleted version (testing this is
      *       complex - it is really a concurrency control test).
+     * 
+     * @todo Verify that the deleted firstSlot is computed correctly. Since zero
+     *       is a valid slot index, we can not just use -firstSlot to indicate a
+     *       deleted object in the object index. Instead we have to offset the
+     *       slot by -1 so that it is always a negative integer when the
+     *       original value was a non-negative integer.
      */
+    
     public void test_delete001() throws IOException {
 
         final Properties properties = new Properties();
@@ -837,10 +860,63 @@ public class TestJournal extends TestCase {
             assertEquals("acutal.capacity()",expected.length,actual.capacity());
             assertEquals(expected,actual);
 
+            // The firstSlot for the version that we are about to delete.
+            final int firstSlot = journal.objectIndex.get(id).intValue();
+            
             journal.delete(tx, id);
 
-            assertNull("Read returns non-null", journal.read(tx, id));
+            // Verify the object is now correctly marked as deleted in the
+            // object index.
+            assertEquals(-(firstSlot+1),journal.objectIndex.get(id).intValue());
+
+            /*
+             * Test read after delete.
+             */
+            try {
+                
+                journal.read(tx, id);
+
+                fail("Expecting " + IllegalArgumentException.class);
+                
+            } catch (IllegalArgumentException ex) {
+                
+                System.err.println("Ignoring expected exception: " + ex);
+                
+            }
+
+            /*
+             * Test delete after delete.
+             */
+            try {
+                
+                journal.delete(tx, id);
+
+                fail("Expecting " + IllegalStateException.class);
+                
+            } catch (IllegalStateException ex) {
+                
+                System.err.println("Ignoring expected exception: " + ex);
+                
+            }
             
+            /*
+             * Deallocate the slots for that object.
+             * 
+             * @todo This is not really a correctness test since we do not
+             * verify the changes to the allocation index -- it only tests for
+             * normal execution.
+             */
+            
+            journal.deallocateSlots(tx, id);
+
+            // Verify the entry in the object index is gone.
+            assertNull(journal.objectIndex.get(id));
+
+            /*
+             * Verify that read now reports "NOTFOUND" (vs DELETED).
+             */
+            assertNull("Read returns non-null", journal.read(tx, id));
+
         } finally {
 
             deleteTestJournalFile(filename);
