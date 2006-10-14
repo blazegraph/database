@@ -3,7 +3,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.journal.Journal.FileMetadata;
 
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write

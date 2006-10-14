@@ -3,7 +3,6 @@ package com.bigdata.journal;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
-import com.bigdata.journal.Journal.FileMetadata;
 
 /**
  * <p>

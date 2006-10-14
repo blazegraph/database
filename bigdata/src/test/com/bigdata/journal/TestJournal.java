@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -55,8 +54,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-
-import junit.framework.TestCase2;
 
 
 /**
@@ -67,16 +64,22 @@ import junit.framework.TestCase2;
  * 
  * FIXME Refactor to use junit-ext and parameterize the test suite for various
  * configurations of the journal, especially the different buffering mechanisms.
- * Reuse the various helper method in place from TestCase2.
+ * Reuse the various helper method in place from TestCase2. We need to handle
+ * (a) isolated tests, which run on a new journal; and possibly (b) tests that
+ * share the same journal.  The GOM test suite is setup like (b), but journal
+ * tests are probably better off like (a) -- fully isolated.
  * 
  * FIXME Work through basic operations for writing and committing a transaction
  * without concurrency support, then modify to add in concurrency.
  * 
  * @todo tests of creating a new journal, including with bad properties.
+ * 
  * @todo tests of opening an existing journal, including with incomplete writes
  *       of a root block.
+
  * @todo tests when the journal is very large (NOT the normal use case for
  *       bigdata).
+ * 
  * @todo tests of the exclusive lock mechanism during startup/shutdown (the
  *       advisory file locking mechanism). This is not used for the
  *       memory-mapped mode, but it is used for both "Direct" and "Disk" modes.
@@ -98,86 +101,10 @@ import junit.framework.TestCase2;
  *       visible).
  */
 
-public class TestJournal extends TestCase2 {
+public class TestJournal extends ProxyTestCase {
 
     Random r = new Random();
-    
-    /**
-     * <p>
-     * Return the name of a journal file to be used for a unit test. The file is
-     * created using the temporary file creation mechanism, but it is then
-     * deleted. Ideally the returned filename is unique for the scope of the
-     * test and will not be reported by the journal as a "pre-existing" file.
-     * </p>
-     * <p>
-     * Note: This method is not advised for performance tests in which the disk
-     * allocation matters since the file is allocated in a directory choosen by
-     * the OS.
-     * </p>
-     * 
-     * @return The unique filename.
-     * 
-     * @throws IOException
-     */
-    
-    String getTestJournalFile() throws IOException {
-
-        File tmp = File.createTempFile("test-"+getName()+"-", ".jnl");
         
-        if( ! tmp.delete() ) {
-            
-            throw new RuntimeException("Unable to remove empty test file: "
-                    + tmp);
-            
-        }
-        
-        return tmp.toString();
-        
-    }
-
-    /**
-     * Delete the test file.
-     */
-    void deleteTestJournalFile(String filename) {
-        try {
-            if (!new File(filename).delete()) {
-                System.err.println("Warning: could not delete: " + filename);
-            }
-        } catch (Throwable t) {
-            System.err.println("Warning: " + t);
-        }
-    }
-
-    /**
-     * Helper method verifies that the contents of <i>actual</i> from
-     * position() to limit() are consistent with the expected byte[]. A
-     * read-only view of <i>actual</i> is used to avoid side effects on the
-     * position, mark or limit properties of the buffer.
-     * 
-     * @param expected Non-null byte[].
-     * @param actual Buffer.
-     */
-    public void assertEquals(byte[] expected, ByteBuffer actual ) {
-
-        if( expected == null ) throw new IllegalArgumentException();
-        
-        if( actual == null ) fail("actual is null");
-        
-        /* Create a read-only view on the buffer so that we do not mess with
-         * its position, mark, or limit.
-         */
-        actual = actual.asReadOnlyBuffer();
-        
-        int len = actual.capacity();
-        
-        byte[] actual2 = new byte[len];
-        
-        actual.get(actual2);
-
-        assertEquals(expected,actual2);
-        
-    }
-    
     /**
      * 
      */
@@ -190,153 +117,6 @@ public class TestJournal extends TestCase2 {
     public TestJournal(String arg0) {
         super(arg0);
     }
-
-    /**
-     * Verify normal operation and basic assumptions when creating a new journal
-     * using {@link BufferMode#Transient}.
-     * 
-     * @throws IOException
-     */
-    public void test_create_transient01() throws IOException {
-
-        final Properties properties = new Properties();
-        
-        properties.setProperty("bufferMode",BufferMode.Transient.toString());
-        
-        Journal journal = new Journal(properties);
-
-        assertEquals("slotSize", 128, journal.slotSize);
-        assertNotNull("slotMath", journal.slotMath);
-
-        TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
-
-        assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
-                bufferStrategy.getExtent());
-        assertEquals("bufferMode", BufferMode.Transient, journal.getBufferMode());
-        assertEquals("bufferMode", BufferMode.Transient, bufferStrategy
-                .getBufferMode());
-        assertNotNull("directBuffer", bufferStrategy.directBuffer);
-        assertEquals("", bufferStrategy.getExtent(),
-                bufferStrategy.directBuffer.capacity());
-        
-    }
-        
-    /**
-     * Verify normal operation and basic assumptions when creating a new journal
-     * using {@link BufferMode#Direct}.
-     * 
-     * @throws IOException
-     */
-    public void test_create_direct01() throws IOException {
-
-        final Properties properties = new Properties();
-        
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("bufferMode",BufferMode.Direct.toString());
-
-        properties.setProperty("file",filename);
-
-        try {
-            
-            Journal journal = new Journal(properties);
-
-            assertEquals("slotSize", 128, journal.slotSize);
-            assertNotNull("slotMath", journal.slotMath);
-            
-            DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
-            
-            assertEquals("file", filename, bufferStrategy.file.toString());
-            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Direct, journal.getBufferMode());
-            assertEquals("bufferMode", BufferMode.Direct, bufferStrategy.getBufferMode());
-            assertNotNull("directBuffer", bufferStrategy.directBuffer);
-            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
-                    .capacity());
-
-        } finally {
-            
-            deleteTestJournalFile(filename);
-            
-        }
-        
-    }
-    
-    public void test_create_mapped01() throws IOException {
-
-        final Properties properties = new Properties();
-        
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("bufferMode",BufferMode.Mapped.toString());
-
-        properties.setProperty("file",filename);
-
-        try {
-            
-            Journal journal = new Journal(properties);
-
-            assertEquals("slotSize", 128, journal.slotSize);
-            assertNotNull("slotMath", journal.slotMath);
-            
-            MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
-            
-            assertEquals("file", filename, bufferStrategy.file.toString());
-            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Mapped, journal.getBufferMode());
-            assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
-            assertNotNull("directBuffer", bufferStrategy.directBuffer);
-            assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
-            assertEquals("mappedBuffer",bufferStrategy.directBuffer,bufferStrategy.directBuffer);
-            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
-                    .capacity());
-
-        } finally {
-            
-            deleteTestJournalFile(filename);
-            
-        }
-
-    }
-    
-    public void test_create_disk01() throws IOException {
-        
-        final Properties properties = new Properties();
-        
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("bufferMode",BufferMode.Disk.toString());
-
-        properties.setProperty("file",filename);
-
-        try {
-            
-            Journal journal = new Journal(properties);
-
-            assertEquals("slotSize", 128, journal.slotSize);
-            assertNotNull("slotMath", journal.slotMath);
-            
-            DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
-            
-            assertEquals("file", filename, bufferStrategy.file.toString());
-            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Disk, journal.getBufferMode());
-            assertEquals("bufferMode", BufferMode.Disk, bufferStrategy.getBufferMode());
-
-        } finally {
-            
-            deleteTestJournalFile(filename);
-            
-        }
-
-    }
-
     // FIXME Test re-open of a journal in direct mode.
     public void test_open_direct() throws IOException {
         
@@ -389,7 +169,7 @@ public class TestJournal extends TestCase2 {
 
     public void test_write_underOneSlot01() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -402,7 +182,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, 10);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, 10);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -410,6 +190,8 @@ public class TestJournal extends TestCase2 {
              */
             assertEquals(1,journal.allocationIndex.cardinality());
 
+            journal.close();
+            
         } finally {
 
             deleteTestJournalFile(filename);
@@ -425,7 +207,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_underOneSlot02() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -438,7 +220,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            final long tx = 0;
+            final Tx tx = new Tx(journal,0);
             final long id = 1;
             final int nbytes = 67;
             
@@ -451,6 +233,8 @@ public class TestJournal extends TestCase2 {
              * there is only one object in the journal).
              */
             assertEquals(1,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -471,7 +255,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsOneSlot() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -484,13 +268,15 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(1,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -507,7 +293,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsOneSlotMinus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -520,13 +306,15 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize-1);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize-1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(1,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -543,7 +331,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsOneSlotPlus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -556,13 +344,15 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize+1);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize+1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(2,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -583,7 +373,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsTwoSlots() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -596,13 +386,15 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize * 2);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize * 2);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(2,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -619,7 +411,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsTwoSlotsMinus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -632,7 +424,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0,
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 2) - 1);
 
             /*
@@ -640,6 +432,8 @@ public class TestJournal extends TestCase2 {
              * there is only one object in the journal).
              */
             assertEquals(2,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -656,7 +450,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsTwoSlotsPlus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -669,7 +463,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0,
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 2) + 1);
 
             /*
@@ -677,6 +471,8 @@ public class TestJournal extends TestCase2 {
              * there is only one object in the journal).
              */
             assertEquals(3,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -697,7 +493,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsThreeSlots() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -710,13 +506,15 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0, journal.slotMath.dataSize * 3);
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize * 3);
             
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(3,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -733,7 +531,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsThreeSlotsMinus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -746,7 +544,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0,
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 3) - 1);
             
             /*
@@ -754,6 +552,8 @@ public class TestJournal extends TestCase2 {
              * there is only one object in the journal).
              */
             assertEquals(3,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -770,7 +570,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_fillsThreeSlotsPlus1() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -783,7 +583,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, 0, 0,
+            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 3) + 1);
             
             /*
@@ -791,6 +591,8 @@ public class TestJournal extends TestCase2 {
              * there is only one object in the journal).
              */
             assertEquals(4,journal.allocationIndex.cardinality());
+
+            journal.close();
 
         } finally {
 
@@ -818,7 +620,7 @@ public class TestJournal extends TestCase2 {
      */
     public void test_write_multipleObjectWrites001() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
         
         final String filename = getTestJournalFile();
         
@@ -837,7 +639,7 @@ public class TestJournal extends TestCase2 {
             
             assertEquals("slotSize",128,journal.slotSize);
 
-            long tx = 0;
+            Tx tx = new Tx(journal,0);
             
             int maxSize = journal.slotMath.dataSize * 50;
             
@@ -875,7 +677,9 @@ public class TestJournal extends TestCase2 {
                 assertEquals(expected,actual);
 
             }
-            
+
+            journal.close();
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -905,7 +709,7 @@ public class TestJournal extends TestCase2 {
     
     public void test_delete001() throws IOException {
 
-        final Properties properties = new Properties();
+        final Properties properties = getProperties();
 
         final String filename = getTestJournalFile();
 
@@ -918,7 +722,7 @@ public class TestJournal extends TestCase2 {
 
             assertEquals("slotSize", 128, journal.slotSize);
 
-            long tx = 0;
+            Tx tx = new Tx(journal,0);
             
             long id = 0;
             
@@ -1001,6 +805,8 @@ public class TestJournal extends TestCase2 {
              */
             assertNull("Read returns non-null", journal.read(tx, id));
 
+            journal.close();
+
         } finally {
 
             deleteTestJournalFile(filename);
@@ -1019,7 +825,7 @@ public class TestJournal extends TestCase2 {
      * @param journal
      *            The journal.
      * @param tx
-     *            The transaction identifier.
+     *            The transaction.
      * @param id
      *            The persistent identifier.
      * @param nbytes
@@ -1029,7 +835,7 @@ public class TestJournal extends TestCase2 {
      *         intervening reads.
      */
     
-    protected byte[] doWriteRoundTripTest(Journal journal,long tx, long id, int nbytes) {
+    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, long id, int nbytes) {
 
         System.err.println("Test writing tx="+tx+", id="+id+", nbytes="+nbytes);
         

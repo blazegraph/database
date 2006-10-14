@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-import com.bigdata.journal.Journal.FileMetadata;
 
 /**
  * Abstract base class for implementations that use a direct buffer as a

@@ -94,6 +94,11 @@ public class JournalServer {
     Map<Long,Journal> journals = new HashMap<Long, Journal>();
 
     /**
+     * Active transactions (indexed by the transaction identifier).
+     */
+    Map<Long,Tx> transactions = new HashMap<Long,Tx>();
+    
+    /**
      * 
      * @param segment
      * @param properties
@@ -271,7 +276,17 @@ public class JournalServer {
          */
         public void write(long tx, long id, ByteBuffer data) {
 
-            journal.write(tx,id,data);
+            Tx transaction = transactions.get(tx);
+            
+            if( transaction == null ) {
+                
+                // @todo Send back an error.
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
+            journal.write(transaction,id,data);
             
         }
 
@@ -284,7 +299,17 @@ public class JournalServer {
          */
         public void read(long tx, long id) {
 
-            ByteBuffer data = journal.read(tx, id);
+            Tx transaction = transactions.get(tx);
+            
+            if( transaction == null ) {
+                
+                // @todo Send back an error.
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
+            ByteBuffer data = journal.read(transaction, id);
             
             if( data == null ) {
                 
@@ -302,6 +327,18 @@ public class JournalServer {
         }
 
         public void delete(long tx, long id) {
+
+            Tx transaction = transactions.get(tx);
+            
+            if( transaction == null ) {
+                
+                // @todo Send back an error.
+                
+                throw new UnsupportedOperationException();
+                
+            }
+
+            journal.delete(transaction, id);
 
         }
 

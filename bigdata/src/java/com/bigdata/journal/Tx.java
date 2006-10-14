@@ -145,4 +145,47 @@ public class Tx {
 
     }
     
+    public String toString() {
+        
+        return ""+timestamp;
+        
+    }
+
+    /**
+     * Prepare the transaction for a {@link #commit()}.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction is not active.
+     */
+    public void prepare() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * Commit the transaction.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction has not been
+     *                {@link #prepare() prepared}.
+     */
+    public void commit() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * Abort the transaction.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction is not active.
+     */
+    public void abort() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
 }
