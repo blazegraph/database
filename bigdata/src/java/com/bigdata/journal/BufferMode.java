@@ -61,18 +61,12 @@ public enum BufferMode {
     
     /**
      * <p>
-     * The journal is managed on disk. Disk pages are cached to support
-     * random access patterns. The primary use cases for random access are
-     * reading index or allocation nodes; reading objects to support
-     * state-based validation or application data fetches; reading objects
-     * whose data is being migrated to the database.
-     * </p>
-     * <p>
-     * This option may be used with very large files. Large files are NOT
-     * the normal use case for bigdata. Journal performance for very large
-     * files should be fair on write, but performance does degrade as the
-     * the object and allocation indices grow and the journal is NOT
-     * optimized for random reads (poor locality).
+     * The journal is managed on disk. This option may be used with files of
+     * more than {@link Integer#MAX_VALUE} bytes in extent, but no more than
+     * {@link Integer#MAX_VAlUE} slots. Large files are NOT the normal use case
+     * for bigdata. Journal performance for large files should be fair on write,
+     * but performance will degrade as the the object and allocation indices
+     * grow and the journal is NOT optimized for random reads (poor locality).
      * </p>
      */
     Disk("disk");
@@ -80,10 +74,16 @@ public enum BufferMode {
     private final String name;
     
     BufferMode(String name) {
+
         this.name = name;
+        
     }
     
-    public String toString() { return name; }
+    public String toString() {
+        
+        return name;
+        
+    }
 
     /**
      * Parse a string whose contents must be "transient", "direct", "mapped", or
