@@ -51,8 +51,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -256,6 +254,8 @@ public class Journal {
         return _bufferStrategy;
         
     }
+
+    final IObjectIndex objectIndex = new SimpleObjectIndex();
     
     /**
      * Asserts that the slot index is in the legal range for the journal
@@ -557,6 +557,7 @@ public class Journal {
      * 
      * @return The first slot on which the object was written.
      */
+
     public int write(Tx tx,int id,ByteBuffer data) {
         
         assert( data != null ); // Note: could treat null or zero len as delete
@@ -654,98 +655,17 @@ public class Journal {
         assert nwritten == nslots;
         
         // Update the object index.
-        mapIdToSlot( tx, id, firstSlot);
+        if( tx != null ) {
+            // transactional isolation.
+            tx.objectIndex.mapIdToSlot( id, firstSlot);
+        } else {
+            // no isolation.
+            objectIndex.mapIdToSlot(id, firstSlot);
+        }
 
         return firstSlot;
         
     }
-    
-    /**
-     * Update the object index for the transaction to map id onto slot.
-     * 
-     * @param tx
-     *            The transaction.
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param slot
-     *            The first slot on which the current version of the identified
-     *            data is written within this transaction scope.
-     * 
-     * @todo This needs to use a persistence capable data structure for the
-     *       object index.
-     * 
-     * @todo This needs to isolate changes to the object index within the
-     *       specified transaction.
-     */
-    private void mapIdToSlot( Tx tx, int id, int slot ) {
-        
-        assert slot != -1;
-
-        // Update the object index.
-        Integer oldSlot = objectIndex.put(id, slot);
-        
-        if( oldSlot != null ) {
-            
-            throw new AssertionError("Already mapped to slot=" + oldSlot
-                    + ": tx=" + tx + ", id=" + id + ", slot=" + slot);
-            
-        }
-        
-    }
-    
-    /**
-     * Return the first slot on which the current version of the data is stored.
-     * If the current version of the object for the transaction is stored on the
-     * journal, then this returns the first slot on which that object is
-     * written. Otherwise {@link NOTFOUND} is returned to indicate that the
-     * current version is stored on the database. An exception is thrown if the
-     * persistent identifier has been deleted within the scope visible to the
-     * transaction.
-     * 
-     * @param tx
-     *            The transaction.
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * 
-     * @return The first slot on which the data version is stored or
-     *         {@link #NOTFOUND} if the identifier is not mapped
-     * 
-     * @exception DataDeletedException
-     *                This exception is thrown if the object is logically
-     *                deleted on the journal within the scope visible to the
-     *                transaction. The caller MUST NOT resolve the persistent
-     *                identifier against the database since the current version
-     *                is deleted.
-     * 
-     * @see #NOTFOUND
-     * 
-     * @todo Transactions are not isolated.
-     */
-    int getFirstSlot( Tx tx, int id ) {
-
-        Integer firstSlot = objectIndex.get(id);
-        
-        if( firstSlot == null ) return NOTFOUND;
-        
-        int slot = firstSlot.intValue();
-        
-        if( slot < 0 ) {
-            
-            throw new DataDeletedException(tx,id);
-            
-        }
-        
-        return slot;
-        
-    }
-    
-    /**
-     * Indicates that the current data version for the persistent identifier was
-     * not found in the journal's object index (-1). An application should test
-     * the database when this is returned since the current version MAY exist on
-     * the database.
-     */
-    static final int NOTFOUND = -1;
     
     /**
      * Indicates the last slot in a chain of slots representing a data version
@@ -983,32 +903,6 @@ public class Journal {
     final int slotLimit;
 
     /**
-     * <p>
-     * Map from the int32 within segment persistent identifier to the first slot
-     * on which the identifier was written.
-     * </p>
-     * <p>
-     * Note: A deleted version is internally coded as a negative slot
-     * identifier. The negative value is computed as
-     * </p>
-     * <pre>
-     * negIndex = -(firstSlot + 1)
-     * </pre>
-     * <p>
-     * The actual slot where the deleted version was written is recovered using:
-     * </p> 
-     * <pre>
-     * firstSlot = (-negIndex - 1);
-     * </pre>
-     * 
-     * @todo This map is not persistent.
-     * @todo This map does not differentiate between data written in different
-     *       transactions.
-     * @todo This map does is not isolated within transaction scope.
-     */
-    final Map<Integer,Integer> objectIndex = new HashMap<Integer,Integer>();
-
-    /**
      * Allocation map of free slots in the journal.
      * 
      * @todo This does not differentiate whether a slot was already written in a
@@ -1064,14 +958,29 @@ public class Journal {
      *                deleted within the scope visible to the transaction. The
      *                caller MUST NOT read through to the database if the data
      *                were deleted.
+     * 
+     * @todo Document that tx==null implies NO isolation and modify / partition
+     *       the test suite to handle both unisolated and isolated testing. The
+     *       semantics on read are that you can read anything that was visible
+     *       as of the last committed state (but nothing written in any still
+     *       active transaction) - and unlike a transactionally isolated read,
+     *       each read operation is reads against the then-current last
+     *       committed state.<br>
+     *       The semantics on write is that the object data version is replaced.
+     *       Unless the 'native transaction counter' is positive, a commit will
+     *       take place immediately.<br>
+     *       The semantics on delete are just like on write (delete is just a
+     *       special case of write, even though it generally gets optimized
+     *       quite a bit and triggers various cleaning behaviors).
      */
     public ByteBuffer read(Tx tx, int id, ByteBuffer dst ) {
 
         assertOpen();
 
-        final int firstSlot = getFirstSlot(tx, id);
+        final int firstSlot = (tx == null ? objectIndex.getFirstSlot(id)
+                : tx.objectIndex.getFirstSlot(id));
 
-        if( firstSlot == NOTFOUND ) {
+        if( firstSlot == IObjectIndex.NOTFOUND ) {
             
             return null;
             
@@ -1183,13 +1092,7 @@ public class Journal {
     final SlotHeader _slotHeader = new SlotHeader();
     
     /**
-     * <p>
      * Delete the data from the store.
-     * </p>
-     * <p>
-     * This removes the entry in the object index, making the data no longer
-     * visible in this transaction scope.
-     * </p>
      * 
      * @param tx
      *            The transaction.
@@ -1213,33 +1116,17 @@ public class Journal {
 
         assertOpen();
 
-        // Get the object index entry.
-        Integer firstSlot = objectIndex.get(id);
-
-        if( firstSlot == null ) {
+        if( tx == null ) {
             
-            throw new IllegalArgumentException("Not found: tx="+tx+", id="+id);
+            // No isolation.
+            objectIndex.delete(id);
             
-        }
-
-        // Convert to int.
-        final int firstSlot2 = firstSlot.intValue();
-        
-        if( firstSlot2 < 0 ) {
+        } else {
             
-            /*
-             * A negative slot index is used to mark objects that have been
-             * deleted from the object index but whose slots have not yet been
-             * released.  It is an error to double-delete an object.
-             */
-            
-            throw new IllegalStateException("Already deleted: tx=" + tx
-                    + ", id=" + id);
+            // Transactional isolation.
+            tx.objectIndex.delete(id);
             
         }
-        
-        // Update the index to store the negative slot index.
-        objectIndex.put(id, -(firstSlot+1));
 
     }
     
@@ -1261,34 +1148,10 @@ public class Journal {
      *       deallocated.
      */
     void deallocateSlots(Tx tx, int id) {
-        
-        // Remove the object index entry, recovering its contents. 
-        Integer negIndex = objectIndex.remove(id);
-        
-        if( negIndex == null ) {
 
-            throw new IllegalArgumentException("Not found: tx="+tx+", id="+id);
-            
-        }
-
-        // Convert to int.
-        final int negIndex2 = negIndex.intValue();
-        
-        if( negIndex2 >= 0 ) {
-            
-            /*
-             * A negative slot index is used to mark objects that have been
-             * deleted from the object index but whose slots have not yet been
-             * released.
-             */
-            
-            throw new IllegalStateException("Not deleted: tx=" + tx
-                    + ", id=" + id);
-            
-        }
-        
-        // Convert back to a non-negative slot index.
-        final int firstSlot = (-negIndex - 1);
+        // first slot of the deleted data.
+        final int firstSlot = (tx == null ? objectIndex.removeDeleted(id)
+                : tx.objectIndex.removeDeleted(id));
 
         // read just the header for the first slot in the chain.
         _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );

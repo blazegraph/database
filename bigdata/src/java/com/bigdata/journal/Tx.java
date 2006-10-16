@@ -48,8 +48,6 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * <p>
@@ -94,6 +92,9 @@ import java.util.Map;
  * 
  * @todo Define the commit procotol.
  * 
+ * @todo Is it possible to have more than one transaction PREPARE must
+ *       concurrent PREPARE operations be serialized?
+ * 
  * @todo Define the abort protocol. On abort, the root block is simply not
  *       updated, all current data versions in the transaction scope are marked
  *       as available, and the slots dedicated to the transaction scope object
@@ -127,8 +128,10 @@ public class Tx {
 
     final Journal journal;
     final private long timestamp;
-    final private Map<Integer,Integer> baseObjectIndex;
-    final private Map<Integer,Integer> objectIndex;
+//    final private Map<Integer,Integer> baseObjectIndex;
+//    final private IObjectIndex baseObjectIndex;
+//    final private Map<Integer,Integer> objectIndex;
+    final IObjectIndex objectIndex;
 
     public Tx(Journal journal, long timestamp ) {
         
@@ -143,9 +146,7 @@ public class Tx {
          * resolve objects against the object index for the last committed
          * state at the time that the transaction was created.
          */
-        this.baseObjectIndex = journal.objectIndex;
-        
-        this.objectIndex = new HashMap<Integer,Integer>();
+        this.objectIndex = new SimpleObjectIndex(journal.objectIndex);
 
     }
     

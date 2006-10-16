@@ -64,11 +64,27 @@ import java.util.Random;
  * FIXME Work through basic operations for writing and committing a transaction
  * without concurrency support, then modify to add in concurrency.
  * 
+ * FIXME Modify the tests to look for transactional isolation? Or write
+ * different tests for that. The initial issue is testing transactional
+ * isolation for the object index. I am thinking about _also_ supporting
+ * operations outside of a transaction (for use as an embedded database), in
+ * which case those need to be tested. The tests for transactional isolation
+ * need to verify that write/delete operations in a transaction are NOT visible
+ * outside of that transaction, whether in the "root" scope or in any other
+ * transaction. Beyond that we get into testing with concurrent modifications by
+ * different transactions and proving out the validation and commit logic, as
+ * well as proving that transaction isolation begins as of the last committed
+ * state when the transaction starts and that concurrent commits do NOT bleed
+ * into visibility within uncommitted, still running transactions. We also have
+ * to prove that abort does not leave anything lying around, both that would
+ * break isolation (unlikely) or just junk that lies around unreclaimed on the
+ * slots (or in the index nodes themselves).
+ * 
  * @todo tests of creating a new journal, including with bad properties.
  * 
  * @todo tests of opening an existing journal, including with incomplete writes
  *       of a root block.
-
+ * 
  * @todo tests when the journal is very large (NOT the normal use case for
  *       bigdata).
  * 
@@ -711,13 +727,19 @@ public class TestJournal extends ProxyTestCase {
             assertEquals(expected,actual);
 
             // The firstSlot for the version that we are about to delete.
-            final int firstSlot = journal.getFirstSlot(tx, id);
+            final int firstSlot = tx.objectIndex.getFirstSlot(id);
             
             journal.delete(tx, id);
 
             // Verify the object is now correctly marked as deleted in the
             // object index.
-            assertEquals(-(firstSlot+1),journal.objectIndex.get(id).intValue());
+            try {
+                tx.objectIndex.getFirstSlot(id);
+                fail("Expecting: "+DataDeletedException.class);
+            }
+            catch(DataDeletedException ex) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
 
             // Verify that the #of allocated slots has not changed.
             assertEquals(nallocated,journal.allocationIndex.cardinality());
@@ -762,7 +784,8 @@ public class TestJournal extends ProxyTestCase {
             journal.deallocateSlots(tx, id);
             
             // Verify the entry in the object index is gone.
-            assertNull(journal.objectIndex.get(id));
+            assertEquals("Expecting 'NOTFOUND'", IObjectIndex.NOTFOUND,
+                    tx.objectIndex.getFirstSlot(id));
 
             // Verify that there are no more allocated slots.
             assertEquals("nallocated", 0, journal.allocationIndex.cardinality());
@@ -814,14 +837,12 @@ public class TestJournal extends ProxyTestCase {
         
         ByteBuffer data = ByteBuffer.wrap(expected);
         
-        assertNull(journal.objectIndex.get(id));
+        assertEquals(IObjectIndex.NOTFOUND,tx.objectIndex.getFirstSlot(id));
         
         int firstSlot = journal.write(tx,id,data);
 
-        assertNotNull(journal.objectIndex.get(id));
+        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
         
-        assertEquals(firstSlot,journal.objectIndex.get(id).intValue());
-
         /*
          * Read into a buffer allocated by the Journal.
          */
