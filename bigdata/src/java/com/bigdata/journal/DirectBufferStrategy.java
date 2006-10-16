@@ -5,8 +5,8 @@ import java.nio.ByteBuffer;
 
 
 /**
- * Direct buffer strategy uses a direct {@link ByteBuffer} as a write
- * through cache and writes through to disk for persistence.
+ * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through
+ * cache and writes through to disk for persistence.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

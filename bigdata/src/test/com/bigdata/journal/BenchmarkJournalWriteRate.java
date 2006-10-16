@@ -497,7 +497,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         suite.addTestSuite( BenchmarkTransientJournal.class );
         suite.addTestSuite( BenchmarkDirectJournal.class );
-//        suite.addTestSuite( BenchmarkMappedJournal.class );
+        suite.addTestSuite( BenchmarkMappedJournal.class );
         suite.addTestSuite( BenchmarkDiskJournal.class );
         suite.addTestSuite( BenchmarkSlotBasedOptimium.class );
         suite.addTestSuite( BenchmarkBlockBasedOptimium.class );

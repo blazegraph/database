@@ -159,10 +159,22 @@ import java.util.Properties;
  * not being verified since we are not testing restart and the journal is
  * reading from an in-memory image.
  * 
- * FIXME See {@link BenchmarkJournalWriteRate}.  We can expect a ~5x performance
- * improvement by introducing a page caching layer for the direct and disk-only
- * modes.
- *  
+ * FIXME Migration of data to the read-optimized database means that the current
+ * committed version is on the database. However, subsequent migration of
+ * another version of the same data item can require the re-introduction of a
+ * mapping into the object index IFF there are active transactions that can read
+ * the now historical data version. This suggests that migration probably should
+ * not remove the entry from the object index, but rather flag that the current
+ * version is on the database. That flag can be cleared when the version is
+ * replaced. This also suggests efficient lookup of prior versions is required.
+ * 
+ * FIXME The notion of a committed state needs to be captured by a persistent
+ * structure in the journal until (a) there are no longer any active
+ * transactions that can read from that committed state; and (b) the slots
+ * allocated to that committed state have been released on the journal. Those
+ * commit states need to be locatable on the journal, suggesting a record
+ * written by PREPARE and finalized by COMMIT.
+ * 
  * @todo Do we need to explicitly zero the allocated buffers? Are they already
  *       zeroed? How much do we actually need to write on them before the rest
  *       of the contents do not matter, e.g., just the root blocks?

@@ -15,12 +15,6 @@ import com.bigdata.journal.Journal.SlotHeader;
  * @version $Id$
  * 
  * @see BufferMode#Disk
- * 
- * @todo Consider whether a page caching layer makes any sense. The basic access
- *       patterns are sequential writes with random reads. It probably makes
- *       sense to just let the OS and disk subsystems handle buffering. However,
- *       object index and allocation index nodes SHOULD be cached for this as
- *       well as all other {@link BufferMode}s.
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
