@@ -153,7 +153,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
      * want to perform more than one read from the disk.
      */
     public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
-            SlotHeader slotHeader) {
+            SlotHeader slotHeader, ByteBuffer dst ) {
 
         assert slotHeader != null;
 
@@ -197,12 +197,20 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
         // Copy out the header fields.
         slotHeader.nextSlot = nextSlot;
-        slotHeader.priorSlot = size;
+        slotHeader.priorSlot = -size;
 
         if (!readData) return null;
 
-        // Allocate destination buffer to size.
-        ByteBuffer dst = ByteBuffer.allocate(size);
+        /*
+         * Verify that the destination buffer exists and has sufficient
+         * remaining capacity.
+         */
+        if (dst == null || dst.remaining() < size) {
+
+            // Allocate a destination buffer to size.
+            dst = ByteBuffer.allocate(size);
+
+        }
 
         /*
          * We copy no more than the remaining bytes and no more than the data
@@ -215,25 +223,31 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
         buf.limit(slotHeaderSize + thisCopy);
 
         // Copy data from slot.
+        dst.limit( dst.position() + thisCopy );
         dst.put(buf);
 
         return dst;
 
     }
 
-    public int readNextSlot(int thisSlot, int priorSlot, int slotsRead, ByteBuffer dst) {
+    public int readNextSlot(int thisSlot, int priorSlot, int slotsRead,
+            int remainingToRead, ByteBuffer dst) {
 
         // #of bytes to read from t
         final int thisCopy;
         
         if (dst != null) {
 
-            final int size = dst.capacity();
+//            final int size = dst.capacity();
+//
+//            final int remaining = size - dst.position();
 
-            final int remaining = size - dst.position();
-
+            assert remainingToRead > 0;
+            
             // #of bytes to read from this slot (header + data).
-            thisCopy = slotHeaderSize + (remaining > slotDataSize ? slotDataSize : remaining);
+            thisCopy = slotHeaderSize
+                    + (remainingToRead > slotDataSize ? slotDataSize
+                            : remainingToRead);
 
         } else {
 

@@ -1,7 +1,6 @@
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 import com.bigdata.journal.Journal.SlotHeader;
 
@@ -93,7 +92,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
   }
 
   public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
-          SlotHeader slotHeader) {
+          SlotHeader slotHeader, ByteBuffer dst ) {
 
       assert slotHeader != null;
       
@@ -105,7 +104,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       final int size = -directBuffer.getInt();
       if( size <= 0 ) {
           
-          dumpSlot( firstSlot, true );
+//          dumpSlot( firstSlot, true );
           throw new RuntimeException("Journal is corrupt" + ": firstSlot="
                     + firstSlot + " reports size=" + size);
           
@@ -113,12 +112,20 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
       // Copy out the header fields.
       slotHeader.nextSlot = nextSlot;
-      slotHeader.priorSlot = size;
+      slotHeader.priorSlot = -size;
 
       if( ! readData ) return null;
       
-      // Allocate destination buffer to size.
-      ByteBuffer dst = ByteBuffer.allocate(size);
+      /*
+       * Verify that the destination buffer exists and has sufficient
+       * remaining capacity.
+       */
+      if (dst == null || dst.remaining() < size) {
+
+          // Allocate a destination buffer to size.
+          dst = ByteBuffer.allocate(size);
+
+      }
       
       /*
        * We copy no more than the remaining bytes and no more than the data
@@ -127,17 +134,22 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       
       final int thisCopy = (size > slotDataSize ? slotDataSize : size);
       
-      // Set limit on source for copy.
-      directBuffer.limit(directBuffer.position() + thisCopy);
+      /*
+       * The source should have its position at the start of the slot data.
+       * Now we set the limit on source for copy of that data.
+       */
+      directBuffer.limit( pos + slotHeaderSize + thisCopy);
       
       // Copy data from slot.
+      dst.limit(dst.position() + thisCopy);
       dst.put(directBuffer);
       
       return dst;
 
   }
 
-  public int readNextSlot(int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
+  public int readNextSlot(int thisSlot, int priorSlot, int slotsRead,
+            int remainingToRead, ByteBuffer dst) {
 
       // Position the buffer on the current slot and set limit for copy.
       final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
@@ -149,7 +161,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       final int priorSlot2 = directBuffer.getInt();
       if( priorSlot != priorSlot2 ) {
           
-          dumpSlot( thisSlot, true );
+//          dumpSlot( thisSlot, true );
           throw new RuntimeException("Journal is corrupt"
                   + ": slotsRead=" + slotsRead + ", slot=" + thisSlot
                   + ", expected priorSlot=" + priorSlot
@@ -159,15 +171,20 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
       // Copy data from slot.
       if( dst != null ) {
+
+          assert remainingToRead > 0;
           
-          final int size = dst.capacity();
+//          final int size = dst.capacity();
           
-          final int remaining = size - dst.position();
+//          final int remaining = size - dst.position();
           
           // #of bytes to read from this slot (header + data).
-          final int thisCopy = (remaining > slotDataSize ? slotDataSize : remaining);
+          final int thisCopy = (remainingToRead > slotDataSize ? slotDataSize
+                  : remainingToRead);
 
           directBuffer.limit( pos + slotHeaderSize + thisCopy );
+
+          dst.limit(dst.position() + thisCopy);
 
           dst.put(directBuffer);
           
@@ -177,51 +194,51 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       
   }
 
-  /**
-   * Utility shows the contents of the slot on stderr.
-   * 
-   * @param slot
-   *            The slot.
-   * @param showData
-   *            When true, the data in the slot will also be dumped.
-   * 
-   * @todo Abstract, remove dumpSlot, or make it impl specific (more code
-   * duplication).  There are only two implementations required.  One for
-   * the buffer modes and one for the disk only mode.
-   */
-  void dumpSlot(int slot, boolean showData) {
-      
-      System.err.println("slot="+slot);
-      assertSlot( slot );
-      
-      ByteBuffer view = directBuffer.asReadOnlyBuffer();
-      
-      int pos = SIZE_JOURNAL_HEADER + slotSize * slot;
-
-      view.limit( pos + slotSize );
-
-      view.position( pos );
-
-      int nextSlot = view.getInt();
-      int priorSlot = view.getInt();
-
-      System.err.println("nextSlot="
-              + nextSlot
-              + (nextSlot == -1 ? " (last slot)"
-                      : (nextSlot < 0 ? "(error: negative slotId)"
-                              : "(more slots)")));
-      System.err.println(priorSlot<0?"size="+(-priorSlot):"priorSlot="+priorSlot);
-      
-      if( showData ) {
-      
-          byte[] data = new byte[slotDataSize];
-
-          view.get(data);
-          
-          System.err.println(Arrays.toString(data));
-          
-      }
-      
-  }
+//  /**
+//   * Utility shows the contents of the slot on stderr.
+//   * 
+//   * @param slot
+//   *            The slot.
+//   * @param showData
+//   *            When true, the data in the slot will also be dumped.
+//   * 
+//   * @todo Abstract, remove dumpSlot, or make it impl specific (more code
+//   * duplication).  There are only two implementations required.  One for
+//   * the buffer modes and one for the disk only mode.
+//   */
+//  void dumpSlot(int slot, boolean showData) {
+//      
+//      System.err.println("slot="+slot);
+//      assertSlot( slot );
+//      
+//      ByteBuffer view = directBuffer.asReadOnlyBuffer();
+//      
+//      int pos = SIZE_JOURNAL_HEADER + slotSize * slot;
+//
+//      view.limit( pos + slotSize );
+//
+//      view.position( pos );
+//
+//      int nextSlot = view.getInt();
+//      int priorSlot = view.getInt();
+//
+//      System.err.println("nextSlot="
+//              + nextSlot
+//              + (nextSlot == -1 ? " (last slot)"
+//                      : (nextSlot < 0 ? "(error: negative slotId)"
+//                              : "(more slots)")));
+//      System.err.println(priorSlot<0?"size="+(-priorSlot):"priorSlot="+priorSlot);
+//      
+//      if( showData ) {
+//      
+//          byte[] data = new byte[slotDataSize];
+//
+//          view.get(data);
+//          
+//          System.err.println(Arrays.toString(data));
+//          
+//      }
+//      
+//  }
 
 }

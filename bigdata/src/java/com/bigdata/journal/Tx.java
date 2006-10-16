@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -124,13 +125,16 @@ import java.util.Map;
 
 public class Tx {
 
+    final Journal journal;
     final private long timestamp;
     final private Map<Integer,Integer> baseObjectIndex;
     final private Map<Integer,Integer> objectIndex;
-    
+
     public Tx(Journal journal, long timestamp ) {
         
         if( journal == null ) throw new IllegalArgumentException();
+        
+        this.journal = journal;
         
         this.timestamp = timestamp;
 
@@ -151,6 +155,72 @@ public class Tx {
         
     }
 
+    /**
+     * Read the current version of the data from the store.
+     * 
+     * @param id
+     *            The int32 within-segment persistent identifier.
+     * @param dst
+     *            When non-null and having sufficient bytes remaining, the data
+     *            version will be read into this buffer. If null or if the
+     *            buffer does not have sufficient bytes remaining, then a new
+     *            (non-direct) buffer will be allocated that is right-sized for
+     *            the data version, the data will be read into that buffer, and
+     *            the buffer will be returned to the caller.
+     * 
+     * @return The data. The position will always be zero if a new buffer was
+     *         allocated. Otherwise, the position will be invariant across this
+     *         method. The limit - position will be the #of bytes read into the
+     *         buffer, starting at the position. A <code>null</code> return
+     *         indicates that the object was not found in the journal, in which
+     *         case the application MUST attempt to resolve the object against
+     *         the database (i.e., the object MAY have been migrated onto the
+     *         database and the version logically deleted on the journal).
+     * 
+     * @exception DataDeletedException
+     *                if the current version of the identifier data has been
+     *                deleted within the scope visible to the transaction. The
+     *                caller MUST NOT read through to the database if the data
+     *                were deleted.
+     */
+    public ByteBuffer read( int id, ByteBuffer dst ) {
+        
+        return journal.read( this, id, dst );
+        
+    }
+
+    /**
+     * Write a data version. The data version of the data will not be visible
+     * outside of this transaction until the transaction is committed.
+     * 
+     * @param id
+     *            The int32 within-segment persistent identifier.
+     * @param data
+     *            The data to be written. The bytes from
+     *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
+     *            will be written.
+     */
+    public void write(Tx tx,int id,ByteBuffer data) {
+
+        journal.write( this, id, data );
+    
+    }
+    
+    /**
+     * Delete the data from the store.
+     * 
+     * @param id
+     *            The int32 within-segment persistent identifier.
+     *            
+     * @exception IllegalArgumentException
+     *                if the persistent identifier is bad.
+     */
+    public void delete( int id) {
+
+        journal.delete( this, id );
+        
+    }
+    
     /**
      * Prepare the transaction for a {@link #commit()}.
      * 

@@ -488,8 +488,10 @@ abstract public class AbstractTestCase
      * read-only view of <i>actual</i> is used to avoid side effects on the
      * position, mark or limit properties of the buffer.
      * 
-     * @param expected Non-null byte[].
-     * @param actual Buffer.
+     * @param expected
+     *            Non-null byte[].
+     * @param actual
+     *            Buffer.
      */
     public void assertEquals(byte[] expected, ByteBuffer actual ) {
 
@@ -502,9 +504,9 @@ abstract public class AbstractTestCase
          */
         actual = actual.asReadOnlyBuffer();
         
-        int len = actual.capacity();
+        final int len = actual.remaining();
         
-        byte[] actual2 = new byte[len];
+        final byte[] actual2 = new byte[len];
         
         actual.get(actual2);
 

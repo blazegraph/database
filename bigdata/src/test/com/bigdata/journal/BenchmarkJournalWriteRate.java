@@ -97,11 +97,6 @@ import junit.framework.TestSuite;
  * IO).
  * </p>
  * 
- * FIXME Either introduce an intermediate page caching layer or combine per-slot
- * writes into larger bulk writes in order to achieve performance comparable to
- * a block-oriented technique (factor of ~5x performance improvement for the
- * disk and direct modes).
- * 
  * @todo Monitor the heap, IO, and CPU using this benchmark : profile as well.
  *       Try on linux with top and vmstat and on Windows with "perfmon".
  * 

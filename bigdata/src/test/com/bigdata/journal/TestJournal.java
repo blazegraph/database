@@ -582,7 +582,11 @@ public class TestJournal extends ProxyTestCase {
      * 
      * @todo Evolve this into a stress test.
      * 
-     * @todo Evolve this into a stress test that also verifies restart.
+     * @todo Evolve this into a stress test that also verifies restart. This
+     *       currently does a lot of redundent reads in
+     *       {@link #doWriteRoundTripTest(Journal, Tx, int, int)} that we would
+     *       not want as part of a benchmark, but they are fine for a stress
+     *       test.
      */
     public void test_write_multipleObjectWrites001() throws IOException {
 
@@ -632,11 +636,14 @@ public class TestJournal extends ProxyTestCase {
                 System.err.println("Verifying read: tx=" + tx + ", id=" + id
                         + ", size=" + expected.length);
                 
-                ByteBuffer actual = journal.read(tx, id);
+                // FIXME Also try reading multiple times into a buffer to verify
+                // that the buffer is used and that the contract for its use is
+                // observed.
+                ByteBuffer actual = journal.read(tx, id, null);
                 
                 assertEquals("acutal.position()",0,actual.position());
                 assertEquals("acutal.limit()",expected.length,actual.limit());
-                assertEquals("acutal.capacity()",expected.length,actual.capacity());
+                assertEquals("limit() - position()", expected.length,actual.limit() - actual.position());
                 assertEquals(expected,actual);
 
             }
@@ -696,11 +703,11 @@ public class TestJournal extends ProxyTestCase {
             final int nallocated = journal.allocationIndex.cardinality();
             System.err.println("Allocated "+nallocated+" slots to tx="+tx+", id="+id);
 
-            ByteBuffer actual = journal.read(tx, id);
+            ByteBuffer actual = journal.read(tx, id, null);
 
             assertEquals("acutal.position()",0,actual.position());
             assertEquals("acutal.limit()",expected.length,actual.limit());
-            assertEquals("acutal.capacity()",expected.length,actual.capacity());
+            assertEquals("limit() - position()",expected.length,actual.limit() - actual.position());
             assertEquals(expected,actual);
 
             // The firstSlot for the version that we are about to delete.
@@ -720,7 +727,7 @@ public class TestJournal extends ProxyTestCase {
              */
             try {
                 
-                journal.read(tx, id);
+                journal.read(tx, id, null);
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -765,7 +772,7 @@ public class TestJournal extends ProxyTestCase {
              * caller MUST attempt to resolve the object against the database
              * (not that it will be found there either for this test case).
              */
-            assertNull("Read returns non-null", journal.read(tx, id));
+            assertNull("Read returns non-null", journal.read(tx, id, null));
 
             journal.close();
 
@@ -815,13 +822,49 @@ public class TestJournal extends ProxyTestCase {
         
         assertEquals(firstSlot,journal.objectIndex.get(id).intValue());
 
-        ByteBuffer actual = journal.read(tx, id);
-        
+        /*
+         * Read into a buffer allocated by the Journal.
+         */
+        ByteBuffer actual = journal.read(tx, id, null);
+
         assertEquals("acutal.position()",0,actual.position());
         assertEquals("acutal.limit()",expected.length,actual.limit());
-        assertEquals("acutal.capacity()",expected.length,actual.capacity());
+        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
         assertEquals(expected,actual);
 
+        /*
+         * Read multiple copies into a buffer that we allocate ourselves.
+         */
+        final int ncopies = 7;
+        int pos = 0;
+        actual = ByteBuffer.allocate(expected.length * ncopies);
+        for( int i=0; i<ncopies; i++ ) {
+
+            /*
+             * Setup to read into the next slice of our buffer.
+             */
+//            System.err.println("reading @ i="+i+" of "+ncopies);
+            pos = i * expected.length;
+            actual.limit( actual.capacity() );
+            actual.position( pos );
+            
+            ByteBuffer tmp = journal.read(tx, id, actual);
+            assertTrue("Did not read into the provided buffer", tmp == actual);
+            assertEquals("position()", pos, actual.position() );
+            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
+            assertEquals(expected,actual);
+
+            /*
+             * Attempt to read with insufficient remaining bytes in the buffer
+             * and verify that the data are read into a new buffer.
+             */
+            actual.limit(pos+expected.length-1);
+            tmp = journal.read(tx, id, actual);
+            assertFalse("Read failed to allocate a new buffer", tmp == actual);
+            assertEquals(expected,tmp);
+
+        }
+        
         return expected;
         
     }

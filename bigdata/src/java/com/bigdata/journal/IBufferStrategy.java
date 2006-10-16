@@ -112,6 +112,15 @@ public interface IBufferStrategy {
      *            into that buffer. The buffer is returned to the caller.
      * @param slotHeader
      *            The structure into which the header data will be copied.
+     * @param dst
+     *            When non-null and having sufficient bytes remaining, the data
+     *            version will be read into this buffer beginning with the
+     *            current position. If null or if the buffer does not have
+     *            sufficient bytes remaining, then a new (non-direct) buffer
+     *            will be allocated that is right-sized for the data version,
+     *            the data will be read into that buffer, and the buffer will be
+     *            returned to the caller. (This is ignored unless data is
+     *            actually being read.)
      * 
      * @return A newly allocated buffer containing the data from the first slot
      *         or <code>null</code> iff <i>readData</i> is false. The
@@ -127,7 +136,7 @@ public interface IBufferStrategy {
      */
 
     public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
-            SlotHeader slotHeader);
+            SlotHeader slotHeader, ByteBuffer dst);
     
     /**
      * Read another slot in a chain of slots for some data version.
@@ -138,13 +147,18 @@ public interface IBufferStrategy {
      *            The previous slot read.
      * @param slotsRead
      *            The #of slots read so far in the chain for the data version.
+     * @param remainingToRead
+     *            The #of bytes that remain to be read for this data version.
+     *            (This is ignored unless data is actually being read.)
      * @param dst
      *            When non-null, the data from the slot is appended into this
-     *            buffer starting at the current position.
+     *            buffer starting at the current position. (This is ignored
+     *            unless data is actually being read.)
      * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
      *         was the last slot in the chain.
      */
-    public int readNextSlot(int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst );
+    public int readNextSlot(int thisSlot, int priorSlot, int slotsRead,
+            int remainingToRead, ByteBuffer dst);
 
     /**
      * Write a slot.

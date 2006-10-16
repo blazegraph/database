@@ -6,12 +6,17 @@ import java.nio.channels.FileLock;
 
 /**
  * <p>
- * Memory-mapped journal strategy.
+ * Memory-mapped journal strategy (this mode is NOT recommended).
  * </p>
  * <p>
  * Note: the use of {@link FileLock} with a memory-mapped file is NOT
  * recommended by the JDK as this combination is not permitted on some
  * platforms.
+ * </p>
+ * <p>
+ * Note: Extension and truncation of a mapped file are not possible with the JDK
+ * since there is no way to guarentee that the mapped file will be unmapped in a
+ * timely manner.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -47,6 +52,18 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
 
         // Note: This super class invocation is probably not required.
         super.force(metadata );
+        
+    }
+ 
+    /**
+     * The file channel is closed, but according to
+     * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038 there is no
+     * way to guarentee when the mapped file will be released.
+     */
+    
+    public void close() {
+        
+        super.close();
         
     }
     

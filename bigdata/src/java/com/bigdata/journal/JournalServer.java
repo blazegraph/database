@@ -313,7 +313,13 @@ public class JournalServer {
                 
             }
             
-            ByteBuffer data = journal.read(transaction, id);
+            /*
+             * @todo If we are doing a row scan or any kind of read-ahead then
+             * we can buffer the results into a block and send it back along
+             * with an object map so that the client can slice the individual
+             * rows out of the block.
+             */
+            ByteBuffer data = journal.read(transaction, id, null);
             
             if( data == null ) {
                 

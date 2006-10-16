@@ -145,9 +145,6 @@ public class TestMappedJournal extends AbstractTestCase {
                     .capacity());
             
             journal.close();
-            
-            // FIXME Verify that the mapped file is now released.  This is a bit
-            // tricky.
 
         } finally {
             

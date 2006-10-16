@@ -1030,19 +1030,32 @@ public class Journal {
      * the slots are chained together using their headers. All such slots are
      * read into a buffer, which is then returned to the caller.
      * </p>
+     * <p>
+     * Note: You can use this method to read objects into a block buffer using
+     * this method. When the next object will not fit into the buffer, it is
+     * read anyway and time to handle the full buffer.
+     * </p>
      * 
      * @param tx
      *            The transaction scope for the read request.
      * @param id
      *            The int32 within-segment persistent identifier.
+     * @param dst
+     *            When non-null and having sufficient bytes remaining, the data
+     *            version will be read into this buffer. If null or if the
+     *            buffer does not have sufficient bytes remaining, then a new
+     *            (non-direct) buffer will be allocated that is right-sized for
+     *            the data version, the data will be read into that buffer, and
+     *            the buffer will be returned to the caller.
      * 
-     * @return The data. The position will be zero (0). The limit will be the
-     *         capacity. The buffer will be entirely filled with the read data
-     *         version. A <code>null</code> return indicates that the object
-     *         was not found in the journal, in which case the application MUST
-     *         attempt to resolve the object against the database (i.e., the
-     *         object MAY have been migrated onto the database and the version
-     *         logically deleted on the journal).
+     * @return The data. The position will always be zero if a new buffer was
+     *         allocated. Otherwise, the position will be invariant across this
+     *         method. The limit - position will be the #of bytes read into the
+     *         buffer, starting at the position. A <code>null</code> return
+     *         indicates that the object was not found in the journal, in which
+     *         case the application MUST attempt to resolve the object against
+     *         the database (i.e., the object MAY have been migrated onto the
+     *         database and the version logically deleted on the journal).
      * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
@@ -1051,16 +1064,8 @@ public class Journal {
      *                deleted within the scope visible to the transaction. The
      *                caller MUST NOT read through to the database if the data
      *                were deleted.
-     * 
-     * @todo Perhaps the object index should also store the datum size so that
-     *       we can right size the buffer? However, this this interface is
-     *       single threaded, we can just reuse (or pass in and use if size is
-     *       appropriate) the same buffer over and over and size the buffer to
-     *       the maximum data length that the journal will accept. (Note that
-     *       the API presently makes promises about the meaning of the limit,
-     *       position and capacity of the returned buffer.)
      */
-    public ByteBuffer read(Tx tx, int id) {
+    public ByteBuffer read(Tx tx, int id, ByteBuffer dst ) {
 
         assertOpen();
 
@@ -1072,24 +1077,41 @@ public class Journal {
             
         }
         
-//        if( firstSlot == DELETED ) {
-//
-//            throw new IllegalArgumentException("Deleted: tx="+tx+", id="+id);
-//
-//        }
-        
         // Verify that this slot has been allocated.
         assert( allocationIndex.get(firstSlot) );
 
         /*
-         * Read the first slot, returning a new buffer with the data from that
-         * slot and returning the header information as a side effect.
+         * Read the first slot, returning the buffer into which the data was
+         * written. The header information is returned as a side effect.
          */
-        final ByteBuffer dst = _bufferStrategy.readFirstSlot( firstSlot,
-                true, _slotHeader);
+
+        int startingPosition = (dst == null ? 0 : dst.position());
+        
+        ByteBuffer tmp = _bufferStrategy.readFirstSlot(firstSlot, true,
+                _slotHeader, dst);
+        
+        if( tmp != dst ) {
+            
+            startingPosition = 0;
+            
+            dst = tmp;
+            
+        }
 
         // #of bytes in the data version.
-        final int size = dst.capacity();
+        final int size = - _slotHeader.priorSlot;
+        
+        assert size > 0;
+        
+        // #of bytes read from the first slot.
+        final int nread = (dst.limit() - startingPosition);
+        assert nread > 0;
+
+        // #of bytes that remain to be read (zero if the entire version was read
+        // from the first slot).
+        int remainingToRead = size - nread;
+        
+        assert remainingToRead >= 0;
         
         // The next slot to be read.
         int nextSlot = _slotHeader.nextSlot;
@@ -1110,7 +1132,11 @@ public class Journal {
             assert( allocationIndex.get(thisSlot) );
 
             nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
-                    slotsRead, dst);
+                    slotsRead, remainingToRead, dst);
+
+            remainingToRead = size - (dst.limit() - startingPosition);
+
+            assert remainingToRead >= 0;
 
             priorSlot = thisSlot;
 
@@ -1118,7 +1144,7 @@ public class Journal {
             
         }
 
-        if (dst.limit() != size) {
+        if (dst.limit() - startingPosition != size) {
 
             throw new RuntimeException("Journal is corrupt: tx=" + tx + ", id="
                     + id + ", size=" + size + ", slotsRead=" + slotsRead + ", expected size="
@@ -1126,7 +1152,7 @@ public class Journal {
             
         }
 
-        dst.position(0);
+        dst.position( startingPosition );
         
         return dst;
         
@@ -1178,6 +1204,10 @@ public class Journal {
      *       reuse of slots first allocated within the same transaction. The
      *       slots occupied by the data are immediately marked as "free" in a
      *       global scope.
+     * 
+     * @todo Clean up the exceptions thrown.
+     * 
+     * @todo Simplify access paths to the object index (here, and in read()).
      */
     public void delete(Tx tx, int id) {
 
@@ -1261,7 +1291,7 @@ public class Journal {
         final int firstSlot = (-negIndex - 1);
 
         // read just the header for the first slot in the chain.
-        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader);
+        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
 
         // mark slot as available in the allocation index.
         allocationIndex.clear(firstSlot);
@@ -1277,7 +1307,7 @@ public class Journal {
             final int thisSlot = nextSlot;
             
             nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
-                    slotsRead, null);
+                    slotsRead, 0, null);
             
             priorSlot = thisSlot;
             
