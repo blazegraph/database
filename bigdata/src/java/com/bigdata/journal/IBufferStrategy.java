@@ -65,6 +65,11 @@ public interface IBufferStrategy {
     public int getSlotLimit();
     
     /**
+     * The #of bytes of data that fit in each slot.
+     */
+    public int getSlotDataSize();
+    
+    /**
      * The current size of the journal in bytes.
      */
     public long getExtent();
@@ -99,8 +104,6 @@ public interface IBufferStrategy {
     /**
      * Read the first slot for some data version.
      * 
-     * @param id
-     *            The persistent identifier.
      * @param firstSlot
      *            The first slot for that data version.
      * @param readData
@@ -123,14 +126,12 @@ public interface IBufferStrategy {
      *                if the slot is corrupt.
      */
 
-    public ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+    public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
             SlotHeader slotHeader);
     
     /**
      * Read another slot in a chain of slots for some data version.
      * 
-     * @param id
-     *            The persistent identifier.
      * @param thisSlot
      *            The slot being read.
      * @param priorSlot
@@ -143,7 +144,7 @@ public interface IBufferStrategy {
      * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
      *         was the last slot in the chain.
      */
-    public int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst );
+    public int readNextSlot(int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst );
 
     /**
      * Write a slot.
@@ -155,7 +156,10 @@ public interface IBufferStrategy {
      * @param nextSlot
      *            The value to be written into the nextSlot header field.
      * @param data
-     *            The data to be written on the slot.
+     *            The data to be written on the slot. Bytes are written from the
+     *            current position up to the limit (exclusive). The position is
+     *            updated as a side effect. The post-condition is that the
+     *            position is equal to the pre-condition limit.
      */
     public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data);
 

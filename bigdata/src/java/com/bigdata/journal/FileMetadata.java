@@ -40,6 +40,11 @@ class FileMetadata {
     final long extent;
     
     /**
+     * True iff the file was opened in a read-only mode.
+     */
+    final boolean readOnly;
+    
+    /**
      * Depending on the mode, this will be either a direct buffer, a mapped
      * buffer or [null] if no buffer is being used.
      */
@@ -50,7 +55,26 @@ class FileMetadata {
      */
     final boolean exists;
 
-    FileMetadata(File file, BufferMode bufferMode, long initialExtent)
+    /**
+     * Prepare a journal file for use by an {@link IBufferStrategy}.
+     * 
+     * @param file
+     *            The name of the file to be opened.
+     * @param bufferMode
+     *            The {@link BufferMode}.
+     * @param initialExtent
+     *            The initial extent of the file iff a new file is created.
+     * @param readOnly
+     *            When true, the file is opened in a read-only mode and it is an
+     *            error if the file does not exist.
+     * @param forceWrites
+     *            When true, the file is opened in "rwd" mode and individual IOs
+     *            are forced to disk. This option SHOULD be false since we only
+     *            need to write through to disk on commit, not on each IO.
+     * 
+     * @throws IOException
+     */
+    FileMetadata(File file, BufferMode bufferMode, long initialExtent, boolean readOnly, boolean forceWrites)
             throws IOException {
 
         if (file == null)
@@ -67,27 +91,39 @@ class FileMetadata {
             
         }
         
+        if (readOnly && forceWrites) {
+
+            throw new IllegalArgumentException(
+                    "forceWrites may not be used with readOnly");
+            
+        }
+        
         this.file = file;
         
         this.bufferMode = bufferMode;
 
-        /*
-         * Note: We do not choose the options for writing synchronously to
-         * the underlying storage device since we only need to write through
-         * to disk on commit, not on incremental write.
-         */
+        final String fileMode = "r"+(readOnly?"":"w")+(forceWrites?"d":"");
 
-        final String fileMode = "rw";
-
+        this.readOnly = readOnly;
+        
         exists = file.exists();
 
         if (exists) {
 
-            System.err.println("Opening existing file: " + file);
+            System.err.println("Opening existing file: "
+                    + file.getAbsolutePath());
 
         } else {
 
-            System.err.println("Will create file: " + file);
+            if (readOnly) {
+
+                throw new RuntimeException(
+                        "File does not exist and readOnly was specified: "
+                                + file.getAbsolutePath());
+
+            }
+
+            System.err.println("Will create file: " + file.getAbsolutePath());
 
         }
 
@@ -192,6 +228,8 @@ class FileMetadata {
              * multi-phase commit strategy.
              */
 
+            throw new UnsupportedOperationException("Restart not supported");
+            
         } else {
 
             /*

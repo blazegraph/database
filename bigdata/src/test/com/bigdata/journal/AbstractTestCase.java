@@ -470,7 +470,7 @@ abstract public class AbstractTestCase
             
             if ( file.exists() && ! file.delete()) {
                 
-                System.err.println("Warning: could not delete: " + filename);
+                System.err.println("Warning: could not delete: " + file.getAbsolutePath());
                 
             }
             

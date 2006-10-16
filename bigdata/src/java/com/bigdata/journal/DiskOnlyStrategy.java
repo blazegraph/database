@@ -45,6 +45,22 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
      */
     final int slotLimit;
 
+    /**
+     * The backing channel.
+     */
+    final FileChannel channel;
+
+    /**
+     * <p>
+     * A buffer used to read/write a slot at a time. On read, the slot is read
+     * from disk into this buffer and then the buffer is unpacked. On write, the
+     * header and data for a slot are first written into this buffer and then
+     * the buffer is written in a single operation to disk. This minimizes the
+     * #of IOs that actually read/write through to disk to one per slot.
+     * </p>
+     */
+    final private ByteBuffer buf;
+    
     private boolean open;
 
     /**
@@ -70,6 +86,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
         System.err.println("slotLimit=" + slotLimit);
 
+        this.channel = raf.getChannel();
+        
+        this.buf = ByteBuffer.allocateDirect(slotSize);
+        
         open = true;
 
     }
@@ -133,54 +153,32 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     }
 
-    // @todo vet this method against the RandomAccessFile, FileChannel, and
-    // ReadableChannel APIs
-    public ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+    /**
+     * Note: This always reads the full slot into a temporary buffer since we
+     * (a) do not know a priori how much data is in the slot; and (b) we do not
+     * want to perform more than one read from the disk.
+     */
+    public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
             SlotHeader slotHeader) {
 
         assert slotHeader != null;
 
         try {
 
-            final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) firstSlot;
-            raf.seek(pos);
-
-            int nextSlot = raf.readInt();
-            final int size = -raf.readInt();
-            if (size <= 0) {
-
-                // dumpSlot( firstSlot, true );
-                throw new RuntimeException("Journal is corrupt: id=" + id
-                        + ", firstSlot=" + firstSlot + " reports size=" + size);
-
-            }
-
-            // Copy out the header fields.
-            slotHeader.nextSlot = nextSlot;
-            slotHeader.priorSlot = size;
-
-            if (!readData)
-                return null;
-
-            // Allocate destination buffer to size.
-            ByteBuffer dst = ByteBuffer.allocate(size);
-
             /*
-             * We copy no more than the remaining bytes and no more than the
-             * data available in the slot.
+             * Read the slot from disk into a temporary buffer.
              */
 
-            final int dataSize = slotDataSize;
+            // Position the buffer on the current slot.
+            final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) firstSlot;
 
-            int thisCopy = (size > dataSize ? dataSize : size);
+            buf.clear();
+            
+            // Read the data from the disk.
+            channel.read(buf,pos);
 
-            // Set limit on dst for copy.
-            dst.limit(thisCopy);
-
-            // Copy data from slot.
-            raf.getChannel().read(dst,pos+slotHeaderSize);
-
-            return dst;
+            // Flip to read the data from the temporary buffer.
+            buf.flip();
 
         }
 
@@ -189,49 +187,85 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
             throw new RuntimeException(ex);
 
         }
+
+        /*
+         * Unpack the slot header.
+         */
+        final int nextSlot = buf.getInt();
+        final int size = -buf.getInt();
+        if (size <= 0) {
+            
+            // dumpSlot( firstSlot, true );
+            throw new RuntimeException("Journal is corrupt"
+                    + ": firstSlot=" + firstSlot + " reports size=" + size);
+
+        }
+
+        // Copy out the header fields.
+        slotHeader.nextSlot = nextSlot;
+        slotHeader.priorSlot = size;
+
+        if (!readData) return null;
+
+        // Allocate destination buffer to size.
+        ByteBuffer dst = ByteBuffer.allocate(size);
+
+        /*
+         * We copy no more than the remaining bytes and no more than the data
+         * available in the slot.
+         */
+
+        final int thisCopy = (size > slotDataSize ? slotDataSize : size);
+
+        // Set limit on source for copy.
+        buf.limit(slotHeaderSize + thisCopy);
+
+        // Copy data from slot.
+        dst.put(buf);
+
+        return dst;
 
     }
 
-    // @todo vet this method against the RandomAccessFile, FileChannel, and ReadableChannel APIs
-    public int readNextSlot(long id, int thisSlot, int priorSlot, int slotsRead, ByteBuffer dst) {
+    public int readNextSlot(int thisSlot, int priorSlot, int slotsRead, ByteBuffer dst) {
+
+        // #of bytes to read from t
+        final int thisCopy;
+        
+        if (dst != null) {
+
+            final int size = dst.capacity();
+
+            final int remaining = size - dst.position();
+
+            // #of bytes to read from this slot (header + data).
+            thisCopy = slotHeaderSize + (remaining > slotDataSize ? slotDataSize : remaining);
+
+        } else {
+
+            thisCopy = slotHeaderSize;
+
+        }
 
         try {
 
-            // Position the buffer on the current slot and set limit for copy.
+            /*
+             * Read the slot from disk into a temporary buffer.
+             */
+
+            // Position the buffer on the current slot.
             final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) thisSlot;
-            raf.seek(pos);
 
-            // read the header.
-            final int nextSlot = raf.readInt();
-            final int priorSlot2 = raf.readInt();
-            if (priorSlot != priorSlot2) {
+            buf.clear();
 
-                // dumpSlot( thisSlot, true );
-                throw new RuntimeException("Journal is corrupt:  id=" + id
-                        + ", slotsRead=" + slotsRead + ", slot=" + thisSlot
-                        + ", expected priorSlot=" + priorSlot
-                        + ", actual priorSlot=" + priorSlot2);
+            // #of bytes to read from the disk.
+            buf.limit( thisCopy );
+            
+            // Read the data from the disk.
+            channel.read(buf,pos);
 
-            }
-
-            // Copy data from slot.
-            if (dst != null) {
-
-                final int size = dst.capacity();
-
-                final int remaining = size - dst.position();
-
-                // #of bytes to read from this slot (header + data).
-                final int thisCopy = (remaining > slotDataSize ? slotDataSize
-                        : remaining);
-
-                dst.limit(dst.position() + thisCopy);
-
-                raf.getChannel().read(dst,pos+slotHeaderSize);
-
-            }
-
-            return nextSlot;
+            // Flip to read the data from the temporary buffer.
+            buf.flip();
 
         }
 
@@ -240,26 +274,79 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
             throw new RuntimeException(ex);
 
         }
+
+        // read the header, advancing buf.position().
+        final int nextSlot = buf.getInt();
+        final int priorSlot2 = buf.getInt();
+        if (priorSlot != priorSlot2) {
+
+            // dumpSlot( thisSlot, true );
+            throw new RuntimeException("Journal is corrupt" + ": slotsRead="
+                    + slotsRead + ", slot=" + thisSlot
+                    + ", expected priorSlot=" + priorSlot
+                    + ", actual priorSlot=" + priorSlot2);
+
+        }
+
+        // Copy data from slot.
+        if (dst != null) {
+
+            dst.limit(dst.position() + thisCopy - slotHeaderSize);
+
+            dst.put( buf );
+
+        }
+
+        return nextSlot;
 
     }
 
     public void writeSlot(int thisSlot, int priorSlot, int nextSlot,
             ByteBuffer data) {
 
-        FileChannel channel = raf.getChannel();
+        // #of bytes of data to be written (does not include header).
+        final int remaining = data.remaining();
+
+        /*
+         * Write the header and data onto an intermediate buffer.
+         */
+
+        // Reset the buffer.
+        buf.clear();
+        
+        // Write the slot header.
+        buf.putInt(nextSlot); // nextSlot or -1 iff last
+        buf.putInt(priorSlot); // priorSlot or -size iff first
+
+        // Write the slot data, advances data.position().
+        buf.put(data);
+        
+        // Flip before writing onto the disk.
+        buf.flip();
+
+        /*
+         * Write the intermedite buffer onto the disk.
+         */
 
         try {
 
             // Seek to the current slot.
             final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) thisSlot;
-            raf.seek(pos);
+            
+            final int nwritten = channel.write(buf, pos);
+            
+            assert nwritten == remaining + slotHeaderSize;
+            
+//            raf.seek(pos);
 
-            // Write the slot header.
-            raf.writeInt(nextSlot); // nextSlot or -1 iff last
-            raf.writeInt(priorSlot); // priorSlot or -size iff first
-
-            // Write the slot data, advances data.position().
-            channel.write(data, pos + slotHeaderSize);
+//            // Write the slot header.
+//            raf.writeInt(nextSlot); // nextSlot or -1 iff last
+//            raf.writeInt(priorSlot); // priorSlot or -size iff first
+//
+//            // Write the slot data, advances data.position().
+//            final int nwritten = channel.write(data, pos + slotHeaderSize);
+//            
+//            assert nwritten == remaining;
  
         } catch (IOException ex) {
             

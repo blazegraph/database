@@ -36,6 +36,12 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      */
     final int slotDataSize;
 
+    public int getSlotDataSize() {
+        
+        return slotDataSize;
+        
+    }
+    
     public BufferMode getBufferMode() {return bufferMode;}
 
     AbstractBufferStrategy(BufferMode bufferMode, SlotMath slotMath) {

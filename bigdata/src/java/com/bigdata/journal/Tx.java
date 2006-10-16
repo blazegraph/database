@@ -125,8 +125,8 @@ import java.util.Map;
 public class Tx {
 
     final private long timestamp;
-    final private Map<Long,Integer> baseObjectIndex;
-    final private Map<Long,Integer> objectIndex;
+    final private Map<Integer,Integer> baseObjectIndex;
+    final private Map<Integer,Integer> objectIndex;
     
     public Tx(Journal journal, long timestamp ) {
         
@@ -141,7 +141,7 @@ public class Tx {
          */
         this.baseObjectIndex = journal.objectIndex;
         
-        this.objectIndex = new HashMap<Long,Integer>();
+        this.objectIndex = new HashMap<Integer,Integer>();
 
     }
     

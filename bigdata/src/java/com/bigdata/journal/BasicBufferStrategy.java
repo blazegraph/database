@@ -92,7 +92,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
   }
 
-  public ByteBuffer readFirstSlot(long id, int firstSlot, boolean readData,
+  public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
           SlotHeader slotHeader) {
 
       assert slotHeader != null;
@@ -106,8 +106,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       if( size <= 0 ) {
           
           dumpSlot( firstSlot, true );
-          throw new RuntimeException("Journal is corrupt: id=" + id
-                  + ", firstSlot=" + firstSlot + " reports size=" + size);
+          throw new RuntimeException("Journal is corrupt" + ": firstSlot="
+                    + firstSlot + " reports size=" + size);
           
       }
 
@@ -125,9 +125,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
        * available in the slot.
        */
       
-      final int dataSize = slotDataSize;
-      
-      int thisCopy = (size > dataSize ? dataSize : size);
+      final int thisCopy = (size > slotDataSize ? slotDataSize : size);
       
       // Set limit on source for copy.
       directBuffer.limit(directBuffer.position() + thisCopy);
@@ -139,7 +137,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
   }
 
-  public int readNextSlot(long id,int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
+  public int readNextSlot(int thisSlot,int priorSlot,int slotsRead,ByteBuffer dst ) {
 
       // Position the buffer on the current slot and set limit for copy.
       final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
@@ -152,8 +150,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       if( priorSlot != priorSlot2 ) {
           
           dumpSlot( thisSlot, true );
-          throw new RuntimeException("Journal is corrupt:  id=" + id
-                  + ", slotsRead=" + slotsRead + ", slot=" + thisSlot
+          throw new RuntimeException("Journal is corrupt"
+                  + ": slotsRead=" + slotsRead + ", slot=" + thisSlot
                   + ", expected priorSlot=" + priorSlot
                   + ", actual priorSlot=" + priorSlot2);
 

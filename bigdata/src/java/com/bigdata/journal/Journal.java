@@ -155,25 +155,31 @@ import java.util.Properties;
  * <li> Distributed database protocols.</li>
  * </ol>
  * 
- * FIXME Convert from int64 persistent identifer to int32 persistent identifier.
- * This conversion can probably happen in the client side of the distributed
- * interface, i.e., once the client has the segment server that will handle a
- * given segment, it can strip off the high end of the persisent identifier and
- * deal with int32 identifiers (actually, that depends on how many segments a
- * server handles - if it handles more than one, then the client needs to use
- * int64 identifiers throughout and we convert to int32 in the server). Both
- * {@link Journal} and {@link JournalServer} currently assume int64 identifiers,
- * which is wrong. This change has no effect on the binary form of the journal.
- * The journal and database segments need to know what their segment identifier
- * is so that they can reconstruct the full int64 identifier when required.
+ * FIXME Except for the disk-only and memory-mapped modes, the disk writes are
+ * not being verified since we are not testing restart and the journal is
+ * reading from an in-memory image.
  * 
- * @todo Benchmark write absorption rates for single and concurrent writers and
- *       with and without concurrent readers.
+ * FIXME See {@link BenchmarkJournalWriteRate}.  We can expect a ~5x performance
+ * improvement by introducing a page caching layer for the direct and disk-only
+ * modes.
+ *  
+ * @todo Do we need to explicitly zero the allocated buffers? Are they already
+ *       zeroed? How much do we actually need to write on them before the rest
+ *       of the contents do not matter, e.g., just the root blocks?
  * 
  * @todo Work out protocol for shutdown with the single-threaded journal server.
  * 
- * @todo Implement thread-checking using thread local variables or the ability
- *       to assign the journal to a thread?
+ * @todo Normal transaction operations need to be interleaved with operations to
+ *       migrate committed data to the read-optimized database; with operations
+ *       to logically delete data versions (and their slots) on the journal once
+ *       those version are no longer readable by any active transaction; and
+ *       with operations to compact the journal (extending can occur during
+ *       normal transaction operations). One approach is to implement
+ *       thread-checking using thread local variables or the ability to assign
+ *       the journal to a thread and then hand off the journal to the thread for
+ *       the activity that needs to be run, returning control to the normal
+ *       transaction thread on (or shortly after) interrupt or when the
+ *       operation is finished.
  * 
  * @todo There is a dependency in a distributed database architecture on
  *       transaction begin time. A very long running transaction could force the
@@ -214,7 +220,6 @@ public class Journal {
 
     final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
     
-    final int slotSize;
     final SlotMath slotMath;
     
     /**
@@ -276,9 +281,20 @@ public class Journal {
      *            <dt>bufferMode</dt>
      *            <dd>Either "transient", "direct", "mapped", or "disk". See
      *            {@link BufferMode} for more information about each mode.</dd>
+     *            <dt>forceWrites</dt>
+     *            <dd>When true, the journal file is opened in a mode where
+     *            writes are written through to disk immediately. The use of
+     *            this option is not recommended as it imposes strong
+     *            performance penalties and does NOT provide any additional data
+     *            safety (it is here mainly for performance testing).</dd>
      *            </dl>
      * @throws IOException
      * 
+     * @todo Write tests that verify (a) that read-only mode does not permit
+     *       writes; (b) that read-only mode is not supported for a transient
+     *       buffer (since the buffer does not pre-exist by definition); (c)
+     *       that read-only mode reports an error if the file does not
+     *       pre-exist; and (d) that you can not write on a read-only journal.
      * @todo Caller should start migration thread.
      * @todo Caller should provide network interface and distributed commit
      *       support.
@@ -288,6 +304,8 @@ public class Journal {
         
         int slotSize = 128;
         long initialExtent = DEFAULT_INITIAL_EXTENT;
+        boolean readOnly = false;
+        boolean forceWrites = false;
         String val;
 
         if( properties == null ) throw new IllegalArgumentException();
@@ -322,8 +340,6 @@ public class Journal {
             
         }
 
-        this.slotSize = slotSize;
-
         /*
          * Helper object for slot-based computations. 
          */
@@ -349,7 +365,35 @@ public class Journal {
             }
             
         }
+        
+        /*
+         * "readOnly"
+         */
 
+        val = properties.getProperty("readOnly");
+        
+        if( val != null ) {
+
+            readOnly = Boolean.parseBoolean(val);
+            
+        }
+
+        /*
+         * "forceWrites"
+         */
+
+        val = properties.getProperty("forceWrites");
+        
+        if( val != null ) {
+
+            forceWrites = Boolean.parseBoolean(val);
+            
+        }
+
+        /*
+         * Create the appropriate IBufferStrategy object.
+         */
+        
         switch (bufferMode) {
         
         case Transient: {
@@ -357,6 +401,13 @@ public class Journal {
             /*
              * Setup the buffer strategy.
              */
+            
+            if( readOnly ) {
+            
+                throw new RuntimeException(
+                        "readOnly not supported for transient journals.");
+            
+            }
 
             _bufferStrategy = new TransientBufferStrategy(slotMath,
                     initialExtent);
@@ -384,7 +435,7 @@ public class Journal {
              */
 
             _bufferStrategy = new DirectBufferStrategy(new FileMetadata(file,
-                    BufferMode.Direct, initialExtent), slotMath);
+                    BufferMode.Direct, initialExtent, readOnly, forceWrites), slotMath);
 
             break;
         
@@ -409,7 +460,7 @@ public class Journal {
              */
 
             _bufferStrategy = new MappedBufferStrategy(new FileMetadata(file,
-                    BufferMode.Mapped, initialExtent), slotMath);
+                    BufferMode.Mapped, initialExtent, readOnly, forceWrites), slotMath);
 
             break;
             
@@ -433,7 +484,7 @@ public class Journal {
              */
 
             _bufferStrategy = new DiskOnlyStrategy(new FileMetadata(file,
-                    BufferMode.Disk, initialExtent), slotMath);
+                    BufferMode.Disk, initialExtent, readOnly, forceWrites), slotMath);
 
             break;
         
@@ -484,7 +535,7 @@ public class Journal {
      * @param tx
      *            The transaction.
      * @param id
-     *            The int64 persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * @param data
      *            The data to be written. The bytes from
      *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
@@ -494,7 +545,7 @@ public class Journal {
      * 
      * @return The first slot on which the object was written.
      */
-    public int write(Tx tx,long id,ByteBuffer data) {
+    public int write(Tx tx,int id,ByteBuffer data) {
         
         assert( data != null ); // Note: could treat null or zero len as delete
 
@@ -505,6 +556,10 @@ public class Journal {
 
         // #of bytes to be written.
         int remaining = data.remaining();
+        
+        // Verify that there is some data to be written (nothing really prevents
+        // writing empty records).
+        assert( remaining > 0 );
         
         // Total size of the data in bytes.
         final int nbytes = remaining;
@@ -599,7 +654,7 @@ public class Journal {
      * @param tx
      *            The transaction.
      * @param id
-     *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * @param slot
      *            The first slot on which the current version of the identified
      *            data is written within this transaction scope.
@@ -610,12 +665,19 @@ public class Journal {
      * @todo This needs to isolate changes to the object index within the
      *       specified transaction.
      */
-    void mapIdToSlot( Tx tx, long id, int slot ) {
+    private void mapIdToSlot( Tx tx, int id, int slot ) {
         
         assert slot != -1;
 
         // Update the object index.
-        objectIndex.put(id, slot);
+        Integer oldSlot = objectIndex.put(id, slot);
+        
+        if( oldSlot != null ) {
+            
+            throw new AssertionError("Already mapped to slot=" + oldSlot
+                    + ": tx=" + tx + ", id=" + id + ", slot=" + slot);
+            
+        }
         
     }
     
@@ -623,33 +685,31 @@ public class Journal {
      * Return the first slot on which the current version of the data is stored.
      * If the current version of the object for the transaction is stored on the
      * journal, then this returns the first slot on which that object is
-     * written. If the object is logically deleted on the journal within the
-     * scope visible to the transaction, then {@link DELETED} is returned to
-     * indicate that the caller MUST NOT resolve the object against the database
-     * (since the current version is deleted). Otherwise {@link NOTFOUND} is
-     * returned to indicate that the current version is stored on the database.
+     * written. Otherwise {@link NOTFOUND} is returned to indicate that the
+     * current version is stored on the database. An exception is thrown if the
+     * persistent identifier has been deleted within the scope visible to the
+     * transaction.
      * 
      * @param tx
      *            The transaction.
      * @param id
-     *            The persistent identifier.
-     * @return The slot, -1 if the identifier is not mapped, and -2 if the
-     *         identifier is mapped and has been deleted.
+     *            The int32 within-segment persistent identifier.
+     * 
+     * @return The first slot on which the data version is stored or
+     *         {@link #NOTFOUND} if the identifier is not mapped
+     * 
+     * @exception DataDeletedException
+     *                This exception is thrown if the object is logically
+     *                deleted on the journal within the scope visible to the
+     *                transaction. The caller MUST NOT resolve the persistent
+     *                identifier against the database since the current version
+     *                is deleted.
      * 
      * @see #NOTFOUND
-     * @see #DELETED
      * 
      * @todo Transactions are not isolated.
-     * 
-     * @todo Consider simply throwning a specific exception for the "DELETED"
-     *       case as this indicates an error (a bad reference was provided by
-     *       the application). In contrast, the NOTFOUND condition merely
-     *       indicates that the current version is not on the journal and that
-     *       the application MUST resolve the object against the database (which
-     *       will result either in the current version or a "not found"
-     *       semantics, indicating a bad reference).
      */
-    int getFirstSlot( Tx tx, long id ) {
+    int getFirstSlot( Tx tx, int id ) {
 
         Integer firstSlot = objectIndex.get(id);
         
@@ -657,7 +717,11 @@ public class Journal {
         
         int slot = firstSlot.intValue();
         
-        if( slot < 0 ) return DELETED;
+        if( slot < 0 ) {
+            
+            throw new DataDeletedException(tx,id);
+            
+        }
         
         return slot;
         
@@ -669,16 +733,8 @@ public class Journal {
      * the database when this is returned since the current version MAY exist on
      * the database.
      */
-    public static final int NOTFOUND = -1;
+    static final int NOTFOUND = -1;
     
-    /**
-     * Indicates that the current data version for the persistent identifier has
-     * been deleted. An application MUST NOT attempt to resolve the persistent
-     * identifier against the database since that could result in a read of an
-     * earlier version.
-     */
-    public static final int DELETED = -2;
-
     /**
      * Indicates the last slot in a chain of slots representing a data version
      * (-1).
@@ -916,30 +972,29 @@ public class Journal {
 
     /**
      * <p>
-     * Map from persistent identifier to the first slot on which the identifier
-     * was written.
+     * Map from the int32 within segment persistent identifier to the first slot
+     * on which the identifier was written.
      * </p>
      * <p>
      * Note: A deleted version is internally coded as a negative slot
      * identifier. The negative value is computed as
-     * 
+     * </p>
      * <pre>
      * negIndex = -(firstSlot + 1)
      * </pre>
-     * 
+     * <p>
      * The actual slot where the deleted version was written is recovered using:
-     * 
+     * </p> 
      * <pre>
      * firstSlot = (-negIndex - 1);
      * </pre>
-     * </p>
      * 
      * @todo This map is not persistent.
      * @todo This map does not differentiate between data written in different
      *       transactions.
      * @todo This map does is not isolated within transaction scope.
      */
-    final Map<Long,Integer> objectIndex = new HashMap<Long,Integer>();
+    final Map<Integer,Integer> objectIndex = new HashMap<Integer,Integer>();
 
     /**
      * Allocation map of free slots in the journal.
@@ -967,7 +1022,7 @@ public class Journal {
      * @param tx
      *            The transaction scope for the read request.
      * @param id
-     *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * 
      * @return The data. The position will be zero (0). The limit will be the
      *         capacity. The buffer will be entirely filled with the read data
@@ -979,25 +1034,21 @@ public class Journal {
      * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is bad.
+     * @exception DataDeletedException
+     *                if the current version of the identifier data has been
+     *                deleted within the scope visible to the transaction. The
+     *                caller MUST NOT read through to the database if the data
+     *                were deleted.
      * 
      * @todo Perhaps the object index should also store the datum size so that
      *       we can right size the buffer? However, this this interface is
-     *       single threaded, we can just reuse the same buffer over and over
-     *       and size the buffer to the maximum data length that the journal
-     *       will accept.  (Note that the API presently makes promises about the
-     *       meaning of the limit, position and capacity of the returned buffer.)
-     * 
-     * FIXME Reads that fail on the journal must still be resolved against the
-     * read-write database. However, there is a difference between "not found"
-     * and "deleted". The caller MUST NOT read through to the database if the
-     * data were deleted. This semantic distinction MUST be passed back. Since
-     * DELETED may be a very common outcome, it should not be modeled as a
-     * thrown exception (the overhead is too high) (but NOTFOUND could be
-     * modeled as a thrown exception).
+     *       single threaded, we can just reuse (or pass in and use if size is
+     *       appropriate) the same buffer over and over and size the buffer to
+     *       the maximum data length that the journal will accept. (Note that
+     *       the API presently makes promises about the meaning of the limit,
+     *       position and capacity of the returned buffer.)
      */
-    public ByteBuffer read(Tx tx,long id) {
+    public ByteBuffer read(Tx tx, int id) {
 
         assertOpen();
 
@@ -1009,66 +1060,24 @@ public class Journal {
             
         }
         
-        if( firstSlot == DELETED ) {
-
-            throw new IllegalArgumentException("Deleted: tx="+tx+", id="+id);
-
-        }
+//        if( firstSlot == DELETED ) {
+//
+//            throw new IllegalArgumentException("Deleted: tx="+tx+", id="+id);
+//
+//        }
         
         // Verify that this slot has been allocated.
         assert( allocationIndex.get(firstSlot) );
 
         /*
-         * Position the buffer on the current slot and permit reading of the
-         * header.
-         */
-//        int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
-//        directBuffer.limit( pos + headerSize );
-//        directBuffer.position( pos );
-//        
-//        int nextSlot = directBuffer.getInt();
-//        final int size = -directBuffer.getInt();
-//        if( size <= 0 ) {
-//            
-//            dumpSlot( firstSlot, true );
-//            throw new RuntimeException("Journal is corrupt: tx=" + tx + ", id="
-//                    + id +", slot=" + firstSlot+" reports size="+size );
-//            
-//        }
-//
-//        // Allocate destination buffer to size.
-//        ByteBuffer dst = ByteBuffer.allocate(size);
-//
-//        int remaining = size;
-//        
-//        /*
-//         * We copy no more than the remaining bytes and no more than the data
-//         * available in the slot.
-//         */
-//        int thisCopy = (remaining > dataSize ? dataSize : remaining);
-//        
-//        // Set limit on source for copy.
-//        directBuffer.limit(directBuffer.position() + thisCopy);
-//        
-//        // Copy data from slot.
-//        dst.put(directBuffer);
-//        
-//        remaining -= thisCopy;
-//        
-//        assert( remaining >= 0 );
-
-        /*
          * Read the first slot, returning a new buffer with the data from that
          * slot and returning the header information as a side effect.
          */
-        final ByteBuffer dst = _bufferStrategy.readFirstSlot(id, firstSlot,
+        final ByteBuffer dst = _bufferStrategy.readFirstSlot( firstSlot,
                 true, _slotHeader);
 
         // #of bytes in the data version.
         final int size = dst.capacity();
-        
-//        // #of bytes that still need to be read.
-//        int remaining = size - dst.position();
         
         // The next slot to be read.
         int nextSlot = _slotHeader.nextSlot;
@@ -1088,42 +1097,8 @@ public class Journal {
             // Verify that this slot has been allocated.
             assert( allocationIndex.get(thisSlot) );
 
-            nextSlot = _bufferStrategy.readNextSlot(id, thisSlot, priorSlot,
+            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
                     slotsRead, dst);
-            
-//            // #of bytes to read from this slot (header + data).
-//            int thisCopy = (remaining > dataSize ? dataSize : remaining);
-//
-//            // Verify that this slot has been allocated.
-//            assert( allocationIndex.get(thisSlot) );
-//
-//            // Position the buffer on the current slot and set limit for copy.
-//            int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-//            directBuffer.limit( pos + headerSize + thisCopy );
-//            directBuffer.position( pos );
-//                        
-//            // read the header.
-//            nextSlot = directBuffer.getInt();
-//            int priorSlot2 = directBuffer.getInt();
-//            if( thisSlot != firstSlot && priorSlot != priorSlot2 ) {
-//                
-//                dumpSlot( firstSlot, true );
-//                throw new RuntimeException("Journal is corrupt: tx=" + tx
-//                        + ", id=" + id + ", size=" + size + ", slotsRead="
-//                        + slotsRead + ", slot=" + thisSlot
-//                        + ", expected priorSlot=" + priorSlot
-//                        + ", actual priorSlot=" + priorSlot2);
-//
-//            }
-//
-//            // Copy data from slot.
-//            dst.put(directBuffer);
-//
-//            remaining -= thisCopy;
-//
-//            priorSlot = thisSlot;
-//
-//            assert (remaining >= 0);
 
             priorSlot = thisSlot;
 
@@ -1181,7 +1156,7 @@ public class Journal {
      * @param tx
      *            The transaction.
      * @param id
-     *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
      * @exception IllegalArgumentException
@@ -1192,7 +1167,7 @@ public class Journal {
      *       slots occupied by the data are immediately marked as "free" in a
      *       global scope.
      */
-    public void delete(Tx tx,long id) {
+    public void delete(Tx tx, int id) {
 
         assertOpen();
 
@@ -1234,7 +1209,7 @@ public class Journal {
      * @param tx
      *            The transaction.
      * @param id
-     *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * 
      * @todo This needs to be automatically invoked no earlier than the commit
      *       of this transaction and once there are no active transactions
@@ -1243,7 +1218,7 @@ public class Journal {
      *       array or list of the deallocated slots, or the #of slots that were
      *       deallocated.
      */
-    void deallocateSlots(Tx tx, long id) {
+    void deallocateSlots(Tx tx, int id) {
         
         // Remove the object index entry, recovering its contents. 
         Integer negIndex = objectIndex.remove(id);
@@ -1274,7 +1249,7 @@ public class Journal {
         final int firstSlot = (-negIndex - 1);
 
         // read just the header for the first slot in the chain.
-        _bufferStrategy.readFirstSlot(id, firstSlot, false, _slotHeader);
+        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader);
 
         // mark slot as available in the allocation index.
         allocationIndex.clear(firstSlot);
@@ -1289,7 +1264,7 @@ public class Journal {
 
             final int thisSlot = nextSlot;
             
-            nextSlot = _bufferStrategy.readNextSlot(id, thisSlot, priorSlot,
+            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
                     slotsRead, null);
             
             priorSlot = thisSlot;

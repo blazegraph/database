@@ -49,13 +49,20 @@ public enum BufferMode {
     
     /**
      * <p>
-     * A memory-mapped buffer is allocated for the file image.  Writes are
-     * applied to the buffer.  Reads read from the buffer.  On commit, the
-     * map is forced disk disk.
+     * A memory-mapped buffer is allocated for the file image. Writes are
+     * applied to the buffer. Reads read from the buffer. On commit, the map is
+     * forced disk disk.
      * </p>
      * <p>
      * This option yields control over IO and memory resources to the OS.
-     * </p> 
+     * However, there is currently no way to force release of the mapped memory
+     * per the bug described below. This means (a) that the mapped file might
+     * not be deletable; and (b) that native memory can be exhausted. While
+     * performance is good on at least some benchmarks, it is difficult to
+     * recommend this solution given its downsides.
+     * </p>
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      */
     Mapped("mapped"),
     

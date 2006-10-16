@@ -55,16 +55,18 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-
 /**
  * The network facing interface for a journal file. The journal is used to
  * absorb pre-serialized objects and smaller streams (large streams should be
  * directed to a suitably provisioned read-write database segment, e.g., large
  * pages, large extents, and lots of disk). This means that objects appearing
  * from the network-facing interface of the journal already have an assigned
- * int64 identifier. What the journal does is allocate slots to absorb those
- * objects, update an object index so that they can be recovered. The internal
- * addresses for the journal are slot identifiers.
+ * int64 identifier. This service identifies the target journal based on the
+ * segment component of the identifier. What the journal does is allocate slots
+ * to absorb those objects and update an object index so that they can be
+ * recovered. The journal accepts int32 within segment persistent identifiers.
+ * The internal addresses for the journal are slot identifiers, which are not
+ * visible to the application.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -74,8 +76,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @todo Refactor code from the nio test suites.
  * 
  * @todo Support both row oriented operations on the journal and page oriented
- * operations on the read-optimized database from a single server (and rename
- * this class).
+ *       operations on the read-optimized database from a single server (and
+ *       rename this class).
  * 
  * @todo Support replicated segments, e.g., via chaining or ROWAA.
  */
@@ -268,13 +270,13 @@ public class JournalServer {
          * @param tx
          *            The transaction identifier.
          * @param id
-         *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
          * @param data
          *            The data to be written. The bytes from
          *            {@link ByteBuffer#position()} to
          *            {@link ByteBuffer#limit()} will be written.
          */
-        public void write(long tx, long id, ByteBuffer data) {
+        public void write(long tx, int id, ByteBuffer data) {
 
             Tx transaction = transactions.get(tx);
             
@@ -293,11 +295,13 @@ public class JournalServer {
         /**
          * Read request from the client.
          * 
-         * @param tx The transaction identifier.
+         * @param tx
+         *            The transaction identifier.
          * 
-         * @param id The persistent identifier.
+         * @param id
+         *            The int32 within-segment persistent identifier.
          */
-        public void read(long tx, long id) {
+        public void read(long tx, int id) {
 
             Tx transaction = transactions.get(tx);
             
@@ -326,7 +330,15 @@ public class JournalServer {
 
         }
 
-        public void delete(long tx, long id) {
+        /**
+         * Delete request from client.
+         * 
+         * @param tx
+         *            The transaction identifier.
+         * @param id
+         *            The int32 within-segment persistent identifier.
+         */
+        public void delete(long tx, int id) {
 
             Tx transaction = transactions.get(tx);
             

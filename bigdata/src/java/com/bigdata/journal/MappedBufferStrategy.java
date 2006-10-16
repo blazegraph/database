@@ -17,6 +17,7 @@ import java.nio.channels.FileLock;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
  * @see BufferMode#Mapped
  */
 public class MappedBufferStrategy extends DiskBackedBufferStrategy {

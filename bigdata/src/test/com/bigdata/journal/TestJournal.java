@@ -55,19 +55,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
-
 /**
  * Test suite for {@link Journal} initialization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Refactor to use junit-ext and parameterize the test suite for various
- * configurations of the journal, especially the different buffering mechanisms.
- * Reuse the various helper method in place from TestCase2. We need to handle
- * (a) isolated tests, which run on a new journal; and possibly (b) tests that
- * share the same journal.  The GOM test suite is setup like (b), but journal
- * tests are probably better off like (a) -- fully isolated.
  * 
  * FIXME Work through basic operations for writing and committing a transaction
  * without concurrency support, then modify to add in concurrency.
@@ -180,7 +172,7 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
             
-            assertEquals("slotSize",128,journal.slotSize);
+            assertEquals("slotSize",128,journal.slotMath.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0, 10);
 
@@ -218,10 +210,10 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
             
-            assertEquals("slotSize",128,journal.slotSize);
+            assertEquals("slotSize",128,journal.slotMath.slotSize);
 
             final Tx tx = new Tx(journal,0);
-            final long id = 1;
+            final int id = 1;
             final int nbytes = 67;
             
             assertTrue("dataSize",journal.slotMath.dataSize>nbytes);
@@ -260,13 +252,10 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize);
 
@@ -298,13 +287,10 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize-1);
 
@@ -336,14 +322,11 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
             
-            assertEquals("slotSize",128,journal.slotSize);
-
             doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize+1);
 
             /*
@@ -378,13 +361,10 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize * 2);
 
@@ -416,14 +396,11 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
             
-            assertEquals("slotSize",128,journal.slotSize);
-
             doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 2) - 1);
 
@@ -455,13 +432,10 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 2) + 1);
@@ -498,15 +472,13 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize * 3);
+            doWriteRoundTripTest(journal, new Tx(journal, 0), 0,
+                    journal.slotMath.dataSize * 3);
             
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -536,13 +508,10 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 3) - 1);
@@ -575,14 +544,11 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
             
-            assertEquals("slotSize",128,journal.slotSize);
-
             doWriteRoundTripTest(journal, new Tx(journal,0), 0,
                     (journal.slotMath.dataSize * 3) + 1);
             
@@ -625,25 +591,22 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
         
         properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
 
         // #of objects to write.
         long limit = 1000;
 
         // The data written on the store.
-        Map<Long,byte[]> written = new HashMap<Long, byte[]>();
+        Map<Integer,byte[]> written = new HashMap<Integer, byte[]>();
         
         try {
             
             Journal journal = new Journal(properties);
-            
-            assertEquals("slotSize",128,journal.slotSize);
 
             Tx tx = new Tx(journal,0);
             
             int maxSize = journal.slotMath.dataSize * 50;
             
-            for (long id = 0; id < limit; id++) {
+            for (int id = 0; id < limit; id++) {
 
                 int nbytes = r.nextInt(maxSize)+1; // +1 avoids zero length items.
 
@@ -656,13 +619,13 @@ public class TestJournal extends ProxyTestCase {
              */
             System.err.println("Re-reading data to re-verify writes.");
 
-            Iterator<Map.Entry<Long,byte[]>> itr = written.entrySet().iterator();
+            Iterator<Map.Entry<Integer,byte[]>> itr = written.entrySet().iterator();
             
             while( itr.hasNext() ) {
                 
-                Map.Entry<Long,byte[]> entry = itr.next();
+                Map.Entry<Integer,byte[]> entry = itr.next();
                 
-                long id = entry.getKey();
+                int id = entry.getKey();
                 
                 byte[] expected = entry.getValue();
 
@@ -714,17 +677,14 @@ public class TestJournal extends ProxyTestCase {
         final String filename = getTestJournalFile();
 
         properties.setProperty("file", filename);
-        properties.setProperty("slotSize", "128");
 
         try {
 
             Journal journal = new Journal(properties);
 
-            assertEquals("slotSize", 128, journal.slotSize);
-
             Tx tx = new Tx(journal,0);
             
-            long id = 0;
+            int id = 0;
             
             byte[] expected = doWriteRoundTripTest(journal, tx, id,
                     (journal.slotMath.dataSize * 3) + 1);
@@ -744,7 +704,7 @@ public class TestJournal extends ProxyTestCase {
             assertEquals(expected,actual);
 
             // The firstSlot for the version that we are about to delete.
-            final int firstSlot = journal.objectIndex.get(id).intValue();
+            final int firstSlot = journal.getFirstSlot(tx, id);
             
             journal.delete(tx, id);
 
@@ -762,9 +722,9 @@ public class TestJournal extends ProxyTestCase {
                 
                 journal.read(tx, id);
 
-                fail("Expecting " + IllegalArgumentException.class);
+                fail("Expecting " + DataDeletedException.class);
                 
-            } catch (IllegalArgumentException ex) {
+            } catch (DataDeletedException ex) {
                 
                 System.err.println("Ignoring expected exception: " + ex);
                 
@@ -801,7 +761,9 @@ public class TestJournal extends ProxyTestCase {
             assertEquals("nallocated", 0, journal.allocationIndex.cardinality());
 
             /*
-             * Verify that read now reports "NOTFOUND" (vs DELETED).
+             * Verify that read now reports "not found", indicating that the
+             * caller MUST attempt to resolve the object against the database
+             * (not that it will be found there either for this test case).
              */
             assertNull("Read returns non-null", journal.read(tx, id));
 
@@ -827,7 +789,7 @@ public class TestJournal extends ProxyTestCase {
      * @param tx
      *            The transaction.
      * @param id
-     *            The persistent identifier.
+     *            The int32 within-segment persistent identifier.
      * @param nbytes
      *            The data version length.
      * 
@@ -835,7 +797,7 @@ public class TestJournal extends ProxyTestCase {
      *         intervening reads.
      */
     
-    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, long id, int nbytes) {
+    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, int id, int nbytes) {
 
         System.err.println("Test writing tx="+tx+", id="+id+", nbytes="+nbytes);
         

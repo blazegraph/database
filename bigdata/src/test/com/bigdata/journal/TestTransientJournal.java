@@ -118,11 +118,13 @@ public class TestTransientJournal extends AbstractTestCase {
     public void test_create_transient01() throws IOException {
 
         final Properties properties = getProperties();
-        
+
+        properties.setProperty("slotSize","128");
+
         Journal journal = new Journal(properties);
 
-        assertEquals("slotSize", 128, journal.slotSize);
         assertNotNull("slotMath", journal.slotMath);
+        assertEquals("slotSize", 128, journal.slotMath.slotSize);
 
         TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
 

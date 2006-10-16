@@ -122,13 +122,14 @@ public class TestMappedJournal extends AbstractTestCase {
         final String filename = getTestJournalFile();
 
         properties.setProperty("file",filename);
+        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
 
-            assertEquals("slotSize", 128, journal.slotSize);
             assertNotNull("slotMath", journal.slotMath);
+            assertEquals("slotSize", 128, journal.slotMath.slotSize);
             
             MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
             
@@ -144,6 +145,9 @@ public class TestMappedJournal extends AbstractTestCase {
                     .capacity());
             
             journal.close();
+            
+            // FIXME Verify that the mapped file is now released.  This is a bit
+            // tricky.
 
         } finally {
             

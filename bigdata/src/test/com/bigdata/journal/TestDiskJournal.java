@@ -122,13 +122,14 @@ public class TestDiskJournal extends AbstractTestCase {
         final String filename = getTestJournalFile();
 
         properties.setProperty("file",filename);
+        properties.setProperty("slotSize","128");
 
         try {
             
             Journal journal = new Journal(properties);
 
-            assertEquals("slotSize", 128, journal.slotSize);
             assertNotNull("slotMath", journal.slotMath);
+            assertEquals("slotSize", 128, journal.slotMath.slotSize);
             
             DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
             

@@ -24,26 +24,34 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
     /**
      * Extends the basic behavior to write through to the backing file.
-     * 
-     * @todo This always writes the entire slot, even when only part of the
-     *       slot was written on by the super implementation. This edge case
-     *       only occurs on the last slot of a chain, but it is common
-     *       enough since we expect many objects to fit into a single slot.
      */
     public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data) {
 
+        // #of bytes to be written.
+        final int remaining = data.remaining();
+        
         // Write on the buffer image.
         super.writeSlot(thisSlot,priorSlot,nextSlot,data);
         
         // Position the buffer on the current slot.
         final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
-        directBuffer.limit( pos + slotSize );
+
+        /*
+         * Set limit to write just those bytes that were written on the buffer.
+         * This includes the slot header in addition to the data written onto
+         * the slot.
+         */
+        directBuffer.limit( pos + slotHeaderSize + remaining );
+        
+        // Set position on the buffer.
         directBuffer.position( pos );
 
         try {
 
             // Write on the backing file.
-            raf.getChannel().write(directBuffer,pos);
+            final int nwritten = raf.getChannel().write(directBuffer,pos);
+            
+            assert nwritten == remaining + slotHeaderSize;
             
         }
 
