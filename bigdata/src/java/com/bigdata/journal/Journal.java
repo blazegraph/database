@@ -605,21 +605,23 @@ public class Journal {
          * subsequent write since they do not hold a data version that is
          * visible in any scope.
          * 
-         * FIXME We need to be able to detect an overwrite of a version that was
+         * Note: We need to be able to detect an overwrite of a version that was
          * written in the same scope. This should be a feature of the object
          * index. Basically, if the version is resolved in the outer index, then
-         * it was last written in the same scope. However it is trickier when
-         * running without an inner index (not isolated). In that case I would
-         * have to say that that either we always set this to false _unless_
-         * there are no active transactions, in which case we can merrily wipe
-         * out the old version.
+         * it was last written in the same scope.
          * 
          * Since access to the Journal (and hence to the object indices) is
          * always single threaded, we can just reuse a single per-journal (or
          * per index) data structure to carry back more information about the
          * last match.
+         * 
+         * FIXME When we are running without an inner index (not isolated) this
+         * flag should always be set to false _unless_ there are no active
+         * transactions, in which case we can merrily wipe out the old version
+         * since no one can ever see it.
          */
-        final boolean overwritingVersionWrittenInSameScope = false;
+        final boolean overwritingVersionWrittenInSameScope = (tx == null ? false
+                : tx.objectIndex.hitOnOuterIndex);
         
         // #of bytes of data that fit in a single slot.
         final int dataSize = slotMath.dataSize;

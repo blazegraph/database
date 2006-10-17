@@ -155,7 +155,7 @@ public class Tx {
     
     final Journal journal;
     final private long timestamp;
-    final IObjectIndex objectIndex;
+    final SimpleObjectIndex objectIndex;
 
     public Tx(Journal journal, long timestamp ) {
         

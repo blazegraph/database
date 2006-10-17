@@ -60,6 +60,13 @@ import java.util.Map;
  * 
  * @todo Handle index merging during commit.
  * 
+ * @todo Write a persistence capable version that is efficient for all the
+ *       things that we actually use the object index for. We need benchmarks
+ *       that drive all of those activities (including migration to the
+ *       read-optimized database and deletion of versions that are no longer
+ *       accessible) in order to drive the algorithm, implementation, and
+ *       performance tuning.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -157,30 +164,61 @@ public class SimpleObjectIndex implements IObjectIndex {
      * @param id
      *            The int32 within segment persistent identifier.
      * 
-     * @return The first slot to which that persistent identifier is mapped or
-     *         {@link IObjectIndex#NOTFOUND}.
+     * @return The entry for that persistent identifier or null if no entry was
+     *         found.
+     * 
+     * @see #hitOnOuterIndex()
      */
     private Integer get(int id) {
         
         Integer firstSlot = objectIndex.get(id );
         
-        if( firstSlot == null ) {
-
-            if( baseObjectIndex != null ) {
+        if( firstSlot == null && baseObjectIndex != null ) {
             
-                return baseObjectIndex.getFirstSlot(id);
-                
-            } else {
-                
-                return NOTFOUND;
-                
-            }
+            firstSlot = baseObjectIndex.objectIndex.get(id);
+        
+            hitOnOuterIndex = false;
             
         } else {
-        
-            return firstSlot;
+            
+            hitOnOuterIndex = true;
             
         }
+        
+        return firstSlot;
+        
+    }
+    
+    /**
+     * This field is set by {@link #getFirstSlot(int)} and MAY be reset by any
+     * susequent method invoked against this object index. The field will be
+     * true iff there was a hit on the object index and the hit occurred on the
+     * outer layer - that is, the layer to which the request was directed. When
+     * true, this bit may be interpreted as indicating that a version to be
+     * overwritten was written within the transaction scope IFF this object
+     * index is providing transactional isolation (vs the journal's native level
+     * object index). In this situation the slots allocated to the version that
+     * is being overwritten SHOULD be immediately released on the journal since
+     * it is impossible for any transaction to read the version stored on those
+     * slots.
+     */
+    boolean hitOnOuterIndex = false;
+    
+    public int getFirstSlot( int id ) {
+
+        Integer firstSlot = get(id);
+        
+        if( firstSlot == null ) return NOTFOUND;
+        
+        int slot = firstSlot.intValue();
+        
+        if( slot < 0 ) {
+            
+            throw new DataDeletedException(id);
+            
+        }
+        
+        return slot;
         
     }
     
@@ -234,24 +272,6 @@ public class SimpleObjectIndex implements IObjectIndex {
         
     }
 
-    public int getFirstSlot( int id ) {
-
-        Integer firstSlot = get(id);
-        
-        int slot = firstSlot.intValue();
-        
-        if( slot == NOTFOUND ) return NOTFOUND;
-        
-        if( slot < 0 ) {
-            
-            throw new DataDeletedException(id);
-            
-        }
-        
-        return slot;
-        
-    }
-    
     public int delete(int id) {
 
         // Get the object index entry.
