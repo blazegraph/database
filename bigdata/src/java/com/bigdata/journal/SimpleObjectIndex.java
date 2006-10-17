@@ -51,10 +51,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * FIXME This is a prototype implementation in order to proof out the concept
- * for transactional isolation. This implementation NOT persistence capable;
- * does NOT (yet) read through to a read-only delegate; does NOT handle index
- * merging during commit; etc.
+ * This is a prototype implementation in order to proof out the concept for
+ * transactional isolation. This implementation NOT persistence capable.
+ * 
+ * @todo Write lots of tests -- we will reuse those for the persistence capable
+ *       object index implementation.
+ * 
+ * @todo Handle index merging during commit.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -82,23 +85,74 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     final Map<Integer,Integer> objectIndex = new HashMap<Integer,Integer>();
 
+    /**
+     * When non-null, this is the base (or inner) object index that represents
+     * the committed object index state as of the time that a transaction began.
+     */
     final IObjectIndex baseObjectIndex;
     
+    /**
+     * Constructor used for the base object index (outside of any transactional
+     * scope).
+     */
     public SimpleObjectIndex() {
 
         this.baseObjectIndex = null;
         
     }
-    
+
+    /**
+     * Constructor used to isolate a transaction by a read-only read-through
+     * view of some committed object index state.
+     * 
+     * @param baseObjectIndex
+     *            When non-null, misses on the primary object index MUST read
+     *            through. Writes are ONLY performed on the primary object
+     *            index. The base object index is always read-only.
+     */
     public SimpleObjectIndex(IObjectIndex baseObjectIndex) {
 
         this.baseObjectIndex = baseObjectIndex;
         
     }
+
+    /**
+     * Read an entry from the object index. If there is a miss on the outer
+     * index and an inner index is defined then try a read on the inner index.
+     * 
+     * @param id
+     *            The int32 within segment persistent identifier.
+     * 
+     * @return The first slot to which that persistent identifier is mapped or
+     *         {@link IObjectIndex#NOTFOUND}.
+     */
+    private Integer get(int id) {
         
+        Integer firstSlot = objectIndex.get(id );
+        
+        if( firstSlot == null ) {
+
+            if( baseObjectIndex != null ) {
+            
+                return baseObjectIndex.getFirstSlot(id);
+                
+            } else {
+                
+                return NOTFOUND;
+                
+            }
+            
+        } else {
+        
+            return firstSlot;
+            
+        }
+        
+    }
+    
     public void mapIdToSlot( int id, int slot ) {
         
-        assert slot != -1;
+        assert slot >= 0;
 
         // Update the object index.
         Integer oldSlot = objectIndex.put(id, slot);
@@ -114,11 +168,11 @@ public class SimpleObjectIndex implements IObjectIndex {
 
     public int getFirstSlot( int id ) {
 
-        Integer firstSlot = objectIndex.get(id);
-        
-        if( firstSlot == null ) return NOTFOUND;
+        Integer firstSlot = get(id);
         
         int slot = firstSlot.intValue();
+        
+        if( slot == NOTFOUND ) return NOTFOUND;
         
         if( slot < 0 ) {
             
@@ -133,7 +187,7 @@ public class SimpleObjectIndex implements IObjectIndex {
     public void delete(int id) {
 
         // Get the object index entry.
-        Integer firstSlot = objectIndex.get(id);
+        Integer firstSlot = get(id);
 
         if( firstSlot == null ) {
             
@@ -156,14 +210,30 @@ public class SimpleObjectIndex implements IObjectIndex {
             
         }
         
-        // Update the index to store the negative slot index.
-        objectIndex.put(id, -(firstSlot+1));
+        /*
+         * Update the index to store the negative slot index. The change is
+         * always applied to the outer index, even if the object was located
+         * using the inner index. E.g., if the object was created in a previous
+         * transaction and is deleted in this transaction, then the object is
+         * resolved against the read-only object index for the historical state
+         * and the deleted flag is set within the transactional scope.
+         */
+        objectIndex.put(id, -(firstSlot2+1));
         
     }
 
     public int removeDeleted(int id) {
     
-        // Remove the object index entry, recovering its contents. 
+        /*
+         * Remove the object index entry, recovering its contents.
+         * 
+         * Note: Unlike all other methods that read on the object index, this
+         * one does NOT read through to the inner index. The reason is that
+         * deleted entries are only written on the outer index. If we read
+         * through to the inner index then we will always find the un-deleted
+         * entry (if there is any entry for the identifier).
+         */ 
+
         Integer negIndex = objectIndex.remove(id);
         
         if( negIndex == null ) {

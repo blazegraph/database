@@ -726,8 +726,8 @@ public class TestJournal extends ProxyTestCase {
             assertEquals("limit() - position()",expected.length,actual.limit() - actual.position());
             assertEquals(expected,actual);
 
-            // The firstSlot for the version that we are about to delete.
-            final int firstSlot = tx.objectIndex.getFirstSlot(id);
+//            // The firstSlot for the version that we are about to delete.
+//            final int firstSlot = tx.objectIndex.getFirstSlot(id);
             
             journal.delete(tx, id);
 

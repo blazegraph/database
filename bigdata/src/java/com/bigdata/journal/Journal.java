@@ -255,6 +255,10 @@ public class Journal {
         
     }
 
+    /**
+     * FIXME This object index is not persistence capable and will NOT survive
+     * restart.
+     */
     final IObjectIndex objectIndex = new SimpleObjectIndex();
     
     /**
@@ -887,8 +891,7 @@ public class Journal {
     /**
      * <p>
      * The next slot that is known to be available. Slot indices begin at 0 and
-     * run up to {@link Integer#MAX_VALUE}. A -1 is used to indicate an invalid
-     * slot index.
+     * run up to {@link Integer#MAX_VALUE}.
      * </p>
      * 
      * @todo This MUST be initialized on startup. The default is valid only for

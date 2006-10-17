@@ -145,10 +145,17 @@ public interface IObjectIndex {
     
     /**
      * Indicates that the current data version for the persistent identifier was
-     * not found in the journal's object index (-1). An application should test
-     * the database when this is returned since the current version MAY exist on
-     * the database.
+     * not found in the journal's object index. An application should test the
+     * database when this is returned since the current version MAY exist on the
+     * database.
+     * 
+     * @todo The value of this constant was changed from -1 to
+     *       {@link Integer#MIN_VALUE} to remove the possibility of confusing a
+     *       deleted slot with a "not found" return.  However, this has implications
+     *       for where the fencepost lies for the maximum #of addressable slots in a
+     *       journal.  If we continue to use negative values to mark deleted entries
+     *       then update those fencepost tests (which need review anyway).
      */
-    public static final int NOTFOUND = -1;
+    public static final int NOTFOUND = Integer.MIN_VALUE;
 
 }
