@@ -90,6 +90,7 @@ public class TestJournalBasics extends TestCase {
         TestSuite suite = new TestSuite("Core Journal Test Suite");
 
         suite.addTestSuite( TestJournal.class );
+        suite.addTestSuite( TestTx.class );
 
 //        suite.addTest( org.CognitiveWeb.generic.core.om.blob.TestAll.suite() );
 

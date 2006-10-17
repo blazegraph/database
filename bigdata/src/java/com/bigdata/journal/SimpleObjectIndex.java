@@ -89,7 +89,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * When non-null, this is the base (or inner) object index that represents
      * the committed object index state as of the time that a transaction began.
      */
-    final IObjectIndex baseObjectIndex;
+    final SimpleObjectIndex baseObjectIndex;
     
     /**
      * Constructor used for the base object index (outside of any transactional
@@ -110,9 +110,19 @@ public class SimpleObjectIndex implements IObjectIndex {
      *            through. Writes are ONLY performed on the primary object
      *            index. The base object index is always read-only.
      */
-    public SimpleObjectIndex(IObjectIndex baseObjectIndex) {
+    public SimpleObjectIndex(SimpleObjectIndex baseObjectIndex) {
 
-        this.baseObjectIndex = baseObjectIndex;
+        /*
+         * Note: This makes a deep copy of the then current object index. This
+         * provides isolation against changes to the object index on the
+         * journal.
+         * 
+         * @todo An efficient implementation MUST NOT make an eager deep copy.
+         */
+
+        this.baseObjectIndex = new SimpleObjectIndex();
+        
+        this.baseObjectIndex.objectIndex.putAll(baseObjectIndex.objectIndex);
         
     }
 
@@ -150,18 +160,33 @@ public class SimpleObjectIndex implements IObjectIndex {
         
     }
     
-    public void mapIdToSlot( int id, int slot ) {
+    public void mapIdToSlot( int id, int slot, boolean overwrite ) {
         
         assert slot >= 0;
 
         // Update the object index.
         Integer oldSlot = objectIndex.put(id, slot);
         
-        if( oldSlot != null ) {
+        if( overwrite ) {
+
+            if( oldSlot == null ) {
+                
+                throw new IllegalStateException(
+                        "Identifier is not mapped: id="
+                        + id + ", slot=" + slot + ", overwrite=" + overwrite);
+                
+            }
             
-            throw new AssertionError("Already mapped to slot=" + oldSlot
-                    + ": id=" + id + ", slot=" + slot);
-            
+        } else {
+        
+            if (oldSlot != null) {
+
+                throw new IllegalStateException(
+                        "Identifier already mapped: id=" + id + ", oldSlot="
+                                + oldSlot + ", newSlot=" + slot);
+
+            }
+
         }
         
     }
@@ -184,7 +209,7 @@ public class SimpleObjectIndex implements IObjectIndex {
         
     }
     
-    public void delete(int id) {
+    public int delete(int id) {
 
         // Get the object index entry.
         Integer firstSlot = get(id);
@@ -206,7 +231,7 @@ public class SimpleObjectIndex implements IObjectIndex {
              * released.  It is an error to double-delete an object.
              */
             
-            throw new IllegalStateException("Already deleted: id=" + id);
+            throw new DataDeletedException(id);
             
         }
         
@@ -219,6 +244,8 @@ public class SimpleObjectIndex implements IObjectIndex {
          * and the deleted flag is set within the transactional scope.
          */
         objectIndex.put(id, -(firstSlot2+1));
+
+        return firstSlot2;
         
     }
 

@@ -77,8 +77,18 @@ public interface IObjectIndex {
      * @param slot
      *            The first slot on which the current version of the identified
      *            data is written within this transaction scope.
+     * @param overwrite
+     *            This parameter MUST be true when the caller has the
+     *            expectation that they are overwriting an existing version.
+     * 
+     * @exception IllegalStateException
+     *                if the identifier is already mapped to a slot and
+     *                overwrite == false.
+     * @exception IllegalStateException
+     *                if the identifier is not mapped to a slot and overwrite ==
+     *                true.
      */
-    public void mapIdToSlot( int id, int slot );
+    public void mapIdToSlot( int id, int slot, boolean overwrite );
     
     /**
      * Return the first slot on which the current version of the data is stored.
@@ -134,14 +144,16 @@ public interface IObjectIndex {
      * 
      * @param id
      *            The int32 within-segment persistent identifier.
-     *            
+     * 
+     * @return The first slot on which the deleted version was written.
+     * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is bad.
+     * @exception DataDeletedException
+     *                if the data is already deleted.
      * 
      */
-    public void delete( int id );
+    public int delete( int id );
     
     /**
      * Indicates that the current data version for the persistent identifier was

@@ -56,29 +56,10 @@ import java.util.Properties;
 import java.util.Random;
 
 /**
- * Test suite for {@link Journal} initialization.
+ * Test suite for basic {@link Journal} operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Work through basic operations for writing and committing a transaction
- * without concurrency support, then modify to add in concurrency.
- * 
- * FIXME Modify the tests to look for transactional isolation? Or write
- * different tests for that. The initial issue is testing transactional
- * isolation for the object index. I am thinking about _also_ supporting
- * operations outside of a transaction (for use as an embedded database), in
- * which case those need to be tested. The tests for transactional isolation
- * need to verify that write/delete operations in a transaction are NOT visible
- * outside of that transaction, whether in the "root" scope or in any other
- * transaction. Beyond that we get into testing with concurrent modifications by
- * different transactions and proving out the validation and commit logic, as
- * well as proving that transaction isolation begins as of the last committed
- * state when the transaction starts and that concurrent commits do NOT bleed
- * into visibility within uncommitted, still running transactions. We also have
- * to prove that abort does not leave anything lying around, both that would
- * break isolation (unlikely) or just junk that lies around unreclaimed on the
- * slots (or in the index nodes themselves).
  * 
  * @todo tests of creating a new journal, including with bad properties.
  * 
@@ -125,6 +106,7 @@ public class TestJournal extends ProxyTestCase {
     public TestJournal(String arg0) {
         super(arg0);
     }
+
     // FIXME Test re-open of a journal in direct mode.
     public void test_open_direct() throws IOException {
         
@@ -145,7 +127,7 @@ public class TestJournal extends ProxyTestCase {
      * 
      * @throws IOException
      * 
-     * @todo Isolate and test this aspect of the API.
+     * FIXME Isolate and test this aspect of the API.
      */
     public void test_releaseSlots001() throws IOException {
        
@@ -585,6 +567,102 @@ public class TestJournal extends ProxyTestCase {
     }
 
     /**
+     * Test writes multiple versions and verifies that the correct version may
+     * be read back at any time. The last written version is then deleted and we
+     * verify that read, write and delete operations all correctly report that
+     * the data is deleted.
+     * 
+     * @throws IOException
+     */
+    public void test_writeMultipleVersions() throws IOException {
+
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            // Two versions of id0.
+            final int id0 = 0;
+            final ByteBuffer expected0v0 = getRandomData(journal);
+            final ByteBuffer expected0v1 = getRandomData(journal);
+            
+            // Three versions of id1.
+            final int id1 = 1;
+            final ByteBuffer expected1v0 = getRandomData(journal);
+            final ByteBuffer expected1v1 = getRandomData(journal);
+            final ByteBuffer expected1v2 = getRandomData(journal);
+            
+            // precondition tests, write id0 version0, postcondition tests.
+            assertNotFound(journal.read(null,id0,null));
+            
+            assertNotFound(journal.read(null,id1,null));
+
+            journal.write(null,id0,expected0v0);
+            
+            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            
+            assertNotFound(journal.read(null,id1,null));
+
+            // write id1 version0, postcondition tests.
+            journal.write(null,id1,expected1v0);
+            
+            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            
+            assertEquals(expected1v0.array(),journal.read(null, id1, null));
+            
+            // write id1 version1, postcondition tests.
+            journal.write(null,id1,expected1v1);
+            
+            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            
+            assertEquals(expected1v1.array(),journal.read(null, id1, null));
+            
+            // write id1 version2, postcondition tests.
+            journal.write(null,id1,expected1v2);
+            
+            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            
+            assertEquals(expected1v2.array(),journal.read(null, id1, null));
+
+            // write id0 version1, postcondition tests.
+            journal.write(null,id0,expected0v1);
+            
+            assertEquals(expected0v1.array(),journal.read(null, id0, null));
+            
+            assertEquals(expected1v2.array(),journal.read(null, id1, null));
+
+            // delete id1, postcondition tests.
+
+            journal.delete(null, id1);
+            
+            assertEquals(expected0v1.array(),journal.read(null, id0, null));
+            
+            assertDeleted(journal, id1);
+
+            // delete id0, postcondition tests.
+
+            journal.delete(null, id0);
+            
+            assertDeleted(journal, id0);
+            
+            assertDeleted(journal, id1);
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
+    /**
      * Test of multiple objects write with interleaved and final read back. Each
      * object fills one or more slots.
      * 
@@ -613,7 +691,7 @@ public class TestJournal extends ProxyTestCase {
         properties.setProperty("file",filename);
 
         // #of objects to write.
-        long limit = 1000;
+        long limit = 100;
 
         // The data written on the store.
         Map<Integer,byte[]> written = new HashMap<Integer, byte[]>();
@@ -726,10 +804,10 @@ public class TestJournal extends ProxyTestCase {
             assertEquals("limit() - position()",expected.length,actual.limit() - actual.position());
             assertEquals(expected,actual);
 
-//            // The firstSlot for the version that we are about to delete.
-//            final int firstSlot = tx.objectIndex.getFirstSlot(id);
+            // The firstSlot for the version that we are about to delete.
+            final int firstSlot = tx.objectIndex.getFirstSlot(id);
             
-            journal.delete(tx, id);
+            assertEquals(firstSlot,journal.delete(tx, id));
 
             // Verify the object is now correctly marked as deleted in the
             // object index.
@@ -747,9 +825,14 @@ public class TestJournal extends ProxyTestCase {
             /*
              * Test read after delete.
              */
+            assertDeleted(tx,id);
+
+            /*
+             * Test delete after delete.
+             */
             try {
                 
-                journal.read(tx, id, null);
+                journal.delete(tx, id);
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -760,15 +843,15 @@ public class TestJournal extends ProxyTestCase {
             }
 
             /*
-             * Test delete after delete.
+             * Test write after delete.
              */
             try {
                 
-                journal.delete(tx, id);
+                journal.write(tx, id, getRandomData(journal));
 
-                fail("Expecting " + IllegalStateException.class);
+                fail("Expecting " + DataDeletedException.class);
                 
-            } catch (IllegalStateException ex) {
+            } catch (DataDeletedException ex) {
                 
                 System.err.println("Ignoring expected exception: " + ex);
                 
@@ -781,7 +864,13 @@ public class TestJournal extends ProxyTestCase {
              * Deallocate the slots for that object.
              */
 
-            journal.deallocateSlots(tx, id);
+            journal.deallocateSlots(tx, firstSlot);
+
+            // clean up the object index since the slots were deallocated (this
+            // is just a wee-bit of a low-level hack).
+            assertEquals(firstSlot, (tx == null ? journal.objectIndex
+                    .removeDeleted(id) : tx.objectIndex.removeDeleted(id)));
+
             
             // Verify the entry in the object index is gone.
             assertEquals("Expecting 'NOTFOUND'", IObjectIndex.NOTFOUND,
@@ -804,6 +893,7 @@ public class TestJournal extends ProxyTestCase {
             deleteTestJournalFile(filename);
 
         }
+
     }
     
     //
@@ -840,7 +930,9 @@ public class TestJournal extends ProxyTestCase {
         assertEquals(IObjectIndex.NOTFOUND,tx.objectIndex.getFirstSlot(id));
         
         int firstSlot = journal.write(tx,id,data);
-
+        assertEquals("limit() != #bytes", expected.length, data.limit());
+        assertEquals("position() != limit()",data.limit(),data.position());
+        
         assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
         
         /*

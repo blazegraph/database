@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.Random;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
@@ -511,6 +512,91 @@ abstract public class AbstractTestCase
         actual.get(actual2);
 
         assertEquals(expected,actual2);
+        
+    }
+
+    /**
+     * A random number generated - the seed is NOT fixed.
+     */
+    protected Random r = new Random();
+
+    /**
+     * Returns random data that will fit in N slots. N is choosen randomly, the
+     * slotSize is assumed to be 128, and then the actual length is choosen
+     * randomly within that slot.
+     * 
+     * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
+     *         random length and having random contents.
+     */
+    ByteBuffer getRandomData(Journal journal) {
+        
+        final int slotDataSize = journal.slotMath.dataSize;
+        
+        // @todo change the distribution shape to make 1 slot very common and give it a modestly long tail, e.g., out to 50 slots.
+        final int nslots = r.nextInt(5)+1;
+        
+        final int nbytes = ((nslots - 1) * slotDataSize)
+                + r.nextInt(slotDataSize) + 1;
+        
+        byte[] bytes = new byte[nbytes];
+        
+        r.nextBytes(bytes);
+        
+        return ByteBuffer.wrap(bytes);
+        
+    }
+    
+
+    /**
+     * Test helper verifies that the journal believes that the data is deleted
+     * by attempting to read the current data version.
+     */
+    public void assertDeleted(Journal journal, int id) {
+
+        try {
+
+            journal.read(null, id, null);
+
+            fail("Expecting " + DataDeletedException.class);
+
+        } catch (DataDeletedException ex) {
+
+            System.err.println("Ignoring expected exception: " + ex);
+
+        }
+        
+    }
+
+    /**
+     * Test helper verifies that the transaction believes that the data is
+     * deleted
+     */
+    public void assertDeleted(Tx tx, int id) {
+
+        try {
+
+            tx.read(id, null);
+
+            fail("Expecting " + DataDeletedException.class);
+
+        } catch (DataDeletedException ex) {
+
+            System.err.println("Ignoring expected exception: " + ex);
+
+        }
+        
+    }
+
+    /**
+     * Test helper checks for the parameter for the semantics of "not found" as
+     * defined by {@link Journal#read(Tx, int, ByteBuffer)} or
+     * {@link Tx#read(int, ByteBuffer)}.
+     * 
+     * @param actual The value returned by either of those methods.
+     */
+    public void assertNotFound(ByteBuffer actual) {
+        
+        assertNull("Expecting 'not found'", actual);
         
     }
 

@@ -13,9 +13,9 @@ public class DataDeletedException extends RuntimeException {
     /**
      * The persistent identifier.
      */
-    public final long id;
+    public final int id;
     
-    public DataDeletedException(long id) {
+    public DataDeletedException(int id) {
        
         super( "Data is deleted: id="+id );
         

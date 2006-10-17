@@ -126,11 +126,35 @@ import java.nio.ByteBuffer;
 
 public class Tx {
 
+    private enum RunState {
+        ACTIVE("active",0,true),
+        PREPARING("preparing",1,false),
+        PREPARED("prepared",1,true),
+        COMMITTING("committing",2,false),
+        COMMITTED("committed",2,true),
+        ABORTING("aborting",2,false),
+        ABORTED("aborted",2,false);
+        private final String name;
+        private final int order;
+        private final boolean stable;
+        RunState(String name,int order,boolean stable) {
+            this.name = name;
+            this.order = order;
+            this.stable = stable;
+        }
+        public String toString() {
+            return name;
+        }
+        public int getOrder() {
+            return order;
+        }
+        public boolean isStable() {
+            return stable;
+        }
+    }
+    
     final Journal journal;
     final private long timestamp;
-//    final private Map<Integer,Integer> baseObjectIndex;
-//    final private IObjectIndex baseObjectIndex;
-//    final private Map<Integer,Integer> objectIndex;
     final IObjectIndex objectIndex;
 
     public Tx(Journal journal, long timestamp ) {
@@ -146,7 +170,8 @@ public class Tx {
          * resolve objects against the object index for the last committed
          * state at the time that the transaction was created.
          */
-        this.objectIndex = new SimpleObjectIndex(journal.objectIndex);
+        this.objectIndex = new SimpleObjectIndex(
+                (SimpleObjectIndex) journal.objectIndex);
 
     }
     
@@ -200,8 +225,11 @@ public class Tx {
      *            The data to be written. The bytes from
      *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
      *            will be written.
+     *            
+     * @exception DataDeletedException
+     *                if the persistent identifier is deleted.
      */
-    public void write(Tx tx,int id,ByteBuffer data) {
+    public void write(int id,ByteBuffer data) {
 
         journal.write( this, id, data );
     
@@ -213,8 +241,8 @@ public class Tx {
      * @param id
      *            The int32 within-segment persistent identifier.
      *            
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is bad.
+     * @exception DataDeletedException
+     *                if the persistent identifier is already deleted.
      */
     public void delete( int id) {
 
@@ -230,6 +258,8 @@ public class Tx {
      */
     public void prepare() {
         
+        validate();
+        
         throw new UnsupportedOperationException();
         
     }
@@ -244,6 +274,30 @@ public class Tx {
     public void commit() {
         
         throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * <p>
+     * Validate changes made within the transaction against the last committed
+     * state of the journal. In general there are two kinds of conflicts:
+     * read-write conflicts and write-write conflicts. Read-write conflicts are
+     * handled by NEVER overwriting an existing version (an MVCC style
+     * strategy). Write-write conflicts are detected by backward validation
+     * against the last committed state of the journal and are resolved by a
+     * variety of data type specific state-based mechanisms. If a write-write
+     * conflict can not be validated, then validation will fail and the
+     * transaction will abort.
+     * </p>
+     * <p>
+     * Validation occurs as part of the prepare/commit protocol. Concurrent
+     * transactions MAY continue to run without limitation. A concurrent commit
+     * (if permitted) would force re-validation since the transaction MUST now
+     * be validated against the new baseline. (It is possible that this
+     * validation could be optimized.)
+     * </p>
+     */
+    void validate() {
         
     }
     
