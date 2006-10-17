@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.Random;
 
 /**
  * Test suite for transaction isolation with respect to the underlying journal.
@@ -59,27 +58,16 @@ import java.util.Random;
  * journal. This basically amounts to verifying that operations read through the
  * transaction scope object index into the journal scope object index.
  * 
- * @todo This suite does not attempt to verify isolation for concurrent
- *       transactions, but that amounts to pretty much the same thing.
- * 
  * @todo Work through tests of the commit logic and verify the post-conditions
  *       for successful commit vs abort of a transaction.
  * 
- * FIXME Modify the tests to look for transactional isolation? Or write
- * different tests for that. The initial issue is testing transactional
- * isolation for the object index. I am thinking about _also_ supporting
- * operations outside of a transaction (for use as an embedded database), in
- * which case those need to be tested. The tests for transactional isolation
- * need to verify that write/delete operations in a transaction are NOT visible
- * outside of that transaction, whether in the "root" scope or in any other
- * transaction. Beyond that we get into testing with concurrent modifications by
- * different transactions and proving out the validation and commit logic, as
- * well as proving that transaction isolation begins as of the last committed
- * state when the transaction starts and that concurrent commits do NOT bleed
- * into visibility within uncommitted, still running transactions. We also have
- * to prove that abort does not leave anything lying around, both that would
- * break isolation (unlikely) or just junk that lies around unreclaimed on the
- * slots (or in the index nodes themselves).
+ * @todo Work through backward validatation, data type specific state based
+ *       conflict resolution, and merging down the object indices onto the
+ *       journal during the commit.
+ * 
+ * @todo Show that abort does not leave anything lying around, both that would
+ *       break isolation (unlikely) or just junk that lies around unreclaimed on
+ *       the slots (or in the index nodes themselves).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -97,10 +85,21 @@ public class TestTx extends ProxyTestCase {
     }
 
     /**
-     * @todo Verify no object outside of tx scope, no object in side of tx scope.
-     * write object inside of tx scope.  verify not visible outside of tx scope.
-     * verify visible inside of tx scope. etc, etc.
+     * Test verifies some aspects of transactional isolation. A transaction
+     * (tx0) is created from a journal with nothing written on it. A data
+     * version is then written onto the journal outside of the transactional
+     * scope and we verify that the version is visible on the journal but not in
+     * tx0. Another transaction (tx1) is created and we version that the written
+     * version is visible. We then update the version on the journal and verify
+     * that they change is NOT visible to either transaction. We then delete the
+     * version on the journal and verify that the change is not visible to
+     * either transaction. A 2nd version is then written in both tx0 and tx1 and
+     * everything is reverified. The version is then deleted on tx1
+     * (reverified). A 3rd version is written on tx0 (reverified). Finally, we
+     * delete the version on tx0 (reverified). At this point the most recent
+     * version has been deleted on the journal and in both transactions.
      */
+
     public void test_isolation001() throws IOException {
         
         final Properties properties = getProperties();
@@ -118,9 +117,9 @@ public class TestTx extends ProxyTestCase {
 
             // Write a random data version for id 0.
             final int id0 = 0;
-            final ByteBuffer expected0v0 = getRandomData(journal);
-            journal.write(null, id0, expected0v0);
-            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            final ByteBuffer expected_id0_v0 = getRandomData(journal);
+            journal.write(null, id0, expected_id0_v0);
+            assertEquals(expected_id0_v0.array(),journal.read(null, id0, null));
 
             /*
              * Verify that the version does NOT show up in a transaction created
@@ -138,18 +137,18 @@ public class TestTx extends ProxyTestCase {
              * Verify that the version shows up in a transaction created after
              * the write.
              */
-            assertEquals(expected0v0.array(),tx1.read(id0, null));
+            assertEquals(expected_id0_v0.array(),tx1.read(id0, null));
 
             /*
              * Update the version outside of the transaction.  This change SHOULD
              * NOT be visible to either transaction.
              */
 
-            final ByteBuffer expected0v1 = getRandomData(journal);
-            journal.write(null, id0, expected0v1);
-            assertEquals(expected0v1.array(),journal.read(null, id0, null));
+            final ByteBuffer expected_id0_v1 = getRandomData(journal);
+            journal.write(null, id0, expected_id0_v1);
+            assertEquals(expected_id0_v1.array(),journal.read(null, id0, null));
             assertNotFound(tx0.read(id0, null));
-            assertEquals(expected0v0.array(),tx1.read(id0, null));
+            assertEquals(expected_id0_v0.array(),tx1.read(id0, null));
 
             /*
              * Delete the version on the journal. This change SHOULD NOT be
@@ -158,13 +157,78 @@ public class TestTx extends ProxyTestCase {
             journal.delete(null, id0);
             assertDeleted(journal, id0);
             assertNotFound(tx0.read(id0, null));
-            assertEquals(expected0v0.array(),tx1.read(id0, null));
+            assertEquals(expected_id0_v0.array(),tx1.read(id0, null));
+
+            /*
+             * Write a version on tx1 and verify that we read that version from
+             * tx1 rather than the version written in the journal scope before
+             * the transaction began. Verify that the written version does not
+             * show up either on the journal or in tx1.
+             */
+            final ByteBuffer expected_tx1_id0_v0 = getRandomData(journal);
+            tx1.write(id0, expected_tx1_id0_v0);
+            assertDeleted(journal, id0);
+            assertNotFound(tx0.read(id0, null));
+            assertEquals(expected_tx1_id0_v0.array(),tx1.read(id0, null));
+
+            /*
+             * Write a version on tx0 and verify that we read that version from
+             * tx0 rather than the version written in the journal scope before
+             * the transaction began. Verify that the written version does not
+             * show up either on the journal or in tx1.
+             */
+            final ByteBuffer expected_tx0_id0_v0 = getRandomData(journal);
+            tx0.write(id0, expected_tx0_id0_v0);
+            assertDeleted(journal, id0);
+            assertEquals(expected_tx0_id0_v0.array(),tx0.read(id0, null));
+            assertEquals(expected_tx1_id0_v0.array(),tx1.read(id0, null));
+
+            /*
+             * Write a 2nd version on tx0 and reverify.
+             */
+            final ByteBuffer expected_tx0_id0_v1 = getRandomData(journal);
+            tx0.write(id0, expected_tx0_id0_v1);
+            assertDeleted(journal, id0);
+            assertEquals(expected_tx0_id0_v1.array(),tx0.read(id0, null));
+            assertEquals(expected_tx1_id0_v0.array(),tx1.read(id0, null));
+
+            /*
+             * Write a 2nd version on tx1 and reverify.
+             */
+            final ByteBuffer expected_tx1_id0_v1 = getRandomData(journal);
+            tx1.write(id0, expected_tx1_id0_v1);
+            assertDeleted(journal, id0);
+            assertEquals(expected_tx0_id0_v1.array(),tx0.read(id0, null));
+            assertEquals(expected_tx1_id0_v1.array(),tx1.read(id0, null));
+
+            /*
+             * Delete the version on tx1 and reverify.
+             */
+            tx1.delete(id0);
+            assertDeleted(journal, id0);
+            assertEquals(expected_tx0_id0_v1.array(),tx0.read(id0, null));
+            assertDeleted(tx1, id0);
+
+            /*
+             * Write a 3rd version on tx0 and reverify.
+             */
+            final ByteBuffer expected_tx0_id0_v2 = getRandomData(journal);
+            tx0.write(id0, expected_tx0_id0_v2);
+            assertDeleted(journal, id0);
+            assertEquals(expected_tx0_id0_v2.array(),tx0.read(id0, null));
+            assertDeleted(tx1, id0);
+            
+            /*
+             * Delete the version on tx0 and reverify.
+             */
+            tx0.delete(id0);
+            assertDeleted(journal, id0);
+            assertDeleted(tx0, id0);
+            assertDeleted(tx1, id0);
 
             /*
              * @todo Since commit processing is not implemented, we can not go a
-             * lot further with this test. (We could write versions on the
-             * different transactions and verify that they were mutually
-             * isolated and that those versions do not show up in the journal.)
+             * lot further with this test.
              */
             
             journal.close();

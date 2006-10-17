@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,7 +84,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * firstSlot = (-negIndex - 1);
      * </pre>
      */
-    final Map<Integer,Integer> objectIndex = new HashMap<Integer,Integer>();
+    final Map<Integer,Integer> objectIndex;
 
     /**
      * When non-null, this is the base (or inner) object index that represents
@@ -97,21 +98,44 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     public SimpleObjectIndex() {
 
+        this.objectIndex = new HashMap<Integer,Integer>();
+
         this.baseObjectIndex = null;
-        
+
     }
 
+    /**
+     * Private constructor creates a read-only (unmodifiable) deep-copy of the
+     * supplied object index state.  This is used to provide a strong guarentee
+     * that object index modifications can not propagate through to the inner
+     * layer using this API.
+     * 
+     * @param objectIndex
+     */
+    private SimpleObjectIndex(Map<Integer,Integer> objectIndex ) {
+
+        Map<Integer,Integer> copy = new HashMap<Integer,Integer>();
+        copy.putAll( objectIndex );
+        
+        this.objectIndex = Collections.unmodifiableMap(copy);
+
+        this.baseObjectIndex = null;
+
+    }
+    
     /**
      * Constructor used to isolate a transaction by a read-only read-through
      * view of some committed object index state.
      * 
      * @param baseObjectIndex
-     *            When non-null, misses on the primary object index MUST read
-     *            through. Writes are ONLY performed on the primary object
-     *            index. The base object index is always read-only.
+     *            Misses on the primary object index read through to this object
+     *            index. Writes are ONLY performed on the primary object index.
+     *            The base object index is always read-only.
      */
     public SimpleObjectIndex(SimpleObjectIndex baseObjectIndex) {
 
+        assert baseObjectIndex != null;
+        
         /*
          * Note: This makes a deep copy of the then current object index. This
          * provides isolation against changes to the object index on the
@@ -120,9 +144,9 @@ public class SimpleObjectIndex implements IObjectIndex {
          * @todo An efficient implementation MUST NOT make an eager deep copy.
          */
 
-        this.baseObjectIndex = new SimpleObjectIndex();
-        
-        this.baseObjectIndex.objectIndex.putAll(baseObjectIndex.objectIndex);
+        this.objectIndex = new HashMap<Integer,Integer>();
+
+        this.baseObjectIndex = new SimpleObjectIndex(baseObjectIndex.objectIndex);
         
     }
 
@@ -166,6 +190,25 @@ public class SimpleObjectIndex implements IObjectIndex {
 
         // Update the object index.
         Integer oldSlot = objectIndex.put(id, slot);
+        
+        /*
+         * Note: everything below here is just to validate our expectation
+         * concerning whether or not we are overwriting an existing version. In
+         * order to find the entry for the overwritten layer (since the object
+         * index map has two layers) we have to read on the inner layer if the
+         * put() on the outer layer does not return a pre-existing entry.
+         * 
+         * Note: I expect that this will all change drammatically when we move
+         * to a persistent and restart safe object index data structure.
+         */
+        
+        if( oldSlot == null && baseObjectIndex != null ) {
+            
+            // read the entry from the inner layer.
+            
+            oldSlot = baseObjectIndex.objectIndex.get(id);
+            
+        }
         
         if( overwrite ) {
 
