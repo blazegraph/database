@@ -13,11 +13,19 @@ import java.nio.ByteBuffer;
  */
 public class TransientBufferStrategy extends BasicBufferStrategy {
     
+    /**
+     * The transient journal does not have a header (no magic, no version, and
+     * no root blocks).
+     * 
+     * FIXME Verify that we can (and want to) operate without root blocks.
+     */
+    static private final int journalHeaderSize = 0;
+    
     private boolean open = false;
     
     TransientBufferStrategy(SlotMath slotMath,long initialExtent) {
         
-        super(BufferMode.Transient, slotMath, ByteBuffer
+        super(journalHeaderSize,BufferMode.Transient, slotMath, ByteBuffer
                 .allocateDirect((int) assertNonDiskExtent(initialExtent)));
     
         open = true;

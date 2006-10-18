@@ -105,6 +105,8 @@ public class TestMappedJournal extends AbstractTestCase {
 
         properties.setProperty("bufferMode", BufferMode.Mapped.toString());
 
+        properties.setProperty("segment", "0");
+
         return properties;
 
     }

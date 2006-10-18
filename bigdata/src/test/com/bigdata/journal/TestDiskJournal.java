@@ -105,6 +105,8 @@ public class TestDiskJournal extends AbstractTestCase {
 
         properties.setProperty("bufferMode", BufferMode.Disk.toString());
 
+        properties.setProperty("segment", "0");
+
         return properties;
 
     }

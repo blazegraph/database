@@ -60,10 +60,22 @@ package com.bigdata.journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo Consider adding a parity flag or something similar that is fast to
+ *       compute and has low storage requirements into the slot header as a
+ *       basic test for corrupt data.  This is sort of like having a checksum
+ *       for a page, but slots are smaller and lighter than pages.
+ * 
  * @see TestSlotMath
  */
 
 public class SlotMath {
+
+    /**
+     * The size of the per-slot header.
+     * 
+     * @see #headerSize
+     */
+    static final int HEADER_SIZE = Bytes.SIZEOF_INT + Bytes.SIZEOF_INT;
     
     /**
      * The slot size in bytes.  This includes the per-slot header.
@@ -99,7 +111,7 @@ public class SlotMath {
      * committed. That information is carried in the object index and the
      * allocation nodes.
      */
-    final int headerSize = Bytes.SIZEOF_INT + Bytes.SIZEOF_INT;
+    final int headerSize = HEADER_SIZE;
     
     /**
      * The #of bytes per slot that are available for application data.

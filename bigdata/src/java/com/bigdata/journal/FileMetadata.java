@@ -9,9 +9,11 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
 /**
- * Helper object used when opening or creating an {@link DirectBufferStrategy}.
- * This takes care of the basics for creating or opening the file, preparing
- * the buffer image, etc.
+ * Helper object used when opening or creating journal file in any of the
+ * file-based modes.
+ * 
+ * FIXME Write tests that verify the correct initialization of a new journal
+ * file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -19,6 +21,25 @@ import java.nio.channels.FileLock;
 
 class FileMetadata {
 
+    final int SIZE_MAGIC = Bytes.SIZEOF_INT;
+    final int SIZE_VERSION = Bytes.SIZEOF_INT;
+    final int SIZEOF_ROOT_BLOCK = RootBlockView.SIZEOF_ROOT_BLOCK;
+
+    /**
+     * Magic value for journal (the root blocks have their own magic value).
+     */
+    final int MAGIC = 0xe6b4c275;
+    
+    /**
+     * Journal version number (version 1).
+     */
+    final int VERSION1 = 0x1;
+    
+    /**
+     * The unique segment identifier.
+     */
+    final long segment;
+    
     /**
      * The file that was opened.
      */
@@ -38,11 +59,37 @@ class FileMetadata {
      * The extent of the file in bytes.
      */
     final long extent;
+
+    /**
+     * The actual slot size for the file (which may differ from the given slot
+     * size when opening a pre-existing file).
+     */
+    final int slotSize;
+
+    /**
+     * The actual or computed slot limit for the file.
+     */
+    final int slotLimit;
     
     /**
      * True iff the file was opened in a read-only mode.
      */
     final boolean readOnly;
+
+    /**
+     * Offset of the first root block in the file.
+     */
+    final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
+    /**
+     * Offset of the second root block in the file.
+     */
+    final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
+    /**
+     * The size of the journal header, including MAGIC, version, and both root
+     * blocks. This is as an offset when computing the index of a slot on the
+     * journal.
+     */
+    final int journalHeaderSize  = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
     
     /**
      * Depending on the mode, this will be either a direct buffer, a mapped
@@ -58,12 +105,16 @@ class FileMetadata {
     /**
      * Prepare a journal file for use by an {@link IBufferStrategy}.
      * 
+     * @param segment
+     *            The unique segment identifier.
      * @param file
      *            The name of the file to be opened.
      * @param bufferMode
      *            The {@link BufferMode}.
      * @param initialExtent
      *            The initial extent of the file iff a new file is created.
+     * @param slotSize
+     *            The slot size iff a new file is created.
      * @param readOnly
      *            When true, the file is opened in a read-only mode and it is an
      *            error if the file does not exist.
@@ -74,7 +125,9 @@ class FileMetadata {
      * 
      * @throws IOException
      */
-    FileMetadata(File file, BufferMode bufferMode, long initialExtent, boolean readOnly, boolean forceWrites)
+
+    FileMetadata(long segment, File file, BufferMode bufferMode,
+            long initialExtent, int slotSize, boolean readOnly, boolean forceWrites)
             throws IOException {
 
         if (file == null)
@@ -90,13 +143,15 @@ class FileMetadata {
             throw new IllegalArgumentException();
             
         }
-        
+
         if (readOnly && forceWrites) {
 
             throw new IllegalArgumentException(
                     "forceWrites may not be used with readOnly");
             
         }
+
+        this.segment = segment;
         
         this.file = file;
         
@@ -179,6 +234,66 @@ class FileMetadata {
                 
             }
 
+            /*
+             * Read the MAGIC and VERSION.
+             */
+            raf.seek(0L);
+            final int magic = raf.readInt();
+            if (magic != MAGIC)
+                throw new RuntimeException("Bad journal magic: expected="
+                        + MAGIC + ", actual=" + magic);
+            final int version = raf.readInt();
+            if (version != VERSION1)
+                throw new RuntimeException("Bad journal version: expected="
+                        + VERSION1 + ", actual=" + version);
+
+            /*
+             * Check root blocks (magic, timestamps), choose root block, read
+             * constants (slotSize, segmentId).
+             * 
+             * @todo figure out whether the journal is empty or not. If it is
+             * then it could be simply discarded (this decision really needs to
+             * be at a high level).
+             * 
+             * @todo make decision whether to compact and truncate the journal
+             * 
+             * FIXME read the slot allocation index (how is this passed along to
+             * the Journal; what about the transient journal?)
+             * 
+             * FIXME read the object index (how is this passed along to the
+             * Journal; what about the transient journal?)
+             */
+            
+            FileChannel channel = raf.getChannel();
+            ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+            ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+            channel.read(tmp0, OFFSET_ROOT_BLOCK0);
+            channel.read(tmp1, OFFSET_ROOT_BLOCK1);
+            IRootBlockView rootBlock0 = null;
+            IRootBlockView rootBlock1 = null;
+            try {
+                rootBlock0 = new RootBlockView(tmp0);
+            } catch(RootBlockException ex ) {
+                System.err.println("Bad root block zero: "+ex);
+            }
+            try {
+                rootBlock1 = new RootBlockView(tmp1);
+            } catch(RootBlockException ex ) {
+                System.err.println("Bad root block one: "+ex);
+            }
+            if( rootBlock0 == null && rootBlock1 == null ) {
+                throw new RuntimeException("Both root blocks are bad - journal is not usable.");
+            }
+            // Choose the root block based on the commit counter.
+            IRootBlockView rootBlock =
+                ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
+                    ? rootBlock0
+                    : rootBlock1
+                    );
+            
+            this.slotSize = rootBlock.getSlotSize();
+            this.slotLimit = rootBlock.getSlotLimit();
+            
             switch (bufferMode) {
             case Direct:
                 // Allocate a direct buffer.
@@ -210,21 +325,13 @@ class FileMetadata {
             }
 
             /*
-             * FIXME Check root blocks (magic, timestamps), choose root
-             * block, figure out whether the journal is empty or not, read
-             * constants (slotSize, segmentId), make decision whether to
-             * compact and truncate the journal, read root nodes of indices,
-             * etc.
+             * @todo Review requirements for restart processing. I believe that
+             * we only need to deallocate all slots that are marked as allocated
+             * but not committed.
              * 
-             * @todo Check the magic and other things that can be used to
-             * quickly detect a corrupt file or a file that is not a journal
-             * before reading the image from the disk. This can be done with
-             * a little helper method.
-             * 
-             * @todo Review requirements for restart processing. Off hand,
-             * there should be no processing required on restart since the
-             * intention of transactions that did not commit will not be
-             * visible. However, that may change once we nail down the
+             * Other than that there should be no processing required on restart
+             * since the intention of transactions that did not commit will not
+             * be visible. However, that may change once we nail down the
              * multi-phase commit strategy.
              */
 
@@ -260,10 +367,69 @@ class FileMetadata {
              */
             raf.setLength(extent);
 
+            /*
+             * Write the MAGIC and version on the file.
+             */
+            raf.seek(0);
+            raf.writeInt(MAGIC);
+            raf.writeInt(VERSION1);
+
+            /*
+             * FIXME bootstrap the slot allocation and object indices. These
+             * data structures need to be written on the buffer (where one is
+             * used) and then flushed to disk. For at least the slot allocation
+             * index we will maintain a resident data structure for instant
+             * access.
+             */
+            
+            final int slotChain = 0; // @todo bootstrap slot allocation index.
+            
+            final int objectIndex = 0; // @todo bootstrap object index.
+            
+            this.slotSize = slotSize;
+            
+            /*
+             * The first slot index that MUST NOT be addressed.
+             * 
+             * Note: The same computation occurs in DiskOnlyStrategy and BasicBufferStrategy.
+             */
+            this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
+
+            /*
+             * Generate the root blocks. The are for all practical purposes
+             * identical (in fact, their timestamps will be distict). The root
+             * block are then written into their locations in the file.
+             */
+            final long commitCounter = 0L;
+            IRootBlockView rootBlock0 = new RootBlockView(segment, slotSize,
+                    slotLimit, slotChain, objectIndex, commitCounter );
+            IRootBlockView rootBlock1 = new RootBlockView(segment, slotSize,
+                    slotLimit, slotChain, objectIndex, commitCounter );
+            FileChannel channel = raf.getChannel();
+            channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+            channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+            
+            // Force the changes to disk.
+            channel.force(false);
+
             switch (bufferMode) {
             case Direct:
                 // Allocate a direct buffer.
                 buffer = ByteBuffer.allocateDirect((int) extent);
+                /*
+                 * Read in the journal header, including the root blocks since
+                 * those are not-zeroed.
+                 * 
+                 * FIXME It might be safer to not read the journal header into
+                 * the buffer since that would mean that we could not write on
+                 * it by mistake since it was not in the buffer. That could be
+                 * consistent with the transient journal not having a header at
+                 * all. The memory-mapped mode would have to be changed to not
+                 * map the header either.
+                 */
+                buffer.position(0);
+                buffer.limit(journalHeaderSize);
+                channel.read(buffer, 0);
                 break;
             case Mapped:
                 // Map the file.
@@ -276,11 +442,6 @@ class FileMetadata {
             default:
                 throw new AssertionError();
             }
-
-            /*
-             * FIXME Format the journal, e.g., write the root blocks and the
-             * root index and allocation nodes.
-             */
 
         }
 

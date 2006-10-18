@@ -55,9 +55,9 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
     }
 
-  BasicBufferStrategy(BufferMode bufferMode,SlotMath slotMath,ByteBuffer buffer) {
+  BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,SlotMath slotMath,ByteBuffer buffer) {
       
-      super( bufferMode, slotMath );
+      super( journalHeaderSize, bufferMode, slotMath );
       
       this.directBuffer = buffer;
       
@@ -66,10 +66,10 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
       /*
        * The first slot index that MUST NOT be addressed.
        * 
-       * Note: The same computation occurs in DiskOnlyStrategy.
+       * Note: The same computation occurs in DiskOnlyStrategy and FileMetadata.
        */
 
-      this.slotLimit = (int) (extent - SIZE_JOURNAL_HEADER) / slotSize;
+      this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
 
       System.err.println("slotLimit=" + slotLimit);
 
@@ -78,7 +78,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
   public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data) {
       
       // Position the buffer on the current slot.
-      final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+      final int pos = journalHeaderSize + slotSize * thisSlot;
       directBuffer.limit( pos + slotSize );
       directBuffer.position( pos );
       
@@ -96,7 +96,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
       assert slotHeader != null;
       
-      final int pos = SIZE_JOURNAL_HEADER + slotSize * firstSlot;
+      final int pos = journalHeaderSize + slotSize * firstSlot;
       directBuffer.limit( pos + slotHeaderSize );
       directBuffer.position( pos );
       
@@ -152,7 +152,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             int remainingToRead, ByteBuffer dst) {
 
       // Position the buffer on the current slot and set limit for copy.
-      final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+      final int pos = journalHeaderSize + slotSize * thisSlot;
       directBuffer.limit( pos + slotHeaderSize );
       directBuffer.position( pos );
                   
@@ -213,7 +213,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 //      
 //      ByteBuffer view = directBuffer.asReadOnlyBuffer();
 //      
-//      int pos = SIZE_JOURNAL_HEADER + slotSize * slot;
+//      int pos = journalHeaderSize + slotSize * slot;
 //
 //      view.limit( pos + slotSize );
 //

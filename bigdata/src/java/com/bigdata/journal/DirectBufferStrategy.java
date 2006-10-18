@@ -34,7 +34,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         super.writeSlot(thisSlot,priorSlot,nextSlot,data);
         
         // Position the buffer on the current slot.
-        final int pos = SIZE_JOURNAL_HEADER + slotSize * thisSlot;
+        final int pos = journalHeaderSize + slotSize * thisSlot;
 
         /*
          * Set limit to write just those bytes that were written on the buffer.

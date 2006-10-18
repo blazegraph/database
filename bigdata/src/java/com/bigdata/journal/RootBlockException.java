@@ -42,53 +42,48 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Oct 18, 2006
  */
 
 package com.bigdata.journal;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
- * Runs all tests for all journal implementations.
+ * An instance of this class is thrown if there is a problem with a root block
+ * (bad magic, timestamps do not agree, etc).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class RootBlockException extends RuntimeException {
+
+    private static final long serialVersionUID = -4642401001787156369L;
 
     /**
      * 
      */
-    public TestAll() {
+    public RootBlockException() {
     }
 
     /**
-     * @param arg0
+     * @param message
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public RootBlockException(String message) {
+        super(message);
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * @param cause
      */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("All Journals");
-
-        suite.addTestSuite( TestRootBlockView.class );
-        suite.addTest( TestTransientJournal.suite() );
-        suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
-        suite.addTest( TestDiskJournal.suite() );
-
-        return suite;
-        
+    public RootBlockException(Throwable cause) {
+        super(cause);
     }
-    
+
+    /**
+     * @param message
+     * @param cause
+     */
+    public RootBlockException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
 }

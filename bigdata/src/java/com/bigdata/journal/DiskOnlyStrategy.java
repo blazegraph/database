@@ -62,7 +62,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
      */
     DiskOnlyStrategy(FileMetadata fileMetadata, SlotMath slotMath) {
 
-        super(BufferMode.Disk, slotMath);
+        super(fileMetadata.journalHeaderSize,BufferMode.Disk, slotMath);
 
         this.file = fileMetadata.file;
 
@@ -73,10 +73,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
         /*
          * The first slot index that MUST NOT be addressed.
          * 
-         * Note: The same computation occurs in BasicBufferStrategy.
+         * Note: The same computation occurs in BasicBufferStrategy and FileMetadata.
          */
 
-        this.slotLimit = (int) (extent - SIZE_JOURNAL_HEADER) / slotSize;
+        this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
 
         System.err.println("slotLimit=" + slotLimit);
 
@@ -164,7 +164,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
              */
 
             // Position the buffer on the current slot.
-            final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) firstSlot;
+            final long pos = journalHeaderSize + slotSize * (long) firstSlot;
 
             buf.clear();
             
@@ -262,7 +262,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
              */
 
             // Position the buffer on the current slot.
-            final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) thisSlot;
+            final long pos = journalHeaderSize + slotSize * (long) thisSlot;
 
             buf.clear();
 
@@ -339,7 +339,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
         try {
 
             // Seek to the current slot.
-            final long pos = SIZE_JOURNAL_HEADER + slotSize * (long) thisSlot;
+            final long pos = journalHeaderSize + slotSize * (long) thisSlot;
             
             final int nwritten = channel.write(buf, pos);
             

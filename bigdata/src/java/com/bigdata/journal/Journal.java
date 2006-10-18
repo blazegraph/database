@@ -289,6 +289,12 @@ public class Journal {
      *            <dt>file</dt>
      *            <dd>The name of the file. If the file not found and "create"
      *            is true, then a new journal will be created.</dd>
+     *            <dt>segment</dt>
+     *            <dd>The unique segment identifier (required unless this is a
+     *            transient journal).  Segment identifiers are assigned by a
+     *            bigdata federation.  When using the journal as part of an
+     *            embedded database you may safely assign an arbitrary segment
+     *            identifier.</dd>
      *            <dt>slotSize</dt>
      *            <dd>The slot size in bytes.</dd>
      *            <dt>initialExtent</dt>
@@ -322,7 +328,8 @@ public class Journal {
     
     public Journal(Properties properties) throws IOException {
         
-        int slotSize = 128;
+        long segment;
+        int slotSize;
         long initialExtent = DEFAULT_INITIAL_EXTENT;
         boolean readOnly = false;
         boolean forceWrites = false;
@@ -343,25 +350,53 @@ public class Journal {
         BufferMode bufferMode = BufferMode.parse(val);
 
         /*
-         * "slotSize"
+         * "segment".
          */
-
-        val = properties.getProperty("slotSize");
-
-        if (val != null) {
-
-            slotSize = Integer.parseInt(val);
-
-            if( slotSize < 32 ) {
-                
-                throw new RuntimeException("slotSize >= 32");
+        
+        val = properties.getProperty("segment");
+        
+        if( val == null ) {
+            
+            if( bufferMode == BufferMode.Transient) {
+            
+            val = "0";
+            
+            } else {
+            
+                throw new RuntimeException("Required property: 'segment'");
                 
             }
             
         }
 
+        segment = Long.parseLong(val);
+        
         /*
-         * Helper object for slot-based computations. 
+         * "slotSize"
+         */
+
+        val = properties.getProperty("slotSize");
+
+        if (val == null) {
+         
+            val = "128";
+            
+        }
+
+        slotSize = Integer.parseInt(val);
+
+        final int MIN_SLOT_DATA = 32;
+        final int minSlotSize = ( SlotMath.HEADER_SIZE + MIN_SLOT_DATA );
+        
+        if (slotSize < minSlotSize ) {
+
+            throw new RuntimeException("slotSize must be at least "
+                    + minSlotSize + " : " + slotSize);
+
+        }
+
+        /*
+         * Helper object for slot-based computations.
          */
         
         this.slotMath = new SlotMath(slotSize);
@@ -454,8 +489,8 @@ public class Journal {
              * Setup the buffer strategy.
              */
 
-            _bufferStrategy = new DirectBufferStrategy(new FileMetadata(file,
-                    BufferMode.Direct, initialExtent, readOnly, forceWrites), slotMath);
+            _bufferStrategy = new DirectBufferStrategy(new FileMetadata(segment,file,
+                    BufferMode.Direct, initialExtent, slotSize, readOnly, forceWrites), slotMath);
 
             break;
         
@@ -479,8 +514,8 @@ public class Journal {
              * Setup the buffer strategy.
              */
 
-            _bufferStrategy = new MappedBufferStrategy(new FileMetadata(file,
-                    BufferMode.Mapped, initialExtent, readOnly, forceWrites), slotMath);
+            _bufferStrategy = new MappedBufferStrategy(new FileMetadata(segment,file,
+                    BufferMode.Mapped, initialExtent, slotSize, readOnly, forceWrites), slotMath);
 
             break;
             
@@ -503,8 +538,8 @@ public class Journal {
              * Setup the buffer strategy.
              */
 
-            _bufferStrategy = new DiskOnlyStrategy(new FileMetadata(file,
-                    BufferMode.Disk, initialExtent, readOnly, forceWrites), slotMath);
+            _bufferStrategy = new DiskOnlyStrategy(new FileMetadata(segment,file,
+                    BufferMode.Disk, initialExtent, slotSize, readOnly, forceWrites), slotMath);
 
             break;
         
@@ -521,7 +556,13 @@ public class Journal {
         /*
          * An index of the free and used slots in the journal.
          * 
+         * FIXME For any of the file-backed modes we need to read the slot
+         * allocation index and the object index from the file.
+         * 
          * FIXME This needs to be refactored to be a persistent data structure.
+         * 
+         * FIXME We need to set _nextSlot based on the persistent slot
+         * allocation index chain.
          */
         allocationIndex = new BitSet(_bufferStrategy.getSlotLimit());
 
@@ -689,7 +730,7 @@ public class Journal {
                 /*
                  * Mark the last slot on which we write as allocated.
                  * 
-                 * @todo We need better encapsulation for the allocation logic.
+                 * FIXME We need better encapsulation for the allocation logic.
                  */
                 allocationIndex.set(thisSlot);
                 
@@ -813,11 +854,14 @@ public class Journal {
      *       journal (handling transparent promotion of the journal to disk is a
      *       relatively low priority, but is required if the journal was not
      *       original opened in that mode).
-     * @todo Allocation by
-     *       {@link #releaseNextSlot(long) should be optimized for fast consumption of
-     *       the next N free slots.
-     * @todo Track the #of slots remaining in the global scope so that this
-     *       method can be ultra fast if there is no work to be done.
+     * 
+     * @todo Allocation by {@link #releaseNextSlot(long)} should be optimized
+     *       for fast consumption of the next N free slots.
+     * 
+     * FIXME Track the #of slots remaining in the global scope so that this
+     * method can be ultra fast if there is no work to be done (this counter
+     * could even live in the root block, along with the index of the next free
+     * slot and the first free slot on the journal).
      */
     int releaseSlots(Tx tx,int nslots) {
 

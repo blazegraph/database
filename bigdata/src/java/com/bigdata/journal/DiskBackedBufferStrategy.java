@@ -81,7 +81,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
     DiskBackedBufferStrategy(BufferMode bufferMode, FileMetadata fileMetadata, SlotMath slotMath) {
 
-        super(bufferMode,slotMath,fileMetadata.buffer);
+        super(fileMetadata.journalHeaderSize, bufferMode,slotMath,fileMetadata.buffer);
 
         this.file = fileMetadata.file;
         

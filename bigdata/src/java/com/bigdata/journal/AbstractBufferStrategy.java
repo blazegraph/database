@@ -15,11 +15,11 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
     final BufferMode bufferMode;
     
     /**
-     * The size of the journal root blocks.  There are two root blocks
-     * and they are written in an alternating order using the Challis
-     * algorithm.
+     * The size of the journal header, including MAGIC, version, and both root
+     * blocks. This is as an offset when computing the index of a slot on the
+     * journal.
      */
-    final int SIZE_JOURNAL_HEADER = 0;
+    final int journalHeaderSize;
 
     /**
      * The size of a slot. 
@@ -44,11 +44,15 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
     
     public BufferMode getBufferMode() {return bufferMode;}
 
-    AbstractBufferStrategy(BufferMode bufferMode, SlotMath slotMath) {
+    AbstractBufferStrategy(int journalHeaderSize, BufferMode bufferMode, SlotMath slotMath) {
+
+        assert journalHeaderSize >= 0;
         
         if( bufferMode == null ) throw new IllegalArgumentException();
         
         if( slotMath == null ) throw new IllegalArgumentException();
+        
+        this.journalHeaderSize = journalHeaderSize;
         
         this.bufferMode = bufferMode;
         

@@ -105,6 +105,8 @@ public class TestDirectJournal extends AbstractTestCase {
 
         properties.setProperty("bufferMode", BufferMode.Direct.toString());
 
+        properties.setProperty("segment", "0");
+
         return properties;
 
     }
