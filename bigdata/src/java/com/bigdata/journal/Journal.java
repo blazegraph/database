@@ -153,9 +153,13 @@ import java.util.Properties;
  * <li> Distributed database protocols.</li>
  * </ol>
  * 
- * FIXME Except for the disk-only and memory-mapped modes, the disk writes are
- * not being verified since we are not testing restart and the journal is
- * reading from an in-memory image.
+ * FIXME The disk writes are not being verified for the "direct" mode since we
+ * are not testing restart and the journal is reading from an in-memory image.
+ * 
+ * FIXME Stress tests that cause the journal to wrap several times. Also tests
+ * of extension, compaction, and truncation of the journal. A test that causes
+ * wrapping needs to mix writes and deletes or the journal will run out of space
+ * (running out of space should trigger extension).
  * 
  * FIXME Migration of data to the read-optimized database means that the current
  * committed version is on the database. However, subsequent migration of
@@ -567,8 +571,6 @@ public class Journal {
      *                forget to set the position and limit before calling this
      *                method).
      * 
-     * @todo Handle transaction isolation for object and allocation indices.
-     * 
      * @return The first slot on which the object was written.
      */
 
@@ -618,7 +620,11 @@ public class Journal {
          * FIXME When we are running without an inner index (not isolated) this
          * flag should always be set to false _unless_ there are no active
          * transactions, in which case we can merrily wipe out the old version
-         * since no one can ever see it.
+         * since no one can ever see it.  In order to do this the journal will
+         * need to keep track of the active transactions, e.g., in an hash table
+         * indexed by the transaction identifier.  When the hash table is empty
+         * there are no active transactions.  (Except that once a transaction has
+         * prepared, it can no longer read versions.)
          */
         final boolean overwritingVersionWrittenInSameScope = (tx == null ? false
                 : tx.objectIndex.hitOnOuterIndex);
@@ -750,7 +756,7 @@ public class Journal {
                  * 
                  * One way to do this is to keep track of the committed states
                  * and scan for versions that have been overwritten as of the
-                 * most recent committed state (version that have been deleted
+                 * most recent committed state (versions that have been deleted
                  * can be handled either in the same manner or as we are
                  * handling them now).
                  */
@@ -894,11 +900,6 @@ public class Journal {
      *                {@link #releaseSlots(long, int)} MUST be invoked as a
      *                pre-condition to guarentee that the necessary free slots
      *                have been released on the journal.
-     * 
-     * @todo This is not able to recognize slots corresponding to versions that
-     *       were written and then logically deleted within the given
-     *       transaction scope. The slots for such versions MAY be reused within
-     *       that transaction.
      */
     int releaseNextSlot(Tx tx) {
 
@@ -1008,10 +1009,6 @@ public class Journal {
 
     /**
      * Allocation map of free slots in the journal.
-     * 
-     * @todo This does not differentiate whether a slot was already written in a
-     *       given transaction, making it impossible to overwrite slots already
-     *       written in the same transaction.
      * 
      * @todo This map is not persisent.
      */
@@ -1209,15 +1206,6 @@ public class Journal {
      *                if the transaction identifier is bad.
      * @exception DataDeletedException
      *                if the persistent identifier is already deleted.
-     * 
-     * @todo This implementation does not support transactional isolation or the
-     *       reuse of slots first allocated within the same transaction. The
-     *       slots occupied by the data are immediately marked as "free" in a
-     *       global scope.
-     * 
-     * @todo Clean up the exceptions thrown.
-     * 
-     * @todo Simplify access paths to the object index (here, and in read()).
      */
     public int delete(Tx tx, int id) {
 
@@ -1280,13 +1268,6 @@ public class Journal {
      * @param firstSlot
      *            The int32 within-segment persistent identifier.
      * 
-     * @todo This needs to be automatically invoked no earlier than the commit
-     *       of this transaction and once there are no active transactions
-     *       remaining that could read the deleted version. Possible return
-     *       values of interest are the first slot that was deallocated, an
-     *       array or list of the deallocated slots, or the #of slots that were
-     *       deallocated.
-     * 
      * @todo Do we need the {@link Tx} parameter?
      */
     void deallocateSlots(Tx tx, int firstSlot) {
@@ -1294,10 +1275,6 @@ public class Journal {
         assertSlot(firstSlot);
         assert allocationIndex.get(firstSlot);
         
-        //        // first slot of the deleted data.
-//        final int firstSlot = (tx == null ? objectIndex.removeDeleted(id)
-//                : tx.objectIndex.removeDeleted(id));
-
         // read just the header for the first slot in the chain.
         _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
 

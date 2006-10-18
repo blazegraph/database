@@ -574,16 +574,14 @@ public class TestJournal extends ProxyTestCase {
      * 
      * @throws IOException
      * 
-     * FIXME Do a version of this that operations in a transaction.
+     * @see TestTx#test_writeMultipleVersions()
      * 
-     * FIXME For both the isolated and the unisolated version, verify that we
-     * are immediately deallocating slots for the historical versions. There are
-     * some fenceposts here that need to be tested, including: when a version
-     * exists on the journal before the transaction starts only the 2nd write
-     * should cause the prior version to be immediately deallocated; when a
-     * version is being overwritten without isolation, the prior version may be
-     * immediately deallocated IFF there are no active transactions (since there
-     * can then be no reads of the prior version).
+     * FIXME Verify that we are immediately deallocating slots for the
+     * historical versions.
+     * 
+     * FIXME When a version is being overwritten without isolation, verify that
+     * the prior version is immediately deallocated IFF there are no active
+     * transactions (since there can then be no reads of the prior version).
      */
     public void test_writeMultipleVersions() throws IOException {
 

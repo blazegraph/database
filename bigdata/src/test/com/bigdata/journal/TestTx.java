@@ -241,4 +241,109 @@ public class TestTx extends ProxyTestCase {
         
     }
     
+    /**
+     * Test writes multiple versions and verifies that the correct version may
+     * be read back at any time. The last written version is then deleted and we
+     * verify that read, write and delete operations all correctly report that
+     * the data is deleted.
+     * 
+     * @throws IOException
+     * 
+     * FIXME Verify that we are immediately deallocating slots for the
+     * historical versions.
+     * 
+     * FIXME When a version exists on the journal before the transaction starts
+     * only the 2nd write should cause the prior version to be immediately
+     * deallocated.  (This could be its own test.)
+     */
+    public void test_writeMultipleVersions() throws IOException {
+
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            Tx tx0 = new Tx(journal,0);
+            
+            // Two versions of id0.
+            final int id0 = 0;
+            final ByteBuffer expected0v0 = getRandomData(journal);
+            final ByteBuffer expected0v1 = getRandomData(journal);
+            
+            // Three versions of id1.
+            final int id1 = 1;
+            final ByteBuffer expected1v0 = getRandomData(journal);
+            final ByteBuffer expected1v1 = getRandomData(journal);
+            final ByteBuffer expected1v2 = getRandomData(journal);
+            
+            // precondition tests, write id0 version0, postcondition tests.
+            assertNotFound(tx0.read(id0,null));
+            
+            assertNotFound(tx0.read(id1,null));
+
+            tx0.write(id0,expected0v0);
+            
+            assertEquals(expected0v0.array(),tx0.read(id0, null));
+            
+            assertNotFound(tx0.read(id1,null));
+
+            // write id1 version0, postcondition tests.
+            tx0.write(id1,expected1v0);
+            
+            assertEquals(expected0v0.array(),tx0.read(id0, null));
+            
+            assertEquals(expected1v0.array(),tx0.read(id1, null));
+            
+            // write id1 version1, postcondition tests.
+            tx0.write(id1,expected1v1);
+            
+            assertEquals(expected0v0.array(),tx0.read( id0, null));
+            
+            assertEquals(expected1v1.array(),tx0.read( id1, null));
+            
+            // write id1 version2, postcondition tests.
+            tx0.write(id1,expected1v2);
+            
+            assertEquals(expected0v0.array(),tx0.read( id0, null));
+            
+            assertEquals(expected1v2.array(),tx0.read( id1, null));
+
+            // write id0 version1, postcondition tests.
+            tx0.write(id0,expected0v1);
+            
+            assertEquals(expected0v1.array(),tx0.read(id0, null));
+            
+            assertEquals(expected1v2.array(),tx0.read(id1, null));
+
+            // delete id1, postcondition tests.
+
+            tx0.delete(id1);
+            
+            assertEquals(expected0v1.array(),tx0.read(id0, null));
+            
+            assertDeleted(tx0, id1);
+
+            // delete id0, postcondition tests.
+
+            tx0.delete(id0);
+            
+            assertDeleted(tx0, id0);
+            
+            assertDeleted(tx0, id1);
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
 }
