@@ -178,7 +178,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(1,journal.allocationIndex.cardinality());
+            assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
             
@@ -222,7 +222,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(1,journal.allocationIndex.cardinality());
+            assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -261,7 +261,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(1,journal.allocationIndex.cardinality());
+            assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -296,7 +296,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(1,journal.allocationIndex.cardinality());
+            assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -331,7 +331,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(2,journal.allocationIndex.cardinality());
+            assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -370,7 +370,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(2,journal.allocationIndex.cardinality());
+            assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -406,7 +406,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(2,journal.allocationIndex.cardinality());
+            assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -442,7 +442,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(3,journal.allocationIndex.cardinality());
+            assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -482,7 +482,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(3,journal.allocationIndex.cardinality());
+            assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -518,7 +518,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(3,journal.allocationIndex.cardinality());
+            assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -554,7 +554,7 @@ public class TestJournal extends ProxyTestCase {
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
-            assertEquals(4,journal.allocationIndex.cardinality());
+            assertEquals(4,journal.allocationIndex.getAllocatedSlotCount());
 
             journal.close();
 
@@ -803,7 +803,7 @@ public class TestJournal extends ProxyTestCase {
              * #of slots allocated to that object (this relies on the fact that
              * it is the only object in the journal).
              */
-            final int nallocated = journal.allocationIndex.cardinality();
+            final int nallocated = journal.allocationIndex.getAllocatedSlotCount();
             System.err.println("Allocated "+nallocated+" slots to tx="+tx+", id="+id);
 
             ByteBuffer actual = journal.read(tx, id, null);
@@ -829,7 +829,7 @@ public class TestJournal extends ProxyTestCase {
             }
 
             // Verify that the #of allocated slots has not changed.
-            assertEquals(nallocated,journal.allocationIndex.cardinality());
+            assertEquals(nallocated,journal.allocationIndex.getAllocatedSlotCount());
 
             /*
              * Test read after delete.
@@ -867,13 +867,13 @@ public class TestJournal extends ProxyTestCase {
             }
 
             // Verify that the #of allocated slots has not changed.
-            assertEquals(nallocated,journal.allocationIndex.cardinality());
+            assertEquals(nallocated,journal.allocationIndex.getAllocatedSlotCount());
 
             /*
              * Deallocate the slots for that object.
              */
 
-            journal.deallocateSlots(tx, firstSlot);
+            journal.deallocateSlots(firstSlot);
 
             // clean up the object index since the slots were deallocated (this
             // is just a wee-bit of a low-level hack).
@@ -886,7 +886,7 @@ public class TestJournal extends ProxyTestCase {
                     tx.objectIndex.getFirstSlot(id));
 
             // Verify that there are no more allocated slots.
-            assertEquals("nallocated", 0, journal.allocationIndex.cardinality());
+            assertEquals("nallocated", 0, journal.allocationIndex.getAllocatedSlotCount());
 
             /*
              * Verify that read now reports "not found", indicating that the

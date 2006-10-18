@@ -146,6 +146,8 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         properties.setProperty("bufferMode", getBufferMode().toString());
 
+        properties.setProperty("segment", "0");
+        
         properties.setProperty("file",getFilename());
         
         return properties;

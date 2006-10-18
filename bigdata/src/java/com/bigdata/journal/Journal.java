@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.BitSet;
 import java.util.Properties;
 
 /**
@@ -152,6 +151,9 @@ import java.util.Properties;
  * supporting both embedded and remote scenarios.</li>
  * <li> Distributed database protocols.</li>
  * </ol>
+ * 
+ * FIXME Does the Journal need to have a concept of "named root objects?"  How
+ * is that concept supported by bigdata?  Per segment?  Overall?  Both?
  * 
  * FIXME The disk writes are not being verified for the "direct" mode since we
  * are not testing restart and the journal is reading from an in-memory image.
@@ -260,11 +262,35 @@ public class Journal {
     }
 
     /**
-     * FIXME This object index is not persistence capable and will NOT survive
-     * restart.
+     * The object index.
+     * 
+     * @todo Change to use the {@link IObjectIndex} interface.
      */
     final SimpleObjectIndex objectIndex = new SimpleObjectIndex();
     
+    /**
+     * Indicates the last slot in a chain of slots representing a data version
+     * (-1).
+     * 
+     * @see SlotMath#headerSize
+     */
+    public static final int LAST_SLOT_MARKER = -1;
+    
+    /**
+     * The index of the first slot that MUST NOT be addressed ([0:slotLimit-1]
+     * is the valid range of slot indices).
+     * 
+     * @todo Is this field required on this class?
+     */
+    final int slotLimit;
+    
+    /**
+     * The slot allocation index.
+     * 
+     * @todo Change to use the {@link ISlotAllocationIndex} interface.
+     */
+    final SimpleSlotAllocationIndex allocationIndex;
+
     /**
      * Asserts that the slot index is in the legal range for the journal
      * <code>[0:slotLimit)</code>
@@ -321,7 +347,9 @@ public class Journal {
      *       buffer (since the buffer does not pre-exist by definition); (c)
      *       that read-only mode reports an error if the file does not
      *       pre-exist; and (d) that you can not write on a read-only journal.
+     * 
      * @todo Caller should start migration thread.
+     * 
      * @todo Caller should provide network interface and distributed commit
      *       support.
      */
@@ -564,7 +592,8 @@ public class Journal {
          * FIXME We need to set _nextSlot based on the persistent slot
          * allocation index chain.
          */
-        allocationIndex = new BitSet(_bufferStrategy.getSlotLimit());
+        allocationIndex = new SimpleSlotAllocationIndex(_bufferStrategy
+                .getSlotLimit());
 
     }
 
@@ -627,11 +656,6 @@ public class Journal {
         
         /*
          * Note: throws DataDeletedException if the version is deleted.
-         * 
-         * @todo Optimize the object index to handle the case when we are
-         * overwriting an existing version and where the version that we are
-         * overwritting was written in the same transactional scope (including
-         * the journal scope since the last commit).
          */
         final int firstSlotBefore = (tx == null ? objectIndex.getFirstSlot(id)
                 : tx.objectIndex.getFirstSlot(id));
@@ -696,7 +720,7 @@ public class Journal {
          * the data and obtain the first slot on which the data will be written.
          */
         final int nslots = slotMath.getSlotCount(remaining);
-        final int firstSlot = releaseSlots( tx, nslots );
+        final int firstSlot = allocationIndex.releaseSlots( nslots );
 
         int thisSlot = firstSlot;
 
@@ -720,7 +744,7 @@ public class Journal {
                  * Marks the current slot as allocated and returns the next free
                  * slot (the slot on which we will write in the _next_ pass).
                  */
-                nextSlot = releaseNextSlot(tx);
+                nextSlot = allocationIndex.releaseNextSlot();
 
                 // We will write dataSize bytes into the current slot.
                 thisCopy = dataSize;
@@ -729,10 +753,8 @@ public class Journal {
 
                 /*
                  * Mark the last slot on which we write as allocated.
-                 * 
-                 * FIXME We need better encapsulation for the allocation logic.
                  */
-                allocationIndex.set(thisSlot);
+                allocationIndex.setAllocated(thisSlot);
                 
                 // This is the last slot for this data.
                 nextSlot = LAST_SLOT_MARKER; // Marks the end of the chain.
@@ -743,7 +765,7 @@ public class Journal {
             }
 
             // Verify that this slot has been allocated.
-            assert( allocationIndex.get(thisSlot) );
+            assert( allocationIndex.isAllocated(thisSlot) );
             
             // Set limit on data to be written on the slot.
             data.limit( data.position() + thisCopy );
@@ -784,7 +806,7 @@ public class Journal {
                  * deleted as a postcondition.
                  */
 
-                deallocateSlots(tx, firstSlotBefore);
+                deallocateSlots(firstSlotBefore);
                 
             } else {
                 
@@ -818,245 +840,6 @@ public class Journal {
         return firstSlot;
         
     }
-    
-    /**
-     * Indicates the last slot in a chain of slots representing a data version
-     * (-1).
-     * 
-     * @see SlotMath#headerSize
-     */
-    public static final int LAST_SLOT_MARKER = -1;
-    
-    /**
-     * Ensure that at least this many slots are available for writing data in
-     * this transaction. If necessary, triggers the logical deletion of
-     * historical data versions no longer accessable to any active transaction.
-     * If necessary, triggers the extension of the journal.
-     * 
-     * @param tx
-     *            The transaction. Note that slots written in the same
-     *            transaction whose data have since been re-written or deleted
-     *            are available for overwrite in that transaction (but not in
-     *            any other transaction).
-     * 
-     * @param nslots
-     *            The #of slots required.
-     * 
-     * @return The first free slot. The slot is NOT mark as allocated by this
-     *         call.
-     * 
-     * @see #releaseNextSlot(long)
-     * 
-     * @todo Ensure that at least N slots are available for overwrite by this
-     *       transaction. When necessary do extra work to migrate data to the
-     *       database (perhaps handled by the journal/segment server), release
-     *       slots that can be reused (part of concurrency control), or extend
-     *       journal (handling transparent promotion of the journal to disk is a
-     *       relatively low priority, but is required if the journal was not
-     *       original opened in that mode).
-     * 
-     * @todo Allocation by {@link #releaseNextSlot(long)} should be optimized
-     *       for fast consumption of the next N free slots.
-     * 
-     * FIXME Track the #of slots remaining in the global scope so that this
-     * method can be ultra fast if there is no work to be done (this counter
-     * could even live in the root block, along with the index of the next free
-     * slot and the first free slot on the journal).
-     */
-    int releaseSlots(Tx tx,int nslots) {
-
-        _nextSlot = nextFreeSlot( tx );
-        
-        return _nextSlot;
-        
-//        // first slot found.  this will be our return value.
-//        int firstSlot = -1;
-//        
-//        // #of slots found.  we can not stop until nfree >= nslots.
-//        int nfree = 0;
-//        
-//        /*
-//         * True iff wrapped around the journal once already.
-//         * 
-//         * Note that the BitSet search methods only allow us to specify a
-//         * fromIndex, not a fromIndex and a toIndex.  This means that we need
-//         * to do a little more work to detect when we have scanned past our
-//         * stopping point (and that BitSet will of necessity scan to the end
-//         * of the bitmap).
-//         */
-//        boolean wrapped = false;
-//        
-//        // starting point for the search.
-//        int fromSlot = this.nextSlot;
-//        
-//        // We do not search past this slot.
-//        final int finalSlot = ( fromSlot == 0 ? slotLimit : fromSlot - 1 ); 
-//        
-//        while( nfree < nslots ) {
-//            
-//            if( _nextSlot == slotLimit ) {
-//                
-//                if( wrapped ) {
-//                    
-//                } else {
-//                
-//                    // restart search from front of journal.
-//                    _nextSlot = 0;
-//
-//                    wrapped = true;
-//                    
-//                }
-//                
-//            }
-//            
-//            if( _nextSlot == -1 ) {
-//                
-//                int nrequired = nslots - nfree;
-//                
-//                _nextSlot = release(fromSlot, nrequired );
-//                
-//            }
-//            
-//            nfree++;
-//            
-//        }
-//        
-//        return _nextSlot;
-        
-    }
-
-    /* Use to optimize release of the next N slots, and where N==1.
-    private int[] releasedSlots;
-    private int nextReleasedSlot;
-    */
-    
-    /**
-     * Marks the current slot as "in use" and return the next slot free in the
-     * journal.
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @return The next slot.
-     * 
-     * @exception IllegalStateException
-     *                if there are no free slots. Note that
-     *                {@link #releaseSlots(long, int)} MUST be invoked as a
-     *                pre-condition to guarentee that the necessary free slots
-     *                have been released on the journal.
-     */
-    int releaseNextSlot(Tx tx) {
-
-        // Required to prevent inadvertant extension of the BitSet.
-        assertSlot(_nextSlot);
-        
-        // Mark this slot as in use.
-        allocationIndex.set(_nextSlot);
-
-        return nextFreeSlot( tx );
-        
-    }
-    
-    /**
-     * Returns the next free slot.
-     */
-    private int nextFreeSlot( Tx tx )
-    {
-
-        // Required to prevent inadvertant extension of the BitSet.
-        assertSlot(_nextSlot);
-
-        // Determine whether [_nextSlot] has been consumed.
-        if( ! allocationIndex.get(_nextSlot) ) {
-            
-            /*
-             * The current [_nextSlot] has not been allocated and is still
-             * available.
-             */
-            
-            return _nextSlot;
-            
-        }
-        
-        /*
-         * Note: BitSet returns nbits when it can not find the next clear bit
-         * but -1 when it can not find the next set bit. This is because the 
-         * BitSet is logically infinite, so there is always another clear bit
-         * beyond the current position.
-         */
-        _nextSlot = allocationIndex.nextClearBit(_nextSlot);
-        
-        if( _nextSlot == slotLimit ) {
-            
-            /*
-             * No more free slots, try wrapping and looking again.
-             * 
-             * @todo This scans the entire index -- there is definately some
-             * wasted effort there. However, the allocation index structure
-             * needs to evolve to support persistence and transactional
-             * isolation so this is not worth tuning further at this time.
-             */
-            
-            System.err.println("Journal is wrapping around.");
-            
-            _nextSlot = allocationIndex.nextClearBit( 0 );
-            
-            if( _nextSlot == slotLimit ) {
-
-                // The journal is full.
-                throw new IllegalStateException("Journal is full");
-                
-            }
-            
-        }
-        
-        return _nextSlot;
-        
-    }
-
-    /**
-     * Release slots on the journal beginning at the specified slot index by
-     * logical deletion of historical data versions no longer accessable to any
-     * active transaction. If necessary, triggers the extension of the journal.
-     * 
-     * @param fromSlot
-     *            The index of the slot where the release operation will begin.
-     * 
-     * @param minSlots
-     *            The minimum #of slots that must be made available by this
-     *            operation.
-     * 
-     * @return The index of the next free slot.
-     */
-    int release(int fromSlot, int minSlots ) {
-       
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
-     * <p>
-     * The next slot that is known to be available. Slot indices begin at 0 and
-     * run up to {@link Integer#MAX_VALUE}.
-     * </p>
-     * 
-     * @todo This MUST be initialized on startup. The default is valid only for
-     *       a new journal.
-     */
-    int _nextSlot = 0;
-
-    /**
-     * The index of the first slot that MUST NOT be addressed ([0:slotLimit-1]
-     * is the valid range of slot indices).
-     */
-    final int slotLimit;
-
-    /**
-     * Allocation map of free slots in the journal.
-     * 
-     * @todo This map is not persisent.
-     */
-    final BitSet allocationIndex;
     
     /**
      * <p>
@@ -1132,7 +915,7 @@ public class Journal {
         }
         
         // Verify that this slot has been allocated.
-        assert( allocationIndex.get(firstSlot) );
+        assert( allocationIndex.isAllocated(firstSlot) );
 
         /*
          * Read the first slot, returning the buffer into which the data was
@@ -1183,7 +966,7 @@ public class Journal {
             final int thisSlot = nextSlot; 
 
             // Verify that this slot has been allocated.
-            assert( allocationIndex.get(thisSlot) );
+            assert( allocationIndex.isAllocated(thisSlot) );
 
             nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
                     slotsRead, remainingToRead, dst);
@@ -1307,17 +1090,14 @@ public class Journal {
      * version.
      * </p>
      * 
-     * @param tx
-     *            The transaction.
      * @param firstSlot
      *            The int32 within-segment persistent identifier.
-     * 
-     * @todo Do we need the {@link Tx} parameter?
      */
-    void deallocateSlots(Tx tx, int firstSlot) {
+    void deallocateSlots(int firstSlot) {
 
         assertSlot(firstSlot);
-        assert allocationIndex.get(firstSlot);
+
+        assert allocationIndex.isAllocated(firstSlot);
         
         // read just the header for the first slot in the chain.
         _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
@@ -1335,7 +1115,7 @@ public class Journal {
 
             final int thisSlot = nextSlot;
             
-            assert allocationIndex.get(thisSlot);
+            assert allocationIndex.isAllocated(thisSlot);
             
             nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
                     slotsRead, 0, null);
@@ -1349,7 +1129,7 @@ public class Journal {
             
         }
 
-        System.err.println("Dealloacted " + slotsRead + " slots: tx=" + tx );
+        System.err.println("Dealloacted " + slotsRead + " slots" );
         
     }
     

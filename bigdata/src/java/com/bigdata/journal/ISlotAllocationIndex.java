@@ -187,4 +187,115 @@ import java.util.BitSet;
  */
 public interface ISlotAllocationIndex {
 
+    /**
+     * Release slots on the journal beginning at the specified slot index by
+     * logical deletion of historical data versions no longer accessable to any
+     * active transaction. If necessary, triggers the extension of the journal.
+     * 
+     * @param fromSlot
+     *            The index of the slot where the release operation will begin.
+     * 
+     * @param minSlots
+     *            The minimum #of slots that must be made available by this
+     *            operation.
+     * 
+     * @return The index of the next free slot.
+     */
+    public int release(int fromSlot, int minSlots );    
+
+    /**
+     * Ensure that at least this many slots are available for writing data in
+     * this transaction. If necessary, triggers the logical deletion of
+     * historical data versions no longer accessable to any active transaction.
+     * If necessary, triggers the extension of the journal.
+     * 
+     * @param tx
+     *            The transaction. Note that slots written in the same
+     *            transaction whose data have since been re-written or deleted
+     *            are available for overwrite in that transaction (but not in
+     *            any other transaction).
+     * 
+     * @param nslots
+     *            The #of slots required.
+     * 
+     * @return The first free slot. The slot is NOT mark as allocated by this
+     *         call.
+     * 
+     * @see #releaseNextSlot(long)
+     */
+    public int releaseSlots(int nslots);
+
+    /**
+     * Marks the current slot as "in use" and return the next slot free in the
+     * journal.
+     * 
+     * @param tx
+     *            The transaction.
+     * 
+     * @return The next slot.
+     * 
+     * @exception IllegalStateException
+     *                if there are no free slots. Note that
+     *                {@link #releaseSlots(int)} MUST be invoked as a
+     *                pre-condition to guarentee that the necessary free slots
+     *                have been released on the journal.
+     */
+    public int releaseNextSlot();
+ 
+    /**
+     * Mark the slot as allocated but not committed.
+     * 
+     * @param slot
+     *            The slot.
+     * 
+     * @exception IllegalStateException
+     *                if the slot is already marked as allocated.
+     * 
+     * @see #setCommitted(int)
+     */
+    public void setAllocated(int slot);
+    
+    /**
+     * True iff the slot is currently allocated.
+     * 
+     * @param slot
+     *            The slot.
+     * 
+     * @see #isCommitted()
+     */
+    public boolean isAllocated(int slot);
+    
+    /**
+     * Mark the slot as committed.
+     * 
+     * @param slot
+     *            The slot.
+     * 
+     * @exception IllegalStateException
+     *                if the slot is not already marked as allocated.
+     */
+    public void setCommitted(int slot);
+    
+    /**
+     * True iff the slot is allocated and the allocation has been committed.
+     * 
+     * @see #isAllocated()
+     */
+    public boolean isCommitted(int slot);
+
+    /**
+     * Clears the slot (it will be marked as de-allocated and its commit flag
+     * will also be cleared).
+     * 
+     * @param slot
+     *            The slot.
+     */
+    public void clear(int slot);
+
+    /**
+     * The #of allocated slots (does NOT guarentee that all allocated slots
+     * are also committed).
+     */
+    public int getAllocatedSlotCount();
+
 }
