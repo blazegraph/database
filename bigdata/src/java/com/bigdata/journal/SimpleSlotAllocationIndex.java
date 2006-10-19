@@ -55,8 +55,6 @@ import java.util.BitSet;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Refactor methods onto {@link ISlotAllocationIndex}.
- * 
  * FIXME Modify Journal to use the distinction of allocated + committed (two bits of
  * state per slot).
  */

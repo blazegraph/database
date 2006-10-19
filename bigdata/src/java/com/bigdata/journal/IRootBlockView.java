@@ -61,15 +61,6 @@ import java.nio.ByteBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Add metadata field for interesting counters to the root block, e.g.:
- *       the #of non-deleted objects on the journal (so that we know whether or
- *       not it is empty), the depth of the object index, the #of free slots,
- *       etc. Since this is a bit wide open, there may be some evolution in both
- *       this interface and the {@link RootBlockView}. That evolution needs to
- *       get locked down at some point. Verify that we can version the Journal
- *       safely so as to be able to read and write journals that have an older
- *       root block format.
  */
 public interface IRootBlockView {
 

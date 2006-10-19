@@ -2,7 +2,6 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.journal.Journal.SlotHeader;
 
 /**
  * <p>

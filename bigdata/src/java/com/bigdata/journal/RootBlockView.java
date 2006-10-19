@@ -54,6 +54,34 @@ import java.nio.ByteBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Add metadata field for interesting counters to the root block, e.g.:
+ *       the #of non-deleted objects on the journal (so that we know whether or
+ *       not it is empty), the depth of the object index, the #of free slots,
+ *       etc. Since this is a bit wide open, there may be some evolution in both
+ *       this interface and the {@link RootBlockView}. That evolution needs to
+ *       get locked down at some point. Verify that we can version the Journal
+ *       safely so as to be able to read and write journals that have an older
+ *       root block format.
+ * 
+ * FIXME Add a field for the last transaction identifier to commit on the
+ * journal. As long as the globally assigned transaction identifiers are
+ * monotonically increasing (and a lot of things depend on this) then we could
+ * use this field in place of the commit counter field to determine which root
+ * block was more current.
+ * 
+ * FIXME Add a field for the last transaction committed on the journal whose
+ * data was deleted from the journal. As data versions written in a transaction
+ * are no longer visible to active (post-PREPAREd) transactions the slots
+ * corresponding to those versions are deallocated on the journal and this field
+ * is updated. (Each commit record MUST contain a both the transaction identifer
+ * for the prior commit record and the slot index on which that commit record
+ * was written, forming a singly linked chain of prior commit records. When
+ * traversing that chain, this root block field MUST be checked to determine
+ * whether the prior commit record still exists. If the transaction identifier
+ * for the prior commit record is equal to or less than this root block field
+ * then the transaction is GONE from the journal.)
+ * 
  */
 public class RootBlockView implements IRootBlockView {
 

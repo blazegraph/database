@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.BitSet;
-
 /**
  * <p>
  * Interface for managing the free and allocated slots in a {@link Journal}.
@@ -179,8 +177,54 @@ import java.util.BitSet;
  *       no active transaction can read any historical versions on the journal.
  *       In this case, we can simple drop the journal.
  * 
- * @todo add methods to this API and create a SimpleSlotAllocationIndex class
- *       that implements those methods using a {@link BitSet}.
+ * @todo Commit processing requires that we mark all slots allocated by a given
+ *       tx as committed. Currently, the outer object index holds the firstSlot
+ *       for each chain of slots for an object. We have to actually examine that
+ *       slot in order to determine whether there are more slots in the chain,
+ *       and if there are then we have to chase the slot chain in order to find
+ *       all of those slots. If the journal is buffered in memory then this will
+ *       be very cheap. However, a memory-mapped or disk-based journal could
+ *       show a significant performance hit.<br>
+ *       One way to handle this would be to factor the slot header out of the
+ *       slot and into the allocation index. The index would then have two bits
+ *       plus two int32, for a total of 9 bytes per slot. This would make it
+ *       much more pallatable to keep the slot chains in RAM, even for the
+ *       disk-based journal. However, this still gets pretty bit for a 200M
+ *       journal - and is probably too large for memory for a very large
+ *       disk-based journal.<br>
+ *       There is really no reason to have prior and next slot links in the slot
+ *       header. The prior links provide for greater transparency in the journal
+ *       since you can scan slot by slot and figure out where the object starts
+ *       and where it ends and look it up in the various stable object indices.
+ *       However, that seems like it may be too much cost for the benefit given
+ *       the percentage of a slot that is dedicated to the slot header and given
+ *       the size of a slot metadata array if the slot headers are re-factored
+ *       into the slot allocation index. <br>
+ *       Another way to deal with this is to have slots of differing sizes and
+ *       slot allocation indices for each extent of slots of a given size.
+ *       However, that does not nicely support an append only writer, which is a
+ *       key requirement.
+ * 
+ * @todo If it is true that the allocations for entire transactions get released
+ *       at once, then we can probably optimize deallocation simply by tracking
+ *       the allocations made within a transaction using chunks of bit sets,
+ *       much like the global allocation table but using only a single bit per
+ *       slot. Our expectation is that allocations tend to occur in bursts for a
+ *       given transaction (since we buffer write requests in the server) and
+ *       tend to have good locality in the slot address space. Therefore we can
+ *       use a chain of bit set chunks. Each chunk would have to identify the
+ *       slot range to which it applied. Another representation would be a run
+ *       length encoding of the allocated slots. The encoding could be built up
+ *       directly as slots are allocated, and incrementally written onto a chain
+ *       of slots itself. (This approach would fail if it were possible for the
+ *       slots for a version written by a transaction to be deallocated during
+ *       that transaction and then written on by another transaction. However,
+ *       we only allow reuse of slots dedicated to prior versions within the
+ *       same transaction.) When we finally deallocate the versions written in
+ *       that transaction on the journal we simply mark all slots allocated by
+ *       that transaction as deallocated in the global scope. We do not even
+ *       need to scan the object allocation index for the transaction - it can
+ *       simply be discarded.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

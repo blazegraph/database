@@ -65,7 +65,41 @@ import java.util.Map;
  *       that drive all of those activities (including migration to the
  *       read-optimized database and deletion of versions that are no longer
  *       accessible) in order to drive the algorithm, implementation, and
- *       performance tuning.
+ *       performance tuning.<br>
+ *       Some of the complex points are handling transaction isolation
+ *       efficiently with minimal duplication of data and high performance and,
+ *       in interaction with the slot allocation index, providing fast
+ *       deallocation of slots no longer used by any active transaction - the
+ *       current scheme essentially forces visitation of the slots to be
+ *       deleted.
+ * 
+ * @todo A larger branching factor in the object index will result in fewer
+ *       accesses to resolve a given identifier. This does not matter much when
+ *       the journal is fully buffered, but it is critical when a journal uses a
+ *       page buffer (unless the base object index and the per transaction
+ *       object indices can be wired into memory).<br>
+ *       A large branching factor is naturally in opposition to a smaller slot
+ *       size. If larger nodes are used with smaller slot sizes then each index
+ *       node will occupy multiple slots. It is possible to force allocation of
+ *       those slots such that they are contiguous - this approach has the
+ *       advantage that the journal remains an append-only store, but introduces
+ *       complexity in allocation of index nodes. My expectation is that most
+ *       allocations will be much smaller than index node allocations, but that
+ *       many allocations will be made together since writes are buffered on a
+ *       per tx basis before being applied to the journal. If it is also true
+ *       that we tend to release the allocations for entire transactions at
+ *       once, then this reduces the likelyhood that we will exhaust an extent
+ *       for index node allocations through fragmentation. <br>
+ *       Another approach would partition the journal (either within one file or
+ *       into two files) so that part was reserved for object index nodes and
+ *       part was reserved for slots. This would, pragmatically, result in two
+ *       memory spaces each having fixed length slots - one for the objects and
+ *       the slot allocation index blocks and one for the object index nodes.
+ *       However, partitioning also goes directly against the requirement for an
+ *       append-only store and would result in, essentially, twice as many
+ *       append only data structures - and hence twice the disk head movement as
+ *       a design that does not rely on either within file partition or a two
+ *       file scheme.<br>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
