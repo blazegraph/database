@@ -70,7 +70,7 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestServiceDiscovery.class );
 
-        suite.addTestSuite( TestServer.class );
+//        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
         return suite;
         
