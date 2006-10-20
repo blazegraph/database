@@ -49,6 +49,7 @@ package com.bigdata.journal;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -386,6 +387,54 @@ public class SimpleObjectIndex implements IObjectIndex {
 
         return firstSlot;
     
+    }
+
+    /**
+     * <p>
+     * Merge the transaction scope object index onto the global scope object
+     * index.
+     * </p>
+     * <p>
+     * This method is invoked by a transaction during commit processing to merge
+     * the write set of its object index into the global scope. This operation
+     * does NOT check for conflicts. The pre-condition is that the transaction
+     * has already been validated (hence, there will be no conflicts). The
+     * method exists on the object index so that we can optimize the traversal
+     * of the object index in an implementation specific manner (vs exposing an
+     * iterator).
+     * </p>
+     */
+    void mergeWithGlobalObjectIndex(Journal journal) {
+        
+        // Verify that this is a transaction scope object index.
+        assert baseObjectIndex != null;
+        
+        Iterator<Map.Entry<Integer,Integer>> itr = objectIndex.entrySet().iterator();
+        
+        while( itr.hasNext() ) {
+            
+            Map.Entry<Integer, Integer> entry = itr.next();
+            
+            // The persistent identifier.
+            final int id = entry.getKey();
+            
+            // The first slot on which the current version of that data resides.
+            final int firstSlot = entry.getValue();
+            
+            /*
+             * FIXME Is there any easy way to determine that we will be
+             * overwriting a pre-existing version in the global scope vs the
+             * case when a version was first created within this transactional
+             * scope?  If not, then mapIdToSlot() imposes a burden that we can
+             * not meet cheaply - knowing whether an existing data version will
+             * be overwritten.
+             */
+            boolean overwrite = journal.objectIndex.get(id) != null;
+            
+            journal.objectIndex.mapIdToSlot(id, firstSlot, overwrite);
+            
+        }
+        
     }
 
 }

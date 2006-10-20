@@ -50,6 +50,8 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -199,6 +201,13 @@ import java.util.Properties;
  * robust notice of the abort. Transactions probably need to send heartbeats so
  * that they can be presumptively killed if they stop working.) </li>
  * </ul>
+ * 
+ * FIXME Expand on latency and decision criteria for int64 assignments.
+ * 
+ * FIXME Expand on latency and decision criteria for notifying clients when
+ * pages or objects of interest have been modified by another transaction that
+ * has committed (or in the case of distributed workers on a single transaction,
+ * its peers).
  * 
  * FIXME Expand on the expected cost of finding a key or key range in a
  * clustered index, and on growth, splitting, migration, merging, and rebuilding
@@ -357,6 +366,158 @@ public class Journal {
      * is single threaded.
      */
     final SlotHeader _slotHeader = new SlotHeader();
+
+    /**
+     * A hash map containing all active transactions.
+     */
+    final Map<Long,Tx> activeTx = new HashMap<Long,Tx>();
+
+    /**
+     * A hash map containing all transactions that have prepared but not yet
+     * either committed or aborted.
+     */
+    final Map<Long,Tx> prepareTx = new HashMap<Long,Tx>();
+    
+    /**
+     * Notify the journal that a new transaction is being activated (starting on
+     * the journal).
+     * 
+     * @param tx
+     *            The transaction.
+     * 
+     * @throws IllegalStateException
+     * 
+     * FIXME Detect transaction identifiers that go backwards? For example tx0
+     * starts on one segment A while tx1 starts on segment B. Tx0 later starts
+     * on segment B. From the perspective of segment B, tx0 begins after tx1.
+     * This does not look like a problem unless there is an intevening commit,
+     * at which point tx0 and tx1 will have starting contexts that differ by the
+     * write set of the commit.<br>
+     * What exactly is the impact when transactions start out of sequence? Do we
+     * need to negotiated a distributed start time among all segments on which
+     * the transaction starts? That would be a potential source of latency and
+     * other kinds of pain. Look at how this is handled in the literature. One
+     * way to handle it is essentially to declare the intention of the
+     * transaction and pre-notify segments that will be written. This requires
+     * some means of figuring out that intention and is probably relevant (and
+     * solvable) only for very large row or key scans.
+     * 
+     * @todo What exactly is the impact when transactions end out of sequence? I
+     *       presume that this is absolutely Ok.
+     */
+    void activatingTx( Tx tx ) throws IllegalStateException {
+        
+        Long id = tx.getId();
+        
+        if( activeTx.containsKey( id ) ) throw new IllegalStateException("Already active: tx="+tx);
+        
+        if( prepareTx.containsKey(id)) throw new IllegalStateException("Already prepared: tx="+tx);
+
+        activeTx.put(id,tx);
+        
+    }
+
+    /**
+     * Notify the journal that a transaction is being prepared (and hence is no
+     * longer active).
+     * 
+     * @param tx
+     *            The transaction
+     * 
+     * @throws IllegalStateException
+     */
+    void preparingTx( Tx tx ) throws IllegalStateException {
+        
+        Long id = tx.getId();
+        
+        Tx tx2 = activeTx.remove(id);
+        
+        if( tx2 == null ) throw new IllegalStateException("Not active: tx="+tx);
+        
+        assert tx == tx2;
+        
+        if( prepareTx.containsKey(id)) throw new IllegalStateException("Already preparing: tx="+tx);
+        
+        prepareTx.put(id, tx);
+        
+    }
+
+    /**
+     * Notify the journal that a transaction is being completed (either aborting
+     * or committing).
+     * 
+     * @param tx
+     *            The transaction.
+     * 
+     * @throws IllegalStateException
+     * 
+     * @todo Keep around complete transaction identifiers as a sanity check for
+     *       repeated identifiers? This is definately not something to do for a
+     *       deployed system since it will cause a memory leak.
+     */
+    void completingTx( Tx tx ) throws IllegalStateException {
+        
+        Long id = tx.getId();
+        
+        Tx txActive = activeTx.remove(id);
+        
+        Tx txPrepared = prepareTx.remove(id);
+        
+        if( txActive == null && txPrepared == null ) {
+            
+            throw new IllegalStateException("Neither active nor being prepared: tx="+tx);
+            
+        }
+        
+    }
+    
+//    /**
+//     * The transaction identifier of the last transaction begun on this journal.
+//     * In order to avoid extra IO this value survives restart IFF there is an
+//     * intervening commit by any active transaction. This value is used to
+//     * reject transactions whose identifier arrives out of sequence at the
+//     * journal.
+//     * 
+//     * @return The transaction identifier or <code>-1</code> if no
+//     *         transactions have begun on the journal (or if no transactions
+//     *         have ever committed and no transaction has begun since restart).
+//     */
+//    public long getLastBegunTx() {
+//        
+//        return lastBegunTx;
+//        
+//    }
+//    private long lastBegunTx = -1;
+    
+    /**
+     * The transaction identifier of the most recently committed (last)
+     * transaction that was committed on the journal regardless of whether or
+     * not the data for that transaction remains on the journal.
+     * 
+     * @return The transaction identifier or <code>-1</code> IFF there no
+     *         transactions have ever committed on the journal.
+     */
+    public long getLastCommittedTx() {
+        
+        return lastCommittedTx;
+        
+    }
+    private long lastCommittedTx = -1;
+    
+    /**
+     * The transaction identifier of the first (earliest) transaction that was
+     * committed on the journal and whose data versions have not since been
+     * deleted from the journal.
+     * 
+     * @return The transaction identifier or <code>-1</code> IFF there are no
+     *         committed transactions on the journal.
+     */
+    public long getFirstTxOnJournal() {
+     
+        return firstTxOnJournal;
+        
+    }
+    private long firstTxOnJournal = -1;
     
     /**
      * Asserts that the slot index is in the legal range for the journal

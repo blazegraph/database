@@ -346,4 +346,650 @@ public class TestTx extends ProxyTestCase {
 
     }
     
+    /*
+     * Transaction run state tests.
+     */
+
+    /**
+     * Simple test of the transaction run state machine.
+     * 
+     * @todo detect duplicate transaction identifiers.
+     */
+    public void test_runStateMachine_activeAbort() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            tx0.abort();
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
+    /**
+     * Simple test of the transaction run state machine.
+     */
+    public void test_runStateMachine_activePrepareAbort() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            tx0.prepare();
+
+            assertFalse( tx0.isActive() );
+            assertTrue( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertTrue(journal.prepareTx.containsKey(ts0));
+
+            tx0.abort();
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+
+    /**
+     * Simple test of the transaction run state machine.
+     */
+    public void test_runStateMachine_activePrepareCommit() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            tx0.prepare();
+
+            assertFalse( tx0.isActive() );
+            assertTrue( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertTrue(journal.prepareTx.containsKey(ts0));
+
+            tx0.commit();
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertTrue( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+
+    /**
+     * Simple test of the transaction run state machine. verifies that a 2nd
+     * attempt to abort the same transaction results in an exception that does
+     * not change the transaction run state.
+     */
+    public void test_runStateMachine_activeAbortAbort_correctRejection() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            tx0.abort();
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            try {
+                tx0.abort();
+                fail("Expecting: "+IllegalStateException.class);
+            }
+            catch( IllegalStateException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+
+    /**
+     * Simple test of the transaction run state machine verifies that a 2nd
+     * attempt to prepare the same transaction results in an exception that
+     * changes the transaction run state to 'aborted'.
+     */
+    public void test_runStateMachine_activePreparePrepare_correctRejection() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            tx0.prepare();
+
+            assertFalse( tx0.isActive() );
+            assertTrue( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertTrue(journal.prepareTx.containsKey(ts0));
+
+            try {
+                tx0.prepare();
+                fail("Expecting: "+IllegalStateException.class);
+            }
+            catch( IllegalStateException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+
+    /**
+     * Simple test of the transaction run state machine verifies that a commit
+     * out of order results in an exception that changes the transaction run
+     * state to 'aborted'.
+     */
+    public void test_runStateMachine_activeCommit_correctRejection() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            long ts0 = 0;
+            
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            Tx tx0 = new Tx(journal,ts0);
+            assertEquals(ts0,tx0.getId());
+            
+            assertTrue( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertFalse( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertFalse( tx0.isComplete() );
+            
+            assertTrue(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+            
+            try {
+                tx0.commit();
+                fail("Expecting: "+IllegalStateException.class);
+            }
+            catch( IllegalStateException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+
+    /**
+     * Verifies that a READ is not permitted after a PREPARE and that the
+     * attempt results in an aborted transaction.
+     * 
+     * @throws IOException
+     */
+    public void test_runStateMachine_prepareRead_correctRejection() throws IOException {
+
+        final Properties properties = getProperties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            final long ts0 = 0;
+            
+            Tx tx0 = new Tx(journal, ts0);
+
+            tx0.prepare();
+
+            // can not read, write, delete or prepare after 'prepare'.
+            try {
+                tx0.read(0, null);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                System.err.println("Ignoring expected exception: " + ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+
+    }
+            
+    /**
+     * Verifies that a WRITE is not permitted after a PREPARE and that the
+     * attempt results in an aborted transaction.
+     * 
+     * @throws IOException
+     */
+    public void test_runStateMachine_prepareWrite_correctRejection() throws IOException {
+
+        final Properties properties = getProperties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            final long ts0 = 0;
+            
+            Tx tx0 = new Tx(journal, ts0);
+
+            tx0.prepare();
+
+            // can not read, write, delete or prepare after 'prepare'.
+            try {
+                tx0.write(0, getRandomData(journal));
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                System.err.println("Ignoring expected exception: " + ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+
+    }
+
+    /**
+     * Verifies that a DELETE is not permitted after a PREPARE and that the
+     * attempt results in an aborted transaction.
+     * 
+     * @throws IOException
+     */
+    public void test_runStateMachine_prepareDelete_correctRejection() throws IOException {
+
+        final Properties properties = getProperties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            final long ts0 = 0;
+            
+            Tx tx0 = new Tx(journal, ts0);
+
+            tx0.prepare();
+
+            // can not read, write, delete or prepare after 'prepare'.
+            try {
+                tx0.delete(0);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                System.err.println("Ignoring expected exception: " + ex);
+            }
+
+            assertFalse( tx0.isActive() );
+            assertFalse( tx0.isPrepared() );
+            assertTrue( tx0.isAborted() );
+            assertFalse( tx0.isCommitted() );
+            assertTrue( tx0.isComplete() );
+
+            assertFalse(journal.activeTx.containsKey(ts0));
+            assertFalse(journal.prepareTx.containsKey(ts0));
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+
+    }
+
+    /*
+     * Transaction semantics tests.
+     */
+    
+    /**
+     * Simple test of commit semantics. Three transactions are started: tx0, on
+     * which we will write one data version; tx1, which begins after tx0 but
+     * before tx0 commits - the change will NOT be visible in this transaction;
+     * and tx2, which begins after the commit - the change will be visible in
+     * this transaction.
+     * 
+     * @todo Add another tx that starts "before" tx0 and verify that the change
+     *       is NOT visible in that transaction. This will actually require
+     *       renumbering the transactions. This could also be written as another
+     *       test.
+     * 
+     * @todo We already have tests that create read-write conflicts above -
+     *       modify them to do a commit or abort as necessary.
+     * 
+     * @todo Write tests that create write-write conflicts to verify that they
+     *       can be detected and provide versions of those tests where the
+     *       conflict and can not be validated and verify the end state in each
+     *       case.
+     * 
+     * @todo Verify correct abort after 'prepare'.
+     * 
+     * @todo Issue warning or throw exception when closing journal with active
+     *       transactions? Provide a 'force' and timeout option? This was all
+     *       implemented for the DBCache implementation.
+     */
+    public void test_commit01() throws IOException {
+
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            // transaction on which we write and later commit.
+            Tx tx0 = new Tx(journal,0);
+            
+            // new transaction - commit will not be visible in this scope.
+            Tx tx1 = new Tx(journal,1);
+                        
+            ByteBuffer expected_id0_v0 = getRandomData(journal);
+            
+            // write data version on tx0
+            tx0.write(  0, expected_id0_v0 );
+
+            // data version visible in tx0.
+            assertEquals( expected_id0_v0.array(), tx0.read(0, null));
+
+            // data version not visible in global scope.
+            assertNotFound( journal.read(null, 0, null));
+
+            // data version not visible in tx1.
+            assertNotFound( tx1.read(0, null));
+
+            // prepare
+            tx0.prepare();
+
+            // commit.
+            tx0.commit();
+
+            // data version now visible in global scope.
+            assertEquals( expected_id0_v0.array(), journal.read(null,0, null));
+
+            // new transaction - commit is visible in this scope.
+            Tx tx2 = new Tx(journal,2);
+            
+            // data version now visible in global scope.
+            assertEquals( expected_id0_v0.array(), tx2.read(0, null));
+
+            // data version still not visible in tx1.
+            assertNotFound( tx1.read(0, null));
+            
+            // committed data version visible in tx2.
+            assertEquals( expected_id0_v0.array(), tx2.read(0, null));
+
+            /*
+             * abort tx1 - nothing was written.
+             */
+            tx1.abort();
+
+            // abort tx2 - nothing was written.
+            tx2.abort();
+            
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
 }

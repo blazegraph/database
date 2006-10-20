@@ -82,6 +82,7 @@ import junit.framework.TestSuite;
  *      slot size: 128
  *      Elapsed: 1609(ms), bufferMode=transient (memory only)
  *      Elapsed: 2375(ms), block-based optimum (low level disk IO, 8k blocks)
+ *      Elapsed: 2485(ms), sustained transfer optimum
  *      Elapsed: 2687(ms), bufferMode=mapped
  *      Elapsed: 4641(ms), slot-based optimum (low level disk IO, 128b slots)
  *      Elapsed: 9328(ms), bufferMode=disk
@@ -401,10 +402,10 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      * <p>
      * Writes the same amount of data using large blocks on a pre-extended file
      * using pure sequential IO. This case should produce the "best-case"
-     * optimium throughput to disk. In order for the journal to approach this
-     * best case scenario, it needs to combine individual slot writes that are,
-     * in fact, on purely successive positions in the channel into larger block
-     * write operations. 
+     * optimium throughput to disk <i>for block-oriented IO</i>. In order for
+     * the journal to approach this best case scenario, it needs to combine
+     * individual slot writes that are, in fact, on purely successive positions
+     * in the channel into larger block write operations.
      * </p>
      * <p>
      * Note: This overrides several methods in the base class in order to
@@ -480,9 +481,112 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
                 
             }
 
+            // Force to the disk.
+            raf.getChannel().force(false);
+
             final long elapsed = System.currentTimeMillis() - begin;
             
             System.err.println("Elapsed: "+elapsed+"(ms), block-based optimum");
+
+        }
+
+    }
+    
+    /**
+     * <p>
+     * Writes the same amount of data using a single nio "write buffer"
+     * operation on a pre-extended file. The buffer is a direct buffer, so it is
+     * allocated in the OS memory. The write should be pure sequential IO. This
+     * case should produce the "best-case" optimium throughput to disk <i>for
+     * sustained IO</i>. The journal SHOULD NOT be approach this best case
+     * scenario, but in fact block-based IO appears to out-perform this option!
+     * Comparison to this case SHOULD reveal the overhead of the journal, Java,
+     * and block-oriented IO when compare to sustained sequential data transfer
+     * from RAM to disk. Since block-based IO is, in fact, better, one can only
+     * presume that the nio library has some problem with very large writes.
+     * </p>
+     * <p>
+     * Note: This overrides several methods in the base class in order to
+     * conduct a test without the use of a journal.
+     * </p>
+     * 
+     * FIXME Try with write through to disk option enabled for the channel in
+     * the RandomAccessFile constructor. This might improve performance since we
+     * are writing through without read back. Try this option also on the
+     * block-based optimium test. If successful in that context, then it SHOULD
+     * be used on the journal modes with a page cache (direct and disk-only).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class BenchmarkSustainedTransferOptimium extends BenchmarkJournalWriteRate {
+
+        // Note: This winds up basically not used.
+        public BufferMode getBufferMode() {return BufferMode.Transient;}
+        
+        // Note: contents are not actually a journal.
+        public String getFilename() {return "benchmark-sustained-transfer-optimum.bin";}
+
+        RandomAccessFile raf;
+
+        public void setUp() throws IOException {
+            
+            deleteFile();
+
+            raf = new RandomAccessFile(getFilename(),"rw");
+            
+        }
+        
+        public void tearDown() throws IOException {
+            
+            raf.getChannel().force(false);
+            
+            raf.close();
+            
+            deleteFile();
+            
+        }
+
+        public void test() throws IOException {
+
+            doOptimiumWriteRateTest();
+            
+        }
+
+        public void doOptimiumWriteRateTest() throws IOException {
+
+            final long initialExtent = getInitialExtent();
+
+            if( initialExtent > Integer.MAX_VALUE ) {
+                
+                throw new RuntimeException("The initialExtent is too large to be buffered in RAM.");
+                
+            }
+            
+            final int dataSize = (int) initialExtent;
+            
+            System.err.println("Begin: Sustained-tranasfer optimum write rate test: #writes="+1+", dataSize="+dataSize);
+           
+            raf.setLength(initialExtent);
+            
+            ByteBuffer data = ByteBuffer.allocateDirect(dataSize);
+            
+            data.position( 0 );
+                
+            data.limit( dataSize );
+                
+            // Note measure only the disk operation time.
+            final long begin = System.currentTimeMillis();
+
+            // Write on the disk.
+            raf.getChannel().write(data,0L);
+
+            // Force to the disk.
+            raf.getChannel().force(false);
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            System.err.println("Elapsed: "+elapsed+"(ms), sustained transfer optimum");
 
         }
 
@@ -498,6 +602,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         suite.addTestSuite( BenchmarkDiskJournal.class );
         suite.addTestSuite( BenchmarkSlotBasedOptimium.class );
         suite.addTestSuite( BenchmarkBlockBasedOptimium.class );
+        suite.addTestSuite( BenchmarkSustainedTransferOptimium.class );
 
         return suite;
         
