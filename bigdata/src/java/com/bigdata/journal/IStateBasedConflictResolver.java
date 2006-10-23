@@ -78,7 +78,7 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStateBasedConflictResolover {
+public interface IStateBasedConflictResolver {
 
     /**
      * Resolve a conflict between a committed version and a proposed version.

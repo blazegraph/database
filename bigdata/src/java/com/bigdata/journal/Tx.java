@@ -361,7 +361,14 @@ public class Tx {
 
         try {
 
-            validate();
+            /*
+             * Validate against the current state of the journal's object index.
+             * 
+             * Note: This is NOT always the same as the inner object index map
+             * used by normal the transaction since other transactions MAY have
+             * committed on the journal since the transaction started!
+             */
+            objectIndex.validate(journal.objectIndex);
             
         } catch( ValidationError ex ) {
             
@@ -459,58 +466,6 @@ public class Tx {
      * serialized on this journal.
      */
     private void writeCommitRecord() {
-        
-    }
-    
-    /**
-     * <p>
-     * Validate changes made within the transaction against the last committed
-     * state of the journal. In general there are two kinds of conflicts:
-     * read-write conflicts and write-write conflicts. Read-write conflicts are
-     * handled by NEVER overwriting an existing version (an MVCC style
-     * strategy). Write-write conflicts are detected by backward validation
-     * against the last committed state of the journal and are resolved by a
-     * variety of data type specific state-based mechanisms. If a write-write
-     * conflict can not be validated, then validation will fail and the
-     * transaction will abort.
-     * </p>
-     * <p>
-     * Validation occurs as part of the prepare/commit protocol. Concurrent
-     * transactions MAY continue to run without limitation. A concurrent commit
-     * (if permitted) would force re-validation since the transaction MUST now
-     * be validated against the new baseline. (It is possible that this
-     * validation could be optimized.)
-     * </p>
-     * 
-     * FIXME As a trivial case, if no intervening commits have occurred on the
-     * journal then this transaction MUST be valid regardless of its write (or
-     * delete) set.
-     * 
-     * FIXME Make validation efficient by a streaming pass over the write set of
-     * this transaction that detects when the transaction identifier for the
-     * global object index has been modified since the transaction identifier
-     * that serves as the basis for this transaction (the committed state whose
-     * object index this transaction uses as its inner read-only context).
-     * 
-     * FIXME This raises a requirement that the object index "knows" the
-     * transaction identifier for the resolved data version. One way to handle
-     * that is to put the transaction identifier on the data version itself.
-     * Another way is to put it into the object index entry.
-     */
-    void validate() {
-        
-        if( objectIndex.objectIndex.isEmpty() ) {
-        
-            /*
-             * The write set is empty so the transaction automatically
-             * validates.
-             */
-
-            return;
-            
-        }
-        
-        // FIXME Implement validation.
         
     }
     
