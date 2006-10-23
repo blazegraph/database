@@ -600,4 +600,96 @@ abstract public class AbstractTestCase
         
     }
 
+    /**
+     * Verify that the {@link ISlotAllocation}s are consistent ( the same slots
+     * in the same order).
+     * 
+     * @param expected
+     *            The expected slot allocation.
+     * @param actual
+     *            The actual slot allocation.
+     */
+    public void assertEquals(ISlotAllocation expected, ISlotAllocation actual) {
+
+        /* Note: We MUST use a reference test here since the visitation pattern
+         * does not support concurrent traversal.  Failure to test for the same
+         * reference here will cause a seemingly suprious IllegalStateException
+         * when trying to compare a SingletonSlotAllocation with itself.
+         */ 
+        if( expected == actual ) return; // same same.
+        
+        if( expected == null && actual != null ) fail("Expected null.");
+        
+        if( expected != null && actual == null ) fail("Expected non-null");
+        
+        assertEquals("capacity",expected.capacity(),actual.capacity());
+
+        assertEquals("closed",expected.isClosed(),actual.isClosed());
+        
+        assertEquals("#bytes",expected.getByteCount(),actual.getByteCount());
+        
+        assertEquals("#slots",expected.getSlotCount(),actual.getSlotCount());
+
+        // check the first slot.
+        int expectedSlot = expected.firstSlot();
+        int actualSlot = actual.firstSlot();
+        assertEquals("firstSlot",expectedSlot,actualSlot);
+
+        // check the remaining slots.
+        int i = 1;
+        do {
+            
+            expectedSlot = expected.nextSlot();
+            
+//            try {
+                actualSlot = actual.nextSlot();
+//            }
+//            catch( IllegalStateException ex ) {
+//                System.err.println("expected: "+expected.getClass());
+//                System.err.println("actual  : "+actual.getClass());
+//                throw ex;
+//            }
+            
+            assertEquals("slot[" + i + "]", expectedSlot, actualSlot);
+
+            i++;
+            
+        } while( expectedSlot != -1 );
+
+    }
+
+    /**
+     * Verify that the slots are marked as indicated in the specified
+     * {@link ISlotAllocationIndex}.
+     * 
+     * @param slots
+     *            The slots.
+     * @param allocationIndex
+     *            The slot allocation index.
+     * @param allocated
+     *            true iff the slots must be marked as allocated in the index.
+     */
+//    * @param committed
+//    *            true iff the slots must be marked as committed in the index.
+    public void assertSlotAllocationState(ISlotAllocation slots,
+            ISlotAllocationIndex allocationIndex, boolean allocated) {
+
+        assert slots != null;
+        
+        assert allocationIndex != null;
+        
+        int i = 0;
+        
+        for (int slot = slots.firstSlot(); slot != -1; slot = slots.nextSlot()) {
+
+            assertEquals(
+                    "nslots=" + slots.getSlotCount() + " : slot[" + i + "]",
+                    allocated, allocationIndex.isAllocated(slot));
+
+            i++;
+            
+        }
+        
+    }
+
 }

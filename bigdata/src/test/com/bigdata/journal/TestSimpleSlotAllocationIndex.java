@@ -42,59 +42,27 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Oct 23, 2006
  */
 
 package com.bigdata.journal;
 
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
- * Runs all tests for all journal implementations.
+ * Test suite for {@link SimpleSlotAllocationIndex}.
+ * 
+ * FIXME Write tests for {@link SimpleSlotAllocationIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestSimpleSlotAllocationIndex extends
+        AbstractTestSlotAllocationIndex {
 
-    /**
-     * 
-     */
-    public TestAll() {
+    public TestSimpleSlotAllocationIndex() {
     }
 
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
+    public TestSimpleSlotAllocationIndex(String name) {
+        super(name);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("All Journals");
-
-        suite.addTestSuite( TestSlotMath.class );
-        suite.addTestSuite( TestRootBlockView.class );
-        suite.addTestSuite( TestSlotAllocation.class );
-        suite.addTestSuite( TestSimpleObjectIndex.class );
-        suite.addTestSuite( TestSimpleSlotAllocationIndex.class );
-        
-        suite.addTest( TestTransientJournal.suite() );
-        suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
-        suite.addTest( TestDiskJournal.suite() );
-
-        return suite;
-        
-    }
-    
 }

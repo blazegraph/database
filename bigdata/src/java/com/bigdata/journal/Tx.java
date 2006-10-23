@@ -140,6 +140,7 @@ public class Tx {
      */
     final static String NOT_ACTIVE = "Not active";
     final static String NOT_PREPARED = "Transaction is not prepared";
+    final static String NOT_COMMITTED = "Transaction is not committed";
     final static String IS_COMPLETE = "Transaction is complete";
     
     private enum RunState {
@@ -482,7 +483,8 @@ public class Tx {
      * </p>
      * 
      * FIXME As a trivial case, if no intervening commits have occurred on the
-     * journal then this transaction MUST be valid.
+     * journal then this transaction MUST be valid regardless of its write (or
+     * delete) set.
      * 
      * FIXME Make validation efficient by a streaming pass over the write set of
      * this transaction that detects when the transaction identifier for the
@@ -496,6 +498,17 @@ public class Tx {
      * Another way is to put it into the object index entry.
      */
     void validate() {
+        
+        if( objectIndex.objectIndex.isEmpty() ) {
+        
+            /*
+             * The write set is empty so the transaction automatically
+             * validates.
+             */
+
+            return;
+            
+        }
         
         // FIXME Implement validation.
         
@@ -584,5 +597,25 @@ public class Tx {
         return runState == RunState.ABORTED;
         
     }
-    
+
+    /**
+     * Garbage collect pre-existing versions that were overwritten or deleted
+     * during this transactions. This method MUST NOT be invoked by the
+     * application since its pre-conditions require total knowledge of the state
+     * of transactions running against the distributed database. That knowledge
+     * is available for the journal locally IFF it is running as a standalone /
+     * embedded database. Otherwise the knowledge is only available to the
+     * distributed transaction server.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction has not committed.
+     */
+    void gc() {
+
+        if( ! isCommitted() ) throw new IllegalStateException(NOT_COMMITTED);
+        
+        objectIndex.gc(journal.allocationIndex);
+        
+    }
+
 }

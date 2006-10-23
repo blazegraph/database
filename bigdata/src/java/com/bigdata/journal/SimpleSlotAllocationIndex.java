@@ -49,14 +49,12 @@ package com.bigdata.journal;
 
 import java.util.BitSet;
 
+
 /**
  * Non-persistence capable implementation of a slot allocation index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Modify Journal to use the distinction of allocated + committed (two bits of
- * state per slot).
  */
 public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
 
@@ -137,6 +135,12 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
      * 
      * @todo Allocation by {@link #releaseNextSlot(long)} should be optimized
      *       for fast consumption of the next N free slots.
+     * 
+     * @todo For index nodes and perhaps in general, it is strongly preferable
+     *       to have the released slots be contiguous. This could be the default
+     *       behavior or we could provide a boolean flag for this purpose. When
+     *       fragmentation is too great in the journal, we could force extension
+     *       in order to keep allocations contiguous.
      * 
      * FIXME Track the #of slots remaining in the global scope so that this
      * method can be ultra fast if there is no work to be done (this counter
@@ -320,6 +324,18 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
         allocated.clear(slot);
 
         committed.clear(slot);
+        
+    }
+    
+    public void clear(ISlotAllocation slots) {
+        
+        assert slots != null;
+        
+        for( int slot = slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
+            
+            clear( slot );
+            
+        }
         
     }
     

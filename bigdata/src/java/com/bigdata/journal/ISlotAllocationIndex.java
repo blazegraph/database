@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+
 /**
  * <p>
  * Interface for managing the free and allocated slots in a {@link Journal}.
@@ -76,6 +77,11 @@ package com.bigdata.journal;
  * and the <em>last free slot</em> in order to bound scans for the next free
  * slot when a new slot must be allocated.
  * </p>
+ * 
+ * FIXME Modify Journal to use the distinction of allocated + committed (two
+ * bits of state per slot).
+ * 
+ * FIXME Write a test suite for {@link ISlotAllocationIndex}.
  * 
  * @todo decide on requirements for incremental or all at once storage.
  *       incremental storage would break down the slot allocation index into
@@ -341,5 +347,16 @@ public interface ISlotAllocationIndex {
      * are also committed).
      */
     public int getAllocatedSlotCount();
+    
+    /**
+     * Deallocates the slots in the specified allocation.
+     * 
+     * @param slots
+     *            The allocation.
+     *            
+     * @exception IllegalStateException
+     *                if the slot is not already marked as allocated.
+     */
+    public void clear(ISlotAllocation slots);
 
 }

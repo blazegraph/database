@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+
 /**
  * <p>
  * An object journal for very fast write absorbtion. The journal supports
@@ -345,6 +346,8 @@ public class Journal {
      * (-1).
      * 
      * @see SlotMath#headerSize
+     * 
+     * @deprecated The use of slot headers is being phased out.
      */
     public static final int LAST_SLOT_MARKER = -1;
     
@@ -468,6 +471,144 @@ public class Journal {
             throw new IllegalStateException("Neither active nor being prepared: tx="+tx);
             
         }
+        
+    }
+    
+    /**
+     * <p>
+     * Deallocate slots for versions having a transaction timestamp less than or
+     * equal to <i>timestamp</i> that have since been overwritten (or deleted)
+     * by a committed transaction having a timestamp greater than <i>timestamp</i>.
+     * </p>
+     * <p>
+     * The criteria for deallocating historical versions is that (a) there is a
+     * more recent version; and (b) there is no ACTIVE (vs PENDING or COMPLETED)
+     * transaction which could read from that historical version. The journal
+     * does NOT locally have enough information to decide when it can swept
+     * historical versions written by a given transaction. This notice MUST come
+     * from a transaction service which has global knowledge of which
+     * transactions have PREPARED or ABORTED and can generate notices when all
+     * transactions before a given timestamp have been PREPARED or ABORTED. For
+     * example, a long running transaction can cause notice to be delayed for
+     * many short lived transactions that have since completed. Once the long
+     * running transaction completes, the transaction server can compute the
+     * largest timestamp value below which there are no active transactions and
+     * generate a single notice with that timestamp.
+     * </p>
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @todo This operation MUST be extremely efficient.
+     * 
+     * @todo This method is exposed suposing a transaction service that will
+     *       deliver notice when the operation should be conducted based on
+     *       total knowledge of the state of all transactions running against
+     *       the distributed database. As such, it may have to scan the journal
+     *       to locate the commit record for transactions satisifying the
+     *       timestamp criteria.
+     */
+    void gcTx( long timestamp ) {
+
+//        * <p>
+//        * Note: Migration to the read-optimized database is NOT a pre-condition for
+//        * deallocation of historical versions - rather it enables us to remove the
+//        * <em>current</em> committed version from the journal.
+//        * </p>
+
+        /*
+         * FIXME Implement garbage collection of overwritten and unreachable
+         * versions. Without migration to a read-optimized database, GC by
+         * itself is NOT sufficient to allow us to deallocate versions that have
+         * NOT been overwritten and hence is NOT sufficient to allow us to
+         * discard historical transactions in their entirety.
+         * 
+         * Given a transaction Tn that overwrites one or more pre-existing
+         * versions, the criteria for deallocation of the overwritten versions
+         * are:
+         * 
+         * (A) Tn commits, hence its intention has been made persistent; and
+         * 
+         * (B) There are no active transactions remaining that started from a
+         * committed state before the commit state resulting from Tn, hence the
+         * versions overwritten by Tn are not visible to any active transaction.
+         * Any new transaction will read through the committed state produced by
+         * Tn and will perceive the new versions rather than the overwritten
+         * versions.
+         * 
+         * Therefore, once Tn commits (assuming it has overwritten at least one
+         * pre-existing version), we can add each concurrent transaction Ti that
+         * is still active when Tn commits to a set of transactions that must
+         * either validate or abort before we may GC(Tn). Since Tn has committed
+         * it is not possible for new transactions to be created that would have
+         * to be included in this set since any new transaction would start from
+         * the committed state of Tn or its successors in the serialization
+         * order. As transactions validate or abort they are removed from
+         * GC(Tn). When this set is empty, we garbage collect the pre-existing
+         * versions that were overwritten by Tn.
+         * 
+         * The sets GC(T) must be restart safe. Changes to the set can only
+         * occur when a transaction commits or aborts.  However, even the abort
+         * of a transaction MUST be noticable on restart.
+         * 
+         * A summary may be used that is the highest transaction timestamp for
+         * which Tn must wait before running GC(Tn).  That can be written once
+         * 
+         * 
+         * Note that multiple transactions may have committed, so we may find
+         * that Tn has successors in the commit/serialization order that also
+         * meet the above criteria. All such committed transactions may be
+         * processed at once, but they MUST be processed in their commit order.
+         * 
+         * Once those pre-conditions have been met the following algorithm is
+         * applied to GC the historical versions that were overwritten by Tn:
+         * 
+         * 1. For each write by Ti where n < i <= m that overwrote a historical
+         * version, deallocate the slots for that historical version. This is
+         * valid since there are no active transactions that can read from that
+         * historical state. The processing order for Ti probably does not
+         * matter, but in practice there may be a reason to choose the
+         * serialization or reverse serialization order
+         * 
+         * ---- this is getting closed but is not yet correct ----
+         * 
+         * All versions written by a given transaction have the timestamp of
+         * that transaction.
+         * 
+         * The committed transactions are linked by their commit records into a
+         * reverse serialization sequence.
+         * 
+         * Each committed transaction has an object index that is accessible
+         * from its commit record. The entries in this index are versions that
+         * were written (or deleted) by that transaction. This index reads
+         * through into the object index for the committed state of the journal
+         * from which the transaction was minted.
+         * 
+         * We could maintain in the entry information about the historical
+         * version that was overwritten. For example, its firstSlot or a run
+         * length encoding of the slots allocated to the historical version.
+         * 
+         * We could maintain an index for all overwritten versions from
+         * [timestamp + dataId] to [slotId] (or a run-length encoding of the
+         * slots on which the version was written). Given a timestamp, we would
+         * then do a key scan from the start of the index for all entries whose
+         * timestamp was less than or equal to the given timestamp. For each
+         * such entry, we would deallocate the version and delete the entry from
+         * the index.
+         * 
+         * tx0 : begin tx0 : write id0 (v0) tx0 : commit journal : deallocate <=
+         * tx0 (NOP since no overwritten versions)
+         * 
+         * tx1 : begin tx2 : begin tx1 : write id0 (v1) tx1 : commit journal :
+         * deallocate <= tx1 (MUST NOT BE GENERATED since dependencies exist :
+         * tx1 and tx0 both depend on the committed state of tx0 -- sounds like
+         * lock style dependencies for deallocation !) tx2 : commit journal :
+         * deallocate <= tx2
+         * 
+         * index:: [ tx0 : id0 ] : v0 [ tx1 : id1 ] : v1
+         * 
+         * keyscan <= tx2
+         */
         
     }
     
@@ -868,11 +1009,9 @@ public class Journal {
      *                if data has no remaining bytes (this can happen if you
      *                forget to set the position and limit before calling this
      *                method).
-     * 
-     * @return The first slot on which the object was written.
      */
 
-    public int write(Tx tx,int id,ByteBuffer data) {
+    public void write(Tx tx,int id,ByteBuffer data) {
         
         if( data == null ) {
             
@@ -882,45 +1021,45 @@ public class Journal {
 
         assertOpen();
         
-        /*
-         * Note: throws DataDeletedException if the version is deleted.
-         */
-        final int firstSlotBefore = (tx == null ? objectIndex.getFirstSlot(id)
-                : tx.objectIndex.getFirstSlot(id));
-
-        /*
-         * True iff we are overwriting an existing, non-deleted version.
-         */
-        final boolean overwritingVersion = firstSlotBefore != IObjectIndex.NOTFOUND;
-        
-        /*
-         * True iff overwritting an existing version that was written in the
-         * same scope. When true, as a postcondition we synchronously deallocate
-         * the slots associated with the old version. They may be used by any
-         * subsequent write since they do not hold a data version that is
-         * visible in any scope.
-         * 
-         * Note: We need to be able to detect an overwrite of a version that was
-         * written in the same scope. This should be a feature of the object
-         * index. Basically, if the version is resolved in the outer index, then
-         * it was last written in the same scope.
-         * 
-         * Since access to the Journal (and hence to the object indices) is
-         * always single threaded, we can just reuse a single per-journal (or
-         * per index) data structure to carry back more information about the
-         * last match.
-         * 
-         * FIXME When we are running without an inner index (not isolated) this
-         * flag should always be set to false _unless_ there are no active
-         * transactions, in which case we can merrily wipe out the old version
-         * since no one can ever see it.  In order to do this the journal will
-         * need to keep track of the active transactions, e.g., in an hash table
-         * indexed by the transaction identifier.  When the hash table is empty
-         * there are no active transactions.  (Except that once a transaction has
-         * prepared, it can no longer read versions.)
-         */
-        final boolean overwritingVersionWrittenInSameScope = (tx == null ? false
-                : tx.objectIndex.hitOnOuterIndex);
+//        /*
+//         * Note: throws DataDeletedException if the version is deleted.
+//         */
+//        final int firstSlotBefore = (tx == null ? objectIndex.getFirstSlot(id)
+//                : tx.objectIndex.getFirstSlot(id));
+//
+//        /*
+//         * True iff we are overwriting an existing, non-deleted version.
+//         */
+//        final boolean overwritingVersion = firstSlotBefore != IObjectIndex.NOTFOUND;
+//        
+//        /*
+//         * True iff overwritting an existing version that was written in the
+//         * same scope. When true, as a postcondition we synchronously deallocate
+//         * the slots associated with the old version. They may be used by any
+//         * subsequent write since they do not hold a data version that is
+//         * visible in any scope.
+//         * 
+//         * Note: We need to be able to detect an overwrite of a version that was
+//         * written in the same scope. This should be a feature of the object
+//         * index. Basically, if the version is resolved in the outer index, then
+//         * it was last written in the same scope.
+//         * 
+//         * Since access to the Journal (and hence to the object indices) is
+//         * always single threaded, we can just reuse a single per-journal (or
+//         * per index) data structure to carry back more information about the
+//         * last match.
+//         * 
+//         * FIXME When we are running without an inner index (not isolated) this
+//         * flag should always be set to false _unless_ there are no active
+//         * transactions, in which case we can merrily wipe out the old version
+//         * since no one can ever see it.  In order to do this the journal will
+//         * need to keep track of the active transactions, e.g., in an hash table
+//         * indexed by the transaction identifier.  When the hash table is empty
+//         * there are no active transactions.  (Except that once a transaction has
+//         * prepared, it can no longer read versions.)
+//         */
+//        final boolean overwritingVersionWrittenInSameScope = (tx == null ? false
+//                : tx.objectIndex.hitOnOuterIndex);
         
         // #of bytes of data that fit in a single slot.
         final int dataSize = slotMath.dataSize;
@@ -947,9 +1086,22 @@ public class Journal {
          * Make sure that there are enough free slots in the journal to write
          * the data and obtain the first slot on which the data will be written.
          */
+        
+        // #of slots needed to write the data on the journal.
         final int nslots = slotMath.getSlotCount(remaining);
+        
+        // verify that at least this many slots are available, returning the
+        // index of the first slot to be written.
         final int firstSlot = allocationIndex.releaseSlots( nslots );
 
+        // create object to store the allocated slots indices. the case where
+        // nslots == 1 is optimized.
+        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(nbytes)
+                : new CompactSlotAllocation(nbytes,nslots));
+        
+        // Add the first slot to the record of allocated slots.
+        slots.add( firstSlot );
+        
         int thisSlot = firstSlot;
 
         // The priorSlot in the chain and -size for the first slot in the chain.
@@ -977,6 +1129,9 @@ public class Journal {
                 // We will write dataSize bytes into the current slot.
                 thisCopy = dataSize;
 
+                // Add the next slot to the record of allocated slots.
+                slots.add( nextSlot );
+                
             } else {
 
                 /*
@@ -990,6 +1145,9 @@ public class Journal {
                 // We will write [remaining] bytes into the current slot
                 thisCopy = remaining;
 
+                // close the allocation to further writes.
+                slots.close();
+                
             }
 
             // Verify that this slot has been allocated.
@@ -1016,56 +1174,60 @@ public class Journal {
             
         }
 
+        assert slots.isClosed();
+        
+        assert slots.getSlotCount() == nslots;
+        
         assert nwritten == nslots;
 
-        if( firstSlotBefore != IObjectIndex.NOTFOUND ) {
-            
-            if( overwritingVersionWrittenInSameScope ) {
-
-                /*
-                 * If this is a transactional write and the version that we are
-                 * overwriting was written in the current transaction, then the
-                 * slots associated with old version MUST be deleted as a
-                 * postcondition.
-                 * 
-                 * If this is a non-transactional write and the version that we
-                 * are overwriting was written on the journal since the last
-                 * commit, then the slots associated with old version MUST be
-                 * deleted as a postcondition.
-                 */
-
-                deallocateSlots(firstSlotBefore);
-                
-            } else {
-                
-                /*
-                 * FIXME We need to keep track of the overwritten version so
-                 * that its slots can be deallocated once there is no longer any
-                 * active transaction that can read from that version. Since the
-                 * version was overwritten and not simply deleted, we can not
-                 * use a flag on the object index.
-                 * 
-                 * One way to do this is to keep track of the committed states
-                 * and scan for versions that have been overwritten as of the
-                 * most recent committed state (versions that have been deleted
-                 * can be handled either in the same manner or as we are
-                 * handling them now).
-                 */
-                
-            }
-            
-        }
+//        if( firstSlotBefore != IObjectIndex.NOTFOUND ) {
+//            
+//            if( overwritingVersionWrittenInSameScope ) {
+//
+//                /*
+//                 * If this is a transactional write and the version that we are
+//                 * overwriting was written in the current transaction, then the
+//                 * slots associated with old version MUST be deleted as a
+//                 * postcondition.
+//                 * 
+//                 * If this is a non-transactional write and the version that we
+//                 * are overwriting was written on the journal since the last
+//                 * commit, then the slots associated with old version MUST be
+//                 * deleted as a postcondition.
+//                 */
+//
+//                deallocateSlots(firstSlotBefore);
+//                
+//            } else {
+//                
+//                /*
+//                 * FIXME We need to keep track of the overwritten version so
+//                 * that its slots can be deallocated once there is no longer any
+//                 * active transaction that can read from that version. Since the
+//                 * version was overwritten and not simply deleted, we can not
+//                 * use a flag on the object index.
+//                 * 
+//                 * One way to do this is to keep track of the committed states
+//                 * and scan for versions that have been overwritten as of the
+//                 * most recent committed state (versions that have been deleted
+//                 * can be handled either in the same manner or as we are
+//                 * handling them now).
+//                 */
+//                
+//            }
+//            
+//        }
         
         // Update the object index.
         if( tx != null ) {
             // transactional isolation.
-            tx.objectIndex.mapIdToSlot(id, firstSlot, overwritingVersion);
+            tx.objectIndex.mapIdToSlots(id, slots, allocationIndex);
         } else {
             // no isolation.
-            objectIndex.mapIdToSlot(id, firstSlot, overwritingVersion);
+            objectIndex.mapIdToSlots(id, slots, allocationIndex);
         }
 
-        return firstSlot;
+//        return firstSlot;
         
     }
     
@@ -1133,14 +1295,15 @@ public class Journal {
 
         assertOpen();
 
-        final int firstSlot = (tx == null ? objectIndex.getFirstSlot(id)
-                : tx.objectIndex.getFirstSlot(id));
+//        final int firstSlot = (tx == null ? objectIndex.getFirstSlot(id)
+//                : tx.objectIndex.getFirstSlot(id));
 
-        if( firstSlot == IObjectIndex.NOTFOUND ) {
-            
-            return null;
-            
-        }
+        ISlotAllocation slots = (tx == null ? objectIndex.getSlots(id)
+              : tx.objectIndex.getSlots(id));
+        
+        if( slots == null ) return null;
+        
+        final int firstSlot = slots.firstSlot();
         
         // Verify that this slot has been allocated.
         assert( allocationIndex.isAllocated(firstSlot) );
@@ -1152,6 +1315,10 @@ public class Journal {
 
         int startingPosition = (dst == null ? 0 : dst.position());
         
+        // FIXME Remove use of the SlotHeader using slots.nextSlot()!
+        //
+        // FIXME Requires [size] in IObjectIndexEntry to pre-size the return
+        // buffer!  The easiest way to do that is move it into ISlotAllocation!
         ByteBuffer tmp = _bufferStrategy.readFirstSlot(firstSlot, true,
                 _slotHeader, dst);
         
@@ -1231,118 +1398,126 @@ public class Journal {
      * @param id
      *            The int32 within-segment persistent identifier.
      * 
-     * @return The first slot on which the deleted version was written.
-     * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
      * @exception DataDeletedException
      *                if the persistent identifier is already deleted.
+     * 
+     * @todo This notion of deleting probably interfers with the ability to
+     *       latter reuse the same persistent identifier for new data. Explore
+     *       the scope of such interference and its impact on the read-optimized
+     *       database. Can we get into a situation with persistent identifier
+     *       exhaustion for some logical page?
      */
-    public int delete(Tx tx, int id) {
+    public void delete(Tx tx, int id) {
 
         assertOpen();
 
         if( tx == null ) {
             
             // No isolation.
-            return objectIndex.delete(id);
+            objectIndex.delete(id, allocationIndex );
             
         } else {
             
             // Transactional isolation.
-            return tx.objectIndex.delete(id);
+            tx.objectIndex.delete(id, allocationIndex );
             
         }
 
     }
     
-    /**
-     * <p>
-     * Deallocates slots storing a logically deleted data version. The data
-     * version MUST no longer be visible to any active transaction (this is NOT
-     * checked). This method is invoked in the following cases:
-     * 
-     * <ul>
-     * 
-     * <li> A version that was written within transaction is being overwritten
-     * in the same transaction. In this case, the slots allocated to the
-     * overwritten version may be immediately deleted since the overwritten
-     * version is no longer visible in any scope. This case is detected and
-     * handled by {@link #write(Tx, int, ByteBuffer)}.</li>
-     * 
-     * <li> The last transaction that is capable of reading versions from a
-     * historical committed state on the journal has completed processing (it
-     * has either prepared or aborted and in any case will no longer read data
-     * versions). Once notice of that event is received by the journal, the
-     * journal can release the slots allocated to the committed version of any
-     * data written by that transaction (or by any earlier transaction). There
-     * are actually two cases here: one in which the data version was deleted,
-     * one in which it was subsequently overwritten. (A pre-condition is that
-     * the committed state of transactions is migrated in a timely manner onto
-     * the read-optimized database such that the last committed version of any
-     * data version that has not subsequently been overwritten is on the
-     * database, otherwise deleting the versions for that transaction would
-     * result in unrecoverable loss of those versions.)</li>
-     * 
-     * </ul>
-     * </p>
-     * <p>
-     * Note: Just because a data version has been migrated onto the
-     * read-optimized database does NOT mean that its slots may be deleted on
-     * the journal. This is because subsequent committed versions will overwrite
-     * the version on the database. The overwritten version MUST remain on the
-     * journal until it is no longer visible to any active transaction.
-     * </p>
-     * <p>
-     * Note: Regardless of the reason why the slots are being deallocated, the
-     * <em>caller</em> has the responsibility to clean up the object index
-     * metadata such that the deallocated slots are no longer mapped to the
-     * version. This is easy in the case of within-transaction overwrite of data
-     * versions. Likewise, the object index for the transaction can simply be
-     * discarded when releasing slots for an entire transaction.
-     * </p>
-     * 
-     * @param firstSlot
-     *            The int32 within-segment persistent identifier.
-     */
-    void deallocateSlots(int firstSlot) {
-
-        assertSlot(firstSlot);
-
-        assert allocationIndex.isAllocated(firstSlot);
-        
-        // read just the header for the first slot in the chain.
-        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
-
-        // mark slot as available in the allocation index.
-        allocationIndex.clear(firstSlot);
-        
-        int nextSlot = _slotHeader.nextSlot; 
-
-        int priorSlot = firstSlot;
-        
-        int slotsRead = 1;
-        
-        while( nextSlot != LAST_SLOT_MARKER ) {
-
-            final int thisSlot = nextSlot;
-            
-            assert allocationIndex.isAllocated(thisSlot);
-            
-            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
-                    slotsRead, 0, null);
-            
-            priorSlot = thisSlot;
-            
-            // mark slot as available in the allocation index.
-            allocationIndex.clear(thisSlot);
-            
-            slotsRead++;
-            
-        }
-
-        System.err.println("Dealloacted " + slotsRead + " slots" );
-        
-    }
+//    /**
+//     * <p>
+//     * Deallocates slots storing a logically deleted data version. The data
+//     * version MUST no longer be visible to any active transaction (this is NOT
+//     * checked). This method is invoked in the following cases:
+//     * 
+//     * <ul>
+//     * 
+//     * <li> A version that was written within transaction is being overwritten
+//     * in the same transaction. In this case, the slots allocated to the
+//     * overwritten version may be immediately deallocated since the overwritten
+//     * version is no longer visible in any scope. This case is detected and
+//     * handled automatically withhin {@link #write(Tx, int, ByteBuffer)}.</li>
+//     * 
+//     * <li> The last transaction that is capable of reading versions from a
+//     * historical committed state on the journal has completed processing (it
+//     * has either prepared or aborted and in any case will no longer read data
+//     * versions). Once notice of that event is received by the journal, the
+//     * journal can release the slots allocated to the committed version of any
+//     * data written by that transaction (or by any earlier transaction). There
+//     * are actually two cases here: one in which the data version was deleted,
+//     * one in which it was subsequently overwritten. (A pre-condition is that
+//     * the committed state of transactions is migrated in a timely manner onto
+//     * the read-optimized database such that the last committed version of any
+//     * data version that has not subsequently been overwritten is on the
+//     * database, otherwise deleting the versions for that transaction would
+//     * result in unrecoverable loss of those versions.)</li>
+//     * 
+//     * </ul>
+//     * </p>
+//     * <p>
+//     * Note: Just because a data version has been migrated onto the
+//     * read-optimized database does NOT mean that its slots may be deleted on
+//     * the journal. This is because subsequent committed versions will overwrite
+//     * the version on the database. The overwritten version MUST remain on the
+//     * journal until it is no longer visible to any active transaction.
+//     * </p>
+//     * <p>
+//     * Note: Regardless of the reason why the slots are being deallocated, the
+//     * <em>caller</em> has the responsibility to clean up the object index
+//     * metadata such that the deallocated slots are no longer mapped to the
+//     * version. This is easy in the case of within-transaction overwrite of data
+//     * versions. Likewise, the object index for the transaction can simply be
+//     * discarded when releasing slots for an entire transaction.
+//     * </p>
+//     * 
+//     * @param firstSlot
+//     *            The int32 within-segment persistent identifier.
+//     * 
+//     * FIXME Rewrite to use {@link ISlotAllocation}? Move to
+//     * {@link ISlotAllocationIndex} since we no longer need to read on the
+//     * journal to perform the deallocation?
+//     */
+//    void deallocateSlots(int firstSlot) {
+//
+//        assertSlot(firstSlot);
+//
+//        assert allocationIndex.isAllocated(firstSlot);
+//        
+//        // read just the header for the first slot in the chain.
+//        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
+//
+//        // mark slot as available in the allocation index.
+//        allocationIndex.clear(firstSlot);
+//        
+//        int nextSlot = _slotHeader.nextSlot; 
+//
+//        int priorSlot = firstSlot;
+//        
+//        int slotsRead = 1;
+//        
+//        while( nextSlot != LAST_SLOT_MARKER ) {
+//
+//            final int thisSlot = nextSlot;
+//            
+//            assert allocationIndex.isAllocated(thisSlot);
+//            
+//            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
+//                    slotsRead, 0, null);
+//            
+//            priorSlot = thisSlot;
+//            
+//            // mark slot as available in the allocation index.
+//            allocationIndex.clear(thisSlot);
+//            
+//            slotsRead++;
+//            
+//        }
+//
+//        System.err.println("Dealloacted " + slotsRead + " slots" );
+//        
+//    }
     
 }

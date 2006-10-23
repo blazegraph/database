@@ -74,6 +74,8 @@ public class SlotMath {
      * The size of the per-slot header.
      * 
      * @see #headerSize
+     * 
+     * @deprecated The use of slot headers is being phased out.
      */
     static final int HEADER_SIZE = Bytes.SIZEOF_INT + Bytes.SIZEOF_INT;
     
@@ -110,11 +112,16 @@ public class SlotMath {
      * transaction the data were written and whether or not that transaction
      * committed. That information is carried in the object index and the
      * allocation nodes.
+     * 
+     * @deprecated The use of slot headers is being phased out.
      */
     final int headerSize = HEADER_SIZE;
     
     /**
      * The #of bytes per slot that are available for application data.
+     * 
+     * @todo This will be identical to slotSize once the use of slot headers is
+     *       phased out. Those two fields should therefore be collapsed.
      */
     final int dataSize;
     

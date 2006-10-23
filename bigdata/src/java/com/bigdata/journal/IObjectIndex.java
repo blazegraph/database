@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+
 /**
  * <p>
  * Interface for operations on the index mapping int32 within segment persistent
@@ -70,40 +71,29 @@ package com.bigdata.journal;
 public interface IObjectIndex {
 
     /**
-     * Update the object index to map the id onto the slot.
+     * Update the object index to map the id onto the slots.
      * 
      * @param id
      *            The int32 within-segment persistent identifier.
-     * @param slot
-     *            The first slot on which the current version of the identified
-     *            data is written within this transaction scope.
-     * @param overwrite
-     *            This parameter MUST be true when the caller has the
-     *            expectation that they are overwriting an existing version.
-     * 
-     * @exception IllegalStateException
-     *                if the identifier is already mapped to a slot and
-     *                overwrite == false.
-     * @exception IllegalStateException
-     *                if the identifier is not mapped to a slot and overwrite ==
-     *                true.
+     * @param slots
+     *            The slots on which the current version of the identified data
+     *            was written within this transaction scope.
+     * @param allocationIndex
+     *            The slot allocation index. When there is a current version and
+     *            it was written during the current transaction, then its slots
+     *            are synchronously deallocated since they are no longer
+     *            accessible to any active transaction.
      */
-    public void mapIdToSlot( int id, int slot, boolean overwrite );
+    public void mapIdToSlots( int id, ISlotAllocation slots, ISlotAllocationIndex allocationIndex );
     
     /**
-     * Return the first slot on which the current version of the data is stored.
-     * If the current version of the object for the transaction is stored on the
-     * journal, then this returns the first slot on which that object is
-     * written. Otherwise {@link NOTFOUND} is returned to indicate that the
-     * current version is stored on the database. An exception is thrown if the
-     * persistent identifier has been deleted within the scope visible to the
-     * transaction.
+     * Return the slots on which the current version of the data is stored.
      * 
      * @param id
      *            The int32 within-segment persistent identifier.
      * 
-     * @return The first slot on which the data version is stored or
-     *         {@link #NOTFOUND} if the identifier is not mapped
+     * @return The slots on which the data version is stored or
+     *         <code>null</code> if the identifier is not mapped.
      * 
      * @exception DataDeletedException
      *                This exception is thrown if the object is logically
@@ -111,41 +101,38 @@ public interface IObjectIndex {
      *                transaction. The caller MUST NOT resolve the persistent
      *                identifier against the database since the current version
      *                is deleted.
-     * 
-     * @see #NOTFOUND
      */
-    public int getFirstSlot( int id );
+    public ISlotAllocation getSlots( int id );
 
-    /**
-     * Removes and returns the first slot on which a version of the deleted data
-     * version was last written.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * 
-     * @return The first slot.
-     * 
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is bad.
-     * @exception IllegalStateException
-     *                if <i>id</id> does not identify deleted data.
-     */
-    public int removeDeleted( int id );
+//    /**
+//     * Removes and returns the first slot on which a version of the deleted data
+//     * version was last written.
+//     * 
+//     * @param id
+//     *            The int32 within-segment persistent identifier.
+//     * 
+//     * @return The first slot.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if the persistent identifier is bad.
+//     * @exception IllegalStateException
+//     *                if <i>id</id> does not identify deleted data.
+//     */
+//    public int removeDeleted( int id );
     
     /**
-     * Remove the entry in the object index, making the data no longer visible
-     * in this transaction scope.
-     * 
-     * @todo The real contract for this method is a little more complex. It has
-     *       to remove the data from visibility within the transaction, but it
-     *       also needs to record that the data was deleted so that we can
-     *       correctly respond to subsequent reads with a {@link #NOTFOUND} and
-     *       properly handle index merges during commit processing.
+     * Mark the entry in the object index as <em>deleted</em>. If the current
+     * version was written during this transaction, then this method
+     * synchronously deallocates the slots allocated to the current version. In
+     * either case, subsequent reads on the object index will respond with a
+     * {@link DataDeletedException}.
      * 
      * @param id
      *            The int32 within-segment persistent identifier.
      * 
-     * @return The first slot on which the deleted version was written.
+     * @param allocationIndex
+     *            The slot allocation index that will be used to deallocate the
+     *            slots allocated to the current version.
      * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
@@ -153,7 +140,7 @@ public interface IObjectIndex {
      *                if the data is already deleted.
      * 
      */
-    public int delete( int id );
+    public void delete( int id, ISlotAllocationIndex allocationIndex );
     
     /**
      * Indicates that the current data version for the persistent identifier was

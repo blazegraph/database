@@ -69,6 +69,8 @@ import java.util.Random;
  * @todo tests when the journal is very large (NOT the normal use case for
  *       bigdata).
  * 
+ * @todo Do stress test with writes, reads, and deletes.
+ * 
  * @todo tests of the exclusive lock mechanism during startup/shutdown (the
  *       advisory file locking mechanism). This is not used for the
  *       memory-mapped mode, but it is used for both "Direct" and "Disk" modes.
@@ -771,13 +773,6 @@ public class TestJournal extends ProxyTestCase {
      * @todo Do some more simple tests where a few objects are written, read
      *       back, deleted one by one, and verify that they can no longer be
      *       read.
-     * 
-     * @todo Do stress test with writes, reads, and deletes.
-     * 
-     * @todo Verify that the slots are released once there is no active
-     *       transaction that could read the deleted version (testing this is
-     *       complex - it is really a concurrency control test and can't be
-     *       written without building out the transaction model further).
      */
     
     public void test_delete001() throws IOException {
@@ -791,12 +786,10 @@ public class TestJournal extends ProxyTestCase {
         try {
 
             Journal journal = new Journal(properties);
-
-            Tx tx = new Tx(journal,0);
             
-            int id = 0;
+            final int id = 0;
             
-            byte[] expected = doWriteRoundTripTest(journal, tx, id,
+            byte[] expected = doWriteRoundTripTest(journal, null, id,
                     (journal.slotMath.dataSize * 3) + 1);
 
             /*
@@ -804,44 +797,58 @@ public class TestJournal extends ProxyTestCase {
              * it is the only object in the journal).
              */
             final int nallocated = journal.allocationIndex.getAllocatedSlotCount();
-            System.err.println("Allocated "+nallocated+" slots to tx="+tx+", id="+id);
+            System.err.println("Allocated "+nallocated+" slots for id="+id);
 
-            ByteBuffer actual = journal.read(tx, id, null);
+            ByteBuffer actual = journal.read(null, id, null);
 
             assertEquals("acutal.position()",0,actual.position());
             assertEquals("acutal.limit()",expected.length,actual.limit());
             assertEquals("limit() - position()",expected.length,actual.limit() - actual.position());
             assertEquals(expected,actual);
 
-            // The firstSlot for the version that we are about to delete.
-            final int firstSlot = tx.objectIndex.getFirstSlot(id);
-            
-            assertEquals(firstSlot,journal.delete(tx, id));
+            // The slots for the version that we are about to delete.
+            final ISlotAllocation slots = journal.objectIndex.getSlots(id);
+
+            // delete the version.
+            journal.delete(null,id);
+
+            /*
+             * Since the version only existed within in the global scope, verify
+             * that the slots were synchronously deallocated when the version
+             * was deleted (this requires the journal to track whether or not
+             * there are any active transactions).
+             * 
+             * @todo Do a variant test when there is an active transaction and
+             * verify that the slots are NOT deallocated until that transaction
+             * prepares or aborts. This requires some tricky work on the part of
+             * the journal.
+             */
+            assertSlotAllocationState(slots, journal.allocationIndex,false);
+
+            // Verify that there are no more allocated slots.
+            assertEquals("nallocated", 0, journal.allocationIndex.getAllocatedSlotCount());
 
             // Verify the object is now correctly marked as deleted in the
             // object index.
             try {
-                tx.objectIndex.getFirstSlot(id);
+                journal.objectIndex.getSlots(id);
                 fail("Expecting: "+DataDeletedException.class);
             }
             catch(DataDeletedException ex) {
                 System.err.println("Ignoring expected exception: "+ex);
             }
 
-            // Verify that the #of allocated slots has not changed.
-            assertEquals(nallocated,journal.allocationIndex.getAllocatedSlotCount());
-
             /*
              * Test read after delete.
              */
-            assertDeleted(tx,id);
+            assertDeleted(journal,id);
 
             /*
              * Test delete after delete.
              */
             try {
                 
-                journal.delete(tx, id);
+                journal.delete(null,id);
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -856,7 +863,7 @@ public class TestJournal extends ProxyTestCase {
              */
             try {
                 
-                journal.write(tx, id, getRandomData(journal));
+                journal.write(null,id, getRandomData(journal));
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -865,35 +872,6 @@ public class TestJournal extends ProxyTestCase {
                 System.err.println("Ignoring expected exception: " + ex);
                 
             }
-
-            // Verify that the #of allocated slots has not changed.
-            assertEquals(nallocated,journal.allocationIndex.getAllocatedSlotCount());
-
-            /*
-             * Deallocate the slots for that object.
-             */
-
-            journal.deallocateSlots(firstSlot);
-
-            // clean up the object index since the slots were deallocated (this
-            // is just a wee-bit of a low-level hack).
-            assertEquals(firstSlot, (tx == null ? journal.objectIndex
-                    .removeDeleted(id) : tx.objectIndex.removeDeleted(id)));
-
-            
-            // Verify the entry in the object index is gone.
-            assertEquals("Expecting 'NOTFOUND'", IObjectIndex.NOTFOUND,
-                    tx.objectIndex.getFirstSlot(id));
-
-            // Verify that there are no more allocated slots.
-            assertEquals("nallocated", 0, journal.allocationIndex.getAllocatedSlotCount());
-
-            /*
-             * Verify that read now reports "not found", indicating that the
-             * caller MUST attempt to resolve the object against the database
-             * (not that it will be found there either for this test case).
-             */
-            assertNull("Read returns non-null", journal.read(tx, id, null));
 
             journal.close();
 
@@ -916,7 +894,7 @@ public class TestJournal extends ProxyTestCase {
      * @param journal
      *            The journal.
      * @param tx
-     *            The transaction.
+     *            The transaction (may be null to use no isolation).
      * @param id
      *            The int32 within-segment persistent identifier.
      * @param nbytes
@@ -936,13 +914,18 @@ public class TestJournal extends ProxyTestCase {
         
         ByteBuffer data = ByteBuffer.wrap(expected);
         
-        assertEquals(IObjectIndex.NOTFOUND,tx.objectIndex.getFirstSlot(id));
+        assertNull((tx == null ? journal.objectIndex.getSlots(id)
+                : tx.objectIndex.getSlots(id)));
         
-        int firstSlot = journal.write(tx,id,data);
+        journal.write(tx,id,data);
         assertEquals("limit() != #bytes", expected.length, data.limit());
         assertEquals("position() != limit()",data.limit(),data.position());
-        
-        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
+
+        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
+                : tx.objectIndex.getSlots(id));
+        assertEquals("#bytes",nbytes,slots.getByteCount());
+        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
+//        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
         
         /*
          * Read into a buffer allocated by the Journal.
