@@ -60,10 +60,6 @@ import java.util.Properties;
  * 
  * @todo Do stress test with writes, reads, and deletes.
  * 
- * @todo Write lots of tests to handle the edge cases for overwrite and/or
- *       delete of pre-existing versions and versions that exist only within a
- *       tx scope.
- * 
  * @todo Work through tests of the commit logic and verify the post-conditions
  *       for successful commit vs abort of a transaction. Verification must
  *       occur on many levels. For example, there are post-conditions for
@@ -112,7 +108,8 @@ import java.util.Properties;
  *       validation rules to the database, perhaps as a parameter when a
  *       transaction starts or - to enforce the data type specificity at the
  *       risk of tighter integration of components - as part of the schema
- *       declaration.
+ *       declaration.  Declare IStateBasedConflictResolver that either merges
+ *       state into object in the transaction or causes the tx to abort.
  * 
  * @todo Verify correct abort after 'prepare'.
  * 
@@ -566,19 +563,20 @@ public class TestTx extends ProxyTestCase {
     }
     
     /**
-     * Test writes multiple versions and verifies that the correct version may
-     * be read back at any time. The last written version is then deleted and we
-     * verify that read, write and delete operations all correctly report that
-     * the data is deleted.
+     * Test writes multiple versions on a single transaction and verifies that
+     * the correct version may be read back at any time. There are two data
+     * items, id0 and id1. A pre-existing version is written onto the journal
+     * for id0 before the transaction starts. Multiple versions are then written
+     * onto the journal for each identifier and we verify that versions written
+     * within the transaction that are subsequently overwritten are
+     * synchronously deallocated while the pre-existing version on the journal
+     * is not. Finally, the versions are deleted and we again verify the correct
+     * deallocation strategy. After the transaction commits, the pre-existing
+     * version is still allocated but unreachable. We then do a GC of the
+     * transaction and verify that the pre-existing version is finally
+     * deallocated.
      * 
      * @throws IOException
-     * 
-     * FIXME Verify that we are immediately deallocating slots for the
-     * historical versions.
-     * 
-     * FIXME When a version exists on the journal before the transaction starts
-     * only the 2nd write should cause the prior version to be immediately
-     * deallocated.  (This could be its own test.)
      */
     public void test_writeMultipleVersions() throws IOException {
 
@@ -592,10 +590,13 @@ public class TestTx extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            Tx tx0 = new Tx(journal,0);
-            
             // Two versions of id0.
             final int id0 = 0;
+            
+            // pre-existing version of id0.
+            final ByteBuffer expected_preExistingVersion = getRandomData(journal);
+
+            // Two versions of id0 written during tx0.
             final ByteBuffer expected0v0 = getRandomData(journal);
             final ByteBuffer expected0v1 = getRandomData(journal);
             
@@ -604,13 +605,27 @@ public class TestTx extends ProxyTestCase {
             final ByteBuffer expected1v0 = getRandomData(journal);
             final ByteBuffer expected1v1 = getRandomData(journal);
             final ByteBuffer expected1v2 = getRandomData(journal);
+
+            // Write pre-existing version onto the journal.
+            journal.write(null,id0,expected_preExistingVersion);
+            ISlotAllocation slots_preExistingVersion = journal.objectIndex.getSlots(id0);
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+
+            // Start transaction.
+            Tx tx0 = new Tx(journal,0);
             
             // precondition tests, write id0 version0, postcondition tests.
-            assertNotFound(tx0.read(id0,null));
+            assertEquals(expected_preExistingVersion.array(),tx0.read(id0,null));
             
             assertNotFound(tx0.read(id1,null));
 
             tx0.write(id0,expected0v0);
+
+            final ISlotAllocation slots_id0_v0 = tx0.objectIndex.getSlots(id0);
+            
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, true);
             
             assertEquals(expected0v0.array(),tx0.read(id0, null));
             
@@ -619,19 +634,49 @@ public class TestTx extends ProxyTestCase {
             // write id1 version0, postcondition tests.
             tx0.write(id1,expected1v0);
             
+            final ISlotAllocation slots_id1_v0 = tx0.objectIndex.getSlots(id1);
+
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, true);
+
             assertEquals(expected0v0.array(),tx0.read(id0, null));
             
             assertEquals(expected1v0.array(),tx0.read(id1, null));
             
             // write id1 version1, postcondition tests.
             tx0.write(id1,expected1v1);
+
+            final ISlotAllocation slots_id1_v1 = tx0.objectIndex.getSlots(id1);
+
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, true);
+
             assertEquals(expected0v0.array(),tx0.read( id0, null));
             
             assertEquals(expected1v1.array(),tx0.read( id1, null));
             
             // write id1 version2, postcondition tests.
             tx0.write(id1,expected1v2);
+
+            final ISlotAllocation slots_id1_v2 = tx0.objectIndex.getSlots(id1);
+
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, true);
             
             assertEquals(expected0v0.array(),tx0.read( id0, null));
             
@@ -639,15 +684,41 @@ public class TestTx extends ProxyTestCase {
 
             // write id0 version1, postcondition tests.
             tx0.write(id0,expected0v1);
+
+            final ISlotAllocation slots_id0_v1 = tx0.objectIndex.getSlots(id0);
+
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id0_v1, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, true);
+
             assertEquals(expected0v1.array(),tx0.read(id0, null));
             
             assertEquals(expected1v2.array(),tx0.read(id1, null));
-
+            
             // delete id1, postcondition tests.
 
             tx0.delete(id1);
             
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id0_v1, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, false);
+
             assertEquals(expected0v1.array(),tx0.read(id0, null));
             
             assertDeleted(tx0, id1);
@@ -656,9 +727,66 @@ public class TestTx extends ProxyTestCase {
 
             tx0.delete(id0);
             
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id0_v1, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, false);
+
             assertDeleted(tx0, id0);
             
             assertDeleted(tx0, id1);
+
+            /*
+             * Commit the transaction.
+             */
+            tx0.prepare();
+            
+            tx0.commit();
+
+            // Note: Still allocated!
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id0_v1, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, false);
+
+            // id0 is deleted, even though the slots for the version are still allocated.
+            assertDeleted(journal, id0);
+            
+            // Garbage collection for tx0.
+            tx0.gc();
+
+            // Note: Finally deallocated!
+            assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id0_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id0_v1, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots_id1_v1, journal.allocationIndex, false);
+            
+            assertSlotAllocationState(slots_id1_v2, journal.allocationIndex, false);
+
+            /*
+             * @todo Should this report "not found" or "deleted"?
+             */
+//            assertNotFound(journal.read( null, id0, null ));
+            assertDeleted(journal, id0);
 
             journal.close();
 
@@ -669,7 +797,7 @@ public class TestTx extends ProxyTestCase {
         }
 
     }
-    
+        
     /*
      * Transaction run state tests.
      */

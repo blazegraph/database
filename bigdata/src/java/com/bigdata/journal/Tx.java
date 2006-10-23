@@ -432,16 +432,16 @@ public class Tx {
         journal.completingTx(this);
 
         /*
-         * FIXME Mark slots allocated by this transaction as committed.
-         */
-        
-        /*
-         * FIXME Merge the object index into the global scope. This operation
-         * MUST succeed since we have already validated. (Note that
-         * non-transactional operations on the global scope should probably be
-         * disallowed if they would conflict with a prepared transaction,
-         * otherwise this merge operation would not have its pre-conditions
-         * satisified).
+         * Merge the object index into the global scope. This also marks the
+         * slots used by the versions written by the transaction as 'committed'.
+         * This operation MUST succeed since we have already validated.
+         * 
+         * FIXME This MUST be ATOMIC.
+         * 
+         * FIXME Note that non-transactional operations on the global scope
+         * should probably be disallowed if they would conflict with a prepared
+         * transaction, otherwise this merge operation would not have its
+         * pre-conditions satisified.
          */
         objectIndex.mergeWithGlobalObjectIndex(journal);
 
@@ -609,6 +609,11 @@ public class Tx {
      * 
      * @exception IllegalStateException
      *                if the transaction has not committed.
+     * 
+     * @todo When a pre-existing version is deleted within a transaction scope
+     *       and the transaction later commits and is finally GC'd, document
+     *       whether or not tge GC will cause the index to report "not found" as
+     *       a post-condition rather than "deleted".
      */
     void gc() {
 

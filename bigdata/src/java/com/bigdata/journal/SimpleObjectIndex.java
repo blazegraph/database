@@ -664,13 +664,13 @@ public class SimpleObjectIndex implements IObjectIndex {
      * index.
      * </p>
      * <p>
-     * This method is invoked by a transaction during commit processing to merge
-     * the write set of its object index into the global scope. This operation
-     * does NOT check for conflicts. The pre-condition is that the transaction
-     * has already been validated (hence, there will be no conflicts). The
-     * method exists on the object index so that we can optimize the traversal
-     * of the object index in an implementation specific manner (vs exposing an
-     * iterator).
+     * Note: This method is invoked by a transaction during commit processing to
+     * merge the write set of its object index into the global scope. This
+     * operation does NOT check for conflicts. The pre-condition is that the
+     * transaction has already been validated (hence, there will be no
+     * conflicts). The method exists on the object index so that we can optimize
+     * the traversal of the object index in an implementation specific manner
+     * (vs exposing an iterator).
      * </p>
      * 
      * @todo For a persistence capable implementation of the object index we
@@ -684,7 +684,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      *       of the journal design). So another option is to just write a chain
      *       of {@link ISlotAllocation} objects. (Note, per the item below GC
      *       also needs to remove entries from the global object index so this
-     *       optimization may not be practical).  This could be a single long
+     *       optimization may not be practical). This could be a single long
      *       run-encoded slot allocation spit out onto a series of slots during
      *       PREPARE. When we GC the transaction, we just read the chain,
      *       deallocate the slots found on that chain, and then release the
@@ -780,6 +780,21 @@ public class SimpleObjectIndex implements IObjectIndex {
                  */
 
                 journal.objectIndex.objectIndex.put(id, entry);
+
+                /*
+                 * Mark the slots for the current version as committed.
+                 * 
+                 * @todo This MUST be atomic. (It probably will be once it is
+                 * modified for a persistence capable index since we do not
+                 * record the new root of the object index on the journal until
+                 * the moment of the commit, so while dirty index nodes may be
+                 * evicted onto the journal, they are not accessible in case of
+                 * a transaction restart. This does suggest a recursive twist
+                 * with whether or not the slots for the index nodes themsevles
+                 * are marked as committed on the journal -- all stuff that
+                 * needs tests!)
+                 */
+                journal.allocationIndex.setCommitted(entry.getCurrentVersionSlots());
                 
             }
             

@@ -303,7 +303,7 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
 
     public void setCommitted(int slot) {
         
-        if( allocated.get( slot ) ) throw new IllegalStateException();
+        if( ! allocated.get( slot ) ) throw new IllegalStateException();
         
         committed.set(slot);
         
@@ -334,6 +334,18 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
         for( int slot = slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
             
             clear( slot );
+            
+        }
+        
+    }
+    
+    public void setCommitted(ISlotAllocation slots) {
+        
+        assert slots != null;
+        
+        for( int slot = slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
+            
+            setCommitted( slot );
             
         }
         

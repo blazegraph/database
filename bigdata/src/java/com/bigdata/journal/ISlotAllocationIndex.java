@@ -359,4 +359,15 @@ public interface ISlotAllocationIndex {
      */
     public void clear(ISlotAllocation slots);
 
+    /**
+     * Marks the slots in the specified allocation as 'committed'.
+     * 
+     * @param slots
+     *            The allocation.
+     *            
+     * @exception IllegalStateException
+     *                if the slot is not already marked as allocated.
+     */
+    public void setCommitted(ISlotAllocation slots);
+    
 }
