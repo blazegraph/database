@@ -53,6 +53,9 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
@@ -237,18 +240,33 @@ abstract public class AbstractTestCase
      */
     
     public Properties getProperties() {
+        
         if( m_properties == null ) {
+            
             /*
              * Read properties from a hierarchy of sources and cache a
              * reference.
              */
+            
             m_properties = super.getProperties();
+            
         }
+        
         /*
          * Wrap up the cached properties so that they are not modifable by the
          * caller (no side effects between calls).
          */
-        return new Properties( m_properties );
+        
+        Properties properties = new Properties( m_properties );
+        
+        /*
+         * The test files are always deleted when the journal is closed
+         * normally.
+         */
+        properties.setProperty("deleteOnClose","true");
+        
+        return properties;
+        
     }
 
     /**
@@ -439,11 +457,20 @@ abstract public class AbstractTestCase
      * @return The unique filename.
      * 
      * @throws IOException
+     * 
+     * @see {@link #getProperties()}, which sets the "deleteOnClose" flag for
+     *      unit tests.
      */
     
     String getTestJournalFile() throws IOException {
 
-        File tmp = File.createTempFile("test-"+getName()+"-", ".jnl");
+        Properties properties = getProperties();
+        
+        String bufferMode = properties.getProperty("bufferMode");
+        
+        if( bufferMode == null ) bufferMode = "default";
+        
+        File tmp = File.createTempFile("test-"+bufferMode+"-"+getName()+"-", ".jnl");
         
         if( ! tmp.delete() ) {
             
@@ -528,7 +555,7 @@ abstract public class AbstractTestCase
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
      *         random length and having random contents.
      */
-    ByteBuffer getRandomData(Journal journal) {
+    public ByteBuffer getRandomData(Journal journal) {
         
         final int slotDataSize = journal.slotMath.dataSize;
         
@@ -692,4 +719,148 @@ abstract public class AbstractTestCase
         
     }
 
+    /**
+     * Test the version counter for a persistent identifier in the global scope.
+     * 
+     * @param journal
+     *            The journal.
+     * @param id
+     *            The int32 within segment persistent identifier.
+     * @param expectedVersionCounter
+     *            The expected value of the version counter.
+     * 
+     * @exception AssertionFailedError
+     *                if the persistent identifier is not found in the global
+     *                object index.
+     * @exception AssertionFailedError
+     *                if the identifer is found, but the version counter value
+     *                differs from the expected version counter.
+     */
+    protected void assertVersionCounter(Journal journal, int id, long expectedVersionCounter ) {
+        
+        IObjectIndexEntry entry = journal.objectIndex.objectIndex.get(id);
+        
+        if( entry == null ) fail("No entry in journal: id="+id);
+        
+        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
+        
+    }
+
+    /**
+     * Test the version counter for a persistent identifier in the transaction
+     * scope.
+     * 
+     * @param tx
+     *            The transaction.
+     * @param id
+     *            The int32 within segment persistent identifier.
+     * @param expectedVersionCounter
+     *            The expected value of the version counter.
+     * @exception AssertionFailedError
+     *                if the persistent identifier is not found in the
+     *                transaction's outer object index (this test does NOT read
+     *                through to the inner index so you MUST NOT invoke it
+     *                before the version has been overwritten by the
+     *                transaction).
+     * @exception AssertionFailedError
+     *                if the identifer is found, but the version counter value
+     *                differs from the expected version counter.
+     */
+    protected void assertVersionCounter(Tx tx, int id, long expectedVersionCounter ) {
+        
+        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
+        
+        if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
+        
+        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
+        
+    }
+    
+    /**
+     * Write a data version consisting of N random bytes and verify that we can
+     * read it back out again.
+     * 
+     * @param journal
+     *            The journal.
+     * @param tx
+     *            The transaction (may be null to use no isolation).
+     * @param id
+     *            The int32 within-segment persistent identifier.
+     * @param nbytes
+     *            The data version length.
+     * 
+     * @return The data written. This can be used to re-verify the write after
+     *         intervening reads.
+     */
+    
+    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, int id, int nbytes) {
+
+        System.err.println("Test writing tx="+tx+", id="+id+", nbytes="+nbytes);
+        
+        byte[] expected = new byte[nbytes];
+        
+        r.nextBytes(expected);
+        
+        ByteBuffer data = ByteBuffer.wrap(expected);
+        
+        assertNull((tx == null ? journal.objectIndex.getSlots(id)
+                : tx.getObjectIndex().getSlots(id)));
+        
+        journal.write(tx,id,data);
+        assertEquals("limit() != #bytes", expected.length, data.limit());
+        assertEquals("position() != limit()",data.limit(),data.position());
+
+        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
+                : tx.getObjectIndex().getSlots(id));
+        assertEquals("#bytes",nbytes,slots.getByteCount());
+        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
+//        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
+        
+        /*
+         * Read into a buffer allocated by the Journal.
+         */
+        ByteBuffer actual = journal.read(tx, id, null);
+
+        assertEquals("acutal.position()",0,actual.position());
+        assertEquals("acutal.limit()",expected.length,actual.limit());
+        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
+        assertEquals(expected,actual);
+
+        /*
+         * Read multiple copies into a buffer that we allocate ourselves.
+         */
+        final int ncopies = 7;
+        int pos = 0;
+        actual = ByteBuffer.allocate(expected.length * ncopies);
+        for( int i=0; i<ncopies; i++ ) {
+
+            /*
+             * Setup to read into the next slice of our buffer.
+             */
+//            System.err.println("reading @ i="+i+" of "+ncopies);
+            pos = i * expected.length;
+            actual.limit( actual.capacity() );
+            actual.position( pos );
+            
+            ByteBuffer tmp = journal.read(tx, id, actual);
+            assertTrue("Did not read into the provided buffer", tmp == actual);
+            assertEquals("position()", pos, actual.position() );
+            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
+            assertEquals(expected,actual);
+
+            /*
+             * Attempt to read with insufficient remaining bytes in the buffer
+             * and verify that the data are read into a new buffer.
+             */
+            actual.limit(pos+expected.length-1);
+            tmp = journal.read(tx, id, actual);
+            assertFalse("Read failed to allocate a new buffer", tmp == actual);
+            assertEquals(expected,tmp);
+
+        }
+        
+        return expected;
+        
+    }
+    
 }

@@ -79,6 +79,19 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
         
     }
 
+    public void deleteFile() {
+        
+        if( open ) throw new IllegalStateException();
+        
+        if( ! file.delete() ) {
+            
+            throw new RuntimeException("Could not delete file: "
+                    + file.getAbsoluteFile());
+            
+        }
+        
+    }
+    
     DiskBackedBufferStrategy(BufferMode bufferMode, FileMetadata fileMetadata, SlotMath slotMath) {
 
         super(fileMetadata.journalHeaderSize, bufferMode,slotMath,fileMetadata.buffer);

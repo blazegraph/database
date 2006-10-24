@@ -32,6 +32,14 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
     
+    public void deleteFile() {
+        
+        if( open ) throw new IllegalStateException();
+
+        // NOP.
+        
+    }
+    
     public void force(boolean metadata) {
         
         // NOP.

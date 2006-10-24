@@ -174,7 +174,9 @@ public class TestJournal extends ProxyTestCase {
             
             assertEquals("slotSize",128,journal.slotMath.slotSize);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, 10);
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0, 10);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -182,6 +184,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
             
         } finally {
@@ -226,6 +232,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+
             journal.close();
 
         } finally {
@@ -257,13 +267,19 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize);
+            Tx tx = new Tx(journal,0);
+
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
              * there is only one object in the journal).
              */
             assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
+
+            tx.prepare();
+            
+            tx.commit();
 
             journal.close();
 
@@ -292,7 +308,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize-1);
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize-1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -300,6 +318,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(1,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -327,7 +349,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
             
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize+1);
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize+1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -335,6 +359,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -366,7 +394,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0, journal.slotMath.dataSize * 2);
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize * 2);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -374,6 +404,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -401,7 +435,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
             
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0,
                     (journal.slotMath.dataSize * 2) - 1);
 
             /*
@@ -410,6 +446,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(2,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -437,7 +477,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
+            Tx tx = new Tx(journal,0);
+            
+            doWriteRoundTripTest(journal, tx, 0,
                     (journal.slotMath.dataSize * 2) + 1);
 
             /*
@@ -446,6 +488,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -477,7 +523,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal, 0), 0,
+            Tx tx = new Tx(journal, 0);
+            
+            doWriteRoundTripTest(journal, tx, 0,
                     journal.slotMath.dataSize * 3);
             
             /*
@@ -486,6 +534,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -513,7 +565,9 @@ public class TestJournal extends ProxyTestCase {
             
             Journal journal = new Journal(properties);
 
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
+            Tx tx = new Tx(journal, 0);
+            
+            doWriteRoundTripTest(journal, tx, 0,
                     (journal.slotMath.dataSize * 3) - 1);
             
             /*
@@ -522,6 +576,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(3,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -548,8 +606,10 @@ public class TestJournal extends ProxyTestCase {
         try {
             
             Journal journal = new Journal(properties);
+
+            Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(journal, new Tx(journal,0), 0,
+            doWriteRoundTripTest(journal, tx, 0,
                     (journal.slotMath.dataSize * 3) + 1);
             
             /*
@@ -558,6 +618,10 @@ public class TestJournal extends ProxyTestCase {
              */
             assertEquals(4,journal.allocationIndex.getAllocatedSlotCount());
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -753,6 +817,10 @@ public class TestJournal extends ProxyTestCase {
 
             }
 
+            tx.prepare();
+            
+            tx.commit();
+            
             journal.close();
 
         } finally {
@@ -884,94 +952,7 @@ public class TestJournal extends ProxyTestCase {
     }
     
     //
-    // Test helper.
+    // Test helpers.
     //
 
-    /**
-     * Write a data version consisting of N random bytes and verify that we can
-     * read it back out again.
-     * 
-     * @param journal
-     *            The journal.
-     * @param tx
-     *            The transaction (may be null to use no isolation).
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param nbytes
-     *            The data version length.
-     * 
-     * @return The data written. This can be used to re-verify the write after
-     *         intervening reads.
-     */
-    
-    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, int id, int nbytes) {
-
-        System.err.println("Test writing tx="+tx+", id="+id+", nbytes="+nbytes);
-        
-        byte[] expected = new byte[nbytes];
-        
-        r.nextBytes(expected);
-        
-        ByteBuffer data = ByteBuffer.wrap(expected);
-        
-        assertNull((tx == null ? journal.objectIndex.getSlots(id)
-                : tx.objectIndex.getSlots(id)));
-        
-        journal.write(tx,id,data);
-        assertEquals("limit() != #bytes", expected.length, data.limit());
-        assertEquals("position() != limit()",data.limit(),data.position());
-
-        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
-                : tx.objectIndex.getSlots(id));
-        assertEquals("#bytes",nbytes,slots.getByteCount());
-        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
-//        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
-        
-        /*
-         * Read into a buffer allocated by the Journal.
-         */
-        ByteBuffer actual = journal.read(tx, id, null);
-
-        assertEquals("acutal.position()",0,actual.position());
-        assertEquals("acutal.limit()",expected.length,actual.limit());
-        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
-        assertEquals(expected,actual);
-
-        /*
-         * Read multiple copies into a buffer that we allocate ourselves.
-         */
-        final int ncopies = 7;
-        int pos = 0;
-        actual = ByteBuffer.allocate(expected.length * ncopies);
-        for( int i=0; i<ncopies; i++ ) {
-
-            /*
-             * Setup to read into the next slice of our buffer.
-             */
-//            System.err.println("reading @ i="+i+" of "+ncopies);
-            pos = i * expected.length;
-            actual.limit( actual.capacity() );
-            actual.position( pos );
-            
-            ByteBuffer tmp = journal.read(tx, id, actual);
-            assertTrue("Did not read into the provided buffer", tmp == actual);
-            assertEquals("position()", pos, actual.position() );
-            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
-            assertEquals(expected,actual);
-
-            /*
-             * Attempt to read with insufficient remaining bytes in the buffer
-             * and verify that the data are read into a new buffer.
-             */
-            actual.limit(pos+expected.length-1);
-            tmp = journal.read(tx, id, actual);
-            assertFalse("Read failed to allocate a new buffer", tmp == actual);
-            assertEquals(expected,tmp);
-
-        }
-        
-        return expected;
-        
-    }
-    
 }

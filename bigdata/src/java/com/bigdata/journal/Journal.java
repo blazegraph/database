@@ -49,6 +49,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -334,6 +335,26 @@ public class Journal {
         
     }
 
+    private final IConflictResolver conflictResolver;
+    
+    /**
+     * The delegate that handles write-write conflict resolution during backward
+     * validation. The conflict resolver is expected to make a best attempt
+     * using data type specific rules to reconcile the state for two versions of
+     * the same persistent identifier. If the conflict can not be resolved, then
+     * validation will fail. State-based conflict resolution when combined with
+     * validation (aka optimistic locking) is capable of validating the greatest
+     * number of interleavings of transactions (aka serialization orders).
+     * 
+     * @return The conflict resolver to be applied during validation or
+     *         <code>null</code> iff no conflict resolution will be performed.
+     */
+    public IConflictResolver getConflictResolver() {
+        
+        return conflictResolver;
+        
+    }
+    
     /**
      * The object index.
      * 
@@ -357,7 +378,7 @@ public class Journal {
      * 
      * @todo Is this field required on this class?
      */
-    final int slotLimit;
+    private final int slotLimit;
     
     /**
      * The slot allocation index.
@@ -367,11 +388,21 @@ public class Journal {
     /**
      * A single instance is used by {@link #read(long, long)} since the journal
      * is single threaded.
+     * 
+     * @deprecated The use of slot headers is being phased out.
      */
-    final SlotHeader _slotHeader = new SlotHeader();
+    private final SlotHeader _slotHeader = new SlotHeader();
 
     /**
-     * A hash map containing all active transactions.
+     * Option set by the test suites causes the file backing the journal to be
+     * deleted when the journal is closed.
+     */
+    private final boolean deleteOnClose;
+    
+    /**
+     * A hash map containing all active transactions. A transaction that is
+     * preparing will be in this collection until it has either successfully
+     * prepared or aborted.
      */
     final Map<Long,Tx> activeTx = new HashMap<Long,Tx>();
 
@@ -379,7 +410,7 @@ public class Journal {
      * A hash map containing all transactions that have prepared but not yet
      * either committed or aborted.
      */
-    final Map<Long,Tx> prepareTx = new HashMap<Long,Tx>();
+    final Map<Long,Tx> preparedTx = new HashMap<Long,Tx>();
     
     /**
      * Notify the journal that a new transaction is being activated (starting on
@@ -408,20 +439,20 @@ public class Journal {
      * @todo What exactly is the impact when transactions end out of sequence? I
      *       presume that this is absolutely Ok.
      */
-    void activatingTx( Tx tx ) throws IllegalStateException {
+    void activateTx( Tx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
         if( activeTx.containsKey( id ) ) throw new IllegalStateException("Already active: tx="+tx);
         
-        if( prepareTx.containsKey(id)) throw new IllegalStateException("Already prepared: tx="+tx);
+        if( preparedTx.containsKey(id)) throw new IllegalStateException("Already prepared: tx="+tx);
 
         activeTx.put(id,tx);
         
     }
 
     /**
-     * Notify the journal that a transaction is being prepared (and hence is no
+     * Notify the journal that a transaction has prepared (and hence is no
      * longer active).
      * 
      * @param tx
@@ -429,7 +460,7 @@ public class Journal {
      * 
      * @throws IllegalStateException
      */
-    void preparingTx( Tx tx ) throws IllegalStateException {
+    void prepared( Tx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
@@ -439,15 +470,15 @@ public class Journal {
         
         assert tx == tx2;
         
-        if( prepareTx.containsKey(id)) throw new IllegalStateException("Already preparing: tx="+tx);
+        if( preparedTx.containsKey(id)) throw new IllegalStateException("Already preparing: tx="+tx);
         
-        prepareTx.put(id, tx);
+        preparedTx.put(id, tx);
         
     }
 
     /**
-     * Notify the journal that a transaction is being completed (either aborting
-     * or committing).
+     * Notify the journal that a transaction is completed (either aborted or
+     * committed).
      * 
      * @param tx
      *            The transaction.
@@ -458,13 +489,13 @@ public class Journal {
      *       repeated identifiers? This is definately not something to do for a
      *       deployed system since it will cause a memory leak.
      */
-    void completingTx( Tx tx ) throws IllegalStateException {
+    void completedTx( Tx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
         Tx txActive = activeTx.remove(id);
         
-        Tx txPrepared = prepareTx.remove(id);
+        Tx txPrepared = preparedTx.remove(id);
         
         if( txActive == null && txPrepared == null ) {
             
@@ -686,8 +717,8 @@ public class Journal {
      *            is true, then a new journal will be created.</dd>
      *            <dt>segment</dt>
      *            <dd>The unique segment identifier (required unless this is a
-     *            transient journal).  Segment identifiers are assigned by a
-     *            bigdata federation.  When using the journal as part of an
+     *            transient journal). Segment identifiers are assigned by a
+     *            bigdata federation. When using the journal as part of an
      *            embedded database you may safely assign an arbitrary segment
      *            identifier.</dd>
      *            <dt>slotSize</dt>
@@ -708,8 +739,24 @@ public class Journal {
      *            this option is not recommended as it imposes strong
      *            performance penalties and does NOT provide any additional data
      *            safety (it is here mainly for performance testing).</dd>
+     *            <dt>conflictResolver</dt>
+     *            <dd>The name of a class that implements the
+     *            {@link IConflictResolver} interface (optional). The class MUST
+     *            define a public constructor with the signature
+     *            <code><i>class</i>( Journal journal )</code>. There is NO
+     *            default. State-based resolution of write-write conflicts is
+     *            enabled iff a conflict resolution class is declared with this
+     *            parameter.</dd>
+     *            <dt>deleteOnClose</dt>
+     *            <dd>This optional boolean option causes the journal file to
+     *            be deleted when the journal is closed (default <em>false</em>).
+     *            This option is used by the test suites to keep down the disk
+     *            burden of the tests and MUST NOT be used with live data.</dd>
      *            </dl>
+     * 
      * @throws IOException
+     *             If there is a problem when creating, opening, or reading from
+     *             the journal file.
      * 
      * @todo Write tests that verify (a) that read-only mode does not permit
      *       writes; (b) that read-only mode is not supported for a transient
@@ -730,6 +777,8 @@ public class Journal {
         long initialExtent = DEFAULT_INITIAL_EXTENT;
         boolean readOnly = false;
         boolean forceWrites = false;
+        boolean deleteOnClose = false;
+        Class conflictResolverClass = null;
         String val;
 
         if( properties == null ) throw new IllegalArgumentException();
@@ -839,6 +888,57 @@ public class Journal {
         if( val != null ) {
 
             forceWrites = Boolean.parseBoolean(val);
+            
+        }
+
+        /*
+         * "deleteOnClose"
+         */
+
+        val = properties.getProperty("deleteOnClose");
+        
+        if( val != null ) {
+
+            deleteOnClose = Boolean.parseBoolean(val);
+            
+        }
+        
+        this.deleteOnClose = deleteOnClose;
+
+        /*
+         * "conflictResolver"
+         */
+
+        val = properties.getProperty("conflictResolver");
+        
+        if( val != null ) {
+
+            try {
+
+                conflictResolverClass = getClass().getClassLoader().loadClass(val);
+
+                if (!IConflictResolver.class
+                        .isAssignableFrom(conflictResolverClass)) {
+
+                    throw new RuntimeException(
+                            "Conflict resolver does not implement: "
+                                    + IConflictResolver.class
+                                    + ", name=" + val);
+
+                }
+
+            } catch (ClassNotFoundException ex) {
+
+                throw new RuntimeException(
+                        "Could not load conflict resolver class: name=" + val
+                                + ", " + ex, ex);
+                
+            }
+
+            /*
+             * Note: initialization of the conflict resolver is delayed until
+             * the journal is fully initialized.
+             */
             
         }
 
@@ -964,13 +1064,85 @@ public class Journal {
         allocationIndex = new SimpleSlotAllocationIndex(_bufferStrategy
                 .getSlotLimit());
 
+        /*
+         * Initialize the conflict resolver.
+         */
+        
+        if( conflictResolverClass != null ) {
+
+            try {
+
+                Constructor ctor = conflictResolverClass
+                        .getConstructor(new Class[] { Journal.class });
+
+                this.conflictResolver = (IConflictResolver) ctor
+                        .newInstance(new Object[] { this });
+                
+            }
+            catch(Exception ex ) {
+                
+                throw new RuntimeException("Conflict resolver: "+ex, ex);
+                
+            }
+            
+        } else {
+            
+            /*
+             * The journal will not attempt to resolve write-write conflicts.
+             */
+            
+            this.conflictResolver = null;
+            
+        }
+        
     }
 
+    /**
+     * Shutdown the journal.
+     * 
+     * @exception IllegalStateException
+     *                if there are active transactions.
+     * @exception IllegalStateException
+     *                if there are prepared transactions.
+     * 
+     * @todo Workout protocol for shutdown of the journal, including forced
+     *       shutdown when there are active or prepar(ed|ing) transactions,
+     *       timeouts on transactions during shutdown, notification of abort for
+     *       transactions that do not complete in a timely manner, and
+     *       survivability of prepared transactions across restart.
+     */
     public void close() {
         
         assertOpen();
+
+        final int nactive = activeTx.size();
+        
+        if( nactive > 0 ) {
+            
+            throw new IllegalStateException("There are "+nactive+" active transactions");
+            
+        }
+        
+        final int nprepare = preparedTx.size();
+        
+        if( nprepare > 0 ) {
+            
+            throw new IllegalStateException("There are "+nprepare+" prepared transactions.");
+            
+        }
         
         _bufferStrategy.close();
+        
+        if( deleteOnClose ) {
+            
+            /*
+             * This option is used by the test suite and MUST NOT be used with
+             * live data.
+             */
+            
+            _bufferStrategy.deleteFile();
+            
+        }
         
     }
     
@@ -1221,7 +1393,7 @@ public class Journal {
         // Update the object index.
         if( tx != null ) {
             // transactional isolation.
-            tx.objectIndex.mapIdToSlots(id, slots, allocationIndex);
+            tx.getObjectIndex().mapIdToSlots(id, slots, allocationIndex);
         } else {
             // no isolation.
             objectIndex.mapIdToSlots(id, slots, allocationIndex);
@@ -1299,7 +1471,7 @@ public class Journal {
 //                : tx.objectIndex.getFirstSlot(id));
 
         ISlotAllocation slots = (tx == null ? objectIndex.getSlots(id)
-              : tx.objectIndex.getSlots(id));
+              : tx.getObjectIndex().getSlots(id));
         
         if( slots == null ) return null;
         
@@ -1421,7 +1593,7 @@ public class Journal {
         } else {
             
             // Transactional isolation.
-            tx.objectIndex.delete(id, allocationIndex );
+            tx.getObjectIndex().delete(id, allocationIndex );
             
         }
 

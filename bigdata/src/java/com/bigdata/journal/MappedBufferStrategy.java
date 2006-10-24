@@ -42,6 +42,28 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
     }
     
     /**
+     * Overrides the default behavior so that an exception is NOT thrown if the
+     * file can not be deleted. Since Java can not provide for synchronous unmap
+     * of memory-mapped files, we can not delete the backing file immediately.
+     * Instead, we mark the file for "deleteOnExit" and let the VM attempt to
+     * clean it up when it exits.
+     */
+    public void deleteFile() {
+        
+        if( isOpen() ) throw new IllegalStateException();
+        
+        if( ! file.delete() ) {
+            
+            System.err.println("Could not delete memory-mapped file: "
+                    + file.getAbsoluteFile());
+
+            file.deleteOnExit();
+            
+        }
+        
+    }
+
+    /**
      * Force the data to disk.
      * 
      * @see MappedByteBuffer#force()

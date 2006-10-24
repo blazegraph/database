@@ -82,6 +82,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("All Journals");
 
+        suite.addTestSuite( TestAccount.class );
         suite.addTestSuite( TestSlotMath.class );
         suite.addTestSuite( TestRootBlockView.class );
         suite.addTestSuite( TestSlotAllocation.class );

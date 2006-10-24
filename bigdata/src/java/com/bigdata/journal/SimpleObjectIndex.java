@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -203,13 +204,6 @@ public class SimpleObjectIndex implements IObjectIndex {
          * </p>
          */
         public ISlotAllocation getPreExistingVersionSlots();
-   
-//        /**
-//         * Clone an entry.
-//         * 
-//         * @return An entry with the references to the same instance data.
-//         */
-//        public IObjectIndexEntry clone();
         
     }
 
@@ -521,48 +515,7 @@ public class SimpleObjectIndex implements IObjectIndex {
             objectIndex.put(id2, newEntry);
             
         }
-                
-//        /*
-//         * Note: everything below here is just to validate our expectation
-//         * concerning whether or not we are overwriting an existing version. In
-//         * order to find the entry for the overwritten layer (since the object
-//         * index map has two layers) we have to read on the inner layer if the
-//         * put() on the outer layer does not return a pre-existing entry.
-//         * 
-//         * Note: I expect that this will all change drammatically when we move
-//         * to a persistent and restart safe object index data structure.
-//         */
-//        
-//        if( oldSlot == null && baseObjectIndex != null ) {
-//            
-//            // read the entry from the inner layer.
-//            
-//            oldSlot = baseObjectIndex.objectIndex.get(id);
-//            
-//        }
-//        
-//        if( overwrite ) {
-//
-//            if( oldSlot == null ) {
-//                
-//                throw new IllegalStateException(
-//                        "Identifier is not mapped: id="
-//                        + id + ", slot=" + slot + ", overwrite=" + overwrite);
-//                
-//            }
-//            
-//        } else {
-//        
-//            if (oldSlot != null) {
-//
-//                throw new IllegalStateException(
-//                        "Identifier already mapped: id=" + id + ", oldSlot="
-//                                + oldSlot + ", newSlot=" + slot);
-//
-//            }
-//
-//        }
-        
+
     }
 
     public void delete(int id, ISlotAllocationIndex allocationIndex ) {
@@ -633,48 +586,6 @@ public class SimpleObjectIndex implements IObjectIndex {
         }
         
     }
-
-//    public int removeDeleted(int id) {
-//    
-//        /*
-//         * Remove the object index entry, recovering its contents.
-//         * 
-//         * Note: Unlike all other methods that read on the object index, this
-//         * one does NOT read through to the inner index. The reason is that
-//         * deleted entries are only written on the outer index. If we read
-//         * through to the inner index then we will always find the un-deleted
-//         * entry (if there is any entry for the identifier).
-//         */ 
-//
-//        Integer negIndex = objectIndex.remove(id);
-//        
-//        if( negIndex == null ) {
-//
-//            throw new IllegalArgumentException("Not found: id="+id);
-//            
-//        }
-//
-//        // Convert to int.
-//        final int negIndex2 = negIndex.intValue();
-//        
-//        if( negIndex2 >= 0 ) {
-//            
-//            /*
-//             * A negative slot index is used to mark objects that have been
-//             * deleted from the object index but whose slots have not yet been
-//             * released.
-//             */
-//            
-//            throw new IllegalStateException("Not deleted: id=" + id);
-//            
-//        }
-//        
-//        // Convert back to a non-negative slot index.
-//        final int firstSlot = (-negIndex - 1);
-//
-//        return firstSlot;
-//    
-//    }
 
     /**
      * <p>
@@ -763,24 +674,24 @@ public class SimpleObjectIndex implements IObjectIndex {
             // The value for that persistent identifier.
             final SimpleEntry entry = (SimpleEntry)mapEntry.getValue();
             
-            if( entry.versionCounter == Long.MAX_VALUE ) {
-                
-                /*
-                 * @todo There may be ways to handle this, but that is really a
-                 * LOT of overwrites. For example, we could just transparently
-                 * promote the field to a BigInteger, which would require
-                 * storing it as a Number rather than a [long]. Another approach
-                 * is to only rely on "same or different". With that approach we
-                 * could use a [short] for the version counter, wrap to zero on
-                 * overflow, and there would not be a problem unless there were
-                 * 32k new versions of this entry written while the transaction
-                 * was running (pretty unlikely, and you can always use a packed
-                 * int or long if you are worried :-)
-                 */
-                
-                throw new RuntimeException("Too many overwrites: id="+id);
-                
-            }
+//            if( entry.versionCounter == Long.MAX_VALUE ) {
+//                
+//                /*
+//                 * @todo There may be ways to handle this, but that is really a
+//                 * LOT of overwrites. For example, we could just transparently
+//                 * promote the field to a BigInteger, which would require
+//                 * storing it as a Number rather than a [long]. Another approach
+//                 * is to only rely on "same or different". With that approach we
+//                 * could use a [short] for the version counter, wrap to zero on
+//                 * overflow, and there would not be a problem unless there were
+//                 * 32k new versions of this entry written while the transaction
+//                 * was running (pretty unlikely, and you can always use a packed
+//                 * int or long if you are worried :-)
+//                 */
+//                
+//                throw new RuntimeException("Too many overwrites: id="+id);
+//                
+//            }
             
             if( entry.isDeleted() ) {
 
@@ -793,13 +704,13 @@ public class SimpleObjectIndex implements IObjectIndex {
                 
                 if( entry.isPreExistingVersionOverwritten() ) {
 
-                    /*
-                     * Bump the version counter -- even for a delete! Otherwise
-                     * we can fail to notice a conflict when an object was
-                     * deleted by a transaction that commits and another
-                     * transaction writes a version of that object.
-                     */
-                    entry.versionCounter++;
+//                    /*
+//                     * Bump the version counter -- even for a delete! Otherwise
+//                     * we can fail to notice a conflict when an object was
+//                     * deleted by a transaction that commits and another
+//                     * transaction writes a version of that object.
+//                     */
+//                    entry.versionCounter++;
 
                     /*
                      * Update the entry in the global object index.
@@ -823,10 +734,10 @@ public class SimpleObjectIndex implements IObjectIndex {
 
             } else {
 
-                /*
-                 * Bump the version counter.
-                 */
-                entry.versionCounter++;
+//                /*
+//                 * Bump the version counter.
+//                 */
+//                entry.versionCounter++;
                 
                 /*
                  * Copy the entry down onto the global scope.
@@ -888,7 +799,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * exists IFF the version counter on the transaction index entry differs
      * from the version counter in the global index scope. Once detected, a the
      * resolution of a write-write conflict is delegated to a
-     * {@link IStateBasedConflictResolver conflict resolver}. If a write-write
+     * {@link IConflictResolver conflict resolver}. If a write-write
      * conflict can not be validated, then validation will fail and the
      * transaction will abort. The version counters are incremented during
      * commit as part of the merge down of the transaction's object index onto
@@ -901,23 +812,41 @@ public class SimpleObjectIndex implements IObjectIndex {
      * be validated against the new baseline. (It is possible that this
      * validation could be optimized.)
      * </p>
+     *
+     * @param journal The journal.
+     * 
+     * @param tx The transaction being validated.
+     * 
+     * @return True iff validation succeeds.
      * 
      * FIXME As a trivial case, if no intervening commits have occurred on the
      * journal then this transaction MUST be valid regardless of its write (or
-     * delete) set.
+     * delete) set.  This test probably needs to examine the current root block
+     * and the transaction to determine if there has been an intervening commit. 
      * 
      * FIXME Make validation efficient by a streaming pass over the write set of
      * this transaction that detects when the transaction identifier for the
      * global object index has been modified since the transaction identifier
      * that serves as the basis for this transaction (the committed state whose
      * object index this transaction uses as its inner read-only context).
-     * 
-     * FIXME This raises a requirement that the object index "knows" the
-     * transaction identifier for the resolved data version. One way to handle
-     * that is to put the transaction identifier on the data version itself.
-     * Another way is to put it into the object index entry.
      */
-    void validate(SimpleObjectIndex globalScope) {
+    boolean validate(Journal journal,Tx tx) {
+        
+        /*
+         * This MUST be the journal's object index. The journals' object index
+         * is NOT always the same as the inner object index map used by normal
+         * the transaction since other transactions MAY have committed on the
+         * journal since the transaction started. If you use the inner object
+         * index for the transaction by mistake then interleaved transactions
+         * will NOT be visible and write-write conflicts will NOT be detected.
+         */
+        final SimpleObjectIndex globalScope = journal.objectIndex;
+        
+        /*
+         * Note: Write-write conflicts can be validated iff a conflict resolver
+         * was declared when the Journal object was instantiated.
+         */
+        final IConflictResolver conflictResolver = journal.getConflictResolver();
         
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;
@@ -934,27 +863,149 @@ public class SimpleObjectIndex implements IObjectIndex {
             final Integer id = mapEntry.getKey();
             
             // The value for that persistent identifier.
-            final IObjectIndexEntry txEntry = mapEntry.getValue();
-            
+            final SimpleEntry txEntry = (SimpleEntry)mapEntry.getValue();
+
+            // Lookup the entry in the global scope.
             IObjectIndexEntry baseEntry = globalScope.objectIndex.get(id);
             
-            if( baseEntry != null && baseEntry.getVersionCounter() != txEntry.getVersionCounter() ) {
+            /*
+             * If there is an entry in the global scope, then we MUST compare the
+             * version counters.
+             */
+            if( baseEntry != null ) {
 
                 /*
-                 * FIXME Declare a delegate for resolving write-write conflicts
-                 * for the journal, create an instance of that delegate globally
-                 * for the journal, and delegate resolution of state-based
-                 * conflicts.
-                 * 
-                 * FIXME Write test cases for write-write conflict resolution.
+                 * If the version counters do not agree then we need to perform
+                 * write-write conflict resolution.
                  */
+                if( baseEntry.getVersionCounter() != txEntry.getVersionCounter() ) {
+
+                    if( conflictResolver == null ) {
+                        
+                        System.err.println("Could not validate write-write conflict: id="+id);
+                        
+                        // validation failed.
+                        
+                        return false;
+                        
+                    } else {
+                        
+                        /*
+                         * Read the versions from the journal.
+                         * 
+                         * @todo Write journal.read(ISlotAllocation) as the core
+                         * implementation for read. We can use it here to read a
+                         * version when we already have the index entry and save
+                         * some overhead. This will be easy to do once we factor
+                         * out the slot header chains.
+                         */
+                        
+                        // The version in the global scope.
+                        ByteBuffer committedVersion = journal.read(null, id, null);
+
+                        // The version in the transaction scope.
+                        ByteBuffer proposedVersion = journal.read(tx, id, null);
+
+                        // The resolved version.
+                        ByteBuffer resolvedVersion;
+                        
+                        try {
+                            
+                            resolvedVersion = conflictResolver.resolveConflict(
+                                    committedVersion, proposedVersion);
+                            
+                        } catch( Throwable t ) {
+                            
+                            System.err.println("Could not resolve write-write conflict: id="+id+" : "+t);
+                            
+                            return false;
+                            
+                        }
+
+                        /*
+                         * FIXME We need to write the resolved version on the
+                         * journal. However, we have to take care since this can
+                         * result in a concurrent modification of the
+                         * transaction's object index, which we are currently
+                         * traversing.
+                         * 
+                         * The simple way to handle this is to accumulate
+                         * updates from conflict resolution during validation
+                         * and write them afterwards when we are no longer
+                         * traversing the transaction's object index.
+                         * 
+                         * A better way would operate at a lower level and avoid
+                         * the memory allocation and heap overhead for those
+                         * temporary structures - this works well if we know
+                         * that only the current entry will be updated by
+                         * conflict resolution.
+                         * 
+                         * Finally, if more than one entry can be updated when
+                         * we MUST use an object index data structure for the
+                         * transaction that is safe for concurrent modification
+                         * and we MUST track whether each entry has been
+                         * resolved and scan until all entries resolve or a
+                         * conflict is reported. Ideally cycles will be small
+                         * and terminate quickly (ideally validation itself will
+                         * terminate quickly), in which case we could use a
+                         * transient data structure to buffer concurrent
+                         * modifications to the object index. In that case, we
+                         * only need to buffer records that are actually
+                         * overwritten during validation - but that change would
+                         * need to be manifest throughout the object index
+                         * support since it is essentially stateful (or by
+                         * further wrapping of the transaction's object index
+                         * with a buffer!).
+                         */
+                        
+                    }
+                    
+                }
                 
-                throw new UnsupportedOperationException("write-write conflict: id="+id);
-                
+                if( baseEntry.getVersionCounter() == Long.MAX_VALUE ) {
+                    
+                    /*
+                     * @todo There may be ways to handle this, but that is
+                     * really a LOT of overwrites. For example, we could just
+                     * transparently promote the field to a BigInteger, which
+                     * would require storing it as a Number rather than a
+                     * [long]. Another approach is to only rely on "same or
+                     * different". With that approach we could use a [short] for
+                     * the version counter, wrap to zero on overflow, and there
+                     * would not be a problem unless there were 32k new versions
+                     * of this entry written while the transaction was running
+                     * (pretty unlikely, and you can always use a packed int or
+                     * long if you are worried :-) We could also just use a
+                     * random number and accept rollback if the random values
+                     * happened to collide.
+                     */
+                    
+                    throw new RuntimeException("Too many overwrites: id="+id);
+                    
+                }
+
+                /*
+                 * Increment the version counter. We add one to the current
+                 * version counter in the _global_ scope since that was the
+                 * current version at the time that the write-write conflict was
+                 * detected.
+                 * 
+                 * Note: We MUST bump the version counter even if the "WRITE"
+                 * was a "DELETE" otherwise we will fail to notice a write-write
+                 * conflict where an intervening transaction deletes the version
+                 * and commits before an overwrite of the version by a concurrent
+                 * transaction.
+                 */
+                txEntry.versionCounter = baseEntry.getVersionCounter() + 1;
+                                
             }
             
         }
 
+        // validation suceeded.
+        
+        return true;
+        
     }
     
     /**

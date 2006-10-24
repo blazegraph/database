@@ -82,7 +82,15 @@ public interface IBufferStrategy {
      * @param extent
      */
     public void truncate(long extent);
-    
+
+    /**
+     * Delete the backing file for the journal if any.
+     * 
+     * @exception IllegalStateException
+     *                if the journal is not closed.
+     */
+    public void deleteFile();
+
     /**
      * Close the journal.
      * 
@@ -175,5 +183,5 @@ public interface IBufferStrategy {
      *            position is equal to the pre-condition limit.
      */
     public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data);
-
+    
 }

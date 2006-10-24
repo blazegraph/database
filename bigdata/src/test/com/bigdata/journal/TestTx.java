@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.Random;
 
 /**
  * Test suite for transaction isolation with respect to the underlying journal.
@@ -108,7 +109,7 @@ import java.util.Properties;
  *       validation rules to the database, perhaps as a parameter when a
  *       transaction starts or - to enforce the data type specificity at the
  *       risk of tighter integration of components - as part of the schema
- *       declaration.  Declare IStateBasedConflictResolver that either merges
+ *       declaration.  Declare IConflictResolver that either merges
  *       state into object in the transaction or causes the tx to abort.
  * 
  * @todo Verify correct abort after 'prepare'.
@@ -150,7 +151,7 @@ public class TestTx extends ProxyTestCase {
 
             Journal journal = new Journal(properties);
 
-            new Tx(journal,0);
+            Tx tx0 = new Tx(journal,0);
 
             try {
 
@@ -166,6 +167,8 @@ public class TestTx extends ProxyTestCase {
                 System.err.println("Ignoring expected exception: "+ex);
                 
             }
+            
+            tx0.abort();
             
             journal.close();
 
@@ -221,6 +224,8 @@ public class TestTx extends ProxyTestCase {
                 System.err.println("Ignoring expected exception: "+ex);
                 
             }
+
+            tx0.abort();
             
             journal.close();
 
@@ -289,7 +294,7 @@ public class TestTx extends ProxyTestCase {
             assertNotFound(tx1.read(id0, null));
 
             // The slot allocation for the version that we are about to delete.
-            final ISlotAllocation slots = tx0.objectIndex.getSlots(id0);
+            final ISlotAllocation slots = tx0.getObjectIndex().getSlots(id0);
             assertNotNull(slots);
             assertSlotAllocationState(slots, journal.allocationIndex, true);
             
@@ -306,7 +311,7 @@ public class TestTx extends ProxyTestCase {
             // Verify the persistent identifier is now correctly marked as
             // deleted in the transaction's object index.
             try {
-                tx0.objectIndex.getSlots(id0);
+                tx0.getObjectIndex().getSlots(id0);
                 fail("Expecting: "+DataDeletedException.class);
             }
             catch(DataDeletedException ex) {
@@ -606,11 +611,12 @@ public class TestTx extends ProxyTestCase {
             final ByteBuffer expected1v1 = getRandomData(journal);
             final ByteBuffer expected1v2 = getRandomData(journal);
 
-            // Write pre-existing version onto the journal.
+            // Write pre-existing version of id0 onto the journal.
             journal.write(null,id0,expected_preExistingVersion);
             ISlotAllocation slots_preExistingVersion = journal.objectIndex.getSlots(id0);
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
-
+            assertVersionCounter(journal, id0, 0);
+            
             // Start transaction.
             Tx tx0 = new Tx(journal,0);
             
@@ -619,9 +625,12 @@ public class TestTx extends ProxyTestCase {
             
             assertNotFound(tx0.read(id1,null));
 
+            // write id0 version0.
             tx0.write(id0,expected0v0);
+            assertVersionCounter(journal, id0, 0); // there is a pre-existing version on the journal.
+            assertVersionCounter(tx0, id0, 0);
 
-            final ISlotAllocation slots_id0_v0 = tx0.objectIndex.getSlots(id0);
+            final ISlotAllocation slots_id0_v0 = tx0.getObjectIndex().getSlots(id0);
             
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -633,8 +642,10 @@ public class TestTx extends ProxyTestCase {
 
             // write id1 version0, postcondition tests.
             tx0.write(id1,expected1v0);
+            // Note: no version of id1 is on the journal.
+            assertVersionCounter(tx0, id1, 0);
             
-            final ISlotAllocation slots_id1_v0 = tx0.objectIndex.getSlots(id1);
+            final ISlotAllocation slots_id1_v0 = tx0.getObjectIndex().getSlots(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -648,8 +659,10 @@ public class TestTx extends ProxyTestCase {
             
             // write id1 version1, postcondition tests.
             tx0.write(id1,expected1v1);
+            // Note: no version of id1 is on the journal.
+            assertVersionCounter(tx0, id1, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id1_v1 = tx0.objectIndex.getSlots(id1);
+            final ISlotAllocation slots_id1_v1 = tx0.getObjectIndex().getSlots(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -665,8 +678,10 @@ public class TestTx extends ProxyTestCase {
             
             // write id1 version2, postcondition tests.
             tx0.write(id1,expected1v2);
+            // Note: no version of id1 is on the journal.
+            assertVersionCounter(tx0, id1, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id1_v2 = tx0.objectIndex.getSlots(id1);
+            final ISlotAllocation slots_id1_v2 = tx0.getObjectIndex().getSlots(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -684,8 +699,10 @@ public class TestTx extends ProxyTestCase {
 
             // write id0 version1, postcondition tests.
             tx0.write(id0,expected0v1);
+            assertVersionCounter(journal, id0, 0); // there is a pre-existing version on the journal.
+            assertVersionCounter(tx0, id0, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id0_v1 = tx0.objectIndex.getSlots(id0);
+            final ISlotAllocation slots_id0_v1 = tx0.getObjectIndex().getSlots(id0);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -706,6 +723,8 @@ public class TestTx extends ProxyTestCase {
             // delete id1, postcondition tests.
 
             tx0.delete(id1);
+            // Note: There is not a version of id1 on the journal.
+            assertVersionCounter(tx0, id1, 0); // counter is only changed by commit.
             
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -726,6 +745,8 @@ public class TestTx extends ProxyTestCase {
             // delete id0, postcondition tests.
 
             tx0.delete(id0);
+            assertVersionCounter(journal, id0, 0); // pre-existing version on the journal.
+            assertVersionCounter(tx0, id0, 0); // counter is only changed by commit.
             
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -750,6 +771,19 @@ public class TestTx extends ProxyTestCase {
             
             tx0.commit();
 
+            /*
+             * Note: Since id0 was pre-existing, the version counter for id0 was
+             * incremented even though the version was deleted!
+             */
+            assertVersionCounter(journal, id0, 1);
+            
+            /*
+             * Note: Since id1 was NOT pre-existing, there is no entry left in
+             * the global object index. This also means that there is no defined
+             * version counter for id1.
+             */
+            assertNotFound(journal.read(null,id1,null));
+            
             // Note: Still allocated!
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -820,7 +854,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -832,7 +866,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             tx0.abort();
 
@@ -843,7 +877,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -873,7 +907,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -885,7 +919,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             tx0.prepare();
 
@@ -896,7 +930,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertTrue(journal.prepareTx.containsKey(ts0));
+            assertTrue(journal.preparedTx.containsKey(ts0));
 
             tx0.abort();
 
@@ -907,7 +941,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -937,7 +971,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -949,7 +983,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             tx0.prepare();
 
@@ -960,7 +994,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertTrue(journal.prepareTx.containsKey(ts0));
+            assertTrue(journal.preparedTx.containsKey(ts0));
 
             tx0.commit();
 
@@ -971,7 +1005,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1003,7 +1037,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -1015,7 +1049,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             tx0.abort();
 
@@ -1026,7 +1060,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             try {
                 tx0.abort();
@@ -1043,7 +1077,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1075,7 +1109,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -1087,7 +1121,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             tx0.prepare();
 
@@ -1098,7 +1132,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertTrue(journal.prepareTx.containsKey(ts0));
+            assertTrue(journal.preparedTx.containsKey(ts0));
 
             try {
                 tx0.prepare();
@@ -1115,7 +1149,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1147,7 +1181,7 @@ public class TestTx extends ProxyTestCase {
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             Tx tx0 = new Tx(journal,ts0);
             assertEquals(ts0,tx0.getId());
@@ -1159,7 +1193,7 @@ public class TestTx extends ProxyTestCase {
             assertFalse( tx0.isComplete() );
             
             assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
             
             try {
                 tx0.commit();
@@ -1176,7 +1210,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1227,7 +1261,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1278,7 +1312,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1329,7 +1363,7 @@ public class TestTx extends ProxyTestCase {
             assertTrue( tx0.isComplete() );
 
             assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.prepareTx.containsKey(ts0));
+            assertFalse(journal.preparedTx.containsKey(ts0));
 
             journal.close();
 
@@ -1382,6 +1416,7 @@ public class TestTx extends ProxyTestCase {
             
             // write data version on tx1
             tx1.write(  0, expected_id0_v0 );
+            assertVersionCounter(tx1, 0, 0);
 
             // data version visible in tx1.
             assertEquals( expected_id0_v0.array(), tx1.read(0, null));
@@ -1400,6 +1435,13 @@ public class TestTx extends ProxyTestCase {
 
             // commit.
             tx1.commit();
+
+            /*
+             * Note: the version counter on the journal is ZERO (0) since tx1
+             * wrote the first version (there was no pre-existing version when
+             * tx1 started).
+             */
+            assertVersionCounter(journal, 0, 0);
 
             // data version now visible in global scope.
             assertEquals( expected_id0_v0.array(), journal.read(null,0, null));
@@ -1434,6 +1476,10 @@ public class TestTx extends ProxyTestCase {
             // abort tx2 - nothing was written, no conflict should result.
             tx3.prepare();
             tx3.commit();
+
+            // Still zero since the version committed by tx1 has not been
+            // overwritten.
+            assertVersionCounter(journal, 0, 0);
 
             // data version in global scope was not changed by any other commit.
             assertEquals( expected_id0_v0.array(), journal.read(null,0, null));
@@ -1471,6 +1517,7 @@ public class TestTx extends ProxyTestCase {
 
             // write data version in global scope.
             journal.write(null,0, expected_id0_v0);
+            assertVersionCounter(journal, 0, 0);
 
             // data version visible in global scope.
             assertEquals(expected_id0_v0.array(), journal.read(null,0, null));
@@ -1483,6 +1530,7 @@ public class TestTx extends ProxyTestCase {
 
             // delete version in transation scope.
             tx0.delete(0);
+            assertVersionCounter(tx0, 0, 0);
             
             // data version not visible in transaction.
             assertDeleted(tx0, 0);
@@ -1495,6 +1543,8 @@ public class TestTx extends ProxyTestCase {
 
             // commit.
             tx0.commit();
+
+            assertVersionCounter(journal, 0, 1);
 
             // data version now deleted in global scope.
             assertDeleted(journal,0);
@@ -1533,11 +1583,23 @@ public class TestTx extends ProxyTestCase {
         final String filename = getTestJournalFile();
 
         properties.setProperty("file", filename);
+        
+        /*
+         * Setup a conflict resolver that will throw an exception if a
+         * write-write conflict is detected (no write-write conflicts are
+         * expected by this test).
+         */
+        properties.setProperty("conflictResolver",ConflictResolverAlwaysFails.class.getName());
 
         try {
 
             Journal journal = new Journal(properties);
 
+            // verify the conflict resolver.
+            assertNotNull( journal.getConflictResolver() );
+            assertTrue( journal.getConflictResolver() instanceof ConflictResolverAlwaysFails );
+
+            // create random data for versions.
             ByteBuffer expected_id0_v0 = getRandomData(journal);
             ByteBuffer expected_id0_v1 = getRandomData(journal);
 
@@ -1571,7 +1633,9 @@ public class TestTx extends ProxyTestCase {
 
             // overwrite data version in transaction scope.
             tx1.write(0, expected_id0_v1);
-            
+            assertVersionCounter(journal, 0, 0);
+            assertVersionCounter(tx1, 0, 0);
+                        
             // slot allocation in global scope is unchanged.
             assertEquals(slots_v0,journal.objectIndex.getSlots(0));
 
@@ -1579,13 +1643,15 @@ public class TestTx extends ProxyTestCase {
             assertEquals(expected_id0_v0.array(), journal.read(null,0, null));
 
             // Get the slots on which the 2nd data version was written.
-            final ISlotAllocation slots_v1 = tx1.objectIndex.getSlots(0);
+            final ISlotAllocation slots_v1 = tx1.getObjectIndex().getSlots(0);
 
             // prepare
             tx1.prepare();
 
             // commit.
             tx1.commit();
+
+            assertVersionCounter(journal, 0, 1);
 
             // The v0 slots are still allocated.
             assertSlotAllocationState(slots_v0, journal.allocationIndex,true);
@@ -1601,7 +1667,7 @@ public class TestTx extends ProxyTestCase {
 
             // The entry in the tx2 object index is consistent with the v0
             // allocatation (it was not overwritten when the tx1 committed).
-            assertEquals(slots_v0,tx2.objectIndex.getSlots(0));
+            assertEquals(slots_v0,tx2.getObjectIndex().getSlots(0));
 
             // Read the version in tx2 (just to prove that we can do it).
             assertEquals(expected_id0_v0.array(), tx2.read(0, null));
@@ -1663,116 +1729,427 @@ public class TestTx extends ProxyTestCase {
     
     /*
      * FIXME Write tests for write-write conflicts.
+     * 
+     * The basic test verifies that a conflict can be detected.
+     * 
+     * Then verify that we can resolve the conflict or fail validation.
+     * 
+     * Then verify that we can resolve the versions for the conflict (both the
+     * last committed version and the proposed version).
+     * 
+     * Then verify that we can make a resolution resulting in a new version and
+     * that the new version is, in fact, committed.
+     * 
+     * Then verify that we can handle the bank account example.
+     * 
+     * Do tests that verify that multiple conflicts are correctly detected and
+     * resolved.
+     * 
+     * Then verify that we can handle examples in which we have to traverse an
+     * object graph during conflict resolution. (Really, two object graphs: a
+     * readOnlyTx started from the last committed state and the readWriteTx that
+     * we are trying to validate.) This last issue is by far the trickyest and
+     * may require support for concurrent modification of the transaction's
+     * object index during traveral.
      */
 
-//    /**
-//     * Test of write-write conflict resolution. A version (v0) is written in the
-//     * global scope. Two transactions are then create (tx1, tx2). We verify that
-//     * v0 is visible to tx1 and then we overwrite it in that transaction.
-//     */
-//    public void test_readWriteConflict02() throws IOException {
-//        
-//        final Properties properties = getProperties();
-//
-//        final String filename = getTestJournalFile();
-//
-//        properties.setProperty("file", filename);
-//
-//        try {
-//
-//            Journal journal = new Journal(properties);
-//
-//            ByteBuffer expected_id0_v0 = getRandomData(journal);
-//            ByteBuffer expected_id0_v1 = getRandomData(journal);
-//
-//            // data version not visible in global scope.
-//            assertNotFound(journal.read(null, 0, null));
-//
-//            /*
-//             * write data version in global scope.
-//             */
-//            journal.write(null,0, expected_id0_v0);
-//
-//            // data version visible in global scope.
-//            assertEquals(expected_id0_v0.array(), journal.read(null,0, null));
-//
-//            // Save the v0 slot allocation.
-//            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(0);
-//            
-//            // start transaction.
-//            Tx tx1 = new Tx(journal, 1);
-//
-//            // start transaction.
-//            Tx tx2 = new Tx(journal, 2);
-//            
-//            /*
-//             * Verify that the data version is visible in the transaction scope
-//             * where it will be overwritten. Note that we do NOT test the other
-//             * concurrent transaction since actually reading the version in that
-//             * transaction might trigger different code paths.
-//             */
-//            assertEquals(expected_id0_v0.array(), tx1.read(0, null));
-//
-//            // overwrite data version in transaction scope.
-//            tx1.write(0, expected_id0_v1);
-//            
-//            // data version still visible in global scope.
-//            assertEquals(expected_id0_v0.array(), journal.read(null,0, null));
-//
-//            // prepare
-//            tx1.prepare();
-//
-//            // commit.
-//            tx1.commit();
-//
-//            // new data version now visible in global scope.
-//            assertEquals(expected_id0_v1.array(), journal.read(null,0, null));
-//
-//            /*
-//             * Verify that v0 is STILL allocated since the version can be read
-//             * by tx2.
-//             */
-//            assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
-//
-//            // Read the version in tx2 (just to prove that we can do it).
-//            assertEquals(expected_id0_v0.array(), tx2.read(0, null));
-//
-//            // Commit tx2 (we could have as easily aborted tx2 for this test).
-//            tx2.prepare();
-//            tx2.commit();
-//            
-//            /*
-//             * Sweap overwritten versions written by or visible to tx1 and
-//             * earlier transactions - this should be a NOP.
-//             */
-//            assertEquals(0,journal.gcTx(tx1.getId()));
-//
-//            /*
-//             * Verify that the slot is STILL allocated since we have not swept
-//             * up to tx2.
-//             */
-//            assertTrue(journal.allocationIndex.isAllocated(firstSlot));
-//
-//            /*
-//             * Sweap overwritten versions written by or visible to tx2 and
-//             * earlier transactions - this should sweapt the versions written
-//             * onto the journal in the global scope before tx2 executed.
-//             */
-//            assertEquals(1,journal.gcTx(tx2.getId()));
-//
-//            /*
-//             * Verify that the slot is not deallocated.
-//             */
-//            assertFalse(journal.allocationIndex.isAllocated(firstSlot));
-//
-//            journal.close();
-//
-//        } finally {
-//
-//            deleteTestJournalFile(filename);
-//
-//        }
-//
-//    }
+    /**
+     * Test of write-write conflict resolution. A version (v0) of id0 is written
+     * in the global scope. Two transactions are then created (tx1, tx2). We
+     * verify that v0 is visible to both transactions. tx1 then overwrites v0
+     * with v1, prepares and commits. Since there are no intervening commits,
+     * tx1 MUST validate. tx2 then overwrites v0 with its own version of v1. tx2
+     * then prepares. Since tx1 committed while tx2 was active, the version
+     * counter on id0 for the global state has been incremented and is now
+     * different from the version counter visible to tx2. The difference in the
+     * counter valid is detected during validation and prompts conflict
+     * resolution.
+     * 
+     * @todo The various other tests in this suite also need to verify the
+     *       version counters.
+     * 
+     * @todo Do variant with more than one intervening overwrite and commit in
+     *       order to verify that the version counter is going up by one each
+     *       time when compare to the version counter in the global object index
+     *       NOT the version counter at the time that the transaction started.
+     *       This could be its own form of a stress test with N transactions
+     *       performing overwrites.
+     * 
+     * @todo Do variants in which a DELETE operation "overwrites" and commits
+     *       and verify that the write-write conflict is correctly detected.
+     *       This tests for correct handling of version counter increments when
+     *       the "write" is a "delete".
+     */
+    public void test_writeWriteConflict01() throws IOException {
+        
+        final Properties properties = getProperties();
 
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+        
+        /*
+         * Setup the conflict resolver.
+         */
+        properties.setProperty("conflictResolver",
+                RandomVersionSingletonConflictResolver.class.getName());
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            // verify the conflict resolver.
+            assertNotNull( journal.getConflictResolver() );
+            assertTrue(journal.getConflictResolver() instanceof RandomVersionSingletonConflictResolver);
+            final RandomVersionSingletonConflictResolver conflictResolver = (RandomVersionSingletonConflictResolver) journal
+                    .getConflictResolver();
+
+            // Create random data for versions.
+            ByteBuffer expected_v0 = getRandomData(journal);
+            ByteBuffer expected_tx1_v1 = getRandomData(journal);
+            ByteBuffer expected_tx2_v1 = getRandomData(journal);
+
+            // data version not visible in global scope.
+            assertNotFound(journal.read(null, 0, null));
+
+            // write data version in global scope.
+            journal.write(null,0, expected_v0);
+            
+            // verify the version counter in the global scope.
+            assertVersionCounter(journal,0,0);
+
+            // data version visible in global scope.
+            assertEquals(expected_v0.array(), journal.read(null,0, null));
+
+            // Save the v0 slot allocation.
+            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(0);
+            
+            // start transaction.
+            Tx tx1 = new Tx(journal, 1);
+
+            // start transaction.
+            Tx tx2 = new Tx(journal, 2);
+            
+            /*
+             * Verify that the data version is visible in both transactions.
+             */
+            assertEquals(expected_v0.array(), tx1.read(0, null));
+            assertEquals(expected_v0.array(), tx2.read(0, null));
+
+            // overwrite data version in transaction scope.
+            tx1.write(0, expected_tx1_v1);
+
+            /*
+             * Verify the version counter in the transaction. The counter MUST
+             * have the same value as in the global scope from which this
+             * transaction was started.  The value of the counter is incremented
+             * in the global scope once (and IF) this transaction commits.
+             */
+            assertVersionCounter(tx1,0,0);
+
+            // Save the tx1(v1) slot allocation.
+            final ISlotAllocation slots_tx1_v1 = tx1.getObjectIndex().getSlots(0);
+
+            // Verify read-back of the version.
+            assertEquals(expected_tx1_v1.array(),tx1.read(0,null));
+            
+            // data version still visible in global scope.
+            assertEquals(expected_v0.array(), journal.read(null,0, null));
+
+            // prepare
+            tx1.prepare();
+
+            // commit.
+            tx1.commit();
+
+            /*
+             * Verify the version counter in the global scope. It MUST have been
+             * incremented by one.
+             */
+            assertVersionCounter(journal, 0, 1);
+
+            // new data version now visible in global scope.
+            assertEquals(expected_tx1_v1.array(), journal.read(null,0, null));
+
+            /*
+             * Verify that v0 is STILL allocated since the version can be read
+             * by tx2.
+             */
+            assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
+
+            // Read the version in tx2 (just to prove that we can do it).
+            assertEquals(expected_v0.array(), tx2.read(0, null));
+
+            /*
+             * Overwrite data version in transaction scope. This will produce a
+             * write-write conflict since tx1 has already overwritten the same
+             * version and committed.
+             */
+            tx2.write(0, expected_tx2_v1);
+
+            /*
+             * Verify the version counter in the transaction. The counter MUST
+             * have the same value as in the global scope from which this
+             * transaction was started. The value of the counter is incremented
+             * in the global scope once (and IF) this transaction commits.
+             * 
+             * If we fail to do copy on write for the global index entry then a
+             * write by tx1 before a write by tx2 will not be noticed since the
+             * post-increment version counter will be visible. This assertion
+             * looks for this problem.
+             */
+            assertVersionCounter(tx2,0,0);
+
+            /*
+             * Note: The counter in the global scope is currently ONE (1), but
+             * that is NOT the counter that is visible to the transaction!!!
+             */
+            assertVersionCounter(journal,0,1);
+
+            // Save the tx2(v1) slot allocation.
+            final ISlotAllocation slots_tx2_v1 = tx2.getObjectIndex().getSlots(0);
+
+            // Verify read-back of the version written by the transaction.
+            assertEquals(expected_tx2_v1.array(),tx2.read(0,null));
+
+            // Verify read-back of the version in the global scope (the one committed by tx1).
+            assertEquals(expected_tx1_v1.array(),journal.read(null,0,null));
+
+            // Verify that v0 is STILL allocated since tx2 has not committed and we have not GC'd.
+            assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
+
+            // Verify that tx1(v1) is STILL allocated - this is the last committed version.
+            assertSlotAllocationState(slots_tx1_v1, journal.allocationIndex, true);
+
+            // Prepare tx2.  This MUST detect the write-write conflict.
+            tx2.prepare();
+
+            // Verify that a write-write conflict was reported.
+            assertTrue("Conflict was not reported", conflictResolver.resolvedConflict());
+            
+            // Commit.
+            tx2.commit();
+
+            // Verify that v0 is STILL allocated since we have not GC'd.
+            assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
+
+            // Verify that tx1(v1) is STILL allocated since we have not GC'd.
+            assertSlotAllocationState(slots_tx1_v1, journal.allocationIndex, true);
+
+            // Verify that tx2(v1) is STILL allocated - this is now the last committed version.
+            assertSlotAllocationState(slots_tx2_v1, journal.allocationIndex, true);
+
+            /*
+             * Verify the version counter in the global scope. It MUST have been
+             * incremented by one.
+             */
+            assertVersionCounter(journal, 0, 2);
+
+            // Verify read-back of the version in the global scope.
+            assertEquals(expected_tx2_v1.array(),journal.read(null,0,null));
+
+            /*
+             * Verify read-back of the version in the global scope - this is the
+             * random data generated by the conflict resolver helper class. If
+             * you see the version that tx1 or the version that tx2 tried to
+             * write then either validation did not detect or failed to impose
+             * the resolved version on the journal.
+             */
+            assertEquals(conflictResolver.getResolvedVersion().array(), journal
+                    .read(null, 0, null));
+
+            /*
+             * Sweap the version overwritten by tx1 (v0).
+             */
+            tx1.gc();
+            
+            // Verify that v0 is now deallocated.
+            assertSlotAllocationState(slots_v0, journal.allocationIndex, false);
+
+            // Verify that tx1(v1) is STILL allocated since we have not GC'd tx2.
+            assertSlotAllocationState(slots_tx1_v1, journal.allocationIndex, true);
+
+            // Verify that tx2(v1) is STILL allocated - this is now the last committed version.
+            assertSlotAllocationState(slots_tx2_v1, journal.allocationIndex, true);
+
+            /*
+             * Sweap the version overwritten by tx2 (tx1_v1).
+             */
+            tx2.gc();
+
+            // Verify that v0 is still deallocated.
+            assertSlotAllocationState(slots_v0, journal.allocationIndex, false);
+
+            // Verify that tx1(v1) is now deallocated.
+            assertSlotAllocationState(slots_tx1_v1, journal.allocationIndex, false);
+
+            // Verify that tx2(v1) is STILL allocated - this is now the last committed version.
+            assertSlotAllocationState(slots_tx2_v1, journal.allocationIndex, true);
+
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+
+    }
+
+    /**
+     * <p>
+     * Helper class always throws an exception.  This may be used to verify that
+     * write-write conflicts are NOT reported when none are expected.
+     * </p>
+     * <p>
+     * Note: This class has to be static since otherwise there is an implicit
+     * outer instance parameter to the constructor that means that the class
+     * can not be instantiated correctly by the journal.
+     * </p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class ConflictResolverAlwaysFails implements IConflictResolver {
+
+//        private final Journal journal;
+        private int counter = 0;
+
+        /**
+         * The #of conflicts that have been presented to this conflict resolver.
+         * 
+         * @return The #of conflicts presented.
+         */
+        public int getCounter() {
+            
+            return counter;
+            
+        }
+        
+        public ConflictResolverAlwaysFails(Journal journal) {
+            
+            assert journal != null;
+            
+//            this.journal = journal;
+            
+        }
+        
+        public ByteBuffer resolveConflict(ByteBuffer committedVersion, ByteBuffer proposedVersion) throws RuntimeException {
+
+            counter++;
+            
+            System.err.println("Refusing to resolve conflict: counter="+counter);
+            
+            throw new RuntimeException("Refusing to resolve conflict: counter="+counter);
+            
+        }
+        
+    }
+
+    /**
+     * <p>
+     * Helper class resolves a single conflict by writing an updated version.
+     * The class notes whether or not it has been invoked and reports the resolved
+     * version so that it may be verified on the journal.
+     * </p>
+     * <p>
+     * Note: This class has to be static since otherwise there is an implicit
+     * outer instance parameter to the constructor that means that the class
+     * can not be instantiated correctly by the journal.
+     * </p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class RandomVersionSingletonConflictResolver implements IConflictResolver {
+
+        private final Journal journal;
+        private ByteBuffer randomData = null;
+        
+        /**
+         * A random number generated - the seed is NOT fixed.
+         */
+        private Random r = new Random();
+
+        /**
+         * Returns random data that will fit in N slots. N is choosen randomly,
+         * the slotSize is assumed to be 128, and then the actual length is
+         * choosen randomly within that slot.
+         * 
+         * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
+         *         of random length and having random contents.
+         * 
+         * @see AbstractTestCase#getRandomData(Journal)
+         */
+        private ByteBuffer getRandomData(Journal journal) {
+            
+            final int slotDataSize = journal.slotMath.dataSize;
+            
+            final int nslots = r.nextInt(5)+1;
+            
+            final int nbytes = ((nslots - 1) * slotDataSize)
+                    + r.nextInt(slotDataSize) + 1;
+            
+            byte[] bytes = new byte[nbytes];
+            
+            r.nextBytes(bytes);
+            
+            return ByteBuffer.wrap(bytes);
+            
+        }
+
+        public RandomVersionSingletonConflictResolver(Journal journal) {
+            
+            assert journal != null;
+            
+            this.journal = journal;
+            
+        }
+
+        /**
+         * True iff a conflict has been reported (and hence resolve).
+         * 
+         * @return
+         */
+        public boolean resolvedConflict() {
+            
+            return randomData != null;
+            
+        }
+
+        /**
+         * Return the resolved data version.
+         * 
+         * @return
+         */
+        public ByteBuffer getResolvedVersion() {
+           
+            // fail the test if the resolver has not been invoked.
+            assertNotNull( "conflict was not reported", randomData );
+            
+            return randomData;
+            
+        }
+        
+        /**
+         * Resolve the conflict by creating a random data version.
+         */
+        public ByteBuffer resolveConflict(ByteBuffer committedVersion, ByteBuffer proposedVersion) throws RuntimeException {
+ 
+            if( randomData != null ) {
+                
+                fail("Already invoked once.");
+                
+            }
+
+            System.err.println("Random resolution of conflict.");
+            
+            randomData = getRandomData(journal);
+            
+            return randomData;
+            
+        }
+        
+    }
+        
 }

@@ -174,9 +174,15 @@ public class Tx {
 //        }
     }
     
-    final Journal journal;
+    final private Journal journal;
     final private long timestamp;
-    final SimpleObjectIndex objectIndex;
+    final private SimpleObjectIndex objectIndex;
+    
+    SimpleObjectIndex getObjectIndex() {
+        
+        return objectIndex;
+        
+    }
     
     private RunState runState;
 
@@ -196,7 +202,7 @@ public class Tx {
         this.objectIndex = new SimpleObjectIndex(
                 (SimpleObjectIndex) journal.objectIndex);
 
-        journal.activatingTx(this);
+        journal.activateTx(this);
         
         this.runState = RunState.ACTIVE;
         
@@ -357,60 +363,31 @@ public class Tx {
             
         }
 
-        journal.preparingTx(this);
-
         try {
 
             /*
              * Validate against the current state of the journal's object index.
-             * 
-             * Note: This is NOT always the same as the inner object index map
-             * used by normal the transaction since other transactions MAY have
-             * committed on the journal since the transaction started!
              */
-            objectIndex.validate(journal.objectIndex);
-            
-        } catch( ValidationError ex ) {
-            
-            if( ! isAborted() ) {
+
+            if( ! objectIndex.validate(journal,this) ) {
                 
                 abort();
                 
+                throw new RuntimeException("Validation failed: write-write conflict");
+                
             }
-
-            throw ex;
             
         } catch( Throwable t ) {
             
-            if( ! isAborted() ) {
-                
-                abort();
-                
-            }
+            abort();
             
-            throw new ValidationError("Unexpected error: "+t, t);
+            throw new RuntimeException("Unexpected error: "+t, t);
             
         }
-        
+
+        journal.prepared(this);
+
         runState = RunState.PREPARED;
-        
-    }
-    
-    /**
-     * @todo Notion exception thrown for normal validation errors.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ValidationError extends RuntimeException {
-        
-        private static final long serialVersionUID = 6662456627493976835L;
-
-        public ValidationError(String msg) {super(msg);}
-        
-        public ValidationError(Throwable cause) {super(cause);}
-
-        public ValidationError(String msg, Throwable cause) {super(msg,cause);}
         
     }
     
@@ -436,7 +413,7 @@ public class Tx {
             
         }
 
-        journal.completingTx(this);
+        journal.completedTx(this);
 
         /*
          * Merge the object index into the global scope. This also marks the
@@ -479,7 +456,7 @@ public class Tx {
 
         if( isComplete() ) throw new IllegalStateException(IS_COMPLETE);
 
-        journal.completingTx(this);
+        journal.completedTx(this);
 
         /*
          * FIXME Implement abort. There are some deallocation operations that

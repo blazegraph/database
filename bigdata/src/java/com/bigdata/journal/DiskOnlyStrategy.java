@@ -134,6 +134,19 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     }
 
+    public void deleteFile() {
+        
+        if( open ) throw new IllegalStateException();
+        
+        if( ! file.delete() ) {
+            
+            throw new RuntimeException("Could not delete file: "
+                    + file.getAbsoluteFile());
+            
+        }
+        
+    }
+    
     public long getExtent() {
 
         return extent;
