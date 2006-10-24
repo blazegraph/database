@@ -50,20 +50,29 @@ package com.bigdata.journal;
 import junit.framework.TestCase;
 
 /**
- * FIXME This is a work in progress for state-based validation. There are
- * several things that are different from my preconceptions, including that some
- * aspects of state appear to be tx local with the same persistent state visible
- * to all active transactions (module whatever object replication synchrony
- * issues). I need to work through this some more (the test below is not
- * functional yet) and think through the relationship between this approach and
- * the notions that I have for handling link set membership and clustered index
- * membership changes with high concurrency. One of the key differences is that
- * validation examines transaction local state and the commit then updates the
- * global state and validation is (I think) required even if only one
- * transaction has written on an object. Plus, this notion of validation is in
- * terms of the objects API (credit and debit in this case) rather than in terms
- * of writes of opaque state that are then unpacked when a write-write conflict
- * is detected.
+ * This test case demonstrates a state-based validation technique described in
+ * http://www.cs.brown.edu/~mph/Herlihy90a/p96-herlihy.pdf for a "bank account"
+ * data type.
+ * 
+ * @todo There are several things that are different about this approach from my
+ *       preconceptions.<br>
+ *       First, there is a distinct between stable state (the account balance)
+ *       and transaction local state (the low, high, and change for that account
+ *       within the transaction).<br>
+ *       This notion of validation is in terms of the objects API (credit and
+ *       debit in this case) rather than in terms of writes of opaque state that
+ *       are then unpacked when a write-write conflict is detected.<br>
+ *       In the atomic commit protocol, validation examines transaction local
+ *       state as well as the global state and updates the global state
+ *       atomically iff validation succeeds.<br>
+ *       This does not appear to depend on the notion of version counters to 
+ *       trigger state-based 
+ *       This raises lots of questions. I need to think through how a
+ *       transaction containing multiple objects could be modeled, how this
+ *       relates to what is already implemented, and the relationship between
+ *       this approach and the notions that I have for handling link set
+ *       membership and clustered index membership changes with high
+ *       concurrency.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -105,6 +114,17 @@ public class TestAccount extends TestCase {
 
     }
     
+    /**
+     * A transactional view of an {@link Account}. Each transaction has its own
+     * transaction local state (low, high, and change). All operations within a
+     * transaction are applied to the {@link TxAccount}. If the transaction
+     * validates and commits, then the net <i>change</i> in the balance due to
+     * the operations on the transaction is applied to the {@link Account}
+     * balance.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     public static class TxAccount {
 
         final Account account;
@@ -131,19 +151,33 @@ public class TestAccount extends TestCase {
          * The transaction's net change to the balance (initially zero).
          */
         long change = 0;
-        
+
+        /**
+         * Credit the account.
+         * 
+         * @param cents
+         *            The amount.
+         */
         public void credit( long cents ) {
             
             change = change + cents;
             
         }
-        
+
+        /**
+         * Debit the account.
+         * 
+         * @param cents
+         *            The amount.
+         * @throws OverdraftException
+         *             iff an overdraft must result.
+         */
         public void debit( long cents ) throws OverdraftException {
-
+// 5 + 6 > 10
             if( account.bal + change >= cents ) {
-                
+// 4 = max( 0, 10 - 6 )                
                 low = Math.max(low, cents - change);
-
+// -4 = 6 - 10
                 change = change - cents;
                 
             } else {
@@ -166,35 +200,55 @@ public class TestAccount extends TestCase {
 
         }
 
-        public boolean validate()  {
-        
-            System.err.println("validate: "+toString());
-            
-            /*
-             * @todo This really needs to synchronize on the account balance for
-             * validation, or perhaps obtain a lock for validation and commit.
-             * Otherwise concurrent transactions that commit together could
-             * resolve account.bal into two distinct values within the
-             * comparison below.
-             */
-            
-            if( low <= account.bal && account.bal < high ) {
-                
+        /**
+         * <p>
+         * Validate the transaction against the current account balance.
+         * </p>
+         * <p>
+         * Note: Validation is currently invoked from within the {@link #commit},
+         * which handles atomicity with respect to the account balance.
+         * </p>
+         */
+        public boolean validate() {
+
+            System.err.println("validate: " + toString());
+
+            if (low <= account.bal && account.bal < high) {
+
                 // valid.
-                
+
                 return true;
-                
+
             }
-            
+
             return false;
-            
+
         }
         
+        /**
+         * <p>
+         * Validate against the current account balance and commit the change to
+         * the account.
+         * </p>
+         * <p>
+         * Note: This validate + commit operation needs to be atomic. That is
+         * achieved here by synchronizing on the {@link #account}. However that
+         * technique will not work in a distributed system.
+         * </p>
+         */
         public void commit() {
-            
-            // @todo This operation needs to be atomic, which it is not.
-            
-            account.bal = account.bal + change;
+
+            synchronized (account) {
+
+                if (!validate()) {
+
+                    throw new RuntimeException("Validation error.");
+
+                }
+
+                account.bal = account.bal + change;
+
+            }
             
         }
         
@@ -206,6 +260,30 @@ public class TestAccount extends TestCase {
         
     }
 
+    /**
+     * <p>
+     * Runs a schedule and verifies the intermediate and stable states for an
+     * {@link Account}.
+     * </p>
+     * <p>
+     * The schedule is from page 101 of
+     * http://www.cs.brown.edu/~mph/Herlihy90a/p96-herlihy.pdf. This schedule
+     * interleaves two transactions, P and Q. There is an initial balance of $0.
+     * There is a $5 credit on P followed by a $6 credit on Q. P then validates
+     * and commits (validation occurs during the commit protocol), with a
+     * resulting stable balance of $5. A $10 debit is then made on Q and Q
+     * validates and commits (again, validation is part of the commit). The
+     * final stable balance is $1.
+     * </p>
+     * 
+     * <pre>
+     *         a Credit($5)/Ok( ) P
+     *         a Credit($6)/Ok( ) Q
+     *         a Commit P
+     *         a Debit($lO)/Ok( ) Q
+     *         a Commit Q
+     * </pre>
+     */
     public void test_Schedule01() {
         
         Account a = new Account();
@@ -235,18 +313,18 @@ public class TestAccount extends TestCase {
         assertEquals("change", 6, q.change);
         
         assertEquals("bal", 0, a.bal);
-        assertTrue(p.validate());
+//        assertTrue(p.validate());
         p.commit();
         assertEquals("bal", 5, a.bal);
         
         q.debit(10);
         
-        assertEquals("low", 0, q.low );
+        assertEquals("low", 4, q.low );
         assertEquals("high", Long.MAX_VALUE, q.high );
-        assertEquals("change", 10, q.change);
+        assertEquals("change", -4, q.change);
         
         assertEquals("bal", 5, a.bal);
-        q.validate();
+//       assertTrue(q.validate());
         q.commit();
         assertEquals("bal", 1, a.bal);
         
