@@ -57,7 +57,13 @@ import junit.framework.TestCase;
  * issues). I need to work through this some more (the test below is not
  * functional yet) and think through the relationship between this approach and
  * the notions that I have for handling link set membership and clustered index
- * membership changes with high concurrency.
+ * membership changes with high concurrency. One of the key differences is that
+ * validation examines transaction local state and the commit then updates the
+ * global state and validation is (I think) required even if only one
+ * transaction has written on an object. Plus, this notion of validation is in
+ * terms of the objects API (credit and debit in this case) rather than in terms
+ * of writes of opaque state that are then unpacked when a write-write conflict
+ * is detected.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
