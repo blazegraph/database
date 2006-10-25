@@ -113,32 +113,30 @@ public interface IConflictResolver {
 
     /**
      * <p>
-     * Resolve a conflict between a committed version and a proposed version.
-     * </p>
-     * <p>
-     * Note: DELETE operations are a special case of WRITE operations. A DELETE
-     * can be recognized by a <code>null</code> value where a WRITE can be
-     * recognized by a <code>non-null</code> value.
+     * Resolve a write-write conflict between a committed version on the journal
+     * and the current version within a transaction that is validating.
      * </p>
      * 
-     * @param committedVersion
-     *            The committed version (the version found on the journal). This
-     *            will be <code>null</code> iff the last committed update was
-     *            a DELETE operation.
-     *            
-     * @param proposedVersion
-     *            The proposed version (the version last written onto the
-     *            transaction that is being validated). This will be
-     *            <code>null</code> iff the last "write" was a DELETE.
-     *            
-     * @return A version in which the conflict is reconciled and
-     *         <code>null</code> if the version should be deleted.
+     * @param id
+     *            The int32 within segment persistent identifier.
+     * 
+     * @param readOnlyTx
+     *            A read-only transactional view from which the committed
+     *            version may be read.
+     * 
+     * @param tx
+     *            The transaction that is being validated.
      * 
      * @exception RuntimeException
      *                if you are not able to resolve the conflict.
+     * 
+     * @todo DELETE operations are a special case of WRITE operations. However,
+     *       there is no way to overwrite a committed delete at this time using
+     *       {@link Tx#write(int, ByteBuffer)} or
+     *       {@link Journal#write(Tx, int, ByteBuffer)}
      */
 
-    public ByteBuffer resolveConflict(ByteBuffer committedVersion,
-            ByteBuffer proposedVersion) throws RuntimeException;
+    public void resolveConflict(int id, Tx readOnlyTx, Tx readWriteTx)
+            throws RuntimeException;
 
 }

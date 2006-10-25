@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -851,6 +850,18 @@ public class SimpleObjectIndex implements IObjectIndex {
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;
         
+        /*
+         * A read-only transaction whose ground state is the current committed
+         * state of the journal. This will be exposed to the conflict resolver
+         * so that it can read the current state of objects committed on the
+         * journal.
+         * 
+         * @todo Extract ITx and refactor Tx to write this class. What is the
+         * timestamp concept for this transaction or does it simply fail to
+         * register itself with the journal?
+         */
+        Tx readOnlyTx = null; // new ReadOnlyTx(journal);
+        
         // Scan entries in the outer map.
         final Iterator<Map.Entry<Integer, IObjectIndexEntry>> itr = objectIndex
                 .entrySet().iterator();
@@ -890,29 +901,9 @@ public class SimpleObjectIndex implements IObjectIndex {
                         
                     } else {
                         
-                        /*
-                         * Read the versions from the journal.
-                         * 
-                         * @todo Write journal.read(ISlotAllocation) as the core
-                         * implementation for read. We can use it here to read a
-                         * version when we already have the index entry and save
-                         * some overhead. This will be easy to do once we factor
-                         * out the slot header chains.
-                         */
-                        
-                        // The version in the global scope.
-                        ByteBuffer committedVersion = journal.read(null, id, null);
-
-                        // The version in the transaction scope.
-                        ByteBuffer proposedVersion = journal.read(tx, id, null);
-
-                        // The resolved version.
-                        ByteBuffer resolvedVersion;
-                        
                         try {
                             
-                            resolvedVersion = conflictResolver.resolveConflict(
-                                    committedVersion, proposedVersion);
+                            conflictResolver.resolveConflict(id,readOnlyTx,tx);
                             
                         } catch( Throwable t ) {
                             

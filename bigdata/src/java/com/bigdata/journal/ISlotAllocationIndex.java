@@ -237,60 +237,63 @@ package com.bigdata.journal;
  */
 public interface ISlotAllocationIndex {
 
-    /**
-     * Release slots on the journal beginning at the specified slot index by
-     * logical deletion of historical data versions no longer accessable to any
-     * active transaction. If necessary, triggers the extension of the journal.
-     * 
-     * @param fromSlot
-     *            The index of the slot where the release operation will begin.
-     * 
-     * @param minSlots
-     *            The minimum #of slots that must be made available by this
-     *            operation.
-     * 
-     * @return The index of the next free slot.
-     */
-    public int release(int fromSlot, int minSlots );    
+//    /**
+//     * Release slots on the journal beginning at the specified slot index by
+//     * logical deletion of historical data versions no longer accessable to any
+//     * active transaction. If necessary, triggers the extension of the journal.
+//     * 
+//     * @param fromSlot
+//     *            The index of the slot where the release operation will begin.
+//     * 
+//     * @param minSlots
+//     *            The minimum #of slots that must be made available by this
+//     *            operation.
+//     * 
+//     * @return The index of the next free slot.
+//     */
+//    public int release(int fromSlot, int minSlots );    
 
     /**
-     * Ensure that at least this many slots are available for writing data in
-     * this transaction. If necessary, triggers the logical deletion of
-     * historical data versions no longer accessable to any active transaction.
-     * If necessary, triggers the extension of the journal.
+     * <p>
+     * Returns an {@link ISlotAllocation} onto which the caller may write data.
+     * The slots are marked as allocated since there is a presumption that the
+     * caller will write data onto those slots.
+     * </p>
+     * <p>
+     * An effort attempt is made to ensure that the allocation is comprised of
+     * contiguous slots. This is especially important for index nodes on a
+     * disk-backed journal using page buffing since the expected time to access
+     * an object is a function of the depth of the index tree. If the index
+     * nodes are fragmented and the journal is not fully buffered then the
+     * access times will go up sharply.
+     * </p>
      * 
-     * @param tx
-     *            The transaction. Note that slots written in the same
-     *            transaction whose data have since been re-written or deleted
-     *            are available for overwrite in that transaction (but not in
-     *            any other transaction).
+     * @param nbytes
+     *            The #of bytes to be stored. The #of slots required is computed
+     *            based on the provisioned slot size for the journal.
      * 
-     * @param nslots
-     *            The #of slots required.
-     * 
-     * @return The first free slot. The slot is NOT mark as allocated by this
-     *         call.
-     * 
-     * @see #releaseNextSlot(long)
+     * @return The slot allocation -or- <code>null</code> if there is
+     *         insufficient space on the journal. The caller will presumably
+     *         handle this condition by extending the journal and trying again.
      */
-    public int releaseSlots(int nslots);
+    public ISlotAllocation alloc(int nbytes);
 
-    /**
-     * Marks the current slot as "in use" and return the next slot free in the
-     * journal.
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @return The next slot.
-     * 
-     * @exception IllegalStateException
-     *                if there are no free slots. Note that
-     *                {@link #releaseSlots(int)} MUST be invoked as a
-     *                pre-condition to guarentee that the necessary free slots
-     *                have been released on the journal.
-     */
-    public int releaseNextSlot();
+//    /**
+//     * Marks the current slot as "in use" and return the next slot free in the
+//     * journal.
+//     * 
+//     * @param tx
+//     *            The transaction.
+//     * 
+//     * @return The next slot.
+//     * 
+//     * @exception IllegalStateException
+//     *                if there are no free slots. Note that
+//     *                {@link #releaseSlots(int)} MUST be invoked as a
+//     *                pre-condition to guarentee that the necessary free slots
+//     *                have been released on the journal.
+//     */
+//    public ISlotAllocation releaseNextSlot();
  
     /**
      * Mark the slot as allocated but not committed.

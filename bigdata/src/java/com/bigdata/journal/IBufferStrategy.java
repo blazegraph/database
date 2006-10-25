@@ -109,79 +109,42 @@ public interface IBufferStrategy {
     public void force(boolean metadata);
     
     /**
-     * Read the first slot for some data version.
+     * Read data from a slot, appending the data into the provided buffer.
+     * Invoking this method for each slot in a {@link ISlotAllocation} in turn
+     * will cause the all data for that allocation to be assembled in the buffer
+     * in order.
      * 
-     * @param firstSlot
-     *            The first slot for that data version.
-     * @param readData
-     *            When true, a buffer will be allocated sized to exactly hold
-     *            the data version and the data from the first slot will be read
-     *            into that buffer. The buffer is returned to the caller.
-     * @param slotHeader
-     *            The structure into which the header data will be copied.
+     * @param slot
+     *            The slot index.
      * @param dst
-     *            When non-null and having sufficient bytes remaining, the data
-     *            version will be read into this buffer beginning with the
-     *            current position. If null or if the buffer does not have
-     *            sufficient bytes remaining, then a new (non-direct) buffer
-     *            will be allocated that is right-sized for the data version,
-     *            the data will be read into that buffer, and the buffer will be
-     *            returned to the caller. (This is ignored unless data is
-     *            actually being read.)
+     *            The data version will be read into this buffer beginning with
+     *            the current position up to the last byte of data in the slot
+     *            or the limit (exclusive) on the buffer, whichever comes first.
      * 
-     * @return A newly allocated buffer containing the data from the first slot
-     *         or <code>null</code> iff <i>readData</i> is false. The
-     *         {@link ByteBuffer#position()} will be the #of bytes read from the
-     *         slot. The limit will be equal to the position. Data from
-     *         remaining slots for this data version should be appended starting
-     *         at the current position. You must examine
-     *         {@link SlotHeader#nextSlot} to determine if more slots should be
-     *         read.
-     * 
-     * @exception RuntimeException
-     *                if the slot is corrupt.
+     * @return The buffer. The {@link ByteBuffer#position()} will be advanced by
+     *         the #of bytes read from the slot.
      */
-
-    public ByteBuffer readFirstSlot(int firstSlot, boolean readData,
-            SlotHeader slotHeader, ByteBuffer dst);
+    public ByteBuffer readSlot(int slot, ByteBuffer dst);
     
     /**
-     * Read another slot in a chain of slots for some data version.
+     * Write data on a slot.
      * 
-     * @param thisSlot
-     *            The slot being read.
-     * @param priorSlot
-     *            The previous slot read.
-     * @param slotsRead
-     *            The #of slots read so far in the chain for the data version.
-     * @param remainingToRead
-     *            The #of bytes that remain to be read for this data version.
-     *            (This is ignored unless data is actually being read.)
-     * @param dst
-     *            When non-null, the data from the slot is appended into this
-     *            buffer starting at the current position. (This is ignored
-     *            unless data is actually being read.)
-     * @return The next slot to be read or {@link #LAST_SLOT_MARKER} iff this
-     *         was the last slot in the chain.
-     */
-    public int readNextSlot(int thisSlot, int priorSlot, int slotsRead,
-            int remainingToRead, ByteBuffer dst);
-
-    /**
-     * Write a slot.
-     * 
-     * @param thisSlot
+     * @param slot
      *            The slot index.
-     * @param priorSlot
-     *            The value to be written into the priorSlot header field.
-     * @param nextSlot
-     *            The value to be written into the nextSlot header field.
      * @param data
      *            The data to be written on the slot. Bytes are written from the
      *            current position up to the limit (exclusive). The position is
      *            updated as a side effect. The post-condition is that the
      *            position is equal to the pre-condition limit.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>slot</i> is invalid.
+     * @exception IllegalArgumentException
+     *                if data is null.
+     * @exception IllegalArgumentException
+     *                if the #of bytes remaining in data exceeds the size of a
+     *                single slot.
      */
-    public void writeSlot(int thisSlot,int priorSlot,int nextSlot, ByteBuffer data);
+    public void writeSlot(int slot, ByteBuffer data);
     
 }

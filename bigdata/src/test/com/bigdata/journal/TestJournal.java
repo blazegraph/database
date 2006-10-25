@@ -222,7 +222,7 @@ public class TestJournal extends ProxyTestCase {
             final int id = 1;
             final int nbytes = 67;
             
-            assertTrue("dataSize",journal.slotMath.dataSize>nbytes);
+            assertTrue("dataSize",journal.slotMath.slotSize>nbytes);
             
             doWriteRoundTripTest(journal, tx, id, nbytes);
 
@@ -269,7 +269,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
 
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize);
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -310,7 +310,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize-1);
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize-1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -351,7 +351,7 @@ public class TestJournal extends ProxyTestCase {
             
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize+1);
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize+1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -396,7 +396,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.dataSize * 2);
+            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize * 2);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -438,7 +438,7 @@ public class TestJournal extends ProxyTestCase {
             Tx tx = new Tx(journal,0);
             
             doWriteRoundTripTest(journal, tx, 0,
-                    (journal.slotMath.dataSize * 2) - 1);
+                    (journal.slotMath.slotSize * 2) - 1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -480,7 +480,7 @@ public class TestJournal extends ProxyTestCase {
             Tx tx = new Tx(journal,0);
             
             doWriteRoundTripTest(journal, tx, 0,
-                    (journal.slotMath.dataSize * 2) + 1);
+                    (journal.slotMath.slotSize * 2) + 1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -526,7 +526,7 @@ public class TestJournal extends ProxyTestCase {
             Tx tx = new Tx(journal, 0);
             
             doWriteRoundTripTest(journal, tx, 0,
-                    journal.slotMath.dataSize * 3);
+                    journal.slotMath.slotSize * 3);
             
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -568,7 +568,7 @@ public class TestJournal extends ProxyTestCase {
             Tx tx = new Tx(journal, 0);
             
             doWriteRoundTripTest(journal, tx, 0,
-                    (journal.slotMath.dataSize * 3) - 1);
+                    (journal.slotMath.slotSize * 3) - 1);
             
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -610,7 +610,7 @@ public class TestJournal extends ProxyTestCase {
             Tx tx = new Tx(journal, 0);
             
             doWriteRoundTripTest(journal, tx, 0,
-                    (journal.slotMath.dataSize * 3) + 1);
+                    (journal.slotMath.slotSize * 3) + 1);
             
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -777,7 +777,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            int maxSize = journal.slotMath.dataSize * 50;
+            int maxSize = journal.slotMath.slotSize * 50;
             
             for (int id = 0; id < limit; id++) {
 
@@ -858,7 +858,7 @@ public class TestJournal extends ProxyTestCase {
             final int id = 0;
             
             byte[] expected = doWriteRoundTripTest(journal, null, id,
-                    (journal.slotMath.dataSize * 3) + 1);
+                    (journal.slotMath.slotSize * 3) + 1);
 
             /*
              * #of slots allocated to that object (this relies on the fact that

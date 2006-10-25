@@ -235,7 +235,12 @@ import java.util.Properties;
  * FIXME Stress tests that cause the journal to wrap several times. Also tests
  * of extension, compaction, and truncation of the journal. A test that causes
  * wrapping needs to mix writes and deletes or the journal will run out of space
- * (running out of space should trigger extension).
+ * (running out of space should trigger extension). Compaction may require re-
+ * copy of committed transactions and MUST NOT cause fragmentation. Compaction
+ * makes sense when large swathes of the journal have been released, e.g., due
+ * to data migration or overwrite.  However, note that overwrite tends to cause
+ * spotty release of slots rather than releasing entire ranges written by some
+ * transaction.
  * 
  * FIXME Migration of data to the read-optimized database means that the current
  * committed version is on the database. However, subsequent migration of
@@ -384,14 +389,6 @@ public class Journal {
      * The slot allocation index.
      */
     final ISlotAllocationIndex allocationIndex;
-
-    /**
-     * A single instance is used by {@link #read(long, long)} since the journal
-     * is single threaded.
-     * 
-     * @deprecated The use of slot headers is being phased out.
-     */
-    private final SlotHeader _slotHeader = new SlotHeader();
 
     /**
      * Option set by the test suites causes the file backing the journal to be
@@ -1061,8 +1058,8 @@ public class Journal {
          * FIXME We need to set _nextSlot based on the persistent slot
          * allocation index chain.
          */
-        allocationIndex = new SimpleSlotAllocationIndex(_bufferStrategy
-                .getSlotLimit());
+        allocationIndex = new SimpleSlotAllocationIndex(slotMath,
+                _bufferStrategy.getSlotLimit());
 
         /*
          * Initialize the conflict resolver.
@@ -1157,6 +1154,32 @@ public class Journal {
     }
     
     /**
+     * <p>
+     * Extend the journal by at least this many bytes. The actual number of
+     * bytes for the extension is choosen based on a growth policy for the
+     * journal.
+     * </p>
+     * <p>
+     * Note: This method is invoked automatically when the journal is out of
+     * space during a write.
+     * </p>
+     * 
+     * @param minBytes
+     *            The minimum #of bytes to extend the journal.
+     * 
+     * FIXME Implement the ability to extend the journal. The
+     * {@link #_bufferStrategy} and {@link #allocationIndex} are both effected
+     * by this operation. If the new extent would exceed the limits of the
+     * current strategy, then this operation requires changing to a
+     * {@link BufferMode#Disk} buffer strategy.
+     */
+    public void extend( int minBytes ) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
      * Insert the data into the store and associate it with the persistent
      * identifier from which the data can be retrieved. If there is an entry for
      * that persistent identifier within the transaction scope, then its data is
@@ -1185,56 +1208,64 @@ public class Journal {
 
     public void write(Tx tx,int id,ByteBuffer data) {
         
+        assertOpen();
+
+        /*
+         * Write the data onto the journal and obtain the slots onto which the
+         * data was written.
+         */
+        ISlotAllocation slots = write( data );
+        
+        /*
+         * Update the object index so that the current data version is mapped
+         * onto the slots on which the data was just written.
+         */
+
+        if( tx != null ) {
+            
+            // transactional isolation.
+            tx.getObjectIndex().mapIdToSlots(id, slots, allocationIndex);
+            
+        } else {
+            
+            // no isolation.
+            objectIndex.mapIdToSlots(id, slots, allocationIndex);
+            
+        }
+
+    }
+    
+    /**
+     * Write the data on the journal. This method is not isolated and does not
+     * update the object index. It operates directly on the slots in the journal
+     * and returns a {@link ISlotAllocation} that may be used to recover the
+     * data.
+     * 
+     * @param data
+     *            The data. The bytes from the current position to the limit
+     *            (exclusive) will be written onto the journal. The position
+     *            will be updated as a side effect. An attempt will be made to
+     *            write the data onto a contiguous run of slots.
+     * 
+     * @return A {@link ISlotAllocation} representing the slots on which the
+     *         data was written. This may be used to read the data back from the
+     *         journal.
+     * 
+     * @todo Since we try hard to use contiguous slot runs, that has
+     *       implications for the best way to encode the {@link ISlotAllocation}.
+     */
+    public ISlotAllocation write(ByteBuffer data) {
+        
+        assertOpen();
+
         if( data == null ) {
             
             throw new IllegalArgumentException("data is null");
             
         }
-
-        assertOpen();
         
-//        /*
-//         * Note: throws DataDeletedException if the version is deleted.
-//         */
-//        final int firstSlotBefore = (tx == null ? objectIndex.getFirstSlot(id)
-//                : tx.objectIndex.getFirstSlot(id));
-//
-//        /*
-//         * True iff we are overwriting an existing, non-deleted version.
-//         */
-//        final boolean overwritingVersion = firstSlotBefore != IObjectIndex.NOTFOUND;
-//        
-//        /*
-//         * True iff overwritting an existing version that was written in the
-//         * same scope. When true, as a postcondition we synchronously deallocate
-//         * the slots associated with the old version. They may be used by any
-//         * subsequent write since they do not hold a data version that is
-//         * visible in any scope.
-//         * 
-//         * Note: We need to be able to detect an overwrite of a version that was
-//         * written in the same scope. This should be a feature of the object
-//         * index. Basically, if the version is resolved in the outer index, then
-//         * it was last written in the same scope.
-//         * 
-//         * Since access to the Journal (and hence to the object indices) is
-//         * always single threaded, we can just reuse a single per-journal (or
-//         * per index) data structure to carry back more information about the
-//         * last match.
-//         * 
-//         * FIXME When we are running without an inner index (not isolated) this
-//         * flag should always be set to false _unless_ there are no active
-//         * transactions, in which case we can merrily wipe out the old version
-//         * since no one can ever see it.  In order to do this the journal will
-//         * need to keep track of the active transactions, e.g., in an hash table
-//         * indexed by the transaction identifier.  When the hash table is empty
-//         * there are no active transactions.  (Except that once a transaction has
-//         * prepared, it can no longer read versions.)
-//         */
-//        final boolean overwritingVersionWrittenInSameScope = (tx == null ? false
-//                : tx.objectIndex.hitOnOuterIndex);
-        
-        // #of bytes of data that fit in a single slot.
-        final int dataSize = slotMath.dataSize;
+        // #of bytes of data that fit in a single slot. @todo move onto the journal.
+        final int slotSize = slotMath.slotSize;
 
         // #of bytes to be written.
         int remaining = data.remaining();
@@ -1255,151 +1286,71 @@ public class Journal {
         final int nbytes = remaining;
 
         /*
-         * Make sure that there are enough free slots in the journal to write
-         * the data and obtain the first slot on which the data will be written.
+         * Obtain an allocation of slots sufficient to write this many bytes
+         * onto the journal.
          */
+        ISlotAllocation slots = allocationIndex.alloc( nbytes );
         
-        // #of slots needed to write the data on the journal.
-        final int nslots = slotMath.getSlotCount(remaining);
-        
-        // verify that at least this many slots are available, returning the
-        // index of the first slot to be written.
-        final int firstSlot = allocationIndex.releaseSlots( nslots );
-
-        // create object to store the allocated slots indices. the case where
-        // nslots == 1 is optimized.
-        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(nbytes)
-                : new CompactSlotAllocation(nbytes,nslots));
-        
-        // Add the first slot to the record of allocated slots.
-        slots.add( firstSlot );
-        
-        int thisSlot = firstSlot;
-
-        // The priorSlot in the chain and -size for the first slot in the chain.
-        int priorSlot = -nbytes;
-
-        int nwritten = 0;
-        
-        while( remaining > 0 ) {
-
-            // verify valid index.
-            assertSlot( thisSlot );
+        if( slots == null ) {
             
-            int nextSlot;
+            extend( nbytes );
             
-            final int thisCopy;
+            slots = allocationIndex.alloc(nbytes);
             
-            if( remaining > dataSize ) {
-
-                /*
-                 * Marks the current slot as allocated and returns the next free
-                 * slot (the slot on which we will write in the _next_ pass).
-                 */
-                nextSlot = allocationIndex.releaseNextSlot();
-
-                // We will write dataSize bytes into the current slot.
-                thisCopy = dataSize;
-
-                // Add the next slot to the record of allocated slots.
-                slots.add( nextSlot );
+            if( slots == null ) {
                 
-            } else {
-
                 /*
-                 * Mark the last slot on which we write as allocated.
+                 * There should always be enough space after an extension.
                  */
-                allocationIndex.setAllocated(thisSlot);
                 
-                // This is the last slot for this data.
-                nextSlot = LAST_SLOT_MARKER; // Marks the end of the chain.
-
-                // We will write [remaining] bytes into the current slot
-                thisCopy = remaining;
-
-                // close the allocation to further writes.
-                slots.close();
+                throw new AssertionError();
                 
             }
+            
+        }
 
-            // Verify that this slot has been allocated.
-            assert( allocationIndex.isAllocated(thisSlot) );
+        // current position on source.
+        int pos = data.position();
+        
+        // starting position -- used to test post-conditions.
+        final int startingPosition = pos;
+
+        /*
+         * Write data onto the allocated slots.
+         */
+        for( int slot=slots.firstSlot(); slot != -1; slot=slots.nextSlot() ) {
+
+            assertSlot( slot );
+
+            assert(allocationIndex.isAllocated(slot));
+
+            // #of bytes to write onto this slot.
+            final int thisCopy = remaining > slotSize ? slotSize : remaining; 
             
             // Set limit on data to be written on the slot.
-            data.limit( data.position() + thisCopy );
+            data.limit( pos + thisCopy );
 
-            _bufferStrategy.writeSlot( thisSlot, priorSlot, nextSlot, data );
+            // write data on the slot.
+            _bufferStrategy.writeSlot(slot, data);
 
             // Update #of bytes remaining in data.
             remaining -= thisCopy;
 
-            // The slot on which we just wrote data.
-            priorSlot = thisSlot;
-            
-            // The next slot on which we will write data.
-            thisSlot = nextSlot;
+            // Update the position.
+            pos += thisCopy;
 
-            // Update the src position.
-            data.position( data.limit() );
-
-            nwritten++;
-            
+            // post-condition tests.
+            assert pos == data.position();
+            assert data.position() == data.limit();
+                        
         }
 
-        assert slots.isClosed();
-        
-        assert slots.getSlotCount() == nslots;
-        
-        assert nwritten == nslots;
+        assert pos == startingPosition + nbytes;
+        assert data.position() == pos;
+        assert data.limit() == pos;
 
-//        if( firstSlotBefore != IObjectIndex.NOTFOUND ) {
-//            
-//            if( overwritingVersionWrittenInSameScope ) {
-//
-//                /*
-//                 * If this is a transactional write and the version that we are
-//                 * overwriting was written in the current transaction, then the
-//                 * slots associated with old version MUST be deleted as a
-//                 * postcondition.
-//                 * 
-//                 * If this is a non-transactional write and the version that we
-//                 * are overwriting was written on the journal since the last
-//                 * commit, then the slots associated with old version MUST be
-//                 * deleted as a postcondition.
-//                 */
-//
-//                deallocateSlots(firstSlotBefore);
-//                
-//            } else {
-//                
-//                /*
-//                 * FIXME We need to keep track of the overwritten version so
-//                 * that its slots can be deallocated once there is no longer any
-//                 * active transaction that can read from that version. Since the
-//                 * version was overwritten and not simply deleted, we can not
-//                 * use a flag on the object index.
-//                 * 
-//                 * One way to do this is to keep track of the committed states
-//                 * and scan for versions that have been overwritten as of the
-//                 * most recent committed state (versions that have been deleted
-//                 * can be handled either in the same manner or as we are
-//                 * handling them now).
-//                 */
-//                
-//            }
-//            
-//        }
-        
-        // Update the object index.
-        if( tx != null ) {
-            // transactional isolation.
-            tx.getObjectIndex().mapIdToSlots(id, slots, allocationIndex);
-        } else {
-            // no isolation.
-            objectIndex.mapIdToSlots(id, slots, allocationIndex);
-        }
-
-//        return firstSlot;
+        // The slots on which the data were written.
+        return slots;
         
     }
     
@@ -1443,6 +1394,7 @@ public class Journal {
      * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
+     *                
      * @exception DataDeletedException
      *                if the current version of the identifier data has been
      *                deleted within the scope visible to the transaction. The
@@ -1462,97 +1414,119 @@ public class Journal {
      *       The semantics on delete are just like on write (delete is just a
      *       special case of write, even though it generally gets optimized
      *       quite a bit and triggers various cleaning behaviors).
+     * 
+     * @see #read(ISlotAllocation, ByteBuffer)
      */
     public ByteBuffer read(Tx tx, int id, ByteBuffer dst ) {
 
         assertOpen();
 
-//        final int firstSlot = (tx == null ? objectIndex.getFirstSlot(id)
-//                : tx.objectIndex.getFirstSlot(id));
-
         ISlotAllocation slots = (tx == null ? objectIndex.getSlots(id)
               : tx.getObjectIndex().getSlots(id));
         
         if( slots == null ) return null;
-        
-        final int firstSlot = slots.firstSlot();
-        
-        // Verify that this slot has been allocated.
-        assert( allocationIndex.isAllocated(firstSlot) );
 
+        return read( slots, dst );
+
+    }
+    
+    /**
+     * Reads data from the slot allocation in sequence, assembling the result in
+     * a buffer. This method is not isolated.
+     * 
+     * @param slots
+     *            The slots whose data will be read.
+     * @param dst
+     *            The destination buffer (optional). When specified, the data
+     *            will be appended starting at the current position. If there is
+     *            not enough room in the buffer then a new buffer will be
+     *            allocated and used for the read operation. In either case, the
+     *            position will be advanced as a side effect and the limit will
+     *            equal the final position.
+     * 
+     * @return The data read from those slots. A new buffer will be allocated if
+     *         <i>dst</i> is <code>null</code> -or- if the data will not fit
+     *         in the provided buffer.
+     */
+    public ByteBuffer read(ISlotAllocation slots, ByteBuffer dst) {
+
+        assertOpen();
+
+        // #of bytes in a slot.
+        final int slotSize = slotMath.slotSize;
+        
+        // The #of bytes to be read.
+        final int nbytes = slots.getByteCount();
+        
         /*
-         * Read the first slot, returning the buffer into which the data was
-         * written. The header information is returned as a side effect.
+         * The starting position on the destination buffer.
          */
+        final int startingPosition;
+        
+        /*
+         * Verify that the destination buffer exists and has sufficient
+         * remaining capacity.
+         */
+        if (dst == null || dst.remaining() < nbytes) {
 
-        int startingPosition = (dst == null ? 0 : dst.position());
-        
-        // FIXME Remove use of the SlotHeader using slots.nextSlot()!
-        //
-        // FIXME Requires [size] in IObjectIndexEntry to pre-size the return
-        // buffer!  The easiest way to do that is move it into ISlotAllocation!
-        ByteBuffer tmp = _bufferStrategy.readFirstSlot(firstSlot, true,
-                _slotHeader, dst);
-        
-        if( tmp != dst ) {
-            
+            /* Allocate a destination buffer to size.
+             * 
+             * @todo Allocate from a pool?
+             */
+            dst = ByteBuffer.allocate(nbytes);
+
             startingPosition = 0;
             
-            dst = tmp;
+        } else {
+            
+            startingPosition = dst.position();
             
         }
+        
+        // Set the limit on the copy operation.
+        dst.limit( startingPosition + nbytes );
 
-        // #of bytes in the data version.
-        final int size = - _slotHeader.priorSlot;
-        
-        assert size > 0;
-        
-        // #of bytes read from the first slot.
-        final int nread = (dst.limit() - startingPosition);
-        assert nread > 0;
+        /*
+         * Read the data into the buffer.
+         */
 
-        // #of bytes that remain to be read (zero if the entire version was read
-        // from the first slot).
-        int remainingToRead = size - nread;
+        int slotsRead = 0;
         
-        assert remainingToRead >= 0;
+        int remaining = nbytes;
         
-        // The next slot to be read.
-        int nextSlot = _slotHeader.nextSlot;
+        int pos = startingPosition;
         
-        // #of slots read. @todo verify that the #of slots read is the lowest
-        // number that would contain the expected data length.
-        int slotsRead = 1;
-        
-        // The previous slot read.
-        int priorSlot = firstSlot;
+        for( int slot=slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
 
-        while( nextSlot != LAST_SLOT_MARKER ) {
+            assertSlot(slot);
             
-            // The current slot being read.
-            final int thisSlot = nextSlot; 
-
             // Verify that this slot has been allocated.
-            assert( allocationIndex.isAllocated(thisSlot) );
+            assert( allocationIndex.isAllocated(slot) );
 
-            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
-                    slotsRead, remainingToRead, dst);
+            /*
+             * In this operation we copy no more than the remaining bytes and no
+             * more than the data available in the slot.
+             */
+            final int thisCopy = remaining > slotSize ? slotSize : remaining; 
 
-            remainingToRead = size - (dst.limit() - startingPosition);
+            dst.limit(pos + thisCopy);
+            
+            // Append the data into the buffer.
+            _bufferStrategy.readSlot(slot, dst);
 
-            assert remainingToRead >= 0;
-
-            priorSlot = thisSlot;
-
+            pos += thisCopy;
+            
+            remaining -= thisCopy;
+            
             slotsRead++;
             
         }
+        
+        if (dst.limit() - startingPosition != nbytes) {
 
-        if (dst.limit() - startingPosition != size) {
-
-            throw new RuntimeException("Journal is corrupt: tx=" + tx + ", id="
-                    + id + ", size=" + size + ", slotsRead=" + slotsRead + ", expected size="
-                    + size + ", actual read=" + dst.limit());
+            throw new AssertionError("Expected to read " + nbytes + " bytes in "
+                    + slots.getSlotCount() + " slots, but read=" + dst.limit()
+                    + " bytes over " + slotsRead + " slots");
             
         }
 
@@ -1598,98 +1572,5 @@ public class Journal {
         }
 
     }
-    
-//    /**
-//     * <p>
-//     * Deallocates slots storing a logically deleted data version. The data
-//     * version MUST no longer be visible to any active transaction (this is NOT
-//     * checked). This method is invoked in the following cases:
-//     * 
-//     * <ul>
-//     * 
-//     * <li> A version that was written within transaction is being overwritten
-//     * in the same transaction. In this case, the slots allocated to the
-//     * overwritten version may be immediately deallocated since the overwritten
-//     * version is no longer visible in any scope. This case is detected and
-//     * handled automatically withhin {@link #write(Tx, int, ByteBuffer)}.</li>
-//     * 
-//     * <li> The last transaction that is capable of reading versions from a
-//     * historical committed state on the journal has completed processing (it
-//     * has either prepared or aborted and in any case will no longer read data
-//     * versions). Once notice of that event is received by the journal, the
-//     * journal can release the slots allocated to the committed version of any
-//     * data written by that transaction (or by any earlier transaction). There
-//     * are actually two cases here: one in which the data version was deleted,
-//     * one in which it was subsequently overwritten. (A pre-condition is that
-//     * the committed state of transactions is migrated in a timely manner onto
-//     * the read-optimized database such that the last committed version of any
-//     * data version that has not subsequently been overwritten is on the
-//     * database, otherwise deleting the versions for that transaction would
-//     * result in unrecoverable loss of those versions.)</li>
-//     * 
-//     * </ul>
-//     * </p>
-//     * <p>
-//     * Note: Just because a data version has been migrated onto the
-//     * read-optimized database does NOT mean that its slots may be deleted on
-//     * the journal. This is because subsequent committed versions will overwrite
-//     * the version on the database. The overwritten version MUST remain on the
-//     * journal until it is no longer visible to any active transaction.
-//     * </p>
-//     * <p>
-//     * Note: Regardless of the reason why the slots are being deallocated, the
-//     * <em>caller</em> has the responsibility to clean up the object index
-//     * metadata such that the deallocated slots are no longer mapped to the
-//     * version. This is easy in the case of within-transaction overwrite of data
-//     * versions. Likewise, the object index for the transaction can simply be
-//     * discarded when releasing slots for an entire transaction.
-//     * </p>
-//     * 
-//     * @param firstSlot
-//     *            The int32 within-segment persistent identifier.
-//     * 
-//     * FIXME Rewrite to use {@link ISlotAllocation}? Move to
-//     * {@link ISlotAllocationIndex} since we no longer need to read on the
-//     * journal to perform the deallocation?
-//     */
-//    void deallocateSlots(int firstSlot) {
-//
-//        assertSlot(firstSlot);
-//
-//        assert allocationIndex.isAllocated(firstSlot);
-//        
-//        // read just the header for the first slot in the chain.
-//        _bufferStrategy.readFirstSlot( firstSlot, false, _slotHeader, null );
-//
-//        // mark slot as available in the allocation index.
-//        allocationIndex.clear(firstSlot);
-//        
-//        int nextSlot = _slotHeader.nextSlot; 
-//
-//        int priorSlot = firstSlot;
-//        
-//        int slotsRead = 1;
-//        
-//        while( nextSlot != LAST_SLOT_MARKER ) {
-//
-//            final int thisSlot = nextSlot;
-//            
-//            assert allocationIndex.isAllocated(thisSlot);
-//            
-//            nextSlot = _bufferStrategy.readNextSlot( thisSlot, priorSlot,
-//                    slotsRead, 0, null);
-//            
-//            priorSlot = thisSlot;
-//            
-//            // mark slot as available in the allocation index.
-//            allocationIndex.clear(thisSlot);
-//            
-//            slotsRead++;
-//            
-//        }
-//
-//        System.err.println("Dealloacted " + slotsRead + " slots" );
-//        
-//    }
-    
+        
 }

@@ -2034,7 +2034,7 @@ public class TestTx extends ProxyTestCase {
             
         }
         
-        public ByteBuffer resolveConflict(ByteBuffer committedVersion, ByteBuffer proposedVersion) throws RuntimeException {
+        public void resolveConflict(int id, Tx readOnlyTx, Tx tx ) throws RuntimeException {
 
             counter++;
             
@@ -2083,12 +2083,12 @@ public class TestTx extends ProxyTestCase {
          */
         private ByteBuffer getRandomData(Journal journal) {
             
-            final int slotDataSize = journal.slotMath.dataSize;
+            final int slotSize = journal.slotMath.slotSize;
             
             final int nslots = r.nextInt(5)+1;
             
-            final int nbytes = ((nslots - 1) * slotDataSize)
-                    + r.nextInt(slotDataSize) + 1;
+            final int nbytes = ((nslots - 1) * slotSize)
+                    + r.nextInt(slotSize) + 1;
             
             byte[] bytes = new byte[nbytes];
             
@@ -2134,7 +2134,8 @@ public class TestTx extends ProxyTestCase {
         /**
          * Resolve the conflict by creating a random data version.
          */
-        public ByteBuffer resolveConflict(ByteBuffer committedVersion, ByteBuffer proposedVersion) throws RuntimeException {
+        public void resolveConflict(int id, Tx readOnlyTx, Tx tx)
+                throws RuntimeException {
  
             if( randomData != null ) {
                 
@@ -2146,7 +2147,7 @@ public class TestTx extends ProxyTestCase {
             
             randomData = getRandomData(journal);
             
-            return randomData;
+            tx.write(id, randomData);
             
         }
         

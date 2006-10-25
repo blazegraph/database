@@ -49,15 +49,27 @@ package com.bigdata.journal;
 
 import java.util.BitSet;
 
-
 /**
  * Non-persistence capable implementation of a slot allocation index.
+ * 
+ * FIXME Write test suite.
+ * 
+ * FIXME Implement policy for contiguous allocations.
+ * 
+ * FIXME Write persistence capable implementation.
+ * 
+ * @todo Tune implementation using performance test.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
 
+    /**
+     * Used to compute the #of slots required for an allocation.
+     */
+    final SlotMath slotMath;
+    
     /**
      * The index of the first slot that MUST NOT be addressed ([0:slotLimit-1]
      * is the valid range of slot indices).
@@ -106,10 +118,14 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
 
     }
 
-    public SimpleSlotAllocationIndex(int slotLimit) {
+    public SimpleSlotAllocationIndex(SlotMath slotMath, int slotLimit) {
 
+        assert slotMath != null;
+        
         assert slotLimit > 0;
 
+        this.slotMath = slotMath;
+        
         this.slotLimit = slotLimit;
 
         allocated = new BitSet( slotLimit );
@@ -118,116 +134,80 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
         
     }
 
-    public int release(int fromSlot, int minSlots ) {
-       
-        throw new UnsupportedOperationException();
-        
-    }
-    
     /**
-     * @todo Ensure that at least N slots are available for overwrite by this
-     *       transaction. When necessary do extra work to migrate data to the
-     *       database (perhaps handled by the journal/segment server), release
-     *       slots that can be reused (part of concurrency control), or extend
-     *       journal (handling transparent promotion of the journal to disk is a
-     *       relatively low priority, but is required if the journal was not
-     *       original opened in that mode).
+     * Release slots required to store a new version.
      * 
-     * @todo Allocation by {@link #releaseNextSlot(long)} should be optimized
-     *       for fast consumption of the next N free slots.
+     * @todo Track the next free slot, its run length (if we can), and the #of
+     *       slots remaining in each slot allocation block so that this method
+     *       can be ultra fast if there is no work to be done (this counter
+     *       could even live in the root block, along with the index of the next
+     *       free slot and the first free slot on the journal).
      * 
-     * @todo For index nodes and perhaps in general, it is strongly preferable
-     *       to have the released slots be contiguous. This could be the default
-     *       behavior or we could provide a boolean flag for this purpose. When
-     *       fragmentation is too great in the journal, we could force extension
-     *       in order to keep allocations contiguous.
-     * 
-     * FIXME Track the #of slots remaining in the global scope so that this
-     * method can be ultra fast if there is no work to be done (this counter
-     * could even live in the root block, along with the index of the next free
-     * slot and the first free slot on the journal).
+     * @todo This notices fragmentation but does not attempt to return an
+     *       unfragmented allocation. We should probably set a policy in place
+     *       for fragmentation on a per allocation basis (as a percent of the
+     *       #of slots to be allocated) and on a trailing history basis (so that
+     *       we can recognize when the journal is generating too many fragments,
+     *       at least in the current allocation region).
      */
-    public int releaseSlots(int nslots) {
-
-        _nextSlot = nextFreeSlot();
+    public ISlotAllocation alloc(int nbytes) {
         
-        return _nextSlot;
+        assert nbytes > 0;
         
-//        // first slot found.  this will be our return value.
-//        int firstSlot = -1;
-//        
-//        // #of slots found.  we can not stop until nfree >= nslots.
-//        int nfree = 0;
-//        
-//        /*
-//         * True iff wrapped around the journal once already.
-//         * 
-//         * Note that the BitSet search methods only allow us to specify a
-//         * fromIndex, not a fromIndex and a toIndex.  This means that we need
-//         * to do a little more work to detect when we have scanned past our
-//         * stopping point (and that BitSet will of necessity scan to the end
-//         * of the bitmap).
-//         */
-//        boolean wrapped = false;
-//        
-//        // starting point for the search.
-//        int fromSlot = this.nextSlot;
-//        
-//        // We do not search past this slot.
-//        final int finalSlot = ( fromSlot == 0 ? slotLimit : fromSlot - 1 ); 
-//        
-//        while( nfree < nslots ) {
-//            
-//            if( _nextSlot == slotLimit ) {
-//                
-//                if( wrapped ) {
-//                    
-//                } else {
-//                
-//                    // restart search from front of journal.
-//                    _nextSlot = 0;
-//
-//                    wrapped = true;
-//                    
-//                }
-//                
-//            }
-//            
-//            if( _nextSlot == -1 ) {
-//                
-//                int nrequired = nslots - nfree;
-//                
-//                _nextSlot = release(fromSlot, nrequired );
-//                
-//            }
-//            
-//            nfree++;
-//            
-//        }
-//        
-//        return _nextSlot;
+        // #of slots needed to write the data on the journal.
+        final int nslots = slotMath.getSlotCount(nbytes);
+
+        /* Create object to store the allocated slots indices. the case where
+         * nslots == 1 is optimized.
+         * 
+         * @todo Use a singleton for nslots == 1?  Use a pool for larger slot
+         * runs?  Reuse a single unbound slot allocation for larger runs and
+         * resize it as required?  Reuse of the returned value requires that
+         * we copy the data into the object index (vs copying a reference).
+         */
+        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(nbytes)
+                : new CompactSlotAllocation(nbytes,nslots));
         
-    }
-
-    /* Use to optimize release of the next N slots, and where N==1.
-    private int[] releasedSlots;
-    private int nextReleasedSlot;
-    */
-    
-    public int releaseNextSlot() {
-
-        // Required to prevent inadvertant extension of the BitSet.
-        assertSlot(_nextSlot);
+        int lastSlot = -1;
         
-        // Mark this slot as in use.
-        allocated.set(_nextSlot);
+        int fragments = 0; 
+        
+        for( int i=0; i<nslots; i++ ) { 
+            
+            int slot = nextFreeSlot();
 
-        return nextFreeSlot();
+            if( i > 0 && lastSlot + 1 != slot ) {
+            
+                fragments++;
+                
+            }
+
+            // add to the allocation that we will return to the caller.
+            slots.add( slot );
+            
+            // mark as allocated.
+            setAllocated(slot);
+            
+            lastSlot = slot;
+            
+        }
+
+        slots.close();
+
+        if( fragments > 0 ) {
+            
+            System.err.println("Allocation of " + nbytes + " bytes in "
+                    + nslots + " slots has " + fragments + " fragments.");
+            
+        }
+        
+        return slots;
         
     }
     
     /**
-     * Returns the next free slot.
+     * Returns the next free slot. This updates {@link #_nextSlot} as a side
+     * effect.  The slot is NOT marked as allocated.
      */
     private int nextFreeSlot()
     {

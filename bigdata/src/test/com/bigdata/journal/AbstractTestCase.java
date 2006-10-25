@@ -557,13 +557,13 @@ abstract public class AbstractTestCase
      */
     public ByteBuffer getRandomData(Journal journal) {
         
-        final int slotDataSize = journal.slotMath.dataSize;
+        final int slotSize = journal.slotMath.slotSize;
         
         // @todo change the distribution shape to make 1 slot very common and give it a modestly long tail, e.g., out to 50 slots.
         final int nslots = r.nextInt(5)+1;
         
-        final int nbytes = ((nslots - 1) * slotDataSize)
-                + r.nextInt(slotDataSize) + 1;
+        final int nbytes = ((nslots - 1) * slotSize)
+                + r.nextInt(slotSize) + 1;
         
         byte[] bytes = new byte[nbytes];
         

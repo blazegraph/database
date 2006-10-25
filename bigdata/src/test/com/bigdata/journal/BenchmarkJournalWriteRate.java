@@ -362,7 +362,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
             final long begin = System.currentTimeMillis();
 
-            final int dataSize = new SlotMath(getSlotSize()).dataSize;
+            final int dataSize = getSlotSize();
             
             final long initialExtent = getInitialExtent();
             

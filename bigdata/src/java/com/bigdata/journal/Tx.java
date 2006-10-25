@@ -143,35 +143,33 @@ public class Tx {
     final static String NOT_COMMITTED = "Transaction is not committed";
     final static String IS_COMPLETE = "Transaction is complete";
     
+    /**
+     * Enum of transaction run states.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     private enum RunState {
+        
         ACTIVE("active"),
         PREPARED("prepared"),
         COMMITTED("committed"),
         ABORTED("aborted");
-//        ACTIVE("active",0,true),
-//        PREPARING("preparing",1,false),
-//        PREPARED("prepared",1,true),
-//        COMMITTING("committing",2,false),
-//        COMMITTED("committed",2,true),
-//        ABORTING("aborting",2,false),
-//        ABORTED("aborted",2,false);
+        
         private final String name;
-//        private final int order;
-//        private final boolean stable;
-        RunState(String name/*,int order,boolean stable*/) {
+        
+        RunState(String name) {
+        
             this.name = name;
-//            this.order = order;
-//            this.stable = stable;
+            
         }
+        
         public String toString() {
+        
             return name;
+            
         }
-//        public int getOrder() {
-//            return order;
-//        }
-//        public boolean isStable() {
-//            return stable;
-//        }
+        
     }
     
     final private Journal journal;
@@ -186,6 +184,19 @@ public class Tx {
     
     private RunState runState;
 
+    /**
+     * Create a transaction starting the last committed state of the journal as
+     * of the specified timestamp.
+     * 
+     * @param journal
+     *            The journal.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction state has been garbage collected.
+     */
     public Tx(Journal journal, long timestamp ) {
         
         if( journal == null ) throw new IllegalArgumentException();

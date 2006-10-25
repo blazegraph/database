@@ -25,20 +25,13 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      * The size of a slot. 
      */
     final int slotSize;
-    
-    /**
-     * The size of the per-slot header.
-     */
-    final int slotHeaderSize;
 
     /**
-     * The size of the per-slot data region.
+     * @todo rename to getSlotSize().
      */
-    final int slotDataSize;
-
     public int getSlotDataSize() {
         
-        return slotDataSize;
+        return slotSize;
         
     }
     
@@ -57,10 +50,6 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         this.bufferMode = bufferMode;
         
         this.slotSize = slotMath.slotSize;
-        
-        this.slotHeaderSize = slotMath.headerSize;
-        
-        this.slotDataSize = slotMath.dataSize;
         
     }
 
