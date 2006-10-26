@@ -92,9 +92,11 @@ public interface IBufferStrategy {
     public void deleteFile();
 
     /**
-     * Close the journal.
+     * Close the journal. If the journal is backed by disk, then the data are
+     * forced to disk first.
      * 
-     * @throws IllegalStateException if the journal is not open.
+     * @throws IllegalStateException
+     *             if the journal is not open.
      */
     public void close();
     
@@ -146,5 +148,21 @@ public interface IBufferStrategy {
      *                single slot.
      */
     public void writeSlot(int slot, ByteBuffer data);
+
+    /**
+     * Write the root block onto stable storage (ie, flush it through to disk).
+     * 
+     * @param rootBlock
+     *            The root block. Which root block is indicated by
+     *            {@link IRootBlockView#isRootBlock0()}.
+     * 
+     * @todo It is up in the air whether the root blocks and file header need to
+     *       appear in the buffer. I rather think not. The buffer can simply
+     *       begin after the root blocks. That approach makes accidental
+     *       overwrite less likely, but it also means that the transient mode
+     *       does not have the notion of root blocks since it has nothing to
+     *       write through to.
+     */
+    public void writeRootBlock(IRootBlockView rootBlock);
     
 }

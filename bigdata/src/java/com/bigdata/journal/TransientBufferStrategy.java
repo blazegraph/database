@@ -65,5 +65,8 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         return open;
         
     }
-    
+
+    public void writeRootBlock(IRootBlockView rootBlock) {
+    }
+
 }

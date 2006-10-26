@@ -829,7 +829,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * that serves as the basis for this transaction (the committed state whose
      * object index this transaction uses as its inner read-only context).
      */
-    boolean validate(Journal journal,Tx tx) {
+    boolean validate(Journal journal,IStore tx) {
         
         /*
          * This MUST be the journal's object index. The journals' object index
@@ -860,7 +860,7 @@ public class SimpleObjectIndex implements IObjectIndex {
          * timestamp concept for this transaction or does it simply fail to
          * register itself with the journal?
          */
-        Tx readOnlyTx = null; // new ReadOnlyTx(journal);
+        IStore readOnlyTx = null; // new ReadOnlyTx(journal);
         
         // Scan entries in the outer map.
         final Iterator<Map.Entry<Integer, IObjectIndexEntry>> itr = objectIndex

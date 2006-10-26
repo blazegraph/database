@@ -3,6 +3,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 
 
 /**
@@ -101,6 +102,30 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
         this.raf = fileMetadata.raf;
         
         this.open = true;
+
+    }
+   
+    public void writeRootBlock(IRootBlockView rootBlock) {
+
+        if( rootBlock == null ) throw new IllegalArgumentException();
+
+        try {
+
+            FileChannel channel = raf.getChannel();
+
+            channel.write(rootBlock.asReadOnlyBuffer(), rootBlock
+                    .isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+                    : FileMetadata.OFFSET_ROOT_BLOCK1);
+
+            force(false);
+
+        }
+
+        catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
 
     }
 

@@ -164,5 +164,86 @@ public class TestSlotMath extends TestCase {
         assertEquals(3,slotMath.getSlotCount(65));
         
     }
+
+    /**
+     * Spot tests round trip of some values.
+     */
+    public void test_toLong() {
+
+        doRoundTrip(1, 1);
+        
+        doRoundTrip(0xaa, 0xff);
+        
+//        lval=2802270714785992659) expected:<652454494> but was:<927764435>
+
+    }
+
+    public void doRoundTrip( int nbytes, int firstSlot ) {
+        
+        final long lval = SlotMath.toLong(nbytes,firstSlot);
+
+        assertEquals("nbytes(lval="+Long.toHexString(lval)+")", nbytes, SlotMath.getByteCount(lval));
+
+        assertEquals("firstSlot(lval="+Long.toHexString(lval)+")", firstSlot, SlotMath.getFirstSlot(lval));
+
+    }
+
+    /**
+     * Test of {@link SlotMath#toLong(int, int)}.
+     */
+    public void test_toLong_nbytes_firstSlot() {
+        
+        final int limit = 100000;
+        
+        for( int i=0; i<limit; i++ ) {
+
+            final int nbytes = r.nextInt(Integer.MAX_VALUE-1)+1;
+            
+            final int firstSlot = r.nextInt(Integer.MAX_VALUE);
+
+            doRoundTrip( nbytes, firstSlot );
+            
+        }
+        
+    }
+
+    /**
+     * Test of {@link SlotMath#toLong(ISlotAllocation)}. 
+     */
+    public void test_toLong_ISlotAllocation() {
+
+        final int slotSize = 128;
+      
+        final SlotMath slotMath = new SlotMath(slotSize);
+        
+        final int limit = 1000;
+        
+        for( int i=0; i<limit; i++ ) {
+
+//            final int nbytes = r.nextInt(Integer.MAX_VALUE-1)+1;
+            final int nbytes = r.nextInt(1024)+1;
+
+            final int nslots = slotMath.getSlotCount(nbytes);
+
+            final int firstSlot = r.nextInt(Integer.MAX_VALUE - nslots);
+            
+            // @todo This does a lot of memory allocation for the slots[].
+            // Replace this with a class that stores contiguous slots in a 
+            // long value (or a pair of ints).
+            ISlotAllocation slots = new CompactSlotAllocation(nbytes,nslots);
+            
+            for( int j=0; j<nslots; j++ ) {
+                
+                slots.add( firstSlot + j );
+                
+            }
+            
+            slots.close();
+
+            doRoundTrip(nbytes, firstSlot);
+
+        }
+        
+    }
     
 }

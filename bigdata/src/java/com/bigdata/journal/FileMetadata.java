@@ -21,9 +21,9 @@ import java.nio.channels.FileLock;
 
 class FileMetadata {
 
-    final int SIZE_MAGIC = Bytes.SIZEOF_INT;
-    final int SIZE_VERSION = Bytes.SIZEOF_INT;
-    final int SIZEOF_ROOT_BLOCK = RootBlockView.SIZEOF_ROOT_BLOCK;
+    static final int SIZE_MAGIC = Bytes.SIZEOF_INT;
+    static final int SIZE_VERSION = Bytes.SIZEOF_INT;
+    static final int SIZEOF_ROOT_BLOCK = RootBlockView.SIZEOF_ROOT_BLOCK;
 
     /**
      * Magic value for journal (the root blocks have their own magic value).
@@ -79,11 +79,11 @@ class FileMetadata {
     /**
      * Offset of the first root block in the file.
      */
-    final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
+    static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
     /**
      * Offset of the second root block in the file.
      */
-    final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
+    static final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
     /**
      * The size of the journal header, including MAGIC, version, and both root
      * blocks. This is as an offset when computing the index of a slot on the
@@ -102,6 +102,12 @@ class FileMetadata {
      */
     final boolean exists;
 
+    /**
+     * The current root block. For a new file, this is "rootBlock0". For an
+     * existing file it is based on an examination of both root blocks.
+     */
+    final IRootBlockView rootBlock;
+    
     /**
      * Prepare a journal file for use by an {@link IBufferStrategy}.
      * 
@@ -272,12 +278,12 @@ class FileMetadata {
             IRootBlockView rootBlock0 = null;
             IRootBlockView rootBlock1 = null;
             try {
-                rootBlock0 = new RootBlockView(tmp0);
+                rootBlock0 = new RootBlockView(true,tmp0);
             } catch(RootBlockException ex ) {
                 System.err.println("Bad root block zero: "+ex);
             }
             try {
-                rootBlock1 = new RootBlockView(tmp1);
+                rootBlock1 = new RootBlockView(false,tmp1);
             } catch(RootBlockException ex ) {
                 System.err.println("Bad root block one: "+ex);
             }
@@ -285,7 +291,7 @@ class FileMetadata {
                 throw new RuntimeException("Both root blocks are bad - journal is not usable.");
             }
             // Choose the root block based on the commit counter.
-            IRootBlockView rootBlock =
+            this.rootBlock =
                 ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
                     ? rootBlock0
                     : rootBlock1
@@ -401,13 +407,14 @@ class FileMetadata {
              * block are then written into their locations in the file.
              */
             final long commitCounter = 0L;
-            IRootBlockView rootBlock0 = new RootBlockView(segment, slotSize,
-                    slotLimit, slotChain, objectIndex, commitCounter );
-            IRootBlockView rootBlock1 = new RootBlockView(segment, slotSize,
-                    slotLimit, slotChain, objectIndex, commitCounter );
+            IRootBlockView rootBlock0 = new RootBlockView(true, segment,
+                    slotSize, slotLimit, slotChain, objectIndex, commitCounter);
+            IRootBlockView rootBlock1 = new RootBlockView(false, segment,
+                    slotSize, slotLimit, slotChain, objectIndex, commitCounter );
             FileChannel channel = raf.getChannel();
             channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
             channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+            this.rootBlock = rootBlock0;
             
             // Force the changes to disk.
             channel.force(false);

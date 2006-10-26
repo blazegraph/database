@@ -238,7 +238,7 @@ import java.util.Properties;
  * (running out of space should trigger extension). Compaction may require re-
  * copy of committed transactions and MUST NOT cause fragmentation. Compaction
  * makes sense when large swathes of the journal have been released, e.g., due
- * to data migration or overwrite.  However, note that overwrite tends to cause
+ * to data migration or overwrite. However, note that overwrite tends to cause
  * spotty release of slots rather than releasing entire ranges written by some
  * transaction.
  * 
@@ -297,7 +297,8 @@ import java.util.Properties;
  *       be deserialized during state-based validation if a conflict is
  *       detected.
  * 
- * @todo Refactor btree support for journals.
+ * @todo Refactor btree support for journals as (a) the object index; and (b)
+ *       primary and secondary application indices.
  * 
  * @todo Flushing to disk on commit could be optional, e.g., if there are
  *       redundent journals then this is not required.
@@ -309,13 +310,41 @@ import java.util.Properties;
  *       If possible, validation should occur in its own layer so that the basic
  *       store can handle IO using either byte[] or streams (allocated from a
  *       high concurrency queue to minimize stream creation overhead).
+ * 
+ * @todo Add feature to return the transient journal buffer so that we can do
+ *       interesting things with it, including write it to disk with the
+ *       appropriate file header and root blocks so that it becomes restartable.
  */
 
-public class Journal {
+public class Journal implements IStore {
 
+    /**
+     * The default initial extent for a new journal.
+     */
     final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
     
-    final SlotMath slotMath;
+    /**
+     * The minimum node size (aka branching factor) for the object index.
+     */
+    final static int MIN_OBJECT_INDEX_SIZE = 16;
+
+    /**
+     * The maximum node size (aka branching factor) for the object index.
+     */
+    final static int MAX_OBJECT_INDEX_SIZE = 2048;
+    
+    /**
+     * The default node size (aka branching factor) for the object index.
+     */
+    final static int DEFAULT_OBJECT_INDEX_SIZE = 256;
+    
+    /**
+     * The minimum permitted slot size.
+     */
+    final static int MIN_SLOT_SIZE = 32;
+    
+    // Make package private or just get rid of this : BTree is currently using it.
+    public final SlotMath slotMath;
     
     /**
      * The implementation logic for the current {@link BufferMode}.
@@ -376,14 +405,6 @@ public class Journal {
      * @deprecated The use of slot headers is being phased out.
      */
     public static final int LAST_SLOT_MARKER = -1;
-    
-    /**
-     * The index of the first slot that MUST NOT be addressed ([0:slotLimit-1]
-     * is the valid range of slot indices).
-     * 
-     * @todo Is this field required on this class?
-     */
-    private final int slotLimit;
     
     /**
      * The slot allocation index.
@@ -461,7 +482,7 @@ public class Journal {
         
         Long id = tx.getId();
         
-        Tx tx2 = activeTx.remove(id);
+        IStore tx2 = activeTx.remove(id);
         
         if( tx2 == null ) throw new IllegalStateException("Not active: tx="+tx);
         
@@ -486,13 +507,13 @@ public class Journal {
      *       repeated identifiers? This is definately not something to do for a
      *       deployed system since it will cause a memory leak.
      */
-    void completedTx( Tx tx ) throws IllegalStateException {
+    void completedTx( ITx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
-        Tx txActive = activeTx.remove(id);
+        IStore txActive = activeTx.remove(id);
         
-        Tx txPrepared = preparedTx.remove(id);
+        IStore txPrepared = preparedTx.remove(id);
         
         if( txActive == null && txPrepared == null ) {
             
@@ -689,22 +710,6 @@ public class Journal {
     private long firstTxOnJournal = -1;
     
     /**
-     * Asserts that the slot index is in the legal range for the journal
-     * <code>[0:slotLimit)</code>
-     * 
-     * @param slot The slot index.
-     */
-    
-    void assertSlot( int slot ) {
-        
-        if( slot>=0 && slot<slotLimit ) return;
-        
-        throw new AssertionError("slot=" + slot + " is not in [0:"
-                + slotLimit + ")");
-        
-    }
-    
-    /**
      * Create or open a journal.
      * 
      * @param properties
@@ -736,6 +741,12 @@ public class Journal {
      *            this option is not recommended as it imposes strong
      *            performance penalties and does NOT provide any additional data
      *            safety (it is here mainly for performance testing).</dd>
+     *            <dt>objectIndexSize</dt>
+     *            <dd>The size of a node in the object index (i.e., the
+     *            branching factor). A larger node size correlates with an
+     *            object index with less height, and height correlates with
+     *            access time. Access time is a concern when the journal is not
+     *            fully buffered.</dd>
      *            <dt>conflictResolver</dt>
      *            <dd>The name of a class that implements the
      *            {@link IConflictResolver} interface (optional). The class MUST
@@ -772,6 +783,7 @@ public class Journal {
         long segment;
         int slotSize;
         long initialExtent = DEFAULT_INITIAL_EXTENT;
+        int objectIndexSize = DEFAULT_OBJECT_INDEX_SIZE;
         boolean readOnly = false;
         boolean forceWrites = false;
         boolean deleteOnClose = false;
@@ -828,13 +840,10 @@ public class Journal {
 
         slotSize = Integer.parseInt(val);
 
-        final int MIN_SLOT_DATA = 32;
-        final int minSlotSize = ( SlotMath.HEADER_SIZE + MIN_SLOT_DATA );
-        
-        if (slotSize < minSlotSize ) {
+        if (slotSize < Journal.MIN_SLOT_SIZE ) {
 
             throw new RuntimeException("slotSize must be at least "
-                    + minSlotSize + " : " + slotSize);
+                    + Journal.MIN_SLOT_SIZE + " : " + slotSize);
 
         }
 
@@ -885,6 +894,26 @@ public class Journal {
         if( val != null ) {
 
             forceWrites = Boolean.parseBoolean(val);
+            
+        }
+
+        /*
+         * "objectIndexSize"
+         */
+
+        val = properties.getProperty("objectIndexSize");
+        
+        if( val != null ) {
+
+            objectIndexSize = Integer.parseInt(val);
+
+            if( objectIndexSize < MIN_OBJECT_INDEX_SIZE || objectIndexSize > MAX_OBJECT_INDEX_SIZE ) {
+                
+                throw new RuntimeException("objectIndexSize must be in ["
+                        + MIN_OBJECT_INDEX_SIZE + ":" + MAX_OBJECT_INDEX_SIZE
+                        + "]: " + objectIndexSize);
+                
+            }
             
         }
 
@@ -961,6 +990,10 @@ public class Journal {
             _bufferStrategy = new TransientBufferStrategy(slotMath,
                     initialExtent);
 
+            // FIXME Refactor code for bootstrapping the root block and use it
+            // here also.
+            this._rootBlock = null;
+            
             break;
             
         }
@@ -983,8 +1016,12 @@ public class Journal {
              * Setup the buffer strategy.
              */
 
-            _bufferStrategy = new DirectBufferStrategy(new FileMetadata(segment,file,
-                    BufferMode.Direct, initialExtent, slotSize, readOnly, forceWrites), slotMath);
+            FileMetadata fileMetadata = new FileMetadata(segment,file,
+                    BufferMode.Direct, initialExtent, slotSize, readOnly, forceWrites);
+            
+            _bufferStrategy = new DirectBufferStrategy( fileMetadata, slotMath);
+
+            this._rootBlock = fileMetadata.rootBlock; 
 
             break;
         
@@ -1007,9 +1044,13 @@ public class Journal {
             /*
              * Setup the buffer strategy.
              */
+            
+            FileMetadata fileMetadata = new FileMetadata(segment,file,
+                    BufferMode.Mapped, initialExtent, slotSize, readOnly, forceWrites);
 
-            _bufferStrategy = new MappedBufferStrategy(new FileMetadata(segment,file,
-                    BufferMode.Mapped, initialExtent, slotSize, readOnly, forceWrites), slotMath);
+            _bufferStrategy = new MappedBufferStrategy( fileMetadata, slotMath);
+
+            this._rootBlock = fileMetadata.rootBlock; 
 
             break;
             
@@ -1032,9 +1073,13 @@ public class Journal {
              * Setup the buffer strategy.
              */
 
-            _bufferStrategy = new DiskOnlyStrategy(new FileMetadata(segment,file,
-                    BufferMode.Disk, initialExtent, slotSize, readOnly, forceWrites), slotMath);
+            FileMetadata fileMetadata = new FileMetadata(segment,file,
+                    BufferMode.Disk, initialExtent, slotSize, readOnly, forceWrites);
+            
+            _bufferStrategy = new DiskOnlyStrategy(fileMetadata, slotMath);
 
+            this._rootBlock = fileMetadata.rootBlock;
+            
             break;
         
         }
@@ -1045,8 +1090,6 @@ public class Journal {
         
         }
 
-        this.slotLimit = _bufferStrategy.getSlotLimit();
-        
         /*
          * An index of the free and used slots in the journal.
          * 
@@ -1091,9 +1134,16 @@ public class Journal {
             this.conflictResolver = null;
             
         }
+
+        /*
+         * FIXME This is NOT restart safe. We need to store the state on the
+         * journal and cache the location of the state in the root block.
+         */
+
+        _extSer = ExtensibleSerializer.createInstance(this);
         
     }
-
+    
     /**
      * Shutdown the journal.
      * 
@@ -1181,57 +1231,24 @@ public class Journal {
     
     /**
      * Insert the data into the store and associate it with the persistent
-     * identifier from which the data can be retrieved. If there is an entry for
-     * that persistent identifier within the transaction scope, then its data is
-     * logically overwritten. The written version of the data will not be
-     * visible outside of this transaction until the transaction is committed.
-     * 
-     * @param tx
-     *            The transaction.
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param data
-     *            The data to be written. The bytes from
-     *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
-     *            will be written. The position will be advanced to the limit.
-     * 
-     * @exception DataDeletedException
-     *                if the persistent identifier is deleted.
-     * 
-     * @exception IllegalArgumentException
-     *                if data is null.
-     * @exception IllegalArgumentException
-     *                if data has no remaining bytes (this can happen if you
-     *                forget to set the position and limit before calling this
-     *                method).
+     * identifier from which the data can be retrieved (non-transactional).
      */
+    public void write(int id,ByteBuffer data) {
 
-    public void write(Tx tx,int id,ByteBuffer data) {
-        
         assertOpen();
 
         /*
          * Write the data onto the journal and obtain the slots onto which the
          * data was written.
          */
-        ISlotAllocation slots = write( data );
-        
+        ISlotAllocation slots = write(data);
+
         /*
          * Update the object index so that the current data version is mapped
          * onto the slots on which the data was just written.
          */
 
-        if( tx != null ) {
-            
-            // transactional isolation.
-            tx.getObjectIndex().mapIdToSlots(id, slots, allocationIndex);
-            
-        } else {
-            
-            // no isolation.
-            objectIndex.mapIdToSlots(id, slots, allocationIndex);
-            
-        }
+        objectIndex.mapIdToSlots(id, slots, allocationIndex);
 
     }
     
@@ -1253,6 +1270,11 @@ public class Journal {
      * 
      * @todo Since we try hard to use contiguous slot runs, that has
      *       implications for the best way to encode the {@link ISlotAllocation}.
+     *       If we require contiguous runs, then all we need is the firstSlot
+     *       and the size (in bytes) of the allocation (4 bytes tops).
+     * 
+     * FIXME WRITE and READ with contiguous slot allocations should bulk get /
+     * put all the data at once rather than performing one operation per slot.
      */
     public ISlotAllocation write(ByteBuffer data) {
         
@@ -1320,8 +1342,6 @@ public class Journal {
          */
         for( int slot=slots.firstSlot(); slot != -1; slot=slots.nextSlot() ) {
 
-            assertSlot( slot );
-
             assert(allocationIndex.isAllocated(slot));
 
             // #of bytes to write onto this slot.
@@ -1356,78 +1376,19 @@ public class Journal {
     
     /**
      * <p>
-     * Read the data from the store.
+     * Read the data from the store (non-transactional).
      * </p>
-     * <p>
-     * This resolves the data by looking up the entry in the object index. If an
-     * entry is found, it records the first slot onto which a data version was
-     * last written. If more than one slot was required to store the data, then
-     * the slots are chained together using their headers. All such slots are
-     * read into a buffer, which is then returned to the caller.
-     * </p>
-     * <p>
-     * Note: You can use this method to read objects into a block buffer using
-     * this method. When the next object will not fit into the buffer, it is
-     * read anyway and time to handle the full buffer.
-     * </p>
-     * 
-     * @param tx
-     *            The transaction scope for the read request.
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param dst
-     *            When non-null and having sufficient bytes remaining, the data
-     *            version will be read into this buffer. If null or if the
-     *            buffer does not have sufficient bytes remaining, then a new
-     *            (non-direct) buffer will be allocated that is right-sized for
-     *            the data version, the data will be read into that buffer, and
-     *            the buffer will be returned to the caller.
-     * 
-     * @return The data. The position will always be zero if a new buffer was
-     *         allocated. Otherwise, the position will be invariant across this
-     *         method. The limit - position will be the #of bytes read into the
-     *         buffer, starting at the position. A <code>null</code> return
-     *         indicates that the object was not found in the journal, in which
-     *         case the application MUST attempt to resolve the object against
-     *         the database (i.e., the object MAY have been migrated onto the
-     *         database and the version logically deleted on the journal).
-     * 
-     * @exception IllegalArgumentException
-     *                if the transaction identifier is bad.
-     *                
-     * @exception DataDeletedException
-     *                if the current version of the identifier data has been
-     *                deleted within the scope visible to the transaction. The
-     *                caller MUST NOT read through to the database if the data
-     *                were deleted.
-     * 
-     * @todo Document that tx==null implies NO isolation and modify / partition
-     *       the test suite to handle both unisolated and isolated testing. The
-     *       semantics on read are that you can read anything that was visible
-     *       as of the last committed state (but nothing written in any still
-     *       active transaction) - and unlike a transactionally isolated read,
-     *       each read operation is reads against the then-current last
-     *       committed state.<br>
-     *       The semantics on write is that the object data version is replaced.
-     *       Unless the 'native transaction counter' is positive, a commit will
-     *       take place immediately.<br>
-     *       The semantics on delete are just like on write (delete is just a
-     *       special case of write, even though it generally gets optimized
-     *       quite a bit and triggers various cleaning behaviors).
-     * 
-     * @see #read(ISlotAllocation, ByteBuffer)
      */
-    public ByteBuffer read(Tx tx, int id, ByteBuffer dst ) {
+    public ByteBuffer read(int id, ByteBuffer dst ) {
 
         assertOpen();
-
-        ISlotAllocation slots = (tx == null ? objectIndex.getSlots(id)
-              : tx.getObjectIndex().getSlots(id));
+        
+        ISlotAllocation slots = objectIndex.getSlots(id);
         
         if( slots == null ) return null;
-
+        
         return read( slots, dst );
-
+        
     }
     
     /**
@@ -1447,6 +1408,9 @@ public class Journal {
      * @return The data read from those slots. A new buffer will be allocated if
      *         <i>dst</i> is <code>null</code> -or- if the data will not fit
      *         in the provided buffer.
+     *         
+     * FIXME WRITE and READ with contiguous slot allocations should bulk get /
+     * put all the data at once rather than performing one operation per slot.
      */
     public ByteBuffer read(ISlotAllocation slots, ByteBuffer dst) {
 
@@ -1498,8 +1462,6 @@ public class Journal {
         
         for( int slot=slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
 
-            assertSlot(slot);
-            
             // Verify that this slot has been allocated.
             assert( allocationIndex.isAllocated(slot) );
 
@@ -1537,15 +1499,11 @@ public class Journal {
     }
 
     /**
-     * Delete the data from the store.
+     * Delete the data from the store (non-transactional).
      * 
-     * @param tx
-     *            The transaction.
      * @param id
      *            The int32 within-segment persistent identifier.
      * 
-     * @exception IllegalArgumentException
-     *                if the transaction identifier is bad.
      * @exception DataDeletedException
      *                if the persistent identifier is already deleted.
      * 
@@ -1553,24 +1511,326 @@ public class Journal {
      *       latter reuse the same persistent identifier for new data. Explore
      *       the scope of such interference and its impact on the read-optimized
      *       database. Can we get into a situation with persistent identifier
-     *       exhaustion for some logical page?
+     *       exhaustion for some logical page? {@link Tx#delete(int)} does
+     *       basically the same thing.
      */
-    public void delete(Tx tx, int id) {
+    public void delete(int id) {
 
         assertOpen();
 
-        if( tx == null ) {
+        // No isolation.
+        objectIndex.delete(id, allocationIndex );
             
-            // No isolation.
-            objectIndex.delete(id, allocationIndex );
+    }
+
+    /**
+     * Immediately deallocates the slot allocation (no isolation).
+     * 
+     * @param slots
+     *            The slot allocation.
+     */
+    public void delete(ISlotAllocation slots) {
+
+        allocationIndex.clear(slots);
+        
+    }
+    
+    /**
+     * Writes the new data on the journal and deallocates the old data. This
+     * low-level method is NOT isolated and SHOULD NOT be used for general
+     * purpose applications. The change is NOT restart safe unless (a) the new
+     * allocation is reachable from the root block; and (b) you write a new root
+     * block that can access the new allocation.
+     * 
+     * @param oldSlots
+     *            The old slots (required). The caller MUST take care that this
+     *            is in fact the slots on which the current version of the data
+     *            is written.
+     * @param data
+     *            The new version of the data (required).
+     * 
+     * @return The slots on which the new version of the data is written.
+     * 
+     * @todo The slots deallocated by this method need to be with held from
+     *       reallocation until the next commit or there is the danger that the
+     *       contents of those slots may have changed while the slots are not
+     *       reachable if the restart occurs before the next root block is
+     *       written. This might be automagically handled by multi-state values
+     *       for the slot allocation index entries (deallocated, vs allocated,
+     *       vs allocated+commited, vs conditionally-deallocated).
+     */
+    public ISlotAllocation update(ISlotAllocation oldSlots,ByteBuffer data) {
+        
+        ISlotAllocation newSlots = write(data);
+        
+        allocationIndex.clear(oldSlots);
+        
+        return newSlots;
+        
+    }
+
+    /*
+     * Low-level interface for non-isolated reads, writes of objects (vs
+     * ByteBuffer's) using the extensible serialization API.
+     */
+    
+    /**
+     * Write an object on the store (no isolation). This method does NOT use the
+     * object index. The caller MUST explicitly manage the store. Normally this
+     * consists of ensuring that the object is recoverable from metadata in a
+     * root block or a commit record. For example, the {@link IObjectIndex} uses
+     * this method to store its nodes. The root node of the current object index
+     * is stored in the commit record.
+     * 
+     * @param obj
+     *            The object to be inserted into the store (required). The
+     *            object will be serialized using the extSer package.
+     * 
+     * @return The <em>journal local</em> persistent identifier assigned to
+     *         the object. This is simply a compact encoding of the
+     *         {@link ISlotAllocation} on which the object is written.
+     */
+    public long _insertObject(Object obj) {
+
+        if( obj == null ) throw new IllegalArgumentException();
+
+        try {
+
+            return write(
+                ByteBuffer.wrap(getExtensibleSerializer()
+                .serialize(0, obj))).toLong();
             
-        } else {
+        }
+        
+        catch(IOException ex ) {
+
+            throw new RuntimeException(ex);
             
-            // Transactional isolation.
-            tx.getObjectIndex().delete(id, allocationIndex );
+        }
+        
+    }
+    
+    /**
+     * Fetch an object from the store (no isolation). This operation is
+     * unchecked. As long as the identifier decodes into a
+     * {@link ISlotAllocation} the contents of that slot allocation will be read
+     * into a buffer and an attempt will be made to deserialize the buffer into
+     * an object using the extSer package.
+     * 
+     * @param id
+     *            The <em>journal local</em> persistent identifier for the
+     *            object.
+     * 
+     * @return The object.
+     */
+    public Object _readObject( long id ) {
+    
+        ByteBuffer tmp = read( slotMath.toSlots(id), null );
+
+        try {
+
+            return getExtensibleSerializer().deserialize(id, tmp.array() );
+            
+        }
+        
+        catch(IOException ex ) {
+
+            throw new RuntimeException(ex);
             
         }
 
     }
+    
+    /**
+     * Update an object in the store (no isolation). The object will serialized
+     * using the extSer package and the resulting byte[] will be written onto a
+     * new {@link ISlotAllocation}. That allocation will be converted into a
+     * long integer by {@link SlotMath#toLong(ISlotAllocation)} and the
+     * resulting long integer value is returned to the caller.
+     * 
+     * @param id
+     *            The <em>journal local</em> persistent identifier for the
+     *            current version of the object. The slots allocated to the
+     *            object will be deallocated, releasing the space on the store.
+     *            (This deallocation operation is unchecked. As long as the
+     *            identifier decodes into a {@link ISlotAllocation}, the slot
+     *            allocation will be deallocated.)
+     * 
+     * @param obj
+     *            The object to be written (required).
+     * 
+     * @return The <em>new journal local</em> persistent identifier for that
+     *         object. The new identifier is NOT the same as the old identifier.
+     *         The old identifier MUST now be considered to be invalid. Further
+     *         reads on the old identifier are STRONGLY DISCOURAGED but
+     *         nevertheless unchecked.
+     */
+    public long _updateObject(long id, Object obj) {
+
+        if( obj == null ) throw new IllegalArgumentException();
         
+        try {
+
+            return update(
+                    slotMath.toSlots(id),
+                    ByteBuffer
+                            .wrap(getExtensibleSerializer().serialize(0, obj)))
+                    .toLong();
+
+        }
+
+        catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * Delete an object from the store (no isolation). The slots allocated to
+     * the object will be deallocated, releasing the space on the store. (This
+     * deallocation operation is unchecked. As long as the identifier decodes
+     * into a {@link ISlotAllocation}, the slot allocation will be
+     * deallocated.)
+     * 
+     * @param id
+     *            The <em>journal local</em> persistent identifier of the
+     *            object.
+     */
+    public void _deleteObject( long id )
+    {
+
+        delete( slotMath.toSlots(id) );
+        
+    }
+
+    /*
+     * commit processing support.
+     */
+    
+    /**
+     * Return the first commit record whose transaction timestamp is less than
+     * or equal to the given timestamp.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @param exact
+     *            When true, only an exact match is accepted.
+     * 
+     * @return The commit record.
+     * 
+     * @todo Define ICommitRecord.
+     * 
+     * @todo A transaction may not begin if a transaction with a later timestamp
+     *       has already committed. Use this method to verify that. Since the
+     *       commit records are cached, this probably needs to be moved back
+     *       into the Journal.
+     * 
+     * @todo Read the commit records into memory on startup.
+     * 
+     * @todo The commit records are chained together by a "pointer" to the prior
+     *       commit record together with the timestamp of that record. The root
+     *       block contains the timestamp of the earliest commit record that is
+     *       still on the journal. Traversal of the prior pointers stops when
+     *       the referenced record has a timestamp before the earliest versions
+     *       still on hand.
+     */
+    protected Object getCommitRecord(long timestamp, boolean exact) {
+ 
+        /*
+         * @todo Search backwards from the current {@link IRootBlockView}.
+         */
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * FIXME Write commit record, including: the transaction identifier, the
+     * location of the object index and the slot allocation index, the location
+     * of a run length encoded representation of slots allocated by this
+     * transaction, and the identifier and location of the prior transaction
+     * serialized on this journal.
+     */
+    protected void writeCommitRecord(IStore tx) {
+        
+    }
+
+    /**
+     * Return a read-only view of the current root block.
+     * 
+     * @return The current root block.
+     * 
+     * @todo Currently [null] for the transient buffer mode.
+     */
+    public IRootBlockView getRootBlockView() {
+
+        return _rootBlock;
+        
+    }
+    IRootBlockView _rootBlock;
+
+    /**
+     * FIXME Write a new root block. This provides atomic commit for a
+     * transaction. After this method has been invoked the intention of the
+     * transaction is persistent the journal. This is achieved by updating the
+     * root of the object index, which is stored as part of the root block.
+     * 
+     * @todo Where is the divide between PREPARE and COMMIT? What do we do with
+     *       PREPARE on restart?
+     */
+    public void writeRootBlock() {
+        
+        final IRootBlockView old = getRootBlockView();
+        
+        // @todo currently null for the transient buffer mode.
+        if( old != null ) {
+
+            // FIXME Need to update the slot allocation chain root.
+            // FIXME Need to update the object index root.
+            //
+            // Those data are probably from the transaction.  Does it make sense
+            // to do this without isolation?
+            //
+            // @todo A clone constructor with some overrides might make a lot of
+            // sense here, especially as we add metadata to the root block.
+            
+            IRootBlockView newRootBlock = new RootBlockView(
+                    !old.isRootBlock0(), old.getSegmentId(), old.getSlotSize(),
+                    old.getSlotLimit(), old.getSlotIndexChainHead(), old
+                            .getObjectIndexRoot(), old.getCommitCounter() + 1);
+
+            _bufferStrategy.writeRootBlock(newRootBlock);
+            
+        }
+        
+    }
+
+    /**
+     * @todo This is a notional non-transactional commit. It just writes a new
+     *       root block.
+     */
+    public void commit() {
+        
+        writeRootBlock();
+        
+    }
+    
+    /**
+     * FIXME Make this more flexible in terms of a service vs a static instance
+     * (for journal only to support the object index) vs true extensibility (for
+     * an embedded database).
+     * 
+     * @return
+     */
+    public ExtensibleSerializer getExtensibleSerializer() {
+        
+        return _extSer;
+        
+    }
+    
+    // FIXME This is NOT restart safe :-)
+    final private ExtensibleSerializer _extSer;
+
 }

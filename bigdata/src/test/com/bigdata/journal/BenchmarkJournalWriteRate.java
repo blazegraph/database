@@ -247,6 +247,9 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      * Run a test.
      * 
      * @return The elapsed time for the test.
+     * 
+     * @todo refactor into a transactional and a non-transactional test using
+     *       the common {@link IStore} interface.
      */
     public long doJournalWriteRateTest() {
 
@@ -270,7 +273,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
             
             data.limit( dataSize );
             
-            journal.write(tx, i, data);
+            tx.write(i, data);
             
         }
 

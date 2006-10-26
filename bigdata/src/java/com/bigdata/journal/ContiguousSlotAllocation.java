@@ -46,37 +46,21 @@ Modifications:
  */
 package com.bigdata.journal;
 
-
 /**
- * Basic implementation should be used when the #of slots to be allocated is
- * known in advance and there are at least two slots to be allocated.
+ * Implementation storing minimal data that requires the slots in the allocation
+ * to be contiguous. The use of this implementation both guarentees that a slot
+ * allocation is contiguous and is more space efficient.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Do an implementation that requires contiguous slots and just stores the
- *       data in a long. The state of a {@link CompactSlotAllocation} is
- *       proportional to the #of slots, while the proposed implementation would
- *       have a fixed size regardless of the #of slots. Much nicer.
  */
-public class CompactSlotAllocation implements ISlotAllocation {
+public class ContiguousSlotAllocation implements ISlotAllocation {
 
-    /**
-     * True iff the allocation is closed.
-     */
-    private transient boolean closed = false;
-    
     private final int nbytes;
-    
-    /**
-     * The ordered list of slots.
-     */
-    private final transient int[] slots;
-    
-    /**
-     * The #of slots added so far.
-     */
-    private transient int n = 0;
+
+    private final int nslots;
+
+    private final int firstSlot;
     
     /**
      * The current cursor position or -1 if the iterator is exhausted or has
@@ -92,11 +76,10 @@ public class CompactSlotAllocation implements ISlotAllocation {
      *            allocation.
      * @param nslots
      *            The #of slots on which the version will be written.
-     * 
-     * @see SingletonSlotAllocation, which is more efficient when there will be
-     *      just one slot in the allocation.
+     * @param firstSlot
+     *            The first slot.
      */
-    public CompactSlotAllocation(int nbytes,int nslots) {
+    public ContiguousSlotAllocation(int nbytes,int nslots,int firstSlot) {
         
         if (nbytes <= 0)
             throw new IllegalArgumentException("nbytes=" + nbytes
@@ -108,7 +91,9 @@ public class CompactSlotAllocation implements ISlotAllocation {
 
         this.nbytes = nbytes;
         
-        this.slots = new int[ nslots ];
+        this.nslots = nslots;
+        
+        this.firstSlot = firstSlot;
         
     }
 
@@ -120,18 +105,14 @@ public class CompactSlotAllocation implements ISlotAllocation {
     
     public int capacity() {
         
-        return slots.length;
+        return nslots;
         
     }
     
     public void add(int slot) {
 
-        if( slot < 0 ) throw new IllegalArgumentException();
-
-        if( n == slots.length ) throw new IllegalStateException("full");
-        
-        slots[ n++ ] = slot;
-        
+        throw new UnsupportedOperationException();
+       
     }
 
     /**
@@ -141,32 +122,22 @@ public class CompactSlotAllocation implements ISlotAllocation {
      */
     public void close() {
         
-        if( closed ) throw new IllegalStateException("Already closed.");
-        
-        if (n != slots.length)
-            throw new IllegalStateException("Only " + n + " of " + slots.length
-                    + " slots are defined.");
-        
-        closed = true;
+        throw new UnsupportedOperationException();
         
     }
 
     public boolean isClosed() {
         
-        return closed;
+        return true;
         
     }
     
     public int firstSlot() {
         
-        // no slots.
-        if( n == 0 ) throw new IllegalStateException();
-
         // next cursor position.
         cursor = 1;
         
-        // first slot.
-        return slots[ 0 ];
+        return firstSlot;
         
     }
 
@@ -174,7 +145,7 @@ public class CompactSlotAllocation implements ISlotAllocation {
 
         if( cursor < 0 ) throw new IllegalStateException();
 
-        if( cursor >= n ) {
+        if( cursor >= nslots ) {
             
             cursor = -1;
             
@@ -182,47 +153,25 @@ public class CompactSlotAllocation implements ISlotAllocation {
             
         }
         
-        return slots[ cursor++ ];
+        return firstSlot + cursor++;
         
     }
 
     public int getSlotCount() {
 
-        return n;
+        return nslots;
         
     }
 
     public boolean isContiguous() {
-        
-        if( n == 0 ) throw new IllegalStateException();
-        
-        int lastSlot = -1;
-        
-        for( int i=0; i<n; i++ ) {
-            
-            int thisSlot = slots[i];
-            
-            if( i>0 && thisSlot != lastSlot + 1 ) {
-                
-                return false;
-                
-            }
-            
-            lastSlot = thisSlot;
-            
-        }
-        
+
         return true;
         
     }
     
     public long toLong() {
 
-        if( ! isContiguous() ) throw new IllegalStateException();
-        
-        if( n == 0 ) throw new IllegalStateException();
-        
-        return SlotMath.toLong( nbytes, slots[0] );
+        return SlotMath.toLong( nbytes, firstSlot );
         
     }
 

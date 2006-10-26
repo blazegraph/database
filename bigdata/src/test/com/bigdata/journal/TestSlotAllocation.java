@@ -50,8 +50,10 @@ package com.bigdata.journal;
 import junit.framework.TestCase;
 
 /**
+ * <p>
  * Test suite for {@link ISlotAllocation} - an interface that represents the
  * slots allocated to a single data version.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -64,6 +66,17 @@ public class TestSlotAllocation extends TestCase {
     public TestSlotAllocation(String arg0) {
         super(arg0);
     }
+    
+    /**
+     * The assumed slot size for these tests.
+     */
+    final int slotSize = 128;
+    
+    /**
+     * Used by some tests to compute the #of slots in which a given allocation
+     * will fit.
+     */
+    final SlotMath slotMath = new SlotMath(slotSize);
 
     /**
      * Test constructors.
@@ -367,6 +380,225 @@ public class TestSlotAllocation extends TestCase {
         }
 
         return fixture;
+        
+    }
+
+    public void test_isContiguous_singleton() {
+
+        ISlotAllocation tmp;
+        
+        tmp = new SingletonSlotAllocation(100);
+
+        try {
+            tmp.isContiguous();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+        
+        tmp.add(10);
+
+        tmp.close();
+        
+        assertTrue(tmp.isContiguous());
+        
+    }
+    
+    public void test_isContiguous_compact() {
+
+        final int nbytes = 412;
+        
+        ISlotAllocation tmp = new CompactSlotAllocation(nbytes, slotMath
+                .getSlotCount(nbytes));
+
+        try {
+            tmp.isContiguous();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+        
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(13);
+
+        tmp.close();
+        
+        assertTrue(tmp.isContiguous());
+        
+        // Try again.
+        tmp = new CompactSlotAllocation(nbytes, slotMath.getSlotCount(nbytes));
+
+        tmp.add(9);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(13);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+        // Try again.
+        tmp = new CompactSlotAllocation(nbytes, slotMath.getSlotCount(nbytes));
+
+        tmp.add(10);
+        tmp.add(12);
+        tmp.add(13);
+        tmp.add(14);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+        // Try again.
+        tmp = new CompactSlotAllocation(nbytes, slotMath.getSlotCount(nbytes));
+
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(14);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+    }
+
+    public void test_isContiguous_unbounded() {
+
+        ISlotAllocation tmp = new UnboundedSlotAllocation();
+
+        try {
+            tmp.isContiguous();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+        
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(13);
+
+        tmp.close();
+        
+        assertTrue(tmp.isContiguous());
+        
+        // Try again.
+        tmp = new UnboundedSlotAllocation();
+
+        tmp.add(9);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(13);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+        // Try again.
+        tmp = new UnboundedSlotAllocation();
+
+        tmp.add(10);
+        tmp.add(12);
+        tmp.add(13);
+        tmp.add(14);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+        // Try again.
+        tmp = new UnboundedSlotAllocation();
+
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(14);
+
+        tmp.close();
+        
+        assertFalse(tmp.isContiguous());
+
+    }
+    
+    // @todo tests of toLong, but the core implementation is on SlotMath.
+//    public void test_toLong() {
+//
+//        final int nbytes = 412;
+//        
+//        ISlotAllocation tmp;
+//
+//        // singleton.
+//        tmp = new SingletonSlotAllocation(100);
+//
+//        tmp.add(10);
+//        tmp.close();
+//        tmp.toLong();
+//        
+//        // compact
+//        tmp = new CompactSlotAllocation(nbytes, slotMath
+//                .getSlotCount(nbytes));
+//
+//        
+//        // @todo unbounded
+//        
+//    }
+    
+    public void test_toLong_correctRejection() {
+
+        ISlotAllocation tmp;
+        
+        // empty singleton.
+        tmp = new SingletonSlotAllocation(100);
+
+        try {
+            tmp.toLong();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+        
+        // not contiguous.
+        final int nbytes = 412;
+        
+        tmp = new CompactSlotAllocation(nbytes,slotMath.getSlotCount(nbytes));
+
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(12);
+        tmp.add(14);
+        tmp.close();
+
+        try {
+            tmp.toLong();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+
+        // not contiguous.
+        tmp = new UnboundedSlotAllocation();
+
+        tmp.add(10);
+        tmp.add(11);
+        tmp.add(13);
+        tmp.add(14);
+        tmp.close();
+
+        try {
+            tmp.toLong();
+            fail("Expecting: "+IllegalStateException.class);
+        }
+        catch( IllegalStateException ex ) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
         
     }
     

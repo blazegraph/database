@@ -214,4 +214,28 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     }
 
+    public void writeRootBlock(IRootBlockView rootBlock) {
+
+        if( rootBlock == null ) throw new IllegalArgumentException();
+        
+        try {
+
+            FileChannel channel = raf.getChannel();
+
+            channel.write(rootBlock.asReadOnlyBuffer(), rootBlock
+                    .isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+                    : FileMetadata.OFFSET_ROOT_BLOCK1);
+
+            force(false);
+
+        }
+
+        catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
 }

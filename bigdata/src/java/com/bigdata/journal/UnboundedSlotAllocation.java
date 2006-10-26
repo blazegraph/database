@@ -198,4 +198,43 @@ public class UnboundedSlotAllocation implements ISlotAllocation {
         
     }
 
+    public boolean isContiguous() {
+        
+        int lastSlot = -1;
+        
+        Iterator<Integer> itr = slots.iterator();
+        
+        int i = 0;
+        
+        while( itr.hasNext() ) {
+            
+            int thisSlot = itr.next();
+            
+            if( i>0 && thisSlot != lastSlot + 1 ) {
+                
+                return false;
+                
+            }
+            
+            lastSlot = thisSlot;
+            
+            i++;
+            
+        }
+
+        // empty.
+        if( i == 0 ) throw new IllegalStateException();
+        
+        return true;
+        
+    }
+    
+    public long toLong() {
+
+        if( ! isContiguous() ) throw new IllegalStateException();
+        
+        return SlotMath.toLong( nbytes, firstSlot() );
+        
+    }
+
 }

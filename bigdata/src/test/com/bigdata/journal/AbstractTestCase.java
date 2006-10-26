@@ -462,7 +462,7 @@ abstract public class AbstractTestCase
      *      unit tests.
      */
     
-    String getTestJournalFile() throws IOException {
+    protected String getTestJournalFile() throws IOException {
 
         Properties properties = getProperties();
         
@@ -490,7 +490,7 @@ abstract public class AbstractTestCase
      * the journal in your test.
      */
     
-    void deleteTestJournalFile(String filename) {
+    protected void deleteTestJournalFile(String filename) {
         
         try {
             
@@ -559,8 +559,9 @@ abstract public class AbstractTestCase
         
         final int slotSize = journal.slotMath.slotSize;
         
-        // @todo change the distribution shape to make 1 slot very common and give it a modestly long tail, e.g., out to 50 slots.
-        final int nslots = r.nextInt(5)+1;
+        // @todo change the distribution shape to make 1 slot very common and
+        // give it a modestly long tail, e.g., out to 50 slots.
+        final int nslots = r.nextInt(5) + 1;
         
         final int nbytes = ((nslots - 1) * slotSize)
                 + r.nextInt(slotSize) + 1;
@@ -573,36 +574,14 @@ abstract public class AbstractTestCase
         
     }
     
-
     /**
-     * Test helper verifies that the journal believes that the data is deleted
-     * by attempting to read the current data version.
+     * Test helper verifies that the data is deleted.
      */
-    public void assertDeleted(Journal journal, int id) {
+    public void assertDeleted(IStore store, int id) {
 
         try {
 
-            journal.read(null, id, null);
-
-            fail("Expecting " + DataDeletedException.class);
-
-        } catch (DataDeletedException ex) {
-
-            System.err.println("Ignoring expected exception: " + ex);
-
-        }
-        
-    }
-
-    /**
-     * Test helper verifies that the transaction believes that the data is
-     * deleted
-     */
-    public void assertDeleted(Tx tx, int id) {
-
-        try {
-
-            tx.read(id, null);
+            store.read(id, null);
 
             fail("Expecting " + DataDeletedException.class);
 
@@ -616,10 +595,10 @@ abstract public class AbstractTestCase
 
     /**
      * Test helper checks for the parameter for the semantics of "not found" as
-     * defined by {@link Journal#read(Tx, int, ByteBuffer)} or
-     * {@link Tx#read(int, ByteBuffer)}.
+     * defined by {@link IStore#read(int, ByteBuffer)}.
      * 
-     * @param actual The value returned by either of those methods.
+     * @param actual
+     *            The value returned by either of those methods.
      */
     public void assertNotFound(ByteBuffer actual) {
         
@@ -628,7 +607,7 @@ abstract public class AbstractTestCase
     }
 
     /**
-     * Verify that the {@link ISlotAllocation}s are consistent ( the same slots
+     * Verify that the {@link ISlotAllocation}s are consistent (the same slots
      * in the same order).
      * 
      * @param expected
@@ -780,10 +759,8 @@ abstract public class AbstractTestCase
      * Write a data version consisting of N random bytes and verify that we can
      * read it back out again.
      * 
-     * @param journal
-     *            The journal.
-     * @param tx
-     *            The transaction (may be null to use no isolation).
+     * @param store
+     *            The store.
      * @param id
      *            The int32 within-segment persistent identifier.
      * @param nbytes
@@ -793,9 +770,9 @@ abstract public class AbstractTestCase
      *         intervening reads.
      */
     
-    protected byte[] doWriteRoundTripTest(Journal journal,Tx tx, int id, int nbytes) {
+    protected byte[] doWriteRoundTripTest(IStore store, int id, int nbytes) {
 
-        System.err.println("Test writing tx="+tx+", id="+id+", nbytes="+nbytes);
+        System.err.println("Test writing: id="+id+", nbytes="+nbytes);
         
         byte[] expected = new byte[nbytes];
         
@@ -803,23 +780,23 @@ abstract public class AbstractTestCase
         
         ByteBuffer data = ByteBuffer.wrap(expected);
         
-        assertNull((tx == null ? journal.objectIndex.getSlots(id)
-                : tx.getObjectIndex().getSlots(id)));
+//        assertNull((tx == null ? journal.objectIndex.getSlots(id)
+//                : tx.getObjectIndex().getSlots(id)));
         
-        journal.write(tx,id,data);
+        store.write(id,data);
         assertEquals("limit() != #bytes", expected.length, data.limit());
         assertEquals("position() != limit()",data.limit(),data.position());
 
-        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
-                : tx.getObjectIndex().getSlots(id));
-        assertEquals("#bytes",nbytes,slots.getByteCount());
-        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
+//        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
+//                : tx.getObjectIndex().getSlots(id));
+//        assertEquals("#bytes",nbytes,slots.getByteCount());
+//        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
 //        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
         
         /*
          * Read into a buffer allocated by the Journal.
          */
-        ByteBuffer actual = journal.read(tx, id, null);
+        ByteBuffer actual = store.read(id, null);
 
         assertEquals("acutal.position()",0,actual.position());
         assertEquals("acutal.limit()",expected.length,actual.limit());
@@ -842,7 +819,7 @@ abstract public class AbstractTestCase
             actual.limit( actual.capacity() );
             actual.position( pos );
             
-            ByteBuffer tmp = journal.read(tx, id, actual);
+            ByteBuffer tmp = store.read(id, actual);
             assertTrue("Did not read into the provided buffer", tmp == actual);
             assertEquals("position()", pos, actual.position() );
             assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
@@ -853,7 +830,7 @@ abstract public class AbstractTestCase
              * and verify that the data are read into a new buffer.
              */
             actual.limit(pos+expected.length-1);
-            tmp = journal.read(tx, id, actual);
+            tmp = store.read(id, actual);
             assertFalse("Read failed to allocate a new buffer", tmp == actual);
             assertEquals(expected,tmp);
 

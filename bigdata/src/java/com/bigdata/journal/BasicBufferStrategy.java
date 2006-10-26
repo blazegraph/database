@@ -40,21 +40,21 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     /**
      * Asserts that the slot index is in the legal range for the journal
-     * <code>[0:slotLimit)</code>
+     * <code>[1:slotLimit-1]</code>
      * 
      * @param slot The slot index.
      */
     
     void assertSlot( int slot ) {
         
-        if( slot>=0 && slot<slotLimit ) return;
+        if( slot>=1 && slot<slotLimit ) return;
         
-        throw new AssertionError("slot=" + slot + " is not in [0:"
+        throw new AssertionError("slot=" + slot + " is not in [1:"
                 + slotLimit + ")");
         
     }
 
-  BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,SlotMath slotMath,ByteBuffer buffer) {
+    BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,SlotMath slotMath,ByteBuffer buffer) {
       
       super( journalHeaderSize, bufferMode, slotMath );
       

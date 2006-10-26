@@ -90,16 +90,19 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
      */
     final BitSet committed;
     
+    final private int FIRST_SLOT = 1;
+    
     /**
      * <p>
-     * The next slot that is known to be available. Slot indices begin at 0 and
-     * run up to {@link Integer#MAX_VALUE}.
+     * The next slot that is known to be available. Slot indices begin at 1 and
+     * run up to {@link Integer#MAX_VALUE}. The value ZERO(0) is explicitly
+     * excluded so that it may be treated as a [null] identifier.
      * </p>
      * 
      * @todo This MUST be initialized on startup. The default is valid only for
      *       a new journal.
      */
-    private int _nextSlot = 0;
+    private int _nextSlot = FIRST_SLOT;
 
     /**
      * Asserts that the slot index is in the legal range for the journal
@@ -110,11 +113,11 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
      */
     void assertSlot(int slot) {
 
-        if (slot >= 0 && slot < slotLimit)
+        if (slot >= FIRST_SLOT && slot < slotLimit)
             return;
 
-        throw new AssertionError("slot=" + slot + " is not in [0:" + slotLimit
-                + ")");
+        throw new AssertionError("slot=" + slot + " is not in [" + FIRST_SLOT
+                + ":" + slotLimit + ")");
 
     }
 
@@ -165,8 +168,8 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
          * resize it as required?  Reuse of the returned value requires that
          * we copy the data into the object index (vs copying a reference).
          */
-        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(nbytes)
-                : new CompactSlotAllocation(nbytes,nslots));
+        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(
+                nbytes) : new CompactSlotAllocation(nbytes, nslots));
         
         int lastSlot = -1;
         
@@ -248,7 +251,7 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
             
             System.err.println("Journal is wrapping around.");
             
-            _nextSlot = allocated.nextClearBit( 0 );
+            _nextSlot = allocated.nextClearBit( FIRST_SLOT );
             
             if( _nextSlot == slotLimit ) {
 

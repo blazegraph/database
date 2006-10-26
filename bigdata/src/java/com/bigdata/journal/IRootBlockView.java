@@ -72,6 +72,19 @@ public interface IRootBlockView {
     public void valid() throws RootBlockException;
 
     /**
+     * There are two root blocks and they are written in an alternating order.
+     * For the sake of distinction, the first one is referred to as "rootBlock0"
+     * while the 2nd one is referred to as "rootBlock1". This method indicates
+     * which root block is represented by this view based on metadata supplied
+     * to the constructor (the distinction is not persistent on disk).
+     * 
+     * @return True iff the root block view was constructed from "rootBlock0".
+     * 
+     * @todo Should this distinction be persistent on disk?
+     */
+    public boolean isRootBlock0();
+    
+    /**
      * The segment identifier.
      */
     public long getSegmentId();

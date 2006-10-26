@@ -71,7 +71,7 @@ import junit.framework.Test;
  * @see AbstractTestCase
  */
 
-abstract class ProxyTestCase
+public abstract class ProxyTestCase
     extends AbstractTestCase
     implements IProxyTest
 {

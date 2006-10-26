@@ -66,8 +66,10 @@ import java.util.Random;
  * @todo tests of opening an existing journal, including with incomplete writes
  *       of a root block.
  * 
- * @todo tests when the journal is very large (NOT the normal use case for
- *       bigdata).
+ * @todo tests when the journal is very large. This is NOT the normal use case
+ *       for bigdata, but one option for an embedded database. However, even an
+ *       embedded database would normally use a read-optimized database segment
+ *       paired with the journal.
  * 
  * @todo Do stress test with writes, reads, and deletes.
  * 
@@ -124,17 +126,141 @@ public class TestJournal extends ProxyTestCase {
         
     }
 
+    //
+    //
+    //
+    
     /**
-     * Test ability to release and consume slots on the journal.
+     * Test of low-level non-isolated read, write, update, delete operations
+     * using the journal. These operations work directly with slot allocations
+     * and do not use the object index. (In fact, the object index uses these
+     * operations itself to store its nodes on the journal.) It is not possible
+     * to test for a "not found" condition here since a READ just appends the
+     * data from the slots into a buffer - you can read anything this way, but
+     * the data may not be what you want. It also does not make sense to test
+     * for the state of the old data following a write or delete since the data
+     * will be unchanged until someone comes along to overwrite them.
      * 
-     * @throws IOException
-     * 
-     * FIXME Isolate and test this aspect of the API.
+     * @todo Note that deallocation may wind up being conditional so that it is
+     *       restart safe (it probably needs to be).
      */
-    public void test_releaseSlots001() throws IOException {
-       
+    public void test_lowLevelCrud() throws IOException {
+        
+        final Properties properties = getProperties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            final ByteBuffer expected0 = getRandomData(journal);
+            final ByteBuffer expected1 = getRandomData(journal);
+            final ByteBuffer expected2 = getRandomData(journal);
+            
+            // write on the journal (aka insert).
+            final ISlotAllocation slots0 = journal.write(expected0);
+
+            assertSlotAllocationState(slots0, journal.allocationIndex, true);
+            
+            assertEquals(expected0.array(),journal.read(slots0, null));
+
+            // update.
+            final ISlotAllocation slots1 = journal.update(slots0, expected1);
+            
+            assertSlotAllocationState(slots0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots1, journal.allocationIndex, true);
+
+            assertEquals(expected1.array(),journal.read(slots1, null));
+            
+            // update.
+            final ISlotAllocation slots2 = journal.update(slots0, expected2);
+            
+            assertSlotAllocationState(slots0, journal.allocationIndex, false);
+
+            assertSlotAllocationState(slots1, journal.allocationIndex, true);
+
+            assertSlotAllocationState(slots2, journal.allocationIndex, true);
+
+            assertEquals(expected2.array(),journal.read(slots2, null));
+            
+            // delete.
+            journal.delete( slots2 );
+            
+            assertSlotAllocationState(slots2, journal.allocationIndex, false);
+            
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+        
     }
     
+    /**
+     * Test of low-level non-isolated read, write, update, delete operations on
+     * objects using the journal and the extSer package. These operations work
+     * directly with slot allocations and do not use the object index. (In fact,
+     * the object index uses these operations itself to store its nodes on the
+     * journal.) It is not possible to test for a "not found" condition here
+     * since a READ just appends the data from the slots into a buffer - you can
+     * read anything this way, but the data may not be what you want. It also
+     * does not make sense to test for the state of the old data following a
+     * write or delete since the data will be unchanged until someone comes
+     * along to overwrite them.
+     * 
+     * @todo Do variant tests of a persistence capable object index (actually,
+     *       this will need to be its own test suite).
+     */
+    public void test_lowLevelObjectCrud() throws IOException {
+        
+        final Properties properties = getProperties();
+
+        final String filename = getTestJournalFile();
+
+        properties.setProperty("file", filename);
+
+        try {
+
+            Journal journal = new Journal(properties);
+
+            final Object expected0 = "expected0";
+            final Object expected1 = "expected1";
+            final Object expected2 = "expected2";
+            
+            // write on the journal (aka insert).
+            final long id0 = journal._insertObject(expected0);
+
+            assertEquals(expected0,journal._readObject(id0));
+
+            // update.
+            final long id1 = journal._updateObject(id0, expected1);
+            
+            assertEquals(expected1,journal._readObject(id1));
+            
+            // update.
+            final long id2 = journal._updateObject(id1, expected2);
+
+            assertEquals(expected2,journal._readObject(id2));
+            
+            // delete.
+            journal._deleteObject(id2);
+            
+            journal.close();
+
+        } finally {
+
+            deleteTestJournalFile(filename);
+
+        }
+        
+    }
+
     //
     // Under one slot.
     //
@@ -148,7 +274,7 @@ public class TestJournal extends ProxyTestCase {
      *       right requires that we diddle the journal into a corrupt state and
      *       then verify that the corrupt condition is correctly detected by the
      *       various methods.
-     *       
+     * 
      * @todo test of write that wraps the journal.
      * @todo test of write that triggers reuse of slots already written on the
      *       journal by the same tx.
@@ -157,6 +283,11 @@ public class TestJournal extends ProxyTestCase {
      * @todo write test where there is not enough room to write the data in the
      *       journal (even after release).
      * @todo etc.
+     * 
+     * FIXME All of these tests are transactional the way that they are
+     * currently written. Refactor the tests so that we can run them against
+     * both the {@link Journal} and a writable {@link Tx} using their common
+     * {@link IStore} interface.
      */
 
     public void test_write_underOneSlot01() throws IOException {
@@ -176,7 +307,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, 10);
+            doWriteRoundTripTest(tx, 0, 10);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -224,7 +355,7 @@ public class TestJournal extends ProxyTestCase {
             
             assertTrue("dataSize",journal.slotMath.slotSize>nbytes);
             
-            doWriteRoundTripTest(journal, tx, id, nbytes);
+            doWriteRoundTripTest(tx, id, nbytes);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -269,7 +400,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
 
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize);
+            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -310,7 +441,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize-1);
+            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize-1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -351,7 +482,7 @@ public class TestJournal extends ProxyTestCase {
             
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize+1);
+            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize+1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -396,7 +527,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0, journal.slotMath.slotSize * 2);
+            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize * 2);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -437,7 +568,7 @@ public class TestJournal extends ProxyTestCase {
             
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0,
+            doWriteRoundTripTest(tx, 0,
                     (journal.slotMath.slotSize * 2) - 1);
 
             /*
@@ -479,7 +610,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(journal, tx, 0,
+            doWriteRoundTripTest(tx, 0,
                     (journal.slotMath.slotSize * 2) + 1);
 
             /*
@@ -525,7 +656,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(journal, tx, 0,
+            doWriteRoundTripTest(tx, 0,
                     journal.slotMath.slotSize * 3);
             
             /*
@@ -567,7 +698,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(journal, tx, 0,
+            doWriteRoundTripTest(tx, 0,
                     (journal.slotMath.slotSize * 3) - 1);
             
             /*
@@ -609,7 +740,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(journal, tx, 0,
+            doWriteRoundTripTest(tx, 0,
                     (journal.slotMath.slotSize * 3) + 1);
             
             /*
@@ -673,55 +804,55 @@ public class TestJournal extends ProxyTestCase {
             final ByteBuffer expected1v2 = getRandomData(journal);
             
             // precondition tests, write id0 version0, postcondition tests.
-            assertNotFound(journal.read(null,id0,null));
+            assertNotFound(journal.read(id0,null));
             
-            assertNotFound(journal.read(null,id1,null));
+            assertNotFound(journal.read(id1,null));
 
-            journal.write(null,id0,expected0v0);
+            journal.write(id0,expected0v0);
             
-            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            assertEquals(expected0v0.array(),journal.read( id0, null));
             
-            assertNotFound(journal.read(null,id1,null));
+            assertNotFound(journal.read(id1,null));
 
             // write id1 version0, postcondition tests.
-            journal.write(null,id1,expected1v0);
+            journal.write(id1,expected1v0);
             
-            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            assertEquals(expected0v0.array(),journal.read( id0, null));
             
-            assertEquals(expected1v0.array(),journal.read(null, id1, null));
+            assertEquals(expected1v0.array(),journal.read( id1, null));
             
             // write id1 version1, postcondition tests.
-            journal.write(null,id1,expected1v1);
+            journal.write(id1,expected1v1);
             
-            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            assertEquals(expected0v0.array(),journal.read( id0, null));
             
-            assertEquals(expected1v1.array(),journal.read(null, id1, null));
+            assertEquals(expected1v1.array(),journal.read( id1, null));
             
             // write id1 version2, postcondition tests.
-            journal.write(null,id1,expected1v2);
+            journal.write(id1,expected1v2);
             
-            assertEquals(expected0v0.array(),journal.read(null, id0, null));
+            assertEquals(expected0v0.array(),journal.read( id0, null));
             
-            assertEquals(expected1v2.array(),journal.read(null, id1, null));
+            assertEquals(expected1v2.array(),journal.read( id1, null));
 
             // write id0 version1, postcondition tests.
-            journal.write(null,id0,expected0v1);
+            journal.write(id0,expected0v1);
             
-            assertEquals(expected0v1.array(),journal.read(null, id0, null));
+            assertEquals(expected0v1.array(),journal.read( id0, null));
             
-            assertEquals(expected1v2.array(),journal.read(null, id1, null));
+            assertEquals(expected1v2.array(),journal.read( id1, null));
 
             // delete id1, postcondition tests.
 
-            journal.delete(null, id1);
+            journal.delete(id1);
             
-            assertEquals(expected0v1.array(),journal.read(null, id0, null));
+            assertEquals(expected0v1.array(),journal.read( id0, null));
             
             assertDeleted(journal, id1);
 
             // delete id0, postcondition tests.
 
-            journal.delete(null, id0);
+            journal.delete(id0);
             
             assertDeleted(journal, id0);
             
@@ -753,9 +884,11 @@ public class TestJournal extends ProxyTestCase {
      * 
      * @todo Evolve this into a stress test that also verifies restart. This
      *       currently does a lot of redundent reads in
-     *       {@link #doWriteRoundTripTest(Journal, Tx, int, int)} that we would
-     *       not want as part of a benchmark, but they are fine for a stress
-     *       test.
+     *       {@link #doWriteRoundTripTest(IStore, int, int)} that we would not
+     *       want as part of a benchmark, but they are fine for a stress test.
+     * 
+     * @todo This test is transactional. Either refactor into a transactional
+     *       and a non-transactional test or just move it into {@link TestTx}.
      */
     public void test_write_multipleObjectWrites001() throws IOException {
 
@@ -783,7 +916,7 @@ public class TestJournal extends ProxyTestCase {
 
                 int nbytes = r.nextInt(maxSize)+1; // +1 avoids zero length items.
 
-                written.put(id, doWriteRoundTripTest(journal, tx, id, nbytes) );
+                written.put(id, doWriteRoundTripTest(tx, id, nbytes) );
 
             }
             
@@ -808,7 +941,7 @@ public class TestJournal extends ProxyTestCase {
                 // FIXME Also try reading multiple times into a buffer to verify
                 // that the buffer is used and that the contract for its use is
                 // observed.
-                ByteBuffer actual = journal.read(tx, id, null);
+                ByteBuffer actual = tx.read(id, null);
                 
                 assertEquals("acutal.position()",0,actual.position());
                 assertEquals("acutal.limit()",expected.length,actual.limit());
@@ -857,7 +990,7 @@ public class TestJournal extends ProxyTestCase {
             
             final int id = 0;
             
-            byte[] expected = doWriteRoundTripTest(journal, null, id,
+            byte[] expected = doWriteRoundTripTest(journal, id,
                     (journal.slotMath.slotSize * 3) + 1);
 
             /*
@@ -867,7 +1000,7 @@ public class TestJournal extends ProxyTestCase {
             final int nallocated = journal.allocationIndex.getAllocatedSlotCount();
             System.err.println("Allocated "+nallocated+" slots for id="+id);
 
-            ByteBuffer actual = journal.read(null, id, null);
+            ByteBuffer actual = journal.read(id, null);
 
             assertEquals("acutal.position()",0,actual.position());
             assertEquals("acutal.limit()",expected.length,actual.limit());
@@ -878,7 +1011,7 @@ public class TestJournal extends ProxyTestCase {
             final ISlotAllocation slots = journal.objectIndex.getSlots(id);
 
             // delete the version.
-            journal.delete(null,id);
+            journal.delete(id);
 
             /*
              * Since the version only existed within in the global scope, verify
@@ -916,7 +1049,7 @@ public class TestJournal extends ProxyTestCase {
              */
             try {
                 
-                journal.delete(null,id);
+                journal.delete(id);
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -931,7 +1064,7 @@ public class TestJournal extends ProxyTestCase {
              */
             try {
                 
-                journal.write(null,id, getRandomData(journal));
+                journal.write(id, getRandomData(journal));
 
                 fail("Expecting " + DataDeletedException.class);
                 
@@ -952,7 +1085,7 @@ public class TestJournal extends ProxyTestCase {
     }
     
     //
-    // Test helpers.
+    // 
     //
-
+    
 }

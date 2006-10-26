@@ -16,7 +16,8 @@ public class SingletonSlotAllocation implements ISlotAllocation {
     /**
      * Create an allocation that must fit within a single slot.
      * 
-     * @param nbytes The #of bytes in the allocation.
+     * @param nbytes
+     *            The #of bytes in the allocation.
      */
     public SingletonSlotAllocation(int nbytes) {
 
@@ -112,5 +113,21 @@ public class SingletonSlotAllocation implements ISlotAllocation {
         return this.slot == -1 ? 0 : 1;
         
     }
+
+    public boolean isContiguous() {
+        
+        if( slot == -1 ) throw new IllegalStateException();
+        
+        return true;
+        
+    }
     
+    public long toLong() {
+
+        if( slot == -1 ) throw new IllegalStateException();
+        
+        return SlotMath.toLong( nbytes, slot );
+        
+    }
+
 }

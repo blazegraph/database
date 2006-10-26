@@ -56,83 +56,52 @@ import java.io.OutputStream;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Drop methods that accept byte[] in favor of using streams and create a
- *       stream factory utility class. At their lowest level, store
- *       implementations may use single threaded writers and a different API.
  */
 
 public interface IStore {
 
     /**
-     * Insert data into the store.
+     * Insert an object into the store.
      * 
-     * @param data The data.
+     * @param obj The object (required).
      * 
-     * @return The persistent identifier.
+     * @return The int64 persistent identifier.
      */
 
-    public long insert(byte[] data);
+    public long insert(Object obj);
 
     /**
-     * Insert data into the store.
-     * 
-     * @return A stream on which the data can be written.
-     */
-    public StoreOutputStream getOutputStream();
-
-    /**
-     * Read data from the store.
-     * 
-     * @param id The persistent identifier.
-     * 
-     * @return The data.
-     * 
-     * @throws NotFoundException if the identifier can not be resolved.
-     */
-    public byte[] read(long id);
-
-    /**
-     * Read data from the store.
+     * Read an object from the store.
      * 
      * @param id
-     *            The persistent identifier.
+     *            The int64 persistent identifier.
      * 
-     * @return An input stream from which you can read the data.
+     * @return The object.
      * 
      * @throws NotFoundException
      *             if the identifier can not be resolved.
      */
-    public InputStream getInputStream(long id);
+    public Object read(long id);
 
     /**
-     * Update data in the store.
+     * Update an object on the store.
      * 
      * @param id
-     *            The persistent identifier.
+     *            The int64 persistent identifier.
      * 
-     * @param data
-     *            The new data.
-     *            
-     * @throws NotFoundException if the identifier can not be resolved.
+     * @param obj
+     *            The new object.
+     * 
+     * @throws NotFoundException
+     *             if the identifier can not be resolved.
      */
-    public void update(long id, byte[] data);
+    public void update(long id, Object obj);
 
     /**
-     * Update data in the store.
+     * Delete an object in the store.
      * 
      * @param id
-     *            The persistent identifier.
-     *            
-     * @return A stream on which the new data can be written.
-     */
-    public StoreOutputStream getUpdateStream(long id);
-
-    /**
-     * Delete data in the store.
-     * 
-     * @param id
-     *            The persistent identifier.
+     *            The int64 persistent identifier.
      * 
      * @throws NotFoundException
      *             if the identifier can not be resolved, including if the data
@@ -140,38 +109,68 @@ public interface IStore {
      */
     public void delete(long id);
 
-    /**
-     * <p>
-     * An output stream used to insert or update data in the store. The caller
-     * writes on the stream. When the stream is closed, the data is saved to the
-     * store. Internally, data is incrementally written against the store so
-     * that this mechanism may be used to write very large objects. The data is
-     * saved by invoking {@link #close()}.
-     * </p>
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo Use factory to obtain pre-existing instances where possible.
-     * 
-     * @todo Support blobs transparently by writing on this stream.
-     * 
-     * @todo Consider protocol for aborting an operation. Certainly the
-     *       application can just thrown an exception forcing a transaction to
-     *       rollback.
-     */
-    
-    public abstract static class StoreOutputStream extends OutputStream {
-
-        /**
-         * The persistent identifier for the data. This is assigned by the store
-         * when inserting new data and provided by the application when updating
-         * existing data.
-         * 
-         * @return The persistent identifier.
-         */
-        abstract public long getId();
-
-    }
+//    /**
+//     * Write a stream onto the store.
+//     * 
+//     * @return A stream on which the data can be written.
+//     */
+//    public StoreOutputStream getOutputStream();
+//
+//    /**
+//     * Read data from the store.
+//     * 
+//     * @param id
+//     *            The persistent identifier.
+//     * 
+//     * @return An input stream from which you can read the data.
+//     * 
+//     * @throws NotFoundException
+//     *             if the identifier can not be resolved.
+//     */
+//    public InputStream getInputStream(long id);
+//
+//    /**
+//     * Update data in the store.
+//     * 
+//     * @param id
+//     *            The persistent identifier.
+//     *            
+//     * @return A stream on which the new data can be written.
+//     */
+//    public StoreOutputStream getUpdateStream(long id);
+//
+//    /**
+//     * <p>
+//     * An output stream used to insert or update data in the store. The caller
+//     * writes on the stream. When the stream is closed, the data is saved to the
+//     * store. Internally, data is incrementally written against the store so
+//     * that this mechanism may be used to write very large objects. The data is
+//     * saved by invoking {@link #close()}.
+//     * </p>
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * 
+//     * @todo Use factory to obtain pre-existing instances where possible.
+//     * 
+//     * @todo Support blobs transparently by writing on this stream.
+//     * 
+//     * @todo Consider protocol for aborting an operation. Certainly the
+//     *       application can just thrown an exception forcing a transaction to
+//     *       rollback.
+//     */
+//    
+//    public abstract static class StoreOutputStream extends OutputStream {
+//
+//        /**
+//         * The persistent identifier for the data. This is assigned by the store
+//         * when inserting new data and provided by the application when updating
+//         * existing data.
+//         * 
+//         * @return The persistent identifier.
+//         */
+//        abstract public long getId();
+//
+//    }
 
 }

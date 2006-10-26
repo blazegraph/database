@@ -42,59 +42,48 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Nov 4, 2005
  */
-
 package com.bigdata.journal;
 
-import junit.extensions.proxy.ProxyTestSuite;
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.CognitiveWeb.extser.AbstractSingleton;
 
 /**
- * Aggregates all tests into something approximately increasing dependency
- * order. Most of the tests that are aggregated are proxied test suites and will
- * therefore run with the configuration of the test class running that suite.
+ * <p>
+ * Stateless singleton seralizer wrapping the semantics of the {@link
+ * ExtensibleSerializer} serializer. The use of this class prevents multiple
+ * copies of the state of the extensible serializer from being written into the
+ * store.
+ * </p>
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author thompsonbry
  * @version $Id$
- * 
- * @see AbstractTestCase
- * @see ProxyTestCase
  */
 
-public class TestJournalBasics extends TestCase {
+public class ExtensibleSerializerSingleton
+    extends AbstractSingleton
+{
 
-    public TestJournalBasics() {
-        super();
+    private static final long serialVersionUID = -374435143615477216L;
+
+    public ExtensibleSerializer getSerializer( Journal journal )
+        throws IllegalStateException
+    {
+        
+        return (ExtensibleSerializer) super.getSerializer
+            ( journal
+              );
+        
     }
 
-    public TestJournalBasics(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Aggregates the test suites into something approximating increasing
-     * dependency. This is designed to run as a <em>proxy test suite</em> in
-     * which all tests are run using a common configuration and a delegatation
-     * mechanism. You MUST add the returned {@link Test} into a properly
-     * configured {@link ProxyTestSuite}.
-     * 
-     * @see ProxyTestSuite
-     */
-
-    public static Test suite()
+    public void setSerializer( Journal journal, ExtensibleSerializer ser )
+        throws IllegalStateException
     {
 
-        TestSuite suite = new TestSuite("Core Journal Test Suite");
-
-        suite.addTestSuite( TestJournal.class );
-        suite.addTestSuite( TestTx.class );
-
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-
-        return suite;
+        super.setSerializer
+            ( journal,
+              ser
+              );
         
     }
 

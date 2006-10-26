@@ -83,14 +83,14 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME The various public methods on this API that have {@link RunState}
- * constraints all eagerly force an abort when invoked from an illegal state.
- * This is, perhaps, excessive. Futher, since this is used in a single-threaded
- * server context, we are better off testing for illegal conditions and
- * notifying clients without out generating expensive stack traces. This could
- * be done by return flags or by the server checking pre-conditions itself and
- * exceptions being thrown from here if the server failed to test the
- * pre-conditions and they were not met
+ * @todo The various public methods on this API that have {@link RunState}
+ *       constraints all eagerly force an abort when invoked from an illegal
+ *       state. This is, perhaps, excessive. Futher, since this is used in a
+ *       single-threaded server context, we are better off testing for illegal
+ *       conditions and notifying clients without out generating expensive stack
+ *       traces. This could be done by return flags or by the server checking
+ *       pre-conditions itself and exceptions being thrown from here if the
+ *       server failed to test the pre-conditions and they were not met
  * 
  * @todo Define isolation for the allocation index. We can actually ignore the
  *       problem and only sacrifice the ability to reuse slots allocated to data
@@ -133,7 +133,7 @@ import java.nio.ByteBuffer;
  *       period.
  */
 
-public class Tx {
+public class Tx implements IStore, ITx {
 
     /*
      * Text for error messages.
@@ -282,7 +282,11 @@ public class Tx {
             
         }
         
-        return journal.read( this, id, dst );
+        ISlotAllocation slots = getObjectIndex().getSlots(id);
+        
+        if( slots == null ) return null;
+
+        return journal.read( slots, dst );
         
     }
 
@@ -318,8 +322,19 @@ public class Tx {
             
         }
 
-        journal.write( this, id, data );
-    
+        /*
+         * Write the data onto the journal and obtain the slots onto which the
+         * data was written.
+         */
+        ISlotAllocation slots = journal.write( data );
+        
+        /*
+         * Update the object index so that the current data version is mapped
+         * onto the slots on which the data was just written.
+         */
+
+        getObjectIndex().mapIdToSlots(id, slots, journal.allocationIndex);
+        
     }
     
     /**
@@ -349,7 +364,8 @@ public class Tx {
             
         }
 
-        journal.delete( this, id );
+        // Transactional isolation.
+        getObjectIndex().delete(id, journal.allocationIndex );
         
     }
     
@@ -440,23 +456,14 @@ public class Tx {
          */
         objectIndex.mergeWithGlobalObjectIndex(journal);
 
-        writeCommitRecord();
+        journal.writeCommitRecord( this );
+        
+        journal.writeRootBlock();
         
         runState = RunState.COMMITTED;
         
     }
 
-    /**
-     * FIXME Write commit record, including: the transaction identifier, the
-     * location of the object index and the slot allocation index, the location
-     * of a run length encoded representation of slots allocated by this
-     * transaction, and the identifier and location of the prior transaction
-     * serialized on this journal.
-     */
-    private void writeCommitRecord() {
-        
-    }
-    
     /**
      * Abort the transaction.
      * 

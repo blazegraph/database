@@ -136,7 +136,7 @@ public interface IConflictResolver {
      *       {@link Journal#write(Tx, int, ByteBuffer)}
      */
 
-    public void resolveConflict(int id, Tx readOnlyTx, Tx readWriteTx)
+    public void resolveConflict(int id, IStore readOnlyTx, IStore readWriteTx)
             throws RuntimeException;
 
 }

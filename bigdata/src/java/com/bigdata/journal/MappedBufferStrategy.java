@@ -3,7 +3,6 @@ package com.bigdata.journal;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
-
 /**
  * <p>
  * Memory-mapped journal strategy (this mode is NOT recommended).
@@ -88,5 +87,5 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
         super.close();
         
     }
-    
+
 }

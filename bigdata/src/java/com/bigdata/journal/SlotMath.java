@@ -67,15 +67,15 @@ package com.bigdata.journal;
 
 public class SlotMath {
 
-    /**
-     * The size of the per-slot header.
-     * 
-     * @see #headerSize
-     * 
-     * @deprecated The use of slot headers is being phased out.
-     */
-    static final int HEADER_SIZE = 0; // Bytes.SIZEOF_INT + Bytes.SIZEOF_INT;
-    
+//    /**
+//     * The size of the per-slot header.
+//     * 
+//     * @see #headerSize
+//     * 
+//     * @deprecated The use of slot headers is being phased out.
+//     */
+//    static final int HEADER_SIZE = 0; // Bytes.SIZEOF_INT + Bytes.SIZEOF_INT;
+
     /**
      * The slot size in bytes.
      */
@@ -164,5 +164,107 @@ public class SlotMath {
         return nslots;
  
     }
+
+    /**
+     * Converts a continguous slot allocation to a long integer.
+     * 
+     * @param nbytes
+     *            The #of bytes in the allocation.
+     * @param firstSlot
+     *            The first slot in the allocation.
+     * 
+     * @return The long integer.
+     * 
+     * @exception IllegalArgumentException
+     *                if the slot allocation is not contiguous.
+     * 
+     * @see #toLong(int, int)
+     * @see #getByteCount(long)
+     * @see #getFirstSlot(long)
+     */
+    public static long toLong(ISlotAllocation slots) {
+        
+        if( ! slots.isContiguous() ) throw new IllegalArgumentException();
+       
+        return toLong( slots.getByteCount(), slots.firstSlot() );
+        
+    }
     
+    /**
+     * <p>
+     * Converts a (presumed) continguous slot allocation to a long integer.
+     * </p>
+     * <p>
+     * Note: This is package private since it does not verify that the
+     * allocation is contiguous. This method should only be used within
+     * {@link ISlotAllocation#toLong()} implementations that have already
+     * validated that the slots are contiguous.
+     * </p>
+     * 
+     * @param nbytes
+     *            The #of bytes in the allocation.
+     * @param firstSlot
+     *            The first slot in the allocation.
+     * 
+     * @return The long integer.
+     * 
+     * @see #toLong(ISlotAllocation)
+     * @see #getByteCount(long)
+     * @see #getFirstSlot(long)
+     */
+    static long toLong(int nbytes,int firstSlot) {
+        
+        return ((long) firstSlot) << 32 | nbytes ;
+        
+    }
+    
+    /**
+     * Extracts the byte count from a long integer formed by
+     * {@link #toLong(int, int)}.
+     * 
+     * @param longValue
+     *            The long integer.
+     * @return The byte count in the corresponding slot allocation.
+     */
+    public static int getByteCount(long longValue) {
+
+        return (int) (NBYTES_MASK & longValue);
+
+    }
+
+    /**
+     * Extracts the first slot index from a long integer formed by
+     * {@link #toLong(int, int)}. Since the slots are guarenteed to be
+     * contiguous
+     * 
+     * @param longValue
+     *            The long integer.
+     * @return The first slot index in the corresponding slot allocation.
+     */
+    public static int getFirstSlot(long longValue) {
+
+        return (int) ((FIRST_SLOT_MASK & longValue) >>> 32);
+
+    }
+
+    private static final transient long NBYTES_MASK     = 0x00000000ffffffffL;
+    private static final transient long FIRST_SLOT_MASK = 0xffffffff00000000L;
+
+    /**
+     * Convert a long integer into an {@link ISlotAllocation}.
+     * 
+     * @param longValue A value formed by {@link #toLong(ISlotAllocation)}
+     */
+    public ISlotAllocation toSlots(long longValue) {
+
+        int nbytes = SlotMath.getByteCount(longValue);
+
+        int nslots = getSlotCount(nbytes);
+
+        int firstSlot = SlotMath.getFirstSlot(longValue);
+
+        return new ContiguousSlotAllocation(nbytes, nslots, firstSlot);
+
+    }
+
 }

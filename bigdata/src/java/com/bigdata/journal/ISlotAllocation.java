@@ -121,8 +121,13 @@ public interface ISlotAllocation {
     public int getSlotCount();
 
     /**
+     * <p>
      * The first slot in the allocation. Calling this method resets a
      * per-instance cursor that visits in this allocation.
+     * </p>
+     * <p>
+     * The visitation pattern for {@link ISlotAllocation} is NOT thread-safe.
+     * </p>
      * 
      * @return The first slot in the allocation.
      * 
@@ -132,7 +137,12 @@ public interface ISlotAllocation {
     public int firstSlot();
 
     /**
+     * <p>
      * Visit the next slot in the allocation.
+     * </p>
+     * <p>
+     * The visitation pattern for {@link ISlotAllocation} is NOT thread-safe.
+     * </p>
      * 
      * @return The next slot in the allocation or <code>-1</code> IFF the last
      *         slot was just read using {@link #nextSlot()}.
@@ -146,5 +156,26 @@ public interface ISlotAllocation {
      *                {@link #firstSlot()}
      */
     public int nextSlot(); 
+
+    /**
+     * Return true iff the allocation is contiguous.
+     * 
+     * @exception IllegalStateException
+     *                if there is nothing allocated.
+     */
+    public boolean isContiguous();
+    
+    /**
+     * A slot allocation created from contiguous slots may be represented as a
+     * long integer. The int32 within segment persistent identifier is placed
+     * into the high word and the low word is the size of the allocation. Since
+     * the slots are contiguous, the allocation may be recovered from this data.
+     * 
+     * @return The allocation expressed as a long integer.
+     * 
+     * @exception IllegalStateException
+     *                if the slots in the allocation are not contiguous.
+     */
+    public long toLong();
     
 }

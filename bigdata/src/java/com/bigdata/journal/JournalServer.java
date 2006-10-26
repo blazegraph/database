@@ -288,7 +288,7 @@ public class JournalServer {
                 
             }
             
-            journal.write(transaction,id,data);
+            transaction.write(id,data);
             
         }
 
@@ -319,7 +319,7 @@ public class JournalServer {
              * with an object map so that the client can slice the individual
              * rows out of the block.
              */
-            ByteBuffer data = journal.read(transaction, id, null);
+            ByteBuffer data = transaction.read(id, null);
             
             if( data == null ) {
                 
@@ -356,7 +356,7 @@ public class JournalServer {
                 
             }
 
-            journal.delete(transaction, id);
+            transaction.delete(id);
 
         }
 

@@ -42,60 +42,23 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Oct 26, 2006
  */
 
-package com.bigdata.journal;
-
-import junit.extensions.proxy.ProxyTestSuite;
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.istore;
 
 /**
- * Aggregates all tests into something approximately increasing dependency
- * order. Most of the tests that are aggregated are proxied test suites and will
- * therefore run with the configuration of the test class running that suite.
+ * A transactional operation on a store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see AbstractTestCase
- * @see ProxyTestCase
  */
-
-public class TestJournalBasics extends TestCase {
-
-    public TestJournalBasics() {
-        super();
-    }
-
-    public TestJournalBasics(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Aggregates the test suites into something approximating increasing
-     * dependency. This is designed to run as a <em>proxy test suite</em> in
-     * which all tests are run using a common configuration and a delegatation
-     * mechanism. You MUST add the returned {@link Test} into a properly
-     * configured {@link ProxyTestSuite}.
-     * 
-     * @see ProxyTestSuite
-     */
-
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("Core Journal Test Suite");
-
-        suite.addTestSuite( TestJournal.class );
-        suite.addTestSuite( TestTx.class );
-
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-
-        return suite;
-        
-    }
+public interface ITx extends IStore {
+    
+    public void prepare();
+    
+    public void commit();
+    
+    public void abort();
 
 }
