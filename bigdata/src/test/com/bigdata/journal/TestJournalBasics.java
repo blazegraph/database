@@ -92,7 +92,8 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestJournal.class );
         suite.addTestSuite( TestTx.class );
 
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
+        // @todo add test suite for the persistent object index here.
+//        suite.addTest( com.bigdata.btree.TestAll.suite() );
 
         return suite;
         
