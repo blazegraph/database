@@ -48,10 +48,12 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.Collections;
+//import java.util.HashMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This is a prototype implementation in order to proof out the concept for
@@ -291,23 +293,44 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     public SimpleObjectIndex() {
 
-        this.objectIndex = new HashMap<Integer,IObjectIndexEntry>();
+        /*
+         * Assume that the journal object index will be relatively large.
+         * 
+         * @todo We could also use a btree for the base object index. That is
+         * what it will be when we are done in any case.  In fact, the TreeMap
+         * (a red-black tree implementation) does MUCH worse during the index
+         * merge.
+         */
+        final int initialCapacity = 100000;
 
+        this.objectIndex = new HashMap<Integer, IObjectIndexEntry>(
+                initialCapacity);
+
+//        this.objectIndex = new TreeMap<Integer, IObjectIndexEntry>();
+        
         this.baseObjectIndex = null;
 
     }
 
     /**
      * Private constructor creates a read-only (unmodifiable) deep-copy of the
-     * supplied object index state.  This is used to provide a strong guarentee
+     * supplied object index state. This is used to provide a strong guarentee
      * that object index modifications can not propagate through to the inner
      * layer using this API.
      * 
      * @param objectIndex
+     * 
+     * FIXME The requirement to deep-copy the base object index arises because
+     * the transaction needs a view that is consistent with the start time for
+     * that transaction. When using a persistence capable object index based on
+     * a btree, we will use copy-on-write semantics to prevent the view with
+     * which the tx starts from being modified either by unisolated writes or by
+     * concurrent transactions that commit.
      */
     private SimpleObjectIndex(Map<Integer,IObjectIndexEntry> objectIndex ) {
 
-        Map<Integer,IObjectIndexEntry> copy = new HashMap<Integer,IObjectIndexEntry>();
+        Map<Integer, IObjectIndexEntry> copy = new HashMap<Integer, IObjectIndexEntry>(
+                objectIndex.size());
         copy.putAll( objectIndex );
         
         /*
@@ -345,7 +368,27 @@ public class SimpleObjectIndex implements IObjectIndex {
 
         assert baseObjectIndex != null;
 
-        this.objectIndex = new HashMap<Integer,IObjectIndexEntry>();
+        /*
+         * Presume modest initial capacity for a transaction. Only writes or
+         * deletes result in an entry in the isolated object index.
+         */
+        final int initialCapacity = 1000;
+        
+        /*
+         * Default load factor.
+         */
+        final float loadFactor = 0.75f;
+        
+        /*
+         * Note: The concurrent hash map is used since we have traversal with
+         * concurrent modification during state-based validation. However, there
+         * is never more than a single thread accessing the map so the
+         * concurrency level is ONE (1).
+         */
+        final int concurrencyLevel = 1;
+        
+        this.objectIndex = new ConcurrentHashMap<Integer, IObjectIndexEntry>(
+                initialCapacity, loadFactor, concurrencyLevel);
 
         this.baseObjectIndex = new SimpleObjectIndex(baseObjectIndex.objectIndex);
         
@@ -673,25 +716,6 @@ public class SimpleObjectIndex implements IObjectIndex {
             // The value for that persistent identifier.
             final SimpleEntry entry = (SimpleEntry)mapEntry.getValue();
             
-//            if( entry.versionCounter == Long.MAX_VALUE ) {
-//                
-//                /*
-//                 * @todo There may be ways to handle this, but that is really a
-//                 * LOT of overwrites. For example, we could just transparently
-//                 * promote the field to a BigInteger, which would require
-//                 * storing it as a Number rather than a [long]. Another approach
-//                 * is to only rely on "same or different". With that approach we
-//                 * could use a [short] for the version counter, wrap to zero on
-//                 * overflow, and there would not be a problem unless there were
-//                 * 32k new versions of this entry written while the transaction
-//                 * was running (pretty unlikely, and you can always use a packed
-//                 * int or long if you are worried :-)
-//                 */
-//                
-//                throw new RuntimeException("Too many overwrites: id="+id);
-//                
-//            }
-            
             if( entry.isDeleted() ) {
 
                 /*
@@ -703,23 +727,16 @@ public class SimpleObjectIndex implements IObjectIndex {
                 
                 if( entry.isPreExistingVersionOverwritten() ) {
 
-//                    /*
-//                     * Bump the version counter -- even for a delete! Otherwise
-//                     * we can fail to notice a conflict when an object was
-//                     * deleted by a transaction that commits and another
-//                     * transaction writes a version of that object.
-//                     */
-//                    entry.versionCounter++;
-
                     /*
                      * Update the entry in the global object index.
-                     *
+                     * 
                      * Note: the same post-conditions could be satisified by
                      * getting the entry in the global scope, clearing its
                      * [currentVersionSlots] field, settting its
                      * [preExistingVersionSlots] field and marking the entry as
                      * dirty -- that may be more effective with a persistence
-                     * capable implementation.
+                     * capable implementation. It is also more "obvious" and
+                     * safer since there is no reference sharing.
                      */
                     journal.objectIndex.objectIndex.put(id,entry);
                     
@@ -733,15 +750,9 @@ public class SimpleObjectIndex implements IObjectIndex {
 
             } else {
 
-//                /*
-//                 * Bump the version counter.
-//                 */
-//                entry.versionCounter++;
-                
                 /*
                  * Copy the entry down onto the global scope.
                  */
-
                 journal.objectIndex.objectIndex.put(id, entry);
 
                 /*
@@ -762,7 +773,6 @@ public class SimpleObjectIndex implements IObjectIndex {
             }
             
             /*
-             * 
              * The slots allocated to the pre-existing version are retained in
              * the index entry for this transaction until the garbage collection
              * is run for the transaction. This is true regardless of whether

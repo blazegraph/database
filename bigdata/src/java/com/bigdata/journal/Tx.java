@@ -270,6 +270,8 @@ public class Tx implements IStore, ITx {
      */
     public ByteBuffer read( int id, ByteBuffer dst ) {
 
+        if( id <= 0 ) throw new IllegalArgumentException();
+
         if( ! isActive() ) {
             
             if( ! isComplete() ) {
@@ -282,7 +284,7 @@ public class Tx implements IStore, ITx {
             
         }
         
-        ISlotAllocation slots = getObjectIndex().getSlots(id);
+        ISlotAllocation slots = objectIndex.getSlots(id);
         
         if( slots == null ) return null;
 
@@ -310,7 +312,9 @@ public class Tx implements IStore, ITx {
      */
     public void write(int id,ByteBuffer data) {
 
-        if( ! isActive() ) {
+        if( id <= 0 ) throw new IllegalArgumentException();
+
+        if( runState != RunState.ACTIVE ) {
             
             if( ! isComplete() ) {
                 
@@ -333,7 +337,7 @@ public class Tx implements IStore, ITx {
          * onto the slots on which the data was just written.
          */
 
-        getObjectIndex().mapIdToSlots(id, slots, journal.allocationIndex);
+        objectIndex.mapIdToSlots(id, slots, journal.allocationIndex);
         
     }
     
@@ -352,6 +356,8 @@ public class Tx implements IStore, ITx {
      */
     public void delete( int id) {
 
+        if( id <= 0 ) throw new IllegalArgumentException();
+
         if( ! isActive() ) {
             
             if( ! isComplete() ) {
@@ -365,7 +371,7 @@ public class Tx implements IStore, ITx {
         }
 
         // Transactional isolation.
-        getObjectIndex().delete(id, journal.allocationIndex );
+        objectIndex.delete(id, journal.allocationIndex );
         
     }
     

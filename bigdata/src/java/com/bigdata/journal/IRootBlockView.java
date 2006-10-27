@@ -135,6 +135,30 @@ public interface IRootBlockView {
     public int getObjectIndexRoot();
 
     /**
+     * Return the value of the indicated root id. Each root id is an int32
+     * field. Root ids are normally int32 persistent within segment object
+     * identifiers. Some common uses are the identifier for a map storing named
+     * root objects, etc.
+     * 
+     * @param index
+     *            The index of the root id.
+     * 
+     * @return The int32 id stored at that index.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if the root id is negative or too large.
+     */
+    public int getRootId(int index);
+
+    /**
+     * Returns a read-only view of the root ids. The caller may modify the
+     * returned array without changing the state of the {@link RootBlockView}.
+     * 
+     * @return The root ids.
+     */
+    public int[] getRootIds();
+
+    /**
      * A read-only buffer whose contents are the root block.
      */
     public ByteBuffer asReadOnlyBuffer();

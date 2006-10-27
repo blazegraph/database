@@ -226,9 +226,6 @@ import java.util.Properties;
  * manage this when the native segment model is a key range rather than int64
  * OIDs.
  * 
- * FIXME Does the Journal need to have a concept of "named root objects?" How is
- * that concept supported by bigdata? Per segment? Overall? Both?
- * 
  * FIXME Explore use of bloom filters in front of segments. How does this
  * interact with transaction isolation?
  * 
@@ -269,16 +266,6 @@ import java.util.Properties;
  * time will suck, but it will provide the design for conditional deallocation
  * and restart.
  * 
- * FIXME Do we need extser at all in the journal proper? The object index can
- * not use it since it needs fixed size allocations. The slot allocation index
- * is a chain (or tree) of slots. The root ids are use an indexed array of int32
- * values in the root block. There is no notion of named roots at the journal
- * level (that is an OM feature). There are no general purpose btrees at the
- * journal level (again, an OM / store feature). An embedded database using the
- * journal can use extser by storing its state in a data version whose int32 id
- * is cached in the root block. Since the object index does not depend on
- * extser, we can use the standard data version mechanism to store its state.
- * 
  * @todo Do we need to explicitly zero the allocated buffers? Are they already
  *       zeroed? How much do we actually need to write on them before the rest
  *       of the contents do not matter, e.g., just the root blocks?
@@ -318,9 +305,6 @@ import java.util.Properties;
  *       be deserialized during state-based validation if a conflict is
  *       detected.
  * 
- * @todo Refactor btree support for journals as (a) the object index; and (b)
- *       primary and secondary application indices.
- * 
  * @todo Flushing to disk on commit could be optional, e.g., if there are
  *       redundent journals then this is not required.
  * 
@@ -335,16 +319,6 @@ import java.util.Properties;
  * @todo Add feature to return the transient journal buffer so that we can do
  *       interesting things with it, including write it to disk with the
  *       appropriate file header and root blocks so that it becomes restartable.
- * 
- * @todo Support named objects with transactional isolation. The notional design
- *       uses a B+Tree behind the scenes. The root of the btree is stored in a
- *       known location, e.g., the root block of segment0. There can also be
- *       segment local names. An embedded database would provide only global
- *       names, and they would be implemented as segment local names. Changes to
- *       the tree need to be validated. Other than having to store its root in a
- *       special slot, the tree can use the normal object api and the standard
- *       btree (vs the specialized object index variant). A short term solution
- *       can simply use a hash table to store the name : id mapping.
  */
 
 public class Journal implements IStore {
@@ -1272,6 +1246,8 @@ public class Journal implements IStore {
      */
     public void write(int id,ByteBuffer data) {
 
+        if( id <= 0 ) throw new IllegalArgumentException();
+        
         assertOpen();
 
         /*
@@ -1418,6 +1394,8 @@ public class Journal implements IStore {
      */
     public ByteBuffer read(int id, ByteBuffer dst ) {
 
+        if( id <= 0 ) throw new IllegalArgumentException();
+
         assertOpen();
         
         ISlotAllocation slots = objectIndex.getSlots(id);
@@ -1552,6 +1530,8 @@ public class Journal implements IStore {
      *       basically the same thing.
      */
     public void delete(int id) {
+
+        if( id <= 0 ) throw new IllegalArgumentException();
 
         assertOpen();
 
@@ -1835,10 +1815,20 @@ public class Journal implements IStore {
             // @todo A clone constructor with some overrides might make a lot of
             // sense here, especially as we add metadata to the root block.
             
+            /*
+             * @todo The notional use case for named roots is storing things
+             * such as the root of the named object map or the state of an
+             * extser instance for an embedded database. In order to do that,
+             * the array needs to be made visible one layer up so that the root
+             * ids may be modified before they are set on the new root block.
+             */ 
+            int[] rootIds = old.getRootIds();
+            
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getSegmentId(), old.getSlotSize(),
                     old.getSlotLimit(), old.getSlotIndexChainHead(), old
-                            .getObjectIndexRoot(), old.getCommitCounter() + 1);
+                            .getObjectIndexRoot(), old.getCommitCounter() + 1,
+                            rootIds );
 
             _bufferStrategy.writeRootBlock(newRootBlock);
             

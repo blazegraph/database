@@ -29,7 +29,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
     /**
      * @todo rename to getSlotSize().
      */
-    public int getSlotDataSize() {
+    public int getSlotSize() {
         
         return slotSize;
         

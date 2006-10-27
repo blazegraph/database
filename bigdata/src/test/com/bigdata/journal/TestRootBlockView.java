@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import java.util.Random;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link RootBlockView}.
@@ -57,7 +57,7 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRootBlockView extends TestCase {
+public class TestRootBlockView extends TestCase2 {
 
     /**
      * 
@@ -90,9 +90,13 @@ public class TestRootBlockView extends TestCase {
             final int slotChain = r.nextInt(slotLimit);
             final int objectIndex = r.nextInt(slotLimit);
             final long commitCounter = r.nextInt(Integer.MAX_VALUE);
+            final int[] rootIds = new int[RootBlockView.MAX_ROOT_ID];
+            for( int j=0; j<rootIds.length; j++ ) {
+                rootIds[j] = r.nextInt();
+            }
 
             RootBlockView rootBlock = new RootBlockView(rootBlock0,segmentId, slotSize, slotLimit,
-                    slotChain, objectIndex, commitCounter );
+                    slotChain, objectIndex, commitCounter, rootIds );
 
             System.err.println("pass=" + i + " of " + limit + " : timestamp="
                     + rootBlock.getTimestamp());
@@ -107,6 +111,11 @@ public class TestRootBlockView extends TestCase {
                     .getSlotIndexChainHead());
             assertEquals("objectIndex", objectIndex, rootBlock
                     .getObjectIndexRoot());
+            assertEquals("rootIds", rootIds, rootBlock.getRootIds());
+            for( int j=0; j<rootIds.length; j++ ) {
+                assertEquals("rootId[" + j + "]", rootIds[j], rootBlock
+                        .getRootId(j));
+            }
             assertEquals("commitCounter", commitCounter, rootBlock
                     .getCommitCounter());
 
@@ -149,22 +158,26 @@ public class TestRootBlockView extends TestCase {
         final int objectIndexOk2 = 0;
         final int objectIndexBad = slotLimit; // too large
         final int objectIndexBad2 = -1; // negative
+        final int[] rootIdsOk = new int[RootBlockView.MAX_ROOT_ID];
+        final int[] rootIdsBad = null; // null.
+        final int[] rootIdsBad2 = new int[RootBlockView.MAX_ROOT_ID-1]; // too small.
+        final int[] rootIdsBad3 = new int[RootBlockView.MAX_ROOT_ID+1]; // too large.
         final long commitCounterOk = 0;
         final long commitCounterBad = -1; // negative
         final long commitCounterBad2 = Long.MAX_VALUE; // too large.
-
+        
         // legit.
         new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                slotChainOk, objectIndexOk, commitCounterOk);
+                slotChainOk, objectIndexOk, commitCounterOk, rootIdsOk );
         new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                slotChainOk2, objectIndexOk, commitCounterOk);
+                slotChainOk2, objectIndexOk, commitCounterOk, rootIdsOk );
         new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                slotChainOk, objectIndexOk2, commitCounterOk);
+                slotChainOk, objectIndexOk2, commitCounterOk, rootIdsOk );
 
         // bad slot size.
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeBad, slotLimit,
-                    slotChainOk, objectIndexOk, commitCounterOk);
+                    slotChainOk, objectIndexOk, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -173,7 +186,7 @@ public class TestRootBlockView extends TestCase {
         // bad slot size.
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeBad2, slotLimit,
-                    slotChainOk, objectIndexOk, commitCounterOk);
+                    slotChainOk, objectIndexOk, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -182,14 +195,14 @@ public class TestRootBlockView extends TestCase {
         // bad slot chain.
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainBad, objectIndexOk, commitCounterOk);
+                    slotChainBad, objectIndexOk, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainBad2, objectIndexOk, commitCounterOk);
+                    slotChainBad2, objectIndexOk, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -198,14 +211,14 @@ public class TestRootBlockView extends TestCase {
         // bad object index.
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainOk, objectIndexBad, commitCounterOk);
+                    slotChainOk, objectIndexBad, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainOk, objectIndexBad2, commitCounterOk);
+                    slotChainOk, objectIndexBad2, commitCounterOk, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -214,14 +227,37 @@ public class TestRootBlockView extends TestCase {
         // bad commit counter
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainOk, objectIndexOk, commitCounterBad);
+                    slotChainOk, objectIndexOk, commitCounterBad, rootIdsOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
             new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
-                    slotChainOk, objectIndexOk, commitCounterBad2);
+                    slotChainOk, objectIndexOk, commitCounterBad2, rootIdsOk);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+
+        // bad root ids.
+        try {
+            new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
+                    slotChainOk, objectIndexOk, commitCounterOk, rootIdsBad);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
+                    slotChainOk, objectIndexOk, commitCounterOk, rootIdsBad2);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            new RootBlockView(rootBlock0, segmentId, slotSizeOk, slotLimit,
+                    slotChainOk, objectIndexOk, commitCounterOk, rootIdsBad3);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);

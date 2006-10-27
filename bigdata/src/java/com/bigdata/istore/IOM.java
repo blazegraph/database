@@ -53,7 +53,22 @@ package com.bigdata.istore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo named objects.
+ * @todo The largest question facing an unisolated object manager is its
+ *       behavior in a distributed database with other concurrent unisolated
+ *       object managers and with concurrent transactions. There are also
+ *       unresolved questions in concurrency control simply within the journal,
+ *       which implements MVCC.  I need a better distinction here between what
+ *       is possible and what is useful.
+ * 
+ * @todo Support named objects with transactional isolation. The notional design
+ *       uses a B+Tree behind the scenes. The root of the btree is stored in a
+ *       known location, e.g., the root block of segment0. There can also be
+ *       segment local names. An embedded database would provide only global
+ *       names, and they would be implemented as segment local names. Changes to
+ *       the tree need to be validated. Other than having to store its root in a
+ *       special slot, the tree can use the normal object api and the standard
+ *       btree (vs the specialized object index variant). A short term solution
+ *       can simply use a hash table to store the name : id mapping.
  * 
  * @todo Object caching, which is part of the OM contract (for reference testing
  *       for equality within a VM).

@@ -238,6 +238,8 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
          */
         _nextSlot = allocated.nextClearBit(_nextSlot);
         
+        assert _nextSlot <= slotLimit;
+        
         if( _nextSlot == slotLimit ) {
             
             /*
@@ -252,8 +254,10 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
             System.err.println("Journal is wrapping around.");
             
             _nextSlot = allocated.nextClearBit( FIRST_SLOT );
+        
+            assert _nextSlot <= slotLimit;
             
-            if( _nextSlot >= slotLimit ) {
+            if( _nextSlot == slotLimit ) {
 
                 // The journal is full.
                 throw new IllegalStateException("Journal is full");

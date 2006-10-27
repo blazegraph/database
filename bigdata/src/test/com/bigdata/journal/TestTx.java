@@ -135,10 +135,82 @@ public class TestTx extends ProxyTestCase {
     }
 
     /**
+     * Correct rejection tests for persistent identifiers (must be positive
+     * integers).
+     */
+    public void test_ids_correctRejection() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+        properties.setProperty("slotSize","128");
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            Tx tx = new Tx(journal,0);
+            
+            try {
+                tx.write(0,getRandomData(journal));
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+            try {
+                tx.write(-1,getRandomData(journal));
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                tx.read(0,null);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                tx.read(-1,null);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                tx.delete(0);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                tx.delete(-1);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            tx.abort();
+            
+            journal.close();
+            
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
+    /**
      * Test verifiers that duplicate transaction identifiers are detected in the
      * case where the first transaction is active.
      */
-
     public void test_duplicateTransactionIdentifiers01() throws IOException {
         
         final Properties properties = getProperties();

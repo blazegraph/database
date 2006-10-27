@@ -52,6 +52,8 @@ package com.bigdata.istore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Reify the notion of a segment?  Provide named roots for segments?
  */
 public interface IStore {
 

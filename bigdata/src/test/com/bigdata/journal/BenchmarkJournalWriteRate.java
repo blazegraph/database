@@ -75,19 +75,19 @@ import junit.framework.TestSuite;
  * </p>
  * 
  * <pre>
- *                 
- *      Windows XP 2002 SP2 on Dell Latitude D620.
- *      
- *      #of slots in the journal: 819200
- *      slot size: 128
- *      Elapsed: 1609(ms), bufferMode=transient (memory only)
- *      Elapsed: 2375(ms), block-based optimum (low level disk IO, 8k blocks)
- *      Elapsed: 2485(ms), sustained transfer optimum
- *      Elapsed: 2687(ms), bufferMode=mapped
- *      Elapsed: 4641(ms), slot-based optimum (low level disk IO, 128b slots)
- *      Elapsed: 9328(ms), bufferMode=disk
- *      Elapsed: 9391(ms), bufferMode=direct
- *                 
+ *                    
+ *         Windows XP 2002 SP2 on Dell Latitude D620.
+ *         
+ *         #of slots in the journal: 819200
+ *         slot size: 128
+ *         Elapsed: 1609(ms), bufferMode=transient (memory only)
+ *         Elapsed: 2375(ms), block-based optimum (low level disk IO, 8k blocks)
+ *         Elapsed: 2485(ms), sustained transfer optimum
+ *         Elapsed: 2687(ms), bufferMode=mapped
+ *         Elapsed: 4641(ms), slot-based optimum (low level disk IO, 128b slots)
+ *         Elapsed: 9328(ms), bufferMode=disk
+ *         Elapsed: 9391(ms), bufferMode=direct
+ *                    
  * </pre>
  * 
  * <p>
@@ -112,6 +112,18 @@ import junit.framework.TestSuite;
  * @todo Try with "write through" option on the {@link RandomAccessFile} enabled
  *       for the various journal configurations and the low level "optimum" test
  *       cases.
+ * 
+ * @todo Compare performance with and without transactional isolation. Isolation
+ *       is definately slower. Validation is relatively fast. Most of the
+ *       additional time appears to be merging the isolated object index down
+ *       onto the global object index.  (Note that I am seeing lots of variance
+ *       in the times for the transient journal.  This may be due to whether or
+ *       not a full GC is being performed.  Also, the transient journal is a
+ *       direct buffer, so there may be contention for native heap space.)
+ * 
+ * @todo Compare performance as a function of the "object size". It appears to
+ *       be significantly faster to perform fewer writes of larger objects both
+ *       with and without isolation.
  * 
  * FIXME The memory-mapped file can not be deleted after close(). See
  * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038.
@@ -161,8 +173,8 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     public long getInitialExtent() {return 100*Bytes.megabyte;}
 
     /**
-     * The test are performed with a slot size of 128 - all "objects" are
-     * designed to fit within a single slot.
+     * The test are performed with a slot size of 128, but you can vary
+     * the "object size" to be larger or smaller.
      */
     public int getSlotSize() {return 128;}
 
@@ -170,7 +182,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     
     public String getFilename() {
     
-        return "benchmark-"+getBufferMode()+".jnl";
+        return "benchmark-"+getBufferMode()+"-"+getName()+".jnl";
         
     }
     
@@ -198,6 +210,8 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     
     public void setUp() throws IOException {
         
+        System.err.println("------------------\n");
+        
         deleteFile();
         
         journal = new Journal( getProperties() );
@@ -206,52 +220,58 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     
     public void tearDown() throws IOException {
         
-        journal.close();
-        
-        deleteFile();
-        
-    }
-    
-    public void test() throws IOException {
+        try {
 
-        // Note: This does not work since we have to setUp/tearDown for each
-        // pass.  We can make this work if we move away from junit for the
-        // benchmark.
+            journal.close();
+            
+            deleteFile();
+            
+        }
+        catch( IllegalStateException ex ) {
+            
+            System.err.println("Could not close the journal: "+ex);
+            
+        }
         
-//        final int limit = 10;
-//        
-//        long[] elapsed = new long[limit];
-//        
-//        long total = 0l;
-//        
-//        // Discard one test.
-//        doJournalWriteRateTest();
-//
-//        // Run N tests.
-//        for( int i=0; i<limit; i++ ) {
-//            
-//            elapsed[ i ] = doJournalWriteRateTest();
-//
-//            total += elapsed[ i ];
-//            
-//        }
-//        
-//        // Report average elapsed time.
-//        System.err.println("Results: "+getBufferMode()+" : "+(total/limit));
-    
-        doJournalWriteRateTest();
-
     }
 
     /**
+     * FIXME Testing with isolation appears to pose a heavy memory burden during
+     * writes (vs prepare/commit) for some of the buffer modes - track that
+     * down!
+     */
+    public void testWithIsolation() throws IOException {
+
+        Tx tx = new Tx(journal, 0L);
+
+        doJournalWriteRateTest(tx,128);
+
+    }
+
+    public void testNoIsolation() throws IOException {
+
+        doJournalWriteRateTest(journal,128);
+
+    }
+    
+    /**
      * Run a test.
      * 
-     * @return The elapsed time for the test.
+     * @param store
+     *            The interface on which the writes will be performed. This can
+     *            be either an isolated {@link ITx} or an unisolated
+     *            {@link IStore}.
      * 
-     * @todo refactor into a transactional and a non-transactional test using
-     *       the common {@link IStore} interface.
+     * @param writeSize
+     *            The size of the object to be written. Objects may be less
+     *            than, equal to, or greater than the size of a slot. Objects
+     *            that span slots will be written onto multiple slots.  When the
+     *            write size is equal to the slot size, the assumption is that
+     *            each object fits in one slot.
+     * 
+     * @return The elapsed time for the test.
      */
-    public long doJournalWriteRateTest() {
+    public long doJournalWriteRateTest(IStore store,int writeSize) {
 
         System.err.println("Begin: bufferMode="+journal._bufferStrategy.getBufferMode());
 
@@ -259,27 +279,74 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         final int slotLimit = journal._bufferStrategy.getSlotLimit();
 
-        final int dataSize = journal._bufferStrategy.getSlotDataSize();
-        
-        ByteBuffer data = ByteBuffer.allocateDirect(dataSize);
+//        final int dataSize = journal._bufferStrategy.getSlotDataSize();
 
-        Tx tx = new Tx(journal,0L);
+        final int slotCount = journal.slotMath.getSlotCount(writeSize);
         
-        for( int i=0; i<slotLimit; i++ ) {
+        // less one since slot 0 is not writable.
+        final int nwrites = (slotLimit-1) / slotCount;
+        
+        System.err.println("writeSize=" + writeSize + ", slotSize="
+                + journal.getBufferStrategy().getSlotSize() + ", slotLimit="
+                + slotLimit + ", slotCountPerWrite=" + slotCount + ", nwrites="
+                + nwrites);
+        
+        ByteBuffer data = ByteBuffer.allocateDirect(writeSize);
+
+        int id = 1;
+        
+        for( int i=0; i<nwrites; i++ ) {
         
             data.put(0,(byte)i); // at least one non-zero byte.
 
             data.position( 0 );
             
-            data.limit( dataSize );
+            data.limit( writeSize );
             
-            tx.write(i, data);
+            store.write(id++, data);
             
         }
 
+        final boolean isTx = store instanceof ITx;
+        
+        if( isTx ) {
+
+            ITx tx = (Tx) store;
+            
+            final long beginPrepare = System.currentTimeMillis();            
+
+            final long elapsedWrite =  beginPrepare - begin;
+
+            tx.prepare();
+
+            final long beginCommit = System.currentTimeMillis();
+            
+            final long elapsedPrepare = beginCommit - beginPrepare;
+
+            tx.commit();
+
+            final long elapsedCommit = System.currentTimeMillis() - beginCommit;
+
+            System.err.println("Write  : "+elapsedWrite+"(ms)");
+            System.err.println("Prepare: "+elapsedPrepare+"(ms)");
+            System.err.println("Commit : "+elapsedCommit+"(ms)");
+
+        } else {
+            
+            /*
+             * Force to stable store when not using isolation (the transaction
+             * does this anyway so this makes things more fair).
+             */
+            
+            journal._bufferStrategy.force(false);
+            
+        }
+        
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("Elapsed: "+elapsed+"(ms), bufferMode="+journal._bufferStrategy.getBufferMode());
+        System.err.println("Elapsed: " + elapsed + "(ms), bufferMode="
+                + journal._bufferStrategy.getBufferMode() + ", isolation="
+                + isTx);
 
         return elapsed;
         
@@ -355,12 +422,14 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
             
         }
 
-        public void test() throws IOException {
+        public void testNoIsolation() throws IOException {
 
             doOptimiumWriteRateTest();
             
         }
 
+        public void testWithIsolation() throws IOException {/*NOP*/}
+        
         public void doOptimiumWriteRateTest() throws IOException {
 
             final long begin = System.currentTimeMillis();
@@ -446,11 +515,13 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
             
         }
 
-        public void test() throws IOException {
+        public void testNoIsolation() throws IOException {
 
             doOptimiumWriteRateTest();
             
         }
+
+        public void testWithIsolation() throws IOException {/*NOP*/}
 
         public void doOptimiumWriteRateTest() throws IOException {
 
@@ -502,15 +573,19 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      * allocated in the OS memory. The write should be pure sequential IO. This
      * case should produce the "best-case" optimium throughput to disk <i>for
      * sustained IO</i>. The journal SHOULD NOT be approach this best case
-     * scenario, but in fact block-based IO appears to out-perform this option!
-     * Comparison to this case SHOULD reveal the overhead of the journal, Java,
-     * and block-oriented IO when compare to sustained sequential data transfer
-     * from RAM to disk. Since block-based IO is, in fact, better, one can only
-     * presume that the nio library has some problem with very large writes.
+     * scenario. Comparison to this case should reveal the overhead of the
+     * journal, Java, and block-oriented IO when compare to sustained sequential
+     * data transfer from RAM to disk. Since block-based IO is, in fact, better,
+     * one can only presume that the nio library has some problem with very
+     * large writes.
      * </p>
      * <p>
      * Note: This overrides several methods in the base class in order to
      * conduct a test without the use of a journal.
+     * </p>
+     * <p>
+     * Note: I have seen block-based IO perform better in cases where system
+     * resources were low (the disk was nearly full).
      * </p>
      * 
      * FIXME Try with write through to disk option enabled for the channel in
@@ -550,11 +625,13 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
             
         }
 
-        public void test() throws IOException {
+        public void testNoIsolation() throws IOException {
 
             doOptimiumWriteRateTest();
             
         }
+
+        public void testWithIsolation() throws IOException {/*NOP*/}
 
         public void doOptimiumWriteRateTest() throws IOException {
 
@@ -595,13 +672,20 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
     }
     
+    /**
+     * Runs the tests that have not been commented out :-)
+     * 
+     * Note: Running all benchmarks together can challange the VM by running low
+     * on heap, native memory given over to direct buffers - and things can actually
+     * slow down with more memory.
+     */
     public static Test suite() {
         
         TestSuite suite = new TestSuite("Benchmark Journal Write Rates");
         
         suite.addTestSuite( BenchmarkTransientJournal.class );
         suite.addTestSuite( BenchmarkDirectJournal.class );
-        suite.addTestSuite( BenchmarkMappedJournal.class );
+//        suite.addTestSuite( BenchmarkMappedJournal.class );
         suite.addTestSuite( BenchmarkDiskJournal.class );
         suite.addTestSuite( BenchmarkSlotBasedOptimium.class );
         suite.addTestSuite( BenchmarkBlockBasedOptimium.class );

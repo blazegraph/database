@@ -65,11 +65,7 @@ import com.bigdata.util.TimestampFactory;
  *       get locked down at some point. Verify that we can version the Journal
  *       safely so as to be able to read and write journals that have an older
  *       root block format.
- * 
- * @todo Add an array of root ids? We can then assign indices into the array to
- *       application level objects. The core journal objects should have ids (or
- *       slot allocations) in the root but outside of the "user space" root ids.
- * 
+ *       
  * FIXME Add a field for the last transaction identifier to commit on the
  * journal. As long as the globally assigned transaction identifiers are
  * monotonically increasing (and a lot of things depend on this) then we could
@@ -90,12 +86,18 @@ import com.bigdata.util.TimestampFactory;
  */
 public class RootBlockView implements IRootBlockView {
 
+    /**
+     * The #of root ids.  Their indices are [0:N-1].
+     */
+    static public final short MAX_ROOT_ID       = 10;
+
     static final short SIZEOF_TIMESTAMP  = Bytes.SIZEOF_LONG;
     static final short SIZEOF_MAGIC      = Bytes.SIZEOF_INT;
     static final short SIZEOF_SEGMENT_ID = Bytes.SIZEOF_LONG; // Note: Could be INT.
     static final short SIZEOF_SLOT_SIZE  = Bytes.SIZEOF_INT; // Note: Could be SHORT.
     static final short SIZEOF_SLOT_LIMIT = Bytes.SIZEOF_INT;
     static final short SIZEOF_SLOT_INDEX = Bytes.SIZEOF_INT;
+    static final short SIZEOF_ROOT_IDS   = SIZEOF_SLOT_INDEX * MAX_ROOT_ID;
     
     static final short OFFSET_TIMESTAMP0 = 0;
     static final short OFFSET_MAGIC      = OFFSET_TIMESTAMP0 + SIZEOF_TIMESTAMP;
@@ -104,7 +106,8 @@ public class RootBlockView implements IRootBlockView {
     static final short OFFSET_SLOT_LIMIT = OFFSET_SLOT_SIZE  + SIZEOF_SLOT_SIZE;
     static final short OFFSET_SLOT_CHAIN = OFFSET_SLOT_LIMIT + SIZEOF_SLOT_LIMIT;
     static final short OFFSET_OBJECT_NDX = OFFSET_SLOT_CHAIN + SIZEOF_SLOT_INDEX;
-    static final short OFFSET_COMMIT_CTR = OFFSET_OBJECT_NDX + SIZEOF_SLOT_INDEX;
+    static final short OFFSET_ROOT_IDS   = OFFSET_OBJECT_NDX + SIZEOF_SLOT_INDEX;
+    static final short OFFSET_COMMIT_CTR = OFFSET_ROOT_IDS   + SIZEOF_ROOT_IDS;
     static final short OFFSET_TIMESTAMP1 = OFFSET_COMMIT_CTR + Bytes.SIZEOF_LONG;
     static final short SIZEOF_ROOT_BLOCK = OFFSET_TIMESTAMP1 + SIZEOF_TIMESTAMP;
 
@@ -144,9 +147,12 @@ public class RootBlockView implements IRootBlockView {
      *            journal. For an existing journal, the value should be
      *            incremented by ONE (1) each time the root block is written (as
      *            part of a commit naturally).
+     * @param rootIds
+     *            An array of int32 root ids.
      */
     RootBlockView(boolean rootBlock0, long segmentId, int slotSize,
-            int slotLimit, int slotChain, int objectIndex, long commitCounter) {
+            int slotLimit, int slotChain, int objectIndex, long commitCounter,
+            int[] rootIds) {
 
         if (slotSize < Journal.MIN_SLOT_SIZE)
             throw new IllegalArgumentException();
@@ -157,6 +163,8 @@ public class RootBlockView implements IRootBlockView {
         if (objectIndex < 0 || objectIndex >= slotLimit)
             throw new IllegalArgumentException();
         if (commitCounter < 0 || commitCounter == Long.MAX_VALUE )
+            throw new IllegalArgumentException();
+        if( rootIds == null || rootIds.length != MAX_ROOT_ID ) 
             throw new IllegalArgumentException();
         
         buf = ByteBuffer.allocate(SIZEOF_ROOT_BLOCK);
@@ -172,6 +180,9 @@ public class RootBlockView implements IRootBlockView {
         buf.putInt(slotLimit);
         buf.putInt(slotChain);
         buf.putInt(objectIndex);
+        for (int i = 0; i < MAX_ROOT_ID; i++) {
+            buf.putInt(rootIds[i]);
+        }
         buf.putLong(commitCounter);
         buf.putLong(timestamp);
 
@@ -193,7 +204,6 @@ public class RootBlockView implements IRootBlockView {
     /**
      * Create a new read-only view of the region of the supplied buffer from its
      * current position to its current limit.
-     * 
      * 
      * @param rootBlock0
      *            There are two root blocks and they are written in an
@@ -265,6 +275,33 @@ public class RootBlockView implements IRootBlockView {
         
     }
 
+    public int getRootId(int index) {
+        
+        if( index < 0 || index > MAX_ROOT_ID ) {
+            
+            throw new IndexOutOfBoundsException("index=" + index
+                    + " must be in [0:" + (MAX_ROOT_ID - 1) + "]");
+            
+        }
+        
+        return buf.getInt(OFFSET_ROOT_IDS + index * SIZEOF_SLOT_INDEX);
+        
+    }
+
+    public int[] getRootIds() {
+        
+       int[] rootIds = new int[MAX_ROOT_ID]; 
+       
+       for( int i=0; i<MAX_ROOT_ID; i++ ) {
+           
+           rootIds[ i ] = buf.getInt(OFFSET_ROOT_IDS + i * SIZEOF_SLOT_INDEX);
+           
+       }
+       
+       return rootIds;
+       
+    }
+    
     public long getCommitCounter() {
         
         return buf.getLong(OFFSET_COMMIT_CTR);

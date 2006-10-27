@@ -77,6 +77,8 @@ import java.util.Random;
  *       advisory file locking mechanism). This is not used for the
  *       memory-mapped mode, but it is used for both "Direct" and "Disk" modes.
  * 
+ * @todo test for correct detection of a "full" journal.
+ * 
  * @todo test ability to extend the journal.
  * 
  * @todo test ability to compact and truncate the journal. Compaction moves
@@ -261,6 +263,75 @@ public class TestJournal extends ProxyTestCase {
 //        
 //    }
 
+    /**
+     * Correct rejection tests for persistent identifiers (must be positive
+     * integers).
+     */
+    public void test_ids_correctRejection() throws IOException {
+        
+        final Properties properties = getProperties();
+        
+        final String filename = getTestJournalFile();
+        
+        properties.setProperty("file",filename);
+        properties.setProperty("slotSize","128");
+
+        try {
+            
+            Journal journal = new Journal(properties);
+
+            try {
+                journal.write(0,getRandomData(journal));
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+            try {
+                journal.write(-1,getRandomData(journal));
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                journal.read(0,null);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                journal.read(-1,null);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                journal.delete(0);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            try {
+                journal.delete(-1);
+                fail("Expecting: "+IllegalArgumentException.class);
+            } catch(IllegalArgumentException ex ) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            journal.close();
+            
+        } finally {
+
+            deleteTestJournalFile(filename);
+            
+        }
+
+    }
+    
     //
     // Under one slot.
     //

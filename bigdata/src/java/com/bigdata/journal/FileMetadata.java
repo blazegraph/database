@@ -407,10 +407,13 @@ class FileMetadata {
              * block are then written into their locations in the file.
              */
             final long commitCounter = 0L;
+            int[] rootIds = new int[ RootBlockView.MAX_ROOT_ID ];
             IRootBlockView rootBlock0 = new RootBlockView(true, segment,
-                    slotSize, slotLimit, slotChain, objectIndex, commitCounter);
+                    slotSize, slotLimit, slotChain, objectIndex, commitCounter,
+                    rootIds );
             IRootBlockView rootBlock1 = new RootBlockView(false, segment,
-                    slotSize, slotLimit, slotChain, objectIndex, commitCounter );
+                    slotSize, slotLimit, slotChain, objectIndex, commitCounter,
+                    rootIds );
             FileChannel channel = raf.getChannel();
             channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
             channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);

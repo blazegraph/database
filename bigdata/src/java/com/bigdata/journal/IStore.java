@@ -85,6 +85,9 @@ public interface IStore {
      *                caller MUST NOT read through to the database if the data
      *                were deleted.
      * 
+     * @exception IllegalArgumentException
+     *                if the persistent identifier is non-positive (0 is treated
+     *                as a null).
      * @exception IllegalStateException
      *                if the store is not open.
      * @exception IllegalStateException
@@ -104,9 +107,11 @@ public interface IStore {
      *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
      *            will be written. The position will be advanced to the limit.
      * 
+     * @exception IllegalArgumentException
+     *                if the persistent identifier is non-positive (0 is treated
+     *                as a null).
      * @exception DataDeletedException
      *                if the persistent identifier is deleted.
-     * 
      * @exception IllegalStateException
      *                if the store is not open.
      * @exception IllegalStateException
@@ -124,6 +129,9 @@ public interface IStore {
      * @exception DataDeletedException
      *                if the persistent identifier is already deleted.
      *                
+     * @exception IllegalArgumentException
+     *                if the persistent identifier is non-positive (0 is treated
+     *                as a null).
      * @exception IllegalStateException
      *                if the store is not open.
      * @exception IllegalStateException

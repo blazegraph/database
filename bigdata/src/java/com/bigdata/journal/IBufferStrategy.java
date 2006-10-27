@@ -66,7 +66,7 @@ public interface IBufferStrategy {
     /**
      * The #of bytes of data that fit in each slot.
      */
-    public int getSlotDataSize();
+    public int getSlotSize();
     
     /**
      * The current size of the journal in bytes.
