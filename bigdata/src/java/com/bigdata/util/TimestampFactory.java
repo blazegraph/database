@@ -45,7 +45,7 @@ Modifications:
  * Created on Oct 26, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.util;
 
 /**
  * Timestamp factory class.

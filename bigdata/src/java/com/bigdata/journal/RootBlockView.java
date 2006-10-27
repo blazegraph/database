@@ -49,13 +49,15 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.util.TimestampFactory;
+
 /**
  * A view onto a root block of the {@link Journal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Add metadata field for interesting counters to the root block, e.g.:
+ * @todo Add metadata fields for interesting counters to the root block, e.g.:
  *       the #of non-deleted objects on the journal (so that we know whether or
  *       not it is empty), the depth of the object index, the #of free slots,
  *       etc. Since this is a bit wide open, there may be some evolution in both
@@ -63,6 +65,10 @@ import java.nio.ByteBuffer;
  *       get locked down at some point. Verify that we can version the Journal
  *       safely so as to be able to read and write journals that have an older
  *       root block format.
+ * 
+ * @todo Add an array of root ids? We can then assign indices into the array to
+ *       application level objects. The core journal objects should have ids (or
+ *       slot allocations) in the root but outside of the "user space" root ids.
  * 
  * FIXME Add a field for the last transaction identifier to commit on the
  * journal. As long as the globally assigned transaction identifiers are

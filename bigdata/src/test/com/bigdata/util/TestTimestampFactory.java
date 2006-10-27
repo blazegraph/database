@@ -45,7 +45,9 @@ Modifications:
  * Created on Oct 26, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.util;
+
+import com.bigdata.util.TimestampFactory;
 
 import junit.framework.TestCase;
 

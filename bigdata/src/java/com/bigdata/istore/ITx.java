@@ -48,17 +48,35 @@ Modifications:
 package com.bigdata.istore;
 
 /**
- * A transactional operation on a store.
+ * A transactional object manager.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo The reason to expose prepare separately at the application level is so
+ *       that distributed hybrid transactions may be implementation.  However, 
+ *       that is a sticky wicket and we are better off with commit implictly
+ *       preparing the transaction for now.
  */
-public interface ITx extends IStore {
+public interface ITx extends IOM {
     
-    public void prepare();
-    
+//    public void prepare();
+  
+    /**
+     * Commit the transaction.
+     */
     public void commit();
     
+    /**
+     * Abort the transaction.
+     */
     public void abort();
 
+    /**
+     * The object manager from which the transaction was started.
+     * 
+     * @return
+     */
+    public IOM getRootObjectManager();
+    
 }

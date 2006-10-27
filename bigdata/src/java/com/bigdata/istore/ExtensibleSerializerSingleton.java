@@ -44,14 +44,16 @@ Modifications:
 /*
  * Created on Nov 4, 2005
  */
-package com.bigdata.journal;
+package com.bigdata.istore;
 
 import org.CognitiveWeb.extser.AbstractSingleton;
+
+import com.bigdata.journal.Journal;
 
 /**
  * <p>
  * Stateless singleton seralizer wrapping the semantics of the {@link
- * ExtensibleSerializer} serializer. The use of this class prevents multiple
+ * OMExtensibleSerializer} serializer. The use of this class prevents multiple
  * copies of the state of the extensible serializer from being written into the
  * store.
  * </p>
@@ -66,17 +68,17 @@ public class ExtensibleSerializerSingleton
 
     private static final long serialVersionUID = -374435143615477216L;
 
-    public ExtensibleSerializer getSerializer( Journal journal )
+    public OMExtensibleSerializer getSerializer( Journal journal )
         throws IllegalStateException
     {
         
-        return (ExtensibleSerializer) super.getSerializer
+        return (OMExtensibleSerializer) super.getSerializer
             ( journal
               );
         
     }
 
-    public void setSerializer( Journal journal, ExtensibleSerializer ser )
+    public void setSerializer( Journal journal, OMExtensibleSerializer ser )
         throws IllegalStateException
     {
 

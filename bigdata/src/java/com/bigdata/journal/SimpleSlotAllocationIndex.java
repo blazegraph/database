@@ -253,7 +253,7 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
             
             _nextSlot = allocated.nextClearBit( FIRST_SLOT );
             
-            if( _nextSlot == slotLimit ) {
+            if( _nextSlot >= slotLimit ) {
 
                 // The journal is full.
                 throw new IllegalStateException("Journal is full");

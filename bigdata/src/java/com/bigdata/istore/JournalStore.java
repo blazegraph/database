@@ -2,25 +2,26 @@ package com.bigdata.istore;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 
 import org.CognitiveWeb.bigdata.OId;
 
-import com.bigdata.journal.ExtensibleSerializer;
+import com.bigdata.journal.DataDeletedException;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.TimestampFactory;
 import com.bigdata.journal.Tx;
+import com.bigdata.util.TimestampFactory;
 
 /**
- * Hacked test class exposing the {@link IStore} interface backed by a
+ * Hacked test class exposing the {@link IOM} interface backed by a
  * {@link Journal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Support notion of transactions on {@link IStore}. In fact, the problem
+ * @todo Support notion of transactions on {@link IOM}. In fact, the problem
  *       is more like supporting unisolated operations.
  * 
- * @todo Refine the {@link IStore} API. There is a distinction between what is
+ * @todo Refine the {@link IOM} API. There is a distinction between what is
  *       good for the store and what is good for applications. For example, are
  *       the raw operations on byte[], ByteBuffer, or Object using extSer?
  * 
@@ -37,61 +38,50 @@ import com.bigdata.journal.Tx;
  * 
  * @todo Hook up and debug the btree integration.
  * 
- * @todo Hook this up to GOM and test performance with the various journal
+ * @todo Hook this up to GOM and test performance with the various _journal
  *       backends.
  * 
  * @todo Consider disallowing unisolated store operations (by removing the
- *       IStore interface or simply moving the CRUD operations into ITx).
+ *       IOM interface or simply moving the CRUD operations into ITx).
  */
 public class JournalStore implements IStore {
 
     /**
      * The backing store.
      */
-    private final Journal journal;
+    private final Journal _journal;
+    
+    /**
+     * The unisolated object manager.
+     */
+    private final IOM _om;
 
     /**
      * The next persistent identifier to be assigned.
      *  
      * @todo This is not restart safe.
      */
-    private long nextId = 1;
+    private long _nextId = 1;
 
-    // @todo probably synchronous or block up ids by tx, etc.
+    // @todo probably synchronous _definately_ atomic, could block up ids by tx,
+    // etc.
     protected long nextId() {
 
-        return nextId++;
+        return _nextId++;
 
     }
 
-    /**
-     * 
-     * @todo Make this more flexible in terms of a service vs a static
-     *       instance (for journal only to support the object index) vs true
-     *       extensibility (for an embedded database). The extser state
-     *       should only be shared with the journal's internal extser state
-     *       when the journal is used as an embedded database without an
-     *       external read-optimized segment. In every other case (and
-     *       probably simply in every case) the journal's internal extser
-     *       state should be considered private.
-     * 
-     * @return
-     */
-    public ExtensibleSerializer getExtensibleSerializer() {
+    public JournalStore(Properties properties) throws IOException {
 
-        return journal.getExtensibleSerializer();
-
-    }
-
-    public JournalStore(Journal journal) {
-
-        this.journal = journal;
+        this._journal = new Journal(properties);
+        
+        this._om = new OM(this,_journal);
 
     }
 
     public void close() {
 
-        journal.close();
+        _journal.close();
 
     }
 
@@ -105,10 +95,10 @@ public class JournalStore implements IStore {
      * @return The int32 within segment persistent identifier.
      * 
      * @todo The conversions between int64 bigdata identifiers and int32
-     *       within segment journal identifiers are hacked. The code
-     *       presumes that the journal is segment0 and just uses casting. It
+     *       within segment _journal identifiers are hacked. The code
+     *       presumes that the _journal is segment0 and just uses casting. It
      *       does not verify that the int64 identifier actually addresses
-     *       the segment covered by the journal. Further, there are no test
+     *       the segment covered by the _journal. Further, there are no test
      *       cases. We should probably be using IOI and {@link OId}.
      */
     private int getId(long id) {
@@ -132,75 +122,149 @@ public class JournalStore implements IStore {
     //            
     //        }
 
-    public long insert(Object obj) {
+    public IOM getObjectManager() {
+        
+        return _om;
+        
+    }
+    
+    public boolean isOpen() {
+        
+        return _journal.isOpen();
+        
+    }
+    
+    static class OM implements IOM {
+        
+        private final IStore store;
+        private final Journal journal;
 
-        long id = nextId();
+        // FIXME This is NOT restart safe :-)
+        final private OMExtensibleSerializer _extSer;
+        
+        OM(IStore store,Journal journal) {
+        
+            assert store != null;
 
-        try {
+            assert journal != null;
+            
+            this.store = store;
+            
+            this.journal = journal;
+            
+            _extSer = new OMExtensibleSerializer(this);
 
-            journal.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
-                    .serialize(0, obj)));
+        }
+        
+        // @todo place _nextId on an abstract class: AbstractStore?
+        private long nextId() {
 
-        } catch (IOException ex) {
+            return ((JournalStore)store).nextId();
 
-            throw new RuntimeException(ex);
+        }
+        
+        // @todo place getId on an abstract class: AbstractStore?
+        private int getId(long id) {
+            
+            return ((JournalStore)store).getId(id);
+            
+        }
+
+        /**
+         * FIXME This is NOT restart safe. We need to store the state on the
+         * _journal and cache the location of the state in the root block.
+         * 
+         * FIXME In order to support transactions, we will need to be able to
+         * wrap the extser instance with one that resolves the IOM of the tx
+         * rather than the unisolated IOM.
+         * 
+         * FIXME Make this more flexible in terms of a service vs a static
+         * instance (for _journal only to support the object index) vs true
+         * extensibility (for an embedded database).
+         * 
+         * @return
+         */
+        public OMExtensibleSerializer getExtensibleSerializer() {
+
+            return _extSer;
+
+        }
+        
+        public long insert(Object obj) {
+
+            long id = nextId();
+
+            try {
+
+                journal.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
+                        .serialize(0, obj)));
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            return id;
 
         }
 
-        return id;
+        public Object read(long id) {
 
-    }
+            try {
 
-    public Object read(long id) {
+                return getExtensibleSerializer().deserialize(id,
+                        journal.read(getId(id), null).array());
 
-        try {
+            } catch (IOException ex) {
 
-            return getExtensibleSerializer().deserialize(id,
-                    journal.read(getId(id), null).array());
+                throw new RuntimeException(ex);
 
-        } catch (IOException ex) {
+            } catch( DataDeletedException ex ) {
+                
+                return null;
+                
+            }
 
-            throw new RuntimeException(ex);
+        }
+
+        public void update(long id, Object obj) {
+
+            try {
+
+                journal.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
+                        .serialize(id, obj)));
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+
+        public void delete(long id) {
+
+            journal.delete(getId(id));
 
         }
 
     }
-
-    public void update(long id, Object obj) {
-
-        try {
-
-            journal.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
-                    .serialize(id, obj)));
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    public void delete(long id) {
-
-        journal.delete(getId(id));
-
-    }
-
+    
     /**
      * FIXME Abstract and integrate with a transaction service. When this is a
      * distributed database, this should start a distributed transaction.
      */
     public ITx startTx() {
 
-        return new StoreTx(this, new Tx(journal, TimestampFactory
+        return new OMTx(this, new Tx(_journal, TimestampFactory
                 .nextNanoTime()));
 
     }
 
     //      public InputStream getInputStream(long id) {
     //      
-    //      ByteBuffer tmp = journal.read(getId(id), null);
+    //      ByteBuffer tmp = _journal.read(getId(id), null);
     //      
     //      return new ByteArrayInputStream(tmp.array());
     //      
@@ -218,13 +282,15 @@ public class JournalStore implements IStore {
     //      
     //  }
 
-    static class StoreTx implements ITx {
+    static class OMTx implements ITx {
 
-        private final JournalStore store;
+        private final IStore store;
 
         private final Tx tx;
+        
+        private final TxExtensibleSerializer extser;
 
-        StoreTx(JournalStore store, Tx tx) {
+        OMTx(IStore store, Tx tx) {
 
             assert store != null;
 
@@ -234,6 +300,43 @@ public class JournalStore implements IStore {
 
             this.tx = tx;
 
+            this.extser = new TxExtensibleSerializer(this,
+                    (OMExtensibleSerializer) store.getObjectManager()
+                            .getExtensibleSerializer());
+            
+        }
+
+        // @todo place _nextId on an abstract class: AbstractStore?
+        private long nextId() {
+
+            return ((JournalStore)store).nextId();
+
+        }
+        
+        // @todo place getId on an abstract class: AbstractStore?
+        private int getId(long id) {
+            
+            return ((JournalStore)store).getId(id);
+            
+        }
+        
+        public IOM getRootObjectManager() {
+            
+            return store.getObjectManager();
+            
+        }
+        
+        /**
+         * @todo Non-transactional, cached, immutable writes _and_ wraps the ITx
+         *       so that deserialization has access to both the oid and the
+         *       transactional object manager context.
+         * 
+         * @return
+         */
+        public IOMExtensibleSerializer getExtensibleSerializer() {
+            
+            return extser;
+            
         }
 
         public void abort() {
@@ -244,24 +347,20 @@ public class JournalStore implements IStore {
 
         public void commit() {
 
-            tx.commit();
-
-        }
-
-        public void prepare() {
-
             tx.prepare();
+            
+            tx.commit();
 
         }
 
         public long insert(Object obj) {
 
-            long id = store.nextId();
+            long id = nextId();
 
             try {
 
-                tx.write(store.getId(id), ByteBuffer.wrap(store
-                        .getExtensibleSerializer().serialize(0, obj)));
+                tx.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
+                        .serialize(0, obj)));
 
             } catch (IOException ex) {
 
@@ -277,8 +376,8 @@ public class JournalStore implements IStore {
 
             try {
 
-                return store.getExtensibleSerializer().deserialize(id,
-                        tx.read(store.getId(id), null).array());
+                return getExtensibleSerializer().deserialize(id,
+                        tx.read(getId(id), null).array());
 
             } catch (IOException ex) {
 
@@ -292,8 +391,8 @@ public class JournalStore implements IStore {
 
             try {
 
-                tx.write(store.getId(id), ByteBuffer.wrap(store
-                        .getExtensibleSerializer().serialize(id, obj)));
+                tx.write(getId(id), ByteBuffer.wrap(getExtensibleSerializer()
+                        .serialize(id, obj)));
 
             } catch (IOException ex) {
 
@@ -305,7 +404,7 @@ public class JournalStore implements IStore {
 
         public void delete(long id) {
 
-            tx.delete(store.getId(id));
+            tx.delete(getId(id));
 
         }
 

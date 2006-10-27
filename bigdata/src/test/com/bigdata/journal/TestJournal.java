@@ -202,64 +202,64 @@ public class TestJournal extends ProxyTestCase {
         
     }
     
-    /**
-     * Test of low-level non-isolated read, write, update, delete operations on
-     * objects using the journal and the extSer package. These operations work
-     * directly with slot allocations and do not use the object index. (In fact,
-     * the object index uses these operations itself to store its nodes on the
-     * journal.) It is not possible to test for a "not found" condition here
-     * since a READ just appends the data from the slots into a buffer - you can
-     * read anything this way, but the data may not be what you want. It also
-     * does not make sense to test for the state of the old data following a
-     * write or delete since the data will be unchanged until someone comes
-     * along to overwrite them.
-     * 
-     * @todo Do variant tests of a persistence capable object index (actually,
-     *       this will need to be its own test suite).
-     */
-    public void test_lowLevelObjectCrud() throws IOException {
-        
-        final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
-
-        try {
-
-            Journal journal = new Journal(properties);
-
-            final Object expected0 = "expected0";
-            final Object expected1 = "expected1";
-            final Object expected2 = "expected2";
-            
-            // write on the journal (aka insert).
-            final long id0 = journal._insertObject(expected0);
-
-            assertEquals(expected0,journal._readObject(id0));
-
-            // update.
-            final long id1 = journal._updateObject(id0, expected1);
-            
-            assertEquals(expected1,journal._readObject(id1));
-            
-            // update.
-            final long id2 = journal._updateObject(id1, expected2);
-
-            assertEquals(expected2,journal._readObject(id2));
-            
-            // delete.
-            journal._deleteObject(id2);
-            
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile(filename);
-
-        }
-        
-    }
+//    /**
+//     * Test of low-level non-isolated read, write, update, delete operations on
+//     * objects using the journal and the extSer package. These operations work
+//     * directly with slot allocations and do not use the object index. (In fact,
+//     * the object index uses these operations itself to store its nodes on the
+//     * journal.) It is not possible to test for a "not found" condition here
+//     * since a READ just appends the data from the slots into a buffer - you can
+//     * read anything this way, but the data may not be what you want. It also
+//     * does not make sense to test for the state of the old data following a
+//     * write or delete since the data will be unchanged until someone comes
+//     * along to overwrite them.
+//     * 
+//     * @todo Do variant tests of a persistence capable object index (actually,
+//     *       this will need to be its own test suite).
+//     */
+//    public void test_lowLevelObjectCrud() throws IOException {
+//        
+//        final Properties properties = getProperties();
+//
+//        final String filename = getTestJournalFile();
+//
+//        properties.setProperty("file", filename);
+//
+//        try {
+//
+//            Journal journal = new Journal(properties);
+//
+//            final Object expected0 = "expected0";
+//            final Object expected1 = "expected1";
+//            final Object expected2 = "expected2";
+//            
+//            // write on the journal (aka insert).
+//            final long id0 = journal._insertObject(expected0);
+//
+//            assertEquals(expected0,journal._readObject(id0));
+//
+//            // update.
+//            final long id1 = journal._updateObject(id0, expected1);
+//            
+//            assertEquals(expected1,journal._readObject(id1));
+//            
+//            // update.
+//            final long id2 = journal._updateObject(id1, expected2);
+//
+//            assertEquals(expected2,journal._readObject(id2));
+//            
+//            // delete.
+//            journal._deleteObject(id2);
+//            
+//            journal.close();
+//
+//        } finally {
+//
+//            deleteTestJournalFile(filename);
+//
+//        }
+//        
+//    }
 
     //
     // Under one slot.

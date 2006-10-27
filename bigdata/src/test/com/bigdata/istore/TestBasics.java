@@ -51,9 +51,6 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
-
-import com.bigdata.journal.Journal;
-
 /**
  * Rudiments of a test suite for the bigdata client API.
  * 
@@ -80,7 +77,7 @@ public class TestBasics extends TestCase {
         super(arg0);
     }
 
-    JournalStore store;
+    IStore store;
     
     public void setUp() throws Exception {
 
@@ -89,53 +86,55 @@ public class TestBasics extends TestCase {
         properties.setProperty("bufferMode","transient");
 //        properties.setProperty("segmentId","0");
         
-        Journal journal = new Journal(properties);
-
-        store = new JournalStore( journal );
+        store = new JournalStore( properties );
         
     }
 
     public void tearDown() throws Exception {
 
-        // NOP since the journal is transient.
+        store.close();
         
     }
 
     /**
+     * Basic CRUD without transactional isolation.
+     * 
      * @todo modify to test for "not found" and "deleted" semantics. Those
      *       depend on whether or not transactions have been GC'd.  The store
      *       API needs a transaction service that is responsible for notifying
      *       the segments when transactions can be GC'd.
      */
     public void test_crud() {
-        
+
         final Object expected0 = "expected0";
         final Object expected1 = "expected1";
         final Object expected2 = "expected2";
+
+        IOM om = store.getObjectManager();
         
         // insert.
-        final long id0 = store.insert(expected0);
+        final long id0 = om.insert(expected0);
 
-        assertEquals(expected0,store.read(id0));
+        assertEquals(expected0,om.read(id0));
 
         // update.
-        store.update(id0, expected1);
+        om.update(id0, expected1);
         
-        assertEquals(expected1,store.read(id0));
+        assertEquals(expected1,om.read(id0));
         
         // update.
-        store.update(id0, expected2);
+        om.update(id0, expected2);
 
-        assertEquals(expected2,store.read(id0));
+        assertEquals(expected2,om.read(id0));
         
         // delete.
-        store.delete(id0);
-        
-        store.close();
+        om.delete(id0);
 
     }
 
     /**
+     * Basic CRUD with transactional isolation.
+     * 
      * @todo expand to verify isolation.
      * @todo expand to test read after commit.
      * @todo expand to test restart.
@@ -166,11 +165,7 @@ public class TestBasics extends TestCase {
         // delete.
         tx.delete(id0);
         
-        tx.prepare();
-        
         tx.commit();
-        
-        store.close();
 
     }
 

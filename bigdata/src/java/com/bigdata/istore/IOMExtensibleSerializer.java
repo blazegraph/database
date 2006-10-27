@@ -47,38 +47,40 @@ Modifications:
 
 package com.bigdata.istore;
 
+import java.io.IOException;
+
+import org.CognitiveWeb.extser.IExtensibleSerializer;
+
 /**
- * A persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
+public interface IOMExtensibleSerializer {
 
     /**
-     * Return an unisolated object manager.
+     * The object manager.
      * 
      * @return
-     * 
-     * @todo Optional operation?  Drop completely?
      */
     public IOM getObjectManager();
     
     /**
-     * Return a new object manager with transactional isolation.
-     * 
-     * @return
+     * @todo there is something NOT good about the interface hierarchy here. We
+     *       have to declare these methods so that the
+     *       {@link TxExtensibleSerializer} can expose them as well. However,
+     *       the {@link OMExtensibleSerializer} is really using the methods
+     *       declared by {@link IExtensibleSerializer}. This just looks bad in
+     *       Java which is not known for letting you mask methods in multiple
+     *       inheritance. I think that the answer lies in creating a divide in
+     *       extser itself between the service (managing persistent state of the
+     *       classIds and versioned serializers) and the local behavior
+     *       (serializing and deserializing and caching the remote state).
      */
-    public ITx startTx();
+    public byte[] serialize( long oid, Object obj )
+    throws IOException;
     
-    /**
-     * Shutdown the store.
-     */
-    public void close();
+    public Object deserialize( long oid, byte[] serialized )
+    throws IOException;
 
-    /**
-     * True iff the store is open.
-     */
-    public boolean isOpen();
-    
 }

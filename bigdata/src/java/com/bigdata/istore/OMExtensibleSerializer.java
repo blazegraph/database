@@ -45,7 +45,7 @@ Modifications:
  * Created on Oct 22, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.istore;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -63,6 +63,16 @@ import org.CognitiveWeb.extser.LongPacker;
  * @see ExtensibleSerializerSingleton
  * 
  * @author thompsonbry
+ * 
+ * FIXME This does not handle transactional isolation. The extser state must be
+ * store global, highly concurrent and restart safe. Ergo, it really needs to be
+ * a service apart from the persistence store.  If it is necessary to realize 
+ * within an embedded store and for use by that embedded store, then it seems
+ * that the embedded database needs to provide specially for the extser state
+ * using low-level operations.  I suppose that we could get away with validating
+ * conflicts by re-serializing objects using corrected classId assignments, but
+ * extser by design should probably never expose a classId that would then have
+ * to be retracted. 
  * 
  * FIXME This implementation is NOT restart safe.
  * 
@@ -89,115 +99,85 @@ import org.CognitiveWeb.extser.LongPacker;
  * @todo Provide for registration of several classes or versions at once?
  */
 
-public class ExtensibleSerializer
+public class OMExtensibleSerializer
    extends AbstractExtensibleSerializer
+   implements IOMExtensibleSerializer
 {
 
     private static final long serialVersionUID = -62406796750184962L;
 
-    /**
-     * A reference to the {@link Journal}.
-     */
-    transient private Journal m_recman;
+    transient private IOM m_om;
 
-    /**
-     * The recid of this serializer.
-     */
-    transient private long m_recid;
+//    /**
+//     * The recid of this serializer.
+//     */
+//    transient private long m_recid;
     
     /**
-     * Return the record manager.
+     * The object manager. When used in a transactional context, this will be a
+     * transactional object manager.
+     * 
+     * @return The object manager.
      */
-    public Journal getJournal()
+    public IOM getObjectManager()
     {
      
-        return m_recman;
+        return m_om;
         
     }
 
-    /**
-     * Return the logical row id of this serializer.
-     */
-    public long getRecid()
-    {
-        return m_recid;
-    }
+//    /**
+//     * Return the logical row id of this serializer.
+//     */
+//    public long getRecid()
+//    {
+//        return m_recid;
+//    }
 
     /**
      * Deserialization constructor.
      */
     
-    public ExtensibleSerializer()
+    public OMExtensibleSerializer()
     {
         super();
     }
-    
-    /**
-     * Create a new instance an insert it into the store.
-     * 
-     * @param journal
-     *            The journal.
-     * @return The new instance.
-     */
-    public static ExtensibleSerializer createInstance( Journal journal )
-    {
-        ExtensibleSerializer ser = new ExtensibleSerializer();
-        ser.m_recman = journal;
-//        ser.m_recid = recman.insert
-//            ( ser,
-//              DefaultSerializer.INSTANCE
-//              );
-        ser.registerSerializers(); // register serializers.
-        return ser;
+
+    public OMExtensibleSerializer(IOM om) {
+        
+        m_om = om;
+
+        setupSerializers();
+        
     }
 
-//    /**
-//     * Load an existing instance from the store.
-//     * 
-//     * @param recman
-//     * @param recid
-//     * @return
-//     */
-//    
-//    public static ExtensibleSerializer load( RecordManager recman, long recid )
-//    	throws IOException
-//    {
-//        ExtensibleSerializer ser = (ExtensibleSerializer) recman.fetch
-//            ( recid,
-//              DefaultSerializer.INSTANCE
-//              );
-//        ser.m_recman = recman;
-//        ser.m_recid = recid;
-//        return ser;
-//    }
-    
     synchronized protected void update()
     {
 
-//        m_recman.update
+//        m_om.update
 //		( m_recid,
 //		  this,
 //		  DefaultSerializer.INSTANCE
 //		  );
         
 //        System.err.println
-//		( "Updated state: #classes="+getClassCount()+", m_recid="+m_recid+", m_recman="+m_recman
+//		( "Updated state: #classes="+getClassCount()+", m_recid="+m_recid+", m_om="+m_om
 //		  );
         
     }
 
-    // @todo implement.
-    public ISerializer getSerializer( long serializerId ) {
+    public ISerializer getSerializer( long oid ) {
 
-        throw new UnsupportedOperationException();
-        
-//        return (ISerializer) getJournal().fetch( serializerId );
+        return (ISerializer) m_om.read(oid);
         
     }
 
     /**
      * Extends the default behavior to also register serializers for the classes
      * with persistent state.
+     * 
+     * @todo This should be done by the extser service, not the instances that
+     *       connect to that service.
      */
     
     protected void setupSerializers()
@@ -206,12 +186,12 @@ public class ExtensibleSerializer
         // extend default behavior.
         super.setupSerializers();
         
-//        _registerClass(com.bigdata.btree.BTree.class,
-//                com.bigdata.btree.BTree.Serializer0.class, (short) 0,
-//                false);
-//        _registerClass(com.bigdata.btree.BPage.class,
-//                com.bigdata.btree.BPage.Serializer0.class, (short) 0,
-//                false);
+        _registerClass(com.bigdata.btree.BTree.class,
+                com.bigdata.btree.BTree.Serializer0.class, (short) 0,
+                false);
+        _registerClass(com.bigdata.btree.BPage.class,
+                com.bigdata.btree.BPage.Serializer0.class, (short) 0,
+                false);
 	
         // @todo ??? HashMap is used for the named object directory, so
         // we pre-register a classId for it now.

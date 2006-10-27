@@ -147,6 +147,9 @@ import java.util.Properties;
  * transactions.</li>
  * <li> Migration of data to a read-optimized database (have to implement the
  * read-optimized database as well).</li>
+ * <li> Testing of an "embedded database" using both a journal only and a
+ * journal + read-optimized database design. This can be tested up to the GPO
+ * layer.</li>
  * <li>Support primary key indices in GPO/PO layer.</li>
  * <li>Implement forward validation and state-based conflict resolution with
  * custom merge rules for persistent objects, generic objects, and primary key
@@ -258,6 +261,24 @@ import java.util.Properties;
  * commit states need to be locatable on the journal, suggesting a record
  * written by PREPARE and finalized by COMMIT.
  * 
+ * FIXME I need to work through the conditional deallocation of slots using a
+ * persistence capable slot allocation before putting more effort into a
+ * persistence capable object index. I can do that by working through making the
+ * store restart safe, even if the object index is a full serialization of a
+ * hash table rather than incremental updates of a persistent btree. The commit
+ * time will suck, but it will provide the design for conditional deallocation
+ * and restart.
+ * 
+ * FIXME Do we need extser at all in the journal proper? The object index can
+ * not use it since it needs fixed size allocations. The slot allocation index
+ * is a chain (or tree) of slots. The root ids are use an indexed array of int32
+ * values in the root block. There is no notion of named roots at the journal
+ * level (that is an OM feature). There are no general purpose btrees at the
+ * journal level (again, an OM / store feature). An embedded database using the
+ * journal can use extser by storing its state in a data version whose int32 id
+ * is cached in the root block. Since the object index does not depend on
+ * extser, we can use the standard data version mechanism to store its state.
+ * 
  * @todo Do we need to explicitly zero the allocated buffers? Are they already
  *       zeroed? How much do we actually need to write on them before the rest
  *       of the contents do not matter, e.g., just the root blocks?
@@ -314,6 +335,16 @@ import java.util.Properties;
  * @todo Add feature to return the transient journal buffer so that we can do
  *       interesting things with it, including write it to disk with the
  *       appropriate file header and root blocks so that it becomes restartable.
+ * 
+ * @todo Support named objects with transactional isolation. The notional design
+ *       uses a B+Tree behind the scenes. The root of the btree is stored in a
+ *       known location, e.g., the root block of segment0. There can also be
+ *       segment local names. An embedded database would provide only global
+ *       names, and they would be implemented as segment local names. Changes to
+ *       the tree need to be validated. Other than having to store its root in a
+ *       special slot, the tree can use the normal object api and the standard
+ *       btree (vs the specialized object index variant). A short term solution
+ *       can simply use a hash table to store the name : id mapping.
  */
 
 public class Journal implements IStore {
@@ -1135,12 +1166,12 @@ public class Journal implements IStore {
             
         }
 
-        /*
-         * FIXME This is NOT restart safe. We need to store the state on the
-         * journal and cache the location of the state in the root block.
-         */
-
-        _extSer = ExtensibleSerializer.createInstance(this);
+//        /*
+//         * FIXME This is NOT restart safe. We need to store the state on the
+//         * journal and cache the location of the state in the root block.
+//         */
+//
+//        _extSer = ExtensibleSerializer.createInstance(this);
         
     }
     
@@ -1200,6 +1231,12 @@ public class Journal implements IStore {
             throw new IllegalStateException();
 
         }
+        
+    }
+    
+    public boolean isOpen() {
+        
+        return _bufferStrategy.isOpen();
         
     }
     
@@ -1558,6 +1595,8 @@ public class Journal implements IStore {
      *       written. This might be automagically handled by multi-state values
      *       for the slot allocation index entries (deallocated, vs allocated,
      *       vs allocated+commited, vs conditionally-deallocated).
+     * 
+     * @deprecated Is this method required?
      */
     public ISlotAllocation update(ISlotAllocation oldSlots,ByteBuffer data) {
         
@@ -1569,141 +1608,141 @@ public class Journal implements IStore {
         
     }
 
-    /*
-     * Low-level interface for non-isolated reads, writes of objects (vs
-     * ByteBuffer's) using the extensible serialization API.
-     */
-    
-    /**
-     * Write an object on the store (no isolation). This method does NOT use the
-     * object index. The caller MUST explicitly manage the store. Normally this
-     * consists of ensuring that the object is recoverable from metadata in a
-     * root block or a commit record. For example, the {@link IObjectIndex} uses
-     * this method to store its nodes. The root node of the current object index
-     * is stored in the commit record.
-     * 
-     * @param obj
-     *            The object to be inserted into the store (required). The
-     *            object will be serialized using the extSer package.
-     * 
-     * @return The <em>journal local</em> persistent identifier assigned to
-     *         the object. This is simply a compact encoding of the
-     *         {@link ISlotAllocation} on which the object is written.
-     */
-    public long _insertObject(Object obj) {
-
-        if( obj == null ) throw new IllegalArgumentException();
-
-        try {
-
-            return write(
-                ByteBuffer.wrap(getExtensibleSerializer()
-                .serialize(0, obj))).toLong();
-            
-        }
-        
-        catch(IOException ex ) {
-
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-    
-    /**
-     * Fetch an object from the store (no isolation). This operation is
-     * unchecked. As long as the identifier decodes into a
-     * {@link ISlotAllocation} the contents of that slot allocation will be read
-     * into a buffer and an attempt will be made to deserialize the buffer into
-     * an object using the extSer package.
-     * 
-     * @param id
-     *            The <em>journal local</em> persistent identifier for the
-     *            object.
-     * 
-     * @return The object.
-     */
-    public Object _readObject( long id ) {
-    
-        ByteBuffer tmp = read( slotMath.toSlots(id), null );
-
-        try {
-
-            return getExtensibleSerializer().deserialize(id, tmp.array() );
-            
-        }
-        
-        catch(IOException ex ) {
-
-            throw new RuntimeException(ex);
-            
-        }
-
-    }
-    
-    /**
-     * Update an object in the store (no isolation). The object will serialized
-     * using the extSer package and the resulting byte[] will be written onto a
-     * new {@link ISlotAllocation}. That allocation will be converted into a
-     * long integer by {@link SlotMath#toLong(ISlotAllocation)} and the
-     * resulting long integer value is returned to the caller.
-     * 
-     * @param id
-     *            The <em>journal local</em> persistent identifier for the
-     *            current version of the object. The slots allocated to the
-     *            object will be deallocated, releasing the space on the store.
-     *            (This deallocation operation is unchecked. As long as the
-     *            identifier decodes into a {@link ISlotAllocation}, the slot
-     *            allocation will be deallocated.)
-     * 
-     * @param obj
-     *            The object to be written (required).
-     * 
-     * @return The <em>new journal local</em> persistent identifier for that
-     *         object. The new identifier is NOT the same as the old identifier.
-     *         The old identifier MUST now be considered to be invalid. Further
-     *         reads on the old identifier are STRONGLY DISCOURAGED but
-     *         nevertheless unchecked.
-     */
-    public long _updateObject(long id, Object obj) {
-
-        if( obj == null ) throw new IllegalArgumentException();
-        
-        try {
-
-            return update(
-                    slotMath.toSlots(id),
-                    ByteBuffer
-                            .wrap(getExtensibleSerializer().serialize(0, obj)))
-                    .toLong();
-
-        }
-
-        catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    /**
-     * Delete an object from the store (no isolation). The slots allocated to
-     * the object will be deallocated, releasing the space on the store. (This
-     * deallocation operation is unchecked. As long as the identifier decodes
-     * into a {@link ISlotAllocation}, the slot allocation will be
-     * deallocated.)
-     * 
-     * @param id
-     *            The <em>journal local</em> persistent identifier of the
-     *            object.
-     */
-    public void _deleteObject( long id )
-    {
-
-        delete( slotMath.toSlots(id) );
-        
-    }
+//    /*
+//     * Low-level interface for non-isolated reads, writes of objects (vs
+//     * ByteBuffer's) using the extensible serialization API.
+//     */
+//    
+//    /**
+//     * Write an object on the store (no isolation). This method does NOT use the
+//     * object index. The caller MUST explicitly manage the store. Normally this
+//     * consists of ensuring that the object is recoverable from metadata in a
+//     * root block or a commit record. For example, the {@link IObjectIndex} uses
+//     * this method to store its nodes. The root node of the current object index
+//     * is stored in the commit record.
+//     * 
+//     * @param obj
+//     *            The object to be inserted into the store (required). The
+//     *            object will be serialized using the extSer package.
+//     * 
+//     * @return The <em>journal local</em> persistent identifier assigned to
+//     *         the object. This is simply a compact encoding of the
+//     *         {@link ISlotAllocation} on which the object is written.
+//     */
+//    public long _insertObject(Object obj) {
+//
+//        if( obj == null ) throw new IllegalArgumentException();
+//
+//        try {
+//
+//            return write(
+//                ByteBuffer.wrap(getExtensibleSerializer()
+//                .serialize(0, obj))).toLong();
+//            
+//        }
+//        
+//        catch(IOException ex ) {
+//
+//            throw new RuntimeException(ex);
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Fetch an object from the store (no isolation). This operation is
+//     * unchecked. As long as the identifier decodes into a
+//     * {@link ISlotAllocation} the contents of that slot allocation will be read
+//     * into a buffer and an attempt will be made to deserialize the buffer into
+//     * an object using the extSer package.
+//     * 
+//     * @param id
+//     *            The <em>journal local</em> persistent identifier for the
+//     *            object.
+//     * 
+//     * @return The object.
+//     */
+//    public Object _readObject( long id ) {
+//    
+//        ByteBuffer tmp = read( slotMath.toSlots(id), null );
+//
+//        try {
+//
+//            return getExtensibleSerializer().deserialize(id, tmp.array() );
+//            
+//        }
+//        
+//        catch(IOException ex ) {
+//
+//            throw new RuntimeException(ex);
+//            
+//        }
+//
+//    }
+//    
+//    /**
+//     * Update an object in the store (no isolation). The object will serialized
+//     * using the extSer package and the resulting byte[] will be written onto a
+//     * new {@link ISlotAllocation}. That allocation will be converted into a
+//     * long integer by {@link SlotMath#toLong(ISlotAllocation)} and the
+//     * resulting long integer value is returned to the caller.
+//     * 
+//     * @param id
+//     *            The <em>journal local</em> persistent identifier for the
+//     *            current version of the object. The slots allocated to the
+//     *            object will be deallocated, releasing the space on the store.
+//     *            (This deallocation operation is unchecked. As long as the
+//     *            identifier decodes into a {@link ISlotAllocation}, the slot
+//     *            allocation will be deallocated.)
+//     * 
+//     * @param obj
+//     *            The object to be written (required).
+//     * 
+//     * @return The <em>new journal local</em> persistent identifier for that
+//     *         object. The new identifier is NOT the same as the old identifier.
+//     *         The old identifier MUST now be considered to be invalid. Further
+//     *         reads on the old identifier are STRONGLY DISCOURAGED but
+//     *         nevertheless unchecked.
+//     */
+//    public long _updateObject(long id, Object obj) {
+//
+//        if( obj == null ) throw new IllegalArgumentException();
+//        
+//        try {
+//
+//            return update(
+//                    slotMath.toSlots(id),
+//                    ByteBuffer
+//                            .wrap(getExtensibleSerializer().serialize(0, obj)))
+//                    .toLong();
+//
+//        }
+//
+//        catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * Delete an object from the store (no isolation). The slots allocated to
+//     * the object will be deallocated, releasing the space on the store. (This
+//     * deallocation operation is unchecked. As long as the identifier decodes
+//     * into a {@link ISlotAllocation}, the slot allocation will be
+//     * deallocated.)
+//     * 
+//     * @param id
+//     *            The <em>journal local</em> persistent identifier of the
+//     *            object.
+//     */
+//    public void _deleteObject( long id )
+//    {
+//
+//        delete( slotMath.toSlots(id) );
+//        
+//    }
 
     /*
      * commit processing support.
@@ -1817,20 +1856,20 @@ public class Journal implements IStore {
         
     }
     
-    /**
-     * FIXME Make this more flexible in terms of a service vs a static instance
-     * (for journal only to support the object index) vs true extensibility (for
-     * an embedded database).
-     * 
-     * @return
-     */
-    public ExtensibleSerializer getExtensibleSerializer() {
-        
-        return _extSer;
-        
-    }
-    
-    // FIXME This is NOT restart safe :-)
-    final private ExtensibleSerializer _extSer;
+//    /**
+//     * FIXME Make this more flexible in terms of a service vs a static instance
+//     * (for journal only to support the object index) vs true extensibility (for
+//     * an embedded database).
+//     * 
+//     * @return
+//     */
+//    public ExtensibleSerializer getExtensibleSerializer() {
+//        
+//        return _extSer;
+//        
+//    }
+//    
+//    // FIXME This is NOT restart safe :-)
+//    final private ExtensibleSerializer _extSer;
 
 }
