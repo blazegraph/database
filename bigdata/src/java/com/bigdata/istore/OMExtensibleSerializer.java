@@ -57,6 +57,8 @@ import org.CognitiveWeb.extser.IExtensibleSerializer;
 import org.CognitiveWeb.extser.ISerializer;
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.journal.ISlotAllocation;
+
 /**
  * Concrete class knows how to maintain its state.
  * 
@@ -186,12 +188,12 @@ public class OMExtensibleSerializer
         // extend default behavior.
         super.setupSerializers();
         
-        _registerClass(com.bigdata.btree.BTree.class,
-                com.bigdata.btree.BTree.Serializer0.class, (short) 0,
-                false);
-        _registerClass(com.bigdata.btree.BPage.class,
-                com.bigdata.btree.BPage.Serializer0.class, (short) 0,
-                false);
+//        _registerClass(com.bigdata.btree.BTree.class,
+//                com.bigdata.btree.BTree.Serializer0.class, (short) 0,
+//                false);
+//        _registerClass(com.bigdata.btree.BPage.class,
+//                com.bigdata.btree.BPage.Serializer0.class, (short) 0,
+//                false);
 	
         // @todo ??? HashMap is used for the named object directory, so
         // we pre-register a classId for it now.
