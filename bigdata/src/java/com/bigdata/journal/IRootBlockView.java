@@ -101,6 +101,11 @@ public interface IRootBlockView {
     public int getSlotLimit();
 
     /**
+     * The #of keys in a node of the object index (aka branching factor).
+     */
+    public int getObjectIndexSize();
+    
+    /**
      * The timestamp at which the root block was last modified.
      * 
      * @return The timestamp.

@@ -351,7 +351,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * Write v0 on tx0.
              */
-            final int id0 = 0;
+            final int id0 = 1;
             final ByteBuffer expected_id0_v0 = getRandomData(journal);
             tx0.write(id0, expected_id0_v0);
             assertEquals(expected_id0_v0.array(),tx0.read(id0, null));
@@ -497,7 +497,7 @@ public class TestTx extends ProxyTestCase {
             IStore tx0 = new Tx(journal,0);
 
             // Write a random data version for id 0.
-            final int id0 = 0;
+            final int id0 = 1;
             final ByteBuffer expected_id0_v0 = getRandomData(journal);
             journal.write( id0, expected_id0_v0);
             assertEquals(expected_id0_v0.array(),journal.read( id0, null));
@@ -668,7 +668,7 @@ public class TestTx extends ProxyTestCase {
             Journal journal = new Journal(properties);
 
             // Two versions of id0.
-            final int id0 = 0;
+            final int id0 = 1;
             
             // pre-existing version of id0.
             final ByteBuffer expected_preExistingVersion = getRandomData(journal);
@@ -678,7 +678,7 @@ public class TestTx extends ProxyTestCase {
             final ByteBuffer expected0v1 = getRandomData(journal);
             
             // Three versions of id1.
-            final int id1 = 1;
+            final int id1 = 2;
             final ByteBuffer expected1v0 = getRandomData(journal);
             final ByteBuffer expected1v1 = getRandomData(journal);
             final ByteBuffer expected1v2 = getRandomData(journal);
@@ -1320,7 +1320,7 @@ public class TestTx extends ProxyTestCase {
 
             // can not read, write, delete or prepare after 'prepare'.
             try {
-                tx0.read(0, null);
+                tx0.read(1, null);
                 fail("Expecting: " + IllegalStateException.class);
             } catch (IllegalStateException ex) {
                 System.err.println("Ignoring expected exception: " + ex);
@@ -1371,7 +1371,7 @@ public class TestTx extends ProxyTestCase {
 
             // can not read, write, delete or prepare after 'prepare'.
             try {
-                tx0.write(0, getRandomData(journal));
+                tx0.write(1, getRandomData(journal));
                 fail("Expecting: " + IllegalStateException.class);
             } catch (IllegalStateException ex) {
                 System.err.println("Ignoring expected exception: " + ex);
@@ -1422,7 +1422,7 @@ public class TestTx extends ProxyTestCase {
 
             // can not read, write, delete or prepare after 'prepare'.
             try {
-                tx0.delete(0);
+                tx0.delete(1);
                 fail("Expecting: " + IllegalStateException.class);
             } catch (IllegalStateException ex) {
                 System.err.println("Ignoring expected exception: " + ex);
@@ -1483,24 +1483,26 @@ public class TestTx extends ProxyTestCase {
             
             // new transaction - commit will not be visible in this scope.
             Tx tx2 = new Tx(journal,2);
-                        
-            ByteBuffer expected_id0_v0 = getRandomData(journal);
+            
+            int id1 = 1;
+            
+            ByteBuffer expected_id1_v0 = getRandomData(journal);
             
             // write data version on tx1
-            tx1.write(  0, expected_id0_v0 );
-            assertVersionCounter(tx1, 0, 0);
+            tx1.write(  id1, expected_id1_v0 );
+            assertVersionCounter(tx1, id1, 0);
 
             // data version visible in tx1.
-            assertEquals( expected_id0_v0.array(), tx1.read(0, null));
+            assertEquals( expected_id1_v0.array(), tx1.read(id1, null));
 
             // data version not visible in global scope.
-            assertNotFound( journal.read( 0, null));
+            assertNotFound( journal.read( id1, null));
 
             // data version not visible in tx0.
-            assertNotFound( tx0.read(0, null));
+            assertNotFound( tx0.read(id1, null));
 
             // data version not visible in tx2.
-            assertNotFound( tx2.read(0, null));
+            assertNotFound( tx2.read(id1, null));
 
             // prepare
             tx1.prepare();
@@ -1513,25 +1515,25 @@ public class TestTx extends ProxyTestCase {
              * wrote the first version (there was no pre-existing version when
              * tx1 started).
              */
-            assertVersionCounter(journal, 0, 0);
+            assertVersionCounter(journal, id1, 0);
 
             // data version now visible in global scope.
-            assertEquals( expected_id0_v0.array(), journal.read(0, null));
+            assertEquals( expected_id1_v0.array(), journal.read(id1, null));
 
             // new transaction - commit is visible in this scope.
             Tx tx3 = new Tx(journal,3);
             
             // data version visible in the new tx.
-            assertEquals( expected_id0_v0.array(), tx3.read(0, null));
+            assertEquals( expected_id1_v0.array(), tx3.read(id1, null));
 
             // data version still not visible in tx0.
-            assertNotFound( tx0.read(0, null));
+            assertNotFound( tx0.read(id1, null));
 
             // data version still not visible in tx2.
-            assertNotFound( tx2.read(0, null));
+            assertNotFound( tx2.read(id1, null));
             
             // committed data version visible in tx3.
-            assertEquals( expected_id0_v0.array(), tx3.read(0, null));
+            assertEquals( expected_id1_v0.array(), tx3.read(id1, null));
 
             /*
              * commit tx0 - nothing was written, no conflict should result.
@@ -1551,10 +1553,10 @@ public class TestTx extends ProxyTestCase {
 
             // Still zero since the version committed by tx1 has not been
             // overwritten.
-            assertVersionCounter(journal, 0, 0);
+            assertVersionCounter(journal, id1, 0);
 
             // data version in global scope was not changed by any other commit.
-            assertEquals( expected_id0_v0.array(), journal.read(0, null));
+            assertEquals( expected_id1_v0.array(), journal.read(id1, null));
 
             journal.close();
 
@@ -1582,33 +1584,35 @@ public class TestTx extends ProxyTestCase {
 
             Journal journal = new Journal(properties);
 
+            int id0 = 1;
+            
             ByteBuffer expected_id0_v0 = getRandomData(journal);
 
             // data version not visible in global scope.
-            assertNotFound(journal.read( 0, null));
+            assertNotFound(journal.read( id0, null));
 
             // write data version in global scope.
-            journal.write(0, expected_id0_v0);
-            assertVersionCounter(journal, 0, 0);
+            journal.write(id0, expected_id0_v0);
+            assertVersionCounter(journal, id0, 0);
 
             // data version visible in global scope.
-            assertEquals(expected_id0_v0.array(), journal.read(0, null));
+            assertEquals(expected_id0_v0.array(), journal.read(id0, null));
 
             // start transaction.
-            Tx tx0 = new Tx(journal, 0);
+            Tx tx0 = new Tx(journal, id0);
 
             // data version visible in global scope.
-            assertEquals(expected_id0_v0.array(), tx0.read(0, null));
+            assertEquals(expected_id0_v0.array(), tx0.read(id0, null));
 
             // delete version in transation scope.
-            tx0.delete(0);
-            assertVersionCounter(tx0, 0, 0);
+            tx0.delete(id0);
+            assertVersionCounter(tx0, id0, 0);
             
             // data version not visible in transaction.
-            assertDeleted(tx0, 0);
+            assertDeleted(tx0, id0);
             
             // data version still visible in global scope.
-            assertEquals(expected_id0_v0.array(), journal.read(0, null));
+            assertEquals(expected_id0_v0.array(), journal.read(id0, null));
 
             // prepare
             tx0.prepare();
@@ -1616,10 +1620,10 @@ public class TestTx extends ProxyTestCase {
             // commit.
             tx0.commit();
 
-            assertVersionCounter(journal, 0, 1);
+            assertVersionCounter(journal, id0, 1);
 
             // data version now deleted in global scope.
-            assertDeleted(journal,0);
+            assertDeleted(journal,id0);
 
             journal.close();
 
@@ -1671,23 +1675,25 @@ public class TestTx extends ProxyTestCase {
             assertNotNull( journal.getConflictResolver() );
             assertTrue( journal.getConflictResolver() instanceof ConflictResolverAlwaysFails );
 
+            int id0 = 1;
+            
             // create random data for versions.
             ByteBuffer expected_id0_v0 = getRandomData(journal);
             ByteBuffer expected_id0_v1 = getRandomData(journal);
 
             // data version not visible in global scope.
-            assertNotFound(journal.read( 0, null));
+            assertNotFound(journal.read( id0, null));
 
             /*
              * write data version in global scope.
              */
-            journal.write(0, expected_id0_v0);
+            journal.write(id0, expected_id0_v0);
 
             // The slots on which the first data version is written.
-            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(0);
+            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(id0);
             
             // Verify the data version is visible in global scope.
-            assertEquals(expected_id0_v0.array(), journal.read(0, null));
+            assertEquals(expected_id0_v0.array(), journal.read(id0, null));
 
             // start transaction.
             Tx tx1 = new Tx(journal, 1);
@@ -1701,21 +1707,21 @@ public class TestTx extends ProxyTestCase {
              * concurrent transaction since actually reading the version in that
              * transaction might trigger different code paths.
              */
-            assertEquals(expected_id0_v0.array(), tx1.read(0, null));
+            assertEquals(expected_id0_v0.array(), tx1.read(id0, null));
 
             // overwrite data version in transaction scope.
-            tx1.write(0, expected_id0_v1);
-            assertVersionCounter(journal, 0, 0);
-            assertVersionCounter(tx1, 0, 0);
+            tx1.write(id0, expected_id0_v1);
+            assertVersionCounter(journal, id0, 0);
+            assertVersionCounter(tx1, id0, 0);
                         
             // slot allocation in global scope is unchanged.
-            assertEquals(slots_v0,journal.objectIndex.getSlots(0));
+            assertEquals(slots_v0,journal.objectIndex.getSlots(id0));
 
             // data version in global scope is unchanged.
-            assertEquals(expected_id0_v0.array(), journal.read(0, null));
+            assertEquals(expected_id0_v0.array(), journal.read(id0, null));
 
             // Get the slots on which the 2nd data version was written.
-            final ISlotAllocation slots_v1 = tx1.getObjectIndex().getSlots(0);
+            final ISlotAllocation slots_v1 = tx1.getObjectIndex().getSlots(id0);
 
             // prepare
             tx1.prepare();
@@ -1723,7 +1729,7 @@ public class TestTx extends ProxyTestCase {
             // commit.
             tx1.commit();
 
-            assertVersionCounter(journal, 0, 1);
+            assertVersionCounter(journal, id0, 1);
 
             // The v0 slots are still allocated.
             assertSlotAllocationState(slots_v0, journal.allocationIndex,true);
@@ -1732,17 +1738,17 @@ public class TestTx extends ProxyTestCase {
             assertSlotAllocationState(slots_v1, journal.allocationIndex,true);
 
             // The entry in the scope is consistent with the v1 allocation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(0));
+            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
 
             // new data version now visible in global scope.
-            assertEquals(expected_id0_v1.array(), journal.read(0, null));
+            assertEquals(expected_id0_v1.array(), journal.read(id0, null));
 
             // The entry in the tx2 object index is consistent with the v0
             // allocatation (it was not overwritten when the tx1 committed).
-            assertEquals(slots_v0,tx2.getObjectIndex().getSlots(0));
+            assertEquals(slots_v0,tx2.getObjectIndex().getSlots(id0));
 
             // Read the version in tx2 (just to prove that we can do it).
-            assertEquals(expected_id0_v0.array(), tx2.read(0, null));
+            assertEquals(expected_id0_v0.array(), tx2.read(id0, null));
 
             // Commit tx2 (we could have as easily aborted tx2 for this test).
             tx2.prepare();
@@ -1766,10 +1772,10 @@ public class TestTx extends ProxyTestCase {
 
             // The entry in the global object index is consistent with the v1
             // allocatation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(0));
+            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
 
             // The v1 version is still visible in global scope.
-            assertEquals(expected_id0_v1.array(), journal.read(0, null));
+            assertEquals(expected_id0_v1.array(), journal.read(id0, null));
 
             /*
              * GC(tx2) - this MUST be a NOP.
@@ -1784,10 +1790,10 @@ public class TestTx extends ProxyTestCase {
 
             // The entry in the global object index is consistent with the v1
             // allocatation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(0));
+            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
 
             // The v1 version is still visible in global scope.
-            assertEquals(expected_id0_v1.array(), journal.read(0, null));
+            assertEquals(expected_id0_v1.array(), journal.read(id0, null));
             
             journal.close();
 
@@ -1876,25 +1882,27 @@ public class TestTx extends ProxyTestCase {
             final RandomVersionSingletonConflictResolver conflictResolver = (RandomVersionSingletonConflictResolver) journal
                     .getConflictResolver();
 
+            final int id0 = 1;
+            
             // Create random data for versions.
             ByteBuffer expected_v0 = getRandomData(journal);
             ByteBuffer expected_tx1_v1 = getRandomData(journal);
             ByteBuffer expected_tx2_v1 = getRandomData(journal);
 
             // data version not visible in global scope.
-            assertNotFound(journal.read( 0, null));
+            assertNotFound(journal.read( id0, null));
 
             // write data version in global scope.
-            journal.write(0, expected_v0);
+            journal.write(id0, expected_v0);
             
             // verify the version counter in the global scope.
-            assertVersionCounter(journal,0,0);
+            assertVersionCounter(journal,id0,0);
 
             // data version visible in global scope.
-            assertEquals(expected_v0.array(), journal.read(0, null));
+            assertEquals(expected_v0.array(), journal.read(id0, null));
 
             // Save the v0 slot allocation.
-            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(0);
+            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(id0);
             
             // start transaction.
             Tx tx1 = new Tx(journal, 1);
@@ -1905,11 +1913,11 @@ public class TestTx extends ProxyTestCase {
             /*
              * Verify that the data version is visible in both transactions.
              */
-            assertEquals(expected_v0.array(), tx1.read(0, null));
-            assertEquals(expected_v0.array(), tx2.read(0, null));
+            assertEquals(expected_v0.array(), tx1.read(id0, null));
+            assertEquals(expected_v0.array(), tx2.read(id0, null));
 
             // overwrite data version in transaction scope.
-            tx1.write(0, expected_tx1_v1);
+            tx1.write(id0, expected_tx1_v1);
 
             /*
              * Verify the version counter in the transaction. The counter MUST
@@ -1917,16 +1925,16 @@ public class TestTx extends ProxyTestCase {
              * transaction was started.  The value of the counter is incremented
              * in the global scope once (and IF) this transaction commits.
              */
-            assertVersionCounter(tx1,0,0);
+            assertVersionCounter(tx1,id0,0);
 
             // Save the tx1(v1) slot allocation.
-            final ISlotAllocation slots_tx1_v1 = tx1.getObjectIndex().getSlots(0);
+            final ISlotAllocation slots_tx1_v1 = tx1.getObjectIndex().getSlots(id0);
 
             // Verify read-back of the version.
-            assertEquals(expected_tx1_v1.array(),tx1.read(0,null));
+            assertEquals(expected_tx1_v1.array(),tx1.read(id0,null));
             
             // data version still visible in global scope.
-            assertEquals(expected_v0.array(), journal.read(0, null));
+            assertEquals(expected_v0.array(), journal.read(id0, null));
 
             // prepare
             tx1.prepare();
@@ -1938,10 +1946,10 @@ public class TestTx extends ProxyTestCase {
              * Verify the version counter in the global scope. It MUST have been
              * incremented by one.
              */
-            assertVersionCounter(journal, 0, 1);
+            assertVersionCounter(journal, id0, 1);
 
             // new data version now visible in global scope.
-            assertEquals(expected_tx1_v1.array(), journal.read(0, null));
+            assertEquals(expected_tx1_v1.array(), journal.read(id0, null));
 
             /*
              * Verify that v0 is STILL allocated since the version can be read
@@ -1950,14 +1958,14 @@ public class TestTx extends ProxyTestCase {
             assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
 
             // Read the version in tx2 (just to prove that we can do it).
-            assertEquals(expected_v0.array(), tx2.read(0, null));
+            assertEquals(expected_v0.array(), tx2.read(id0, null));
 
             /*
              * Overwrite data version in transaction scope. This will produce a
              * write-write conflict since tx1 has already overwritten the same
              * version and committed.
              */
-            tx2.write(0, expected_tx2_v1);
+            tx2.write(id0, expected_tx2_v1);
 
             /*
              * Verify the version counter in the transaction. The counter MUST
@@ -1970,22 +1978,22 @@ public class TestTx extends ProxyTestCase {
              * post-increment version counter will be visible. This assertion
              * looks for this problem.
              */
-            assertVersionCounter(tx2,0,0);
+            assertVersionCounter(tx2,id0,0);
 
             /*
              * Note: The counter in the global scope is currently ONE (1), but
              * that is NOT the counter that is visible to the transaction!!!
              */
-            assertVersionCounter(journal,0,1);
+            assertVersionCounter(journal,id0,1);
 
             // Save the tx2(v1) slot allocation.
-            final ISlotAllocation slots_tx2_v1 = tx2.getObjectIndex().getSlots(0);
+            final ISlotAllocation slots_tx2_v1 = tx2.getObjectIndex().getSlots(id0);
 
             // Verify read-back of the version written by the transaction.
-            assertEquals(expected_tx2_v1.array(),tx2.read(0,null));
+            assertEquals(expected_tx2_v1.array(),tx2.read(id0,null));
 
             // Verify read-back of the version in the global scope (the one committed by tx1).
-            assertEquals(expected_tx1_v1.array(),journal.read(0,null));
+            assertEquals(expected_tx1_v1.array(),journal.read(id0,null));
 
             // Verify that v0 is STILL allocated since tx2 has not committed and we have not GC'd.
             assertSlotAllocationState(slots_v0, journal.allocationIndex, true);
@@ -2015,10 +2023,10 @@ public class TestTx extends ProxyTestCase {
              * Verify the version counter in the global scope. It MUST have been
              * incremented by one.
              */
-            assertVersionCounter(journal, 0, 2);
+            assertVersionCounter(journal, id0, 2);
 
             // Verify read-back of the version in the global scope.
-            assertEquals(expected_tx2_v1.array(),journal.read(0,null));
+            assertEquals(expected_tx2_v1.array(),journal.read(id0,null));
 
             /*
              * Verify read-back of the version in the global scope - this is the
@@ -2028,7 +2036,7 @@ public class TestTx extends ProxyTestCase {
              * the resolved version on the journal.
              */
             assertEquals(conflictResolver.getResolvedVersion().array(), journal
-                    .read( 0, null));
+                    .read( id0, null));
 
             /*
              * Sweap the version overwritten by tx1 (v0).

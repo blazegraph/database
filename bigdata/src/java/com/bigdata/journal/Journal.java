@@ -319,6 +319,22 @@ import java.util.Properties;
  * @todo Add feature to return the transient journal buffer so that we can do
  *       interesting things with it, including write it to disk with the
  *       appropriate file header and root blocks so that it becomes restartable.
+ * 
+ * @todo Make decision about whether or not id == 0 is allowed and whether or
+ *       not ids are 32bit clean. The main purpose for the journal is part of
+ *       bigdata and in that role it needs to absorb any within segment
+ *       identifier that is legal for bigdata. If bigdata uses 32bit ids, then
+ *       the journal must as well. However, I think that it is quite unlikely
+ *       that bigdata will use a 32-bit within segment identifier with an int16
+ *       page and int16 slot since the goal is to keep the #of pages in a
+ *       segment down (this is true even for large (blob) segments since they
+ *       just use large pages). When the journal is used as part of an embedded
+ *       database, id == 0 is typically treated as null and disallowed. Thse
+ *       only part of the code that depends on this in any way may be the object
+ *       index which has a test for a "null" key value and needs to know the
+ *       minimum and maximum key values. Other than that the constraint is just
+ *       imposed by checks on read(), write() and delete() on the Journal and Tx
+ *       classes.
  */
 
 public class Journal implements IStore {
@@ -747,11 +763,12 @@ public class Journal implements IStore {
      *            performance penalties and does NOT provide any additional data
      *            safety (it is here mainly for performance testing).</dd>
      *            <dt>objectIndexSize</dt>
-     *            <dd>The size of a node in the object index (i.e., the
-     *            branching factor). A larger node size correlates with an
-     *            object index with less height, and height correlates with
-     *            access time. Access time is a concern when the journal is not
-     *            fully buffered.</dd>
+     *            <dd>The size of a node in the object index (aka branching
+     *            factor). A larger node size correlates with an object index
+     *            with less height, and height correlates with access time.
+     *            Access time is a concern when the journal is not fully
+     *            buffered. The value must be even and is normally a power of
+     *            two, e.g., 64, 128, 256, etc.</dd>
      *            <dt>conflictResolver</dt>
      *            <dd>The name of a class that implements the
      *            {@link IConflictResolver} interface (optional). The class MUST
@@ -1021,8 +1038,9 @@ public class Journal implements IStore {
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segment,file,
-                    BufferMode.Direct, initialExtent, slotSize, readOnly, forceWrites);
+            FileMetadata fileMetadata = new FileMetadata(segment, file,
+                    BufferMode.Direct, initialExtent, slotSize,
+                    objectIndexSize, readOnly, forceWrites);
             
             _bufferStrategy = new DirectBufferStrategy( fileMetadata, slotMath);
 
@@ -1050,8 +1068,9 @@ public class Journal implements IStore {
              * Setup the buffer strategy.
              */
             
-            FileMetadata fileMetadata = new FileMetadata(segment,file,
-                    BufferMode.Mapped, initialExtent, slotSize, readOnly, forceWrites);
+            FileMetadata fileMetadata = new FileMetadata(segment, file,
+                    BufferMode.Mapped, initialExtent, slotSize,
+                    objectIndexSize, readOnly, forceWrites);
 
             _bufferStrategy = new MappedBufferStrategy( fileMetadata, slotMath);
 
@@ -1078,8 +1097,9 @@ public class Journal implements IStore {
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segment,file,
-                    BufferMode.Disk, initialExtent, slotSize, readOnly, forceWrites);
+            FileMetadata fileMetadata = new FileMetadata(segment, file,
+                    BufferMode.Disk, initialExtent, slotSize, objectIndexSize,
+                    readOnly, forceWrites);
             
             _bufferStrategy = new DiskOnlyStrategy(fileMetadata, slotMath);
 
@@ -1826,9 +1846,9 @@ public class Journal implements IStore {
             
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getSegmentId(), old.getSlotSize(),
-                    old.getSlotLimit(), old.getSlotIndexChainHead(), old
-                            .getObjectIndexRoot(), old.getCommitCounter() + 1,
-                            rootIds );
+                    old.getSlotLimit(), old.getObjectIndexSize(), old
+                            .getSlotIndexChainHead(), old.getObjectIndexRoot(),
+                    old.getCommitCounter() + 1, rootIds);
 
             _bufferStrategy.writeRootBlock(newRootBlock);
             

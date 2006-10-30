@@ -104,7 +104,8 @@ public class RootBlockView implements IRootBlockView {
     static final short OFFSET_SEGMENT_ID = OFFSET_MAGIC      + SIZEOF_MAGIC;
     static final short OFFSET_SLOT_SIZE  = OFFSET_SEGMENT_ID + SIZEOF_SEGMENT_ID;
     static final short OFFSET_SLOT_LIMIT = OFFSET_SLOT_SIZE  + SIZEOF_SLOT_SIZE;
-    static final short OFFSET_SLOT_CHAIN = OFFSET_SLOT_LIMIT + SIZEOF_SLOT_LIMIT;
+    static final short OFFSET_OBJ_NDX_SZ = OFFSET_SLOT_LIMIT + SIZEOF_SLOT_LIMIT;
+    static final short OFFSET_SLOT_CHAIN = OFFSET_OBJ_NDX_SZ + SIZEOF_SLOT_LIMIT;
     static final short OFFSET_OBJECT_NDX = OFFSET_SLOT_CHAIN + SIZEOF_SLOT_INDEX;
     static final short OFFSET_ROOT_IDS   = OFFSET_OBJECT_NDX + SIZEOF_SLOT_INDEX;
     static final short OFFSET_COMMIT_CTR = OFFSET_ROOT_IDS   + SIZEOF_ROOT_IDS;
@@ -136,6 +137,10 @@ public class RootBlockView implements IRootBlockView {
      *            The slot size for the journal.
      * @param slotLimit
      *            The slot limit for the journal (the #of slots).
+     * @param objectIndexSize
+     *            The #of keys in a node of the object index (aka branching
+     *            factor). Must be a positive, even integer. Normally 16, 32,
+     *            64, 256, 512, etc.
      * @param slotChain
      *            The slot index of the slot that is the head of the slot
      *            allocation chain. See {@link ISlotAllocationIndex}.
@@ -151,12 +156,16 @@ public class RootBlockView implements IRootBlockView {
      *            An array of int32 root ids.
      */
     RootBlockView(boolean rootBlock0, long segmentId, int slotSize,
-            int slotLimit, int slotChain, int objectIndex, long commitCounter,
-            int[] rootIds) {
+            int slotLimit, int objectIndexSize, int slotChain, int objectIndex,
+            long commitCounter, int[] rootIds) {
 
         if (slotSize < Journal.MIN_SLOT_SIZE)
             throw new IllegalArgumentException();
         if (slotLimit <= 0)
+            throw new IllegalArgumentException();
+        if (objectIndexSize <= 0)
+            throw new IllegalArgumentException();
+        if ((objectIndexSize & 1) != 0) // must be even.
             throw new IllegalArgumentException();
         if (slotChain < 0 || slotChain >= slotLimit)
             throw new IllegalArgumentException();
@@ -178,6 +187,7 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(segmentId);
         buf.putInt(slotSize);
         buf.putInt(slotLimit);
+        buf.putInt(objectIndexSize);
         buf.putInt(slotChain);
         buf.putInt(objectIndex);
         for (int i = 0; i < MAX_ROOT_ID; i++) {
@@ -241,6 +251,10 @@ public class RootBlockView implements IRootBlockView {
         
         valid();
         
+    }
+    
+    public int getObjectIndexSize() {
+        return buf.getInt(OFFSET_OBJ_NDX_SZ);
     }
     
     public int getObjectIndexRoot() {

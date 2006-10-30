@@ -121,6 +121,10 @@ class FileMetadata {
      *            The initial extent of the file iff a new file is created.
      * @param slotSize
      *            The slot size iff a new file is created.
+     * @param objectIndexSize
+     *            The #of keys in a node of the object index (aka branching
+     *            factor). This value must be even, and positive. Typically it
+     *            is a power of two. E.g., 64, 128, 256.
      * @param readOnly
      *            When true, the file is opened in a read-only mode and it is an
      *            error if the file does not exist.
@@ -133,7 +137,7 @@ class FileMetadata {
      */
 
     FileMetadata(long segment, File file, BufferMode bufferMode,
-            long initialExtent, int slotSize, boolean readOnly, boolean forceWrites)
+            long initialExtent, int slotSize, int objectIndexSize, boolean readOnly, boolean forceWrites)
             throws IOException {
 
         if (file == null)
@@ -409,11 +413,11 @@ class FileMetadata {
             final long commitCounter = 0L;
             int[] rootIds = new int[ RootBlockView.MAX_ROOT_ID ];
             IRootBlockView rootBlock0 = new RootBlockView(true, segment,
-                    slotSize, slotLimit, slotChain, objectIndex, commitCounter,
-                    rootIds );
+                    slotSize, slotLimit, objectIndexSize, slotChain,
+                    objectIndex, commitCounter, rootIds);
             IRootBlockView rootBlock1 = new RootBlockView(false, segment,
-                    slotSize, slotLimit, slotChain, objectIndex, commitCounter,
-                    rootIds );
+                    slotSize, slotLimit, objectIndexSize, slotChain,
+                    objectIndex, commitCounter, rootIds);
             FileChannel channel = raf.getChannel();
             channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
             channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);

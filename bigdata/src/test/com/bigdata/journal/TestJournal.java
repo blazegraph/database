@@ -378,7 +378,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0, 10);
+            doWriteRoundTripTest(tx, 1, 10);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -471,7 +471,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
 
-            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize);
+            doWriteRoundTripTest(tx, 1, journal.slotMath.slotSize);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -512,7 +512,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize-1);
+            doWriteRoundTripTest(tx, 1, journal.slotMath.slotSize-1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -553,7 +553,7 @@ public class TestJournal extends ProxyTestCase {
             
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize+1);
+            doWriteRoundTripTest(tx, 1, journal.slotMath.slotSize+1);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -598,7 +598,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0, journal.slotMath.slotSize * 2);
+            doWriteRoundTripTest(tx, 1, journal.slotMath.slotSize * 2);
 
             /*
              * Verify that the #of allocated slots (this relies on the fact that
@@ -639,7 +639,7 @@ public class TestJournal extends ProxyTestCase {
             
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0,
+            doWriteRoundTripTest(tx, 1,
                     (journal.slotMath.slotSize * 2) - 1);
 
             /*
@@ -681,7 +681,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal,0);
             
-            doWriteRoundTripTest(tx, 0,
+            doWriteRoundTripTest(tx, 1,
                     (journal.slotMath.slotSize * 2) + 1);
 
             /*
@@ -727,7 +727,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(tx, 0,
+            doWriteRoundTripTest(tx, 1,
                     journal.slotMath.slotSize * 3);
             
             /*
@@ -769,7 +769,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(tx, 0,
+            doWriteRoundTripTest(tx, 1,
                     (journal.slotMath.slotSize * 3) - 1);
             
             /*
@@ -811,7 +811,7 @@ public class TestJournal extends ProxyTestCase {
 
             Tx tx = new Tx(journal, 0);
             
-            doWriteRoundTripTest(tx, 0,
+            doWriteRoundTripTest(tx, 1,
                     (journal.slotMath.slotSize * 3) + 1);
             
             /*
@@ -864,12 +864,12 @@ public class TestJournal extends ProxyTestCase {
             Journal journal = new Journal(properties);
 
             // Two versions of id0.
-            final int id0 = 0;
+            final int id0 = 1;
             final ByteBuffer expected0v0 = getRandomData(journal);
             final ByteBuffer expected0v1 = getRandomData(journal);
             
             // Three versions of id1.
-            final int id1 = 1;
+            final int id1 = 2;
             final ByteBuffer expected1v0 = getRandomData(journal);
             final ByteBuffer expected1v1 = getRandomData(journal);
             final ByteBuffer expected1v2 = getRandomData(journal);
@@ -983,7 +983,7 @@ public class TestJournal extends ProxyTestCase {
             
             int maxSize = journal.slotMath.slotSize * 50;
             
-            for (int id = 0; id < limit; id++) {
+            for (int id = 1; id < limit; id++) {
 
                 int nbytes = r.nextInt(maxSize)+1; // +1 avoids zero length items.
 
@@ -1059,7 +1059,7 @@ public class TestJournal extends ProxyTestCase {
 
             Journal journal = new Journal(properties);
             
-            final int id = 0;
+            final int id = 1;
             
             byte[] expected = doWriteRoundTripTest(journal, id,
                     (journal.slotMath.slotSize * 3) + 1);

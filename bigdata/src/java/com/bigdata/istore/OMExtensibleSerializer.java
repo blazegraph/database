@@ -178,6 +178,12 @@ public class OMExtensibleSerializer
      * 
      * @todo This should be done by the extser service, not the instances that
      *       connect to that service.
+     * 
+     * @todo It would be a nice feature for extser if a class had a protocol for
+     *       reporting its serializers. That would mean that we did not have to
+     *       explicitly register serializers for classes that we write. We would
+     *       still have to register serializers for pre-existing classes, such
+     *       as HashMap.
      */
     
     protected void setupSerializers()

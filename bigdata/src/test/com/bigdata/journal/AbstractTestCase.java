@@ -745,13 +745,13 @@ abstract public class AbstractTestCase
      *                if the identifer is found, but the version counter value
      *                differs from the expected version counter.
      */
-    protected void assertVersionCounter(Tx tx, int id, long expectedVersionCounter ) {
+    protected void assertVersionCounter(Tx tx, int id, int expectedVersionCounter ) {
         
         IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
         
         if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
         
-        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
+        assertEquals("versionCounter", (short) expectedVersionCounter, entry.getVersionCounter() );
         
     }
     

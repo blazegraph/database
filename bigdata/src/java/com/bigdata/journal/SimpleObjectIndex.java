@@ -48,11 +48,9 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.Collections;
-//import java.util.HashMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -122,7 +120,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static interface IObjectIndexEntry /*extends Cloneable*/ {
+    public static interface IObjectIndexEntry /*extends Cloneable*/ {
 
         /**
          * A counter that is updated each time a new version is committed for
@@ -146,7 +144,7 @@ public class SimpleObjectIndex implements IObjectIndex {
          * @see SimpleObjectIndex#mapIdToSlots(int, ISlotAllocation,
          *      ISlotAllocationIndex)
          */
-        public long getVersionCounter();
+        public short getVersionCounter();
         
         /**
          * True iff the persistent identifier for this entry has been deleted.
@@ -216,10 +214,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     static class SimpleEntry implements IObjectIndexEntry {
 
-        /*
-         * @todo This can be packed - it is a non-negative counter.
-         */
-        private long versionCounter;
+        private short versionCounter;
         private ISlotAllocation currentVersionSlots;
         private ISlotAllocation preExistingVersionSlots;
 
@@ -229,7 +224,7 @@ public class SimpleObjectIndex implements IObjectIndex {
             
         }
         
-        public long getVersionCounter() {
+        public short getVersionCounter() {
             
             return versionCounter;
             
@@ -259,6 +254,15 @@ public class SimpleObjectIndex implements IObjectIndex {
             
         }
         
+        /**
+         * Dumps the state of the entry.
+         */
+        public String toString() {
+            return "{versionCounter=" + versionCounter + ", currentVersion="
+                    + currentVersionSlots + ", preExistingVersion="
+                    + preExistingVersionSlots + "}";
+        }
+
 //        public IObjectIndexEntry clone() {
 //            
 //            SimpleEntry clone = new SimpleEntry();
@@ -997,7 +1001,7 @@ public class SimpleObjectIndex implements IObjectIndex {
                  * and commits before an overwrite of the version by a concurrent
                  * transaction.
                  */
-                txEntry.versionCounter = baseEntry.getVersionCounter() + 1;
+                txEntry.versionCounter = (short) (baseEntry.getVersionCounter() + 1);
                                 
             }
             
