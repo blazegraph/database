@@ -352,7 +352,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
              * does this anyway so this makes things more fair).
              */
             
-            journal._bufferStrategy.force(false);
+            journal._bufferStrategy.force(true);
             
         }
         

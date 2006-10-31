@@ -92,8 +92,8 @@ public interface IBufferStrategy {
     public void deleteFile();
 
     /**
-     * Close the journal. If the journal is backed by disk, then the data are
-     * forced to disk first.
+     * Close the journal. If the journal is backed by disk, then the data (and
+     * file metadata) are forced to disk first.
      * 
      * @throws IllegalStateException
      *             if the journal is not open.
@@ -156,6 +156,10 @@ public interface IBufferStrategy {
      *            The root block. Which root block is indicated by
      *            {@link IRootBlockView#isRootBlock0()}.
      * 
+     * @param forceOnCommit Governs whether or not the journal is forced to stable
+     * storage and whether or not the file metadata for the journal is forced to
+     * stable storage.  See {@link Options#FORCE_ON_COMMIT}.
+     * 
      * @todo It is up in the air whether the root blocks and file header need to
      *       appear in the buffer. I rather think not. The buffer can simply
      *       begin after the root blocks. That approach makes accidental
@@ -163,6 +167,6 @@ public interface IBufferStrategy {
      *       does not have the notion of root blocks since it has nothing to
      *       write through to.
      */
-    public void writeRootBlock(IRootBlockView rootBlock);
+    public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommitEnum);
     
 }

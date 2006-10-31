@@ -107,7 +107,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
         try {
 
-            force(false);
+            force(true);
 
             raf.close();
 
@@ -214,7 +214,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     }
 
-    public void writeRootBlock(IRootBlockView rootBlock) {
+    public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
 
         if( rootBlock == null ) throw new IllegalArgumentException();
         
@@ -226,7 +226,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
                     .isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
                     : FileMetadata.OFFSET_ROOT_BLOCK1);
 
-            force(false);
+            if( forceOnCommit != ForceEnum.No ) {
+
+                force(forceOnCommit==ForceEnum.ForceMetadata);
+            
+            }
 
         }
 

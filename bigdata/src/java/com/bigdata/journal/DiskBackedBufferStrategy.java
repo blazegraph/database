@@ -66,7 +66,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
         try {
 
-            force( false );
+            force( true );
             
             raf.close();
             
@@ -105,7 +105,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
     }
    
-    public void writeRootBlock(IRootBlockView rootBlock) {
+    public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
 
         if( rootBlock == null ) throw new IllegalArgumentException();
 
@@ -117,7 +117,11 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
                     .isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
                     : FileMetadata.OFFSET_ROOT_BLOCK1);
 
-            force(false);
+            if( forceOnCommit != ForceEnum.No ) {
+
+                force(forceOnCommit==ForceEnum.ForceMetadata);
+            
+            }
 
         }
 

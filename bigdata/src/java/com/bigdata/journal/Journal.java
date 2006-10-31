@@ -140,17 +140,17 @@ import java.util.Properties;
  * matter how you approach it is getting closure on the self-referential issue
  * with slots and a slot allocation index; maybe the per-tx data structure is
  * just transient will the committed data structure is persistent?</li>
- * <li> Transaction isolation. (Also, will there be a "non-transactional mode"?)
- * The API in {@link Journal} should probably be modified to use "Tx" objects
- * rather than just long ids for transactions.</li>
+ * <li> Transaction isolation.</li>
  * <li> Commit protocol, including plan for PREPARE in support of distributed
  * transactions.</li>
  * <li> Migration of data to a read-optimized database (have to implement the
- * read-optimized database as well).</li>
+ * read-optimized database as well). Explore use of page at a time compression
+ * of rows. Compression makes it possible to fit more data on a logical page.
+ * Overflow of rows on a logical page forces use of continuation pages.</li>
  * <li> Testing of an "embedded database" using both a journal only and a
  * journal + read-optimized database design. This can be tested up to the GPO
  * layer.</li>
- * <li>Support primary key indices in GPO/PO layer.</li>
+ * <li>Support primary key (clustered) indices in GPO/PO layer.</li>
  * <li>Implement forward validation and state-based conflict resolution with
  * custom merge rules for persistent objects, generic objects, and primary key
  * indices, and secondary indexes.</li>
@@ -205,6 +205,9 @@ import java.util.Properties;
  * notices - it still needs to wait for an acknowledgement in order to have a
  * robust notice of the abort. Transactions probably need to send heartbeats so
  * that they can be presumptively killed if they stop working.) </li>
+ * <li> Replicating segments should be part of how they are written and failover
+ * to an existing replication is very cheap. However, splitting a segment could
+ * be relatively expensive.</li>
  * </ul>
  * 
  * FIXME Expand on latency and decision criteria for int64 assignments.
@@ -397,6 +400,11 @@ public class Journal implements IStore {
      */
     final ISlotAllocationIndex allocationIndex;
 
+    /**
+     * Option controls how the journal behaves during a commit.
+     */
+    private final ForceEnum forceOnCommit;
+    
     /**
      * Option set by the test suites causes the file backing the journal to be
      * deleted when the journal is closed.
@@ -726,8 +734,10 @@ public class Journal implements IStore {
         int objectIndexSize = Options.DEFAULT_OBJECT_INDEX_SIZE;
         boolean create = Options.DEFAULT_CREATE;
         boolean readOnly = Options.DEFAULT_READ_ONLY;
-        boolean forceWrites = Options.DEFAULT_FORCE_WRITES;
         boolean deleteOnClose = Options.DEFAULT_DELETE_ON_CLOSE;
+        ForceEnum forceWrites = Options.DEFAULT_FORCE_WRITES;
+        ForceEnum forceOnCommit = Options.DEFAULT_FORCE_ON_COMMIT;
+        
         Class conflictResolverClass = null;
         String val;
 
@@ -836,10 +846,24 @@ public class Journal implements IStore {
         
         if( val != null ) {
 
-            forceWrites = Boolean.parseBoolean(val);
+            forceWrites = ForceEnum.parse(val);
             
         }
 
+        /*
+         * "forceOnCommit"
+         */
+
+        val = properties.getProperty(Options.FORCE_ON_COMMIT);
+        
+        if( val != null ) {
+
+            forceOnCommit = ForceEnum.parse(val);
+            
+        }
+
+        this.forceOnCommit = forceOnCommit;
+        
         /*
          * "objectIndexSize"
          */
@@ -1047,7 +1071,7 @@ public class Journal implements IStore {
             throw new AssertionError();
         
         }
-
+        
         /*
          * An index of the free and used slots in the journal.
          * 
@@ -1798,7 +1822,7 @@ public class Journal implements IStore {
                             .getSlotIndexChainHead(), old.getObjectIndexRoot(),
                     old.getCommitCounter() + 1, rootIds);
 
-            _bufferStrategy.writeRootBlock(newRootBlock);
+            _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
             
         }
         

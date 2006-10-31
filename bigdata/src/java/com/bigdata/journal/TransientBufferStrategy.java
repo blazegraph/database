@@ -66,7 +66,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
-    public void writeRootBlock(IRootBlockView rootBlock) {
+    public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
     }
 
 }

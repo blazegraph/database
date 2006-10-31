@@ -141,7 +141,7 @@ class FileMetadata {
 
     FileMetadata(long segment, File file, BufferMode bufferMode,
             long initialExtent, int slotSize, int objectIndexSize,
-            boolean create, boolean readOnly, boolean forceWrites)
+            boolean create, boolean readOnly, ForceEnum forceWrites)
             throws IOException {
 
         if (file == null)
@@ -165,10 +165,11 @@ class FileMetadata {
 
         }
 
-        if (readOnly && forceWrites) {
+        if (readOnly && forceWrites != ForceEnum.No) {
 
             throw new IllegalArgumentException("'" + Options.FORCE_WRITES
-                    + "' may not be used with '" + Options.READ_ONLY + "'");
+                    + "'='" + forceWrites + "' may not be used with '"
+                    + Options.READ_ONLY + "'");
 
         }
 
@@ -178,7 +179,7 @@ class FileMetadata {
         
         this.bufferMode = bufferMode;
 
-        final String fileMode = "r"+(readOnly?"":"w")+(forceWrites?"d":"");
+        final String fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
         this.readOnly = readOnly;
         
