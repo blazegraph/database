@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -103,9 +104,11 @@ public class TestDiskJournal extends AbstractTestCase {
 
         Properties properties = super.getProperties();
 
-        properties.setProperty("bufferMode", BufferMode.Disk.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        properties.setProperty("segment", "0");
+        properties.setProperty(Options.SEGMENT, "0");
+
+        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -121,10 +124,7 @@ public class TestDiskJournal extends AbstractTestCase {
         
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
+        properties.setProperty(Options.SLOT_SIZE,"128");
 
         try {
             
@@ -135,17 +135,17 @@ public class TestDiskJournal extends AbstractTestCase {
             
             DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
             
-            assertEquals("file", filename, bufferStrategy.file.toString());
-            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+            assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
+            assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                     bufferStrategy.getExtent());
             assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Disk, bufferStrategy.getBufferMode());
+            assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy.getBufferMode());
 
             journal.close();
             
         } finally {
             
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 

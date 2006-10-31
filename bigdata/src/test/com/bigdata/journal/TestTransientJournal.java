@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -103,7 +104,7 @@ public class TestTransientJournal extends AbstractTestCase {
 
         Properties properties = super.getProperties();
 
-        properties.setProperty("bufferMode", BufferMode.Transient.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
 
         return properties;
 
@@ -119,7 +120,7 @@ public class TestTransientJournal extends AbstractTestCase {
 
         final Properties properties = getProperties();
 
-        properties.setProperty("slotSize","128");
+        properties.setProperty(Options.SLOT_SIZE,"128");
 
         Journal journal = new Journal(properties);
 
@@ -128,9 +129,9 @@ public class TestTransientJournal extends AbstractTestCase {
 
         TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
 
-        assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+        assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getExtent());
-        assertEquals("bufferMode", BufferMode.Transient, bufferStrategy
+        assertEquals(Options.BUFFER_MODE, BufferMode.Transient, bufferStrategy
                 .getBufferMode());
         assertNotNull("directBuffer", bufferStrategy.directBuffer);
         assertEquals("", bufferStrategy.getExtent(),

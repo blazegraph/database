@@ -49,6 +49,7 @@ package com.bigdata.journal;
 
 import java.util.Random;
 
+
 import junit.framework.TestCase2;
 
 /**
@@ -87,7 +88,7 @@ public class TestRootBlockView extends TestCase2 {
 
             final boolean rootBlock0 = r.nextBoolean();
             final long segmentId = r.nextLong();
-            final int slotSize = Journal.MIN_SLOT_SIZE + r.nextInt(1024);
+            final int slotSize = Options.MIN_SLOT_SIZE + r.nextInt(1024);
             final int slotLimit = 100 + r.nextInt(10000);
             final int objectIndexSize = objectIndexSizes[r.nextInt(objectIndexSizes.length)];
             final int slotChain = r.nextInt(slotLimit);
@@ -151,7 +152,7 @@ public class TestRootBlockView extends TestCase2 {
         final boolean rootBlock0 = true; // all values are legal.
         final long segmentId = 0L; // no constraint
         final int slotSizeOk = 100;
-        final int slotSizeBad = Journal.MIN_SLOT_SIZE - 1; // too small.
+        final int slotSizeBad = Options.MIN_SLOT_SIZE - 1; // too small.
         final int slotSizeBad2 = -1; // negative.
         final int slotLimit = 100; // no constraint.
         final int objectIndexSizeOk = 64;

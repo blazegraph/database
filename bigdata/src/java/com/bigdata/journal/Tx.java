@@ -337,7 +337,7 @@ public class Tx implements IStore, ITx {
          * onto the slots on which the data was just written.
          */
 
-        objectIndex.mapIdToSlots(id, slots, journal.allocationIndex);
+        objectIndex.put(id, slots);
         
     }
     

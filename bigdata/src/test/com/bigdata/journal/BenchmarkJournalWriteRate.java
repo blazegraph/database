@@ -53,6 +53,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase2;
 import junit.framework.TestSuite;
@@ -75,19 +76,19 @@ import junit.framework.TestSuite;
  * </p>
  * 
  * <pre>
- *                    
- *         Windows XP 2002 SP2 on Dell Latitude D620.
- *         
- *         #of slots in the journal: 819200
- *         slot size: 128
- *         Elapsed: 1609(ms), bufferMode=transient (memory only)
- *         Elapsed: 2375(ms), block-based optimum (low level disk IO, 8k blocks)
- *         Elapsed: 2485(ms), sustained transfer optimum
- *         Elapsed: 2687(ms), bufferMode=mapped
- *         Elapsed: 4641(ms), slot-based optimum (low level disk IO, 128b slots)
- *         Elapsed: 9328(ms), bufferMode=disk
- *         Elapsed: 9391(ms), bufferMode=direct
- *                    
+ *                         
+ *              Windows XP 2002 SP2 on Dell Latitude D620.
+ *              
+ *              #of slots in the journal: 819200
+ *              slot size: 128
+ *              Elapsed: 1609(ms), bufferMode=transient (memory only)
+ *              Elapsed: 2375(ms), block-based optimum (low level disk IO, 8k blocks)
+ *              Elapsed: 2485(ms), sustained transfer optimum
+ *              Elapsed: 2687(ms), bufferMode=mapped
+ *              Elapsed: 4641(ms), slot-based optimum (low level disk IO, 128b slots)
+ *              Elapsed: 9328(ms), bufferMode=disk
+ *              Elapsed: 9391(ms), bufferMode=direct
+ *                         
  * </pre>
  * 
  * <p>
@@ -97,6 +98,15 @@ import junit.framework.TestSuite;
  * nearly the performance of the transient mode (direct in-memory buffer without
  * IO).
  * </p>
+ * 
+ * FIXME Implement and test the impact of the {@link PageCommitList}, which is
+ * designed to buffer writes into blocks for better IO throughput. Since the
+ * journal is now providing contiguous slots in a slot allocation, the
+ * {@link IBufferStrategy} interface should also be modified to support reads
+ * and writes that cover an entire contiguous allocation. This is relatively
+ * minor tweak that will provide greater efficiency w/o a page buffer. With a
+ * page buffer, the efficiency gain is minor since it only removes an in-memory
+ * loop vs reducing IOs.
  * 
  * @todo Monitor the heap, IO, and CPU using this benchmark : profile as well.
  *       Try on linux with top and vmstat and on Windows with "perfmon".
@@ -111,14 +121,16 @@ import junit.framework.TestSuite;
  * 
  * @todo Try with "write through" option on the {@link RandomAccessFile} enabled
  *       for the various journal configurations and the low level "optimum" test
- *       cases.
+ *       cases. Write through may do quite well in combination with a dirty page
+ *       cache (commit list of dirty pages with incremental flush and flush on
+ *       commit in any case).
  * 
  * @todo Compare performance with and without transactional isolation. Isolation
  *       is definately slower. Validation is relatively fast. Most of the
  *       additional time appears to be merging the isolated object index down
- *       onto the global object index.  (Note that I am seeing lots of variance
- *       in the times for the transient journal.  This may be due to whether or
- *       not a full GC is being performed.  Also, the transient journal is a
+ *       onto the global object index. (Note that I am seeing lots of variance
+ *       in the times for the transient journal. This may be due to whether or
+ *       not a full GC is being performed. Also, the transient journal is a
  *       direct buffer, so there may be contention for native heap space.)
  * 
  * @todo Compare performance as a function of the "object size". It appears to
@@ -153,15 +165,17 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         Properties properties = super.getProperties();
 
-        properties.setProperty("initialExtent",""+getInitialExtent());
+        properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
-        properties.setProperty("slotSize",""+getSlotSize());
+        properties.setProperty(Options.SLOT_SIZE,""+getSlotSize());
         
-        properties.setProperty("bufferMode", getBufferMode().toString());
+        properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
 
-        properties.setProperty("segment", "0");
+        properties.setProperty(Options.SEGMENT, "0");
         
-        properties.setProperty("file",getFilename());
+        properties.setProperty(Options.FILE,getFilename());
+        
+        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
         
         return properties;
         

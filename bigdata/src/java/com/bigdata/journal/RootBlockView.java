@@ -159,7 +159,7 @@ public class RootBlockView implements IRootBlockView {
             int slotLimit, int objectIndexSize, int slotChain, int objectIndex,
             long commitCounter, int[] rootIds) {
 
-        if (slotSize < Journal.MIN_SLOT_SIZE)
+        if (slotSize < Options.MIN_SLOT_SIZE)
             throw new IllegalArgumentException();
         if (slotLimit <= 0)
             throw new IllegalArgumentException();

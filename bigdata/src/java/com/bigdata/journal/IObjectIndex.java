@@ -71,20 +71,18 @@ package com.bigdata.journal;
 public interface IObjectIndex {
 
     /**
-     * Update the object index to map the id onto the slots.
+     * Update the object index to map the id onto the slots. When there is a
+     * current version and it was written during the current transaction, then
+     * its slots MUST be synchronously deallocated since they are no longer
+     * accessible to any active transaction.
      * 
      * @param id
      *            The int32 within-segment persistent identifier.
      * @param slots
      *            The slots on which the current version of the identified data
      *            was written within this transaction scope.
-     * @param allocationIndex
-     *            The slot allocation index. When there is a current version and
-     *            it was written during the current transaction, then its slots
-     *            are synchronously deallocated since they are no longer
-     *            accessible to any active transaction.
      */
-    public void mapIdToSlots( int id, ISlotAllocation slots, ISlotAllocationIndex allocationIndex );
+    public void put( int id, ISlotAllocation slots );
     
     /**
      * Return the slots on which the current version of the data is stored.

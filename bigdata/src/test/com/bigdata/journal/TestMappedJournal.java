@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -103,9 +104,11 @@ public class TestMappedJournal extends AbstractTestCase {
 
         Properties properties = super.getProperties();
 
-        properties.setProperty("bufferMode", BufferMode.Mapped.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 
-        properties.setProperty("segment", "0");
+        properties.setProperty(Options.SEGMENT, "0");
+
+        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -121,10 +124,7 @@ public class TestMappedJournal extends AbstractTestCase {
 
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
+        properties.setProperty(Options.SLOT_SIZE,"128");
 
         try {
             
@@ -135,8 +135,8 @@ public class TestMappedJournal extends AbstractTestCase {
             
             MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
             
-            assertEquals("file", filename, bufferStrategy.file.toString());
-            assertEquals("initialExtent", Journal.DEFAULT_INITIAL_EXTENT,
+            assertEquals("file", properties.getProperty(Options.FILE), bufferStrategy.file.toString());
+            assertEquals("initialExtent", Options.DEFAULT_INITIAL_EXTENT,
                     bufferStrategy.getExtent());
             assertNotNull("raf", bufferStrategy.raf);
             assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
@@ -150,7 +150,7 @@ public class TestMappedJournal extends AbstractTestCase {
 
         } finally {
             
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 

@@ -52,6 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
+
 /**
  * Test suite for transaction isolation with respect to the underlying journal.
  * The tests in this suite are designed to verify isolation of changes within
@@ -142,10 +143,7 @@ public class TestTx extends ProxyTestCase {
         
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
-        properties.setProperty("slotSize","128");
+        properties.setProperty(Options.SLOT_SIZE,"128");
 
         try {
             
@@ -201,7 +199,7 @@ public class TestTx extends ProxyTestCase {
             
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -214,10 +212,6 @@ public class TestTx extends ProxyTestCase {
     public void test_duplicateTransactionIdentifiers01() throws IOException {
         
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -246,7 +240,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }       
         
@@ -269,10 +263,6 @@ public class TestTx extends ProxyTestCase {
     public void test_duplicateTransactionIdentifiers02() throws IOException {
         
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -303,7 +293,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }       
         
@@ -335,10 +325,6 @@ public class TestTx extends ProxyTestCase {
     public void test_delete001() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -450,7 +436,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -484,10 +470,6 @@ public class TestTx extends ProxyTestCase {
     public void test_isolation001() throws IOException {
         
         final Properties properties = getProperties();
-        
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
 
         try {
             
@@ -633,7 +615,7 @@ public class TestTx extends ProxyTestCase {
             
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
         
@@ -659,10 +641,6 @@ public class TestTx extends ProxyTestCase {
 
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
-
         try {
             
             Journal journal = new Journal(properties);
@@ -898,7 +876,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -914,10 +892,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_activeAbort() throws IOException {
         
         final Properties properties = getProperties();
-        
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
 
         try {
             
@@ -955,7 +929,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -968,10 +942,6 @@ public class TestTx extends ProxyTestCase {
         
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
-
         try {
             
             Journal journal = new Journal(properties);
@@ -1019,7 +989,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1031,10 +1001,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_activePrepareCommit() throws IOException {
         
         final Properties properties = getProperties();
-        
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
 
         try {
             
@@ -1083,7 +1049,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1098,10 +1064,6 @@ public class TestTx extends ProxyTestCase {
         
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
-
         try {
             
             Journal journal = new Journal(properties);
@@ -1155,7 +1117,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1169,10 +1131,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_activePreparePrepare_correctRejection() throws IOException {
         
         final Properties properties = getProperties();
-        
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
 
         try {
             
@@ -1227,7 +1185,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1241,10 +1199,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_activeCommit_correctRejection() throws IOException {
         
         final Properties properties = getProperties();
-        
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
 
         try {
             
@@ -1288,7 +1242,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1303,10 +1257,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_prepareRead_correctRejection() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -1339,7 +1289,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -1354,10 +1304,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_prepareWrite_correctRejection() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -1390,7 +1336,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -1405,10 +1351,6 @@ public class TestTx extends ProxyTestCase {
     public void test_runStateMachine_prepareDelete_correctRejection() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -1441,7 +1383,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -1464,10 +1406,6 @@ public class TestTx extends ProxyTestCase {
 
         final Properties properties = getProperties();
         
-        final String filename = getTestJournalFile();
-        
-        properties.setProperty("file",filename);
-
         try {
             
             Journal journal = new Journal(properties);
@@ -1562,7 +1500,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
             
         }
 
@@ -1575,10 +1513,6 @@ public class TestTx extends ProxyTestCase {
     public void test_deletePreExistingVersion_noConflict() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
 
         try {
 
@@ -1629,7 +1563,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -1655,10 +1589,6 @@ public class TestTx extends ProxyTestCase {
     public void test_readWriteConflict01() throws IOException {
 
         final Properties properties = getProperties();
-
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
         
         /*
          * Setup a conflict resolver that will throw an exception if a
@@ -1799,7 +1729,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 
@@ -1862,10 +1792,6 @@ public class TestTx extends ProxyTestCase {
         
         final Properties properties = getProperties();
 
-        final String filename = getTestJournalFile();
-
-        properties.setProperty("file", filename);
-        
         /*
          * Setup the conflict resolver.
          */
@@ -2070,7 +1996,7 @@ public class TestTx extends ProxyTestCase {
 
         } finally {
 
-            deleteTestJournalFile(filename);
+            deleteTestJournalFile();
 
         }
 

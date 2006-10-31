@@ -339,31 +339,6 @@ import java.util.Properties;
 
 public class Journal implements IStore {
 
-    /**
-     * The default initial extent for a new journal.
-     */
-    final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
-    
-    /**
-     * The minimum node size (aka branching factor) for the object index.
-     */
-    final static int MIN_OBJECT_INDEX_SIZE = 16;
-
-    /**
-     * The maximum node size (aka branching factor) for the object index.
-     */
-    final static int MAX_OBJECT_INDEX_SIZE = 2048;
-    
-    /**
-     * The default node size (aka branching factor) for the object index.
-     */
-    final static int DEFAULT_OBJECT_INDEX_SIZE = 256;
-    
-    /**
-     * The minimum permitted slot size.
-     */
-    final static int MIN_SLOT_SIZE = 32;
-    
     // Make package private or just get rid of this : BTree is currently using it.
     public final SlotMath slotMath;
     
@@ -382,7 +357,7 @@ public class Journal implements IStore {
     final IBufferStrategy _bufferStrategy;
 
     /**
-     * The delegate that implements the {@link BufferMode}.
+     * The delegate that implements the {@link BufferMode}.-
      */
     public IBufferStrategy getBufferStrategy() {
         
@@ -415,17 +390,7 @@ public class Journal implements IStore {
      * 
      * @todo Change to use the {@link IObjectIndex} interface.
      */
-    final SimpleObjectIndex objectIndex = new SimpleObjectIndex();
-    
-    /**
-     * Indicates the last slot in a chain of slots representing a data version
-     * (-1).
-     * 
-     * @see SlotMath#headerSize
-     * 
-     * @deprecated The use of slot headers is being phased out.
-     */
-    public static final int LAST_SLOT_MARKER = -1;
+    final SimpleObjectIndex objectIndex;
     
     /**
      * The slot allocation index.
@@ -733,60 +698,13 @@ public class Journal implements IStore {
     /**
      * Create or open a journal.
      * 
-     * @param properties
-     *            <dl>
-     *            <dt>file</dt>
-     *            <dd>The name of the file. If the file not found and "create"
-     *            is true, then a new journal will be created.</dd>
-     *            <dt>segment</dt>
-     *            <dd>The unique segment identifier (required unless this is a
-     *            transient journal). Segment identifiers are assigned by a
-     *            bigdata federation. When using the journal as part of an
-     *            embedded database you may safely assign an arbitrary segment
-     *            identifier.</dd>
-     *            <dt>slotSize</dt>
-     *            <dd>The slot size in bytes.</dd>
-     *            <dt>initialExtent</dt>
-     *            <dd>The initial extent of the journal (bytes). The initial
-     *            file size is computed by subtracting off the space required by
-     *            the root blocks and dividing by the slot size.</dd>
-     *            <dt>create</dt>
-     *            <dd>When [create == true] and the named file is not found, a
-     *            new journal will be created.</dd>
-     *            <dt>bufferMode</dt>
-     *            <dd>Either "transient", "direct", "mapped", or "disk". See
-     *            {@link BufferMode} for more information about each mode.</dd>
-     *            <dt>forceWrites</dt>
-     *            <dd>When true, the journal file is opened in a mode where
-     *            writes are written through to disk immediately. The use of
-     *            this option is not recommended as it imposes strong
-     *            performance penalties and does NOT provide any additional data
-     *            safety (it is here mainly for performance testing).</dd>
-     *            <dt>objectIndexSize</dt>
-     *            <dd>The size of a node in the object index (aka branching
-     *            factor). A larger node size correlates with an object index
-     *            with less height, and height correlates with access time.
-     *            Access time is a concern when the journal is not fully
-     *            buffered. The value must be even and is normally a power of
-     *            two, e.g., 64, 128, 256, etc.</dd>
-     *            <dt>conflictResolver</dt>
-     *            <dd>The name of a class that implements the
-     *            {@link IConflictResolver} interface (optional). The class MUST
-     *            define a public constructor with the signature
-     *            <code><i>class</i>( Journal journal )</code>. There is NO
-     *            default. State-based resolution of write-write conflicts is
-     *            enabled iff a conflict resolution class is declared with this
-     *            parameter.</dd>
-     *            <dt>deleteOnClose</dt>
-     *            <dd>This optional boolean option causes the journal file to
-     *            be deleted when the journal is closed (default <em>false</em>).
-     *            This option is used by the test suites to keep down the disk
-     *            burden of the tests and MUST NOT be used with live data.</dd>
-     *            </dl>
+     * @param properties The properties as defined by {@link Options}.
      * 
      * @throws IOException
      *             If there is a problem when creating, opening, or reading from
      *             the journal file.
+     * 
+     * @see Options
      * 
      * @todo Write tests that verify (a) that read-only mode does not permit
      *       writes; (b) that read-only mode is not supported for a transient
@@ -804,11 +722,12 @@ public class Journal implements IStore {
         
         long segment;
         int slotSize;
-        long initialExtent = DEFAULT_INITIAL_EXTENT;
-        int objectIndexSize = DEFAULT_OBJECT_INDEX_SIZE;
-        boolean readOnly = false;
-        boolean forceWrites = false;
-        boolean deleteOnClose = false;
+        long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
+        int objectIndexSize = Options.DEFAULT_OBJECT_INDEX_SIZE;
+        boolean create = Options.DEFAULT_CREATE;
+        boolean readOnly = Options.DEFAULT_READ_ONLY;
+        boolean forceWrites = Options.DEFAULT_FORCE_WRITES;
+        boolean deleteOnClose = Options.DEFAULT_DELETE_ON_CLOSE;
         Class conflictResolverClass = null;
         String val;
 
@@ -819,7 +738,7 @@ public class Journal implements IStore {
          * disk-based mode.
          */
 
-        val = properties.getProperty("bufferMode");
+        val = properties.getProperty(Options.BUFFER_MODE);
 
         if (val == null)
             val = BufferMode.Direct.toString();
@@ -830,7 +749,7 @@ public class Journal implements IStore {
          * "segment".
          */
         
-        val = properties.getProperty("segment");
+        val = properties.getProperty(Options.SEGMENT);
         
         if( val == null ) {
             
@@ -840,7 +759,7 @@ public class Journal implements IStore {
             
             } else {
             
-                throw new RuntimeException("Required property: 'segment'");
+                throw new RuntimeException("Required property: '"+Options.SEGMENT+"'");
                 
             }
             
@@ -852,7 +771,7 @@ public class Journal implements IStore {
          * "slotSize"
          */
 
-        val = properties.getProperty("slotSize");
+        val = properties.getProperty(Options.SLOT_SIZE);
 
         if (val == null) {
          
@@ -862,10 +781,11 @@ public class Journal implements IStore {
 
         slotSize = Integer.parseInt(val);
 
-        if (slotSize < Journal.MIN_SLOT_SIZE ) {
+        if (slotSize < Options.MIN_SLOT_SIZE ) {
 
-            throw new RuntimeException("slotSize must be at least "
-                    + Journal.MIN_SLOT_SIZE + " : " + slotSize);
+            throw new RuntimeException("'" + Options.SLOT_SIZE
+                    + "' must be at least " + Options.MIN_SLOT_SIZE
+                    + ", but found " + slotSize);
 
         }
 
@@ -879,17 +799,18 @@ public class Journal implements IStore {
          * "initialExtent"
          */
 
-        val = properties.getProperty("initialExtent");
+        val = properties.getProperty(Options.INITIAL_EXTENT);
 
         if (val != null) {
 
             initialExtent = Long.parseLong(val);
 
-            if( initialExtent <= Bytes.megabyte ) {
+            if( initialExtent < Bytes.megabyte ) {
                 
                 throw new RuntimeException(
-                        "The initialExtent must be at least one megabyte("
-                                + Bytes.megabyte + ")");
+                        "The '" + Options.INITIAL_EXTENT
+                        + "' must be at least one megabyte(" + Bytes.megabyte
+                        + ")");
                 
             }
             
@@ -899,7 +820,7 @@ public class Journal implements IStore {
          * "readOnly"
          */
 
-        val = properties.getProperty("readOnly");
+        val = properties.getProperty(Options.READ_ONLY);
         
         if( val != null ) {
 
@@ -911,7 +832,7 @@ public class Journal implements IStore {
          * "forceWrites"
          */
 
-        val = properties.getProperty("forceWrites");
+        val = properties.getProperty(Options.FORCE_WRITES);
         
         if( val != null ) {
 
@@ -923,17 +844,20 @@ public class Journal implements IStore {
          * "objectIndexSize"
          */
 
-        val = properties.getProperty("objectIndexSize");
+        val = properties.getProperty(Options.OBJECT_INDEX_SIZE);
         
         if( val != null ) {
 
             objectIndexSize = Integer.parseInt(val);
 
-            if( objectIndexSize < MIN_OBJECT_INDEX_SIZE || objectIndexSize > MAX_OBJECT_INDEX_SIZE ) {
-                
-                throw new RuntimeException("objectIndexSize must be in ["
-                        + MIN_OBJECT_INDEX_SIZE + ":" + MAX_OBJECT_INDEX_SIZE
-                        + "]: " + objectIndexSize);
+            if (objectIndexSize < Options.MIN_OBJECT_INDEX_SIZE
+                    || objectIndexSize > Options.MAX_OBJECT_INDEX_SIZE) {
+
+                throw new RuntimeException("'"
+                        + Options.DEFAULT_OBJECT_INDEX_SIZE + "' must be in ["
+                        + Options.MIN_OBJECT_INDEX_SIZE + ":"
+                        + Options.MAX_OBJECT_INDEX_SIZE + "], but found "
+                        + objectIndexSize);
                 
             }
             
@@ -943,7 +867,7 @@ public class Journal implements IStore {
          * "deleteOnClose"
          */
 
-        val = properties.getProperty("deleteOnClose");
+        val = properties.getProperty(Options.DELETE_ON_CLOSE);
         
         if( val != null ) {
 
@@ -957,7 +881,7 @@ public class Journal implements IStore {
          * "conflictResolver"
          */
 
-        val = properties.getProperty("conflictResolver");
+        val = properties.getProperty(Options.CONFLICT_RESOLVER);
         
         if( val != null ) {
 
@@ -1026,10 +950,12 @@ public class Journal implements IStore {
              * "file"
              */
 
-            val = properties.getProperty("file");
+            val = properties.getProperty(Options.FILE);
 
             if (val == null) {
-                throw new RuntimeException("Required property: 'file'");
+             
+                throw new RuntimeException("Required property: '"+Options.FILE+"'");
+                
             }
 
             File file = new File(val);
@@ -1040,26 +966,29 @@ public class Journal implements IStore {
 
             FileMetadata fileMetadata = new FileMetadata(segment, file,
                     BufferMode.Direct, initialExtent, slotSize,
-                    objectIndexSize, readOnly, forceWrites);
-            
-            _bufferStrategy = new DirectBufferStrategy( fileMetadata, slotMath);
+                    objectIndexSize, create, readOnly, forceWrites);
 
-            this._rootBlock = fileMetadata.rootBlock; 
+            _bufferStrategy = new DirectBufferStrategy(fileMetadata, slotMath);
+
+            this._rootBlock = fileMetadata.rootBlock;
 
             break;
-        
+
         }
 
         case Mapped: {
-            
+
             /*
              * "file"
              */
 
-            val = properties.getProperty("file");
+            val = properties.getProperty(Options.FILE);
 
             if (val == null) {
-                throw new RuntimeException("Required property: 'file'");
+
+                throw new RuntimeException("Required property: '"
+                        + Options.FILE + "'");
+
             }
 
             File file = new File(val);
@@ -1067,28 +996,32 @@ public class Journal implements IStore {
             /*
              * Setup the buffer strategy.
              */
-            
+
             FileMetadata fileMetadata = new FileMetadata(segment, file,
                     BufferMode.Mapped, initialExtent, slotSize,
-                    objectIndexSize, readOnly, forceWrites);
+                    objectIndexSize, create, readOnly, forceWrites);
 
-            _bufferStrategy = new MappedBufferStrategy( fileMetadata, slotMath);
+            _bufferStrategy = new MappedBufferStrategy(fileMetadata, slotMath);
 
-            this._rootBlock = fileMetadata.rootBlock; 
+            this._rootBlock = fileMetadata.rootBlock;
 
             break;
-            
+
         }
-        
+
         case Disk: {
+
             /*
              * "file"
              */
 
-            val = properties.getProperty("file");
+            val = properties.getProperty(Options.FILE);
 
             if (val == null) {
-                throw new RuntimeException("Required property: 'file'");
+
+                throw new RuntimeException("Required property: '"
+                        + Options.FILE + "'");
+
             }
 
             File file = new File(val);
@@ -1099,7 +1032,7 @@ public class Journal implements IStore {
 
             FileMetadata fileMetadata = new FileMetadata(segment, file,
                     BufferMode.Disk, initialExtent, slotSize, objectIndexSize,
-                    readOnly, forceWrites);
+                    create, readOnly, forceWrites);
             
             _bufferStrategy = new DiskOnlyStrategy(fileMetadata, slotMath);
 
@@ -1130,6 +1063,11 @@ public class Journal implements IStore {
                 _bufferStrategy.getSlotLimit());
 
         /*
+         * FIXME Change this to use the persistence capable object index.
+         */
+        objectIndex = new SimpleObjectIndex(allocationIndex);
+        
+        /*
          * Initialize the conflict resolver.
          */
         
@@ -1144,10 +1082,11 @@ public class Journal implements IStore {
                         .newInstance(new Object[] { this });
                 
             }
-            catch(Exception ex ) {
-                
-                throw new RuntimeException("Conflict resolver: "+ex, ex);
-                
+
+            catch (Exception ex) {
+
+                throw new RuntimeException("Conflict resolver: " + ex, ex);
+
             }
             
         } else {
@@ -1253,6 +1192,15 @@ public class Journal implements IStore {
      * by this operation. If the new extent would exceed the limits of the
      * current strategy, then this operation requires changing to a
      * {@link BufferMode#Disk} buffer strategy.
+     * 
+     * FIXME Implement the ability to transparently change the buffer mode. For
+     * example, the journal comes only using a disk-only mode (paged, low memory
+     * burden) but access starts to heat up. We need to be able to convert
+     * access to direct without forcing restart of the journal. There could be a
+     * similar conversion to a special "transient" mode in which redundent
+     * servers provide restart safety for even high performance. Likewise, we
+     * should be able to reduce the resource consumption of the journal at any
+     * time by converting from direct to disk-only.
      */
     public void extend( int minBytes ) {
         
@@ -1281,7 +1229,7 @@ public class Journal implements IStore {
          * onto the slots on which the data was just written.
          */
 
-        objectIndex.mapIdToSlots(id, slots, allocationIndex);
+        objectIndex.put(id, slots);
 
     }
     

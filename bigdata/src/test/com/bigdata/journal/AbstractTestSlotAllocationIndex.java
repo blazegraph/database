@@ -55,6 +55,8 @@ import junit.framework.TestCase;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME write tests.
  */
 public class AbstractTestSlotAllocationIndex extends TestCase {
 

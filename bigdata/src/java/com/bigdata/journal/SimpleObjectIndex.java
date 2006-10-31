@@ -290,13 +290,30 @@ public class SimpleObjectIndex implements IObjectIndex {
      * the committed object index state as of the time that a transaction began.
      */
     final SimpleObjectIndex baseObjectIndex;
+
+    /**
+     * The slot allocation index.
+     */
+    final ISlotAllocationIndex allocationIndex;
+    
+    /**
+     * Disallowed constructor.
+     */
+    private SimpleObjectIndex() {
+        throw new UnsupportedOperationException();
+    }
     
     /**
      * Constructor used for the base object index (outside of any transactional
      * scope).
+     * 
+     * @param allocationIndex
+     *            The slot allocation index.
      */
-    public SimpleObjectIndex() {
+    public SimpleObjectIndex(ISlotAllocationIndex allocationIndex) {
 
+        if( allocationIndex == null ) throw new IllegalArgumentException();
+        
         /*
          * Assume that the journal object index will be relatively large.
          * 
@@ -313,6 +330,8 @@ public class SimpleObjectIndex implements IObjectIndex {
 //        this.objectIndex = new TreeMap<Integer, IObjectIndexEntry>();
         
         this.baseObjectIndex = null;
+        
+        this.allocationIndex = allocationIndex;
 
     }
 
@@ -331,7 +350,9 @@ public class SimpleObjectIndex implements IObjectIndex {
      * which the tx starts from being modified either by unisolated writes or by
      * concurrent transactions that commit.
      */
-    private SimpleObjectIndex(Map<Integer,IObjectIndexEntry> objectIndex ) {
+    private SimpleObjectIndex(ISlotAllocationIndex allocationIndex, Map<Integer,IObjectIndexEntry> objectIndex ) {
+
+        if( allocationIndex == null ) throw new IllegalArgumentException();
 
         Map<Integer, IObjectIndexEntry> copy = new HashMap<Integer, IObjectIndexEntry>(
                 objectIndex.size());
@@ -346,6 +367,8 @@ public class SimpleObjectIndex implements IObjectIndex {
         this.objectIndex = Collections.unmodifiableMap(copy);
 
         this.baseObjectIndex = null;
+        
+        this.allocationIndex = allocationIndex; 
 
     }
     
@@ -394,7 +417,10 @@ public class SimpleObjectIndex implements IObjectIndex {
         this.objectIndex = new ConcurrentHashMap<Integer, IObjectIndexEntry>(
                 initialCapacity, loadFactor, concurrencyLevel);
 
-        this.baseObjectIndex = new SimpleObjectIndex(baseObjectIndex.objectIndex);
+        this.baseObjectIndex = new SimpleObjectIndex(
+                baseObjectIndex.allocationIndex, baseObjectIndex.objectIndex);
+
+        this.allocationIndex = baseObjectIndex.allocationIndex;
         
     }
 
@@ -469,7 +495,7 @@ public class SimpleObjectIndex implements IObjectIndex {
         
     }
     
-    public void mapIdToSlots( int id, ISlotAllocation slots, ISlotAllocationIndex allocationIndex ) {
+    public void put( int id, ISlotAllocation slots ) {
         
         if( slots == null ) throw new IllegalArgumentException();
         

@@ -8,6 +8,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
+
 /**
  * Helper object used when opening or creating journal file in any of the
  * file-based modes.
@@ -125,6 +126,8 @@ class FileMetadata {
      *            The #of keys in a node of the object index (aka branching
      *            factor). This value must be even, and positive. Typically it
      *            is a power of two. E.g., 64, 128, 256.
+     * @param create
+     *            When true, the file is created if it does not exist.
      * @param readOnly
      *            When true, the file is opened in a read-only mode and it is an
      *            error if the file does not exist.
@@ -137,7 +140,8 @@ class FileMetadata {
      */
 
     FileMetadata(long segment, File file, BufferMode bufferMode,
-            long initialExtent, int slotSize, int objectIndexSize, boolean readOnly, boolean forceWrites)
+            long initialExtent, int slotSize, int objectIndexSize,
+            boolean create, boolean readOnly, boolean forceWrites)
             throws IOException {
 
         if (file == null)
@@ -154,11 +158,18 @@ class FileMetadata {
             
         }
 
+        if (readOnly && create) {
+
+            throw new IllegalArgumentException("'" + Options.CREATE
+                    + "' may not be used with '" + Options.READ_ONLY + "'");
+
+        }
+
         if (readOnly && forceWrites) {
 
-            throw new IllegalArgumentException(
-                    "forceWrites may not be used with readOnly");
-            
+            throw new IllegalArgumentException("'" + Options.FORCE_WRITES
+                    + "' may not be used with '" + Options.READ_ONLY + "'");
+
         }
 
         this.segment = segment;
@@ -176,19 +187,27 @@ class FileMetadata {
         if (exists) {
 
             System.err.println("Opening existing file: "
-                    + file.getAbsolutePath());
+                    + file.getAbsoluteFile());
 
         } else {
 
             if (readOnly) {
 
-                throw new RuntimeException(
-                        "File does not exist and readOnly was specified: "
-                                + file.getAbsolutePath());
+                throw new RuntimeException("File does not exist and '"
+                        + Options.READ_ONLY + "' was specified: "
+                        + file.getAbsoluteFile());
 
             }
 
-            System.err.println("Will create file: " + file.getAbsolutePath());
+            if ( ! create ) {
+
+                throw new RuntimeException("File does not exist and '"
+                        + Options.CREATE + "' was not specified: "
+                        + file.getAbsoluteFile());
+
+            }
+
+            System.err.println("Will create file: " + file.getAbsoluteFile());
 
         }
 
@@ -217,7 +236,7 @@ class FileMetadata {
                  * We were not able to get a lock on the file.
                  */
 
-                throw new RuntimeException("Could not lock file: " + file);
+                throw new RuntimeException("Could not lock file: " + file.getAbsoluteFile());
 
             }
 
@@ -230,6 +249,22 @@ class FileMetadata {
              */
 
             this.extent = raf.length();
+            
+            if( this.extent <= journalHeaderSize ) {
+
+                /*
+                 * By throwing an exception for files that are not large enough
+                 * to contain the MAGIC, VERSION, and both root blocks we avoid
+                 * IO errors when trying to read those data and are able to
+                 * reject files based on whether they have bad magic, version,
+                 * or root blocks.
+                 */
+                
+                throw new RuntimeException(
+                        "File too small to contain a valid journal: "
+                                + file.getAbsoluteFile());
+                
+            }
 
             if( bufferMode != BufferMode.Disk ) {
 
