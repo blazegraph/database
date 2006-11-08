@@ -45,14 +45,15 @@ Modifications:
  * Created on Nov 8, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.cache;
 
 import java.util.Stack;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.objndx.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.cache.HardReferenceCache;
+import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
 
 /**
  * Unit tests for {@link HardReferenceCache}.

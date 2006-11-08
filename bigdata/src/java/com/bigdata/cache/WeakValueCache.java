@@ -1,0 +1,630 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Dec 13, 2005
+ */
+package com.bigdata.cache;
+
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+/**
+ * <p>
+ * A memory sensitive cache using weak references for its values and object ids
+ * for its keys and backed by the CRUD operations of the persistence layer,
+ * which is assumed to implement a hard reference LRU or similar cache policy.
+ * </p>
+ * <p>
+ * Performance can be drammatically effect by the selection of the size of the
+ * LRU cache and by the choice of soft vs. weak references. The interaction of
+ * these parameters and the choice of the load factor for the weak value and LRU
+ * caches is non-trival. Good performance is observed for default settings, but
+ * you can see 2-4x or better improvements through a tuned cache. You need a
+ * performance benchmark in order to tune your cache. The best performance
+ * benchmark is a solid and representative sample of real operations performed
+ * by your application, e.g., loading data, navigating data, and querying data.
+ * </p>
+ * <p>
+ * If you use soft references then the garbage collector will defer collection
+ * of application objects until it determines that it needs the memory. In
+ * contrast the garbage collector ignores the presence of weak references when
+ * deciding whether or not to clear the references for an object. The backing
+ * LRU cache policy MUST be using hard references, so in any case nothing will
+ * be removed from the weak value cache until it has been first evicted from the
+ * backing LRU.
+ * </p>
+ * <p>
+ * Finalizers MUST NOT be relied on to effect the persistent state of objects in
+ * this cache since (a) finalizers may never run; and (b) finalizers will only
+ * run after references to the object in the cache have been cleared.
+ * </p>
+ * <p>
+ * Since dirty objects that are evicted from the hard reference cache are
+ * installed on the database, it is NOT possible to have an object in the weak
+ * cache that is (a) dirty; and (b) not also in the hard reference cache.
+ * Therefore the <i>dirty</i> flag is <em>only</em> maintained by the hard
+ * reference cache.  When an object no longer exists in the hard reference cache
+ * but it still present in the weak reference cache, a {@link #get(long)} will 
+ * cause the object to be installed into the hard reference cache and the object
+ * will be marked as <strong>clean</strong>.
+ * <p>
+ * This implementation is synchronized.
+ * </p>
+ * 
+ * @version $Id$
+ * @author thompsonbry
+ */
+
+final public class WeakValueCache<T>
+    implements ICachePolicy<T>
+{
+
+    public static final Logger log = Logger.getLogger(WeakValueCache.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+
+    /**
+     * Default value for the initial capacity (1000).
+     */
+    static public final int INITIAL_CAPACITY = 1000;
+    
+    /**
+     * Default value for the load factor (0.75).
+     */
+    static public final float LOAD_FACTOR = 0.75f;
+    
+    /**
+     * The initial capacity of the cache.
+     */
+    private int _initialCapacity; 
+    
+    /**
+     * The load factor for the cache.
+     */
+    private float _loadFactor;
+    
+    /**
+     * #of "put" operations. Put operations either result in an insert or a
+     * "touch".
+     */
+    private int _nput     = 0;
+    
+    /**
+     * #of "put" operations that wind up inserting the object into the weak
+     * value cache.
+     */
+    private int _ninsert  = 0;
+    
+    /**
+     * #of "put" operations that wind up touching the object in the weak value
+     * cache. A touch in the weak value cache does not cause any change in the
+     * state of the weak value cache.
+     */
+    private int _ntouch   = 0;
+    
+    /**
+     * #of cache tests.
+     */
+    private int _ntest    = 0;
+    
+    /**
+     * #of successful cache tests.
+     */
+    private int _nsuccess = 0;
+    
+    /**
+     * #of cache entries which were cleared.
+     */
+    private int _nclear   = 0;
+    
+    /**
+     * #of cache entries which were explicitly removed.
+     */
+    private int _nremove  = 0;
+
+    /**
+     * The high tide for the cache is the largest size which it achieves. The
+     * size of the cache grows as objects are added to the cache and shrinks as
+     * references are cleared and as objects are explicitly removed from the
+     * cache.
+     */
+    private int _highTide = 0;
+        
+    /**
+     * The hash map which is the basis for the cache. The keys are the object
+     * identifiers. The values are weak references to the objects inserted into
+     * the cache.
+     * 
+     * @see WeakCacheEntry
+     */
+    private Map<Long,IWeakRefCacheEntry<T>> _cache;
+    
+    /**
+     * Reference queue for weak references in entered into the cache.
+     * A weak reference will appear on this queue once the reference
+     * has been cleared.
+     */
+    private ReferenceQueue<T> _queue;
+    
+    /**
+     * The delegate for the hard reference cache policy implemented by the
+     * persistence layer.
+     */
+    final private ICachePolicy<T> _delegate;
+    
+    final private IWeakRefCacheEntryFactory<T> _factory;
+
+    public WeakValueCache( ICachePolicy<T> delegate )
+    {
+        
+        this( INITIAL_CAPACITY, LOAD_FACTOR, delegate, new WeakCacheEntryFactory<T>() );
+        
+    }
+
+    public WeakValueCache( ICachePolicy<T> delegate, IWeakRefCacheEntryFactory<T> factory )
+    {
+    
+        this( INITIAL_CAPACITY, LOAD_FACTOR, delegate, factory );
+
+    }
+    
+    /**
+	 * Designated constructor.
+	 * 
+	 * @param initialCapacity
+	 *            May be used to reduce re-hashing by starting with a larger
+	 *            initial capacicty in the {@link HashMap} with weak values.
+	 *            (The capacity of the delegate hard reference cache map is
+	 *            configured separately.)
+	 * 
+	 * @param loadFactor
+	 *            May be used to bias for speed vs space in the {@link HashMap}.
+	 * 
+	 * @param delegate
+	 *            The delegate which MUST implement a hard reference cache
+	 *            policy such as LRU.
+	 * 
+	 * @param factory
+	 *            The factory which will generate the weak reference value
+	 *            objects for this cache.
+	 * 
+	 * @exception IllegalArgumentException
+	 *                if the initialCapacity is negative.
+	 * @exception IllegalArgumentException
+	 *                if the loadFactor is non-positive.
+	 */
+    
+    public WeakValueCache
+    	( int initialCapacity,
+    	  float loadFactor,
+    	  ICachePolicy<T> delegate,
+    	  IWeakRefCacheEntryFactory<T> factory
+    	  )
+    {
+    
+        if( delegate == null || factory == null ) {
+            
+            throw new IllegalArgumentException();
+           
+        }
+        
+        _initialCapacity = initialCapacity;
+        
+        _loadFactor = loadFactor;
+        
+        _cache = new HashMap<Long,IWeakRefCacheEntry<T>>( initialCapacity, loadFactor );
+        
+        _queue = new ReferenceQueue<T>();
+        
+        _delegate = delegate;
+        
+        _factory = factory;
+        
+    }
+
+    /**
+     * The delegate hard reference cache.
+     */
+    public ICachePolicy<T> getDelegate() {
+        return _delegate;
+    }
+    
+    synchronized public void clear()
+    {
+
+        reportStatistics( true );
+        
+        _cache = new HashMap<Long,IWeakRefCacheEntry<T>>( _initialCapacity, _loadFactor );
+        
+        _queue = new ReferenceQueue<T>();
+        
+        _delegate.clear();
+
+    }
+    
+    /**
+     * Report and optionally clear the cache statistics.
+     * 
+     * @param resetCounters
+     *            When true the counters will be reset to zero.
+     */
+    
+    synchronized public void reportStatistics( boolean resetCounters )
+    {
+        
+        int size = _cache.size();
+        
+        double hitRatio = ((double)_nsuccess/_ntest);
+        
+        System.err.println
+           ( "WeakValueCache"+
+             ": initialCapacity="+_initialCapacity+
+             ", size="+size+
+             ", highTide="+_highTide+
+             ", nput="+_nput+
+             ", ninsert="+_ninsert+
+             ", ntouch="+_ntouch+
+             ", nremove="+_nremove+
+             ", nclear="+_nclear+
+             ", ntest="+_ntest+
+             ", nsuccess="+_nsuccess+
+             ", hitRatio="+hitRatio
+             );
+        
+        if( resetCounters ) {
+            
+            _highTide = _nput = _ninsert = _ntouch = _nremove = _nclear = _ntest = _nsuccess = 0;
+            
+        }
+        
+    }
+    
+    /**
+	 * This reports some statistics gathered during the cache use. The execution
+	 * of this finalizer is NOT required for the correct functioning of the
+	 * cache.
+	 */
+    protected void finalize()
+    	throws Throwable
+    {
+        
+        super.finalize();
+        
+        reportStatistics( false );
+        
+    }
+        
+    synchronized public void put( long oid, T obj, boolean dirty )
+    {
+
+        _nput++;
+        
+        _delegate.put( oid, obj, dirty );
+        
+        /*
+         * Note: To the extent that this is a common operation it does not make
+         * sense to trade off speed vs space using the weak reference cache load
+         * factor. If this method is called on each update() of a persistent
+         * object, then speed is very important for _cache.
+         */
+        
+        Long key = new Long( oid );
+        
+        IWeakRefCacheEntry<T> entry = _cache.get( key );
+        
+        Object value = ( entry == null ? null : entry.getObject() );
+
+        if( value == null ) {
+
+        	entry = _factory.newCacheEntry( oid, obj, _queue );
+        	
+            _cache.put( key, entry );
+            
+            _ninsert++;
+
+        } else {
+
+            /*
+             * Since the object already exists in the weak value cache verify
+             * that we are not being asked to replace the object under this key
+             * with a different object.
+             */
+
+            if( value != obj ) {
+                    
+                throw new IllegalStateException
+                   ( "Attempting to change the object in cache under this key: key="+oid+", obj="+obj
+                   );
+                
+            }
+
+//            entry.setDirty( dirty );
+            
+            _ntouch++;
+
+        }
+        
+        int size = _cache.size();
+        
+        if( size > _highTide ) {
+            
+            _highTide = size;
+            
+        }
+        
+        removeClearedEntries();
+        
+    }
+    
+    synchronized public T get( long oid )
+    {
+
+        _ntest++;
+        
+        T obj = _delegate.get( oid );
+
+        if( obj != null ) {
+            
+            _nsuccess++;
+            
+        } else {
+            
+            IWeakRefCacheEntry<T> entry = _cache.get
+               ( new Long( oid )
+                 );
+            
+            if( entry != null ) {
+                
+                obj = entry.getObject();
+                
+                if( obj != null ) {
+                    /*
+                     * Note: Dirty objects are installed when they are evicted
+                     * on the hard reference cache and it is impossible for an
+                     * object to be dirty if it is not found on the hard
+                     * reference cache. Therefore we always set the dirty flag
+                     * to [false] when an object is found in the weak reference
+                     * cache and needs to be installed on the inner hard
+                     * reference cache.
+                     */
+                    _delegate.put( oid, obj, false );
+                    
+                    _nsuccess++;
+                    
+                }
+                
+            }
+            
+        }
+        
+        removeClearedEntries();
+
+        return obj;
+        
+    }
+    
+    synchronized public T remove( long oid )
+    {
+        
+        _delegate.remove( oid );
+        
+        IWeakRefCacheEntry<T> entry = _cache.remove( new Long( oid ) );
+
+        _nremove++;
+        
+        removeClearedEntries();
+        
+        if( entry != null ) {
+            
+            return entry.getObject(); 
+            
+        } else {
+            
+            return null;
+            
+        }
+        
+    }
+    
+    /**
+	 * <p>
+	 * Invoked from various methods to remove any objects whose weak reference
+	 * has been cleared from the cache. This method does not block and only
+	 * polls the {@link ReferenceQueue}. We do not clear entries from the
+	 * delegate hard reference cache because it is not possible to have a weak
+	 * or soft reference cleared while a hard reference exists, so it is not
+	 * possible to have an entry in the hard reference cache for a reference
+	 * that is being cleared here.
+	 * </p>
+	 */
+    
+    private void removeClearedEntries()
+    {
+        
+        int counter = 0; 
+        
+        for( Reference ref = _queue.poll(); ref != null; ref = _queue.poll() ) {
+            
+            Long oid = new Long( ((IWeakRefCacheEntry)ref).getKey() );
+            
+            if( _cache.get( oid ) == ref ) {
+                
+                if( DEBUG ) {
+
+                    log.debug( "Removing cleared reference: key="+oid );
+                    
+                }
+                    
+                _cache.remove( oid );
+
+                counter++;
+                
+                _nclear++;
+                
+            }
+            
+        }
+        
+        if( counter > 1 ) {
+            
+            if( INFO ) {
+                
+                log.info( "Removed "+counter+" cleared references" );
+                
+            }
+            
+        }
+        
+    }
+
+    /**
+     * Sets the listener on the delegate.
+     */
+    public void setListener(ICacheListener<T> listener) {
+       _delegate.setListener( listener ); 
+    }
+    
+    /**
+     * Return the listener on the delegate.
+     */
+    public ICacheListener<T> getCacheListener() {
+        return _delegate.getCacheListener();
+    }
+
+    /**
+     * <p>
+     * Visits objects in the delegate cache in the order defined by the
+     * delegate.
+     * </p>
+     * <p>
+     * Note: Objects evicted from the hard reference cache that are still weakly
+     * reachable are no longer accessible from the weak cache iterators. This is
+     * consistent with the policy that dirty objects are installed onto pages in
+     * the peristence layer when they are evicted from the inner hard reference
+     * cache and provides a fast iterator mechanism for scanning the object
+     * cache. While it means that you are not able to fully enumerate the
+     * entries in the weak reference cache, when integrated with a persistence
+     * layer handling installation of dirty objects onto pages, objects that are
+     * not visitable are guarenteed to be clean.
+     * </p>
+     * 
+     * @return Iterator visiting objects from the delegate hard reference cache.
+     */
+    public Iterator<T> iterator() {
+        return _delegate.iterator();
+    }
+    
+    /**
+     * <p>
+     * Visits entries in the delegate cache in the order defined by the
+     * delegate.
+     * </p>
+     * <p>
+     * Note: Objects evicted from the hard reference cache that are still weakly
+     * reachable are no longer accessible from the weak cache iterators. This is
+     * consistent with the policy that dirty objects are installed onto pages in
+     * the peristence layer when they are evicted from the inner hard reference
+     * cache and provides a fast iterator mechanism for scanning the object
+     * cache. While it means that you are not able to fully enumerate the
+     * entries in the weak reference cache, when integrated with a persistence
+     * layer handling installation of dirty objects onto pages, entries that are
+     * not visitable are guarenteed to be clean.
+     * </p>
+     * 
+     * @return Iterator visiting {@link ICacheEntry} objects from the delegate
+     *         hard reference cache.
+     */
+    public Iterator<ICacheEntry<T>> entryIterator() {
+        return _delegate.entryIterator();
+    }
+    
+//    /**
+//	 * The #of entries in the weak reference cache. Entries may be
+//	 * deterministically {@link #remove(long) removed} from the cache. However
+//	 * entries are also cleared from the cache once the object in that entry
+//	 * becomes weakly reachable. The number of entries in the cache is therefore
+//	 * a non-deterministic function of the running system since entries whose
+//	 * referents have become weakly reachable may or may not have been placed on
+//	 * the {@link ReferenceQueue} used to detect and clear weakly reachable
+//	 * entries. Once placed on the reference queue, they may be cleared
+//	 * deterministically.
+//	 * 
+//	 * @return The #of entries in the map.
+//	 */
+    /**
+     * The #of entries in the backing hard reference cache.  The weak reference
+     * cache will often contain additional entries, but those entries are not
+     * reported by this method and can not be visited by either {@link #iterator()}
+     * or {@link #entryIterator()}.
+     * 
+     * @see ICachePolicy
+     */
+    public int size() {
+//    	removeClearedEntries();
+//    	return _cache.size();
+    	return _delegate.size();
+    }
+
+    /**
+     * The capacity of the backing hard reference cache.
+     */
+    public int capacity() {
+    	return _delegate.capacity();
+    }
+    
+}

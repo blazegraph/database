@@ -45,7 +45,7 @@ Modifications:
  * Created on Nov 8, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.cache;
 
 /**
  * <p>

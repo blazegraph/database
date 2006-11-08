@@ -1,0 +1,86 @@
+<html>
+<head>
+<title>Object Cache.</title>
+</head>
+<body>
+
+<p>A canonicalizing object cache may be constructed from an outer weak
+reference value hash map backed by an inner hard reference LRU policy.
+The weak reference value map ensures that there is never more than one
+runtime object for a given object identifier (OID) in the same
+transactional scope. This guarentee means that we can use reference
+testing on persistence capable runtime objects to test for equality.
+Further, unlike testing the OID, a reference test also differentiates
+between runtime objects with the same OID in different transactional
+scopes or in different databases.</p>
+
+<h3>WeakValueCache</h3>
+
+<p>This class implements a hash map using weak or soft references as its
+values and object identifiers as its keys. When an object is touched in
+the weak value its ordering is updated in the LRU policy. Java does not
+support notification before a weak reference is cleared. Therefore cache
+eviction notices are generated when the object is evicted from the inner
+hard reference cache. When a weak reference is cleared, that fact is
+recorded on a ReferenceQueue. Various operations on the cache poll the
+queue and remove entries corresponding to objects which are no longer
+weakly reachable.</p>
+
+<h3>LRUCache</h3>
+
+<p>This class implements an LRU policy. Once the cache reaches capacity
+inserting a new object into the cache causes the Least Recently Used
+object to be evicted from the cache. A listener may be registered
+against the cache and will be notified when objects are evicted from the
+cache.</p>
+
+<h3>Integration</h3>
+
+<p>This package is designed to support efficient incremental writes of
+dirty objects which are no longer strongly reachable against page images
+within the current transaction scope for a persistence layer. The
+application is typically an object database framework, such as the
+Generic Object Model (GOM).</p>
+
+<p>A WeakValueCache is constructed using the LRUCache as its internal
+cache and registers a listener for cache eviction events against the
+LRUCache and the application registers a listener against the
+WeakValueCache.</p>
+
+<p>The capacity of the inner LRUCache determines the maximum #of dirty
+objects that may exist within the transactional scope. When the
+application fetches an object, it inserts it into the WeakValueCache.
+When the application updates the persistent state of the object it
+notifies the WeakValueCache using its update() method. Both insert and
+update operations cause the LRUCache ordering to be updated. While the
+WeakValueCache will contain all weakly reachable objects within the
+transaction, the LRUCache capacity is fixed when the transaction is
+started. Once the LRUCache is at capacity both an insert operation and
+an update operation for an object not in the LRUCache force the eviction
+of another object. No facility is provided to remove individual objects
+from the cache - they are automatically removed when the the garbage
+collector clears the weak reference.</p>
+
+<p>When the LRUCache evicts an object, the application receives notice
+via the WeakValueCache listener. If the object is dirty, then the
+application must cause the persistent state of the object to be updated
+within the transaction scope. Typically this means serializing the
+persistent state of the object and requesting that the persistence layer
+update its copy of the object state on a page image.</p>
+
+<p>When a transaction commits all dirty objects on the inner LRUCache
+must be flushed to the persistence layer.</p>
+
+<p>Each object in the cache is either clear or dirty. The dirty flag
+state is normally managed using {@link ICachePolicy#put(long, Object,
+boolean)}. During a cache eviction, the object evicted from the cache
+gets written through to the persistence layer. However it is not
+necessary to clear the dirty flag during a cache eviction since the
+cache entry will be either recycled or discarded. The only case where
+the client needs to directly set the dirty flag state is during a
+transaction commit since objects may remain in the cache after the
+commit but they are no longer dirty since they were written through to
+the persistence layer during the commit.</p>
+
+</body>
+</html>
