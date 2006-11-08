@@ -69,6 +69,9 @@ package com.bigdata.objndx;
  * the object's dirty protocol, the hard reference cache can substitute for a
  * commit list.
  * </p>
+ * <p>
+ * Note: This implementation is NOT synchronized.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -239,7 +242,8 @@ public class HardReferenceCache<T> {
          * 
          * Note: This loop goes backwards from the head.  Since the head is the
          * insertion point, we decrement the head position before testing the
-         * reference.
+         * reference.  If the head is zero, then we wrap around.  This carries
+         * the head back to the last index in the array (capacity-1).
          *
          * Note: This uses local variables to shadow the instance variables
          * so that we do not modify the state of the cache as a side effect.
@@ -252,7 +256,7 @@ public class HardReferenceCache<T> {
 
             for (int i = 0; i < nscan && count > 0; i++) {
 
-                head = (head - 1) % capacity; // update head.
+                head = (head == 0 ? capacity-1 : head - 1); // update head.
 
                 count--; // update #of references.
 
@@ -295,14 +299,16 @@ public class HardReferenceCache<T> {
     }
 
     /**
-     * Evict the LRU reference.
-     *            
+     * Evict the LRU reference. This is a NOP iff the cache is empty.
+     * 
+     * @return true iff a reference was evicted.
+     * 
      * @see HardReferenceCacheEvictionListener
      */
-    protected void evict() {
+    public boolean evict() {
         
         // The cache must not be empty.
-        assert count > 0;
+        if( count <= 0 ) return false;
 
         final T ref = refs[tail]; // LRU reference.
         refs[tail] = null; // drop reference.
@@ -312,8 +318,10 @@ public class HardReferenceCache<T> {
         // report eviction notice to listener.
         listener.evicted(this, ref);
         
+        return true;
+        
     }
-    
+
     /**
      * Evict all references, starting with the LRU reference and proceeding to
      * the MRU reference.
@@ -363,6 +371,56 @@ public class HardReferenceCache<T> {
             }
             
         }
+        
+    }
+
+    /*
+     * package private methods used to write the unit tests.
+     */
+
+    /**
+     * The head index (the insertion point).
+     */
+    int head() {
+        return head;
+    }
+    
+    /**
+     * The tail index (the LRU position).
+     */
+    int tail() {
+        return tail;
+    }
+    
+    /**
+     * The backing array.
+     */
+    T[] array() {
+        return refs;
+    }
+    
+    /**
+     * The references in the cache in order from LRU to MRU. This is a copy of
+     * the relevant references from the backing array. Changes to this array
+     * have NO effect on the state of the cache.
+     */
+    T[] toArray() {
+        
+        T[] ary = (T[])new Object[count];
+        
+        for( int n=0, i=tail; n<count; n++ ) {
+            
+            T ref = refs[ i ];
+            
+            assert ref != null;
+            
+            ary[ n ] = ref;
+            
+            i = (i + 1) % capacity; // update index.
+            
+        }
+                
+        return ary;
         
     }
     
