@@ -19,16 +19,16 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * A direct buffer containing a write through image of the backing file.
      */
     final ByteBuffer directBuffer;
-    
+
     /**
      * The current length of the backing file in bytes.
      */
     final long extent;
 
     public long getExtent() {
-        
+
         return extent;
-        
+
     }
 
     /**
@@ -36,129 +36,146 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      */
     final int slotLimit;
 
-    public int getSlotLimit() {return slotLimit;}
+    public int getSlotLimit() {
+        return slotLimit;
+    }
 
     /**
      * Asserts that the slot index is in the legal range for the journal
      * <code>[1:slotLimit-1]</code>
      * 
-     * @param slot The slot index.
+     * @param slot
+     *            The slot index.
      */
-    
-    void assertSlot( int slot ) {
-        
-        if( slot>=1 && slot<slotLimit ) return;
-        
-        throw new AssertionError("slot=" + slot + " is not in [1:"
-                + slotLimit + ")");
-        
+
+    void assertSlot(int slot) {
+
+        if (slot >= 1 && slot < slotLimit)
+            return;
+
+        throw new AssertionError("slot=" + slot + " is not in [1:" + slotLimit
+                + ")");
+
     }
 
-    BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,SlotMath slotMath,ByteBuffer buffer) {
-      
-      super( journalHeaderSize, bufferMode, slotMath );
-      
-      this.directBuffer = buffer;
-      
-      this.extent = buffer.capacity();
+    BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,
+            SlotMath slotMath, ByteBuffer buffer) {
 
-      /*
-       * The first slot index that MUST NOT be addressed.
-       * 
-       * Note: The same computation occurs in DiskOnlyStrategy and FileMetadata.
-       */
+        super(journalHeaderSize, bufferMode, slotMath);
 
-      this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
+        this.directBuffer = buffer;
 
-      System.err.println("slotLimit=" + slotLimit);
+        this.extent = buffer.capacity();
 
-  }
+        /*
+         * The first slot index that MUST NOT be addressed.
+         * 
+         * Note: The same computation occurs in DiskOnlyStrategy and
+         * FileMetadata.
+         */
 
-  public void writeSlot(int slot, ByteBuffer data) {
+        this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
 
-      assertSlot(slot);
-      assert data != null;
+        System.err.println("slotLimit=" + slotLimit);
 
-      // Position the buffer on the current slot.
-      final int pos = journalHeaderSize + slotSize * slot;
-      directBuffer.limit( pos + slotSize );
-      directBuffer.position( pos );
+    }
 
-      // Write the slot data, advances data.position().
-      directBuffer.put(data);
+    /**
+     * Return a read-only slice of the direct buffer.
+     * 
+     * @param slots
+     *            The slot allocation (MUST be contiguous).
+     * 
+     * @return The slice.
+     */
+    public ByteBuffer getSlice(ISlotAllocation slots) {
 
-  }
+        assert slots != null;
+        
+        assert slots.isContiguous();
 
-  public ByteBuffer readSlot(int slot, ByteBuffer dst ) {
+        int firstSlot = slots.firstSlot();
 
-      assertSlot(slot);
-      assert dst != null;
-      
-      final int remaining = dst.remaining();
+        int nbytes = slots.getByteCount();
 
-      assert remaining <= slotSize;
-      
-      /*
-       * Setup the source (limit and position).
-       */
-      final int pos = journalHeaderSize + slotSize * slot;
-      directBuffer.limit( pos + remaining );
-      directBuffer.position( pos );
-      
-      /*
-       * Copy data from slot.
-       */
-//      dst.limit(dst.position() + thisCopy);
-      dst.put(directBuffer);
-      
-      return dst;
+        final int pos = journalHeaderSize + slotSize * firstSlot;
+        directBuffer.limit(pos + nbytes);
+        directBuffer.position(pos);
 
-  }
+        return directBuffer.slice().asReadOnlyBuffer();
 
-//  public int readNextSlot(int thisSlot, int priorSlot, int slotsRead,
-//            int remainingToRead, ByteBuffer dst) {
-//
-//      // Position the buffer on the current slot and set limit for copy.
-//      final int pos = journalHeaderSize + slotSize * thisSlot;
-//      directBuffer.limit( pos + slotHeaderSize );
-//      directBuffer.position( pos );
-//                  
-//      // read the header.
-//      final int nextSlot = directBuffer.getInt();
-//      final int priorSlot2 = directBuffer.getInt();
-//      if( priorSlot != priorSlot2 ) {
-//          
-////          dumpSlot( thisSlot, true );
-//          throw new RuntimeException("Journal is corrupt"
-//                  + ": slotsRead=" + slotsRead + ", slot=" + thisSlot
-//                  + ", expected priorSlot=" + priorSlot
-//                  + ", actual priorSlot=" + priorSlot2);
-//
-//      }
-//
-//      // Copy data from slot.
-//      if( dst != null ) {
-//
-//          assert remainingToRead > 0;
-//          
-////          final int size = dst.capacity();
-//          
-////          final int remaining = size - dst.position();
-//          
-//          // #of bytes to read from this slot (header + data).
-//          final int thisCopy = (remainingToRead > slotDataSize ? slotDataSize
-//                  : remainingToRead);
-//
-//          directBuffer.limit( pos + slotHeaderSize + thisCopy );
-//
-//          dst.limit(dst.position() + thisCopy);
-//
-//          dst.put(directBuffer);
-//          
-//      }
-//
-//      return nextSlot;
-//      
-//  }
+    }
+    
+    /**
+     * Write the data onto a mutable slice of the buffer corresponding to the
+     * specified allocation.
+     * 
+     * @param slots
+     *            The slot allocation (MUST be contiguous).
+     * 
+     * @param data
+     *            The data (required, MUST be no larger than the capacity of the
+     *            slots).
+     */
+    public void writeSlice(ISlotAllocation slots, ByteBuffer data ) {
 
+        assert slots != null;
+        
+        assert slots.isContiguous();
+
+        int firstSlot = slots.firstSlot();
+
+        int nbytes = slots.getByteCount();
+
+        final int pos = journalHeaderSize + slotSize * firstSlot;
+        directBuffer.limit(pos + nbytes);
+        directBuffer.position(pos);
+
+        ByteBuffer slice = directBuffer.slice();
+        
+        slice.put(data);
+
+    }
+
+    public void writeSlot(int slot, ByteBuffer data) {
+
+        assertSlot(slot);
+        assert data != null;
+
+        // Position the buffer on the current slot.
+        final int pos = journalHeaderSize + slotSize * slot;
+        directBuffer.limit(pos + slotSize);
+        directBuffer.position(pos);
+
+        // Write the slot data, advances data.position().
+        directBuffer.put(data);
+
+    }
+
+    public ByteBuffer readSlot(int slot, ByteBuffer dst) {
+
+        assertSlot(slot);
+        assert dst != null;
+
+        final int remaining = dst.remaining();
+
+        assert remaining <= slotSize;
+
+        /*
+         * Setup the source (limit and position).
+         */
+        final int pos = journalHeaderSize + slotSize * slot;
+        directBuffer.limit(pos + remaining);
+        directBuffer.position(pos);
+
+        /*
+         * Copy data from slot.
+         */
+        // dst.limit(dst.position() + thisCopy);
+        dst.put(directBuffer);
+
+        return dst;
+
+    }
+    
 }

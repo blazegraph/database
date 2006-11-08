@@ -77,6 +77,26 @@ import java.nio.ByteBuffer;
  * @todo Measure the impact of the page-based commit list with
  *       {@link BenchmarkJournalWriteRate}. Examine the impact of "forceWrites"
  *       in this context.
+ * 
+ * @todo Installation reads can be queued, not to occur any later than the page
+ *       write.
+ * 
+ * @todo page writes that have no more than 2 fragments do not benefit from an
+ *       installation read since 2 IO are required in any case.
+ * 
+ * @todo page-to-page IOs can be combined into a single IO iff the pages are
+ *       sequential and we can perform page-at-a-time writes, e.g., either the
+ *       page was never written historically (have to track that on the journal
+ *       the first time around) or we have done an installation read already. If
+ *       the pages are not contiguous, then we have one IO per page written, but
+ *       there is some home that the pages will be written more efficiently on
+ *       the disk (especially if forceWrites == No).
+ * 
+ * @todo We need to steal page images from a read-only cache or from a direct
+ *       buffer in preference to an installation read. In the disk-based mode
+ *       (no buffer) we read through the dirty pages in the page commit list,
+ *       then the cached clean pages, then the disk. When buffered, we can use
+ *       use a slice onto the buffer.
  */
 public class PageCommitList {
 

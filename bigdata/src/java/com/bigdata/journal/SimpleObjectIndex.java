@@ -141,6 +141,10 @@ public class SimpleObjectIndex implements IObjectIndex {
          * @todo What about when the overwrite is outside of a transaction
          *       context? Just increment the counter and get on with life?
          * 
+         * FIXME If the counter is zero and preExistingVersionSlots is non-null
+         * then this indicates a rollover of the counter, right? This case needs
+         * to be handled and tests need to be written for this case.
+         * 
          * @see SimpleObjectIndex#mapIdToSlots(int, ISlotAllocation,
          *      ISlotAllocationIndex)
          */

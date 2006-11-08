@@ -299,7 +299,7 @@ public interface ISlotAllocationIndex {
      * Mark the slot as allocated but not committed.
      * 
      * @param slot
-     *            The slot.
+     *            The slot (0:slotLimit)
      * 
      * @exception IllegalStateException
      *                if the slot is already marked as allocated.
@@ -312,7 +312,7 @@ public interface ISlotAllocationIndex {
      * True iff the slot is currently allocated.
      * 
      * @param slot
-     *            The slot.
+     *            The slot (0:slotLimit)
      * 
      * @see #isCommitted()
      */
@@ -322,7 +322,7 @@ public interface ISlotAllocationIndex {
      * Mark the slot as committed.
      * 
      * @param slot
-     *            The slot.
+     *            The slot (0:slotLimit)
      * 
      * @exception IllegalStateException
      *                if the slot is not already marked as allocated.
@@ -331,6 +331,9 @@ public interface ISlotAllocationIndex {
     
     /**
      * True iff the slot is allocated and the allocation has been committed.
+     * 
+     * @param slot
+     *            The slot (0:slotLimit)
      * 
      * @see #isAllocated()
      */
@@ -341,7 +344,7 @@ public interface ISlotAllocationIndex {
      * will also be cleared).
      * 
      * @param slot
-     *            The slot.
+     *            The slot (0:slotLimit)
      */
     public void clear(int slot);
 
@@ -350,6 +353,16 @@ public interface ISlotAllocationIndex {
      * are also committed).
      */
     public int getAllocatedSlotCount();
+    
+    /**
+     * The index of the first slot that may not be addressed.
+     */
+    public int getSlotLimit();
+    
+    /**
+     * The size of a slot in bytes.
+     */
+    public int getSlotSize();
     
     /**
      * Deallocates the slots in the specified allocation.

@@ -93,11 +93,12 @@ import java.nio.ByteBuffer;
  *       server failed to test the pre-conditions and they were not met
  * 
  * @todo Define isolation for the allocation index. We can actually ignore the
- *       problem and only sacrifice the ability to reuse slots allocated to data
- *       versions within the transaction that are subsequently updated or
- *       deleted within the same transaction. This is a special case and
- *       doubtless of benefit, but we can get by with a flag bit set if we
- *       ignore that case.
+ *       problem if we explictly deallocate slots allocated to a transaction on
+ *       abort, however the journal will falsely believe that slots allocated to
+ *       an active transaction are still allocated in cases in which (a) the
+ *       journal crashes while the transaction is active and (b) slot allocation
+ *       index nodes have been flushed to the journal either by incremental
+ *       writes or by a concurrent transaction committing.
  * 
  * @todo Define the commit procotol.
  * 
@@ -113,17 +114,6 @@ import java.nio.ByteBuffer;
  *       journal. So, either they are the same thread that somehow switches
  *       tasks, or the journal is handed off between threads based on workload
  *       (sounds good), or we have to make the journal thread safe.)
- * 
- * @todo Define a mechanism for generating transaction identifiers. They could
- *       be UUIDs, which would make it very easy to create them but we would
- *       have to transmit transaction metadata for the concurrency control (CC)
- *       strategy, especially the timestamp. Typically the transaction
- *       identifier is simply a timestamp, but that can be overly constraining
- *       depending on the CC strategy. Since we probably need better than millis
- *       resolution, we could shift out the high bytes and bring in some nanos.
- *       We also need to bring in host information or have a centralized server
- *       that generates transaction identifiers that are guarenteed to be unique
- *       (pay a little in latency, but easy to do).
  * 
  * @todo This implementation actually uses a two level transient hash map for
  *       the object index (this is not restart safe). The first level is the
@@ -142,35 +132,6 @@ public class Tx implements IStore, ITx {
     final static String NOT_PREPARED = "Transaction is not prepared";
     final static String NOT_COMMITTED = "Transaction is not committed";
     final static String IS_COMPLETE = "Transaction is complete";
-    
-    /**
-     * Enum of transaction run states.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private enum RunState {
-        
-        ACTIVE("active"),
-        PREPARED("prepared"),
-        COMMITTED("committed"),
-        ABORTED("aborted");
-        
-        private final String name;
-        
-        RunState(String name) {
-        
-            this.name = name;
-            
-        }
-        
-        public String toString() {
-        
-            return name;
-            
-        }
-        
-    }
     
     final private Journal journal;
     final private long timestamp;
@@ -568,7 +529,7 @@ public class Tx implements IStore, ITx {
      * 
      * @todo When a pre-existing version is deleted within a transaction scope
      *       and the transaction later commits and is finally GC'd, document
-     *       whether or not tge GC will cause the index to report "not found" as
+     *       whether or not the GC will cause the index to report "not found" as
      *       a post-condition rather than "deleted".
      */
     void gc() {

@@ -55,7 +55,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-
 /**
  * <p>
  * An object journal for very fast write absorbtion. The journal supports
@@ -261,6 +260,9 @@ import java.util.Properties;
  * commit states need to be locatable on the journal, suggesting a record
  * written by PREPARE and finalized by COMMIT.
  * 
+ * FIXME When is the most efficient time to migrate committed state to the read-
+ * optimized database? How does this trade off system resources and latency?
+ * 
  * FIXME I need to work through the conditional deallocation of slots using a
  * persistence capable slot allocation before putting more effort into a
  * persistence capable object index. I can do that by working through making the
@@ -338,6 +340,30 @@ import java.util.Properties;
  *       minimum and maximum key values. Other than that the constraint is just
  *       imposed by checks on read(), write() and delete() on the Journal and Tx
  *       classes.
+ * 
+ * FIXME Implement a read only transaction and write test suites for its
+ * semantics, including both the inability to write (or delete) on the
+ * transaction, the handling of pre-existing versions, and the non-duplication
+ * of per-tx data structures.
+ * 
+ * FIXME Write test suites for the {@link TransactionServer} - this will prove
+ * out the GC design.
+ * 
+ * FIXME Write a migration thread that just moves the data into another journal
+ * or a jdbm instance. The point is to prove out the migration design in code
+ * and with tests.
+ * 
+ * FIXME Write a test that performs an index split. This is one of the remaining
+ * tricky issues and I want to work it through in more depth. Binary copy of the
+ * index rows will not work since they refer to one another by int64 id, and
+ * those ids are linked to the segment. It is acceptable for the split to be
+ * moderately costly as long as it has low / no apparent latency to bigdata
+ * clients. For example, we could do a split based on a binary copy and an
+ * temporary (mutual) id mapping for the old and new segment and then fixup the
+ * rows in the background. Another alterative is an index specific segment
+ * structure that models a keyrange as sorted data on disk, i.e., the rows are
+ * arranged in sorted order. As far as I can tell, these become the same thing
+ * when a row is an index node is a sufficiently large page.
  */
 
 public class Journal implements IStore {
@@ -416,13 +442,13 @@ public class Journal implements IStore {
      * preparing will be in this collection until it has either successfully
      * prepared or aborted.
      */
-    final Map<Long,Tx> activeTx = new HashMap<Long,Tx>();
+    final Map<Long,ITx> activeTx = new HashMap<Long,ITx>();
 
     /**
      * A hash map containing all transactions that have prepared but not yet
      * either committed or aborted.
      */
-    final Map<Long,Tx> preparedTx = new HashMap<Long,Tx>();
+    final Map<Long,ITx> preparedTx = new HashMap<Long,ITx>();
     
     /**
      * Notify the journal that a new transaction is being activated (starting on
@@ -451,7 +477,7 @@ public class Journal implements IStore {
      * @todo What exactly is the impact when transactions end out of sequence? I
      *       presume that this is absolutely Ok.
      */
-    void activateTx( Tx tx ) throws IllegalStateException {
+    void activateTx( ITx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
@@ -472,7 +498,7 @@ public class Journal implements IStore {
      * 
      * @throws IllegalStateException
      */
-    void prepared( Tx tx ) throws IllegalStateException {
+    void prepared( ITx tx ) throws IllegalStateException {
         
         Long id = tx.getId();
         
@@ -514,6 +540,30 @@ public class Journal implements IStore {
             throw new IllegalStateException("Neither active nor being prepared: tx="+tx);
             
         }
+        
+    }
+
+    /**
+     * Lookup an active or prepared transaction.
+     * 
+     * @param txId
+     *            The transaction identifier.
+     * 
+     * @return The identified transaction or <code>null</code> if the
+     *         transaction identifier is not mapped to either an active or
+     *         prepared transaction.
+     */
+    public ITx getTx(long txId) {
+
+        ITx tx = activeTx.get(txId);
+        
+        if( tx == null ) {
+            
+            tx = preparedTx.get(txId);
+            
+        }
+
+        return null;
         
     }
     
@@ -1415,9 +1465,17 @@ public class Journal implements IStore {
      * @return The data read from those slots. A new buffer will be allocated if
      *         <i>dst</i> is <code>null</code> -or- if the data will not fit
      *         in the provided buffer.
-     *         
+     * 
      * FIXME WRITE and READ with contiguous slot allocations should bulk get /
      * put all the data at once rather than performing one operation per slot.
+     * The code for this partly exists as readSlice() and writeSlice() on
+     * {@link BasicBufferStrategy}. Refactor those methods into the
+     * {@link IBufferStrategy} interface and deprecate the readSlot() and
+     * writeSlot() methods (which could provide alternative implementations of
+     * the slots methods based on the read() and write() methods in the Journal
+     * class if we allowed non-contiguous allocations).
+     * 
+     * FIXME {@link SimpleSlotAllocationIndex} is WAY TO SLOW.
      */
     public ByteBuffer read(ISlotAllocation slots, ByteBuffer dst) {
 
@@ -1440,12 +1498,31 @@ public class Journal implements IStore {
          */
         if (dst == null || dst.remaining() < nbytes) {
 
-            /* Allocate a destination buffer to size.
-             * 
-             * @todo Allocate from a pool?
-             */
-            dst = ByteBuffer.allocate(nbytes);
+//            if( _bufferStrategy instanceof BasicBufferStrategy ) {
+//                
+//                /*
+//                 * For direct buffered modes (including "transient", "direct",
+//                 * and "mapped"), we just return a read-only slice of the
+//                 * buffer.
+//                 * 
+//                 * Note: This relies on the assumption that slot allocations are
+//                 * contiguous.
+//                 */
+//                
+//                return ((BasicBufferStrategy)_bufferStrategy).getSlice(slots);
+//                
+//            } else {
 
+                /*
+                 * Allocate a destination buffer to size.
+                 * 
+                 * @todo Allocate from a pool?
+                 */
+            
+                dst = ByteBuffer.allocate(nbytes);
+            
+//            }
+            
             startingPosition = 0;
             
         } else {

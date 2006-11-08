@@ -106,27 +106,38 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
 
     /**
      * Asserts that the slot index is in the legal range for the journal
-     * <code>[0:slotLimit)</code>
+     * <code>(0:slotLimit)</code> (slot 0 is disallowed).
      * 
      * @param slot
      *            The slot index.
+     * 
+     * @throws IllegalArgumentException
      */
     void assertSlot(int slot) {
 
         if (slot >= FIRST_SLOT && slot < slotLimit)
             return;
 
-        throw new AssertionError("slot=" + slot + " is not in [" + FIRST_SLOT
-                + ":" + slotLimit + ")");
+        throw new IllegalArgumentException("slot=" + slot + " is not in ["
+                + FIRST_SLOT + ":" + slotLimit + ")");
 
     }
 
+    /**
+     * Disallowed constructor.
+     */
+    private SimpleSlotAllocationIndex() {
+    
+        throw new UnsupportedOperationException();
+        
+    }
+    
     public SimpleSlotAllocationIndex(SlotMath slotMath, int slotLimit) {
 
-        assert slotMath != null;
-        
-        assert slotLimit > 0;
+        if( slotMath == null ) throw new IllegalArgumentException();
 
+        if( slotLimit <= 1 ) throw new IllegalArgumentException();
+        
         this.slotMath = slotMath;
         
         this.slotLimit = slotLimit;
@@ -138,7 +149,8 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
     }
 
     /**
-     * Release slots required to store a new version.
+     * Release slots required to store a new version. This implementation always
+     * creates a contiguous allocation.
      * 
      * @todo Track the next free slot, its run length (if we can), and the #of
      *       slots remaining in each slot allocation block so that this method
@@ -146,61 +158,150 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
      *       could even live in the root block, along with the index of the next
      *       free slot and the first free slot on the journal).
      * 
-     * @todo This notices fragmentation but does not attempt to return an
-     *       unfragmented allocation. We should probably set a policy in place
-     *       for fragmentation on a per allocation basis (as a percent of the
-     *       #of slots to be allocated) and on a trailing history basis (so that
-     *       we can recognize when the journal is generating too many fragments,
-     *       at least in the current allocation region).
+     * FIXME This code has grown somewhat organically and should be rewritten
+     *       with a clear head.  The currently implementation is MUCH slower
+     *       than the previous implementation.  The changes have to do with
+     *       ensuring that allocations are contiguous, but we should be able
+     *       to do that very cheaply.
      */
     public ISlotAllocation alloc(int nbytes) {
         
-        assert nbytes > 0;
+        if (nbytes <= 0)
+            throw new IllegalArgumentException();
         
         // #of slots needed to write the data on the journal.
         final int nslots = slotMath.getSlotCount(nbytes);
 
-        /* Create object to store the allocated slots indices. the case where
-         * nslots == 1 is optimized.
-         * 
-         * @todo Use a singleton for nslots == 1?  Use a pool for larger slot
-         * runs?  Reuse a single unbound slot allocation for larger runs and
-         * resize it as required?  Reuse of the returned value requires that
-         * we copy the data into the object index (vs copying a reference).
-         */
-        ISlotAllocation slots = (nslots == 1 ? new SingletonSlotAllocation(
-                nbytes) : new CompactSlotAllocation(nbytes, nslots));
+        // used to avoid wrapping around more than once.
+        final int fromSlot;
         
-        int lastSlot = -1;
-        
-        int fragments = 0; 
-        
-        for( int i=0; i<nslots; i++ ) { 
-            
-            int slot = nextFreeSlot();
+        try {
 
-            if( i > 0 && lastSlot + 1 != slot ) {
+            fromSlot = nextFreeSlot();
             
-                fragments++;
+        } catch (IllegalStateException ex) {
+            
+            System.err.println("Warning: " + ex);
+            
+            return null;
+            
+        }
+        
+        // set when we find a large enough contiguous extent.
+        int firstSlot = -1; // the first slot in the allocation.
+        int lastSlot = -1; // the last slot in the allocation.
+
+        // #of times we rejected an extent that was too small for the allocation.
+        int nattempts = 0;
+
+        /*
+         * true iff we have found an extent that is large enough, in which case
+         * we also set firstSlot and lastSlot.
+         */
+        boolean haveSlots = false;
+        
+        /*
+         * true iff we have wrapped around the end.
+         */
+        boolean wrapped = false;
+        
+        while (!haveSlots) {
+
+            // try to find N contiguous slots.
+            for (int i = 0; i < nslots; i++) {
+
+                final int slot;
+
+                try {
+
+                    // find the next free slot.
+                    slot = nextFreeSlot();
+                    
+                    if( wrapped && slot >= fromSlot ) {
+                        /*
+                         * The allocation has already wrapped around and the
+                         * next slot that would be allocated has an index
+                         * greater than or equal to the first slot that we
+                         * tested. At this point there can not be any extent
+                         * available that would satisify the allocation request.
+                         */
+                        return null;
+                        
+                    }
+                    
+                    /*
+                     * advance [_nextSlot] since we need to skip the slot that
+                     * we just tested and we do not mark it as allocated until
+                     * we know that we have enough slots in hand.
+                     */ 
+                    _nextSlot++;
+                    if( _nextSlot == slotLimit ) {
+                        wrapped = true;
+                        _nextSlot = 1;
+                        if( i+1 < nslots ) {
+                            /*
+                             * We can not grow the extent further since we just
+                             * wrapped around and the extent is not large enough
+                             * to satisify the allocation so we restart the
+                             * inner loop.
+                             */
+                            break;
+                        }
+                    }
+
+
+                } catch (IllegalStateException ex) {
+
+                    System.err.println("Warning: " + ex);
+
+                    return null;
+
+                }
+                
+                if (i == 0) {
+
+                    firstSlot = slot;
+                    
+                } else if (i > 0 && lastSlot + 1 != slot) {
+
+                    /*
+                     * This occurs when the extent would not be contiguous. We
+                     * break the inner loop and restart the scan in the outer
+                     * loop.
+                     */
+                    break;
+
+                }
+
+                lastSlot = slot;
+
+                if( i + 1 == nslots ) {
+                    
+                    haveSlots = true;
+                    
+                }
                 
             }
 
-            // add to the allocation that we will return to the caller.
-            slots.add( slot );
-            
-            // mark as allocated.
-            setAllocated(slot);
-            
-            lastSlot = slot;
-            
         }
 
-        slots.close();
-
-        if( fragments > 0 ) {
+        // Note: allocations never wrap around the end of the journal so this
+        // is always true.
+        assert firstSlot <= lastSlot;
+        
+        // Note: firstSlot == lastSlot iff nslots == 1.
+        assert lastSlot == firstSlot + nslots - 1;
+        
+        // mark as allocated.
+        allocated.set(firstSlot,lastSlot+1);
+        
+        ISlotAllocation slots = new ContiguousSlotAllocation(nbytes, nslots, firstSlot);
+        
+        if( nattempts > 0 ) {
             
-            System.err.println("Allocation of " + nbytes + " bytes in "
-                    + nslots + " slots has " + fragments + " fragments.");
+            System.err.println("Contiguous allocation of " + nbytes
+                    + " bytes in " + nslots + " slots in " + nattempts
+                    + " attempts.");
             
         }
         
@@ -343,5 +444,17 @@ public class SimpleSlotAllocationIndex implements ISlotAllocationIndex {
         return allocated.cardinality();
         
     }
-    
+
+    public int getSlotLimit() {
+        
+        return slotLimit;
+        
+    }
+
+    public int getSlotSize() {
+        
+        return slotMath.slotSize;
+        
+    }
+
 }

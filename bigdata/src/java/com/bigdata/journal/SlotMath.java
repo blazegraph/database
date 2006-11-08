@@ -212,7 +212,10 @@ public class SlotMath {
      * @see #getByteCount(long)
      * @see #getFirstSlot(long)
      */
-    static long toLong(int nbytes,int firstSlot) {
+    public static long toLong(int nbytes,int firstSlot) {
+        
+        assert nbytes > 0;
+        assert firstSlot > 0;
         
         return ((long) firstSlot) << 32 | nbytes ;
         

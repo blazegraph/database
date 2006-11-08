@@ -79,7 +79,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *       operations on the read-optimized database from a single server (and
  *       rename this class).
  * 
- * @todo Support replicated segments, e.g., via chaining or ROWAA.
+ * @todo Support replicated segments, e.g., via chaining or ROWAA, including the
+ *       case with RAM-only segments that gain failover through replication.
  */
 
 public class JournalServer {
@@ -95,11 +96,6 @@ public class JournalServer {
      */
     Map<Long,Journal> journals = new HashMap<Long, Journal>();
 
-    /**
-     * Active transactions (indexed by the transaction identifier).
-     */
-    Map<Long,Tx> transactions = new HashMap<Long,Tx>();
-    
     /**
      * 
      * @param segment
@@ -139,7 +135,7 @@ public class JournalServer {
         
         /*
          * @todo This is far to abupt. We have to gracefully shutdown the
-         * segment.
+         * segment (both the journal and the read-optimized database).
          */
         journal._bufferStrategy.close();
         
@@ -267,18 +263,18 @@ public class JournalServer {
         /**
          * Write request from client.
          * 
-         * @param tx
+         * @param txId
          *            The transaction identifier.
-         * @param id
+         * @param objId
      *            The int32 within-segment persistent identifier.
          * @param data
          *            The data to be written. The bytes from
          *            {@link ByteBuffer#position()} to
          *            {@link ByteBuffer#limit()} will be written.
          */
-        public void write(long tx, int id, ByteBuffer data) {
+        public void write(long txId, int objId, ByteBuffer data) {
 
-            Tx transaction = transactions.get(tx);
+            ITx transaction = journal.getTx(txId);
             
             if( transaction == null ) {
                 
@@ -288,22 +284,22 @@ public class JournalServer {
                 
             }
             
-            transaction.write(id,data);
+            transaction.write(objId,data);
             
         }
 
         /**
          * Read request from the client.
          * 
-         * @param tx
+         * @param txId
          *            The transaction identifier.
          * 
-         * @param id
+         * @param objId
          *            The int32 within-segment persistent identifier.
          */
-        public void read(long tx, int id) {
+        public void read(long txId, int objId) {
 
-            Tx transaction = transactions.get(tx);
+            ITx transaction = journal.getTx(txId);
             
             if( transaction == null ) {
                 
@@ -319,7 +315,7 @@ public class JournalServer {
              * with an object map so that the client can slice the individual
              * rows out of the block.
              */
-            ByteBuffer data = transaction.read(id, null);
+            ByteBuffer data = transaction.read(objId, null);
             
             if( data == null ) {
                 
@@ -339,14 +335,14 @@ public class JournalServer {
         /**
          * Delete request from client.
          * 
-         * @param tx
+         * @param txId
          *            The transaction identifier.
-         * @param id
+         * @param objId
          *            The int32 within-segment persistent identifier.
          */
-        public void delete(long tx, int id) {
+        public void delete(long txId, int objId) {
 
-            Tx transaction = transactions.get(tx);
+            ITx transaction = journal.getTx(txId);
             
             if( transaction == null ) {
                 
@@ -356,7 +352,7 @@ public class JournalServer {
                 
             }
 
-            transaction.delete(id);
+            transaction.delete(objId);
 
         }
 
