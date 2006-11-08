@@ -98,12 +98,17 @@ import org.apache.log4j.Logger;
  * This implementation is synchronized.
  * </p>
  * 
+ * @param K The key type.
+ * @param T The value type.
+ * 
  * @version $Id$
  * @author thompsonbry
+ * 
+ * @todo Consider removing synchronization for use in a single threaded context.
  */
 
-final public class WeakValueCache<T>
-    implements ICachePolicy<T>
+final public class WeakValueCache<K,T>
+    implements ICachePolicy<K,T>
 {
 
     public static final Logger log = Logger.getLogger(WeakValueCache.class);
@@ -192,7 +197,7 @@ final public class WeakValueCache<T>
      * 
      * @see WeakCacheEntry
      */
-    private Map<Long,IWeakRefCacheEntry<T>> _cache;
+    private Map<K,IWeakRefCacheEntry<K,T>> _cache;
     
     /**
      * Reference queue for weak references in entered into the cache.
@@ -205,18 +210,18 @@ final public class WeakValueCache<T>
      * The delegate for the hard reference cache policy implemented by the
      * persistence layer.
      */
-    final private ICachePolicy<T> _delegate;
+    final private ICachePolicy<K,T> _delegate;
     
-    final private IWeakRefCacheEntryFactory<T> _factory;
+    final private IWeakRefCacheEntryFactory<K,T> _factory;
 
-    public WeakValueCache( ICachePolicy<T> delegate )
+    public WeakValueCache( ICachePolicy<K,T> delegate )
     {
         
-        this( INITIAL_CAPACITY, LOAD_FACTOR, delegate, new WeakCacheEntryFactory<T>() );
+        this( INITIAL_CAPACITY, LOAD_FACTOR, delegate, new WeakCacheEntryFactory<K,T>() );
         
     }
 
-    public WeakValueCache( ICachePolicy<T> delegate, IWeakRefCacheEntryFactory<T> factory )
+    public WeakValueCache( ICachePolicy<K,T> delegate, IWeakRefCacheEntryFactory<K,T> factory )
     {
     
         this( INITIAL_CAPACITY, LOAD_FACTOR, delegate, factory );
@@ -252,8 +257,8 @@ final public class WeakValueCache<T>
     public WeakValueCache
     	( int initialCapacity,
     	  float loadFactor,
-    	  ICachePolicy<T> delegate,
-    	  IWeakRefCacheEntryFactory<T> factory
+    	  ICachePolicy<K,T> delegate,
+    	  IWeakRefCacheEntryFactory<K,T> factory
     	  )
     {
     
@@ -267,7 +272,7 @@ final public class WeakValueCache<T>
         
         _loadFactor = loadFactor;
         
-        _cache = new HashMap<Long,IWeakRefCacheEntry<T>>( initialCapacity, loadFactor );
+        _cache = new HashMap<K,IWeakRefCacheEntry<K,T>>( initialCapacity, loadFactor );
         
         _queue = new ReferenceQueue<T>();
         
@@ -280,7 +285,7 @@ final public class WeakValueCache<T>
     /**
      * The delegate hard reference cache.
      */
-    public ICachePolicy<T> getDelegate() {
+    public ICachePolicy<K,T> getDelegate() {
         return _delegate;
     }
     
@@ -289,7 +294,7 @@ final public class WeakValueCache<T>
 
         reportStatistics( true );
         
-        _cache = new HashMap<Long,IWeakRefCacheEntry<T>>( _initialCapacity, _loadFactor );
+        _cache = new HashMap<K,IWeakRefCacheEntry<K,T>>( _initialCapacity, _loadFactor );
         
         _queue = new ReferenceQueue<T>();
         
@@ -349,7 +354,7 @@ final public class WeakValueCache<T>
         
     }
         
-    synchronized public void put( long oid, T obj, boolean dirty )
+    synchronized public void put( K oid, T obj, boolean dirty )
     {
 
         _nput++;
@@ -363,9 +368,7 @@ final public class WeakValueCache<T>
          * object, then speed is very important for _cache.
          */
         
-        Long key = new Long( oid );
-        
-        IWeakRefCacheEntry<T> entry = _cache.get( key );
+        IWeakRefCacheEntry<K,T> entry = _cache.get( oid );
         
         Object value = ( entry == null ? null : entry.getObject() );
 
@@ -373,7 +376,7 @@ final public class WeakValueCache<T>
 
         	entry = _factory.newCacheEntry( oid, obj, _queue );
         	
-            _cache.put( key, entry );
+            _cache.put( oid, entry );
             
             _ninsert++;
 
@@ -411,7 +414,7 @@ final public class WeakValueCache<T>
         
     }
     
-    synchronized public T get( long oid )
+    synchronized public T get( K oid )
     {
 
         _ntest++;
@@ -424,8 +427,8 @@ final public class WeakValueCache<T>
             
         } else {
             
-            IWeakRefCacheEntry<T> entry = _cache.get
-               ( new Long( oid )
+            IWeakRefCacheEntry<K,T> entry = _cache.get
+               ( oid 
                  );
             
             if( entry != null ) {
@@ -458,12 +461,12 @@ final public class WeakValueCache<T>
         
     }
     
-    synchronized public T remove( long oid )
+    synchronized public T remove( K oid )
     {
         
         _delegate.remove( oid );
         
-        IWeakRefCacheEntry<T> entry = _cache.remove( new Long( oid ) );
+        IWeakRefCacheEntry<K,T> entry = _cache.remove( oid );
 
         _nremove++;
         
@@ -498,9 +501,9 @@ final public class WeakValueCache<T>
         
         int counter = 0; 
         
-        for( Reference ref = _queue.poll(); ref != null; ref = _queue.poll() ) {
+        for( Reference<? extends T> ref = _queue.poll(); ref != null; ref = _queue.poll() ) {
             
-            Long oid = new Long( ((IWeakRefCacheEntry)ref).getKey() );
+            K oid = ((IWeakRefCacheEntry<K,T>)ref).getKey();
             
             if( _cache.get( oid ) == ref ) {
                 
@@ -535,14 +538,14 @@ final public class WeakValueCache<T>
     /**
      * Sets the listener on the delegate.
      */
-    public void setListener(ICacheListener<T> listener) {
+    public void setListener(ICacheListener<K,T> listener) {
        _delegate.setListener( listener ); 
     }
     
     /**
      * Return the listener on the delegate.
      */
-    public ICacheListener<T> getCacheListener() {
+    public ICacheListener<K,T> getCacheListener() {
         return _delegate.getCacheListener();
     }
 
@@ -589,7 +592,7 @@ final public class WeakValueCache<T>
      * @return Iterator visiting {@link ICacheEntry} objects from the delegate
      *         hard reference cache.
      */
-    public Iterator<ICacheEntry<T>> entryIterator() {
+    public Iterator<ICacheEntry<K,T>> entryIterator() {
         return _delegate.entryIterator();
     }
     

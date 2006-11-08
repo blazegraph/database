@@ -50,6 +50,7 @@ import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.Journal;
@@ -88,15 +89,15 @@ import com.bigdata.journal.RootBlockView;
  * @author <a href="mailto:boisvert@intalio.com">Alex Boisvert</a>
  * @version $Id$
  * 
- * FIXME The object index has to be intrinsically aware of isolation. Like versions,
- * the object index MUST NOT overwrite pre-existing data or the store will be
- * inconsistent after a crash. For a node that has not been written on in the
- * current isolation context (aka "clean"), changes to the object index need to
- * use copy on write with conditional deallocation of the old slots. Copy on
- * write requires that we clone a node on which we have a read-only view,
- * including all nodes up to the root. Copy on write results in a single tree in
- * which modifications are visible with read through to untouched nodes in the
- * base index. <br>
+ * FIXME The object index has to be intrinsically aware of isolation. Like
+ * versions, the object index MUST NOT overwrite pre-existing data or the store
+ * will be inconsistent after a crash. For a node that has not been written on
+ * in the current isolation context (aka "clean"), changes to the object index
+ * need to use copy on write with conditional deallocation of the old slots.
+ * Copy on write requires that we clone a node on which we have a read-only
+ * view, including all nodes up to the root. Copy on write results in a single
+ * tree in which modifications are visible with read through to untouched nodes
+ * in the base index. <br>
  * Once a node is modified within a transactional scope it may be freely
  * re-written until that isolation context commits. During the commit, the base
  * object index is written on - again using copy on write and conditional
@@ -107,39 +108,51 @@ import com.bigdata.journal.RootBlockView;
  * and the new slot chain. Conditional deallocation is achieved since the slots
  * are marked as deleted on the slot chain using copy on write (this needs to be
  * proved out).<br>
- * The object index needs to use a fixed size node serialization so that it can
- * "update" a node without concern over whether the same allocation can hold the
- * new state. In this way we can reconcile the notions of update for the object
- * index nodes and update for nodes in a general purpose btree. <br>
- * The base object index can be a btree with fixed size node serialization as
- * describe above. The precise design for the object index with a transaction is
- * less clear. The existing code uses a transient hash table. This design could
- * work well using a version of a hash table that supports concurrent
- * modification (or otherwise concurrent modifications during traversal during
- * validation). Commit processing then merges down the transient isolated object
- * index using copy on write onto the base object index. The drawbacks of this
- * design are that it may incur a lot of object allocation to support the object
- * index growth during the transaction and that it does not use a persistence
- * capable data structure for transactions, so the memory footprint of a
- * transaction will grow as a function of the #of objects written.<br>
- * However, making the transaction isolation object index also persistence
- * capable also has its challenges. If we copy the base index in response to
- * writes on objects stored in uncloned nodes of the base index, then the
- * isolated index size could (a) grow very quickly depending on the locality of
- * the objects written on; and (b) store all object mappings in copied nodes
- * rather than just those on which the transaction has actually written - this
- * could also make it more expensive to validate since we need to scan more
- * entries in order to find those that were written on by the tx. The plausible
- * alternative is to use a persistence capable object index supporting
- * concurrent modification (or buffering concurrent modifications arising from
- * validation) and only store objects written on by the tx in that index.
  * 
- * FIXME Support concurrent modification of the index structure (e.g.,
- * splitting, joining, and rotation of nodes) during traversal. Since copy on
- * write gives us isolation level, support for concurrent modification is only
- * concerned with structural changes within a given isolation level. This is
- * necessary for the object index during validation.  However, that case can be
- * handled by buffering with transient data structures.
+ * @todo Work through merge down during commit [ The base object index can be a
+ *       btree with fixed size node serialization as describe above. The precise
+ *       design for the object index with a transaction is less clear. The
+ *       existing code uses a transient hash table. This design could work well
+ *       using a version of a hash table that supports concurrent modification
+ *       (or otherwise concurrent modifications during traversal during
+ *       validation). Commit processing then merges down the transient isolated
+ *       object index using copy on write onto the base object index. The
+ *       drawbacks of this design are that it may incur a lot of object
+ *       allocation to support the object index growth during the transaction
+ *       and that it does not use a persistence capable data structure for
+ *       transactions, so the memory footprint of a transaction will grow as a
+ *       function of the #of objects written.<br>
+ *       However, making the transaction isolation object index also persistence
+ *       capable also has its challenges. If we copy the base index in response
+ *       to writes on objects stored in uncloned nodes of the base index, then
+ *       the isolated index size could (a) grow very quickly depending on the
+ *       locality of the objects written on; and (b) store all object mappings
+ *       in copied nodes rather than just those on which the transaction has
+ *       actually written - this could also make it more expensive to validate
+ *       since we need to scan more entries in order to find those that were
+ *       written on by the tx. The plausible alternative is to use a persistence
+ *       capable object index supporting concurrent modification (or buffering
+ *       concurrent modifications arising from validation) and only store
+ *       objects written on by the tx in that index.]
+ * 
+ * @todo (No, we can just buffer index changes during validation.) Support
+ *       concurrent modification of the index structure (e.g., splitting,
+ *       joining, and rotation of nodes) during traversal? Since copy on write
+ *       gives us isolation level, support for concurrent modification is only
+ *       concerned with structural changes within a given isolation level. This
+ *       is necessary for the object index during validation. However, that case
+ *       can be handled by buffering with transient data structures.
+ * 
+ * @todo Should there be a unique node identifier that is unchanging to
+ *       facilitate cache mechanisms? The problem is that there is no persistent
+ *       identifier for a node right now since its slot allocation changes each
+ *       time it is written. If we can create a persistent identifier, then we
+ *       can use normal cache mechanisms. The cache itself needs to be layered
+ *       or otherwise deal with a transaction finding its copy-on-write versions
+ *       of index nodes rather than those in the base object index. The total
+ *       #of index nodes will continue to rise over time (owing to creation of
+ *       new nodes during transactions).  However, a long integer might well
+ *       suffice.
  * 
  * @todo Convert API and data structures from Integer to int. This is an
  *       optimization and does not effect the basic logic.
@@ -157,30 +170,19 @@ import com.bigdata.journal.RootBlockView;
  *       immutable. Since we never perform random writes we can not update the
  *       data in the node's slot allocation. Instead, we have to clone the node
  *       into a mutable transient object. When we finally write the node on the
- *       end of the journal, it again gets a {@link ISlotAllocation}. There are
- *       three cases for persistent nodes: 1) a newly created node for which
- *       there is no prior version on the journal; 2) a clone of a node that was
- *       written during the current isolation context, in which case prior
- *       version is immediately deallocated on the journal; and 3) a clone of a
- *       node that is part of the base object index - the prior version of the
- *       node can not be deleted until the current isolation context commits
+ *       end of the journal, it again gets a {@link ISlotAllocation} and we MUST
+ *       break the hard reference, forcing the index to obtain a mutable view if
+ *       it needs to write on the node.<br>
+ *       There are three cases for persistent nodes: 1) a newly created node for
+ *       which there is no prior version on the journal; 2) a clone of a node
+ *       that was written during the current isolation context, in which case
+ *       prior version is immediately deallocated on the journal; and 3) a clone
+ *       of a node that is part of the base object index - the prior version of
+ *       the node can not be deleted until the current isolation context commits
  *       since it is part of the last consistent object index state and will be
  *       in use if the isolation context is rolled back. <br>
- *       I don't know if we need a weak reference cache. If so, then consider a
- *       "mru" that just holds the last N touched hard references ala MartynC w/
- *       the special test for nop if the reference was touched very recently.<br>
- *       There will need to be a dirty list that gets committed in any case.<br>
- *       The #of non-leaf nodes (and the space required to store them) is quite
- *       small for the bigdata use cases. We should differentiate between cache
- *       for non-leaf and leaf nodes. The former should always be cached -- the
- *       latter should only be cached during a key scan. Provide an option to
- *       read the non-leaf index into memory during restart, which will require
- *       random IOs iff we are not fully buffered. When a leaf node is used for
- *       a key scan, then it makes sense to cache it. Otherwise, we should avoid
- *       the de-serialization costs and index directly into the buffer using an
- *       alternative implementation of the node API (requires defining a node
- *       API).<br>
- *       We do not need a full MRU for a weak reference cache. Instead, the hard
+ * 
+ * @todo We do not need a full MRU for a weak reference cache. Instead, the hard
  *       reference cache can be a strongly typed array of references to the
  *       nodes. The start/end index of the array are tracked, making it into a
  *       ring buffer. The last N enties are tested before appending to the ring
@@ -188,8 +190,22 @@ import com.bigdata.journal.RootBlockView;
  *       marked as dirty when they are added to the hard reference cache. When
  *       they are evicted, the dirty flag is tested and they are serialized iff
  *       they are still dirty. In this manner, repeated evictions of the same
- *       object do not cause repeated serializations. (This should work well with
- *       the copy on write semantics.)
+ *       object do not cause repeated serializations. (This should work well
+ *       with the copy on write semantics.) See {@link HardReferenceCache}.
+ * 
+ * @todo The #of non-leaf nodes (and the space required to store them) is quite
+ *       small for the bigdata use cases. We should differentiate between cache
+ *       for non-leaf and leaf nodes. Leave nodes do require cache, both for key
+ *       scans and for frequently accessed objects (to avoid any disk hits on
+ *       the index). Ideally, we always cache non-leaf nodes. However, the #of
+ *       leave nodes in cache probably needs to be more limited. We could create
+ *       one cache for leaves and one for non-leafs. Those caches could even
+ *       have similar capacities since the key concerns are (a) enough capacity
+ *       for non-leaf nodes; and (b) leaf churn should not drive non-leaf nodes
+ *       out of cache.
+ * 
+ * @todo Provide an option to read the non-leaf index into memory during
+ *       restart, which will require random IOs iff we are not fully buffered.
  */
 public class ObjectIndex /* FIXME implements IObjectIndex */
 {

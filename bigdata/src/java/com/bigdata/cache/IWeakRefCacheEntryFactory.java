@@ -58,7 +58,7 @@ import java.lang.ref.WeakReference;
  * @author thompsonbry
  * @version $Id$
  */
-public interface IWeakRefCacheEntryFactory<T>
+public interface IWeakRefCacheEntryFactory<K,T>
 {
 
     /**
@@ -82,6 +82,6 @@ public interface IWeakRefCacheEntryFactory<T>
      * @see SoftReference
      */
     
-    public IWeakRefCacheEntry<T> newCacheEntry( long key, T obj, ReferenceQueue<T> queue );
+    public IWeakRefCacheEntry<K,T> newCacheEntry( K key, T obj, ReferenceQueue<T> queue );
     
 }

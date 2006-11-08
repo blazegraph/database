@@ -20,17 +20,27 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * FIXME Is there really any reason to have fixed size serialization? The key
+ * impact seems to be the size of the non-leaf nodes (since they would require
+ * the size of the child node). References can still be negative (long) integers
+ * to differentiate leaf vs non-leaf nodes, but we can also figure out whether
+ * the node is a leaf or not during de-serialization. The big win for accepting
+ * variable size allocation is that we can "right fit" each node into free slots
+ * on the journal. (Since node are immutable once written, it does not make
+ * sense to write a constant size since we will never update the node in its
+ * current allocation.)
+ * 
  * @todo Nodes will have hard references until they are ready to be serialized,
  *       at which point the hard references must be converted to
  *       {@link ISlotAllocation}s. The code below assumes that this conversion
  *       has already been performed and does not anticipate the runtime data
  *       structures that will be required to operate with hard references or
- *       {@link ISlotAllocation}s as appropriate.  (An alternative design might
- *       be to assign negative long integers to transient nodes and convert those
- *       references when a node is serialized.  However we do this, the reference
- *       concept needs to encapsulate both kinds of reference, provide for conversion
- *       of the reference type during (de-)serialization, and support copy-on-write
- *       semantics.)
+ *       {@link ISlotAllocation}s as appropriate. (An alternative design might
+ *       be to assign negative long integers to transient nodes and convert
+ *       those references when a node is serialized. However we do this, the
+ *       reference concept needs to encapsulate both kinds of reference, provide
+ *       for conversion of the reference type during (de-)serialization, and
+ *       support copy-on-write semantics.)
  * 
  * @todo Consider making nodes and leafs the same size and just having more
  *       key/value pairs in nodes. That will give us a higher branching factor

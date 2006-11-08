@@ -55,14 +55,14 @@ import java.lang.ref.WeakReference;
  * @version $Id$
  * @author thompsonbry
  */
-public class WeakCacheEntry<T>
+public class WeakCacheEntry<K,T>
 	extends WeakReference<T>
-	implements IWeakRefCacheEntry<T>
+	implements IWeakRefCacheEntry<K,T>
 {
     
-    final private long oid;
+    final private K oid;
     
-    public WeakCacheEntry( long key, T obj, ReferenceQueue<T> queue )
+    public WeakCacheEntry( K key, T obj, ReferenceQueue<T> queue )
     {
         
         super( obj, queue );
@@ -71,7 +71,7 @@ public class WeakCacheEntry<T>
         
     }
     
-    public long getKey()
+    public K getKey()
     {
         
         return oid;

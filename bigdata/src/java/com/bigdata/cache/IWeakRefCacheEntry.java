@@ -51,13 +51,13 @@ package com.bigdata.cache;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IWeakRefCacheEntry<T> {
+public interface IWeakRefCacheEntry<K,T> {
 
     /**
      * Returns the key for the object stored in the cache entry. This is
      * generally an object identifier (OID).
      */
-    public long getKey();
+    public K getKey();
     
     /**
      * The object in the cache. If the entry belongs to a weak reference cache,

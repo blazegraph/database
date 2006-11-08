@@ -55,18 +55,18 @@ import java.lang.ref.WeakReference;
  * @author thompsonbry
  * @version $Id$
  */
-public class WeakCacheEntryFactory<T>
-    implements IWeakRefCacheEntryFactory<T>
+public class WeakCacheEntryFactory<K,T>
+    implements IWeakRefCacheEntryFactory<K,T>
 {
 
     public WeakCacheEntryFactory()
     {
     }
 
-    public IWeakRefCacheEntry<T> newCacheEntry( long key, T obj, ReferenceQueue<T> queue)
+    public IWeakRefCacheEntry<K,T> newCacheEntry( K key, T obj, ReferenceQueue<T> queue)
     {
         
-        return new WeakCacheEntry<T>( key, obj, queue );
+        return new WeakCacheEntry<K,T>( key, obj, queue );
         
     }
 

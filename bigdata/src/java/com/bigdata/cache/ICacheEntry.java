@@ -69,7 +69,7 @@ package com.bigdata.cache;
  *       object identifier of each object that was marked as dirty in the cache
  *       since the cache was last cleared.
  */
-public interface ICacheEntry<T> extends IWeakRefCacheEntry<T> {
+public interface ICacheEntry<K,T> extends IWeakRefCacheEntry<K,T> {
 
     /**
      * Return true iff the object associated with this entry is dirty.

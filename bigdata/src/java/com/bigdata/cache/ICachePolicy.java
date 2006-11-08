@@ -102,7 +102,7 @@ import java.util.Iterator;
  *       does not encapsulate the odder semantics of the weak value cache.
  */
 
-public interface ICachePolicy<T>
+public interface ICachePolicy<K,T>
 {
     
     /**
@@ -112,12 +112,12 @@ public interface ICachePolicy<T>
 	 * @param listener
 	 *            The listener or <code>null</code> to remove any listener.
 	 */
-    public void setListener( ICacheListener<T> listener );
+    public void setListener( ICacheListener<K,T> listener );
     
     /**
      * Return the cache eviction listener.
      */
-    public ICacheListener<T> getCacheListener();
+    public ICacheListener<K,T> getCacheListener();
     
     /**
      * Insert or "touch" this object in the cache.
@@ -134,7 +134,7 @@ public interface ICachePolicy<T>
      *                If a different object is in the cache under the specified
      *                object identifier.
      */
-    public void put( long oid, T obj, boolean dirty );
+    public void put( K oid, T obj, boolean dirty );
     
     /**
      * Return the indicated object from the cache or null if the object is not
@@ -145,7 +145,7 @@ public interface ICachePolicy<T>
      * 
      * @return The object or null iff it is not in cache.
      */
-    public T get( long oid );
+    public T get( K oid );
     
 //    /**
 //     * Return true iff there is a dirty entry in the cache under that key. The
@@ -168,7 +168,7 @@ public interface ICachePolicy<T>
      * @return The object in the cache for that object identifier or
      *         <code>null</code> if there was no object under that identifier.
      */
-    public T remove( long oid );
+    public T remove( K oid );
 
     /**
      * Clear all objects from the cache. This method may be used to reset the
@@ -209,7 +209,7 @@ public interface ICachePolicy<T>
      * @see ICacheEntry
      * @see #iterator()
      */
-    public Iterator<ICacheEntry<T>> entryIterator();
+    public Iterator<ICacheEntry<K,T>> entryIterator();
 
     /**
      * Return the #of entries in the hard reference cache.

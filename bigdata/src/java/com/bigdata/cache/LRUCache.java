@@ -50,7 +50,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Vector;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * Hard reference hash map with Least Recently Used ordering over entries. The
@@ -61,12 +61,15 @@ import java.util.Vector;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
  *         </a>
  * 
+ * @todo Consider removing synchronization for use in a single threaded context.
+ * 
  * @todo This can be replaced by a hard reference ring buffer that scans the
- * last N entries to minimize churn.  This has been implemented in another
- * module.
+ *       last N entries to minimize churn. See {@link HardReferenceCache}. This
+ *       will change the delegation interfaces since the ring buffer does NOT
+ *       support random access by the identifier.
  */
 
-public class LRUCache<T> implements ICachePolicy<T>
+public class LRUCache<K,T> implements ICachePolicy<K,T>
 {
     
     /**
@@ -75,22 +78,22 @@ public class LRUCache<T> implements ICachePolicy<T>
     private final int capacity;
     
     /**
-     * The hash map.  Keys are {@link Long}s.  Values are {@link Entry}s.
+     * The hash map from keys to entries wrapping cached object references.
      */
-    private final Map<Long,Entry<T>> map;
+    private final Map<K,Entry<K,T>> map;
 
     /**
      * The entry which is first in the ordering (the
      * <em>least recently used</em>) and <code>null</code> iff the cache is
      * empty.
      */
-    private Entry<T> first = null;
+    private Entry<K,T> first = null;
 
     /**
      * The entry which is last in the ordering (the <em>most recently used</em>)
      * and <code>null</code> iff the cache is empty.
      */
-    private Entry<T> last = null;
+    private Entry<K,T> last = null;
 
     /**
      * The load factor for the internal hash table.
@@ -102,7 +105,7 @@ public class LRUCache<T> implements ICachePolicy<T>
     /**
      * The cache eviction listener.
      */
-    private ICacheListener<T> _listener = null;
+    private ICacheListener<K,T> _listener = null;
     
     /**
      * Create an LRU cache with a default load factor of <code>0.75</code>.
@@ -137,15 +140,15 @@ public class LRUCache<T> implements ICachePolicy<T>
         
         this.loadFactor = loadFactor;
         
-        this.map = new HashMap<Long,Entry<T>>( capacity, loadFactor );
+        this.map = new HashMap<K,Entry<K,T>>( capacity, loadFactor );
         
     }
     
-    public void setListener(ICacheListener<T> listener) {
+    public void setListener(ICacheListener<K,T> listener) {
         _listener = listener;
     }
 
-    public ICacheListener<T> getCacheListener() {
+    public ICacheListener<K,T> getCacheListener() {
         return _listener;
     }
     
@@ -163,7 +166,7 @@ public class LRUCache<T> implements ICachePolicy<T>
      */
 
     public Iterator<T> iterator() {
-        return new LRUIterator<T>( this, true );
+        return new LRUIterator<K,T>( this, true );
     }
 
     /**
@@ -178,8 +181,8 @@ public class LRUCache<T> implements ICachePolicy<T>
      * concurrent
      * </p>
      */
-    public Iterator<ICacheEntry<T>> entryIterator() {
-        return new LRUIterator<T>( this, false );
+    public Iterator<ICacheEntry<K,T>> entryIterator() {
+        return new LRUIterator<K,T>( this, false );
     }
     
     public void clear() {
@@ -195,7 +198,6 @@ public class LRUCache<T> implements ICachePolicy<T>
     /**
      * The #of entries in the cache.
      */
-
     synchronized public int size() {
         return map.size();
     }
@@ -257,16 +259,16 @@ public class LRUCache<T> implements ICachePolicy<T>
 	 *            The object.
 	 */
 
-    synchronized public void put( long key, T obj, boolean dirty )
+    synchronized public void put(K key, T obj, boolean dirty )
     {
+
+        assert key != null;
 
 		reentrantPutCounter++;
 
 		try {
 
-			Long theKey = new Long(key);
-
-			Entry<T> entry = map.get(theKey);
+			Entry<K,T> entry = map.get(key);
 
 			if (entry == null) {
 
@@ -294,7 +296,7 @@ public class LRUCache<T> implements ICachePolicy<T>
 						removeEntry(entry);
 
 						// remove entry from hash map under that key.
-						map.remove(new Long(entry.key));
+						map.remove(entry.key);
 
 					}
 
@@ -308,7 +310,7 @@ public class LRUCache<T> implements ICachePolicy<T>
 					entry.dirty = dirty;
 
 					// add entry into the hash map.
-					map.put(theKey, entry);
+					map.put(key, entry);
 
 					// add entry into MRU position in ordering.
 					addEntry(entry);
@@ -323,9 +325,9 @@ public class LRUCache<T> implements ICachePolicy<T>
 					 * over capacity.
 					 */
 
-					entry = new Entry<T>(key, obj, dirty);
+					entry = new Entry<K,T>(key, obj, dirty);
 
-					map.put(theKey, entry);
+					map.put(key, entry);
 
 					addEntry(entry);
 
@@ -378,12 +380,14 @@ public class LRUCache<T> implements ICachePolicy<T>
 	 */
     private int reentrantPutCounter = 0;
 
-    synchronized public T get( long key )
+    synchronized public T get( K key )
     {
 
+        assert key != null;
+        
         ntests++;
         
-        Entry<T> entry = map.get( new Long( key ) );
+        Entry<K,T> entry = map.get( key );
         
         if( entry == null ) {
             
@@ -415,10 +419,12 @@ public class LRUCache<T> implements ICachePolicy<T>
 //
 //    }
     
-    synchronized public T remove( long key )
+    synchronized public T remove( K key )
     {
         
-        Entry<T> entry = map.remove( new Long( key ) );
+        assert key != null;
+
+        Entry<K,T> entry = map.remove( key );
         
         if( entry == null ) return null;
         
@@ -434,9 +440,9 @@ public class LRUCache<T> implements ICachePolicy<T>
 	 * ordering during traversal.
 	 */
     
-    synchronized protected void addCacheOrderChangeListener( ICacheOrderChangeListener<T> l ) {
+    synchronized protected void addCacheOrderChangeListener( ICacheOrderChangeListener<K,T> l ) {
     	if( _cacheOrderChangeListeners == null ) {
-    		_cacheOrderChangeListeners = new Vector<ICacheOrderChangeListener<T>>();
+    		_cacheOrderChangeListeners = new CopyOnWriteArraySet<ICacheOrderChangeListener<K,T>>();
     	}
     	_cacheOrderChangeListeners.add(l);
     }
@@ -448,7 +454,7 @@ public class LRUCache<T> implements ICachePolicy<T>
 	 * @param l
 	 *            The listener.
 	 */
-    synchronized protected void removeCacheOrderChangeListener( ICacheOrderChangeListener<T> l ) {
+    synchronized protected void removeCacheOrderChangeListener( ICacheOrderChangeListener<K,T> l ) {
     	if (_cacheOrderChangeListeners == null)
 			return;
     	_cacheOrderChangeListeners.remove(l);
@@ -457,17 +463,15 @@ public class LRUCache<T> implements ICachePolicy<T>
     	}
     }
     
-    /*
-     * @todo Modify this so that we are not cloning the listeners all the time.  We can at
-     * least special case when #listeners == 1.  More than that, there are new classes in
-     * the concurrency package designed to support listeners.
-     */
-    private void fireCacheOrderChangeEvent( boolean removed, ICacheEntry<T> entry ) {
+    private void fireCacheOrderChangeEvent( boolean removed, ICacheEntry<K,T> entry ) {
     	if( _cacheOrderChangeListeners.size() == 0 ) return; 
-    	ICacheOrderChangeListener<T>[] listeners = _cacheOrderChangeListeners
-				.toArray(new ICacheOrderChangeListener[] {});
-    	for( int i=0; i<listeners.length; i++ ) {
-    		ICacheOrderChangeListener<T> l = listeners[ i ];
+//    	ICacheOrderChangeListener<T>[] listeners = _cacheOrderChangeListeners
+//				.toArray(new ICacheOrderChangeListener[] {});
+//    	for( int i=0; i<listeners.length; i++ ) {
+//    		ICacheOrderChangeListener<T> l = listeners[ i ];
+        Iterator<ICacheOrderChangeListener<K,T>> itr = _cacheOrderChangeListeners.iterator();
+        while( itr.hasNext() ) {
+            ICacheOrderChangeListener<K,T> l = itr.next();
     		if( removed ) {
     			l.willRemove( entry );
     		} else {
@@ -479,17 +483,17 @@ public class LRUCache<T> implements ICachePolicy<T>
     /**
      * Lazily allocated and eagerly freed.
      */
-    private Vector<ICacheOrderChangeListener<T>> _cacheOrderChangeListeners = null;
+    private CopyOnWriteArraySet<ICacheOrderChangeListener<K,T>> _cacheOrderChangeListeners = null;
     
-    protected static interface ICacheOrderChangeListener<T> {
-    	public void willRemove( ICacheEntry<T> entry );
+    protected static interface ICacheOrderChangeListener<K,T> {
+    	public void willRemove( ICacheEntry<K,T> entry );
 //    	public void didAdd(ICacheEntryEntry);
     }
     
     /**
      * Add an Entry to the tail of the linked list (the MRU position).
      */
-    private void addEntry(Entry<T> entry) {
+    private void addEntry(Entry<K,T> entry) {
         if (first == null) {
             first = entry;
             last = entry;
@@ -509,12 +513,12 @@ public class LRUCache<T> implements ICachePolicy<T>
      * in the ordering.  You must also remove the entry under that key from the hash
      * map.
      */
-    private void removeEntry(Entry<T> entry) {
+    private void removeEntry(Entry<K,T> entry) {
     	if( _cacheOrderChangeListeners != null ) {
     		fireCacheOrderChangeEvent(true, entry);
     	}
-        Entry<T> prior = entry.prior;
-        Entry<T> next = entry.next;
+        Entry<K,T> prior = entry.prior;
+        Entry<K,T> next = entry.next;
         if (entry == first) {
             first = next;
         }
@@ -534,7 +538,7 @@ public class LRUCache<T> implements ICachePolicy<T>
     /**
      * Move the entry to the end of the linked list (the MRU position).
      */
-    private void touchEntry(Entry<T> entry) {
+    private void touchEntry(Entry<K,T> entry) {
 
         if (last == entry) {
 
@@ -551,18 +555,18 @@ public class LRUCache<T> implements ICachePolicy<T>
     /**
      * Wraps an object with metadata to maintain the LRU ordering.
      * 
-     * $Id$
+     * @version $Id$
      * @author thompsonbry
      */
     
-    final static class Entry<T> implements ICacheEntry<T>
+    final static class Entry<K,T> implements ICacheEntry<K,T>
     {
-        private long key;
+        private K key;
         private T obj;
         private boolean dirty;
-        private Entry<T> prior;
-        private Entry<T> next;
-        Entry( long key, T obj, boolean dirty )
+        private Entry<K,T> prior;
+        private Entry<K,T> next;
+        Entry( K key, T obj, boolean dirty )
         {
             this.key = key;
             this.obj = obj;
@@ -574,7 +578,7 @@ public class LRUCache<T> implements ICachePolicy<T>
         public void setDirty(boolean dirty) {
             this.dirty = dirty;
         }
-        public long getKey() {
+        public K getKey() {
             return key;
         }
         public T getObject() {
@@ -585,7 +589,7 @@ public class LRUCache<T> implements ICachePolicy<T>
          * 
          * @return The next entry or <code>null</code>.
          */
-        public Entry<T> getPrior() {
+        public Entry<K,T> getPrior() {
             return prior;
         }
         /**
@@ -593,7 +597,7 @@ public class LRUCache<T> implements ICachePolicy<T>
          * 
          * @return The next entry or <code>null</code>.
          */
-        public Entry<T> getNext() {
+        public Entry<K,T> getNext() {
             return next;
         }
         
@@ -608,42 +612,45 @@ public class LRUCache<T> implements ICachePolicy<T>
     }
 
     /**
-	 * <p>
-	 * Visits entries in the {@link LRUCache} in their natural ordering from LRU
-	 * to MRU. The iterator will optionally resolve the entries to the
-	 * application objects associated with each entry. The iterator supports
-	 * removal but is NOT thread-safe and does not support concurrent
-	 * modification of the {@link LRUCache}.
-	 * </p>
-	 * <p>
-	 * This class provide fast visitation from LRU to MRU by chasing references.
-	 * In order to support concurrent modification of the cache order during
-	 * traversal, an instance uses a protocol by it is informed of changes in
-	 * the cache order. There are two basic operations that effect the cache
-	 * order: addEntry and removeEntry. addEntry always inserts the entry in the
-	 * MRU position, so it can not effect the visitation order. However,
-	 * removeEntry could unlink the entry that the iterator will use to reach
-	 * the next entry (via its next reference). The iterator must therefore
-	 * receive notice when a cache entry is about to be removed. If the entry is
-	 * the same entry that the iterator would visit next in the LRU to MRU
-	 * ordering, then the iterator advances its state to the next entry that it
-	 * would visit. When removeEntry then removes the entry from the cache
-	 * ordering, the iterator correctly visits the next cache entry in the new
-	 * ordering.
-	 * </p>
-	 * 
-	 * @version $Id$
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
-	 *         </a>
-	 */
-    static class LRUIterator<T> implements Iterator, ICacheOrderChangeListener<T>
+     * <p>
+     * Visits entries in the {@link LRUCache} in their natural ordering from LRU
+     * to MRU. The iterator will optionally resolve the entries to the
+     * application objects associated with each entry. The iterator supports
+     * removal but is NOT thread-safe and does not support concurrent
+     * modification of the {@link LRUCache}.
+     * </p>
+     * <p>
+     * This class provide fast visitation from LRU to MRU by chasing references.
+     * In order to support concurrent modification of the cache order during
+     * traversal, an instance uses a protocol by it is informed of changes in
+     * the cache order. There are two basic operations that effect the cache
+     * order: addEntry and removeEntry. addEntry always inserts the entry in the
+     * MRU position, so it can not effect the visitation order. However,
+     * removeEntry could unlink the entry that the iterator will use to reach
+     * the next entry (via its next reference). The iterator must therefore
+     * receive notice when a cache entry is about to be removed. If the entry is
+     * the same entry that the iterator would visit next in the LRU to MRU
+     * ordering, then the iterator advances its state to the next entry that it
+     * would visit. When removeEntry then removes the entry from the cache
+     * ordering, the iterator correctly visits the next cache entry in the new
+     * ordering.
+     * </p>
+     * 
+     * @version $Id$
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
+     *         </a>
+     * 
+     * @todo In order to support generics, we might need to break this down into
+     *       two implementations so that we can have a strongly typed iterator
+     *       for both T and ICacheEntry<T>.
+     */
+    static class LRUIterator<K,T> implements Iterator, ICacheOrderChangeListener<K,T>
     {
 
-        private final LRUCache<T> cache;
+        private final LRUCache<K,T> cache;
         private final boolean resolveObjects;
-        private Entry<T> next;
-        private Entry<T> lastVisited = null;
+        private Entry<K,T> next;
+        private Entry<K,T> lastVisited = null;
         
         /**
          * An iterator that traverses the {@link LRUCache} in the its natural
@@ -657,7 +664,7 @@ public class LRUCache<T> implements ICachePolicy<T>
          *            in the cache. When false it will visit the {@link ICache}
          *            entries themselves.
          */
-        LRUIterator( LRUCache<T> cache, boolean resolveObjects )
+        LRUIterator( LRUCache<K,T> cache, boolean resolveObjects )
         {
             this.cache = cache;
             this.next = cache.first;
@@ -702,7 +709,7 @@ public class LRUCache<T> implements ICachePolicy<T>
             if( lastVisited == null ) {
                 throw new IllegalStateException();
             }
-            cache.map.remove( new Long( lastVisited.key ) );
+            cache.map.remove( lastVisited.key );
             cache.removeEntry( lastVisited );
         }
 

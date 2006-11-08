@@ -99,61 +99,61 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
     public void test_ctor() {
     	
     	// local fixtures.
-    	LRUCache<Object> delegate = new LRUCache<Object>(5);
-    	WeakCacheEntryFactory<Object> factory = new WeakCacheEntryFactory<Object>();
+    	LRUCache<Integer,Object> delegate = new LRUCache<Integer,Object>(5);
+    	WeakCacheEntryFactory<Integer,Object> factory = new WeakCacheEntryFactory<Integer,Object>();
     	int initialCapacity = 1;
     	float loadFactor = 1f;
     	
     	try {
-    		new WeakValueCache<Object>(null);
+    		new WeakValueCache<Integer,Object>(null);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
-		new WeakValueCache<Object>(delegate);
+		new WeakValueCache<Integer,Object>(delegate);
 
     	try {
-    		new WeakValueCache<Object>(delegate,null);
+    		new WeakValueCache<Integer,Object>(delegate,null);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
-		new WeakValueCache<Object>(delegate,factory);
+		new WeakValueCache<Integer,Object>(delegate,factory);
     	
     	/*
     	 * (initialCapacity,loadFactor,delegate,factory)
 		 */
     	try {
-    		new WeakValueCache<Object>(-1,.75f,delegate,factory);
+    		new WeakValueCache<Integer,Object>(-1,.75f,delegate,factory);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
     	try {
-    		new WeakValueCache<Object>(initialCapacity,0f,delegate,factory);
+    		new WeakValueCache<Integer,Object>(initialCapacity,0f,delegate,factory);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
     	try {
-    		new WeakValueCache<Object>(initialCapacity,loadFactor,null,factory);
+    		new WeakValueCache<Integer,Object>(initialCapacity,loadFactor,null,factory);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
     	try {
-    		new WeakValueCache<Object>(initialCapacity,loadFactor,delegate,null);
+    		new WeakValueCache<Integer,Object>(initialCapacity,loadFactor,delegate,null);
     		fail("Expecting exception");
     	}
     	catch( IllegalArgumentException ex ) {
     		log.info("Ignoring expected exception: "+ex);
     	}
-		new WeakValueCache<Object>(initialCapacity,loadFactor,delegate,factory);
+		new WeakValueCache<Integer,Object>(initialCapacity,loadFactor,delegate,factory);
 
     }
 
@@ -164,7 +164,7 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
 	 *         the stated capacity.
 	 */
     public ICachePolicy getCachePolicy(int capacity ) {
-    	return new WeakValueCache<String>(new LRUCache<String>(capacity));
+    	return new WeakValueCache<Long,String>(new LRUCache<Long,String>(capacity));
     }
     
     /**
@@ -175,7 +175,8 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
     public void test_put_mayNotModifyObject() {
     	String A = "A";
     	String B = "B";
-    	WeakValueCache<String> cache = new WeakValueCache<String>(new LRUCache<String>(5));
+    	WeakValueCache<Integer, String> cache = new WeakValueCache<Integer, String>(
+                new LRUCache<Integer, String>(5));
     	cache.put(0,A,true);
     	cache.put(0,A,false);
     	try {
@@ -191,11 +192,11 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
      * Tests excercises the ability to set and get the cache listener.
      */
     public void test_cacheListener_getSet() {
-    	WeakValueCache<String> cache = new WeakValueCache<String>(new LRUCache<String>(1));
+    	WeakValueCache<Integer,String> cache = new WeakValueCache<Integer,String>(new LRUCache<Integer,String>(1));
     	assertNull(cache.getCacheListener());
     	cache.setListener(null);
     	assertNull(cache.getCacheListener());
-    	ICacheListener<String> l = new MyCacheListenerThrowsException<String>();
+    	ICacheListener<Integer,String> l = new MyCacheListenerThrowsException<Integer,String>();
     	cache.setListener( l );
     	assertEquals( l, cache.getCacheListener() );
     	cache.setListener(null);
@@ -210,8 +211,9 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
     	/*
 		 * Setup weak cache backed by an LRU with a capacity of ONE (1).
 		 */
-    	WeakValueCache<String> cache = new WeakValueCache<String>(new LRUCache<String>(1));
-    	MyCacheListener<String> l = new MyCacheListener<String>();
+    	WeakValueCache<Integer, String> cache = new WeakValueCache<Integer, String>(
+                new LRUCache<Integer, String>(1));
+        MyCacheListener<Integer, String> l = new MyCacheListener<Integer, String>();
     	l.denyEvents();
     	cache.setListener( l );
     	/*
@@ -224,28 +226,32 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
     	 * Add an object to the cache under a key.
     	 */
     	cache.put(0, A, false);
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
+		assertSameEntryOrdering(
+                "contents",
+                new CacheEntry[] { new CacheEntry<Integer, String>(
 				0, A, false) }, cache.entryIterator());
 		/*
 		 * Update the dirty flag for object under that key, so no eviction.
 		 */
 		cache.put(0, A, true);
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
-				0, A, true) }, cache.entryIterator());
+		assertSameEntryOrdering(
+                "contents",
+                new CacheEntry[] { new CacheEntry<Integer, String>(0, A, true) },
+                cache.entryIterator());
     	/*
     	 * Add an object under another key, causes eviction of [A].
     	 */
     	l.setExpectedEvent(0,A,true);
     	cache.put(1, B, false );
     	l.clearLastEvent();
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
+		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry<Integer, String>(
 				1, B, false) }, cache.entryIterator());
     	/*
     	 * Update the dirty flag for the object under that key, so no eviction.
     	 */
     	l.denyEvents();
     	cache.put(1, B, true );
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
+		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry<Integer, String>(
 				1, B, true) }, cache.entryIterator());
     	/*
     	 * Add an object under another key, causes eviction of [D].
@@ -253,7 +259,7 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
     	l.setExpectedEvent(1,B,true);
     	cache.put(0, A, false );
     	l.clearLastEvent();
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
+		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry<Integer, String>(
 				0, A, false) }, cache.entryIterator());
     }
 
@@ -263,17 +269,17 @@ public class TestWeakValueCache extends AbstractCachePolicyTest {
      */
     public void test_dirtyFlagPropagatesToHardReferenceCache() {
 
-    	LRUCache<String> lru = new LRUCache<String>(3);
-    	WeakValueCache<String> cache = new WeakValueCache<String>(lru);
+    	LRUCache<Integer,String> lru = new LRUCache<Integer,String>(3);
+    	WeakValueCache<Integer,String> cache = new WeakValueCache<Integer,String>(lru);
     	
     	final String A = "A";
-    	cache.put(0L, A, false);
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
-				0L, A, false) }, cache.entryIterator());
+    	cache.put(0, A, false);
+		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry<Integer, String>(
+				0, A, false) }, cache.entryIterator());
 
-		cache.put(0L, A, true );
-		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry(
-				0L, A, true) }, cache.entryIterator());
+		cache.put(0, A, true );
+		assertSameEntryOrdering("contents", new CacheEntry[] { new CacheEntry<Integer, String>(
+				0, A, true) }, cache.entryIterator());
 
     }
     

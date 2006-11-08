@@ -54,7 +54,7 @@ package com.bigdata.cache;
  * @see com.bigdata.cache.ICachePolicy
  */
 
-public interface ICacheListener<T> {
+public interface ICacheListener<K,T> {
 
     /**
      * The object was evicted from the cache.
@@ -65,6 +65,6 @@ public interface ICacheListener<T> {
      *            reused by the {@link ICachePolicy} implementation.
      */
     
-    public void objectEvicted( ICacheEntry<T> entry );
+    public void objectEvicted( ICacheEntry<K,T> entry );
     
 }

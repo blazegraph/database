@@ -127,7 +127,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 	 * @return A new {@link LRUCache} with the stated capacity.
 	 */
     public ICachePolicy getCachePolicy(int capacity ) {
-    	return new LRUCache<String>( capacity );
+    	return new LRUCache<Long,String>( capacity );
     }
 
     /**
@@ -139,7 +139,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     {
 
         final int CAPACITY = 4;
-        LRUCache<String> cache = new LRUCache<String>( CAPACITY );
+        LRUCache<Long,String> cache = new LRUCache<Long,String>( CAPACITY );
 
         long[] oid = new long[] {
           1, 2, 3, 4, 5      
@@ -194,7 +194,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     public void test_dirtyFlag() {
 
         final int CAPACITY = 4;
-        LRUCache<String> cache = new LRUCache<String>( CAPACITY );
+        LRUCache<Long,String> cache = new LRUCache<Long,String>( CAPACITY );
 
         long[] oid = new long[] {
           1, 2, 3, 4, 5      
@@ -234,10 +234,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         
         // test entries in the cache.
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],dirty[0]),
-                new CacheEntry(oid[1],obj[1],dirty[1]),
-                new CacheEntry(oid[2],obj[2],dirty[2]),
-                new CacheEntry(oid[3],obj[3],dirty[3]),
+                new CacheEntry<Long,String>(oid[0],obj[0],dirty[0]),
+                new CacheEntry<Long,String>(oid[1],obj[1],dirty[1]),
+                new CacheEntry<Long,String>(oid[2],obj[2],dirty[2]),
+                new CacheEntry<Long,String>(oid[3],obj[3],dirty[3]),
         	},
         	cache.entryIterator() );
 
@@ -248,10 +248,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         dirty[1] = ! dirty[1];
         cache.put( oid[1], obj[1], dirty[1] );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],dirty[0]),
-                new CacheEntry(oid[2],obj[2],dirty[2]),
-                new CacheEntry(oid[3],obj[3],dirty[3]),
-                new CacheEntry(oid[1],obj[1],dirty[1]),
+                new CacheEntry<Long,String>(oid[0],obj[0],dirty[0]),
+                new CacheEntry<Long,String>(oid[2],obj[2],dirty[2]),
+                new CacheEntry<Long,String>(oid[3],obj[3],dirty[3]),
+                new CacheEntry<Long,String>(oid[1],obj[1],dirty[1]),
         	},
         	cache.entryIterator() );
 
@@ -262,17 +262,17 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         dirty[1] = ! dirty[1];
         cache.remove( oid[1] );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],dirty[0]),
-                new CacheEntry(oid[2],obj[2],dirty[2]),
-                new CacheEntry(oid[3],obj[3],dirty[3]),
+                new CacheEntry<Long,String>(oid[0],obj[0],dirty[0]),
+                new CacheEntry<Long,String>(oid[2],obj[2],dirty[2]),
+                new CacheEntry<Long,String>(oid[3],obj[3],dirty[3]),
         	},
         	cache.entryIterator() );
         cache.put( oid[1], obj[1], dirty[1] );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],dirty[0]),
-                new CacheEntry(oid[2],obj[2],dirty[2]),
-                new CacheEntry(oid[3],obj[3],dirty[3]),
-                new CacheEntry(oid[1],obj[1],dirty[1]),
+                new CacheEntry<Long,String>(oid[0],obj[0],dirty[0]),
+                new CacheEntry<Long,String>(oid[2],obj[2],dirty[2]),
+                new CacheEntry<Long,String>(oid[3],obj[3],dirty[3]),
+                new CacheEntry<Long,String>(oid[1],obj[1],dirty[1]),
         	},
         	cache.entryIterator() );
 
@@ -291,27 +291,27 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     public void test_put_mayNotModifyObject() {
     	final String A = "A";
     	final String B = "B";
-    	LRUCache<String> cache = new LRUCache<String>(5);
+    	LRUCache<Long,String> cache = new LRUCache<Long,String>(5);
 
-    	cache.put(0,A,true);
+    	cache.put(0L,A,true);
         assertSameEntryOrdering("entry ordering",
-				new ICacheEntry[] { new CacheEntry(0, A, true), }, cache
+				new ICacheEntry[] { new CacheEntry<Long,String>(0L, A, true), }, cache
 						.entryIterator());
     	
-        cache.put(0,A,false);
+        cache.put(0L,A,false);
         assertSameEntryOrdering("entry ordering",
-				new ICacheEntry[] { new CacheEntry(0, A, false), }, cache
+				new ICacheEntry[] { new CacheEntry<Long,String>(0L, A, false), }, cache
 						.entryIterator());
 
         try {
-    		cache.put(0,B,true);
+    		cache.put(0L,B,true);
     		fail("Expecting exception.");
     	}
     	catch(IllegalStateException ex) {
     		log.info("Ignoring expected exception: "+ex);
     	}
         assertSameEntryOrdering("entry ordering",
-				new ICacheEntry[] { new CacheEntry(0, A, false), }, cache
+				new ICacheEntry[] { new CacheEntry<Long,String>(0L, A, false), }, cache
 						.entryIterator());
 
     }
@@ -323,7 +323,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     public void test_get() {
 
         final int CAPACITY = 4;
-        LRUCache<String> cache = new LRUCache<String>( CAPACITY );
+        LRUCache<Long,String> cache = new LRUCache<Long,String>( CAPACITY );
 
         long[] oid = new long[] {
           1, 2, 3, 4, 5      
@@ -359,18 +359,18 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         assertEquals(obj[0],cache.get(oid[0]));
         cache.put(oid[3], obj[3], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[1],obj[1],true),
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[1],obj[1],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
         	},
         	cache.entryIterator() );
         cache.put(oid[4], obj[4], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[3],obj[3],true),
-                new CacheEntry(oid[4],obj[4],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[4],obj[4],true),
         	},
         	cache.entryIterator() );
         assertNull(cache.get(oid[1]));
@@ -398,7 +398,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     public void test_nextedCacheEvictionCausesTemporaryOverCapacity() {
     	
         final int CAPACITY = 4;
-        LRUCache<String> cache = new LRUCache<String>( CAPACITY );
+        LRUCache<Long,String> cache = new LRUCache<Long,String>( CAPACITY );
 
         long[] oid = new long[] {
           10, 11, 12, 13, 14, 15
@@ -417,7 +417,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 * Set our cache eviction listener to add the described entry into the
 		 * cache when it receives a cache eviction event.
 		 */
-        MyCacheListenerAddsEntry<String> l = new MyCacheListenerAddsEntry<String>(
+        MyCacheListenerAddsEntry<Long, String> l = new MyCacheListenerAddsEntry<Long, String>(
                 cache, oid[5], obj[5], true);
         cache.setListener( l );
         l.denyEvents();
@@ -430,10 +430,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         cache.put(oid[2], obj[2], true );
         cache.put(oid[3], obj[3], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[1],obj[1],true),
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[1],obj[1],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
         	},
         	cache.entryIterator() );
                 
@@ -464,10 +464,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 */
         showCache( cache );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[2],obj[2],true), // LRU position.
-                new CacheEntry(oid[3],obj[3],true),
-                new CacheEntry(oid[5],obj[5],true), 
-                new CacheEntry(oid[4],obj[4],true), // MRU position
+                new CacheEntry<Long,String>(oid[2],obj[2],true), // LRU position.
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[5],obj[5],true), 
+                new CacheEntry<Long,String>(oid[4],obj[4],true), // MRU position
         	},
         	cache.entryIterator() );
         
@@ -481,7 +481,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     public void test_concurrentModificationDuringTraveral() {
 
         final int CAPACITY = 4;
-        LRUCache<String> cache = new LRUCache<String>( CAPACITY );
+        LRUCache<Long,String> cache = new LRUCache<Long,String>( CAPACITY );
 
         long[] oid = new long[] {
           0, 1, 2, 3, 4      
@@ -499,7 +499,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 * Set our cache eviction listener to add the described entry into the
 		 * cache when it receives a cache eviction event.
 		 */
-        MyCacheListener<String> l = new MyCacheListener<String>();
+        MyCacheListener<Long,String> l = new MyCacheListener<Long,String>();
         cache.setListener( l );
         l.denyEvents();
         
@@ -512,10 +512,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         cache.put(oid[2], obj[2], true );
         cache.put(oid[3], obj[3], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[1],obj[1],true),
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[1],obj[1],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
         	},
         	cache.entryIterator() );
 
@@ -523,10 +523,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
          * Verify state under one at a time iteration.
          */
         Iterator itr = cache.entryIterator();
-        assertSameEntry("LRU[0]", new CacheEntry(oid[0],obj[0],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[1]", new CacheEntry(oid[1],obj[1],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[2]", new CacheEntry(oid[2],obj[2],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[3]", new CacheEntry(oid[3],obj[3],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[0]", new CacheEntry<Long,String>(oid[0],obj[0],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[1]", new CacheEntry<Long,String>(oid[1],obj[1],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[2]", new CacheEntry<Long,String>(oid[2],obj[2],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[3]", new CacheEntry<Long,String>(oid[3],obj[3],true), (ICacheEntry)itr.next() );
         assertFalse( itr.hasNext() );
         try {
         	itr.next();
@@ -544,10 +544,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 */
         itr = cache.entryIterator();
         cache.remove(oid[0]);
-//        assertSameEntry("LRU[0]", new CacheEntry(oid[0],obj[0],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[1]", new CacheEntry(oid[1],obj[1],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[2]", new CacheEntry(oid[2],obj[2],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[3]", new CacheEntry(oid[3],obj[3],true), (ICacheEntry)itr.next() );
+//        assertSameEntry("LRU[0]", new CacheEntry<Long,String>(oid[0],obj[0],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[1]", new CacheEntry<Long,String>(oid[1],obj[1],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[2]", new CacheEntry<Long,String>(oid[2],obj[2],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[3]", new CacheEntry<Long,String>(oid[3],obj[3],true), (ICacheEntry)itr.next() );
         assertFalse( itr.hasNext() );
         try {
         	itr.next();
@@ -566,10 +566,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         cache.put(oid[2], obj[2], true );
         cache.put(oid[3], obj[3], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[1],obj[1],true),
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[1],obj[1],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
         	},
         	cache.entryIterator() );
 
@@ -580,11 +580,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 * This removes the 2nd entry before we would visit it.
 		 */
         itr = cache.entryIterator();
-        assertSameEntry("LRU[0]", new CacheEntry(oid[0],obj[0],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[0]", new CacheEntry<Long,String>(oid[0],obj[0],true), (ICacheEntry)itr.next() );
         cache.remove(oid[1]);
-//        assertSameEntry("LRU[1]", new CacheEntry(oid[1],obj[1],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[2]", new CacheEntry(oid[2],obj[2],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[3]", new CacheEntry(oid[3],obj[3],true), (ICacheEntry)itr.next() );
+//        assertSameEntry("LRU[1]", new CacheEntry<Long,String>(oid[1],obj[1],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[2]", new CacheEntry<Long,String>(oid[2],obj[2],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[3]", new CacheEntry<Long,String>(oid[3],obj[3],true), (ICacheEntry)itr.next() );
         assertFalse( itr.hasNext() );
         try {
         	itr.next();
@@ -603,10 +603,10 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         cache.put(oid[2], obj[2], true );
         cache.put(oid[3], obj[3], true );
         assertSameEntryOrdering("entry ordering",new ICacheEntry[]{
-                new CacheEntry(oid[0],obj[0],true),
-                new CacheEntry(oid[1],obj[1],true),
-                new CacheEntry(oid[2],obj[2],true),
-                new CacheEntry(oid[3],obj[3],true),
+                new CacheEntry<Long,String>(oid[0],obj[0],true),
+                new CacheEntry<Long,String>(oid[1],obj[1],true),
+                new CacheEntry<Long,String>(oid[2],obj[2],true),
+                new CacheEntry<Long,String>(oid[3],obj[3],true),
         	},
         	cache.entryIterator() );
 
@@ -617,11 +617,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 		 * This removes the last entry before we would visit it.
 		 */
         itr = cache.entryIterator();
-        assertSameEntry("LRU[0]", new CacheEntry(oid[0],obj[0],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[1]", new CacheEntry(oid[1],obj[1],true), (ICacheEntry)itr.next() );
-        assertSameEntry("LRU[2]", new CacheEntry(oid[2],obj[2],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[0]", new CacheEntry<Long,String>(oid[0],obj[0],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[1]", new CacheEntry<Long,String>(oid[1],obj[1],true), (ICacheEntry)itr.next() );
+        assertSameEntry("LRU[2]", new CacheEntry<Long,String>(oid[2],obj[2],true), (ICacheEntry)itr.next() );
         cache.remove(oid[3]);
-//        assertSameEntry("LRU[3]", new CacheEntry(oid[3],obj[3],true), (ICacheEntry)itr.next() );
+//        assertSameEntry("LRU[3]", new CacheEntry<Long,String>(oid[3],obj[3],true), (ICacheEntry)itr.next() );
         assertFalse( itr.hasNext() );
         try {
         	itr.next();
@@ -655,15 +655,15 @@ public class TestLRUCache extends AbstractCachePolicyTest {
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
 	 * @version $Id$
 	 */
-    public static class MyCacheListenerAddsEntry<T> extends MyCacheListener<T>
+    public static class MyCacheListenerAddsEntry<K,T> extends MyCacheListener<K,T>
     {
-    	private final ICachePolicy<T> _cache;
-    	private final long _oid;
+    	private final ICachePolicy<K,T> _cache;
+    	private final K _oid;
     	private final T _obj;
     	private final boolean _dirty;
     	private int _nevents = 0;
     	
-    	public MyCacheListenerAddsEntry( ICachePolicy<T> cache, long oid, T obj, boolean dirty ) {
+    	public MyCacheListenerAddsEntry( ICachePolicy<K,T> cache, K oid, T obj, boolean dirty ) {
     		super();
     		this._cache = cache;
     		this._oid = oid;
@@ -671,7 +671,7 @@ public class TestLRUCache extends AbstractCachePolicyTest {
     		this._dirty = dirty;
     	}
     	
-		public void objectEvicted(ICacheEntry<T> entry) {
+		public void objectEvicted(ICacheEntry<K,T> entry) {
 			super.objectEvicted(entry);
 			_nevents++;
 	    	showCache(_cache);

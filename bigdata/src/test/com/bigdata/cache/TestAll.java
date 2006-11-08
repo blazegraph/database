@@ -75,9 +75,11 @@ public class TestAll extends TestCase {
     public static junit.framework.Test suite() {
         TestSuite retval = new TestSuite();
         
+        retval.addTestSuite(TestHardReferenceCache.class);
+        
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
-        
+
         // Test LRU semantics.
         retval.addTestSuite( TestLRUCache.class );
         
