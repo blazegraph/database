@@ -81,6 +81,32 @@ public final class Node
 {
 
     /**
+     * FIXME Temporary factor for node identifers.  This SHOULD NOT be static,
+     * but a per-journal or index instance counter.
+     */
+    static private int nextId = 0;
+
+    /**
+     * Node identifier, perhaps persistent, certainly stable within a session.
+     * 
+     * FIXME Reconcile id and _recid. One should be the current slots on which
+     * the node is written in the journal. The other should be the node
+     * identifier.
+     */
+    transient int id = nextId++;
+    
+    /**
+     * The {@link ISlotAllocation} for this node, encoded as a long integer.
+     * 
+     * @todo This is required to deallocate the storage when the index node is
+     *       GC'd. The value is set when the node is serialized or deserialized.
+     *       (Make this final and set to 0L during tests. It can actually be
+     *       just the firstSlot or even an ISlotAllocation, or we can leave it
+     *       as a long for consistency with non-object index btrees.)
+     */
+    /*final*/ transient long _recid;
+
+    /**
      * Debug flag.
      */
     private static final boolean DEBUG = false;
@@ -99,19 +125,11 @@ public final class Node
 
     /**
      * Parent B+Tree.
+     * 
+     * @todo Reduce this to just the API for the node cache since that is the
+     * only purpose to which the {@link ObjectIndex} is applied by this class.
      */
     final transient ObjectIndex _btree;
-
-    /**
-     * The {@link ISlotAllocation} for this node, encoded as a long integer.
-     * 
-     * @todo This is required to deallocate the storage when the index node is
-     *       GC'd. The value is set when the node is serialized or deserialized.
-     *       (Make this final and set to 0L during tests. It can actually be
-     *       just the firstSlot or even an ISlotAllocation, or we can leave it
-     *       as a long for consistency with non-object index btrees.)
-     */
-    /*final*/ transient long _recid;
 
     /**
      * Flag indicating if this is a leaf Node.
@@ -319,7 +337,7 @@ public final class Node
      * @todo The constructor must not eagerly write the new node onto the
      *       journal.  This should be handled by the {@link Journal} init.
      */
-    Node( ObjectIndex btree, Integer key, ISlotAllocation value )
+    Node( ObjectIndex btree, Integer key, ISlotAllocation currentVersion )
     {
         _btree = btree;
 //        _btreeId = btree.getRecid();
@@ -330,12 +348,21 @@ public final class Node
 
         _first = _pageSize-2;
 
+        /*
+         * @todo What is this about pageSize-2 and pageSize-1 to indicate the
+         * root node? Is this just a means of specifying POSINF as a successor
+         * of the first key?
+         */
+        
         _keys = new Integer[ _pageSize ];
         _keys[ _pageSize-2 ] = key;
         _keys[ _pageSize-1 ] = null;  // I am the root Node for now
 
+        /*
+         * @todo Verify assumption that there is no pre-existing version.
+         */
         _values = new IndexEntry[ _pageSize ];
-        _values[ _pageSize-2 ] = value;
+        _values[ _pageSize-2 ] = new IndexEntry(btree._journal.slotMath,(short)0,currentVersion.toLong(),0L);
         _values[ _pageSize-1 ] = null;  // I am the root Node for now
 
         _recid = _btree._insert( this );
@@ -572,7 +599,16 @@ public final class Node
                     System.out.println( "Bpage.insert() Key already exists." ) ;
                 }
                 result._existing = _values[ index ];
+                assert replace = true; // @todo semantics not appropriate for object index.
                 if ( replace ) {
+                    /*
+                     * FIXME There is a version for the persistent identifier recorded
+                     * in this object index context.  We need to check preExisting and
+                     * deallocation the previous version unless it was preExisting.
+                     * 
+                     * FIXME Deletes are handled separately, but make sure that they are
+                     * handled!
+                     */
                     _values [ index ] = value;
                     _btree._update( this );
                 }
@@ -1026,7 +1062,7 @@ public final class Node
 */
     
     /**
-     * Set the entry at the given index.
+     * Set the entry at the given index (leaf node).
      */
     private static void setEntry( Node page, int index, Integer key, Object value )
     {
@@ -1036,7 +1072,7 @@ public final class Node
 
 
     /**
-     * Set the child Node recid at the given index.
+     * Set the child Node at the given index (non-leaf node).
      */
     private static void setChild( Node page, int index, Integer key, long recid )
     {
@@ -1289,7 +1325,7 @@ public final class Node
                 _index = _page._first;
             }
             tuple.setKey( _page._keys[ _index ] );
-            tuple.setValue( _page._values[ _index ] );
+            tuple.setValue( _page._values[ _index ] );//.getCurrentVersionSlots() );
             _index++;
             return true;
         }
@@ -1308,7 +1344,7 @@ public final class Node
             }
             _index--;
             tuple.setKey( _page._keys[ _index ] );
-            tuple.setValue( _page._values[ _index ] );
+            tuple.setValue( _page._values[ _index ] ); //.getCurrentVersionSlots() );
             return true;
 
         }

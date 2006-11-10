@@ -52,13 +52,31 @@ import java.util.BitSet;
 /**
  * Non-persistence capable implementation of a slot allocation index.
  * 
- * FIXME Write test suite.
+ * FIXME Write persistence capable implementation. The allocation needs to be
+ * broken down into blocks (or chunks). We need to have a meta-allocation
+ * structure that keeps track of commited allocation blocks. The ideal solution
+ * would use a tree to store the meta-allocation structure so that we only have
+ * to write nodes for the allocation blocks written on since the last commit,
+ * but it would be nearly as efficient (since it is sequential block IO) to just
+ * write the offsets of each valid allocation block. The allocation block data
+ * structure itself could be the index of the firstSlot covered by that
+ * allocation block and a bit set showing free vs allocated for N slots starting
+ * with firstSlot.
  * 
- * FIXME Implement policy for contiguous allocations.
+ * @todo Support constant time lookup of the next allocation block that could
+ *       allocate an object of a given #of slots. In order to do this we need to
+ *       store an index into the bit set, perhaps one for each of M different
+ *       allocation sizes. E.g., a 2 slot, 4 slot, 8 slot, etc. index that lets
+ *       us create ordered free lists from the allocators by allocation size
+ *       (the free list order reflects the order of the slots whose allocation
+ *       state is recorded in the bit set of the allocation block).
  * 
- * FIXME Write persistence capable implementation.
- * 
- * @todo Tune implementation using performance test.
+ * @todo Write performance tests and tune implementation. Performance tests must
+ *       handle allocation after wrap around of the journal when allocation
+ *       needs to efficiently search for the next free space in a fragmented
+ *       store. The allocation algorithm must also scale well, ideally constant
+ *       cost, as the #of slots in the journal increases and as the store
+ *       fragments.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

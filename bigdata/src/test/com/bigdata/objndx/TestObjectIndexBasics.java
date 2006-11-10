@@ -64,8 +64,8 @@ import com.bigdata.journal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Refactor to test each of the buffer modes and also a variety of other
- *       configuration factors that impact the object index, notably the
+ * @todo Refactor to test each of the {@link BufferMode}s and also a variety of
+ *       other configuration factors that impact the object index, notably the
  *       branching factor and perhaps the slot size and initial extent.
  */
 public class TestObjectIndexBasics extends AbstractObjectIndexTestCase {
@@ -103,15 +103,22 @@ public class TestObjectIndexBasics extends AbstractObjectIndexTestCase {
         /*
          * @todo Create the root node and test its characteristics.
          * 
-         * @todo Refactor a test setup that can be used for testing the
-         * {@link NodeSerializer} in some depth.
-         * 
          * @todo Inserts into the object index need to be performed with the
          * ISlotAllocation of the current version of the object and then need to
          * reconcile based on whether or not there is a hit in the index.
          * 
          * @todo There probably needs to be a lookup variant that returns the
          * IObjectIndexEntry.
+         * 
+         * FIXME Write basic B+Tree tests and get the basic B+Tree semantics
+         * running, possibly with a cache.
+         * 
+         * FIXME Examine SimpleObjectIndex for possible ways of realizing its
+         * semantics with a btree. Decide on whether to handle copy-on-write or
+         * specialization for object index semantics first.  It will be a real
+         * pain if they have to be solved together.
+         * 
+         * @todo Write object index test and copy on write tests.
          */
         
         // object id.

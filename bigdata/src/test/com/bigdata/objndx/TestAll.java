@@ -85,10 +85,10 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Object Index");
 
+        // @todo test index node cache operations.
+        // @todo test basic tree operations (insert, find, key scan)
         // @todo test basic tree manipulations (insert, rotate, split, etc).
         // @todo test copy-on-write semantics.
-        // @todo test basic tree operations (insert, find, key scan)
-        // @todo test index node cache operations.
         // @todo test tree operations in journal context.
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.

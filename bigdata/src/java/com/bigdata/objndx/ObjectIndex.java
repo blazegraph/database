@@ -51,6 +51,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 import com.bigdata.cache.HardReferenceCache;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
+import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.Journal;
@@ -151,7 +154,7 @@ import com.bigdata.journal.RootBlockView;
  *       or otherwise deal with a transaction finding its copy-on-write versions
  *       of index nodes rather than those in the base object index. The total
  *       #of index nodes will continue to rise over time (owing to creation of
- *       new nodes during transactions).  However, a long integer might well
+ *       new nodes during transactions). However, a long integer might well
  *       suffice.
  * 
  * @todo Convert API and data structures from Integer to int. This is an
@@ -206,8 +209,19 @@ import com.bigdata.journal.RootBlockView;
  * 
  * @todo Provide an option to read the non-leaf index into memory during
  *       restart, which will require random IOs iff we are not fully buffered.
+ * 
+ * 
+ * FIXME The leaves can use a hard reference queue and write when they are
+ * evicted from the queue. On write, the hard references are cleared and the
+ * leaf becomes immutable. Eviction of nodes must use a pre-order traversal
+ * since dirty children implies a dirty parent. During pre-order traversal we
+ * write dirty nodes and assign them their key. That key is then written when we
+ * write the parent node. The key for the root node is stored in the root block.
+ * Nodes can use simple hard references since we always want to keep the object
+ * index in memory except for the leaves, which can be resolved by key using a
+ * weak reference cache.
  */
-public class ObjectIndex /* FIXME implements IObjectIndex */
+public class ObjectIndex implements IObjectIndex
 {
 
     private static final boolean DEBUG = false;
@@ -745,13 +759,29 @@ public class ObjectIndex /* FIXME implements IObjectIndex */
      * Interface to the persistence API.
      */
     
+    /*
+     * FIXME Notional caches for nodes and leaves.  Probably should be shared
+     * caches across both the base object index and the per-transaction object
+     * index.
+     * 
+     * FIXME Break this into a cache for nodes and another for leaves.
+     */
+    final WeakValueCache<Integer, Node> nodeCache = new WeakValueCache<Integer, Node>(
+            new LRUCache<Integer, Node>(1000));
+
+//    final WeakValueCache<Integer, Node> leafCache = new WeakValueCache<Integer, Node>(
+//            new LRUCache<Integer, Node>(1000));
+
     /**
      * Write the node onto the journal.
      * 
-     * @param obj
+     * @param node
      *            The object to be inserted into the store.
      * 
      * @return The persistent identifier assigned to the object.
+     * 
+     * FIXME Do not write on insert. Write only on cache eviction. This is a
+     * SUBSTANTIAL cost savings!
      * 
      * @todo Writes are only performed on cache eviction and must also take
      *       responsibility for breaking hard references so that the node may be
@@ -759,29 +789,51 @@ public class ObjectIndex /* FIXME implements IObjectIndex */
      *       child to the parent, and from leaf to leaf in a chain. Use a pool
      *       fo node and leaf buffers to minimize allocation and GC.
      */
-    long _insert(Node obj) {
+    long _insert(Node node) {
 
+        /*
+         * Serialize the node.
+         */
         final ByteBuffer buf;
 
-        if (obj._isLeaf) {
+        if (node._isLeaf) {
 
             buf = ByteBuffer.allocate(_nodeSer.LEAF_SIZE);
 
-            _nodeSer.putLeaf(buf, obj);
+            _nodeSer.putLeaf(buf, node);
 
         } else {
 
             buf = ByteBuffer.allocate(_nodeSer.NODE_SIZE);
 
-            _nodeSer.putNode(buf, obj);
+            _nodeSer.putNode(buf, node);
 
         }
 
-        long recid = _journal.write(buf).toLong();
+        /*
+         * Write the node onto the journal.
+         * 
+         * FIXME Resolve whether to return anything (both this code and the
+         * various invocation contexts are currently setting the _recid field on
+         * the node)
+         * 
+         * FIXME Resolve the distinction between the slots on which the node is
+         * currently written and the node identifier (used for cache lookups).
+         */
+        ISlotAllocation slots = _journal.write(buf);
         
-        obj._recid = recid;
+        node._recid = slots.toLong();
         
-        return recid;
+        /*
+         * FIXME This is false since we just wrote the node, but we should write
+         * the node only on cache eviction and NOT on insert in which case the
+         * node would still be dirty at this point.
+         */
+        boolean dirty = false;
+        
+        nodeCache.put(node.id,node,dirty);
+        
+        return node._recid;
 
     }
 
@@ -805,11 +857,26 @@ public class ObjectIndex /* FIXME implements IObjectIndex */
      */
     Node _fetch(long recid) {
 
-        ISlotAllocation slots = _journal.slotMath.toSlots(recid);
+        /*
+         * FIXME We need to pass in the node id, not (or perhaps in addition to)
+         * its slots.  "In addition to" will drive up the node reference space
+         * requirements significantly and makes me wonder if I have solved the
+         * problem at all....
+         */
+        int id = 0; // FIXME This is not a valid nodeId.
         
-        ByteBuffer buf = _journal.read(slots, null);
+        Node node = nodeCache.get(id);
         
-        Node node = _nodeSer.getNodeOrLeaf(this, recid, buf);
+        if( node == null ) {
+
+            ISlotAllocation slots = _journal.slotMath.toSlots(recid);
+        
+            ByteBuffer buf = _journal.read(slots, null);
+        
+            node = _nodeSer.getNodeOrLeaf(this, recid, buf);
+         
+            nodeCache.put(id,node,false);
+        }
         
         return node;
 
@@ -837,30 +904,33 @@ public class ObjectIndex /* FIXME implements IObjectIndex */
      */
     void _update(Node node) {
 
-        ISlotAllocation slots = _journal.slotMath.toSlots(node._recid);
+//        ISlotAllocation slots = _journal.slotMath.toSlots(node._recid);
+//
+//        final ByteBuffer buf;
+//
+//        if (node._isLeaf) {
+//
+//            assert slots.getByteCount() == _nodeSer.LEAF_SIZE ; 
+//            
+//            buf = ByteBuffer.allocate(_nodeSer.LEAF_SIZE);
+//
+//            _nodeSer.putLeaf(buf, node);
+//
+//        } else {
+//
+//            assert slots.getByteCount() == _nodeSer.NODE_SIZE ; 
+//            
+//            buf = ByteBuffer.allocate(_nodeSer.NODE_SIZE);
+//
+//            _nodeSer.putNode(buf, node);
+//
+//        }
+//
+//        _journal.write(buf);
 
-        final ByteBuffer buf;
-
-        if (node._isLeaf) {
-
-            assert slots.getByteCount() == _nodeSer.LEAF_SIZE ; 
-            
-            buf = ByteBuffer.allocate(_nodeSer.LEAF_SIZE);
-
-            _nodeSer.putLeaf(buf, node);
-
-        } else {
-
-            assert slots.getByteCount() == _nodeSer.NODE_SIZE ; 
-            
-            buf = ByteBuffer.allocate(_nodeSer.NODE_SIZE);
-
-            _nodeSer.putNode(buf, node);
-
-        }
-
-        _journal.write(buf);
-
+        // mark the node as dirty.
+        nodeCache.put(node.id,node,true);
+        
     }
 
     /**
@@ -881,10 +951,51 @@ public class ObjectIndex /* FIXME implements IObjectIndex */
      */
     void _delete(long recid) {
 
+        /*
+         * FIXME This is the same problem as fetch(). We need both the
+         * persistent identifier and the slots on which the node is written.
+         */
+        int id = 0;
+        
         ISlotAllocation slots = _journal.slotMath.toSlots(recid);
 
         _journal.delete(slots);
 
+        nodeCache.remove(id);
+        
+    }
+
+    /*
+     * IObjectIndex implementation.
+     * 
+     * FIXME This is just simple wrapper methods right now, but I suspect that
+     * the semantics will have to be made intrinsic to the b+tree necessitating
+     * broader changes in the implementation. While we could use the b+tree to
+     * do simple lookups on IObjectIndexEntry values, I doubt that this will
+     * also provide for realizing the copy-on-write semantics.
+     */
+    
+    public void delete(int id) {
+       
+        assert id > Node.NEGINF_KEY && id < Node.POSINF_KEY;
+        
+        delete( new Integer(id) );
+        
+    }
+
+    public ISlotAllocation get(int id) {
+
+        assert id > Node.NEGINF_KEY && id < Node.POSINF_KEY;
+        
+        return (ISlotAllocation) find(new Integer(id));
+    }
+
+    public void put(int id, ISlotAllocation slots) {
+
+        assert id > Node.NEGINF_KEY && id < Node.POSINF_KEY;
+        
+        insert(new Integer(id), slots, true );
+        
     }
 
 }

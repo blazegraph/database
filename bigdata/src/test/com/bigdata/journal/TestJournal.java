@@ -1017,7 +1017,7 @@ public class TestJournal extends ProxyTestCase {
             assertEquals(expected,actual);
 
             // The slots for the version that we are about to delete.
-            final ISlotAllocation slots = journal.objectIndex.getSlots(id);
+            final ISlotAllocation slots = journal.objectIndex.get(id);
 
             // delete the version.
             journal.delete(id);
@@ -1041,7 +1041,7 @@ public class TestJournal extends ProxyTestCase {
             // Verify the object is now correctly marked as deleted in the
             // object index.
             try {
-                journal.objectIndex.getSlots(id);
+                journal.objectIndex.get(id);
                 fail("Expecting: "+DataDeletedException.class);
             }
             catch(DataDeletedException ex) {

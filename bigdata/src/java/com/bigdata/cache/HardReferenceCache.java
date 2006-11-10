@@ -76,7 +76,7 @@ package com.bigdata.cache;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @param <T> The generic type for the cache.
+ * @param <T> The reference type stored in the cache.
  */
 public class HardReferenceCache<T> {
 

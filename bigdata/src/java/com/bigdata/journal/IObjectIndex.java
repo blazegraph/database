@@ -100,7 +100,7 @@ public interface IObjectIndex {
      *                identifier against the database since the current version
      *                is deleted.
      */
-    public ISlotAllocation getSlots( int id );
+    public ISlotAllocation get( int id );
 
 //    /**
 //     * Removes and returns the first slot on which a version of the deleted data
@@ -128,17 +128,13 @@ public interface IObjectIndex {
      * @param id
      *            The int32 within-segment persistent identifier.
      * 
-     * @param allocationIndex
-     *            The slot allocation index that will be used to deallocate the
-     *            slots allocated to the current version.
-     * 
      * @exception IllegalArgumentException
      *                if the transaction identifier is bad.
      * @exception DataDeletedException
      *                if the data is already deleted.
      * 
      */
-    public void delete( int id, ISlotAllocationIndex allocationIndex );
+    public void delete( int id );
     
     /**
      * Indicates that the current data version for the persistent identifier was

@@ -1440,7 +1440,7 @@ public class Journal implements IStore {
 
         assertOpen();
         
-        ISlotAllocation slots = objectIndex.getSlots(id);
+        ISlotAllocation slots = objectIndex.get(id);
         
         if( slots == null ) return null;
         
@@ -1605,7 +1605,7 @@ public class Journal implements IStore {
         assertOpen();
 
         // No isolation.
-        objectIndex.delete(id, allocationIndex );
+        objectIndex.delete(id );
             
     }
 

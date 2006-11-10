@@ -440,7 +440,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * 
      * @see #hitOnOuterIndex
      */
-    private IObjectIndexEntry get(int id) {
+    private IObjectIndexEntry getEntry(int id) {
         
         IObjectIndexEntry entry = objectIndex.get(id );
         
@@ -466,7 +466,7 @@ public class SimpleObjectIndex implements IObjectIndex {
     }
     
     /**
-     * This field is set by {@link #get(int)} each time it is invoked. The field
+     * This field is set by {@link #getEntry(int)} each time it is invoked. The field
      * will be true iff there was a hit on the object index and the hit occurred
      * on the outer layer - that is, the layer to which the request was
      * directed. When true, this flag may be interpreted as indicating that a
@@ -479,9 +479,9 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     private boolean hitOnOuterIndex = false;
     
-    public ISlotAllocation getSlots( int id ) {
+    public ISlotAllocation get( int id ) {
 
-        IObjectIndexEntry entry = get(id);
+        IObjectIndexEntry entry = getEntry(id);
         
         if( entry == null ) return null;
         
@@ -515,7 +515,7 @@ public class SimpleObjectIndex implements IObjectIndex {
          * Note: [hitOnOuterIndex] is set as a side effect.
          */
 
-        IObjectIndexEntry entry = get(id2);
+        IObjectIndexEntry entry = getEntry(id2);
 
         if( entry == null ) {
             
@@ -594,14 +594,14 @@ public class SimpleObjectIndex implements IObjectIndex {
 
     }
 
-    public void delete(int id, ISlotAllocationIndex allocationIndex ) {
+    public void delete(int id ) {
 
         /* 
          * Get the object index entry.  This can read through into the base
          * object index.
          */
 
-        IObjectIndexEntry entry = get(id);
+        IObjectIndexEntry entry = getEntry(id);
 
         if( entry == null ) {
             

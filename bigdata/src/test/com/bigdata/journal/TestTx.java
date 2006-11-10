@@ -352,7 +352,7 @@ public class TestTx extends ProxyTestCase {
             assertNotFound(tx1.read(id0, null));
 
             // The slot allocation for the version that we are about to delete.
-            final ISlotAllocation slots = tx0.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots = tx0.getObjectIndex().get(id0);
             assertNotNull(slots);
             assertSlotAllocationState(slots, journal.allocationIndex, true);
             
@@ -369,7 +369,7 @@ public class TestTx extends ProxyTestCase {
             // Verify the persistent identifier is now correctly marked as
             // deleted in the transaction's object index.
             try {
-                tx0.getObjectIndex().getSlots(id0);
+                tx0.getObjectIndex().get(id0);
                 fail("Expecting: "+DataDeletedException.class);
             }
             catch(DataDeletedException ex) {
@@ -483,7 +483,7 @@ public class TestTx extends ProxyTestCase {
             final ByteBuffer expected_id0_v0 = getRandomData(journal);
             journal.write( id0, expected_id0_v0);
             assertEquals(expected_id0_v0.array(),journal.read( id0, null));
-            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(0);
+            final ISlotAllocation slots_v0 = journal.objectIndex.get(0);
 
             /*
              * Verify that the version does NOT show up in a transaction created
@@ -521,7 +521,7 @@ public class TestTx extends ProxyTestCase {
              * This entire feature (updating the global scope outside of a
              * transaction) is a bit edgy and needs more thought.
              */
-            assertEquals(slots_v0,journal.objectIndex.getSlots(0));
+            assertEquals(slots_v0,journal.objectIndex.get(0));
             assertEquals(expected_id0_v1.array(),journal.read( id0, null));
             assertNotFound(tx0.read(id0, null));
             assertEquals(expected_id0_v0.array(),tx1.read(id0, null));
@@ -663,7 +663,7 @@ public class TestTx extends ProxyTestCase {
 
             // Write pre-existing version of id0 onto the journal.
             journal.write(id0,expected_preExistingVersion);
-            ISlotAllocation slots_preExistingVersion = journal.objectIndex.getSlots(id0);
+            ISlotAllocation slots_preExistingVersion = journal.objectIndex.get(id0);
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             assertVersionCounter(journal, id0, 0);
             
@@ -680,7 +680,7 @@ public class TestTx extends ProxyTestCase {
             assertVersionCounter(journal, id0, 0); // there is a pre-existing version on the journal.
             assertVersionCounter(tx0, id0, 0);
 
-            final ISlotAllocation slots_id0_v0 = tx0.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots_id0_v0 = tx0.getObjectIndex().get(id0);
             
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -695,7 +695,7 @@ public class TestTx extends ProxyTestCase {
             // Note: no version of id1 is on the journal.
             assertVersionCounter(tx0, id1, 0);
             
-            final ISlotAllocation slots_id1_v0 = tx0.getObjectIndex().getSlots(id1);
+            final ISlotAllocation slots_id1_v0 = tx0.getObjectIndex().get(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -712,7 +712,7 @@ public class TestTx extends ProxyTestCase {
             // Note: no version of id1 is on the journal.
             assertVersionCounter(tx0, id1, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id1_v1 = tx0.getObjectIndex().getSlots(id1);
+            final ISlotAllocation slots_id1_v1 = tx0.getObjectIndex().get(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -731,7 +731,7 @@ public class TestTx extends ProxyTestCase {
             // Note: no version of id1 is on the journal.
             assertVersionCounter(tx0, id1, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id1_v2 = tx0.getObjectIndex().getSlots(id1);
+            final ISlotAllocation slots_id1_v2 = tx0.getObjectIndex().get(id1);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -752,7 +752,7 @@ public class TestTx extends ProxyTestCase {
             assertVersionCounter(journal, id0, 0); // there is a pre-existing version on the journal.
             assertVersionCounter(tx0, id0, 0); // counter is only changed by commit.
 
-            final ISlotAllocation slots_id0_v1 = tx0.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots_id0_v1 = tx0.getObjectIndex().get(id0);
 
             assertSlotAllocationState(slots_preExistingVersion, journal.allocationIndex, true);
             
@@ -1620,7 +1620,7 @@ public class TestTx extends ProxyTestCase {
             journal.write(id0, expected_id0_v0);
 
             // The slots on which the first data version is written.
-            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(id0);
+            final ISlotAllocation slots_v0 = journal.objectIndex.get(id0);
             
             // Verify the data version is visible in global scope.
             assertEquals(expected_id0_v0.array(), journal.read(id0, null));
@@ -1645,13 +1645,13 @@ public class TestTx extends ProxyTestCase {
             assertVersionCounter(tx1, id0, 0);
                         
             // slot allocation in global scope is unchanged.
-            assertEquals(slots_v0,journal.objectIndex.getSlots(id0));
+            assertEquals(slots_v0,journal.objectIndex.get(id0));
 
             // data version in global scope is unchanged.
             assertEquals(expected_id0_v0.array(), journal.read(id0, null));
 
             // Get the slots on which the 2nd data version was written.
-            final ISlotAllocation slots_v1 = tx1.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots_v1 = tx1.getObjectIndex().get(id0);
 
             // prepare
             tx1.prepare();
@@ -1668,14 +1668,14 @@ public class TestTx extends ProxyTestCase {
             assertSlotAllocationState(slots_v1, journal.allocationIndex,true);
 
             // The entry in the scope is consistent with the v1 allocation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
+            assertEquals(slots_v1,journal.objectIndex.get(id0));
 
             // new data version now visible in global scope.
             assertEquals(expected_id0_v1.array(), journal.read(id0, null));
 
             // The entry in the tx2 object index is consistent with the v0
             // allocatation (it was not overwritten when the tx1 committed).
-            assertEquals(slots_v0,tx2.getObjectIndex().getSlots(id0));
+            assertEquals(slots_v0,tx2.getObjectIndex().get(id0));
 
             // Read the version in tx2 (just to prove that we can do it).
             assertEquals(expected_id0_v0.array(), tx2.read(id0, null));
@@ -1702,7 +1702,7 @@ public class TestTx extends ProxyTestCase {
 
             // The entry in the global object index is consistent with the v1
             // allocatation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
+            assertEquals(slots_v1,journal.objectIndex.get(id0));
 
             // The v1 version is still visible in global scope.
             assertEquals(expected_id0_v1.array(), journal.read(id0, null));
@@ -1720,7 +1720,7 @@ public class TestTx extends ProxyTestCase {
 
             // The entry in the global object index is consistent with the v1
             // allocatation.
-            assertEquals(slots_v1,journal.objectIndex.getSlots(id0));
+            assertEquals(slots_v1,journal.objectIndex.get(id0));
 
             // The v1 version is still visible in global scope.
             assertEquals(expected_id0_v1.array(), journal.read(id0, null));
@@ -1828,7 +1828,7 @@ public class TestTx extends ProxyTestCase {
             assertEquals(expected_v0.array(), journal.read(id0, null));
 
             // Save the v0 slot allocation.
-            final ISlotAllocation slots_v0 = journal.objectIndex.getSlots(id0);
+            final ISlotAllocation slots_v0 = journal.objectIndex.get(id0);
             
             // start transaction.
             Tx tx1 = new Tx(journal, 1);
@@ -1854,7 +1854,7 @@ public class TestTx extends ProxyTestCase {
             assertVersionCounter(tx1,id0,0);
 
             // Save the tx1(v1) slot allocation.
-            final ISlotAllocation slots_tx1_v1 = tx1.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots_tx1_v1 = tx1.getObjectIndex().get(id0);
 
             // Verify read-back of the version.
             assertEquals(expected_tx1_v1.array(),tx1.read(id0,null));
@@ -1913,7 +1913,7 @@ public class TestTx extends ProxyTestCase {
             assertVersionCounter(journal,id0,1);
 
             // Save the tx2(v1) slot allocation.
-            final ISlotAllocation slots_tx2_v1 = tx2.getObjectIndex().getSlots(id0);
+            final ISlotAllocation slots_tx2_v1 = tx2.getObjectIndex().get(id0);
 
             // Verify read-back of the version written by the transaction.
             assertEquals(expected_tx2_v1.array(),tx2.read(id0,null));

@@ -245,7 +245,7 @@ public class Tx implements IStore, ITx {
             
         }
         
-        ISlotAllocation slots = objectIndex.getSlots(id);
+        ISlotAllocation slots = objectIndex.get(id);
         
         if( slots == null ) return null;
 
@@ -332,7 +332,7 @@ public class Tx implements IStore, ITx {
         }
 
         // Transactional isolation.
-        objectIndex.delete(id, journal.allocationIndex );
+        objectIndex.delete( id );
         
     }
     
