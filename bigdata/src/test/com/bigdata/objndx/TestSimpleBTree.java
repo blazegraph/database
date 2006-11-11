@@ -57,18 +57,23 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.Set;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
@@ -104,6 +109,153 @@ public class TestSimpleBTree extends TestCase2 {
 
     }
 
+    /**
+     * Test binary search for keys in a node. The binary search routine is
+     * implemented just once, by {@link AbstractNode#binarySearch(int)}. This
+     * test sets up some keys, adjusts the #of defined keys, and then verifies
+     * both correct lookup of keys that exist and the correct insertion point
+     * when the key does not exist.
+     */
+    public void test_binarySearch01()
+    {
+    
+        // The general formula for the record offset is:
+        //
+        //    offset := sizeof(record) * ( index - 1 )
+        //
+        // The general formula for the insertion point is:
+        //
+        //    insert := - ( offset + 1 )
+        //
+        // where [offset] is the offset of the record before which the
+        // new record should be inserted.
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int branchingFactor = 6;
+        
+        BTree btree = new BTree(store, branchingFactor);
+
+        Leaf leaf = (Leaf) btree.getRoot();
+
+        int[] keys = leaf.keys;
+
+        int i = 0;
+        keys[i++] = 5;  // offset := 0, insert before := -1
+        keys[i++] = 7;  // offset := 1, insert before := -2
+        keys[i++] = 9;  // offset := 2, insert before := -3
+        keys[i++] = 11; // offset := 3, insert before := -4
+        keys[i++] = 13; // offset := 4, insert before := -5
+                        //              insert  after := -6
+        leaf.nkeys = 5;
+
+        //
+        // verify offset of record found.
+        //
+
+        // Verify finds the first record in the array.
+        assertEquals(0, leaf.binarySearch(5));
+
+        // Verify finds the 2nd record in the array.
+        assertEquals(1, leaf.binarySearch(7));
+
+        // Verify finds the penultimate record in the array.
+        assertEquals(3, leaf.binarySearch(11));
+
+        // Verify finds the last record in the array.
+        assertEquals(4, leaf.binarySearch(13));
+
+        //
+        // verify insertion points (key not found).
+        //
+
+        // Verify insertion point for key less than any value in the
+        // array.
+        assertEquals(-1, leaf.binarySearch(4));
+
+        // Verify insertion point for key between first and 2nd
+        // records.
+        assertEquals(-2, leaf.binarySearch(6));
+
+        // Verify insertion point for key between penultimate and last
+        // records.
+        assertEquals(-5, leaf.binarySearch(12));
+
+        // Verify insertion point for key greater than the last record.
+        assertEquals(-6, leaf.binarySearch(14));
+
+    }
+
+    /**
+     * Test ability to insert entries into a leaf. Random (legal) external keys
+     * are inserted into a leaf until the leaf would overflow. The random keys
+     * are then sorted and compared with the actual keys in the leaf. If the
+     * keys were inserted correctly into the leaf then the two arrays of keys
+     * will have the same values in the same order.
+     * 
+     * @todo Write tests that trigger overflow.
+     * @todo Write tests for insert into a {@link Node}.
+     */
+    public void test_insertIntoLeaf01() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int branchingFactor = 20;
+        
+        BTree btree = new BTree(store, branchingFactor);
+
+        Leaf root = (Leaf) btree.getRoot();
+        
+        // array of inserted keys.
+        int[] expectedKeys = new int[branchingFactor];
+        
+        Random r = new Random();
+        
+        int nkeys = 0;
+        
+        while( nkeys < branchingFactor ) {
+            
+            // Valid random key.
+            int key = r.nextInt(Node.POSINF-1)+1;
+            
+            int index = root.binarySearch(key);
+            
+            if( index >= 0 ) {
+                
+                /*
+                 * The key is already present in the leaf.
+                 */
+                
+                continue;
+                
+            }
+        
+            // Convert the position to obtain the insertion point.
+            index = -index - 1;
+
+            // save the key.
+            expectedKeys[ nkeys ] = key;
+            
+            System.err.println("Will insert: key=" + key + " at index=" + index
+                    + " : nkeys=" + nkeys);
+
+            // insert an entry under that key.
+            root.insert(key, index, new Entry() );
+            
+            nkeys++;
+            
+            assertEquals( nkeys, root.nkeys );
+            
+        }
+
+        // sort the keys that we inserted.
+        Arrays.sort(expectedKeys);
+        
+        // verify that the leaf has the same keys in the same order.
+        assertEquals( expectedKeys, root.keys );
+        
+    }
+    
     /*
      * Test structural modification (adding and removing child nodes).
      */
@@ -124,6 +276,7 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals(null, node.childRefs[0]);
 
         Node child = new Node(btree);
+        assertFalse( child.isLeaf() );
 
         int externalKey = 1; // arbitrary but valid external key.
         node.addChild(externalKey, child);
@@ -151,6 +304,7 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals(null, node.childRefs[0]);
 
         Leaf child = new Leaf(btree);
+        assertTrue( child.isLeaf() );
 
         int externalKey = 1; // arbitrary but valid external key.
         node.addChild(externalKey, child);
@@ -165,6 +319,9 @@ public class TestSimpleBTree extends TestCase2 {
     /*
      * Test iterators -- assumes that structural modification (adding and
      * removing child nodes) has already been tested.
+     * 
+     * @todo Figure out how to write tests for the postOrderIterator that looks
+     * for correct non-visitation of nodes that are not dirty.
      */
 
     /**
@@ -635,10 +792,6 @@ public class TestSimpleBTree extends TestCase2 {
 
     /*
      * Tests of copy-on-write semantics.
-     * 
-     * FIXME There are a lot of assumptions to be tested here, including the
-     * specifics of all the fields that need to be copied and verifying that
-     * fields are copied by value and not be reference (to avoid bleed through).
      */
     
     /**
@@ -648,10 +801,6 @@ public class TestSimpleBTree extends TestCase2 {
      * which forces cloning of the original root node. The test verifies that
      * the new tree has the expected structure and that the old tree was not
      * changed by this operation.
-     * 
-     * FIXME Add more substantive tests of copy-on-write, e.g., when there is
-     * some structure and we trigger a copy-on-write operation that cascades up
-     * the tree.
      */
     public void test_copyOnWrite01() {
 
@@ -770,6 +919,8 @@ public class TestSimpleBTree extends TestCase2 {
      *      leaf3
      *      leaf4
      * </pre>
+     * 
+     * @todo Do tests of copy-on-write that go down to the key-value level.
      */
     public void test_copyOnWrite02() {
 
@@ -1223,9 +1374,22 @@ public class TestSimpleBTree extends TestCase2 {
      * the node (or leaf) can only be set when it is read from the store in
      * context by its parent node.
      * </p>
+     * <p>
+     * Note: This implementation is NOT thread-safe. The object index is
+     * intended for use within a single-threaded context.
+     * </p>
+     * <p>
+     * Note: This iterators exposed by this implementation do NOT support
+     * concurrent structural modification. Concurrent inserts or removals of
+     * keys MAY produce incoherent traversal whether or not they result in
+     * addition or removal of nodes in the tree.
+     * </p>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo Track the height, #of nodes (or nodes + leaves), and #of entries in
+     *       the btree.
      */
     public static class BTree {
 
@@ -1282,6 +1446,11 @@ public class TestSimpleBTree extends TestCase2 {
          */
         AbstractNode root;
 
+        /**
+         * The root of the btree. This is initially a leaf until the leaf is
+         * split, at which point it is replaced by a node. The root is also
+         * replaced each time copy-on-write triggers a cascade of updates.
+         */
         public AbstractNode getRoot() {
 
             return root;
@@ -1370,17 +1539,17 @@ public class TestSimpleBTree extends TestCase2 {
             /*
              * Traverse tree, writing dirty nodes onto the store.
              * 
-             * @todo Add flag to postOrderIterator to (a) only visit dirty nodes
-             * and use it here to optimize the traversal by avoiding traversal
-             * of parts of the tree that are not dirty.
+             * Note: This iterator only visits dirty nodes.
              */
-            Iterator itr = root.postOrderIterator();
+            Iterator itr = root.postOrderIterator(true);
 
             while (itr.hasNext()) {
 
                 AbstractNode node = (AbstractNode) itr.next();
 
-                if (node.isDirty()) {
+                assert node.isDirty();
+                
+//                if (node.isDirty()) {
 
                     if (node != root) {
 
@@ -1401,7 +1570,7 @@ public class TestSimpleBTree extends TestCase2 {
                     if (node instanceof Leaf)
                         nleaves++;
 
-                }
+//                }
 
             }
 
@@ -1412,6 +1581,52 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
+        /**
+         * Add / update an entry in the object index.
+         * 
+         * @param id
+         *            The persistent id.
+         * @param slots
+         *            The slots on which the current version is written.
+         */
+        public void put(int id,ISlotAllocation slots) {
+           
+            assert id > AbstractNode.NEGINF && id < AbstractNode.POSINF;
+
+            // FIXME Implement find/insert.
+            
+        }
+        
+        /**
+         * Return the slots on which the current version of the object is
+         * written.
+         * 
+         * @param id
+         *            The persistent id.
+         * @return The slots on which the current version is written.
+         * 
+         * @todo Implement get(id) : ISlotAllocation.
+         */
+        public ISlotAllocation get(int id) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        /**
+         * Mark the object as deleted.
+         * 
+         * @param id
+         *            The persistent id.
+         * 
+         * @todo Implement delete(id).
+         */
+        public void delete(int id) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
     }
 
     /**
@@ -1430,21 +1645,14 @@ public class TestSimpleBTree extends TestCase2 {
     public abstract static class AbstractNode extends PO {
 
         /**
-         * The branching factor (#of slots for keys or values).
-         * 
-         * @todo refactor capacity for constructor and deserialization.
-         */
-        final int CAPACITY = 4;
-
-        /**
          * Negative infinity for the external keys.
          */
-        final int NEGINF = 0;
+        static final int NEGINF = 0;
 
         /**
          * Positive infinity for the external keys.
          */
-        final int POSINF = Integer.MAX_VALUE;
+        static final int POSINF = Integer.MAX_VALUE;
 
         /**
          * The BTree.
@@ -1454,10 +1662,15 @@ public class TestSimpleBTree extends TestCase2 {
          * reference on hand so that we can set this field.
          * 
          * Note: We also need the branching factor on hand when we deserialize a
-         * node. That is why {@link #CAPACITY} is currently defined as a
+         * node. That is why {@link #branchingFactor} is currently defined as a
          * constant.
          */
         transient protected BTree btree;
+
+        /**
+         * The branching factor (#of slots for keys or values).
+         */
+        transient protected int branchingFactor;
 
         /**
          * The #of valid keys for this node.
@@ -1465,9 +1678,10 @@ public class TestSimpleBTree extends TestCase2 {
         protected int nkeys = 0;
 
         /**
-         * The external keys for the B+Tree.
+         * The external keys for the B+Tree. (The length of this array is the
+         * branching factor in force for this node).
          */
-        protected int[] keys = new int[CAPACITY];
+        protected int[] keys;
 
         /**
          * The parent of this node. This is null for the root node. The parent
@@ -1513,7 +1727,7 @@ public class TestSimpleBTree extends TestCase2 {
          * De-serialization constructor used by subclasses.
          */
         protected AbstractNode() {
-
+            
         }
 
         public AbstractNode(BTree btree) {
@@ -1522,6 +1736,10 @@ public class TestSimpleBTree extends TestCase2 {
 
             this.btree = btree;
 
+            this.branchingFactor = btree.branchingFactor;
+            
+            this.keys = new int[branchingFactor];
+            
         }
 
         /**
@@ -1544,6 +1762,10 @@ public class TestSimpleBTree extends TestCase2 {
 
             this.btree = src.btree;
 
+            this.branchingFactor =  btree.branchingFactor;
+            
+            this.keys = new int[branchingFactor];
+            
             this.nkeys = src.nkeys;
 
             for (int i = 0; i < nkeys; i++) {
@@ -1648,20 +1870,149 @@ public class TestSimpleBTree extends TestCase2 {
          * node, its children are always visited before the node itself (hence
          * the node occurs in the post-order position in the traveral). The
          * iterator is NOT safe for concurrent modification.
-         * 
-         * @todo Add parameter to only visit the dirty nodes.
          */
-        abstract public Iterator postOrderIterator();
+        public Iterator postOrderIterator() {
+            
+            return postOrderIterator( false );
+            
+        }
 
+        /**
+         * Post-order traveral of nodes and leaves in the tree. For any given
+         * node, its children are always visited before the node itself (hence
+         * the node occurs in the post-order position in the traveral). The
+         * iterator is NOT safe for concurrent modification.
+         * 
+         * @param dirtyNodesOnly
+         *            When true, only dirty nodes and leaves will be visited
+         */
+        abstract public Iterator postOrderIterator(boolean dirtyNodesOnly);
+        
         /**
          * Traversal of index values in key order.
          */
-        public Iterator valueIterator() {
+        public Iterator entryIterator() {
 
-            throw new UnsupportedOperationException();
+            /*
+             * Begin with a post-order iterator.
+             */
+            return new Striterator(postOrderIterator()).addFilter(new Expander() {
+                /*
+                 * Expand the {@link Entry} objects for each leaf visited in
+                 * the post-order traversal.
+                 */
+                protected Iterator expand(Object childObj) {
+                    /*
+                     * A child of this node.
+                     */
+                    AbstractNode child = (AbstractNode) childObj;
+
+                    if( child instanceof Leaf ) {
+
+                        return ((Leaf)child).entryIterator();
+
+                    } else {
+                        
+                        return EmptyIterator.DEFAULT;
+                        
+                    }
+                }
+            });
+            
+        }
+
+        /**
+         * True iff this is a leaf node.
+         */
+        abstract public boolean isLeaf();
+        
+        /**
+         * Binary search on the array of external keys.
+         * 
+         * @param key
+         *            The key for the search.
+         * 
+         * @return index of the search key, if it is contained in the array;
+         *         otherwise, <code>(-(insertion point) - 1)</code>. The
+         *         insertion point is defined as the point at which the key
+         *         would be inserted into the array. Note that this guarantees
+         *         that the return value will be >= 0 if and only if the key is
+         *         found.
+         */
+        final public int binarySearch(final int key) {
+
+            int low = 0;
+
+            int high = nkeys - 1;
+
+            while (low <= high) {
+
+                final int mid = (low + high) >> 1;
+
+                final int midVal = keys[mid];
+
+                if (midVal < key) {
+
+                    low = mid + 1;
+                }
+
+                else if (midVal > key) {
+
+                    high = mid - 1;
+
+                } else {
+
+                    // Found: return offset.
+
+                    return mid;
+
+                }
+
+            }
+
+            // Not found: return insertion point.
+
+            final int offset = low;
+
+            return -(offset + 1);
 
         }
 
+        /**
+         * <p>
+         * Copy down the elements of the per-key arrays from the index to the
+         * #of keys currently defined thereby creating an unused position at
+         * <i>index</i>. The #of keys is NOT modified by this method.
+         * </p>
+         * <p>
+         * This method MUST be extended by subclasses that declare additional
+         * per-key data.
+         * </p>
+         * 
+         * @param index
+         *            The index.
+         * 
+         * @param count
+         *            The #of elements to be copied (computed as {@link #nkeys} -
+         *            <i>index</i>).
+         */
+        protected void copyDown(int index, int count) {
+            
+            /*
+             * copy down per-key data.
+             */
+            System.arraycopy( keys, index, keys, index+1, count );
+            
+            /*
+             * Clear the entry at the index. This is part paranoia check and
+             * partly critical. Some per-key elements MUST be cleared and it is
+             * much safer (and quite cheap) to clear them during copyDown()
+             * rather than relying on maintenance elsewhere.
+             */
+            keys[ index ] = NEGINF; // an invalid key.
+
+        }
+        
         /**
          * Writes the node on the store. The node MUST be dirty. If the node has
          * a parent, then the parent is notified of the persistent identity
@@ -1713,7 +2064,7 @@ public class TestSimpleBTree extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class ChildIterator implements Iterator {
+    static class ChildIterator implements Iterator<AbstractNode> {
 
         private final Node node;
 
@@ -1733,7 +2084,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        public Object next() {
+        public AbstractNode next() {
 
             if (!hasNext()) {
 
@@ -1742,6 +2093,54 @@ public class TestSimpleBTree extends TestCase2 {
             }
 
             return node.getChild(index++);
+        }
+
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+    }
+
+    /**
+     * Visits the {@link Entry}s of a {@link Leaf} in the external key ordering.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo write test suite for {@link AbstractNode#entryIterator()}.
+     */
+    static class EntryIterator implements Iterator<Entry> {
+
+        private final Leaf leaf;
+
+        private int index = 0;
+
+        public EntryIterator(Leaf leaf) {
+
+            assert leaf != null;
+
+            this.leaf = leaf;
+
+        }
+
+        public boolean hasNext() {
+
+            return index < leaf.nkeys;
+
+        }
+
+        public Entry next() {
+
+            if (!hasNext()) {
+
+                throw new NoSuchElementException();
+
+            }
+
+            return leaf.values[index++];
+            
         }
 
         public void remove() {
@@ -1801,17 +2200,17 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public static class Node extends AbstractNode {
 
-        private static final long serialVersionUID = -609250271159317457L;
-
-        /**
-         * Weak references to child nodes (may be nodes or leaves).
-         */
-        transient protected WeakReference<AbstractNode>[] childRefs = new WeakReference[CAPACITY];
+        private static final long serialVersionUID = 1L;
 
         /**
          * Hard reference cache containing dirty child nodes (nodes or leaves).
          */
         transient protected Set<AbstractNode> dirtyChildren = new HashSet<AbstractNode>();
+
+        /**
+         * Weak references to child nodes (may be nodes or leaves).
+         */
+        transient protected WeakReference<AbstractNode>[] childRefs;
 
         /**
          * The keys of the childKeys nodes (may be nodes or leaves). The key is
@@ -1824,7 +2223,7 @@ public class TestSimpleBTree extends TestCase2 {
          * having a null entry in this array and a non-null entry in the
          * external {@link #keys} array.
          */
-        protected int[] childKeys = new int[CAPACITY];
+        protected int[] childKeys;
 
         /**
          * Extends the super class implementation to add the node to a hard
@@ -1850,6 +2249,10 @@ public class TestSimpleBTree extends TestCase2 {
 
             super(btree);
 
+            childRefs = new WeakReference[branchingFactor];
+            
+            childKeys = new int[branchingFactor];
+
         }
 
         /**
@@ -1865,17 +2268,30 @@ public class TestSimpleBTree extends TestCase2 {
             assert isDirty();
             assert ! isPersistent();
 
-            // Add to the hard reference cache for nodes.
-            btree.nodes.add(this);
+            childRefs = new WeakReference[branchingFactor];
             
+            childKeys = new int[branchingFactor];
+
             for (int i = 0; i < nkeys; i++) {
 
                 this.childKeys[i] = src.childKeys[i];
 
             }
 
+            // Add to the hard reference cache for nodes.
+            btree.nodes.add(this);
+            
         }
 
+        /**
+         * Always returns <code>false</code>.
+         */
+        final public boolean isLeaf() {
+        
+            return false;
+            
+        }
+        
         /**
          * This method must be invoked on a parent to notify the parent that the
          * child has become persistent. The method scans the weak references for
@@ -2122,19 +2538,31 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
+        protected void copyDown(int index, int count) {
+
+            super.copyDown(index,count);
+            
+            System.arraycopy( childKeys, index, childKeys, index+1, count );
+            System.arraycopy( childRefs, index, childRefs, index+1, count );
+            
+            childKeys[ index ] = NULL;
+            childRefs[ index ] = null;
+            
+        }
+
         /**
          * Iterator visits children, recursively expanding each child with a
          * post-order traversal of its children and finally visits this node
          * itself.
          */
-        public Iterator postOrderIterator() {
+        public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
 
             /*
              * Iterator append this node to the iterator in the post-order
              * position.
              */
 
-            return new Striterator(postOrderIterator1())
+            return new Striterator(postOrderIterator1(dirtyNodesOnly))
                     .append(new SingleValueIterator(this));
 
         }
@@ -2143,14 +2571,20 @@ public class TestSimpleBTree extends TestCase2 {
          * Visits the children (recursively) using post-order traversal, but
          * does NOT visit this node.
          */
-        private Iterator postOrderIterator1() {
+        private Iterator postOrderIterator1(final boolean dirtyNodesOnly) {
 
+            if( dirtyNodesOnly && ! isDirty() ) {
+            
+                return EmptyIterator.DEFAULT;
+                
+            }
+            
             /*
              * Iterator visits the direct children, expanding them in turn with
              * a recursive application of the post-order iterator.
              */
 
-            System.err.println("node: " + this);
+//            System.err.println("node: " + this);
 
             return new Striterator(childIterator()).addFilter(new Expander() {
                 /*
@@ -2170,11 +2604,11 @@ public class TestSimpleBTree extends TestCase2 {
                          * The child is a Node (has children).
                          */
 
-                        System.err.println("child is node: " + child);
+//                        System.err.println("child is node: " + child);
 
                         // visit the children (recursive post-order traversal).
                         Striterator itr = new Striterator(((Node) child)
-                                .postOrderIterator1()); // recursive!
+                                .postOrderIterator1(dirtyNodesOnly));
 
                         // append this node in post-order position.
                         itr.append(new SingleValueIterator(child));
@@ -2187,7 +2621,7 @@ public class TestSimpleBTree extends TestCase2 {
                          * The child is a leaf.
                          */
 
-                        System.err.println("child is leaf: " + child);
+//                        System.err.println("child is leaf: " + child);
 
                         // Visit the leaf itself.
                         return new SingleValueIterator(child);
@@ -2211,6 +2645,7 @@ public class TestSimpleBTree extends TestCase2 {
             if (dirtyChildren.size() > 0) {
                 throw new IllegalStateException("Dirty children exist.");
             }
+            out.writeInt(branchingFactor);
             out.writeInt(nkeys);
             for (int i = 0; i < nkeys; i++) {
                 int key = keys[i];
@@ -2224,7 +2659,11 @@ public class TestSimpleBTree extends TestCase2 {
 
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
+            branchingFactor = in.readInt();
             nkeys = in.readInt();
+            keys = new int[branchingFactor];
+            childRefs = new WeakReference[branchingFactor];
+            childKeys = new int[branchingFactor];
             for (int i = 0; i < nkeys; i++) {
                 int key = in.readInt();
                 int childKey = in.readInt();
@@ -2243,12 +2682,11 @@ public class TestSimpleBTree extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo Reconcile with the state that we need to maintain in the object
-     *       index.
-     * 
-     * @todo Handle compact serialization.
+     * @todo Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
      */
     public static class Entry implements Serializable {
+
+        private static final long serialVersionUID = 1L;
 
         /**
          * Create a new entry.
@@ -2284,12 +2722,12 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public static class Leaf extends AbstractNode {
 
-        private static final long serialVersionUID = 8540218988680712513L;
-
+        private static final long serialVersionUID = 1L;
+        
         /**
          * The values of the tree.
          */
-        protected Entry[] values = new Entry[CAPACITY];
+        protected Entry[] values;
 
         /**
          * De-serialization constructor.
@@ -2302,6 +2740,8 @@ public class TestSimpleBTree extends TestCase2 {
 
             super(btree);
 
+            values = new Entry[branchingFactor];
+            
             // Add to the hard reference queue.
             btree.leaves.append(this);
             
@@ -2317,9 +2757,8 @@ public class TestSimpleBTree extends TestCase2 {
 
             super(src);
 
-            // Add to the hard reference queue.
-            btree.leaves.append(this);
-
+            values = new Entry[branchingFactor];
+            
             for (int i = 0; i < nkeys; i++) {
 
                 /*
@@ -2330,21 +2769,129 @@ public class TestSimpleBTree extends TestCase2 {
 
             }
 
+            // Add to the hard reference queue.
+            btree.leaves.append(this);
+
         }
 
         /**
-         * Returns this {@link Leaf}.
+         * Always returns <code>true</code>.
          */
-        public Iterator postOrderIterator() {
+        final public boolean isLeaf() {
+         
+            return true;
+            
+        }
 
-            return new SingleValueIterator(this);
+        /**
+         * Inserts an entry under an external key. This method is invoked when a
+         * {@link #binarySearch(int)} has already revealed that there is no
+         * entry for the key in the node.
+         * 
+         * @param id
+         *            The external key.
+         * @param index
+         *            The index position for the new entry. Data already present
+         *            in the leaf beyond this insertion point will be shifted
+         *            down by one.
+         * @param entry
+         *            The new entry.
+         * 
+         * @todo insert of child on Node.
+         * @todo handle node overflow
+         * @todo handle leaf overflow
+         */
+        void insert( int id, int index, Entry entry ) {
+
+            assert id != NULL;
+            assert index >=0 && index <= nkeys;
+            assert entry != null;
+            
+            if( nkeys == keys.length ) {
+                
+                throw new RuntimeException("Overflow");
+                
+            } else {
+
+                if( index < nkeys ) {
+                    
+                    /* index = 2;
+                     * nkeys = 6;
+                     * 
+                     * [ 0 1 2 3 4 5 ]
+                     *       ^ index
+                     * 
+                     * count = keys - index = 4;
+                     */
+                    final int count = nkeys - index;
+                    
+                    assert count >= 1;
+
+                    copyDown( index, count );
+                    
+                }
+                
+                /*
+                 * Insert at index.
+                 */
+                keys[ index ] = id; // defined by AbstractNode
+                values[ index ] = entry; // defined by Leaf.
+                
+              }
+            
+            nkeys++;
+            
+        }
+        
+        protected void copyDown(int index, int count) {
+
+            super.copyDown(index, count);
+
+            System.arraycopy( values, index, values, index+1, count );
+            
+            values[ index ] = null;
+            
+        }
+
+        public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
+            
+            if (dirtyNodesOnly) {
+
+                if (isDirty()) {
+                    
+                    return new SingleValueIterator(this);
+                    
+                } else {
+                    
+                    return EmptyIterator.DEFAULT;
+                    
+                }
+
+            } else {
+                
+                return new SingleValueIterator(this);
+                
+            }
 
         }
 
+        /**
+         * Iterator visits the defined {@link Entry}s in key order. 
+         */
+        public Iterator entryIterator() {
+         
+            if (nkeys == 0)
+                return EmptyIterator.DEFAULT;
+
+            return new EntryIterator(this);
+            
+        }
+        
         /*
          * Note: Serialization is fat since values are not strongly typed.
          */
         public void writeExternal(ObjectOutput out) throws IOException {
+            out.writeInt(branchingFactor);
             out.writeInt(nkeys);
             for (int i = 0; i < nkeys; i++) {
                 int key = keys[i];
@@ -2360,7 +2907,10 @@ public class TestSimpleBTree extends TestCase2 {
 
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
-            int nkeys = in.readInt();
+            branchingFactor = in.readInt();
+            nkeys = in.readInt();
+            keys = new int[branchingFactor];
+            values = new Entry[branchingFactor];
             for (int i = 0; i < nkeys; i++) {
                 int key = in.readInt();
                 assert keys[i] > NEGINF && keys[i] < POSINF;
