@@ -63,6 +63,15 @@ import java.util.BitSet;
  * allocation block and a bit set showing free vs allocated for N slots starting
  * with firstSlot.
  * 
+ * @todo One way to handle conditional allocation needs is by advancing a global
+ *       nextSlot index, but making allocations locally within a transaction. On
+ *       commit, the allocations by the transaction are bit-wised ANDed onto the
+ *       global allocation bitmap. This prevents concurrent commits from writing
+ *       out allocations that are not committed. However, we must also track the
+ *       slots that have been skipped over so that we do not accidentally
+ *       re-allocate them to the same or another transaction when the journal
+ *       wraps.
+ * 
  * @todo Support constant time lookup of the next allocation block that could
  *       allocate an object of a given #of slots. In order to do this we need to
  *       store an index into the bit set, perhaps one for each of M different

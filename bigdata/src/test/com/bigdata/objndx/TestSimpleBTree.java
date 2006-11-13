@@ -55,8 +55,10 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +72,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
@@ -79,21 +82,125 @@ import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
+ * <p>
  * Test suite that seeks to develop a persistence capable B-Tree supporting
  * copy-on-write semantics. The nodes of the tree should be wired into memory
  * while the leaves of the tree should be written incrementally as they are
  * evicted from a hard reference queue. During a commit, a pre-order traversal
  * should write any dirty leaves to the store followed by their parents up to
  * the root of the tree.
- * 
+ * </p>
+ * <p>
  * Note: The index does not support traversal with concurrent modification of
  * its structure (adding or removing keys, nodes, or leaves).
+ * </p>
+ * <p>
+ * A btree grows through splitting. We do not need to insert keys in order to
+ * drive splits since we can simply demand a split at any time. Growth by
+ * splitting is naturally produces tree structures in which the nodes have one
+ * fewer keys than they have children. The test plan reflects this.
+ * </p>
+ * The basic test plan tests features of the btree semantics and isolates the
+ * correct tests of those features as far as is possible from the specifics of
+ * the persistence mechanism (copy-on-write, incremental write of leaves, and
+ * commit protocol for the object index).
+ * <ul>
+ * 
+ * <li>tests operations on the root leaf, including leaf.insert(key,value),
+ * leaf.lookup(key), and leaf.values() </li>
+ * 
+ * <li> tests the ability to split the root leaf. leaf.split(key) with root
+ * produces node with two leaves. more splits produces more leaves. continue to
+ * split until the root node would be split again. As part of this, tests the
+ * ability find leaves that are direct children of the root node using
+ * node.findChild(int key)</li>
+ * 
+ * <li>tests node.insert(key,value), node.lookup(key), node.values() with
+ * simple structure (root and two leaves).</li>
+ * 
+ * <li>tests node.insert(key,value) driving additional leaf splits producing a
+ * single root with branchingFactor leaves (perhaps this can be tested with just
+ * split(key) rather than insert(key,value). The next split would cause the root
+ * to split, producing deeper structure.</li>
+ * 
+ * <li>tests node.split() for a root {@link Node}, which produces deeper
+ * structure, and tests node.findChild(key) again with deeper structure. These
+ * tests need to generate a structure having at least a root {@link Node},
+ * child {@link Node}s, and {@link Leaf} nodes under those children in order to
+ * test the various code paths. The leaf hard reference queue should have enough
+ * capacity for these tests to ensure that incremental writes on leaves are NOT
+ * perform, thereby isolating the btree features under test from the incremental
+ * write and commit protocols.</li>
+ * 
+ * <li>test post-order visitation with the root leaf (visits self), with a tree
+ * having a root {@link Node} and child leaves (visits leaf1 ... leafn and then
+ * the root), and with deeper trees.</li>
+ * 
+ * <li>test value visitation with the root leaf (visits values on the root
+ * leaf), with a tree having a root {@link Node} and child leaves (visits values
+ * on leaf1 ... leafn), and with deeper trees.</li>
+ * 
+ * </ul>
+ * 
+ * A second test plan focuses the persistence mechanism, including the
+ * copy-on-write, incremental write of leaves, and commit protocol.
+ * <ul>
+ * 
+ * <li> Test commit logic with progression of btrees having increasing
+ * structure. </li>
+ * <li> Test correct triggering of the copy-on-write mechanism</li>
+ * <li> Test correctness of the post-order traversal for dirty nodes (clean
+ * nodes are not visited).</li>
+ * <li> Test stealing of clean children when cloning {@link Node}s and
+ * invalidation of cloned nodes and their ancestors</li>
+ * 
+ * </ul>
+ * 
+ * A third test plan focuses on stress tests for the tree that rely on both
+ * correct functioning of the btree semantics and correct functionion of the
+ * persistence mechanisms.
+ * 
+ * @todo All of the tests in this file that setup a tree structure will need to
+ *       be re-written to split leaves and nodes in order to produce the desired
+ *       structure.
+ * 
+ * @todo Implement logic to steal immutable children when cloning their parent
+ *       and discard unreachable nodes from the hard reference node cache (the
+ *       cloned node and all ancestors of the cloned node). We can also mark
+ *       those discarded nodes as "invalid" to eagerly detect inadvertant
+ *       access.
+ * 
+ * @todo test inserts leading to repeated splits of the root out to at least a
+ *       depth of 5 (this is easier to do with a smaller branching factor).
+ *       Periodically verify that the tree remains fully ordered. Do tests where
+ *       the leaf cache is small enough that we are doing incremental leaf
+ *       evictions.
+ * 
+ * @todo test tree under sequential insertion, nearly sequential insertion
+ *       (based on a model identifier generation for the read-optimized
+ *       database, including filling up pages, eventually releasing space on
+ *       pages, and then reclaiming space where it becomes available on pages),
+ *       and under random key generation. Does the tree stay nicely balanced for
+ *       all scenarios? What about the average search time? Periodically verify
+ *       that the tree remains fully ordered.
+ * 
+ * @todo test delete of keys, including the rotations required to keep the tree
+ *       balanced.
+ * 
+ * @todo support object index semantics for values. is there some natural way to
+ *       share the code to support both standard btrees and an object index? If
+ *       not, then bifurcate the code for that purpose.
+ * 
+ * @todo value iterators can scan key ranges, but we don't need that for an
+ *       object index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class TestSimpleBTree extends TestCase2 {
 
+    final Random r = new Random();
+    
     /**
      * 
      */
@@ -109,82 +216,174 @@ public class TestSimpleBTree extends TestCase2 {
 
     }
 
-    /**
-     * Test binary search for keys in a node. The binary search routine is
-     * implemented just once, by {@link AbstractNode#binarySearch(int)}. This
-     * test sets up some keys, adjusts the #of defined keys, and then verifies
-     * both correct lookup of keys that exist and the correct insertion point
-     * when the key does not exist.
+    /*
+     * test helpers.
      */
-    public void test_binarySearch01()
-    {
-    
-        // The general formula for the record offset is:
-        //
-        //    offset := sizeof(record) * ( index - 1 )
-        //
-        // The general formula for the insertion point is:
-        //
-        //    insert := - ( offset + 1 )
-        //
-        // where [offset] is the offset of the record before which the
-        // new record should be inserted.
 
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 6;
+    /**
+     * <p>
+     * Unit test for the {@link #getRandomKeys(int, int, int)} test helper. The
+     * test verifies fence posts by requiring the randomly generated keys to be
+     * dense in the target array. The test checks for several different kinds of
+     * fence post errors.
+     * </p>
+     * 
+     * <pre>
+     *   nkeys = 6;
+     *   min   = 1; (inclusive)
+     *   max   = min + nkeys = 7; (exclusive)
+     *   indices : [ 0 1 2 3 4 5 ]
+     *   keys    : [ 1 2 3 4 5 6 ]
+     * </pre>
+     */
+    public void test_randomKeys() {
         
-        BTree btree = new BTree(store, branchingFactor);
+        /*
+         * Note: You can raise or lower this value to increase the probability
+         * of triggering a fence post error. In practice, I have found that a
+         * fence post was reliably triggered at keys = 6.  After debugging, I
+         * then raised the #of keys to be generated to increase the likelyhood
+         * of triggering a fence post error.
+         */
+        final int nkeys = 20;
+        
+        final int min = 1;
+        
+        final int max = min + nkeys;
+        
+        final int[] keys = getRandomKeys(nkeys,min,max);
+        
+        assertNotNull( keys );
+        
+        assertEquals(nkeys,keys.length);
+        
+        System.err.println("keys  : "+Arrays.toString(keys));
 
-        Leaf leaf = (Leaf) btree.getRoot();
+        Arrays.sort(keys);
+        
+        System.err.println("sorted: "+Arrays.toString(keys));
+        
+        // first key is the minimum value (the min is inclusive).
+        assertEquals(min,keys[0]);
 
-        int[] keys = leaf.keys;
+        // last key is the maximum minus one (since the max is exclusive).
+        assertEquals(max-1,keys[nkeys-1]);
+        
+        for( int i=0; i<nkeys; i++ ) {
 
-        int i = 0;
-        keys[i++] = 5;  // offset := 0, insert before := -1
-        keys[i++] = 7;  // offset := 1, insert before := -2
-        keys[i++] = 9;  // offset := 2, insert before := -3
-        keys[i++] = 11; // offset := 3, insert before := -4
-        keys[i++] = 13; // offset := 4, insert before := -5
-                        //              insert  after := -6
-        leaf.nkeys = 5;
+            // verify keys in range.
+            assertTrue( keys[i] >= min );
+            assertTrue( keys[i] < max );
+            
+            if( i > 0 ) {
+                
+                // verify monotonically increasing.
+                assertTrue( keys[i] > keys[i-1]);
 
-        //
-        // verify offset of record found.
-        //
-
-        // Verify finds the first record in the array.
-        assertEquals(0, leaf.binarySearch(5));
-
-        // Verify finds the 2nd record in the array.
-        assertEquals(1, leaf.binarySearch(7));
-
-        // Verify finds the penultimate record in the array.
-        assertEquals(3, leaf.binarySearch(11));
-
-        // Verify finds the last record in the array.
-        assertEquals(4, leaf.binarySearch(13));
-
-        //
-        // verify insertion points (key not found).
-        //
-
-        // Verify insertion point for key less than any value in the
-        // array.
-        assertEquals(-1, leaf.binarySearch(4));
-
-        // Verify insertion point for key between first and 2nd
-        // records.
-        assertEquals(-2, leaf.binarySearch(6));
-
-        // Verify insertion point for key between penultimate and last
-        // records.
-        assertEquals(-5, leaf.binarySearch(12));
-
-        // Verify insertion point for key greater than the last record.
-        assertEquals(-6, leaf.binarySearch(14));
-
+                // verify dense.
+                assertEquals( keys[i], keys[i-1]+1);
+                
+            }
+            
+        }
+        
     }
+    
+    /**
+     * Test helper produces a set of distinct randomly selected external keys.
+     */
+    public int[] getRandomKeys(int nkeys) {
+        
+        return getRandomKeys(nkeys,Node.NEGINF+1,Node.POSINF);
+        
+    }
+    
+    /**
+     * <p>
+     * Test helper produces a set of distinct randomly selected external keys in
+     * the half-open range [fromKey:toKey).
+     * </p>
+     * <p>
+     * Note: An alternative to generating random keys is to generate known keys
+     * and then generate a random permutation of the key order.  This technique
+     * works well when you need to permutate the presentation of keys and values.
+     * See {@link TestCase2#getRandomOrder(int)}.
+     * </p>
+     * 
+     * @param nkeys
+     *            The #of keys to generate.
+     * @param fromKey
+     *            The smallest key value that may be generated (inclusive).
+     * @param toKey
+     *            The largest key value that may be generated (exclusive).
+     */
+    public int[] getRandomKeys(int nkeys,int fromKey,int toKey) {
+    
+        assert nkeys >= 1;
+        
+        assert fromKey > Node.NEGINF;
+        
+        assert toKey <= Node.POSINF;
+        
+        // Must be enough distinct values to populate the key range.
+        if( toKey - fromKey < nkeys ) {
+            
+            throw new IllegalArgumentException(
+                    "Key range too small to populate array" + ": nkeys="
+                            + nkeys + ", fromKey(inclusive)=" + fromKey
+                            + ", toKey(exclusive)=" + toKey);
+            
+        }
+        
+        final int[] keys = new int[nkeys];
+        
+        int n = 0;
+        
+        int tries = 0;
+        
+        while( n<nkeys ) {
+            
+            if( ++tries >= 100000 ) {
+                
+                throw new AssertionError(
+                        "Possible fence post : fromKey(inclusive)=" + fromKey
+                                + ", toKey(exclusive)=" + toKey + ", tries="
+                                + tries + ", n=" + n + ", "
+                                + Arrays.toString(keys));
+                
+            }
+            
+            final int key = r.nextInt(toKey - 1) + fromKey;
+
+            assert key >= fromKey;
+
+            assert key < toKey;
+
+            /*
+             * Note: This does a linear scan of the existing keys. We do NOT use
+             * a binary search since the keys are NOT sorted.
+             */
+            boolean exists = false;
+            for (int i = 0; i < n; i++) {
+                if (keys[i] == key) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) continue;
+
+            // add the key.
+            keys[n++] = key;
+            
+        }
+        
+        return keys;
+        
+    }
+    
+    /*
+     * insert, lookup, and value scan for leaves.
+     */
 
     /**
      * Test ability to insert entries into a leaf. Random (legal) external keys
@@ -192,9 +391,6 @@ public class TestSimpleBTree extends TestCase2 {
      * are then sorted and compared with the actual keys in the leaf. If the
      * keys were inserted correctly into the leaf then the two arrays of keys
      * will have the same values in the same order.
-     * 
-     * @todo Write tests that trigger overflow.
-     * @todo Write tests for insert into a {@link Node}.
      */
     public void test_insertIntoLeaf01() {
 
@@ -209,8 +405,6 @@ public class TestSimpleBTree extends TestCase2 {
         // array of inserted keys.
         int[] expectedKeys = new int[branchingFactor];
         
-        Random r = new Random();
-        
         int nkeys = 0;
         
         while( nkeys < branchingFactor ) {
@@ -218,7 +412,7 @@ public class TestSimpleBTree extends TestCase2 {
             // Valid random key.
             int key = r.nextInt(Node.POSINF-1)+1;
             
-            int index = root.binarySearch(key);
+            int index = Search.search(key, root.keys, root.nkeys);
             
             if( index >= 0 ) {
                 
@@ -256,413 +450,1137 @@ public class TestSimpleBTree extends TestCase2 {
         
     }
     
+    /**
+     * Test ability to insert entries into a leaf. Random (legal) external keys
+     * are inserted into a leaf until the leaf would overflow. The random keys
+     * are then sorted and compared with the actual keys in the leaf. If the
+     * keys were inserted correctly into the leaf then the two arrays of keys
+     * will have the same values in the same order. (This is a variation on the
+     * previous test that inserts keys into the leaf using a slightly higher
+     * level API).
+     * 
+     * @todo verify correct tracking on the tree of the #of entries.
+     */
+    public void test_insertIntoLeaf02() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int branchingFactor = 20;
+        
+        BTree btree = new BTree(store, branchingFactor);
+
+        Leaf root = (Leaf) btree.getRoot();
+
+        // array of inserted keys.
+        int[] expectedKeys = new int[branchingFactor];
+        
+        int nkeys = 0;
+        
+        while( nkeys < branchingFactor ) {
+            
+            // Valid random key.
+            int key = r.nextInt(Node.POSINF-1)+1;
+
+            int nkeysBefore = root.nkeys;
+            
+            boolean exists = root.lookup(key) != null;
+            
+            root.insert(key, new Entry() );
+
+            if( nkeysBefore == root.nkeys ) {
+                
+                // key already exists.
+                assertTrue(exists);
+                
+                continue;
+                
+            }
+            
+            assertFalse(exists);
+            
+            // save the key.
+            expectedKeys[ nkeys ] = key;
+            
+            nkeys++;
+            
+            assertEquals( nkeys, root.nkeys );
+            
+        }
+
+        // sort the keys that we inserted.
+        Arrays.sort(expectedKeys);
+        
+        // verify that the leaf has the same keys in the same order.
+        assertEquals( expectedKeys, root.keys );
+        
+    }
+
+    /**
+     * Test ability to insert entries into a leaf. Known keys and values are
+     * generated and inserted into the leaf in a random order. The sequence of
+     * keys and values in the leaf is then compared with the pre-generated
+     * sequences known to the unit test. The correct behavior of the
+     * {@link Leaf#entryIterator()} is also tested.
+     * 
+     * @see Leaf#insert(int, com.bigdata.objndx.TestSimpleBTree.Entry)
+     * @see Leaf#lookup(int)
+     * @see Leaf#entryIterator()
+     * 
+     * @todo verify correct tracking on the tree of the #of entries.
+     */
+    public void test_insertIntoLeaf03() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int branchingFactor = 20;
+        
+        BTree btree = new BTree(store, branchingFactor);
+
+        Leaf root = (Leaf) btree.getRoot();
+
+        // array of keys to insert.
+        int[] expectedKeys = new int[branchingFactor];
+
+        // the value to insert for each key.
+        Entry[] expectedValues = new Entry[branchingFactor];
+        
+        /*
+         * Generate keys and values. The keys are a monotonic progression with
+         * random non-zero intervals.
+         */
+        
+        int lastKey = Node.NEGINF;
+        
+        for( int i=0; i<branchingFactor; i++ ) {
+            
+            int key = lastKey + r.nextInt(100) + 1;
+            
+            expectedKeys[ i ] = key;
+            
+            expectedValues[ i ] = new Entry();
+            
+            lastKey = key; 
+            
+        }
+        
+        for( int i=0; i<branchingFactor; i++ ) {
+
+            int key = expectedKeys[i];
+            
+            Entry value = expectedValues[i];
+            
+            assertEquals(i, root.nkeys );
+            
+            assertNull("Not expecting to find key=" + key, root.lookup(key));
+            
+//            root.dump(System.err);
+            
+            root.insert(key, value );
+            
+//            root.dump(System.err);
+
+            assertEquals("nkeys(i=" + i + " of " + branchingFactor + ")", i + 1,
+                    root.nkeys);
+            
+            assertEquals("value(i=" + i + " of " + branchingFactor + ")",
+                    value, root.lookup(key));
+            
+            // verify the values iterator
+            Entry[] tmp = new Entry[root.nkeys];
+            for( int j=0; j<root.nkeys; j++ ) {
+                tmp[j] = root.values[j];
+            }
+            assertSameIterator( "values", tmp, root.entryIterator() ); 
+            
+        }
+
+        // verify that the leaf has the same keys in the same order.
+        assertEquals( "keys", expectedKeys, root.keys );
+
+        // verify that the leaf has the same values in the same order.
+        assertEquals( "values", expectedValues, root.values );
+        
+        // verify the expected behavior of the iterator.
+        assertSameIterator( "values", expectedValues, root.entryIterator() );
+        
+    }
+
     /*
-     * Test structural modification (adding and removing child nodes).
+     * Test structure modification.
      */
 
     /**
-     * Test ability to add a child {@link Node}.
+     * <p>
+     * Test ability to split the root leaf. A Btree is created with a known
+     * capacity. The root leaf is filled to capacity and then split. The keys
+     * are choosen so as to create room for an insert into the left and right
+     * leaves after the split. The state of the root leaf before the split is:
+     * </p>
+     * <pre>
+     *  root keys : [ 1 11 21 31 ]
+     * </pre>
+     * <p>
+     * The root leaf is split by inserting the external key <code>15</code>.
+     * The state of the tree after the split is:
+     * </p>
+     * <pre>
+     *  m     = 4 (branching factor)
+     *  m/2   = 2 (index of first key moved to the new leaf)
+     *  m/2-1 = 1 (index of last key retained in the old leaf).
+     *             
+     *  root  keys : [ 15 ]
+     *  leaf1 keys : [  1 11 15  - ]
+     *  leaf2 keys : [ 21 31  -  - ]
+     * </pre>
+     * <p>
+     * The test then inserts <code>2</code> (goes into leaf1, filling it to
+     * capacity), <code>16</code> (goes into leaf2, testing the edge condition
+     * for inserting the key greater than the split key), and <code>24</code>
+     * (goes into leaf2, filling it to capacity). At this point the tree looks
+     * like this:
+     * </p>
+     * <pre>
+     *  root  keys : [ 15 ]
+     *  leaf1 keys : [  1  2 11 15 ]
+     *  leaf2 keys : [ 16 21 24 31 ]
+     * </pre>
+     * <p> 
+     * The test now inserts <code>7</code>, causing leaf1 into split (note that
+     * the leaves are named by their creation order, not their traveral order):
+     * </p>
+     * <pre>
+     *  root  keys : [  7 15 ]
+     *  leaf1 keys : [  1  2  7  - ]
+     *  leaf3 keys : [ 11 15  -  - ]
+     *  leaf2 keys : [ 16 21 24 31 ]
+     * </pre>
+     * <p> 
+     * The test now inserts <code>22</code>, causing leaf2 into split:
+     * </p>
+     * <pre>
+     *  root  keys : [  7 15 22 ]
+     *  leaf1 keys : [  1  2  7  - ]
+     *  leaf3 keys : [ 11 15  -  - ]
+     *  leaf2 keys : [ 16 21 22  - ]
+     *  leaf4 keys : [ 24 31  -  - ]
+     * </pre>
+     * <p>
+     * At this point the root node is at capacity and another split of a leaf
+     * will cause the root node to split and increase the height of the btree.
+     * To prepare for this, we insert <4> (into leaf1), <code>17</code> (into
+     * leaf2), and <code>35</code> and <code>40</code> (into leaf4).  This gives
+     * us the following scenario.
+     * </p>
+     * <pre>
+     *  root  keys : [  7 15 22 ]
+     *  leaf1 keys : [  1  2  4  7 ]
+     *  leaf3 keys : [ 11 15  -  - ]
+     *  leaf2 keys : [ 16 17 21 22 ]
+     *  leaf4 keys : [ 24 31 35 40 ]
+     * </pre>
+     * <p>
+     * Now we drive the root node to split again by inserting <code>50</code>
+     * into leaf4.  The result is as follows (note that the old root is not
+     * named 'node1').  (The split key in this case is in the middle of leaf4,
+     * NOT the key that we are inserting.)
+     * <pre>
+     *  root  keys : [ 15  -  - ]
+     *  node1 keys : [  7 22 35 ]
+     *  leaf1 keys : [  1  2  4  7 ]
+     *  leaf3 keys : [ 11 15  -  - ]
+     *  leaf2 keys : [ 16 17 21 22 ]
+     *  leaf4 keys : [ 24 31  -  - ]
+     *  leaf5 keys : [ 35 40 50  - ]
+     * </pre>
+     * 
+     * @todo Do simple test where the split key is selected from the middle
+     * of the root leaf.
+     * 
+     * @todo Carry through this example in gory detail both here and for the
+     * case where m == 5 (below).
      */
-    public void test_addChild01() {
+    public void test_splitRootLeaf01_even() {
 
         Store<Integer, PO> store = new Store<Integer, PO>();
 
-        BTree btree = new BTree(store, 4);
+        final int m = 4;
 
-        Node node = new Node(btree);
+        BTree btree = new BTree(store, m);
 
-        assertNull(node.parent);
-        assertEquals(0, node.nkeys);
-        assertEquals(null, node.childRefs[0]);
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+        
+        Leaf leaf1 = (Leaf) btree.getRoot();
+        
+        int[] keys = new int[]{1,11,21,31};
+        
+        for( int i=0; i<m; i++ ) {
+         
+            int key = keys[i];
+            
+            Entry entry = new Entry();
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+            
+            assertEquals(entry,btree.lookup(key));
+            
+        }
 
-        Node child = new Node(btree);
-        assertFalse( child.isLeaf() );
+        // Verify leaf is full.
+        assertEquals( m, leaf1.nkeys );
+        
+        // Verify keys.
+        assertEquals( keys, leaf1.keys );
+        
+        // Verify root node has not been changed.
+        assertEquals( leaf1, btree.getRoot() );
 
-        int externalKey = 1; // arbitrary but valid external key.
-        node.addChild(externalKey, child);
+        /*
+         * split the root leaf.
+         */
 
-        assertEquals(1, node.nkeys);
-        assertEquals(node, child.parent.get());
-        assertEquals(child, node.childRefs[0].get());
-        assertEquals(child, node.getChild(0));
+        // Insert [key := 15] goes into leaf1 (forces split).
+        System.err.print("leaf1 before split : "); leaf1.dump(System.err);
+        Entry splitEntry = new Entry();
+        assertNull(btree.lookup(15));
+        btree.insert(15,splitEntry);
+        System.err.print("leaf1 after split : "); leaf1.dump(System.err);
+        assertEquals("leaf1.nkeys",3,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,11,15,0},leaf1.keys);
+        assertEquals(splitEntry,btree.lookup(15));
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 5, btree.nentries);
+
+        /*
+         * Verify things about the new root node.
+         */
+        assertTrue( btree.getRoot() instanceof Node );
+        Node root = (Node) btree.getRoot();
+        System.err.print("root after split : "); root.dump(System.err);
+        assertEquals("root.nkeys",1,root.nkeys);
+        assertEquals("root.keys",new int[]{15,0,0},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+        assertNotNull(root.getChild(1));
+        assertNotSame(leaf1,root.getChild(1));
+
+        /*
+         * Verify things about the new leaf node, which we need to access
+         * from the new root node.
+         */
+        Leaf leaf2 = (Leaf)root.getChild(1);
+        System.err.print("leaf2 after split : "); leaf2.dump(System.err);
+        assertEquals("leaf2.nkeys",m/2,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{21,31,0,0},leaf2.keys);
+        
+        // Insert [key := 2] goes into leaf1, filling it to capacity.
+        root.insert(2,new Entry());
+        assertEquals("leaf1.nkeys",4,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,11,15},leaf1.keys);
+
+        // Insert [key := 16] goes into leaf2 (tests edge condition)
+        root.insert(16,new Entry());
+        assertEquals("leaf2.nkeys",3,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,21,31,0},leaf2.keys);
+
+        // Insert [key := 24] goes into leaf2, filling it to capacity.
+        root.insert(24,new Entry());
+        assertEquals("leaf2.nkeys",4,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,21,24,31},leaf2.keys);
+
+//        System.err.print("root  final : "); root.dump(System.err);
+//        System.err.print("leaf1 final : "); leaf1.dump(System.err);
+//        System.err.print("leaf2 final : "); leaf2.dump(System.err);
+        
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 8, btree.nentries);
+
+        /*
+         * Insert into leaf1, causing it to split. The split will cause a new
+         * child to be added to the root. Verify the post-conditions.
+         */
+        
+        // Insert [key := 7] goes into leaf1, forcing split.
+        assertEquals("leaf1.nkeys",m,leaf1.nkeys);
+        System.err.print("root  before split: ");root.dump(System.err);
+        System.err.print("leaf1 before split: ");leaf1.dump(System.err);
+        root.insert(7,new Entry());
+        System.err.print("root  after split: ");root.dump(System.err);
+        System.err.print("leaf1 after split: ");leaf1.dump(System.err);
+        assertEquals("leaf1.nkeys",3,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,7,0},leaf1.keys);
+
+        assertEquals("root.nkeys",2,root.nkeys);
+        assertEquals("root.keys",new int[]{7,15,0},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+        assertEquals(leaf2,root.getChild(2));
+
+        Leaf leaf3 = (Leaf)root.getChild(1);
+        assertNotNull( leaf3 );
+        assertEquals("leaf3.nkeys",2,leaf3.nkeys);
+        assertEquals("leaf3.keys",new int[]{11,15,0,0},leaf3.keys);
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 3, btree.nleaves);
+        assertEquals("#entries", 9, btree.nentries);
+
+        /*
+         * Insert into leaf2, causing it to split. The split will cause a new
+         * child to be added to the root. At this point the root node is at
+         * capacity.  Verify the post-conditions.
+         */
+        
+        // Insert [key := 22] goes into leaf2, forcing split.
+        assertEquals("leaf2.nkeys",m,leaf2.nkeys);
+        System.err.print("root  before split: ");root.dump(System.err);
+        System.err.print("leaf2 before split: ");leaf2.dump(System.err);
+        root.insert(22,new Entry());
+        System.err.print("root  after split: ");root.dump(System.err);
+        System.err.print("leaf2 after split: ");leaf2.dump(System.err);
+        assertEquals("leaf2.nkeys",3,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,21,22,0},leaf2.keys);
+
+        assertEquals("root.nkeys",3,root.nkeys);
+        assertEquals("root.keys",new int[]{7,15,22},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+        assertEquals(leaf3,root.getChild(1));
+        assertEquals(leaf2,root.getChild(2));
+
+        Leaf leaf4 = (Leaf)root.getChild(3);
+        assertNotNull( leaf4 );
+        assertEquals("leaf4.nkeys",2,leaf4.nkeys);
+        assertEquals("leaf4.keys",new int[]{24,31,0,0},leaf4.keys);
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 4, btree.nleaves);
+        assertEquals("#entries", 10, btree.nentries);
+
+        /*
+         * 
+     * <p>
+     * At this point the root node is at capacity and another split of a leaf
+     * will cause the root node to split and increase the height of the btree.
+     * To prepare for this, we insert <4> (into leaf1), <code>17</code> (into
+     * leaf2), and <code>35</code> and <code>40</code> (into leaf4).  This gives
+     * us the following scenario.
+     * </p>
+     * <pre>
+     *  root  keys : [  7 15 22 ]
+     *  leaf1 keys : [  1  2  4  7 ]
+     *  leaf3 keys : [ 11 15  -  - ]
+     *  leaf2 keys : [ 16 17 21 22 ]
+     *  leaf4 keys : [ 24 31 35 40 ]
+     * </pre>
+         */
+
+        // Insert [key := 4] into leaf1, filling it to capacity.
+        btree.insert(4,new Entry());
+        assertEquals("leaf1.nkeys",4,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,4,7},leaf1.keys);
+
+        // Insert [key := 17] into leaf2, filling it to capacity.
+        btree.insert(17,new Entry());
+        assertEquals("leaf2.nkeys",4,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,17,21,22},leaf2.keys);
+
+        // Insert [key := 35] into leaf4.
+        btree.insert(35,new Entry());
+        assertEquals("leaf4.nkeys",3,leaf4.nkeys);
+        assertEquals("leaf4.keys",new int[]{24,31,35,0},leaf4.keys);
+
+        // Insert [key := 40] into leaf4, filling it to capacity.
+        btree.insert(40,new Entry());
+        assertEquals("leaf4.nkeys",4,leaf4.nkeys);
+        assertEquals("leaf4.keys",new int[]{24,31,35,40},leaf4.keys);
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 4, btree.nleaves);
+        assertEquals("#entries", 14, btree.nentries);
 
     }
-
+    
     /**
-     * Test ability to add a child {@link Leaf}.
+     * Variant of {@link #test_splitRootLeaf01_even()} where the branching
+     * factor is odd.
      */
-    public void test_addChild02() {
+    public void test_splitRootLeaf01_odd() {
 
         Store<Integer, PO> store = new Store<Integer, PO>();
 
-        BTree btree = new BTree(store, 4);
+        final int m = 5;
 
-        Node node = new Node(btree);
+        BTree btree = new BTree(store, m);
 
-        assertNull(node.parent);
-        assertEquals(0, node.nkeys);
-        assertEquals(null, node.childRefs[0]);
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+        
+        Leaf leaf1 = (Leaf) btree.getRoot();
+        
+        int[] keys = new int[]{1,11,21,31,41};
+        
+        for( int i=0; i<m; i++ ) {
+         
+            leaf1.insert(keys[i], new Entry());
+            
+        }
 
-        Leaf child = new Leaf(btree);
-        assertTrue( child.isLeaf() );
+        // Verify leaf is full.
+        assertEquals( m, leaf1.nkeys );
+        
+        // Verify keys.
+        assertEquals( keys, leaf1.keys );
+        
+        // Verify root node has not been changed.
+        assertEquals( leaf1, btree.getRoot() );
+        
+        /*
+         * Setup the split.
+         */
+        
+        // The key that triggers the split.
+        final int splitOnKey = 15;
 
-        int externalKey = 1; // arbitrary but valid external key.
-        node.addChild(externalKey, child);
+        System.err.print("leaf1 before split : "); leaf1.dump(System.err);
 
-        assertEquals(1, node.nkeys);
-        assertEquals(node, child.parent.get());
-        assertEquals(child, node.childRefs[0].get());
-        assertEquals(child, node.getChild(0));
+        /*
+         * Force a split. Note that this does not actually insert a value into
+         * the tree, it just forces the split of the leaf.
+         */
+        leaf1.split(splitOnKey);
+
+        System.err.print("leaf1 after split : "); leaf1.dump(System.err);
+
+        /*
+         * Verify things about this leaf and its relationship to the new root
+         * node.
+         */
+        
+        // Verify that the root node was replaced.
+        assertNotSame(leaf1,btree.getRoot());
+        
+        // Verify that the root node is defined.
+        assertNotNull(btree.getRoot());
+        
+        // Verify that this leaf now has a parent.
+        assertNotNull(leaf1.getParent());
+
+        // Verify that the new root node is the parent of this leaf.
+        assertEquals(btree.getRoot(),leaf1.getParent());
+        
+        // verify keys on the leaf (not that the unused keys are zeros).
+        assertEquals("leaf1.nkeys",2,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,11,0,0,0},leaf1.keys);
+        
+        /*
+         * Verify things about the new root node.
+         */
+        assertTrue( btree.getRoot() instanceof Node );
+        Node root = (Node) btree.getRoot();
+        System.err.print("root after split : "); root.dump(System.err);
+        assertEquals("root.nkeys",1,root.nkeys);
+        assertEquals("root.keys",new int[]{15,0,0,0},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+
+        /*
+         * Verify things about the new leaf node, which we need to access
+         * from the new root node.
+         */
+        Leaf leaf2 = (Leaf)root.getChild(1);
+        System.err.print("leaf2 after split : "); leaf2.dump(System.err);
+        assertEquals("leaf2.nkeys",3,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{21,31,41,0,0},leaf2.keys);
+        
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 5, btree.nentries);
+
+        // Insert [key := 2] goes into leaf1.
+        root.insert(2,new Entry());
+        assertEquals("leaf1.nkeys",3,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,11,0,0},leaf1.keys);
+
+        // Insert [key := 15] goes into leaf1 (test edge condition).
+        root.insert(15,new Entry());
+        assertEquals("leaf1.nkeys",4,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,11,15,0},leaf1.keys);
+
+        // Insert [key := 8] goes into leaf1, bringing the leaf to capacity.
+        root.insert(8,new Entry());
+        assertEquals("leaf1.nkeys",5,leaf1.nkeys);
+        assertEquals("leaf1.keys",new int[]{1,2,8,11,15},leaf1.keys);
+
+        // Insert [key := 16] goes into leaf2 (test edge condition).
+        root.insert(16,new Entry());
+        assertEquals("leaf2.nkeys",4,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,21,31,41,0},leaf2.keys);
+
+        // Insert [key := 24] goes into leaf2.
+        root.insert(24,new Entry());
+        assertEquals("leaf2.nkeys",5,leaf2.nkeys);
+        assertEquals("leaf2.keys",new int[]{16,21,24,31,41},leaf2.keys);
+
+        System.err.print("root  final : "); root.dump(System.err);
+        System.err.print("leaf1 final : "); leaf1.dump(System.err);
+        System.err.print("leaf2 final : "); leaf2.dump(System.err);
+        
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 10, btree.nentries);
+
+        // FIXME extend test to split left and right leaves again.
+        // FIXME extend to split one of the leafs one more time, which will
+        // bring the root to capacity.
+    }
+        
+    /**
+     * Creates a sequence of keys in increasing order and inserts them into the
+     * tree until (a) the root leaf is split; and (b) sufficient leaves are
+     * created through additional splits that the next key inserted would split
+     * the root node.
+     * 
+     * @todo test more post-conditions.
+     */
+    public void test_splitRootLeaf_increasingKeySequence() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int m = 4;
+        
+        BTree btree = new BTree(store, m);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a series of external keys in increasing order. When we
+         * insert these keys in sequence, the result is that all inserts go into
+         * the right-most leaf (this is the original leaf until the first split,
+         * and is thereafter always a new leaf).
+         */
+        
+        // #of keys to insert before the root would split again.
+        int ninserts = m * m;
+        
+        int[] keys = new int[ninserts];
+
+        Entry[] entries = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF + 1;
+        
+        for (int i = 0; i < ninserts; i++) {
+        
+            keys[i] = lastKey;
+            
+            entries[i] = new Entry();
+            
+            lastKey += 1;
+        
+        }
+        
+        /*
+         * Insert keys into the tree.
+         */
+        
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < ninserts; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify things about the new root node.
+         */
+        assertTrue( btree.getRoot() instanceof Node );
+        Node root = (Node) btree.getRoot();
+        System.err.print("root after splits : "); root.dump(System.err);
+        assertEquals("root.nkeys",m-1,root.nkeys);
+        
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
+        
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", m, btree.nleaves);
+        assertEquals("#entries", ninserts, btree.nentries);
 
     }
+    
+    /**
+     * Creates a sequence of keys in decreasing order and inserts them into the
+     * tree until (a) the root leaf is split; and (b) sufficient leaves are
+     * created through additional splits that the next key inserted would split
+     * the root node.
+     * 
+     * @todo test more post-conditions.
+     */
+    public void test_splitRootLeaf_decreasingKeySequence() {
 
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int m = 4;
+        
+        BTree btree = new BTree(store, m);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a series of external keys in decreasing order. When we
+         * insert these keys in sequence, the result is that all inserts go into
+         * the left-most leaf (the original leaf).
+         */
+        
+        // #of keys to insert before the root would split again.
+        int ninserts = m * m;
+        
+        int[] keys = new int[ninserts];
+        Entry[] entries = new Entry[ninserts];
+        
+        int lastKey = ninserts;
+        for( int i=0; i<ninserts; i++) {
+            keys[i] = lastKey;
+            entries[i] = new Entry();
+            lastKey-=1;
+        }
+        
+        /*
+         * Insert keys into the tree.
+         */
+
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < ninserts; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify things about the new root node.
+         */
+        assertTrue( btree.getRoot() instanceof Node );
+        Node root = (Node) btree.getRoot();
+        System.err.print("root after splits : "); root.dump(System.err);
+        assertEquals("root.nkeys",m-1,root.nkeys);
+        
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", m, btree.nleaves);
+        assertEquals("#entries", ninserts, btree.nentries);
+
+    }
+    
+    /**
+     * Creates a sequence of distinct keys in random order and inserts them into
+     * the tree until (a) the root leaf is split; and (b) sufficient leaves are
+     * created through additional splits that the next key inserted would split
+     * the root node.
+     * 
+     * @todo test more post-conditions.
+     */
+    public void test_splitRootLeaf_randomKeySequence() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int m = 4;
+        
+        BTree btree = new BTree(store, m);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a sequence of keys in increasing order and a sequence of
+         * random indices into the keys (and values) that is used to present
+         * the key-value pairs in random order to insert(key,value).
+         */
+        
+        // #of keys to insert before the root would split again.
+        int ninserts = m * m;
+        
+        int[] keys = new int[ninserts];
+        Entry[] entries = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF+1;
+        for( int i=0; i<ninserts; i++) {
+            keys[i] = lastKey;
+            entries[i] = new Entry();
+            lastKey+=1;
+        }
+        
+        // Random indexing into the generated keys and values.
+        int[] order = getRandomOrder(ninserts);
+        
+        /*
+         * Insert keys into the tree.
+         */
+
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < ninserts; i++) {
+
+            int key = keys[order[i]];
+            
+            Entry entry = entries[order[i]];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify things about the new root node.
+         */
+        assertTrue( btree.getRoot() instanceof Node );
+        Node root = (Node) btree.getRoot();
+        System.err.print("root after splits : "); root.dump(System.err);
+        assertEquals("root.nkeys",m-1,root.nkeys);
+        
+        /*
+         * Verify entries in the expected order. While we used a random
+         * presentation order, the entries MUST now be in the original generated
+         * order.
+         */
+        assertSameIterator(entries,btree.getRoot().entryIterator());
+
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", m, btree.nleaves);
+        assertEquals("#entries", ninserts, btree.nentries);
+
+    }
+    
     /*
      * Test iterators -- assumes that structural modification (adding and
      * removing child nodes) has already been tested.
+     * 
+     * FIXME modify tests to grow the tree by splitting.
      * 
      * @todo Figure out how to write tests for the postOrderIterator that looks
      * for correct non-visitation of nodes that are not dirty.
      */
 
-    /**
-     * <p>
-     * Test creates a simple tree and verifies the visitation order. The nodes
-     * and leaves in the tree are NOT persistent so that this test minimizes the
-     * interaction with the copy-on-write persistence mechanisms. The nodes and
-     * leaves of the tree are arranged as follows:
-     * </p>
-     * 
-     * <pre>
-     *  root
-     *   leaf1
-     *   node1
-     *    leaf2
-     *    leaf3
-     * </pre>
-     */
-    public void test_postOrderIterator01() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, 4);
-
-        // Create a root node and its children.
-        Node root = new Node(btree);
-        Leaf leaf1 = new Leaf(btree);
-        Node node1 = new Node(btree);
-        Leaf leaf2 = new Leaf(btree);
-        Leaf leaf3 = new Leaf(btree);
-
-        root.addChild(1, leaf1);
-        root.addChild(2, node1);
-
-        node1.addChild(1, leaf2);
-        node1.addChild(2, leaf3);
-
-        System.err.println("root : " + root);
-        System.err.println("leaf1: " + leaf1);
-        System.err.println("node1: " + node1);
-        System.err.println("leaf2: " + leaf2);
-        System.err.println("leaf3: " + leaf3);
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf1, node1 }, root
-                .childIterator());
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
-                .childIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
-                .postOrderIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
-                .postOrderIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
-                .postOrderIterator());
-
-        // verify post-order iterator for node1.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
-                .postOrderIterator());
-
-        // verify post-order iterator for root.
-        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-                root }, root.postOrderIterator());
-
-    }
-
-    /**
-     * <p>
-     * Test creates a simple tree and verifies the visitation order. The nodes
-     * and leaves in the tree are NOT persistent so that this test minimizes the
-     * interaction with the copy-on-write persistence mechanisms. The nodes and
-     * leaves of the tree are arranged as follows:
-     * </p>
-     * 
-     * <pre>
-     *  root
-     *   node1
-     *    leaf2
-     *    leaf3
-     *   leaf1
-     * </pre>
-     */
-    public void test_postOrderIterator02() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, 4);
-
-        // Create a root node and its children.
-        Node root = new Node(btree);
-        Leaf leaf1 = new Leaf(btree);
-        Node node1 = new Node(btree);
-        Leaf leaf2 = new Leaf(btree);
-        Leaf leaf3 = new Leaf(btree);
-
-        root.addChild(1, node1);
-        root.addChild(2, leaf1);
-
-        node1.addChild(1, leaf2);
-        node1.addChild(2, leaf3);
-
-        System.err.println("root : " + root);
-        System.err.println("leaf1: " + leaf1);
-        System.err.println("node1: " + node1);
-        System.err.println("leaf2: " + leaf2);
-        System.err.println("leaf3: " + leaf3);
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { node1, leaf1 }, root
-                .childIterator());
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
-                .childIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
-                .postOrderIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
-                .postOrderIterator());
-
-        // verify post-order iterator for leaves.
-        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
-                .postOrderIterator());
-
-        // verify post-order iterator for node1.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
-                .postOrderIterator());
-
-        // verify post-order iterator for root.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-                root }, root.postOrderIterator());
-
-    }
-
-    /**
-     * <p>
-     * Test creates a simple tree and verifies the visitation order. The nodes
-     * and leaves in the tree are NOT persistent so that this test minimizes the
-     * interaction with the copy-on-write persistence mechanisms. The nodes and
-     * leaves of the tree are arranged as follows:
-     * </p>
-     * 
-     * <pre>
-     *  root
-     *    node1
-     *      leaf1
-     *      node2
-     *        leaf2
-     *        leaf3
-     *      leaf4
-     *    leaf5
-     *    node3
-     *      leaf6
-     * </pre>
-     */
-    public void test_postOrderIterator03() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, 4);
-
-        // Create a root node and its children.
-        Node root = new Node(btree);
-        Node node1 = new Node(btree);
-        Node node2 = new Node(btree);
-        Node node3 = new Node(btree);
-        Leaf leaf1 = new Leaf(btree);
-        Leaf leaf2 = new Leaf(btree);
-        Leaf leaf3 = new Leaf(btree);
-        Leaf leaf4 = new Leaf(btree);
-        Leaf leaf5 = new Leaf(btree);
-        Leaf leaf6 = new Leaf(btree);
-
-        root.addChild(1, node1);
-        root.addChild(2, leaf5);
-        root.addChild(3, node3);
-
-        node1.addChild(1, leaf1);
-        node1.addChild(2, node2);
-        node1.addChild(3, leaf4);
-
-        node2.addChild(1, leaf2);
-        node2.addChild(2, leaf3);
-
-        node3.addChild(1, leaf6);
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { node1, leaf5, node3 }, root
-                .childIterator());
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf1, node2, leaf4 }, node1
-                .childIterator());
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node2
-                .childIterator());
-
-        // verify simple child iterator.
-        assertSameIterator(new AbstractNode[] { leaf6 }, node3.childIterator());
-
-        // verify post-order iterator for node3.
-        assertSameIterator(new AbstractNode[] { leaf6, node3 }, node3
-                .postOrderIterator());
-
-        // verify post-order iterator for node2.
-        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node2 }, node2
-                .postOrderIterator());
-
-        // verify post-order iterator for node1.
-        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
-                leaf4, node1 }, node1.postOrderIterator());
-
-        // verify post-order iterator for root.
-        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
-                leaf4, node1, leaf5, leaf6, node3, root }, root
-                .postOrderIterator());
-
-    }
-
-    /*
-     * Test persistence.
-     */
-
-    /**
-     * Verify that we can create and persist the root node (a leaf). Verify that
-     * we can recover the node.
-     */
-    public void test_persistence01() {
-
-        final Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 4;
-       
-        final int leafId;
-        {
-
-            BTree btree = new BTree(store, branchingFactor);
-
-            Leaf root = (Leaf) btree.getRoot();
-
-            leafId = root.write();
-
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", leafId, root.getIdentity());
-
-        }
-
-        {
-
-            BTree btree = new BTree(store, branchingFactor, leafId);
-            
-            Leaf root = (Leaf) btree.getRoot();
-            
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", leafId, root.getIdentity());
-
-        }
-
-    }
-
-    /**
-     * Create a small tree with a root node and two leaves and verify that we
-     * can persist and recover it.
-     */
-    public void test_persistence02() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 4;
-            
-        final int rootId;
-        {
-            
-            BTree btree = new BTree(store, branchingFactor);
-
-            Node root = new Node(btree);
-            btree.root = root; // Note: replace root on the btree.
-
-            Leaf leaf1 = new Leaf(btree);
-            Leaf leaf2 = new Leaf(btree);
-            Leaf leaf3 = new Leaf(btree);
-
-            root.addChild(1, leaf1);
-            root.addChild(2, leaf2);
-            root.addChild(3, leaf3);
-
-            int leaf1Id = leaf1.write(); // write on store.
-            assertTrue("persistent", leaf1.isPersistent());
-            assertEquals("identity", leaf1Id, leaf1.getIdentity());
-
-            int leaf2Id = leaf2.write();
-            assertTrue("persistent", leaf2.isPersistent());
-            assertEquals("identity", leaf2Id, leaf2.getIdentity());
-
-            int leaf3Id = leaf3.write();
-            assertTrue("persistent", leaf3.isPersistent());
-            assertEquals("identity", leaf3Id, leaf3.getIdentity());
-
-            rootId = root.write();
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", rootId, root.getIdentity());
-
-        }
-
-        {
-
-            BTree btree = new BTree(store,branchingFactor,rootId);
-            
-            Node root = (Node) btree.getRoot();
-            assertTrue( root.isPersistent() );
-            assertEquals( rootId, root.getIdentity() );
-
-            Leaf leaf1 = (Leaf) root.getChild(0);
-            assertEquals( root, leaf1.getParent() );
-            assertTrue( leaf1.isPersistent() );
-            assertFalse( leaf1.isDirty() );
-            
-            Leaf leaf2 = (Leaf) root.getChild(1);
-            assertEquals( root, leaf2.getParent() );
-            assertTrue( leaf2.isPersistent() );
-            assertFalse( leaf2.isDirty() );
-
-            Leaf leaf3 = (Leaf) root.getChild(2);
-            assertEquals( root, leaf3.getParent() );
-            assertTrue( leaf3.isPersistent() );
-            assertFalse( leaf3.isDirty() );
-
-        }
-
-    }
+//    /**
+//     * <p>
+//     * Test creates a simple tree and verifies the visitation order. The nodes
+//     * and leaves in the tree are NOT persistent so that this test minimizes the
+//     * interaction with the copy-on-write persistence mechanisms. The nodes and
+//     * leaves of the tree are arranged as follows:
+//     * </p>
+//     * 
+//     * <pre>
+//     *  root
+//     *   leaf1
+//     *   node1
+//     *    leaf2
+//     *    leaf3
+//     * </pre>
+//     */
+//    public void test_postOrderIterator01() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        BTree btree = new BTree(store, 4);
+//
+//        // Create a root node and its children.
+//        Node root = new Node(btree);
+//        Leaf leaf1 = new Leaf(btree);
+//        Node node1 = new Node(btree);
+//        Leaf leaf2 = new Leaf(btree);
+//        Leaf leaf3 = new Leaf(btree);
+//
+//        root.addChild(1, leaf1);
+//        root.addChild(2, node1);
+//
+//        node1.addChild(1, leaf2);
+//        node1.addChild(2, leaf3);
+//
+//        System.err.println("root : " + root);
+//        System.err.println("leaf1: " + leaf1);
+//        System.err.println("node1: " + node1);
+//        System.err.println("leaf2: " + leaf2);
+//        System.err.println("leaf3: " + leaf3);
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf1, node1 }, root
+//                .childIterator());
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
+//                .childIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for node1.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for root.
+//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
+//                root }, root.postOrderIterator());
+//
+//    }
+//
+//    /**
+//     * <p>
+//     * Test creates a simple tree and verifies the visitation order. The nodes
+//     * and leaves in the tree are NOT persistent so that this test minimizes the
+//     * interaction with the copy-on-write persistence mechanisms. The nodes and
+//     * leaves of the tree are arranged as follows:
+//     * </p>
+//     * 
+//     * <pre>
+//     *  root
+//     *   node1
+//     *    leaf2
+//     *    leaf3
+//     *   leaf1
+//     * </pre>
+//     */
+//    public void test_postOrderIterator02() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        BTree btree = new BTree(store, 4);
+//
+//        // Create a root node and its children.
+//        Node root = new Node(btree);
+//        Leaf leaf1 = new Leaf(btree);
+//        Node node1 = new Node(btree);
+//        Leaf leaf2 = new Leaf(btree);
+//        Leaf leaf3 = new Leaf(btree);
+//
+//        root.addChild(1, node1);
+//        root.addChild(2, leaf1);
+//
+//        node1.addChild(1, leaf2);
+//        node1.addChild(2, leaf3);
+//
+//        System.err.println("root : " + root);
+//        System.err.println("leaf1: " + leaf1);
+//        System.err.println("node1: " + node1);
+//        System.err.println("leaf2: " + leaf2);
+//        System.err.println("leaf3: " + leaf3);
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { node1, leaf1 }, root
+//                .childIterator());
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
+//                .childIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for leaves.
+//        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for node1.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for root.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
+//                root }, root.postOrderIterator());
+//
+//    }
+//
+//    /**
+//     * <p>
+//     * Test creates a simple tree and verifies the visitation order. The nodes
+//     * and leaves in the tree are NOT persistent so that this test minimizes the
+//     * interaction with the copy-on-write persistence mechanisms. The nodes and
+//     * leaves of the tree are arranged as follows:
+//     * </p>
+//     * 
+//     * <pre>
+//     *  root
+//     *    node1
+//     *      leaf1
+//     *      node2
+//     *        leaf2
+//     *        leaf3
+//     *      leaf4
+//     *    leaf5
+//     *    node3
+//     *      leaf6
+//     * </pre>
+//     */
+//    public void test_postOrderIterator03() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        BTree btree = new BTree(store, 4);
+//
+//        // Create a root node and its children.
+//        Node root = new Node(btree);
+//        Node node1 = new Node(btree);
+//        Node node2 = new Node(btree);
+//        Node node3 = new Node(btree);
+//        Leaf leaf1 = new Leaf(btree);
+//        Leaf leaf2 = new Leaf(btree);
+//        Leaf leaf3 = new Leaf(btree);
+//        Leaf leaf4 = new Leaf(btree);
+//        Leaf leaf5 = new Leaf(btree);
+//        Leaf leaf6 = new Leaf(btree);
+//
+//        root.addChild(1, node1);
+//        root.addChild(2, leaf5);
+//        root.addChild(3, node3);
+//
+//        node1.addChild(1, leaf1);
+//        node1.addChild(2, node2);
+//        node1.addChild(3, leaf4);
+//
+//        node2.addChild(1, leaf2);
+//        node2.addChild(2, leaf3);
+//
+//        node3.addChild(1, leaf6);
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { node1, leaf5, node3 }, root
+//                .childIterator());
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf1, node2, leaf4 }, node1
+//                .childIterator());
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node2
+//                .childIterator());
+//
+//        // verify simple child iterator.
+//        assertSameIterator(new AbstractNode[] { leaf6 }, node3.childIterator());
+//
+//        // verify post-order iterator for node3.
+//        assertSameIterator(new AbstractNode[] { leaf6, node3 }, node3
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for node2.
+//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node2 }, node2
+//                .postOrderIterator());
+//
+//        // verify post-order iterator for node1.
+//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
+//                leaf4, node1 }, node1.postOrderIterator());
+//
+//        // verify post-order iterator for root.
+//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
+//                leaf4, node1, leaf5, leaf6, node3, root }, root
+//                .postOrderIterator());
+//
+//    }
 
     /*
      * Tests of commit processing (without triggering copy-on-write).
@@ -677,379 +1595,420 @@ public class TestSimpleBTree extends TestCase2 {
 
         final int branchingFactor = 4;
         
+        final int metadataId;
         final int rootId;
         {
 
             BTree btree = new BTree(store, branchingFactor);
 
+            assertTrue(btree.root.isDirty());
+
             // Commit of tree with dirty root.
-            rootId = btree.commit();
+            metadataId = btree.commit();
 
-            Leaf root = (Leaf) store.read(rootId);
+            assertFalse(btree.root.isDirty());
 
-            assertEquals(rootId, root.getIdentity());
-
-            // Commit of tree with clean root is NOP and returns existing
-            // rootId.
-            assertEquals(rootId, btree.commit());
+            rootId = btree.root.getIdentity();
+            
+            assertEquals("height", 0, btree.height);
+            assertEquals("#nodes", 0, btree.nnodes);
+            assertEquals("#leaves", 1, btree.nleaves);
+            assertEquals("#entries", 0, btree.nentries);
 
         }
         
+        final int metadata2;
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, branchingFactor, rootId);
+            BTree btree = new BTree(store, branchingFactor, metadataId);
 
-            // Commit of tree with clean root is NOP and returns existing
-            // rootId.
-            assertEquals( rootId, btree.commit() );
+            // verify rootId.
+            assertEquals(rootId,btree.root.getIdentity());
+
+            assertEquals("height", 0, btree.height);
+            assertEquals("#nodes", 0, btree.nnodes);
+            assertEquals("#leaves", 1, btree.nleaves);
+            assertEquals("#entries", 0, btree.nentries);
+
+            /*
+             * Commit of tree with clean root writes a new metadata record but
+             * does not change the rootId.
+             */
+            metadata2 = btree.commit();
+            assertNotSame( metadataId, metadata2 );
 
         }
 
+        {   // re-verify.
+
+            // Load the tree.
+            BTree btree = new BTree(store, branchingFactor, metadataId);
+
+            // verify rootId.
+            assertEquals(rootId,btree.root.getIdentity());
+
+            assertEquals("height", 0, btree.height);
+            assertEquals("#nodes", 0, btree.nnodes);
+            assertEquals("#leaves", 1, btree.nleaves);
+            assertEquals("#entries", 0, btree.nentries);
+
+        }
+        
     }
 
-    /**
-     * Test commit of a tree with some structure.
-     */
-    public void test_commit02() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 4;
-        
-        int rootId;
-        int node1Id;
-        int leaf1Id, leaf2Id, leaf3Id;
-        {
-
-            BTree btree = new BTree(store, branchingFactor);
-
-            /*
-             * Replace the root leaf with a Node. This allows us to write the commit
-             * test without having to rely on logic to split the root leaf on
-             * overflow.
-             */
-            btree.root = new Node(btree);
-
-            // Create children and populate the tree structure.
-            Node root = (Node) btree.getRoot();
-            Leaf leaf1 = new Leaf(btree);
-            Node node1 = new Node(btree);
-            Leaf leaf2 = new Leaf(btree);
-            Leaf leaf3 = new Leaf(btree);
-
-            root.addChild(1, node1);
-            root.addChild(2, leaf1);
-
-            node1.addChild(1, leaf2);
-            node1.addChild(2, leaf3);
-
-            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-                    root }, root.postOrderIterator());
-
-            rootId = btree.commit();
-
-            node1Id = node1.getIdentity();
-
-            leaf1Id = leaf1.getIdentity();
-            leaf2Id = leaf2.getIdentity();
-            leaf3Id = leaf3.getIdentity();
-
-        }
-
-        {
-
-            // Load the btree.
-            BTree btree = new BTree(store, branchingFactor,rootId);
-
-            Node root = (Node) btree.getRoot();
-            assertEquals(rootId, root.getIdentity());
-            assertEquals(null,root.getParent());
-            
-            Node node1 = (Node) root.getChild(0);
-            assertEquals(node1Id, node1.getIdentity());
-            assertEquals(root,node1.getParent());
-            
-            Leaf leaf2 = (Leaf) node1.getChild(0);
-            assertEquals(leaf2Id, leaf2.getIdentity());
-            assertEquals(node1,leaf2.getParent());
-            
-            Leaf leaf3 = (Leaf) node1.getChild(1);
-            assertEquals(leaf3Id, leaf3.getIdentity());
-            assertEquals(node1,leaf3.getParent());
-            
-            Leaf leaf1 = (Leaf) root.getChild(1);
-            assertEquals(leaf1Id, leaf1.getIdentity());
-            assertEquals(root,leaf1.getParent());
-            
-            // verify post-order iterator for root.
-            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-                    root }, root.postOrderIterator());
-
-        }
-
-    }
-
-    /*
-     * Tests of copy-on-write semantics.
-     */
-    
-    /**
-     * This simple test of the copy-on-write mechanism sets up a btree with an
-     * immutable (aka persistent) root {@link Node} and then adds a child node
-     * (a leaf). Adding the child to the immutable root triggers copy-on-write
-     * which forces cloning of the original root node. The test verifies that
-     * the new tree has the expected structure and that the old tree was not
-     * changed by this operation.
-     */
-    public void test_copyOnWrite01() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 4;
-        
-        final int rootId;
-        final BTree oldBTree;
-        {
-            /*
-             * Replace the root leaf with a node and write it on the store. This
-             * gives us an immutable root node as a precondition for what
-             * follows.
-             */
-            BTree btree = new BTree(store, branchingFactor);
-
-            Node root = new Node(btree);
-            btree.root = root; // Note: replace root on the btree.
-
-            rootId = root.write();
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", rootId, root.getIdentity());
-            
-            oldBTree = btree;
-
-        }
-
-        int newRootId;
-        int leaf1Id;
-        { // Add a leaf node - this should trigger copy-on-write.
-
-            // load the btree.
-            BTree btree = new BTree(store,branchingFactor,rootId);
-
-            Node root = (Node) btree.getRoot();
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", rootId, root.getIdentity());
-
-            Leaf leaf1 = new Leaf(btree);
-
-            Node newRoot = root.addChild(/* external id */2, leaf1);
-            assertNotSame(newRoot, root);
-            assertEquals(newRoot,btree.getRoot()); // check : btree root was set?
-            assertTrue("persistent", root.isPersistent());
-            assertFalse("persistent", newRoot.isPersistent());
-
-            newRootId = btree.commit();
-
-            assertEquals(newRootId,newRoot.getIdentity());
-            
-            leaf1Id = leaf1.getIdentity();
-            
-        }
-
-        { // Verify read back from the store.
-
-            BTree btree = new BTree(store,branchingFactor,newRootId);
-
-            // Verify we got the new root.
-            Node root = (Node) btree.getRoot();
-            assertTrue("persistent", root.isPersistent());
-            assertEquals("identity", newRootId, root.getIdentity());
-
-            // Read back the child at index position 0.
-            Leaf leaf1 = (Leaf) root.getChild(0);
-            assertTrue("persistent", leaf1.isPersistent());
-            assertEquals("identity", leaf1Id, leaf1.getIdentity());
-
-            assertSameIterator(new AbstractNode[] { leaf1, root }, root
-                    .postOrderIterator());
-            
-        }
-        
-        { // Verify the old tree is unchanged.
-            
-            /*
-             * Note: We do NOT reload the old tree for this test since we want
-             * to make sure that its state was not modified and we have not done
-             * a commit so a reload would just cause changes to be discarded if
-             * there were any.
-             */
-            
-            Node root = (Node) oldBTree.getRoot();
-            
-            assertSameIterator(new AbstractNode[] { root }, root
-                    .postOrderIterator());
-
-        }
-
-    }
-
-    /**
-     * <p>
-     * Test of copy on write when the pre-condition is a committed tree with the
-     * following committed structure:
-     * </p>
-     * 
-     * <pre>
-     *  root
-     *    leaf1
-     *    node1
-     *      leaf2
-     *      leaf3
-     * </pre>
-     * 
-     * The test adds a leaf to node1 in the 3rd position. This should cause
-     * node1 and the root node to both be cloned and a new root node set on the
-     * tree. The post-modification structure is:
-     * 
-     * <pre>
-     *  root
-     *    leaf1
-     *    node1
-     *      leaf2
-     *      leaf3
-     *      leaf4
-     * </pre>
-     * 
-     * @todo Do tests of copy-on-write that go down to the key-value level.
-     */
-    public void test_copyOnWrite02() {
-
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        final int branchingFactor = 4;
-        
-        final int rootId_v0;
-        final int leaf1Id_v0;
-        final int leaf3Id_v0;
-        final int leaf2Id_v0;
-        final int node1Id_v0;
-        {
-
-            BTree btree = new BTree(store, branchingFactor);
-
-            // Create a root node and its children.
-            Node root = new Node(btree);
-            btree.root = root; // replace the root with a Node.
-            Leaf leaf1 = new Leaf(btree);
-            Node node1 = new Node(btree);
-            Leaf leaf2 = new Leaf(btree);
-            Leaf leaf3 = new Leaf(btree);
-
-            root.addChild(1, leaf1);
-            root.addChild(2, node1);
-
-            node1.addChild(1, leaf2);
-            node1.addChild(2, leaf3);
-
-            // verify post-order iterator for root.
-            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-                    root }, root.postOrderIterator());
-
-            rootId_v0 = btree.commit();
-            leaf1Id_v0 = leaf1.getIdentity();
-            leaf2Id_v0 = leaf2.getIdentity();
-            leaf3Id_v0 = leaf3.getIdentity();
-            node1Id_v0 = node1.getIdentity();
-            
-        }
-
-        final int rootId_v1, leaf4Id_v0, node1Id_v1;
-        {
-
-            /*
-             * Read the tree back from the store and re-verify the tree
-             * structure.
-             */
-            
-            BTree btree = new BTree(store,branchingFactor,rootId_v0);
-
-            Node root = (Node) btree.getRoot();
-            assertEquals(rootId_v0,root.getIdentity());
-
-            Leaf leaf1 = (Leaf) root.getChild(0);
-            assertEquals(leaf1Id_v0, leaf1.getIdentity());
-            assertEquals(root,leaf1.getParent());
-
-            Node node1 = (Node) root.getChild(1);
-            assertEquals(node1Id_v0, node1.getIdentity());
-            assertEquals(root,node1.getParent());
-            
-            Leaf leaf2 = (Leaf) node1.getChild(0);
-            assertEquals(leaf2Id_v0, leaf2.getIdentity());
-            assertEquals(node1,leaf2.getParent());
-            
-            Leaf leaf3 = (Leaf) node1.getChild(1);
-            assertEquals(leaf3Id_v0, leaf3.getIdentity());
-            assertEquals(node1,leaf3.getParent());
-
-            // re-verify post-order iterator for root.
-            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-                    root }, root.postOrderIterator());
-
-            /*
-             * Add a new leaf to node1.  This triggers copy-on-write.
-             */
-            
-            Leaf leaf4 = new Leaf(btree);
-            Node node1_v1 = node1.addChild(/*external key*/3, leaf4);
-
-            // Verify that node1 was changed.
-            assertNotSame( node1_v1, node1 );
-            
-            // Verify that the root node was changed.
-            Node root_v1 = (Node) btree.getRoot();
-            assertNotSame( root, root_v1 );
-
-            // verify post-order iterator for the original root.
-            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, 
-                    node1, root }, root.postOrderIterator());
-
-            // verify post-order iterator for the new root.
-            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, leaf4,
-                    node1_v1, root_v1 }, root_v1.postOrderIterator());
-
-            /*
-             * Commit the tree, get the current identity for all nodes, and
-             * verify that the nodes that should have been cloned by
-             * copy-on-write do in fact have different persistent identity while
-             * those that should not do not.
-             */
-            
-            rootId_v1 = btree.commit();
-            assertEquals( rootId_v1, root_v1.getIdentity() );
-            assertNotSame( rootId_v0, rootId_v1 ); // changed.
-
-            assertEquals( leaf1Id_v0, leaf1.getIdentity() ); // unchanged.
-            assertEquals( leaf2Id_v0, leaf2.getIdentity() ); // unchanged.
-            assertEquals( leaf3Id_v0, leaf3.getIdentity() ); // unchanged.
-            
-            leaf4Id_v0 = leaf4.getIdentity(); // new.
-            
-            node1Id_v1 = node1.getIdentity();
-            assertNotSame( node1Id_v0, node1Id_v1 ); // changed.
-            
-        }
-        
-        { // @todo reload and re-verify the new structure.
-            
-            
-        }
-        
-        {
-            // @todo verify the old tree was unchanged.
-        }
-
-    }
+//    /**
+//     * Test commit of a tree with some structure.
+//     * 
+//     * FIXME Re-write to use insert to store keys and drive splits and to verify
+//     * the post-condition structure with both node and entry iterators.
+//     */
+//    public void test_commit02() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        final int branchingFactor = 4;
+//        
+//        int metadataId;
+//        int node1Id;
+//        int leaf1Id, leaf2Id, leaf3Id;
+//        {
+//
+//            BTree btree = new BTree(store, branchingFactor);
+//
+//            /*
+//             * Replace the root leaf with a Node. This allows us to write the commit
+//             * test without having to rely on logic to split the root leaf on
+//             * overflow.
+//             */
+//            btree.root = new Node(btree);
+//
+//            // Create children and populate the tree structure.
+//            Node root = (Node) btree.getRoot();
+//            Leaf leaf1 = new Leaf(btree);
+//            Node node1 = new Node(btree);
+//            Leaf leaf2 = new Leaf(btree);
+//            Leaf leaf3 = new Leaf(btree);
+//
+//            root.addChild(1, node1);
+//            root.addChild(2, leaf1);
+//
+//            node1.addChild(1, leaf2);
+//            node1.addChild(2, leaf3);
+//
+//            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
+//                    root }, root.postOrderIterator());
+//
+//            metadataId = btree.commit();
+//
+//            node1Id = node1.getIdentity();
+//
+//            leaf1Id = leaf1.getIdentity();
+//            leaf2Id = leaf2.getIdentity();
+//            leaf3Id = leaf3.getIdentity();
+//
+//        }
+//
+//        {
+//
+//            // Load the btree.
+//            BTree btree = new BTree(store, branchingFactor,metadataId);
+//
+//            Node root = (Node) btree.getRoot();
+//            assertEquals(metadataId, root.getIdentity());
+//            assertEquals(null,root.getParent());
+//            
+//            Node node1 = (Node) root.getChild(0);
+//            assertEquals(node1Id, node1.getIdentity());
+//            assertEquals(root,node1.getParent());
+//            
+//            Leaf leaf2 = (Leaf) node1.getChild(0);
+//            assertEquals(leaf2Id, leaf2.getIdentity());
+//            assertEquals(node1,leaf2.getParent());
+//            
+//            Leaf leaf3 = (Leaf) node1.getChild(1);
+//            assertEquals(leaf3Id, leaf3.getIdentity());
+//            assertEquals(node1,leaf3.getParent());
+//            
+//            Leaf leaf1 = (Leaf) root.getChild(1);
+//            assertEquals(leaf1Id, leaf1.getIdentity());
+//            assertEquals(root,leaf1.getParent());
+//            
+//            // verify post-order iterator for root.
+//            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
+//                    root }, root.postOrderIterator());
+//
+//        }
+//
+//    }
+//
+//    /*
+//     * Tests of copy-on-write semantics.
+//     */
+//    
+//    /**
+//     * This simple test of the copy-on-write mechanism sets up a btree with an
+//     * immutable (aka persistent) root {@link Node} and then adds a child node
+//     * (a leaf). Adding the child to the immutable root triggers copy-on-write
+//     * which forces cloning of the original root node. The test verifies that
+//     * the new tree has the expected structure and that the old tree was not
+//     * changed by this operation.
+//     */
+//    public void test_copyOnWrite01() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        final int branchingFactor = 4;
+//        
+//        final int metadataId;
+//        final int rootId;
+//        final BTree oldBTree;
+//        {
+//            /*
+//             * Replace the root leaf with a node and write it on the store. This
+//             * gives us an immutable root node as a precondition for what
+//             * follows.
+//             */
+//            BTree btree = new BTree(store, branchingFactor);
+//
+//            Node root = new Node(btree);
+//            btree.root = root; // Note: replace root on the btree.
+//
+//            rootId = root.write();
+//
+//            metadataId = btree.commit();
+//            
+//            assertTrue("persistent", root.isPersistent());
+//            assertEquals("identity", rootId, root.getIdentity());
+//            
+//            oldBTree = btree;
+//
+//        }
+//
+//        int newMetadataId;
+//        int newRootId;
+//        int leaf1Id;
+//        { // Add a leaf node - this should trigger copy-on-write.
+//
+//            // load the btree.
+//            BTree btree = new BTree(store,branchingFactor,metadataId);
+//
+//            Node root = (Node) btree.getRoot();
+//            assertTrue("persistent", root.isPersistent());
+//            assertEquals("identity", rootId, root.getIdentity());
+//
+//            Leaf leaf1 = new Leaf(btree);
+//
+//            Node newRoot = root.addChild(/* external id */2, leaf1);
+//            assertNotSame(newRoot, root);
+//            assertEquals(newRoot,btree.getRoot()); // check : btree root was set?
+//            assertTrue("persistent", root.isPersistent());
+//            assertFalse("persistent", newRoot.isPersistent());
+//
+//            newMetadataId = btree.commit();
+//            
+//            newRootId = newRoot.getIdentity();
+//            
+//            leaf1Id = leaf1.getIdentity();
+//            
+//        }
+//
+//        { // Verify read back from the store.
+//
+//            BTree btree = new BTree(store,branchingFactor,newMetadataId);
+//
+//            // Verify we got the new root.
+//            Node root = (Node) btree.getRoot();
+//            assertTrue("persistent", root.isPersistent());
+//            assertEquals("identity", newRootId, root.getIdentity());
+//
+//            // Read back the child at index position 0.
+//            Leaf leaf1 = (Leaf) root.getChild(0);
+//            assertTrue("persistent", leaf1.isPersistent());
+//            assertEquals("identity", leaf1Id, leaf1.getIdentity());
+//
+//            assertSameIterator(new AbstractNode[] { leaf1, root }, root
+//                    .postOrderIterator());
+//            
+//        }
+//        
+//        { // Verify the old tree is unchanged.
+//            
+//            /*
+//             * Note: We do NOT reload the old tree for this test since we want
+//             * to make sure that its state was not modified and we have not done
+//             * a commit so a reload would just cause changes to be discarded if
+//             * there were any.
+//             */
+//            
+//            Node root = (Node) oldBTree.getRoot();
+//            
+//            assertSameIterator(new AbstractNode[] { root }, root
+//                    .postOrderIterator());
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * <p>
+//     * Test of copy on write when the pre-condition is a committed tree with the
+//     * following committed structure:
+//     * </p>
+//     * 
+//     * <pre>
+//     *  root
+//     *    leaf1
+//     *    node1
+//     *      leaf2
+//     *      leaf3
+//     * </pre>
+//     * 
+//     * The test adds a leaf to node1 in the 3rd position. This should cause
+//     * node1 and the root node to both be cloned and a new root node set on the
+//     * tree. The post-modification structure is:
+//     * 
+//     * <pre>
+//     *  root
+//     *    leaf1
+//     *    node1
+//     *      leaf2
+//     *      leaf3
+//     *      leaf4
+//     * </pre>
+//     * 
+//     * @todo Do tests of copy-on-write that go down to the key-value level.
+//     */
+//    public void test_copyOnWrite02() {
+//
+//        Store<Integer, PO> store = new Store<Integer, PO>();
+//
+//        final int branchingFactor = 4;
+//        
+//        final int metadataId;
+//        final int rootId_v0;
+//        final int leaf1Id_v0;
+//        final int leaf3Id_v0;
+//        final int leaf2Id_v0;
+//        final int node1Id_v0;
+//        {
+//
+//            BTree btree = new BTree(store, branchingFactor);
+//
+//            // Create a root node and its children.
+//            Node root = new Node(btree);
+//            btree.root = root; // replace the root with a Node.
+//            Leaf leaf1 = new Leaf(btree);
+//            Node node1 = new Node(btree);
+//            Leaf leaf2 = new Leaf(btree);
+//            Leaf leaf3 = new Leaf(btree);
+//
+//            root.addChild(1, leaf1);
+//            root.addChild(2, node1);
+//
+//            node1.addChild(1, leaf2);
+//            node1.addChild(2, leaf3);
+//
+//            // verify post-order iterator for root.
+//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
+//                    root }, root.postOrderIterator());
+//
+//            metadataId = btree.commit();
+//            leaf1Id_v0 = leaf1.getIdentity();
+//            leaf2Id_v0 = leaf2.getIdentity();
+//            leaf3Id_v0 = leaf3.getIdentity();
+//            node1Id_v0 = node1.getIdentity();
+//            rootId_v0  = btree.root.getIdentity();
+//            
+//        }
+//
+//        final int rootId_v1, leaf4Id_v0, node1Id_v1;
+//        {
+//
+//            /*
+//             * Read the tree back from the store and re-verify the tree
+//             * structure.
+//             */
+//            
+//            BTree btree = new BTree(store,branchingFactor,metadataId);
+//
+//            Node root = (Node) btree.getRoot();
+//            assertEquals(rootId_v0,root.getIdentity());
+//
+//            Leaf leaf1 = (Leaf) root.getChild(0);
+//            assertEquals(leaf1Id_v0, leaf1.getIdentity());
+//            assertEquals(root,leaf1.getParent());
+//
+//            Node node1 = (Node) root.getChild(1);
+//            assertEquals(node1Id_v0, node1.getIdentity());
+//            assertEquals(root,node1.getParent());
+//            
+//            Leaf leaf2 = (Leaf) node1.getChild(0);
+//            assertEquals(leaf2Id_v0, leaf2.getIdentity());
+//            assertEquals(node1,leaf2.getParent());
+//            
+//            Leaf leaf3 = (Leaf) node1.getChild(1);
+//            assertEquals(leaf3Id_v0, leaf3.getIdentity());
+//            assertEquals(node1,leaf3.getParent());
+//
+//            // re-verify post-order iterator for root.
+//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
+//                    root }, root.postOrderIterator());
+//
+//            /*
+//             * Add a new leaf to node1.  This triggers copy-on-write.
+//             */
+//            
+//            Leaf leaf4 = new Leaf(btree);
+//            Node node1_v1 = node1.addChild(/*external key*/3, leaf4);
+//
+//            // Verify that node1 was changed.
+//            assertNotSame( node1_v1, node1 );
+//            
+//            // Verify that the root node was changed.
+//            Node root_v1 = (Node) btree.getRoot();
+//            assertNotSame( root, root_v1 );
+//
+//            // verify post-order iterator for the original root.
+//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, 
+//                    node1, root }, root.postOrderIterator());
+//
+//            // verify post-order iterator for the new root.
+//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, leaf4,
+//                    node1_v1, root_v1 }, root_v1.postOrderIterator());
+//
+//            /*
+//             * Commit the tree, get the current identity for all nodes, and
+//             * verify that the nodes that should have been cloned by
+//             * copy-on-write do in fact have different persistent identity while
+//             * those that should not do not.
+//             */
+//            
+//            rootId_v1 = btree.commit();
+//            assertEquals( rootId_v1, root_v1.getIdentity() );
+//            assertNotSame( rootId_v0, rootId_v1 ); // changed.
+//
+//            assertEquals( leaf1Id_v0, leaf1.getIdentity() ); // unchanged.
+//            assertEquals( leaf2Id_v0, leaf2.getIdentity() ); // unchanged.
+//            assertEquals( leaf3Id_v0, leaf3.getIdentity() ); // unchanged.
+//            
+//            leaf4Id_v0 = leaf4.getIdentity(); // new.
+//            
+//            node1Id_v1 = node1.getIdentity();
+//            assertNotSame( node1Id_v0, node1Id_v1 ); // changed.
+//            
+//        }
+//        
+//        { // @todo reload and re-verify the new structure.
+//            
+//            
+//        }
+//        
+//        {
+//            // @todo verify the old tree was unchanged.
+//        }
+//
+//    }
     
     /**
      * Persistence store.
@@ -1122,6 +2081,17 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
+        public byte[] _read(K key) {
+
+            byte[] bytes = store.get(key);
+
+            if (bytes == null)
+                throw new IllegalArgumentException("Not found: key=" + key);
+
+            return bytes;
+            
+        }
+        
         public T read(K key) {
 
             byte[] bytes = store.get(key);
@@ -1139,6 +2109,18 @@ public class TestSimpleBTree extends TestCase2 {
             value.setDirty(false); // just read from the store.
 
             return value;
+
+        }
+
+        public K _insert(byte[] bytes) {
+
+            assert bytes != null;
+
+            K key = nextId();
+
+            store.put(key, bytes);
+
+            return key;
 
         }
 
@@ -1387,12 +2369,14 @@ public class TestSimpleBTree extends TestCase2 {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo Track the height, #of nodes (or nodes + leaves), and #of entries in
-     *       the btree.
      */
     public static class BTree {
 
+        /**
+         * The minimum allowed branching factor (3).
+         */
+        static public final int MIN_BRANCHING_FACTOR = 3;
+        
         /**
          * The persistence store.
          */
@@ -1447,6 +2431,28 @@ public class TestSimpleBTree extends TestCase2 {
         AbstractNode root;
 
         /**
+         * The height of the btree. The height is the #of leaves minus one. A
+         * btree with only a root leaf is said to have <code>height := 0</code>.
+         * Note that the height only changes when we split the root node.
+         */
+        int height;
+
+        /**
+         * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
+         */
+        int nnodes;
+        
+        /**
+         * The #of leaf nodes in the btree.  This is one (1) for a new btree.
+         */
+        int nleaves;
+        
+        /**
+         * The #of entries in the btree.  This is zero (0) for a new btree.
+         */
+        int nentries;
+        
+        /**
          * The root of the btree. This is initially a leaf until the leaf is
          * split, at which point it is replaced by a node. The root is also
          * replaced each time copy-on-write triggers a cascade of updates.
@@ -1468,7 +2474,8 @@ public class TestSimpleBTree extends TestCase2 {
         public BTree(Store<Integer, PO> store, int branchingFactor) {
 
             assert store != null;
-            assert branchingFactor > 0 && (branchingFactor & 1) == 0;
+        
+            assert branchingFactor > MIN_BRANCHING_FACTOR;
 
             this.store = store;
             
@@ -1479,6 +2486,14 @@ public class TestSimpleBTree extends TestCase2 {
             leaves = new HardReferenceCache<PO>(listener,1000);
             
             this.root = new Leaf(this);
+            
+            this.height = 0;
+            
+            this.nnodes = 0;
+            
+            this.nleaves = 1;
+            
+            this.nentries = 0;
 
         }
 
@@ -1489,13 +2504,26 @@ public class TestSimpleBTree extends TestCase2 {
          *            The persistence store.
          * @param branchingFactor
          *            The branching factor.
-         * @param rootId
-         *            The persistent identifier of the root of the btree.
+         * @param metadataId
+         *            The persistent identifier of btree metadata.
+         * 
+         * @todo move the branching factor into the metadata record, but this
+         *       will remove the distinction between the btree constructors.
          */
-        public BTree(Store<Integer, PO> store, int branchingFactor, int rootId) {
+        public BTree(Store<Integer, PO> store, int branchingFactor,
+                int metadataId) {
 
             assert store != null;
-            assert branchingFactor > 0 && (branchingFactor & 1) == 0;
+
+            assert branchingFactor > MIN_BRANCHING_FACTOR;
+
+            assert height >= 0;
+            
+            assert nnodes >= 0;
+            
+            assert nleaves >= 0;
+            
+            assert nentries >= 0;
 
             this.store = store;
             
@@ -1504,12 +2532,119 @@ public class TestSimpleBTree extends TestCase2 {
             listener = new LeafEvictionListener<Integer, PO>(store);
             
             leaves = new HardReferenceCache<PO>(listener,1000);
-            
+
+            // read the btree metadata record.
+            final int rootId = read(metadataId);
+
+            /*
+             * Read the root node of the btree.
+             * 
+             * Note: We could optionally run a variant of the post-order
+             * iterator to suck in the entire node structure of the btree. If we
+             * do nothing, then the nodes will be read in incrementally on
+             * demand. Since we always place non-leaf nodes into a hard
+             * reference cache, tree operations will speed up over time until
+             * the entire non-leaf node structure is loaded.
+             */
             this.root = (AbstractNode)store.read(rootId);
             
-            this.root.btree = this; // patch btree reference.
+            this.root.setBTree( this );
 
         }
+
+        /**
+         * Insert an entry under the external key.
+         */
+        public void insert(int key, Entry entry) {
+            
+            root.insert(key, entry);
+            
+        }
+        
+        /**
+         * Lookup an entry for an external key.
+         * 
+         * @return The entry or null if there is no entry for that key.
+         */
+        public Entry lookup(int key) {
+            
+            return root.lookup(key);
+            
+        }
+        
+        /**
+         * Remove the entry for the external key.
+         * 
+         * @param key
+         *            The external key.
+         * 
+         * @return The entry stored under that key and null if there was no
+         *         entry for that key.
+         */
+        public Entry remove(int key) {
+            
+            return root.remove(key);
+            
+        }
+
+        /**
+         * Write out the persistent metadata for the btree on the store and
+         * return the persistent identifier for that metadata. The metadata
+         * include the persistent identifier of the root of the btree and the
+         * height, #of nodes, #of leaves, and #of entries in the btree.
+         * 
+         * @param rootId
+         *            The persistent identifier of the root of the btree.
+         * 
+         * @return The persistent identifier for the metadata.
+         */
+        int write() {
+            
+            int rootId = root.getIdentity();
+            
+            ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
+            
+            buf.putInt(rootId);
+            buf.putInt(height);
+            buf.putInt(nnodes);
+            buf.putInt(nleaves);
+            buf.putInt(nentries);
+
+            return store._insert(buf.array());
+            
+        }
+
+        /**
+         * Read the persistent metadata record for the btree.  Sets the height,
+         * #of nodes, #of leavs, and #of entries from the metadata record as a
+         * side effect.
+         * 
+         * @param metadataId
+         *            The persistent identifier of the btree metadata record.
+         *            
+         * @return The persistent identifier of the root of the btree.
+         */
+        int read(int metadataId) {
+
+            ByteBuffer buf = ByteBuffer.wrap(store._read(metadataId));
+            
+            final int rootId = buf.getInt();
+            System.err.println("rootId="+rootId);
+            height = buf.getInt(); assert height>=0;
+            nnodes = buf.getInt(); assert nnodes>=0;
+            nleaves = buf.getInt(); assert nleaves>=0;
+            nentries = buf.getInt(); assert nentries>=0;
+            
+            return rootId;
+            
+        }
+
+        /**
+         * The #of bytes in the metadata record written by {@link #write(int)}.
+         * 
+         * @see #write(int)
+         */
+        public static final int SIZEOF_METADATA = Bytes.SIZEOF_INT * 5;  
 
         /**
          * Commit dirty nodes using a post-order traversal that first writes any
@@ -1517,7 +2652,7 @@ public class TestSimpleBTree extends TestCase2 {
          * nodes are guarenteed to be dirty if there is a dirty child so the
          * commit never triggers copy-on-write.
          * 
-         * @return The persistent identity of the root of the tree.
+         * @return The persistent identity of the metadata record for the btree.
          */
         public int commit() {
 
@@ -1575,12 +2710,16 @@ public class TestSimpleBTree extends TestCase2 {
             }
 
             System.err.println("commit: " + ndirty + " dirty nodes (" + nleaves
-                    + " leaves)");
+                    + " leaves), rootId=" + root.getIdentity() );
 
-            return root.getIdentity();
+            return write();
 
         }
 
+        /*
+         * IObjectIndex.
+         */
+        
         /**
          * Add / update an entry in the object index.
          * 
@@ -1626,7 +2765,7 @@ public class TestSimpleBTree extends TestCase2 {
             throw new UnsupportedOperationException();
             
         }
-        
+
     }
 
     /**
@@ -1678,8 +2817,19 @@ public class TestSimpleBTree extends TestCase2 {
         protected int nkeys = 0;
 
         /**
-         * The external keys for the B+Tree. (The length of this array is the
-         * branching factor in force for this node).
+         * The external keys for the B+Tree. The #of keys depends on whether
+         * this is a {@link Node} or a {@link Leaf}. A leaf has one key per
+         * value - that is, the maximum #of keys for a leaf is specified by the
+         * branching factor. In contrast a node has n-1 keys where n is the
+         * maximum #of children (aka the branching factor).  Therefore this
+         * field is initialized by the {@link Leaf} or {@link Node} - NOT by
+         * the {@link AbstractNode}.
+         * 
+         * The interpretation of the key index for a leaf is one to one - key[0]
+         * corresponds to value[0].
+         * 
+         * @see #findChild(int key)
+         * @see Search#search(int, int[], int)
          */
         protected int[] keys;
 
@@ -1734,12 +2884,10 @@ public class TestSimpleBTree extends TestCase2 {
 
             assert btree != null;
 
-            this.btree = btree;
-
             this.branchingFactor = btree.branchingFactor;
-            
-            this.keys = new int[branchingFactor];
-            
+
+            setBTree( btree );
+
         }
 
         /**
@@ -1752,7 +2900,8 @@ public class TestSimpleBTree extends TestCase2 {
 
             /*
              * Note: We do NOT clone the base class since this is a new
-             * persistence capable object.
+             * persistence capable object, but it is not yet persistent and we
+             * do not want to copy the persistent identity of the source object.
              */
             super();
 
@@ -1760,33 +2909,30 @@ public class TestSimpleBTree extends TestCase2 {
             
             assert src != null;
 
-            this.btree = src.btree;
-
-            this.branchingFactor =  btree.branchingFactor;
+            this.branchingFactor = btree.branchingFactor;
             
-            this.keys = new int[branchingFactor];
-            
-            this.nkeys = src.nkeys;
-
-            for (int i = 0; i < nkeys; i++) {
-
-                this.keys[i] = src.keys[i];
-
-            }
+            setBTree( src.btree );
 
         }
 
         /**
-         * Used to patch the btree reference during de-serialization.
+         * This method MUST be used to set the btree reference. This method
+         * verifies that the btree reference is not already set. It is extended
+         * by {@link Node#setBTree(BTree)} to ensure that the btree holds a hard
+         * reference to the node.
          * 
          * @param btree
+         *            The btree.
          */
         void setBTree(BTree btree) {
 
             assert btree != null;
 
-            if (this.btree != null)
+            if (this.btree != null) {
+                
                 throw new IllegalStateException();
+
+            }
 
             this.btree = btree;
 
@@ -1797,18 +2943,21 @@ public class TestSimpleBTree extends TestCase2 {
          * Return this node iff it is dirty and otherwise return a copy of this
          * node. If a copy is made of the node, then a copy will also be made of
          * each parent of the node up to the root of the tree and the new root
-         * node will be set on the {@link BTree}.
+         * node will be set on the {@link BTree}. This method must MUST be
+         * invoked any time an mutative operation is requested for the node. For
+         * simplicity, it is invoked by the two primary mutative operations
+         * {@link #insert(int, com.bigdata.objndx.TestSimpleBTree.Entry)} and
+         * {@link #remove(int)}.
          * </p>
          * <p>
-         * This method must MUST be invoked any time an mutative operation is
-         * requested for the node. You can not modify a node that has been
-         * written onto the store. Instead, you have to clone the node causing
-         * it and all nodes up to the root to be dirty and transient. This
-         * method handles that cloning process, but the caller MUST test whether
-         * or not the node was copied by this method, MUST delegate the mutation
-         * operation to the copy iff a copy was made, and MUST result in an
-         * awareness in the caller that the copy exists and needs to be used in
-         * place of the immutable version of the node.
+         * Note: You can not modify a node that has been written onto the store.
+         * Instead, you have to clone the node causing it and all nodes up to
+         * the root to be dirty and transient. This method handles that cloning
+         * process, but the caller MUST test whether or not the node was copied
+         * by this method, MUST delegate the mutation operation to the copy iff
+         * a copy was made, and MUST result in an awareness in the caller that
+         * the copy exists and needs to be used in place of the immutable
+         * version of the node.
          * </p>
          * 
          * @return Either this node or a copy of this node.
@@ -1843,6 +2992,11 @@ public class TestSimpleBTree extends TestCase2 {
                     
                 } else {
                     
+                    /*
+                     * Recursive copy-on-write up the tree. This operations
+                     * stops as soon as we reach a parent node that is already
+                     * dirty and grounds out at the root in any case.
+                     */
                     assert parent != null;
                     
                     if( ! parent.isDirty() ) {
@@ -1927,91 +3081,73 @@ public class TestSimpleBTree extends TestCase2 {
         abstract public boolean isLeaf();
         
         /**
-         * Binary search on the array of external keys.
+         * Split a node or leaf.
          * 
          * @param key
-         *            The key for the search.
-         * 
-         * @return index of the search key, if it is contained in the array;
-         *         otherwise, <code>(-(insertion point) - 1)</code>. The
-         *         insertion point is defined as the point at which the key
-         *         would be inserted into the array. Note that this guarantees
-         *         that the return value will be >= 0 if and only if the key is
-         *         found.
+         *            The external key.
          */
-        final public int binarySearch(final int key) {
-
-            int low = 0;
-
-            int high = nkeys - 1;
-
-            while (low <= high) {
-
-                final int mid = (low + high) >> 1;
-
-                final int midVal = keys[mid];
-
-                if (midVal < key) {
-
-                    low = mid + 1;
-                }
-
-                else if (midVal > key) {
-
-                    high = mid - 1;
-
-                } else {
-
-                    // Found: return offset.
-
-                    return mid;
-
-                }
-
-            }
-
-            // Not found: return insertion point.
-
-            final int offset = low;
-
-            return -(offset + 1);
-
-        }
-
+        abstract public void split(int key);
+        
         /**
-         * <p>
-         * Copy down the elements of the per-key arrays from the index to the
-         * #of keys currently defined thereby creating an unused position at
-         * <i>index</i>. The #of keys is NOT modified by this method.
-         * </p>
-         * <p>
-         * This method MUST be extended by subclasses that declare additional
-         * per-key data.
-         * </p>
+         * Recursive search locates the approprate leaf and inserts the entry
+         * under the key. The leaf is split iff necessary. Splitting the leaf
+         * can cause splits to cascade up towards the root. If the root is split
+         * then the total depth of the tree is inceased by one.
          * 
-         * @param index
-         *            The index.
-         * 
-         * @param count
-         *            The #of elements to be copied (computed as {@link #nkeys} -
-         *            <i>index</i>).
+         * @param key
+         *            The external key.
+         * @param entry
+         *            The value.
          */
-        protected void copyDown(int index, int count) {
-            
-            /*
-             * copy down per-key data.
-             */
-            System.arraycopy( keys, index, keys, index+1, count );
-            
-            /*
-             * Clear the entry at the index. This is part paranoia check and
-             * partly critical. Some per-key elements MUST be cleared and it is
-             * much safer (and quite cheap) to clear them during copyDown()
-             * rather than relying on maintenance elsewhere.
-             */
-            keys[ index ] = NEGINF; // an invalid key.
-
-        }
+        abstract public void insert(int key, Entry entry);
+        
+        /**
+         * Recursive search locates the appropriate leaf and removes and returns
+         * the pre-existing value stored under the key (if any).
+         * 
+         * @param key
+         *            The external key.
+         * @return The value or null if there was no entry for that key.
+         */
+        abstract public Entry remove(int key);
+        
+        /**
+         * Recursive search locates the entry for the probe key.
+         * 
+         * @param key
+         *            The external key.
+         * 
+         * @return The entry or <code>null</code> iff there is no entry for
+         *         that key.
+         */
+        abstract public Entry lookup(int key);
+        
+//        /**
+//         * <p>
+//         * Copy down the elements of the per-key arrays from the index to the
+//         * #of keys currently defined thereby creating an unused position at
+//         * <i>index</i>. The #of keys is NOT modified by this method. The #of
+//         * elements to be copied is computed as:
+//         * </p>
+//         * 
+//         * <pre>
+//         *   count := #nkeys - index
+//         * </pre>
+//         * 
+//         * <p>
+//         * This method MUST be extended by subclasses that declare additional
+//         * per-key or value data. Note that the child arrays defined by
+//         * {@link Node} are dimensioned to have one more element than the
+//         * external {@link #keys}[] array.
+//         * </p>
+//         * 
+//         * @param index
+//         *            The index.
+//         * 
+//         * @param count
+//         *            The #of elements to be copied
+//         */
+//        abstract void copyDown(int index, int count);
         
         /**
          * Writes the node on the store. The node MUST be dirty. If the node has
@@ -2055,7 +3191,14 @@ public class TestSimpleBTree extends TestCase2 {
             return getIdentity();
             
         }
-        
+
+        /**
+         * Dump the data onto the {@link PrintStream} (non-recursive).
+         * 
+         * @param out
+         */
+        abstract public void dump(PrintStream out);
+
     }
 
     /**
@@ -2105,6 +3248,7 @@ public class TestSimpleBTree extends TestCase2 {
 
     /**
      * Visits the {@link Entry}s of a {@link Leaf} in the external key ordering.
+     * There is exactly one entry per key for a leaf node.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -2151,49 +3295,24 @@ public class TestSimpleBTree extends TestCase2 {
 
     }
 
-    // /**
-    // * Resolve a child index to the child node.
-    // *
-    // * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-    // Thompson</a>
-    // * @version $Id$
-    // */
-    // static class AbstractNodeResolver extends Resolver {
-    //
-    // final private Node node;
-    //
-    // /**
-    // *
-    // * @param node The parent whose children will be resolved.
-    // */
-    // public AbstractNodeResolver(Node node) {
-    //
-    // assert node != null;
-    //
-    // this.node = node;
-    //
-    // }
-    //
-    // /**
-    // * Re-skins the generic object as an instance of the class specified to
-    // * the constructor.
-    // */
-    // final protected Object resolve(Object obj) {
-    //
-    // Integer index = (Integer) obj;
-    //
-    // return node.getChild(index);
-    //            
-    // }
-    //
-    // }
-
     /**
+     * <p>
      * A non-leaf.
-     * 
+     * </p>
+     * <p>
+     * A non-leaf node with <code>m</code> children has <code>m-1</code>
+     * keys. The minimum #of keys that {@link Node} may have is one (1) while
+     * the minimum #of children that a {@link Node} may have is two (2).
+     * However, only the root {@link Node} is permitted to reach that minimum
+     * (unless it is a leaf, in which case it may even be empty). All other
+     * nodes or leaves have between <code>m/2</code> and <code>m</code>
+     * keys, where <code>m</code> is the {@link AbstractNode#branchingFactor}.
+     * </p>
+     * <p>
      * Note: We MUST NOT hold hard references to leafs. Leaves account for most
      * of the storage costs of the BTree. We bound those costs by only holding
      * hard references to nodes and not leaves.
+     * </p>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -2205,23 +3324,29 @@ public class TestSimpleBTree extends TestCase2 {
         /**
          * Hard reference cache containing dirty child nodes (nodes or leaves).
          */
-        transient protected Set<AbstractNode> dirtyChildren = new HashSet<AbstractNode>();
+        transient protected Set<AbstractNode> dirtyChildren;
 
         /**
-         * Weak references to child nodes (may be nodes or leaves).
+         * Weak references to child nodes (may be nodes or leaves). The capacity
+         * of this array is m+1, where m is the {@link #branchingFactor}.
          */
         transient protected WeakReference<AbstractNode>[] childRefs;
 
         /**
-         * The keys of the childKeys nodes (may be nodes or leaves). The key is
-         * [null] until the child has been persisted. The protocol for
-         * persisting the childKeys requires that we use a pre-order traversal
-         * (the general case is a directed graph) so that we can update the keys
-         * on the parent before the parent is serialized.
-         * 
+         * <p>
+         * The persistent keys of the childKeys nodes (may be nodes or leaves).
+         * The capacity of this array is m+1, where m is the
+         * {@link #branchingFactor}. The key is {@link #NULL} until the child
+         * has been persisted. The protocol for persisting child nodes requires
+         * that we use a pre-order traversal (the general case is a directed
+         * graph) so that we can update the keys on the parent before the parent
+         * itself is persisted.
+         * </p>
+         * <p>
          * Note: It is an error if there is an attempt to serialize a node
          * having a null entry in this array and a non-null entry in the
          * external {@link #keys} array.
+         * </p>
          */
         protected int[] childKeys;
 
@@ -2245,10 +3370,17 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
+        /**
+         * @deprecated The tree should only grow by splitting.
+         */
         public Node(BTree btree) {
 
             super(btree);
 
+            keys = new int[branchingFactor-1];
+            
+            dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+            
             childRefs = new WeakReference[branchingFactor];
             
             childKeys = new int[branchingFactor];
@@ -2256,10 +3388,71 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
+         * The root {@link Node} constructor, which is used when splitting the
+         * root {@link Leaf}.
+         * 
+         * @param key
+         *            The external key on which the root leaf is being split.
+         * @param leaf
+         *            The root leaf.
+         * 
+         * @todo The key is ignored and could be removed from the constructor
+         *       signature. The key gets added by
+         *       {@link #addChild(int, com.bigdata.objndx.TestSimpleBTree.AbstractNode)}
+         */
+        Node(int key,Leaf leaf) {
+
+            super(leaf.btree);
+            
+//            assert key>NEGINF && key<POSINF;
+
+            // Verify that this is the root leaf.
+            assert leaf == btree.root;
+            
+            // The leaf is always dirty when it is being split.
+            assert leaf.isDirty();
+            
+            keys = new int[branchingFactor-1];
+                        
+            dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+            
+            childRefs = new WeakReference[branchingFactor];
+            
+            childKeys = new int[branchingFactor];
+
+            // Replace the root node on the tree.
+            btree.root = this;
+            
+            /*
+             * Attach the leaf that was the root of the btree to the node that
+             * is now the root of the btree.
+             */
+
+//            keys[nkeys++] = key;
+            
+            childRefs[0] = new WeakReference<AbstractNode>(leaf); 
+            
+            dirtyChildren.add(leaf);
+
+            leaf.parent = new WeakReference<Node>(this);
+            
+            /*
+             * The tree is deeper since we just split the root node.
+             */
+            btree.height++;
+            
+            btree.nnodes++;
+            
+        }
+
+        /**
          * Copy constructor.
          * 
          * @param src
          *            The source node.
+         * 
+         * FIXME Modify to steal the unmodified children by setting their parent
+         * fields to the new node.
          */
         protected Node(Node src) {
 
@@ -2268,18 +3461,29 @@ public class TestSimpleBTree extends TestCase2 {
             assert isDirty();
             assert ! isPersistent();
 
+            keys = new int[branchingFactor-1];
+            
+            nkeys = src.nkeys;
+
+            dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+
             childRefs = new WeakReference[branchingFactor];
             
             childKeys = new int[branchingFactor];
 
+            // Copy keys.
             for (int i = 0; i < nkeys; i++) {
+
+                keys[i] = src.keys[i];
+
+            }
+
+            // Note: There is always one more child than keys for a Node.
+            for (int i = 0; i <= nkeys; i++) {
 
                 this.childKeys[i] = src.childKeys[i];
 
             }
-
-            // Add to the hard reference cache for nodes.
-            btree.nodes.add(this);
             
         }
 
@@ -2408,76 +3612,324 @@ public class TestSimpleBTree extends TestCase2 {
                     + oldChildKey);
 
         }
-        
+
         /**
-         * Add a child node or leaf.
+         * Insert the entry under the key. This finds the index of the first
+         * external key in the node whose value is greater than or equal to the
+         * supplied key. The insert is then delegated to the child at position
+         * <code>index - 1</code>.
          * 
          * @param key
-         *            The external key value.
-         * @param child
-         *            The node or leaf.
-         * 
-         * @return Either this node or a copy of this node if this node was
-         *         persistent and copy-on-write was triggered.
-         * 
-         * FIXME This does not handle the insertion sort.
-         * 
-         * FIXME This does not split nodes on overflow.
-         * 
-         * FIXME This should probably accept the index position rather than the
-         * key (or in addition to the key). This will provide symmetry with
-         * respect to {@link #getChild(int index)}
+         *            The external key.
+         * @param entry
+         *            The value.
          */
-        public Node addChild(int key, AbstractNode child) {
+        public void insert(int key, Entry entry) {
 
-            Node copy = (Node) copyOnWrite();
+            int index = findChild(key);
+            
+            AbstractNode child = getChild( index );
+            
+            child.insert( key, entry );
+            
+        }
+        
+        public Entry lookup(int key) {
+            
+            int index = findChild(key);
 
-            if (copy != this) {
+            AbstractNode child = getChild(index);
 
-                return copy.addChild(key, child);
+            return child.lookup(key);
+            
+        }
+        
+        /**
+         * Recursive descent until we reach the leaf that would hold the key.
+         * 
+         * @param key
+         *            The external key.
+         * 
+         * @return The value stored under that key or null if the key was not
+         *         found.
+         */
+        public Entry remove(int key) {
+            
+            int index = findChild(key);
 
+            AbstractNode child = getChild(index);
+            
+            return child.remove(key);
+            
+        }
+        
+        /**
+         * Return the index of the child to be searched.
+         * 
+         * The interpretation of the key index for a node is as follows. When
+         * searching nodes of the tree, we search for the index in keys[] of the
+         * first key value greater than or equal (GTE) to the probe key and then
+         * choose the child having the same index as the GTE key match. For
+         * example,
+         * 
+         * <pre>
+         * keys[]  : [ 5 9 12 ]
+         * child[] : [ a b  c  d ]
+         * </pre>
+         * 
+         * A probe with keys up to <code>5</code> matches at index zero (0)
+         * and we choose the 1st child, a, which is at index zero (0).
+         * 
+         * A probe with keys in [6:9] matches at index one (1) and we choose the
+         * 2nd child, b, which is at index one (1).
+         * 
+         * A probe with keys in [10:12] matches at index two (2) and we choose
+         * the 3rd child, c, which is at index two (2).
+         * 
+         * A probe with keys greater than 12 exceeds all keys in the node and
+         * always matches the last child in that node. In this case, d, which is
+         * at index three (3).
+         * 
+         * Note that we never stop a search on a node, even when there is an
+         * exact match on a key. All values are stored in the leaves and we
+         * always descend until we reach the leaf in which a value for the key
+         * would be stored. A test on the keys of that leaf is then conclusive -
+         * either a value is stored in the leaf for that key or it is not stored
+         * in the tree.
+         * 
+         * @param key
+         *            The probe (an external key).
+         * 
+         * @return The child to be searched next for that key.
+         */
+        public int findChild(int key) {
+            
+            int index = Search.search(key,keys,nkeys);
+            
+            if( index >= 0 ) {
+                
+                /*
+                 * exact match.
+                 */
+                
+                return index;
+                
             } else {
-
-                assert key > NEGINF && key < POSINF;
-                assert child != null;
-
-                keys[nkeys] = key;
-
-                if (child.isPersistent()) {
-
-                    childRefs[nkeys] = new WeakReference<AbstractNode>(child);
-                    childKeys[nkeys] = child.getIdentity();
-
-                } else {
-
-                    dirtyChildren.add(child);
-                    child.parent = new WeakReference<Node>(this);
-                    childRefs[nkeys] = new WeakReference<AbstractNode>(child);
-                    childKeys[nkeys] = 0;
-
-                }
-
-                nkeys++;
-
-                setDirty(true);
-
-                return this;
-
+                
+                /*
+                 * There is no exact match on the key, so we convert the search
+                 * result to find the insertion point. The insertion point is
+                 * always an index whose current key (iff it is defined) is
+                 * greater than the probe key.
+                 * 
+                 * keys[] : [ 5 9 12 ]
+                 * 
+                 * The insertion point for key == 4 is zero.
+                 * 
+                 * The insertion point for key == 6 is one.
+                 * 
+                 * etc.
+                 * 
+                 * When the probe key is greater than any existing key, then
+                 * the insertion point is nkeys.  E.g., the insertion point
+                 * for key == 20 is 3.
+                 */
+                
+                // Convert to obtain the insertion point.
+                index = -index - 1;
+                
+                return index;
+                
             }
-
+            
         }
 
         /**
-         * Return the child node or leaf at the specified index in this node.
+         * Split a node.
+         * 
+         * FIXME Implement {@link Node#split(int)}
+         */
+        public void split(int key) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        /**
+         * Invoked to insert a key and reference for a child created when
+         * another child of this node is split.
+         * 
+         * @param key
+         *            The key on which the old node was split.
+         * @param child
+         *            The new node.
+         */
+        public AbstractNode addChild(int key, AbstractNode child) {
+
+            assert key > NEGINF && key < POSINF;
+            assert child != null;
+            assert child.isDirty(); // always dirty since it was just created.
+            assert isDirty(); // must be dirty to permit mutation.
+
+            if (nkeys == keys.length) {
+
+                /*
+                 * FIXME The node is full. First split the node, then add the
+                 * children. If this is the root node, then we handle it
+                 * specially. Otherwise it is a split of a node in an
+                 * intermediate level.
+                 */
+                throw new RuntimeException("Overflow");
+
+            }
+
+            /*
+             * Find the location where this key belongs. When a new node is
+             * created, the constructor sticks the child that demanded the split
+             * into childRef[0]. So, when nkeys == 1, we have nchildren==1 and
+             * the key goes into keys[0] but we have to copyDown by one anyway
+             * to avoid stepping on the existing child.
+             */
+            int index = Search.search(key, keys, nkeys);
+
+            if (index >= 0) {
+
+                /*
+                 * The key is already present. This is an error.
+                 */
+
+                throw new AssertionError("Split on existing key: key=" + key);
+
+            }
+
+            // Convert the position to obtain the insertion point.
+            index = -index - 1;
+
+            assert index >= 0 && index <= nkeys;
+
+            /*
+             * copy down per-key data.
+             */
+            final int keyCount = nkeys - index;
+
+            if( keyCount > 0 ) System.arraycopy(keys, index, keys, index + 1, keyCount);
+
+            /*
+             * Note: This is equivilent to (nkeys + 1) - (index+1). (nkeys+1) is
+             * equivilent to nchildren while (index+1) is the position at which
+             * the new child reference is written. So, childCount == keyCount.
+             * 
+             * @todo Refactor to use only one [count/length] parameter and
+             * update comments.
+             */
+            final int childCount = nkeys - index;
+
+            /*
+             * copy down per-child data. #children == nkeys+1. child[0] is
+             * always defined.
+             */
+            System.arraycopy(childKeys, index + 1, childKeys, index + 2,
+                    childCount);
+            System.arraycopy(childRefs, index + 1, childRefs, index + 2,
+                    childCount);
+
+            /*
+             * Insert key at index.
+             */
+            keys[index] = key;
+
+            /*
+             * Insert child at index+1.
+             */
+            childRefs[index + 1] = new WeakReference<AbstractNode>(child);
+
+            childKeys[index + 1] = NULL;
+
+            dirtyChildren.add(child);
+
+            child.parent = new WeakReference<Node>(this);
+
+            nkeys++;
+
+            return this;
+
+        }
+        
+// /**
+// * Invoked to insert a key and reference for a child created when
+// * another child of this node is split.
+// *
+// * @param key
+// * The external key value.
+// * @param child
+// * The node or leaf.
+// *
+// * @return Either this node or a copy of this node if this node was
+// * persistent and copy-on-write was triggered.
+//         */
+//        Node addChild(int key, AbstractNode child) {
+//
+//            Node copy = (Node) copyOnWrite();
+//
+//            if (copy != this) {
+//
+//                return copy.addChild(key, child);
+//
+//            } else {
+//
+//                assert key > NEGINF && key < POSINF;
+//                assert child != null;
+//
+//                /*
+//                 * FIXME This presumes that the child reference and the external
+//                 * key for the child are stored at the same index. However, the
+//                 * correct interpretation is that child[i] points to the child
+//                 * for keys between key[i] and key[i+1]. Therefore child[0] is
+//                 * between key[0] and key[1]. Note further that key[0] may be
+//                 * elided. On the other end, child[m-1] is for keys between
+//                 * key[m-2] and key[m-1], where m is the #of children. Therefore
+//                 * the #of keys can be said to be one less than the #of children
+//                 * since we can elide key[0] and store child[0:m-1] but only
+//                 * keys[1:m-1].
+//                 */
+//                keys[nkeys] = key;
+//
+//                if (child.isPersistent()) {
+//
+//                    childRefs[nkeys] = new WeakReference<AbstractNode>(child);
+//                    childKeys[nkeys] = child.getIdentity();
+//
+//                } else {
+//
+//                    dirtyChildren.add(child);
+//                    child.parent = new WeakReference<Node>(this);
+//                    childRefs[nkeys] = new WeakReference<AbstractNode>(child);
+//                    childKeys[nkeys] = 0;
+//
+//                }
+//
+//                nkeys++;
+//
+//                setDirty(true);
+//
+//                return this;
+//
+//            }
+//
+//        }
+
+        /**
+         * Return the child node or leaf at the specified index in this node. If
+         * the node is not in memory then it is read from the store.
          * 
          * @param index
-         *            The index in [0:nkeys-1].
+         *            The index in [0:nkeys].
          * 
          * @return The child node or leaf.
          */
         public AbstractNode getChild(int index) {
 
-            assert index >= 0 && index < nkeys;
+            assert index >= 0 && index <= nkeys;
 
             WeakReference<AbstractNode> childRef = childRefs[index];
 
@@ -2499,8 +3951,12 @@ public class TestSimpleBTree extends TestCase2 {
 
                 child = (AbstractNode) btree.store.read(key);
 
-                // patch btree reference since loaded from store.
-                child.btree = btree;
+                /*
+                 * Patch btree reference since loaded from store. If the child
+                 * is a {@link Node}, then it is also inserted into the hard
+                 * reference cache of nodes maintained by the btree.
+                 */
+                child.setBTree( btree );
                 
                 // patch parent reference since loaded from store.
                 child.parent = new WeakReference<Node>(this);
@@ -2508,18 +3964,7 @@ public class TestSimpleBTree extends TestCase2 {
                 // patch the child reference.
                 childRefs[index] = new WeakReference<AbstractNode>(child);
 
-                if (child instanceof Node) {
-
-                    /*
-                     * Nodes are inserted into this hash set when the are
-                     * created. The read above from the store occurs if a node
-                     * has not been read into memory yet, in which case we have
-                     * to insert it into this hash set so that it will remain
-                     * strongly reachable.
-                     */
-                    btree.nodes.add((Node) child);
-
-                } else {
+                if (child instanceof Leaf) {
                     
                     /*
                      * Leaves are added to a hard reference queue. On eviction
@@ -2538,17 +3983,37 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        protected void copyDown(int index, int count) {
-
-            super.copyDown(index,count);
-            
-            System.arraycopy( childKeys, index, childKeys, index+1, count );
-            System.arraycopy( childRefs, index, childRefs, index+1, count );
-            
-            childKeys[ index ] = NULL;
-            childRefs[ index ] = null;
-            
-        }
+//        /**
+//         * Copy down for a node is invoked during a split operation. In this
+//         * context, there is always at one more child than key. The key is
+//         * inserted at index, while the child is inserted at index+1. Therefore
+//         * some adjustment of indices is required.
+//         */
+//        void copyDown(int index, int count) {
+//            
+//            /*
+//             * copy down per-key data.
+//             */
+//            System.arraycopy( keys, index, keys, index+1, count );
+//
+//            /*
+//             * copy down per-child data.  #children == nkeys+1.
+//             */
+//            System.arraycopy( childKeys, index, childKeys, index+1, count+1 );
+//            System.arraycopy( childRefs, index, childRefs, index+1, count+1 );
+//
+//            /*
+//             * Clear the entry at the index. This is partly a paranoia check and
+//             * partly critical. Some per-key elements MUST be cleared and it is
+//             * much safer (and quite cheap) to clear them during copyDown()
+//             * rather than relying on maintenance elsewhere.
+//             */
+//
+//            keys[ index ] = NEGINF; // an invalid key.
+//            childKeys[ index ] = NULL;
+//            childRefs[ index ] = null;
+//            
+//        }
 
         /**
          * Iterator visits children, recursively expanding each child with a
@@ -2641,18 +4106,48 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
+        public void dump(PrintStream out) {
+            
+            out.println("Node: "+toString());
+            out.println("  parent="+getParent());
+            out.println("  nkeys="+nkeys+", nchildren="+(nkeys+1));
+            out.println("  branchingFactor="+branchingFactor);
+            out.println("  keys="+Arrays.toString(keys));
+            out.println("  childKeys="+Arrays.toString(childKeys));
+            out.print("  childRefs=[");
+            for(int i=0; i<branchingFactor; i++ ) {
+                if(i>0) out.print(", ");
+                if(childRefs[i]==null) out.print("null");
+                else out.print(childRefs[i].get());
+            }
+            out.println("]");
+            out.print("  #dirtyChildren="+dirtyChildren.size()+" : {");
+            int n = 0;
+            Iterator<AbstractNode> itr = dirtyChildren.iterator();
+            while(itr.hasNext()) {
+                if(n++>0) out.print(", ");
+                out.print(itr.next());
+            }
+            out.println("}");
+        }
+
         public void writeExternal(ObjectOutput out) throws IOException {
             if (dirtyChildren.size() > 0) {
                 throw new IllegalStateException("Dirty children exist.");
             }
+            assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+            assert nkeys > 0;
             out.writeInt(branchingFactor);
             out.writeInt(nkeys);
             for (int i = 0; i < nkeys; i++) {
                 int key = keys[i];
-                int childKey = childKeys[i];
                 assert key > NEGINF && key < POSINF;
-                assert childKey != NULL;
                 out.writeInt(key);
+            }
+            // Note: nchildren == nkeys+1.
+            for (int i = 0; i <= nkeys; i++) {
+                int childKey = childKeys[i];
+                assert childKey != NULL;
                 out.writeInt(childKey);
             }
         }
@@ -2660,16 +4155,22 @@ public class TestSimpleBTree extends TestCase2 {
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
             branchingFactor = in.readInt();
+            assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
             nkeys = in.readInt();
-            keys = new int[branchingFactor];
+            assert nkeys > 0;
+            keys = new int[branchingFactor-1];
+            dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
             childRefs = new WeakReference[branchingFactor];
             childKeys = new int[branchingFactor];
             for (int i = 0; i < nkeys; i++) {
                 int key = in.readInt();
-                int childKey = in.readInt();
                 assert key > NEGINF && key < POSINF;
-                assert childKey != NULL;
                 keys[i] = key;
+            }
+            // Note: nchildren == nkeys+1.
+            for (int i = 0; i <= nkeys; i++) {
+                int childKey = in.readInt();
+                assert childKey != NULL;
                 childKeys[i] = childKey;
             }
         }
@@ -2688,11 +4189,14 @@ public class TestSimpleBTree extends TestCase2 {
 
         private static final long serialVersionUID = 1L;
 
+        private static int nextId = 1;
+        private int id;
+        
         /**
          * Create a new entry.
          */
         public Entry() {
-
+            id = nextId++;
         }
 
         /**
@@ -2702,9 +4206,13 @@ public class TestSimpleBTree extends TestCase2 {
          *            The source to be copied.
          */
         public Entry(Entry src) {
-
+            id = src.id;
         }
 
+        public String toString() {
+            return ""+id;
+        }
+        
     }
 
     /**
@@ -2740,6 +4248,9 @@ public class TestSimpleBTree extends TestCase2 {
 
             super(btree);
 
+            // nkeys == nvalues for a Leaf.
+            keys = new int[branchingFactor];
+            
             values = new Entry[branchingFactor];
             
             // Add to the hard reference queue.
@@ -2757,6 +4268,9 @@ public class TestSimpleBTree extends TestCase2 {
 
             super(src);
 
+            // nkeys == nvalues for a Leaf.
+            keys = new int[branchingFactor];
+            
             values = new Entry[branchingFactor];
             
             for (int i = 0; i < nkeys; i++) {
@@ -2784,11 +4298,154 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
-         * Inserts an entry under an external key. This method is invoked when a
-         * {@link #binarySearch(int)} has already revealed that there is no
-         * entry for the key in the node.
+         * Inserts an entry under an external key. The caller MUST ensure by
+         * appropriate navigation of parent nodes that the external key either
+         * exists in or belongs in this node.  If the leaf is full, then it is
+         * split before the insert.
          * 
-         * @param id
+         * @param key
+         *            The external key.
+         * @param entry
+         *            The new entry.
+         */
+        public void insert(int key, Entry entry) {
+
+            /*
+             * Note: This is one of the few gateways for mutation of a leaf via
+             * the main btree API (insert, lookup, delete). By ensuring that we
+             * have a mutable leaf here, we can assert that the leaf must be
+             * mutable in other methods.
+             */
+            Leaf copy = (Leaf) copyOnWrite();
+
+            if (copy != this) {
+
+                copy.insert(key, entry);
+                
+                return;
+
+            }
+
+            if( nkeys == branchingFactor ) {
+            
+                split( key );
+                
+            }
+            
+            int index = Search.search(key,keys,nkeys);
+
+            if (index >= 0) {
+
+                /*
+                 * The key is already present in the leaf.
+                 * 
+                 * @todo This is where we would handle replacement of the
+                 * existing value.
+                 * 
+                 * Note: We do NOT search before triggering copy-on-write for an
+                 * object index since an insert always triggers a mutation
+                 * (unlike a standard btree which can report that the key
+                 * already exists, we will actually modify the value as part of
+                 * the object index semantics).
+                 */
+
+                return;
+
+            }
+
+            // Convert the position to obtain the insertion point.
+            index = -index - 1;
+
+            // insert an entry under that key.
+            insert(key, index, entry);
+            
+            // one more entry in the btree.
+            btree.nentries++;
+
+        }
+
+        public Entry lookup(int key) {
+            
+            int index = Search.search(key,keys,nkeys);
+            
+            if( index < 0 ) {
+                
+                // Not found.
+                
+                return null;
+                
+            }
+            
+            return values[ index ];
+            
+        }
+        
+        /**
+         * Split the leaf. Given m := {@link #branchingFactor}, keys in
+         * <code>[0:m/2-1]</code> are retained in this leaf and keys in
+         * <code>[m/2,m)</code> are copied into a new leaf. If this leaf is
+         * the root of the tree, then a new {@link Node} is created and made the
+         * parent of this leaf. The external key is then added to the parent
+         * node (if the parent node is full, then this will cause its parent
+         * node to split, etc). Finally, the new leaf is added as a child of the
+         * parent node.
+         * 
+         * @param key
+         *            The external key.
+         */
+        public void split(int key) {
+            
+            assert isDirty(); // MUST be mutable.
+            
+            final int m = branchingFactor;
+
+            Leaf leaf2 = new Leaf(btree);
+            
+            System.err.print("\nSPLIT key="+key+": ");
+            
+            int j=0;
+            for (int i = m / 2; i < m; i++, j++) {
+            
+                // copy key and value to the new leaf.
+                leaf2.keys[j] = keys[i];
+                leaf2.values[j] = values[i];
+
+                // clear out the old keys and values.
+                keys[i] = NEGINF;
+                values[i] = null;
+                
+                this.nkeys--; // one less key here.
+                leaf2.nkeys++; // more more key there.
+                
+            }
+
+            Node p = getParent();
+            
+            if( p == null ) {
+
+                /*
+                 * Use a special constructor to split the root leaf.
+                 */
+
+                p = new Node(key,this);
+
+            }
+
+            /* 
+             * Add the new leaf to the parent.
+             */
+            p.addChild(key,leaf2);
+            
+            btree.nleaves++;
+
+        }
+        
+        /**
+         * Inserts an entry under an external key. This method is invoked when a
+         * {@link Search#search(int, int[], int)} has already revealed that
+         * there is no entry for the key in the node.
+         * 
+         * @param key
          *            The external key.
          * @param index
          *            The index position for the new entry. Data already present
@@ -2796,20 +4453,17 @@ public class TestSimpleBTree extends TestCase2 {
          *            down by one.
          * @param entry
          *            The new entry.
-         * 
-         * @todo insert of child on Node.
-         * @todo handle node overflow
-         * @todo handle leaf overflow
          */
-        void insert( int id, int index, Entry entry ) {
+        void insert( int key, int index, Entry entry ) {
 
-            assert id != NULL;
+            assert key != NULL;
             assert index >=0 && index <= nkeys;
             assert entry != null;
             
             if( nkeys == keys.length ) {
                 
-                throw new RuntimeException("Overflow");
+                throw new RuntimeException("Overflow: key=" + key + ", index="
+                        + index);
                 
             } else {
 
@@ -2834,7 +4488,7 @@ public class TestSimpleBTree extends TestCase2 {
                 /*
                  * Insert at index.
                  */
-                keys[ index ] = id; // defined by AbstractNode
+                keys[ index ] = key; // defined by AbstractNode
                 values[ index ] = entry; // defined by Leaf.
                 
               }
@@ -2843,13 +4497,99 @@ public class TestSimpleBTree extends TestCase2 {
             
         }
         
-        protected void copyDown(int index, int count) {
+        void copyDown(int index, int count) {
 
-            super.copyDown(index, count);
-
+            /*
+             * copy down per-key data (#values == nkeys).
+             */
+            System.arraycopy( keys, index, keys, index+1, count );
             System.arraycopy( values, index, values, index+1, count );
             
+            /*
+             * Clear the entry at the index. This is partly a paranoia check and
+             * partly critical. Some per-key elements MUST be cleared and it is
+             * much safer (and quite cheap) to clear them during copyDown()
+             * rather than relying on maintenance elsewhere.
+             */
+
+            keys[ index ] = NEGINF; // an invalid key.
+
             values[ index ] = null;
+            
+        }
+
+        /**
+         * If the key is found on this leaf, then ensures that the leaf is
+         * mutable and removes the key and value.
+         * 
+         * @param key
+         *            The external key.
+         * 
+         * @return The value stored under that key or null.
+         * 
+         * @todo write unit tests for removing keys in terms of the keys and
+         *       values remaining in the leaf, lookup reporting false
+         *       afterwards, and not visiting the deleted entry.
+         * 
+         * @todo Write unit tests for maintaining the tree in balance as entries
+         *       are removed.
+         */
+        public Entry remove(int key) {
+
+            assert key > NEGINF && key < POSINF;
+            
+            final int index = Search.search(key,keys,nkeys);
+
+            if( index < 0 ) {
+
+                // Not found.
+                
+                return null;
+                
+            }
+            
+            /*
+             * Note: This is one of the few gateways for mutation of a leaf via
+             * the main btree API (insert, lookup, delete). By ensuring that we
+             * have a mutable leaf here, we can assert that the leaf must be
+             * mutable in other methods.
+             */
+
+            Leaf copy = (Leaf) copyOnWrite();
+
+            if (copy != this) {
+
+                return copy.remove(key);
+                
+            }
+
+            // The value that is being removed.
+            Entry entry = values[ index ];
+            
+            /*
+             * Copy over the hole created when the key and value were removed
+             * from the leaf. 
+             */
+            
+            final int length = nkeys - index;
+            
+            if( length > 0 ) {
+             
+                System.arraycopy(keys, index+1, keys, index, length);
+                
+                System.arraycopy(values, index+1, values, index, length);
+                
+            } else {
+                
+                keys[index] = NEGINF;
+            
+                values[index] = null;
+            
+            }
+            
+            btree.nentries--;
+            
+            return entry;
             
         }
 
@@ -2876,14 +4616,37 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
-         * Iterator visits the defined {@link Entry}s in key order. 
+         * Iterator visits the defined {@link Entry}s in key order.
+         * 
+         * @todo define key range scan iterator. This would be implemented
+         *       differently for a B+Tree since we could just scan leaves. For a
+         *       B-Tree, we have to traverse the nodes (pre- or post-order?) and
+         *       then visit only those keys that satisify the from/to
+         *       constraint. We know when to stop in the leaf scan based on the
+         *       keys, but we also have to check when to stop in the node scan
+         *       or we will scan all nodes and not just those covering the key
+         *       range.
          */
         public Iterator entryIterator() {
          
-            if (nkeys == 0)
+            if (nkeys == 0) {
+
                 return EmptyIterator.DEFAULT;
+                
+            }
 
             return new EntryIterator(this);
+            
+        }
+        
+        public void dump(PrintStream out) {
+            
+            out.println("Leaf: "+toString());
+            out.println("  parent="+getParent());
+            out.println("  nkeys="+nkeys);
+            out.println("  branchingFactor="+branchingFactor);
+            out.println("  keys="+Arrays.toString(keys));
+            out.println("  vals="+Arrays.toString(values));
             
         }
         
