@@ -1615,144 +1615,6 @@ public class TestSimpleBTree extends TestCase2 {
         
     }
 
-// Note: This test needs to be rewritten along the lines of _even.  It is 
-// very dated at this point and made use of a direct split rather than driving
-// splits using insert(key,val)
-//
-//    /**
-//     * Variant of {@link #test_splitRootLeaf01_even()} where the branching
-//     * factor is odd.
-//     */
-//    public void test_splitRootLeaf01_odd() {
-//
-//        Store<Integer, PO> store = new Store<Integer, PO>();
-//
-//        final int m = 5;
-//
-//        BTree btree = new BTree(store, m);
-//
-//        assertEquals("height", 0, btree.height);
-//        assertEquals("#nodes", 0, btree.nnodes);
-//        assertEquals("#leaves", 1, btree.nleaves);
-//        assertEquals("#entries", 0, btree.nentries);
-//        
-//        Leaf leaf1 = (Leaf) btree.getRoot();
-//        
-//        int[] keys = new int[]{1,11,21,31,41};
-//        
-//        for( int i=0; i<m; i++ ) {
-//         
-//            leaf1.insert(keys[i], new Entry());
-//            
-//        }
-//
-//        // Verify leaf is full.
-//        assertEquals( m, leaf1.nkeys );
-//        
-//        // Verify keys.
-//        assertEquals( keys, leaf1.keys );
-//        
-//        // Verify root node has not been changed.
-//        assertEquals( leaf1, btree.getRoot() );
-//        
-//        /*
-//         * Setup the split.
-//         */
-//        
-//        // The key that triggers the split.
-//        final int splitOnKey = 15;
-//
-//        System.err.print("leaf1 before split : "); leaf1.dump(System.err);
-//
-//        /*
-//         * Force a split. Note that this does not actually insert a value into
-//         * the tree, it just forces the split of the leaf.
-//         */
-//        //leaf1.split(splitOnKey);
-//
-//        System.err.print("leaf1 after split : "); leaf1.dump(System.err);
-//
-//        /*
-//         * Verify things about this leaf and its relationship to the new root
-//         * node.
-//         */
-//        
-//        // Verify that the root node was replaced.
-//        assertNotSame(leaf1,btree.getRoot());
-//        
-//        // Verify that the root node is defined.
-//        assertNotNull(btree.getRoot());
-//        
-//        // Verify that this leaf now has a parent.
-//        assertNotNull(leaf1.getParent());
-//
-//        // Verify that the new root node is the parent of this leaf.
-//        assertEquals(btree.getRoot(),leaf1.getParent());
-//        
-//        // verify keys on the leaf (not that the unused keys are zeros).
-//        assertEquals("leaf1.nkeys",2,leaf1.nkeys);
-//        assertEquals("leaf1.keys",new int[]{1,11,0,0,0},leaf1.keys);
-//        
-//        /*
-//         * Verify things about the new root node.
-//         */
-//        assertTrue( btree.getRoot() instanceof Node );
-//        Node root = (Node) btree.getRoot();
-//        System.err.print("root after split : "); root.dump(System.err);
-//        assertEquals("root.nkeys",1,root.nkeys);
-//        assertEquals("root.keys",new int[]{15,0,0,0},root.keys);
-//        assertEquals(leaf1,root.getChild(0));
-//
-//        /*
-//         * Verify things about the new leaf node, which we need to access
-//         * from the new root node.
-//         */
-//        Leaf leaf2 = (Leaf)root.getChild(1);
-//        System.err.print("leaf2 after split : "); leaf2.dump(System.err);
-//        assertEquals("leaf2.nkeys",3,leaf2.nkeys);
-//        assertEquals("leaf2.keys",new int[]{21,31,41,0,0},leaf2.keys);
-//        
-//        assertEquals("height", 1, btree.height);
-//        assertEquals("#nodes", 1, btree.nnodes);
-//        assertEquals("#leaves", 2, btree.nleaves);
-//        assertEquals("#entries", 5, btree.nentries);
-//
-//        // Insert [key := 2] goes into leaf1.
-//        root.insert(2,new Entry());
-//        assertEquals("leaf1.nkeys",3,leaf1.nkeys);
-//        assertEquals("leaf1.keys",new int[]{1,2,11,0,0},leaf1.keys);
-//
-//        // Insert [key := 15] goes into leaf1 (test edge condition).
-//        root.insert(15,new Entry());
-//        assertEquals("leaf1.nkeys",4,leaf1.nkeys);
-//        assertEquals("leaf1.keys",new int[]{1,2,11,15,0},leaf1.keys);
-//
-//        // Insert [key := 8] goes into leaf1, bringing the leaf to capacity.
-//        root.insert(8,new Entry());
-//        assertEquals("leaf1.nkeys",5,leaf1.nkeys);
-//        assertEquals("leaf1.keys",new int[]{1,2,8,11,15},leaf1.keys);
-//
-//        // Insert [key := 16] goes into leaf2 (test edge condition).
-//        root.insert(16,new Entry());
-//        assertEquals("leaf2.nkeys",4,leaf2.nkeys);
-//        assertEquals("leaf2.keys",new int[]{16,21,31,41,0},leaf2.keys);
-//
-//        // Insert [key := 24] goes into leaf2.
-//        root.insert(24,new Entry());
-//        assertEquals("leaf2.nkeys",5,leaf2.nkeys);
-//        assertEquals("leaf2.keys",new int[]{16,21,24,31,41},leaf2.keys);
-//
-//        System.err.print("root  final : "); root.dump(System.err);
-//        System.err.print("leaf1 final : "); leaf1.dump(System.err);
-//        System.err.print("leaf2 final : "); leaf2.dump(System.err);
-//        
-//        assertEquals("height", 1, btree.height);
-//        assertEquals("#nodes", 1, btree.nnodes);
-//        assertEquals("#leaves", 2, btree.nleaves);
-//        assertEquals("#entries", 10, btree.nentries);
-//
-//    }
-
     /**
      * An error run : Different objects at index=8: expected=13, actual=16
      * <pre>
@@ -1766,19 +1628,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         int[] keys=new int[]{14, 15, 7, 12, 5, 16, 9, 6, 13, 1, 11, 8, 10, 3, 4, 2};
 
-        Entry[] entries = new Entry[keys.length];
-        
-        for(int i=0; i<keys.length; i++ ) {
-            
-            entries[ i ] = new Entry();
-            
-        }
-        
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, m);
-
-        doInsertKeySequenceTest(btree,keys,entries);
+        doInsertKeySequenceTest(m,keys,1);
 
     }
 
@@ -1795,19 +1645,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         int[] keys=new int[]{13, 1, 4, 3, 8, 6, 2, 10, 15, 5, 12, 11, 16, 7, 9, 14};
 
-        Entry[] entries = new Entry[keys.length];
-        
-        for(int i=0; i<keys.length; i++ ) {
-            
-            entries[ i ] = new Entry();
-            
-        }
-        
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, m);
-
-        doInsertKeySequenceTest(btree,keys,entries);
+        doInsertKeySequenceTest(m,keys,0);
 
     }
 
@@ -1824,19 +1662,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         int[] keys=new int[]{14, 13, 5, 7, 10, 15, 3, 2, 12, 6, 1, 16, 8, 11, 9, 4};
 
-        Entry[] entries = new Entry[keys.length];
-        
-        for(int i=0; i<keys.length; i++ ) {
-            
-            entries[ i ] = new Entry();
-            
-        }
-        
-        Store<Integer, PO> store = new Store<Integer, PO>();
-
-        BTree btree = new BTree(store, m);
-
-        doInsertKeySequenceTest(btree,keys,entries);
+        doInsertKeySequenceTest(m,keys,0);
 
     }
     
@@ -1918,8 +1744,51 @@ public class TestSimpleBTree extends TestCase2 {
             lastKey += 1;
         
         }
+
+        /*
+         * Do inserts.
+         */
         
-        doInsertKeySequenceTest(btree,keys,entries);
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < keys.length; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        // Note: The height, #of nodes, and #of leaves is path dependent.
+        assertEquals("#entries", keys.length, btree.nentries);
+
+        assertTrue(btree.dump(System.err));
+
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
 
     }
     
@@ -2044,9 +1913,40 @@ public class TestSimpleBTree extends TestCase2 {
     }
     
     /**
-     * Insert key value pairs into the tree.
+     * Insert key value pairs into the tree - used to debug sequences that
+     * cause problems.
+     * 
+     * @param m The branching factor.
+     *            The tree.
+     * @param keys
+     *            The keys.
+     * @param trace
+     *            The trace level (zero disables most tracing).
      */
-    private void doInsertKeySequenceTest(BTree btree,int[] keys,Entry[] entries){
+    private void doInsertKeySequenceTest(int m,int[] keys,int trace){
+        
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        BTree btree = new BTree(store, m);
+
+        /*
+         * Clone the keys and generate a set of entries that will be in the
+         * correct order after the keys have be inserted into the tree.
+         */
+        
+        int[] order = keys.clone();
+        
+        Arrays.sort(order);
+        
+        Entry[] entries = new Entry[keys.length];
+        
+        for(int i=0; i<keys.length; i++ ) {
+        
+            // Note: order[i] - 1 since keys in sequence are origin ONE.
+
+            entries[ order[ i ] - 1 ] = new Entry();
+            
+        }
 
         int lastLeafCount = btree.nleaves;
         
@@ -2056,13 +1956,27 @@ public class TestSimpleBTree extends TestCase2 {
             
             Entry entry = entries[i];
             
-            System.err.println("i="+i+", key="+key);
+            System.err.println("index="+i+", key="+key+", entry="+entry);
 
             assertEquals("#entries",i,btree.nentries);
             
             assertNull(btree.lookup(key));
+
+            if( trace >=2 ) {
+                
+                System.err.print("Before insert: index="+i+", key="+key);
+                btree.dump(System.err);
+                
+            }
             
             btree.insert(key, entry);
+
+            if( trace >=2 ) {
+                
+                System.err.print("After insert: index="+i+", key="+key);
+                btree.dump(System.err);
+                
+            }
 
             assertEquals(entry,btree.lookup(key));
 
@@ -2072,6 +1986,14 @@ public class TestSimpleBTree extends TestCase2 {
 
                 System.err.println("Split: i=" + i + ", key=" + key
                         + ", nleaves=" + btree.nleaves);
+                
+                if(trace>=1) {
+
+                    System.err.print("After split: ");
+                    
+                    btree.dump(System.err);
+                    
+                }
 
                 lastLeafCount = btree.nleaves;
 
@@ -2079,15 +2001,15 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        /*
-         * Verify entries in the expected order.
-         */
-        assertSameIterator(entries, btree.getRoot().entryIterator());
-
         // Note: The height, #of nodes, and #of leaves is path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
 
         assertTrue(btree.dump(System.err));
+
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
 
     }
     
