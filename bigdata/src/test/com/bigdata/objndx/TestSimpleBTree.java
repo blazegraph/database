@@ -610,94 +610,347 @@ public class TestSimpleBTree extends TestCase2 {
      */
 
     /**
+     * Test causes the root leaf to be split such that the insert key goes into
+     * the low leaf (the pre-existing roof leaf).
+     */
+    public void test_splitRootLeaf_low() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int m = 4;
+
+        BTree btree = new BTree(store, m);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+        
+        // The root before the split.
+        Leaf leaf1 = (Leaf) btree.getRoot();
+        
+        // The keys to insert before the split.
+        int[] keys = new int[]{1,11,21,31};
+        
+        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        
+        for( int i=0; i<m; i++ ) {
+        
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+            
+            assertEquals(entry,btree.lookup(key));
+            
+        }
+        
+        System.err.print("Root leaf before split: ");
+        btree.root.dump(System.err);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 4, btree.nentries);
+        
+        assertSameIterator(entries,btree.root.entryIterator());
+        
+        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+                .postOrderIterator());
+
+        /*
+         * Split low.  The key will be inserted into the middle of the low leaf.
+         */
+
+        int splitKey = 4;
+
+        Entry splitEntry = new Entry();
+
+        assertNull(btree.lookup(splitKey));
+
+        btree.insert(splitKey, splitEntry);
+
+        assertEquals(splitEntry, btree.lookup(splitKey));
+    
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 5, btree.nentries);
+
+        assertNotSame(leaf1,btree.root);
+        assertFalse(btree.root.isLeaf());
+        Node root = (Node)btree.root; // the new root.
+        assertEquals(1,root.nkeys);
+        assertEquals(new int[]{21,0,0},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+        Leaf leaf2 = (Leaf)root.getChild(1); // high leaf from the split.
+        assertNotSame(leaf1,leaf2);
+
+        System.err.print("Root node after split: ");
+        root.dump(System.err);
+
+        System.err.print("Low leaf after split: ");
+        leaf1.dump(System.err);
+
+        System.err.print("High leaf after split: ");
+        leaf2.dump(System.err);
+
+        assertEquals(2,leaf2.nkeys);
+        assertEquals(new int[]{21,31,0,0},leaf2.keys);
+
+        assertSameIterator(new Entry[] { entries[0], splitEntry, entries[1] },
+                leaf1.entryIterator());
+
+        assertSameIterator(new Entry[] { entries[2], entries[3] }, leaf2
+                .entryIterator());
+
+        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+                .postOrderIterator());
+        
+        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
+                .postOrderIterator());
+
+        assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
+                .postOrderIterator());
+        
+        assertSameIterator(new Entry[] { entries[0], splitEntry, entries[1],
+                entries[2], entries[3] }, root.entryIterator());
+
+    }
+    
+    /**
+     * Test causes the root leaf to be split such that the insert key goes into
+     * the high leaf (the leaf created by the split leaf).
+     * 
+     * @todo Do test where the split key is in the middle, e.g., 15. The key
+     *       should go into the low leaf since the leaf will split on the key at
+     *       m/2 which is 21. Do the same kind of test where the key would go
+     *       into the first index on the low leaf, and the end of the high leaf.
+     *       This will touch all the fence posts.
+     */
+    public void test_splitRootLeaf_high() {
+
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        final int m = 4;
+
+        BTree btree = new BTree(store, m);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+        
+        // The root before the split.
+        Leaf leaf1 = (Leaf) btree.getRoot();
+        
+        // The keys to insert before the split.
+        int[] keys = new int[]{1,11,21,31};
+        
+        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        
+        for( int i=0; i<m; i++ ) {
+        
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+            
+            assertEquals(entry,btree.lookup(key));
+            
+        }
+        
+        System.err.print("Root leaf before split: ");
+        btree.root.dump(System.err);
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 4, btree.nentries);
+        
+        assertSameIterator(entries,btree.root.entryIterator());
+        
+        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+                .postOrderIterator());
+
+        /*
+         * Split high - the key will be insert into the middle of the high leaf.
+         */
+
+        int splitKey = 22;
+
+        Entry splitEntry = new Entry();
+
+        assertNull(btree.lookup(splitKey));
+
+        btree.insert(splitKey, splitEntry);
+
+        assertEquals(splitEntry, btree.lookup(splitKey));
+    
+        assertEquals("height", 1, btree.height);
+        assertEquals("#nodes", 1, btree.nnodes);
+        assertEquals("#leaves", 2, btree.nleaves);
+        assertEquals("#entries", 5, btree.nentries);
+
+        assertNotSame(leaf1,btree.root);
+        assertFalse(btree.root.isLeaf());
+        Node root = (Node)btree.root; // the new root.
+        assertEquals(1,root.nkeys);
+        assertEquals(new int[]{21,0,0},root.keys);
+        assertEquals(leaf1,root.getChild(0));
+        Leaf leaf2 = (Leaf)root.getChild(1); // high leaf from the split.
+        assertNotSame(leaf1,leaf2);
+
+        System.err.print("Root node after split: ");
+        root.dump(System.err);
+
+        System.err.print("Low leaf after split: ");
+        leaf1.dump(System.err);
+
+        System.err.print("High leaf after split: ");
+        leaf2.dump(System.err);
+
+        assertEquals(3,leaf2.nkeys);
+        assertEquals(new int[]{21,22,31,0},leaf2.keys);
+
+        assertSameIterator(new Entry[] { entries[0], entries[1] }, leaf1
+                .entryIterator());
+
+        assertSameIterator(new Entry[] { entries[2], splitEntry, entries[3] },
+                leaf2.entryIterator());
+
+        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
+                .postOrderIterator());
+        
+        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
+                .postOrderIterator());
+
+        assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
+                .postOrderIterator());
+        
+        assertSameIterator(new Entry[] { entries[0], entries[1], entries[2],
+                splitEntry, entries[3] }, root.entryIterator());
+
+    }
+    
+    /**
      * <p>
      * Test ability to split the root leaf. A Btree is created with a known
      * capacity. The root leaf is filled to capacity and then split. The keys
      * are choosen so as to create room for an insert into the left and right
      * leaves after the split. The state of the root leaf before the split is:
      * </p>
+     * 
      * <pre>
-     *  root keys : [ 1 11 21 31 ]
+     *   root keys : [ 1 11 21 31 ]
      * </pre>
+     * 
      * <p>
      * The root leaf is split by inserting the external key <code>15</code>.
      * The state of the tree after the split is:
      * </p>
+     * 
      * <pre>
-     *  m     = 4 (branching factor)
-     *  m/2   = 2 (index of first key moved to the new leaf)
-     *  m/2-1 = 1 (index of last key retained in the old leaf).
-     *             
-     *  root  keys : [ 15 ]
-     *  leaf1 keys : [  1 11 15  - ]
-     *  leaf2 keys : [ 21 31  -  - ]
+     *   m     = 4 (branching factor)
+     *   m/2   = 2 (index of first key moved to the new leaf)
+     *   m/2-1 = 1 (index of last key retained in the old leaf).
+     *              
+     *   root  keys : [ 21 ]
+     *   leaf1 keys : [  1 11 15  - ]
+     *   leaf2 keys : [ 21 31  -  - ]
      * </pre>
+     * 
      * <p>
      * The test then inserts <code>2</code> (goes into leaf1, filling it to
-     * capacity), <code>16</code> (goes into leaf2, testing the edge condition
+     * capacity), <code>22</code> (goes into leaf2, testing the edge condition
      * for inserting the key greater than the split key), and <code>24</code>
      * (goes into leaf2, filling it to capacity). At this point the tree looks
      * like this:
      * </p>
+     * 
      * <pre>
-     *  root  keys : [ 15 ]
-     *  leaf1 keys : [  1  2 11 15 ]
-     *  leaf2 keys : [ 16 21 24 31 ]
+     *   root  keys : [ 21 ]
+     *   leaf1 keys : [  1  2 11 15 ]
+     *   leaf2 keys : [ 21 22 24 31 ]
      * </pre>
-     * <p> 
-     * The test now inserts <code>7</code>, causing leaf1 into split (note that
-     * the leaves are named by their creation order, not their traveral order):
+     * 
+     * <p>
+     * The test now inserts <code>7</code>, causing leaf1 into split (note
+     * that the leaves are named by their creation order, not their traveral
+     * order):
      * </p>
+     * 
      * <pre>
-     *  root  keys : [  7 15 ]
-     *  leaf1 keys : [  1  2  7  - ]
-     *  leaf3 keys : [ 11 15  -  - ]
-     *  leaf2 keys : [ 16 21 24 31 ]
+     *   root  keys : [ 11 21 ]
+     *   leaf1 keys : [  1  2  7  - ]
+     *   leaf3 keys : [ 11 15  -  - ]
+     *   leaf2 keys : [ 21 22 24 31 ]
      * </pre>
-     * <p> 
-     * The test now inserts <code>22</code>, causing leaf2 into split:
+     * 
+     * <p>
+     * The test now inserts <code>23</code>, causing leaf2 into split:
      * </p>
+     * 
      * <pre>
-     *  root  keys : [  7 15 22 ]
-     *  leaf1 keys : [  1  2  7  - ]
-     *  leaf3 keys : [ 11 15  -  - ]
-     *  leaf2 keys : [ 16 21 22  - ]
-     *  leaf4 keys : [ 24 31  -  - ]
+     *   root  keys : [ 11 21 24 ]
+     *   leaf1 keys : [  1  2  7  - ]
+     *   leaf3 keys : [ 11 15  -  - ]
+     *   leaf2 keys : [ 21 22 23  - ]
+     *   leaf4 keys : [ 24 31  -  - ]
      * </pre>
+     * 
      * <p>
      * At this point the root node is at capacity and another split of a leaf
      * will cause the root node to split and increase the height of the btree.
-     * To prepare for this, we insert <4> (into leaf1), <code>17</code> (into
-     * leaf2), and <code>35</code> and <code>40</code> (into leaf4).  This gives
-     * us the following scenario.
+     * To prepare for this, we insert <4> (into leaf1), <code>17</code> and
+     * <code>18</code> (into leaf3), and <code>35</code> and <code>40</code>
+     * (into leaf4). This gives us the following scenario.
      * </p>
+     * 
      * <pre>
-     *  root  keys : [  7 15 22 ]
-     *  leaf1 keys : [  1  2  4  7 ]
-     *  leaf3 keys : [ 11 15  -  - ]
-     *  leaf2 keys : [ 16 17 21 22 ]
-     *  leaf4 keys : [ 24 31 35 40 ]
-     * </pre>
-     * <p>
-     * Now we drive the root node to split again by inserting <code>50</code>
-     * into leaf4.  The result is as follows (note that the old root is not
-     * named 'node1').  (The split key in this case is in the middle of leaf4,
-     * NOT the key that we are inserting.)
-     * <pre>
-     *  root  keys : [ 15  -  - ]
-     *  node1 keys : [  7 22 35 ]
-     *  leaf1 keys : [  1  2  4  7 ]
-     *  leaf3 keys : [ 11 15  -  - ]
-     *  leaf2 keys : [ 16 17 21 22 ]
-     *  leaf4 keys : [ 24 31  -  - ]
-     *  leaf5 keys : [ 35 40 50  - ]
+     *   root  keys : [ 11 21 23 ]
+     *   leaf1 keys : [  1  2  4  7 ]
+     *   leaf3 keys : [ 11 15 17 18 ]
+     *   leaf2 keys : [ 21 22 23  - ]
+     *   leaf4 keys : [ 24 31 35 40 ]
      * </pre>
      * 
-     * @todo Do simple test where the split key is selected from the middle
-     * of the root leaf.
+     * <p>
+     * Note that leaf2 has a hole that can not be filled by an insert since
+     * <code>24</code> is already in leaf4.
+     * </p>
+     * <p>
+     * Now we insert <code>50</code> into leaf4, forcing leaf4 to split, which
+     * in turn requires the root node to split. The result is as follows (note
+     * that the old root is now named 'node1' and 'node2' is the new non-root
+     * node created by the split of the old root node).  The split is not made
+     * until the insert reaches the leaf, discovers that the key is not already
+     * present, and then discovers that the leaf is full.
+     * </p> 
+     * <pre>
+     *   root  keys : [ 23  -  - ]
+     *   node1 keys : [ 11 21  - ]
+     *   node2 keys : [ 23 35  - ]
+     *   leaf1 keys : [  1  2  4  7 ]
+     *   leaf3 keys : [ 11 15  -  - ]
+     *   leaf2 keys : [ 16 17 21 22 ]
+     *   leaf4 keys : [ 24 31  -  - ]
+     *   leaf5 keys : [ 35 40 50  - ]
+     * </pre>
+     * 
+     * @todo Force at least one other leaf to split and verify the outcome.
+     * 
+     * @todo Do simple test where the split key is selected from the middle of
+     *       the root leaf.
      * 
      * @todo Carry through this example in gory detail both here and for the
-     * case where m == 5 (below).
+     *       case where m == 5 (below).
      */
     public void test_splitRootLeaf01_even() {
 
@@ -765,7 +1018,7 @@ public class TestSimpleBTree extends TestCase2 {
         Node root = (Node) btree.getRoot();
         System.err.print("root after split : "); root.dump(System.err);
         assertEquals("root.nkeys",1,root.nkeys);
-        assertEquals("root.keys",new int[]{15,0,0},root.keys);
+        assertEquals("root.keys",new int[]{21,0,0},root.keys);
         assertEquals(leaf1,root.getChild(0));
         assertNotNull(root.getChild(1));
         assertNotSame(leaf1,root.getChild(1));
@@ -784,15 +1037,15 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals("leaf1.nkeys",4,leaf1.nkeys);
         assertEquals("leaf1.keys",new int[]{1,2,11,15},leaf1.keys);
 
-        // Insert [key := 16] goes into leaf2 (tests edge condition)
-        root.insert(16,new Entry());
+        // Insert [key := 22] goes into leaf2 (tests edge condition)
+        root.insert(22,new Entry());
         assertEquals("leaf2.nkeys",3,leaf2.nkeys);
-        assertEquals("leaf2.keys",new int[]{16,21,31,0},leaf2.keys);
+        assertEquals("leaf2.keys",new int[]{21,22,31,0},leaf2.keys);
 
         // Insert [key := 24] goes into leaf2, filling it to capacity.
         root.insert(24,new Entry());
         assertEquals("leaf2.nkeys",4,leaf2.nkeys);
-        assertEquals("leaf2.keys",new int[]{16,21,24,31},leaf2.keys);
+        assertEquals("leaf2.keys",new int[]{21,22,24,31},leaf2.keys);
 
 //        System.err.print("root  final : "); root.dump(System.err);
 //        System.err.print("leaf1 final : "); leaf1.dump(System.err);
@@ -819,7 +1072,7 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals("leaf1.keys",new int[]{1,2,7,0},leaf1.keys);
 
         assertEquals("root.nkeys",2,root.nkeys);
-        assertEquals("root.keys",new int[]{7,15,0},root.keys);
+        assertEquals("root.keys",new int[]{11,21,0},root.keys);
         assertEquals(leaf1,root.getChild(0));
         assertEquals(leaf2,root.getChild(2));
 
@@ -839,18 +1092,18 @@ public class TestSimpleBTree extends TestCase2 {
          * capacity.  Verify the post-conditions.
          */
         
-        // Insert [key := 22] goes into leaf2, forcing split.
+        // Insert [key := 23] goes into leaf2, forcing split.
         assertEquals("leaf2.nkeys",m,leaf2.nkeys);
         System.err.print("root  before split: ");root.dump(System.err);
         System.err.print("leaf2 before split: ");leaf2.dump(System.err);
-        root.insert(22,new Entry());
+        root.insert(23,new Entry());
         System.err.print("root  after split: ");root.dump(System.err);
         System.err.print("leaf2 after split: ");leaf2.dump(System.err);
         assertEquals("leaf2.nkeys",3,leaf2.nkeys);
-        assertEquals("leaf2.keys",new int[]{16,21,22,0},leaf2.keys);
+        assertEquals("leaf2.keys",new int[]{21,22,23,0},leaf2.keys);
 
         assertEquals("root.nkeys",3,root.nkeys);
-        assertEquals("root.keys",new int[]{7,15,22},root.keys);
+        assertEquals("root.keys",new int[]{11,21,24},root.keys);
         assertEquals(leaf1,root.getChild(0));
         assertEquals(leaf3,root.getChild(1));
         assertEquals(leaf2,root.getChild(2));
@@ -866,21 +1119,10 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals("#entries", 10, btree.nentries);
 
         /*
-         * 
-     * <p>
-     * At this point the root node is at capacity and another split of a leaf
-     * will cause the root node to split and increase the height of the btree.
-     * To prepare for this, we insert <4> (into leaf1), <code>17</code> (into
-     * leaf2), and <code>35</code> and <code>40</code> (into leaf4).  This gives
-     * us the following scenario.
-     * </p>
-     * <pre>
-     *  root  keys : [  7 15 22 ]
-     *  leaf1 keys : [  1  2  4  7 ]
-     *  leaf3 keys : [ 11 15  -  - ]
-     *  leaf2 keys : [ 16 17 21 22 ]
-     *  leaf4 keys : [ 24 31 35 40 ]
-     * </pre>
+         * At this point the root node is at capacity and another split of a
+         * leaf will cause the root node to split and increase the height of the
+         * btree. We prepare for that scenario now by filling up a few of the
+         * leaves to capacity.
          */
 
         // Insert [key := 4] into leaf1, filling it to capacity.
@@ -888,10 +1130,15 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals("leaf1.nkeys",4,leaf1.nkeys);
         assertEquals("leaf1.keys",new int[]{1,2,4,7},leaf1.keys);
 
-        // Insert [key := 17] into leaf2, filling it to capacity.
+        // Insert [key := 17] into leaf3.
         btree.insert(17,new Entry());
-        assertEquals("leaf2.nkeys",4,leaf2.nkeys);
-        assertEquals("leaf2.keys",new int[]{16,17,21,22},leaf2.keys);
+        assertEquals("leaf3.nkeys",3,leaf3.nkeys);
+        assertEquals("leaf3.keys",new int[]{11,15,17,0},leaf3.keys);
+
+        // Insert [key := 18] into leaf3, filling it to capacity.
+        btree.insert(18,new Entry());
+        assertEquals("leaf3.nkeys",4,leaf3.nkeys);
+        assertEquals("leaf3.keys",new int[]{11,15,17,18},leaf3.keys);
 
         // Insert [key := 35] into leaf4.
         btree.insert(35,new Entry());
@@ -906,8 +1153,34 @@ public class TestSimpleBTree extends TestCase2 {
         assertEquals("height", 1, btree.height);
         assertEquals("#nodes", 1, btree.nnodes);
         assertEquals("#leaves", 4, btree.nleaves);
-        assertEquals("#entries", 14, btree.nentries);
+        assertEquals("#entries", 15, btree.nentries);
+        
+        /*
+         * Force leaf4 to split.
+         */
+        
+        // Insert [key := 50] into leaf4, forcing it to split.  The insert
+        // goes into the _new_ leaf.
+        btree.insert(50,new Entry());
+        assertEquals("leaf4.nkeys",2,leaf4.nkeys);
+        assertEquals("leaf4.keys",new int[]{24,31,0,0},leaf4.keys);
 
+        // Alternative shows insert into the original leaf.
+//        btree.insert(36,new Entry());
+//        assertEquals("leaf4.nkeys",3,leaf4.nkeys);
+//        assertEquals("leaf4.keys",new int[]{24,31,36,0},leaf4.keys);
+
+        // @todo verify the entire tree.
+        
+        assertEquals("height", 2, btree.height);
+        assertEquals("#nodes", 3, btree.nnodes);
+        assertEquals("#leaves", 5, btree.nleaves);
+        assertEquals("#entries", 16, btree.nentries);
+
+        /*
+         * @todo validate post-order iterator and entryIterator.
+         */
+        
     }
     
     /**
@@ -959,7 +1232,7 @@ public class TestSimpleBTree extends TestCase2 {
          * Force a split. Note that this does not actually insert a value into
          * the tree, it just forces the split of the leaf.
          */
-        leaf1.split(splitOnKey);
+        //leaf1.split(splitOnKey);
 
         System.err.print("leaf1 after split : "); leaf1.dump(System.err);
 
@@ -2961,6 +3234,10 @@ public class TestSimpleBTree extends TestCase2 {
          * </p>
          * 
          * @return Either this node or a copy of this node.
+         * 
+         * FIXME The comments above are not quite correct since you also need to
+         * invoke copyOnWrite when splits drive up the tree from a node or leaf
+         * towards the root and during rotations.
          */
         protected AbstractNode copyOnWrite() {
 
@@ -3081,12 +3358,26 @@ public class TestSimpleBTree extends TestCase2 {
         abstract public boolean isLeaf();
         
         /**
-         * Split a node or leaf.
+         * <p>
+         * Split a node or leaf. This node (or leaf) is the "low" node (or leaf)
+         * and will contain the lower half of the keys. The split creates a
+         * "high" node (or leaf) to contain the high half of the keys. When this
+         * is the root, the split also creates a new root {@link Node}.
+         * </p>
+         * <p>
+         * Note: Splits are triggered on insert into a full node or leaf. The
+         * first key of the high node is inserted into the parent of the split
+         * node. The caller must test whether the key that is being inserted is
+         * greater than or equal to this key. If it is, then the insert goes
+         * into the high node. Otherwise it goes into the low node.
+         * </p>
          * 
          * @param key
          *            The external key.
+         * 
+         * @return The high node (or leaf) created by the split.
          */
-        abstract public void split(int key);
+        abstract protected AbstractNode split();
         
         /**
          * Recursive search locates the approprate leaf and inserts the entry
@@ -3223,7 +3514,8 @@ public class TestSimpleBTree extends TestCase2 {
 
         public boolean hasNext() {
 
-            return index < node.nkeys;
+            // Note: nchildren == nkeys+1 for a Node.
+            return index <= node.nkeys;
 
         }
 
@@ -3371,9 +3663,9 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
-         * @deprecated The tree should only grow by splitting.
+         * Used to create a new node when a node is split.
          */
-        public Node(BTree btree) {
+        Node(BTree btree) {
 
             super(btree);
 
@@ -3388,29 +3680,29 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
-         * The root {@link Node} constructor, which is used when splitting the
-         * root {@link Leaf}.
+         * This constructor is used when splitting the either the root
+         * {@link Leaf} or a root {@link Node}.
          * 
-         * @param key
-         *            The external key on which the root leaf is being split.
-         * @param leaf
-         *            The root leaf.
+         * @param btree
+         *            Required solely to differentiate the method signature from
+         *            the copy constructor.
+         * @param oldRoot
+         *            The node that was previously the root of the tree (either
+         *            a node or a leaf).
          * 
          * @todo The key is ignored and could be removed from the constructor
          *       signature. The key gets added by
          *       {@link #addChild(int, com.bigdata.objndx.TestSimpleBTree.AbstractNode)}
          */
-        Node(int key,Leaf leaf) {
+        Node(BTree btree,AbstractNode oldRoot) {
 
-            super(leaf.btree);
+            super(oldRoot.btree);
             
-//            assert key>NEGINF && key<POSINF;
-
-            // Verify that this is the root leaf.
-            assert leaf == btree.root;
+            // Verify that this is the root.
+            assert oldRoot == btree.root;
             
-            // The leaf is always dirty when it is being split.
-            assert leaf.isDirty();
+            // The old root must be dirty when it is being split.
+            assert oldRoot.isDirty();
             
             keys = new int[branchingFactor-1];
                         
@@ -3424,17 +3716,14 @@ public class TestSimpleBTree extends TestCase2 {
             btree.root = this;
             
             /*
-             * Attach the leaf that was the root of the btree to the node that
-             * is now the root of the btree.
+             * Attach the old root to this node.
              */
-
-//            keys[nkeys++] = key;
             
-            childRefs[0] = new WeakReference<AbstractNode>(leaf); 
+            childRefs[0] = new WeakReference<AbstractNode>(oldRoot); 
             
-            dirtyChildren.add(leaf);
+            dirtyChildren.add(oldRoot);
 
-            leaf.parent = new WeakReference<Node>(this);
+            oldRoot.parent = new WeakReference<Node>(this);
             
             /*
              * The tree is deeper since we just split the root node.
@@ -3631,7 +3920,7 @@ public class TestSimpleBTree extends TestCase2 {
             AbstractNode child = getChild( index );
             
             child.insert( key, entry );
-            
+
         }
         
         public Entry lookup(int key) {
@@ -3745,14 +4034,80 @@ public class TestSimpleBTree extends TestCase2 {
         }
 
         /**
-         * Split a node.
+         * Split the node. Given m := the #of keys (not children), keys in
+         * <code>[0:m/2-1]</code> are retained in this node and keys in
+         * <code>[m/2,m)</code> are copied into a new node and the key at
+         * <code>m/2</code> is inserted into the parent. If this node is the
+         * not of the tree (no parent), then a new {@link Node} is created and
+         * made the parent of this node. If adding the key would overflow the
+         * parent node, then the parent is split. Finally, the new node is added
+         * as a child of the parent node.
          * 
-         * FIXME Implement {@link Node#split(int)}
+         * @todo Review copyOnWrite triggers when splitting a node.  Basically,
+         * everything up to the root will need to be mutable even if the split
+         * does not reach that high.
          */
-        public void split(int key) {
+        protected AbstractNode split() {
+
+            assert isDirty(); // MUST be mutable.
+
+            // #of keys, not #of children.
+            final int m = branchingFactor-1;
+            final int m2 = m >> 1; // aka m/2
+            // final int m21 = m2-1; // aka (m/2) - 1
+            final int key = keys[m2];
+
+            Node node2 = new Node(btree);
+
+            System.err.print("SPLIT NODE: key=" + key + ": ");
+            dump(System.err);
+
+            int j = 0;
+            for (int i = m2; i < m; i++, j++) {
+
+                // copy key and value to the new leaf.
+                node2.keys[j] = keys[i];
+                node2.childRefs[j] = childRefs[i];
+                node2.childKeys[j] = childKeys[i];
+                AbstractNode tmp = (childRefs[i] == null ? null : childRefs[i].get());
+                if (tmp != null) {
+                    // move hard reference for dirty child to the new node.
+                    dirtyChildren.remove(tmp);
+                    node2.dirtyChildren.add(tmp);
+                }
+
+                // clear out the old keys and values.
+                keys[i] = NEGINF;
+                childRefs[i] = null;
+                childKeys[i] = NULL;
+
+                this.nkeys--; // one less key here.
+                node2.nkeys++; // more more key there.
+
+            }
+
+            Node p = getParent();
+
+            if (p == null) {
+
+                /*
+                 * Use a special constructor to split the root leaf.
+                 */
+
+                p = new Node(btree, this);
+
+            }
+
+            /*
+             * Add the new node to the parent.
+             */
+            p.addChild(key, node2);
+
+            btree.nnodes++;
             
-            throw new UnsupportedOperationException();
-            
+            // Return the high node.
+            return node2;
+
         }
         
         /**
@@ -3779,7 +4134,9 @@ public class TestSimpleBTree extends TestCase2 {
                  * specially. Otherwise it is a split of a node in an
                  * intermediate level.
                  */
-                throw new RuntimeException("Overflow");
+                
+                this.split();
+                //throw new RuntimeException("Overflow");
 
             }
 
@@ -3820,7 +4177,8 @@ public class TestSimpleBTree extends TestCase2 {
              * the new child reference is written. So, childCount == keyCount.
              * 
              * @todo Refactor to use only one [count/length] parameter and
-             * update comments.
+             * update comments.  Avoid invoking the copy operation when the count
+             * is zero.
              */
             final int childCount = nkeys - index;
 
@@ -4327,8 +4685,23 @@ public class TestSimpleBTree extends TestCase2 {
             }
 
             if( nkeys == branchingFactor ) {
-            
-                split( key );
+
+                /*
+                 * Split this leaf into a low leaf (this leaf) and a high leaf
+                 * (returned by split()). If the key is greater than or equal to
+                 * the first key in the high leaf then the insert is directed
+                 * into the high leaf.
+                 */
+
+                Leaf leaf2 = (Leaf) split();
+                
+                if( key >= leaf2.keys[0] ) {
+                    
+                    leaf2.insert(key, entry);
+                    
+                    return;
+                    
+                }
                 
             }
             
@@ -4383,28 +4756,28 @@ public class TestSimpleBTree extends TestCase2 {
         /**
          * Split the leaf. Given m := {@link #branchingFactor}, keys in
          * <code>[0:m/2-1]</code> are retained in this leaf and keys in
-         * <code>[m/2,m)</code> are copied into a new leaf. If this leaf is
-         * the root of the tree, then a new {@link Node} is created and made the
-         * parent of this leaf. The external key is then added to the parent
-         * node (if the parent node is full, then this will cause its parent
-         * node to split, etc). Finally, the new leaf is added as a child of the
-         * parent node.
-         * 
-         * @param key
-         *            The external key.
+         * <code>[m/2,m)</code> are copied into a new leaf and the key at
+         * <code>m/2</code> is inserted into the parent. If this leaf is the
+         * root of the tree (no parent), then a new {@link Node} is created and
+         * made the parent of this leaf. If adding the key would overflow the
+         * parent node, then the parent is split. Finally, the new leaf is added
+         * as a child of the parent node.
          */
-        public void split(int key) {
+        protected AbstractNode split() {
             
             assert isDirty(); // MUST be mutable.
             
             final int m = branchingFactor;
+            final int m2 = m>>1; // aka m/2
+//            final int m21 = m2-1; // aka (m/2) - 1
+            final int key = keys[m2];
 
             Leaf leaf2 = new Leaf(btree);
-            
-            System.err.print("\nSPLIT key="+key+": ");
-            
+
+            System.err.print("SPLIT: key="+key+": "); dump(System.err);
+
             int j=0;
-            for (int i = m / 2; i < m; i++, j++) {
+            for (int i = m2; i < m; i++, j++) {
             
                 // copy key and value to the new leaf.
                 leaf2.keys[j] = keys[i];
@@ -4427,7 +4800,7 @@ public class TestSimpleBTree extends TestCase2 {
                  * Use a special constructor to split the root leaf.
                  */
 
-                p = new Node(key,this);
+                p = new Node(btree,this);
 
             }
 
@@ -4438,6 +4811,9 @@ public class TestSimpleBTree extends TestCase2 {
             
             btree.nleaves++;
 
+            // Return the high leaf.
+            return leaf2;
+            
         }
         
         /**
