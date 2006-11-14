@@ -68,6 +68,7 @@ import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceCache;
@@ -1542,7 +1543,7 @@ public class TestSimpleBTree extends TestCase2 {
          */
         
         System.err.print("Tree pre-split");
-        btree.dump(System.err);
+        assertTrue(btree.dump(System.err));
         
         // Insert [key := 50] into leaf4, forcing it to split.  The insert
         // goes into the _new_ leaf.
@@ -1554,13 +1555,10 @@ public class TestSimpleBTree extends TestCase2 {
 
         /*
          * verify keys the entire tree, starting at the new root.
-         * 
-         * @todo verify more details of the parent/child relationships, ie,
-         * the dirtyChildren set for each parent.
          */
 
         System.err.print("Tree post-split");
-        btree.dump(System.err);
+        assertTrue(btree.dump(System.err));
         
         assertNotSame(root,btree.root); // verify new root.
         root = (Node)btree.root;
@@ -1754,26 +1752,143 @@ public class TestSimpleBTree extends TestCase2 {
 //        assertEquals("#entries", 10, btree.nentries);
 //
 //    }
-        
+
     /**
-     * Creates a sequence of keys in increasing order and inserts them into the
+     * An error run : Different objects at index=8: expected=13, actual=16
+     * <pre>
+     * m=4
+     * keys=[14, 15, 7, 12, 5, 16, 9, 6, 13, 1, 11, 8, 10, 3, 4, 2]
+     * </pre>
+     */
+    public void test_insertSequence01() {
+
+        int m=4;
+
+        int[] keys=new int[]{14, 15, 7, 12, 5, 16, 9, 6, 13, 1, 11, 8, 10, 3, 4, 2};
+
+        Entry[] entries = new Entry[keys.length];
+        
+        for(int i=0; i<keys.length; i++ ) {
+            
+            entries[ i ] = new Entry();
+            
+        }
+        
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        BTree btree = new BTree(store, m);
+
+        doInsertKeySequenceTest(btree,keys,entries);
+
+    }
+
+    /**
+     * An error run : Different objects at index=0: expected=1, actual=2
+     * <pre>
+     * m=4
+     * keys=[13, 1, 4, 3, 8, 6, 2, 10, 15, 5, 12, 11, 16, 7, 9, 14]
+     * </pre>
+     */
+    public void test_insertSequence02() {
+
+        int m=4;
+
+        int[] keys=new int[]{13, 1, 4, 3, 8, 6, 2, 10, 15, 5, 12, 11, 16, 7, 9, 14};
+
+        Entry[] entries = new Entry[keys.length];
+        
+        for(int i=0; i<keys.length; i++ ) {
+            
+            entries[ i ] = new Entry();
+            
+        }
+        
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        BTree btree = new BTree(store, m);
+
+        doInsertKeySequenceTest(btree,keys,entries);
+
+    }
+
+    /**
+     * An error run - lookup after insert does not find a value for that key
+     * <pre>
+     * m=4
+     * keys=[14, 13, 5, 7, 10, 15, 3, 2, 12, 6, 1, 16, 8, 11, 9, 4]
+     * </pre>
+     */
+    public void test_insertSequence03() {
+
+        int m=4;
+
+        int[] keys=new int[]{14, 13, 5, 7, 10, 15, 3, 2, 12, 6, 1, 16, 8, 11, 9, 4};
+
+        Entry[] entries = new Entry[keys.length];
+        
+        for(int i=0; i<keys.length; i++ ) {
+            
+            entries[ i ] = new Entry();
+            
+        }
+        
+        Store<Integer, PO> store = new Store<Integer, PO>();
+
+        BTree btree = new BTree(store, m);
+
+        doInsertKeySequenceTest(btree,keys,entries);
+
+    }
+    
+    /**
+     * A stress test for sequential key insertion that runs with a variety of
+     * branching factors and #of keys to insert.
+     * 
+     * @todo The code fails at m := 3 due to fence posts.
+     * 
+     * @todo as the tree grows larger we get into evictions. This test should
+     * run with evictions disabled since evictions interact with the tree in
+     * interesting ways.... But we should also do a stress test with evictions
+     * enabled, just later in the test suite once we have proven out the basic
+     * btree mechanisms and the basic persistence mechanisms.
+     */
+    public void test_splitRootLeaf_increasingKeySequence() {
+
+        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+            
+            doSplitWithIncreasingKeySequence( m, m );
+            
+            doSplitWithIncreasingKeySequence( m, m*m );
+
+            doSplitWithIncreasingKeySequence( m, m*m*m );
+
+            doSplitWithIncreasingKeySequence( m, m*m*m*m );
+
+        }
+        
+    }
+
+    /**
+     * Test helper for {@link #test_splitRootLeaf_increasingKeySequence()}.
+     * creates a sequence of keys in increasing order and inserts them into the
      * tree. Note that you do not know, in general, how many inserts it will
      * take to split the root node since the split decisions are path dependent.
      * They depend on the manner in which the leaves get filled, whether or not
      * holes are created in the leaves, etc.
      * 
-     * @todo refactor as stress test with random order and #of entries to be
-     *       inserted.  modify dump to report whether or not the tree is valid
-     *       and throw assertion based on that.  show the tree statistics as
-     *       part of dump (height, #of nodes, #of leaves, #of entries, but also
-     *       the %utilization).
+     * @param m
+     *            The branching factor.
+     * @param ninserts
+     *            The #of keys to insert.
      */
-    public void test_splitRootLeaf_increasingKeySequence() {
-
+    public void doSplitWithIncreasingKeySequence(int m,int ninserts) {
+        
         Store<Integer, PO> store = new Store<Integer, PO>();
 
-        final int m = 4;
-        
         BTree btree = new BTree(store, m);
 
         assertEquals("height", 0, btree.height);
@@ -1787,9 +1902,6 @@ public class TestSimpleBTree extends TestCase2 {
          * the right-most leaf (this is the original leaf until the first split,
          * and is thereafter always a new leaf).
          */
-        
-        // #of keys to insert before the root would split again.
-        int ninserts = m * m;
         
         int[] keys = new int[ninserts];
 
@@ -1807,81 +1919,59 @@ public class TestSimpleBTree extends TestCase2 {
         
         }
         
-        /*
-         * Insert keys into the tree.
-         */
-        
-        int lastLeafCount = btree.nleaves;
-        
-        for (int i = 0; i < ninserts; i++) {
+        doInsertKeySequenceTest(btree,keys,entries);
 
-            int key = keys[i];
-            
-            Entry entry = entries[i];
-            
-            System.err.println("i="+i+", key="+key);
-
-            assertEquals("#entries",i,btree.nentries);
-
-            assertNull(btree.lookup(key));
-            
-            btree.insert(key, entry);
-
-            assertEquals(entry,btree.lookup(key));
-
-            assertEquals("#entries",i+1,btree.nentries);
-
-            if (btree.nleaves > lastLeafCount) {
-
-                System.err.println("Split: i=" + i + ", key=" + key
-                        + ", nleaves=" + btree.nleaves);
-
-                lastLeafCount = btree.nleaves;
-
-            }
-
-        }
-
-        // Note: the root node state is path dependent.
-//        /*
-//         * Verify things about the new root node.
-//         */
-//        assertTrue( btree.getRoot() instanceof Node );
-//        Node root = (Node) btree.getRoot();
-//        System.err.print("root after splits : "); root.dump(System.err);
-//        assertEquals("root.nkeys",m-1,root.nkeys);
-        
-        /*
-         * Verify entries in the expected order.
-         */
-        assertSameIterator(entries, btree.getRoot().entryIterator());
-        
-        // Note: the height, #of nodes, and #of leaves is path dependent.
-//        assertEquals("height", 1, btree.height);
-//        assertEquals("#nodes", 1, btree.nnodes);
-//        assertEquals("#leaves", m, btree.nleaves);
-        assertEquals("#entries", ninserts, btree.nentries);
-
-        btree.dump(System.err);
-        
     }
     
+    /**
+     * A stress test for sequential decreasing key insertions that runs with a
+     * variety of branching factors and #of keys to insert.
+     * 
+     * @todo The code fails at m := 3 due to fence posts.
+     * 
+     * @todo as the tree grows larger we get into evictions. This test should
+     *       run with evictions disabled since evictions interact with the tree
+     *       in interesting ways.... But we should also do a stress test with
+     *       evictions enabled, just later in the test suite once we have proven
+     *       out the basic btree mechanisms and the basic persistence
+     *       mechanisms.
+     */
+    public void test_splitRootLeaf_decreasingKeySequence() {
+
+        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+            
+            doSplitWithDecreasingKeySequence( m, m );
+            
+            doSplitWithDecreasingKeySequence( m, m*m );
+
+            doSplitWithDecreasingKeySequence( m, m*m*m );
+
+            doSplitWithDecreasingKeySequence( m, m*m*m*m );
+
+        }
+        
+    }
+
     /**
      * Creates a sequence of keys in decreasing order and inserts them into the
      * tree. Note that you do not know, in general, how many inserts it will
      * take to split the root node since the split decisions are path dependent.
      * They depend on the manner in which the leaves get filled, whether or not
      * holes are created in the leaves, etc.
-     *
-     * @todo refactor as stress test with random order and #of entries to be
-     *       inserted.  
+     * 
+     * @param m
+     *            The branching factor.
+     * @param ninserts
+     *            The #of keys to insert.
      */
-    public void test_splitRootLeaf_decreasingKeySequence() {
+    public void doSplitWithDecreasingKeySequence(int m, int ninserts) {
 
         Store<Integer, PO> store = new Store<Integer, PO>();
 
-        final int m = 4;
-        
         BTree btree = new BTree(store, m);
 
         assertEquals("height", 0, btree.height);
@@ -1894,9 +1984,6 @@ public class TestSimpleBTree extends TestCase2 {
          * insert these keys in sequence, the result is that all inserts go into
          * the left-most leaf (the original leaf).
          */
-        
-        // #of keys to insert before the root would split again.
-        int ninserts = m * m;
         
         int[] keys = new int[ninserts];
         Entry[] entries = new Entry[ninserts];
@@ -1912,14 +1999,10 @@ public class TestSimpleBTree extends TestCase2 {
                 lastKey -= 1;
             }
         }
-        
-        /*
-         * Insert keys into the tree.
-         */
 
         int lastLeafCount = btree.nleaves;
         
-        for (int i = 0; i < ninserts; i++) {
+        for (int i = 0; i < keys.length; i++) {
 
             int key = keys[i];
             
@@ -1948,44 +2031,135 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        // Note: The root node state is path dependent.
-//        /*
-//         * Verify things about the new root node.
-//         */
-//        assertTrue( btree.getRoot() instanceof Node );
-//        Node root = (Node) btree.getRoot();
-//        System.err.print("root after splits : "); root.dump(System.err);
-//        assertEquals("root.nkeys",m-1,root.nkeys);
-        
         /*
          * Verify entries in the expected order.
          */
         assertSameIterator(reverseEntries, btree.getRoot().entryIterator());
 
         // Note: The height, #of nodes, and #of leaves is path dependent.
-//        assertEquals("height", 1, btree.height);
-//        assertEquals("#nodes", 1, btree.nnodes);
-//        assertEquals("#leaves", m, btree.nleaves);
-        assertEquals("#entries", ninserts, btree.nentries);
+        assertEquals("#entries", keys.length, btree.nentries);
 
-        btree.dump(System.err);
+        assertTrue(btree.dump(System.err));
         
     }
     
     /**
-     * Creates a sequence of distinct keys in random order and inserts them into
-     * the tree.  Note that the split decision points are path dependent and can
-     * not be predicated given random inserts.
+     * Insert key value pairs into the tree.
+     */
+    private void doInsertKeySequenceTest(BTree btree,int[] keys,Entry[] entries){
+
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < keys.length; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
+
+        // Note: The height, #of nodes, and #of leaves is path dependent.
+        assertEquals("#entries", keys.length, btree.nentries);
+
+        assertTrue(btree.dump(System.err));
+
+    }
+    
+    /**
+     * A stress test for random key insertion using a that runs with a variety
+     * of branching factors and #of keys to insert.
      * 
-     * FIXME refactor to support a stress test based on this. there are errors
-     * on some runs, indicating that there is a fence post out there somewhere.
+     * @todo The code fails at m := 3 due to fence posts.
+     * 
+     * @todo as the tree grows larger we get into evictions. This test should
+     *       run with evictions disabled since evictions interact with the tree
+     *       in interesting ways.... But we should also do a stress test with
+     *       evictions enabled, just later in the test suite once we have proven
+     *       out the basic btree mechanisms and the basic persistence
+     *       mechanisms.
      */
     public void test_splitRootLeaf_randomKeySequence() {
 
+        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+            
+            doSplitWithRandomKeySequence( m, m );
+            
+            doSplitWithRandomKeySequence( m, m*m );
+
+            doSplitWithRandomKeySequence( m, m*m*m );
+
+            doSplitWithRandomKeySequence( m, m*m*m*m );
+
+        }
+        
+    }
+
+    /**
+     * Creates a sequence of distinct keys in random order and inserts them into
+     * the tree. Note that the split decision points are path dependent and can
+     * not be predicated given random inserts.
+     * 
+     * @param m
+     *            The branching factor.
+     * 
+     * @param ninserts
+     *            The #of keys to insert.
+     * 
+     * FIXME there are errors on some runs, indicating that there is a fence
+     * post out there somewhere. Capture the keys for which it fails and create
+     * a deterministic test case for each failure.  Consider running all possible
+     * insert sequences for m=3, 4, 5, 6.
+     * 
+     * An error run : Different objects at index=8: expected=13, actual=16
+     * <pre>
+     * m=4
+     * keys=[14, 15, 7, 12, 5, 16, 9, 6, 13, 1, 11, 8, 10, 3, 4, 2]
+     * 
+     * and also
+     * 
+     * keys=[13, 1, 4, 3, 8, 6, 2, 10, 15, 5, 12, 11, 16, 7, 9, 14]
+     * </pre>
+     * 
+     * An error run - lookup after insert does not find a value for that key
+     * <pre>
+     * m=4
+     * keys=[14, 13, 5, 7, 10, 15, 3, 2, 12, 6, 1, 16, 8, 11, 9, 4]
+     * </pre>
+     */
+    public void doSplitWithRandomKeySequence(int m, int ninserts) {
+
         Store<Integer, PO> store = new Store<Integer, PO>();
 
-        final int m = 4;
-        
         BTree btree = new BTree(store, m);
 
         assertEquals("height", 0, btree.height);
@@ -1999,9 +2173,6 @@ public class TestSimpleBTree extends TestCase2 {
          * the key-value pairs in random order to insert(key,value).
          */
         
-        // #of keys to insert before the root would split again.
-        int ninserts = m * m;
-        
         int[] keys = new int[ninserts];
         Entry[] entries = new Entry[ninserts];
         
@@ -2014,6 +2185,34 @@ public class TestSimpleBTree extends TestCase2 {
         
         // Random indexing into the generated keys and values.
         int[] order = getRandomOrder(ninserts);
+
+        try {
+            doRandomKeyInsertTest(btree,keys,entries, order);
+        }
+        catch( AssertionError ex ) {
+            System.err.println("m="+m);
+            System.err.print("keys=[");
+            for(int i=0; i<keys.length; i++ ) {
+                if( i>0 ) System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("]");
+            throw ex;
+        }
+        catch( AssertionFailedError ex ) {
+            System.err.println("m="+m);
+            System.err.print("keys=[");
+            for(int i=0; i<keys.length; i++ ) {
+                if( i>0 ) System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("]");
+            throw ex;
+        }
+        
+    }
+
+    private void doRandomKeyInsertTest(BTree btree, int[] keys, Entry[] entries, int[] order ) {
         
         /*
          * Insert keys into the tree.
@@ -2021,7 +2220,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         int lastLeafCount = btree.nleaves;
         
-        for (int i = 0; i < ninserts; i++) {
+        for (int i = 0; i < keys.length; i++) {
 
             int key = keys[order[i]];
             
@@ -2050,15 +2249,6 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        // Note: The root characteristics are path dependent.
-//        /*
-//         * Verify things about the new root node.
-//         */
-//        assertTrue( btree.getRoot() instanceof Node );
-//        Node root = (Node) btree.getRoot();
-//        System.err.print("root after splits : "); root.dump(System.err);
-//        assertEquals("root.nkeys",m-1,root.nkeys);
-        
         /*
          * Verify entries in the expected order. While we used a random
          * presentation order, the entries MUST now be in the original generated
@@ -2067,253 +2257,12 @@ public class TestSimpleBTree extends TestCase2 {
         assertSameIterator(entries,btree.getRoot().entryIterator());
 
         // Note: The height, #of nodes, and #of leaves are path dependent.
-//        assertEquals("height", 1, btree.height);
-//        assertEquals("#nodes", 1, btree.nnodes);
-//        assertEquals("#leaves", m, btree.nleaves);
-        assertEquals("#entries", ninserts, btree.nentries);
+        assertEquals("#entries", keys.length, btree.nentries);
 
-        btree.dump(System.err);
+        assertTrue(btree.dump(System.err));
         
     }
     
-    /*
-     * Test iterators -- assumes that structural modification (adding and
-     * removing child nodes) has already been tested.
-     * 
-     * FIXME modify tests to grow the tree by splitting.
-     * 
-     * @todo Figure out how to write tests for the postOrderIterator that looks
-     * for correct non-visitation of nodes that are not dirty.
-     */
-
-//    /**
-//     * <p>
-//     * Test creates a simple tree and verifies the visitation order. The nodes
-//     * and leaves in the tree are NOT persistent so that this test minimizes the
-//     * interaction with the copy-on-write persistence mechanisms. The nodes and
-//     * leaves of the tree are arranged as follows:
-//     * </p>
-//     * 
-//     * <pre>
-//     *  root
-//     *   leaf1
-//     *   node1
-//     *    leaf2
-//     *    leaf3
-//     * </pre>
-//     */
-//    public void test_postOrderIterator01() {
-//
-//        Store<Integer, PO> store = new Store<Integer, PO>();
-//
-//        BTree btree = new BTree(store, 4);
-//
-//        // Create a root node and its children.
-//        Node root = new Node(btree);
-//        Leaf leaf1 = new Leaf(btree);
-//        Node node1 = new Node(btree);
-//        Leaf leaf2 = new Leaf(btree);
-//        Leaf leaf3 = new Leaf(btree);
-//
-//        root.addChild(1, leaf1);
-//        root.addChild(2, node1);
-//
-//        node1.addChild(1, leaf2);
-//        node1.addChild(2, leaf3);
-//
-//        System.err.println("root : " + root);
-//        System.err.println("leaf1: " + leaf1);
-//        System.err.println("node1: " + node1);
-//        System.err.println("leaf2: " + leaf2);
-//        System.err.println("leaf3: " + leaf3);
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf1, node1 }, root
-//                .childIterator());
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
-//                .childIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for node1.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for root.
-//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-//                root }, root.postOrderIterator());
-//
-//    }
-//
-//    /**
-//     * <p>
-//     * Test creates a simple tree and verifies the visitation order. The nodes
-//     * and leaves in the tree are NOT persistent so that this test minimizes the
-//     * interaction with the copy-on-write persistence mechanisms. The nodes and
-//     * leaves of the tree are arranged as follows:
-//     * </p>
-//     * 
-//     * <pre>
-//     *  root
-//     *   node1
-//     *    leaf2
-//     *    leaf3
-//     *   leaf1
-//     * </pre>
-//     */
-//    public void test_postOrderIterator02() {
-//
-//        Store<Integer, PO> store = new Store<Integer, PO>();
-//
-//        BTree btree = new BTree(store, 4);
-//
-//        // Create a root node and its children.
-//        Node root = new Node(btree);
-//        Leaf leaf1 = new Leaf(btree);
-//        Node node1 = new Node(btree);
-//        Leaf leaf2 = new Leaf(btree);
-//        Leaf leaf3 = new Leaf(btree);
-//
-//        root.addChild(1, node1);
-//        root.addChild(2, leaf1);
-//
-//        node1.addChild(1, leaf2);
-//        node1.addChild(2, leaf3);
-//
-//        System.err.println("root : " + root);
-//        System.err.println("leaf1: " + leaf1);
-//        System.err.println("node1: " + node1);
-//        System.err.println("leaf2: " + leaf2);
-//        System.err.println("leaf3: " + leaf3);
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { node1, leaf1 }, root
-//                .childIterator());
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node1
-//                .childIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf2 }, leaf2
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for leaves.
-//        assertSameIterator(new AbstractNode[] { leaf3 }, leaf3
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for node1.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1 }, node1
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for root.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-//                root }, root.postOrderIterator());
-//
-//    }
-//
-//    /**
-//     * <p>
-//     * Test creates a simple tree and verifies the visitation order. The nodes
-//     * and leaves in the tree are NOT persistent so that this test minimizes the
-//     * interaction with the copy-on-write persistence mechanisms. The nodes and
-//     * leaves of the tree are arranged as follows:
-//     * </p>
-//     * 
-//     * <pre>
-//     *  root
-//     *    node1
-//     *      leaf1
-//     *      node2
-//     *        leaf2
-//     *        leaf3
-//     *      leaf4
-//     *    leaf5
-//     *    node3
-//     *      leaf6
-//     * </pre>
-//     */
-//    public void test_postOrderIterator03() {
-//
-//        Store<Integer, PO> store = new Store<Integer, PO>();
-//
-//        BTree btree = new BTree(store, 4);
-//
-//        // Create a root node and its children.
-//        Node root = new Node(btree);
-//        Node node1 = new Node(btree);
-//        Node node2 = new Node(btree);
-//        Node node3 = new Node(btree);
-//        Leaf leaf1 = new Leaf(btree);
-//        Leaf leaf2 = new Leaf(btree);
-//        Leaf leaf3 = new Leaf(btree);
-//        Leaf leaf4 = new Leaf(btree);
-//        Leaf leaf5 = new Leaf(btree);
-//        Leaf leaf6 = new Leaf(btree);
-//
-//        root.addChild(1, node1);
-//        root.addChild(2, leaf5);
-//        root.addChild(3, node3);
-//
-//        node1.addChild(1, leaf1);
-//        node1.addChild(2, node2);
-//        node1.addChild(3, leaf4);
-//
-//        node2.addChild(1, leaf2);
-//        node2.addChild(2, leaf3);
-//
-//        node3.addChild(1, leaf6);
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { node1, leaf5, node3 }, root
-//                .childIterator());
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf1, node2, leaf4 }, node1
-//                .childIterator());
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3 }, node2
-//                .childIterator());
-//
-//        // verify simple child iterator.
-//        assertSameIterator(new AbstractNode[] { leaf6 }, node3.childIterator());
-//
-//        // verify post-order iterator for node3.
-//        assertSameIterator(new AbstractNode[] { leaf6, node3 }, node3
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for node2.
-//        assertSameIterator(new AbstractNode[] { leaf2, leaf3, node2 }, node2
-//                .postOrderIterator());
-//
-//        // verify post-order iterator for node1.
-//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
-//                leaf4, node1 }, node1.postOrderIterator());
-//
-//        // verify post-order iterator for root.
-//        assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node2,
-//                leaf4, node1, leaf5, leaf6, node3, root }, root
-//                .postOrderIterator());
-//
-//    }
-
     /*
      * Tests of commit processing (without triggering copy-on-write).
      */
@@ -3207,7 +3156,7 @@ public class TestSimpleBTree extends TestCase2 {
 
             assert store != null;
         
-            assert branchingFactor > MIN_BRANCHING_FACTOR;
+            assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
             this.store = store;
             
@@ -3324,10 +3273,19 @@ public class TestSimpleBTree extends TestCase2 {
          * 
          * @param out
          *            The dump is written on this stream.
+         * 
+         * @return true unless an inconsistency is detected.
+         * 
+         * @todo Compute the utilization of the tree.
          */
-        void dump(PrintStream out) {
+        boolean dump(PrintStream out) {
             
-            root.dump(out,0,true);
+            out.println("height=" + height + ", #nodes=" + nnodes
+                    + ", #leaves=" + nleaves + ", #entries=" + nentries);
+            
+            boolean ok = root.dump(out,0,true);
+            
+            return ok;
             
         }
         
@@ -3955,10 +3913,12 @@ public class TestSimpleBTree extends TestCase2 {
          * 
          * @param out
          *            Where to write the dump.
+         * 
+         * @return True unless an inconsistency was detected.
          */
-        public void dump(PrintStream out) {
+        public boolean dump(PrintStream out) {
             
-            dump(out,0,false);
+            return dump(out,0,false);
             
         }
         
@@ -3972,8 +3932,10 @@ public class TestSimpleBTree extends TestCase2 {
          * @param recursive
          *            When true, the node will be dumped recursively using a
          *            pre-order traversal.
+         *            
+         * @return True unless an inconsistency was detected.
          */
-        abstract public void dump(PrintStream out,int height,boolean recursive);
+        abstract public boolean dump(PrintStream out,int height,boolean recursive);
 
         /**
          * Returns a string that may be used to indent a dump of the nodes in
@@ -4335,6 +4297,14 @@ public class TestSimpleBTree extends TestCase2 {
 
             }
 
+            /*
+             * @todo I have seen this triggered by increment writes of dirty
+             * leaves using the doSplitWithIncreasingKeySequence at m := 20.
+             */
+            System.err.print("parent: ");
+            this.dump(System.err);
+            System.err.print("child : ");
+            child.dump(System.err);
             throw new IllegalArgumentException("Not our child : child=" + child);
 
         }
@@ -4603,7 +4573,7 @@ public class TestSimpleBTree extends TestCase2 {
              */
             keys[m21] = NULL;
             nkeys--;
-            assert nkeys > 0;
+            assert nkeys >= 0;
 
             Node p = getParent();
 
@@ -4992,12 +4962,14 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        public void dump(PrintStream out, int height, boolean recursive) {
+        public boolean dump(PrintStream out, int height, boolean recursive) {
             
+            boolean ok = true;
             out.println(indent(height)+"Node: "+toString());
             out.println(indent(height)+"  parent="+getParent());
-            out.println(indent(height)+"  nkeys="+nkeys+", nchildren="+(nkeys+1));
-            out.println(indent(height)+"  branchingFactor="+branchingFactor);
+            out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
+                    + nkeys + ", nchildren=" + (nkeys + 1)
+                    + ", branchingFactor=" + branchingFactor);
             out.println(indent(height)+"  keys="+Arrays.toString(keys));
             { // verify keys are monotonically increasing.
                 int lastKey = NEGINF;
@@ -5007,6 +4979,7 @@ public class TestSimpleBTree extends TestCase2 {
                                 + "ERROR keys out of order at index=" + i
                                 + ", lastKey=" + lastKey + ", keys[" + i + "]="
                                 + keys[i]);
+                        ok = false;
                     }
                     lastKey = keys[i];
                 }
@@ -5027,6 +5000,97 @@ public class TestSimpleBTree extends TestCase2 {
                 out.print(itr.next());
             }
             out.println("}");
+            
+            /*
+             * Look for inconsistencies for children. A dirty child MUST NOT
+             * have an entry in childKeys[] since it is not persistent and MUST
+             * show up in dirtyChildren. Likewise if a child is NOT dirty, then
+             * it MUST have an entry in childKeys and MUST NOT show up in
+             * dirtyChildren.
+             * 
+             * This also verifies that all entries beyond nchildren (nkeys+1)
+             * are unused.
+             */
+            for( int i=0; i<branchingFactor; i++) {
+                
+                if (i > nkeys) {
+
+                    /*
+                     * Scanning past the last valid child index. 
+                     */
+
+                    if (childKeys[i] != NULL) {
+
+                        out.println(indent(height) + "  ERROR childKeys[" + i
+                                + "] should be " + NULL + ", not "
+                                + childKeys[i]);
+
+                        ok = false;
+
+                    }
+
+                    if (childRefs[i] != null) {
+
+                        out.println(indent(height) + "  ERROR childRefs[" + i
+                                + "] should be null, not " + childRefs[i]);
+
+                        ok = false;
+
+                    }
+
+                } else {
+
+                    /*
+                     * Scanning a valid child index.
+                     * 
+                     * Note: This is not fetching the child if it is not in
+                     * memory -- perhaps it should using its persistent id?
+                     */
+
+                    AbstractNode child = (childRefs[i] == null ? null
+                            : childRefs[i].get());
+
+                    if (child != null) {
+
+                        if(child.isDirty()) {
+                            /*
+                             * Dirty child.
+                             */
+                            if (childRefs[i] == null) {
+                                out.println(indent(height)
+                                        + "  ERROR childRefs[" + i
+                                        + "] is null, but the child is dirty");                                
+                            }
+                            if( childKeys[i] != NULL ) {
+                                out.println(indent(height)
+                                        + "  ERROR childKeys[" + i + "]="
+                                        + childKeys[i] + ", but MUST be "
+                                        + NULL + " since the child is dirty");
+                            }
+                            if( ! dirtyChildren.contains(child)) {
+                                out.println(indent(height + 1)
+                                        + "  ERROR child at index="+i+" is dirty, but not on the dirty list: child="+child);
+                            }
+                        } else {
+                            /*
+                             * Clean child (ie, persistent).
+                             */
+                            if( childKeys[i] == NULL ) {
+                                out.println(indent(height)
+                                        + "  ERROR childKey[" + i + "] is "
+                                        + NULL + ", but child is not dirty");
+                            }
+                            if( dirtyChildren.contains(child)) {
+                                out.println(indent(height)
+                                        + "  ERROR child at index="+i+" is not dirty, but is on the dirty list: child="+child);
+                            }
+                        }
+                        
+                    }
+
+                }
+                
+            }
         
             if (recursive) {
 
@@ -5049,6 +5113,8 @@ public class TestSimpleBTree extends TestCase2 {
                                 + "ERROR can not find child at index=" + i
                                 + ", skipping this index.");
 
+                        ok = false;
+                        
                         continue;
 
                     }
@@ -5061,6 +5127,8 @@ public class TestSimpleBTree extends TestCase2 {
                                 "ERROR child does not have parent reference at index="+i
                                 );
                         
+                        ok = false;
+                        
                     }
                     
                     if( child.parent.get() != this ) {
@@ -5068,6 +5136,8 @@ public class TestSimpleBTree extends TestCase2 {
                         out.println(indent(height + 1)+
                                 "ERROR child has incorrect parent reference at index="+i
                                 );
+
+                        ok = false;
                         
                     }
                     
@@ -5077,6 +5147,8 @@ public class TestSimpleBTree extends TestCase2 {
                                         + "ERROR dirty child not in node's dirty list at index="
                                         + i);
                         
+                        ok = false;
+
                     }
 
                     if (! child.isDirty() && dirtyChildren.contains(child)) {
@@ -5084,6 +5156,8 @@ public class TestSimpleBTree extends TestCase2 {
                         out.println(indent(height + 1)
                                 + "ERROR clear child found in node's dirty list at index="
                                 + i);
+
+                        ok = false;
 
                     }
 
@@ -5106,14 +5180,18 @@ public class TestSimpleBTree extends TestCase2 {
                                     + "ERROR first key on first child must be LT "
                                     + keys[0] + ", but found " + child.keys[0]);
                             
+                            ok = false;
+
                         }
 
-                        if( child.keys[child.nkeys-1] >= keys[0] ) {
+                        if( child.nkeys>=1 && child.keys[child.nkeys-1] >= keys[0] ) {
                             
                             out.println(indent(height + 1)
                                     + "ERROR last key on first child must be LT "
                                     + keys[0] + ", but found " + child.keys[child.nkeys-1]);
                             
+                            ok = false;
+
                         }
 
                     } else if( i < nkeys ) {
@@ -5131,7 +5209,9 @@ public class TestSimpleBTree extends TestCase2 {
                                     + "ERROR first key on child leaf must be "
                                     + keys[i-1] + ", not " + child.keys[0]
                                     + " at index=" + i);
-                            
+                        
+                            ok = false;
+
                         }
                         
                     } else {
@@ -5143,7 +5223,11 @@ public class TestSimpleBTree extends TestCase2 {
                         
                     }
                     
-                    child.dump(out, height + 1, true);
+                    if( ! child.dump(out, height + 1, true) ) {
+                        
+                        ok = false;
+                        
+                    }
 
                 }
                 
@@ -5152,11 +5236,15 @@ public class TestSimpleBTree extends TestCase2 {
                     out.println(indent(height + 1) + "ERROR found "
                             + dirty.size() + " dirty children, but "
                             + dirtyChildren.size() + " in node's dirty list");
-                    
+
+                    ok = false;
+
                 }
                 
             }
 
+            return ok;
+            
         }
 
         public void writeExternal(ObjectOutput out) throws IOException {
@@ -5685,14 +5773,29 @@ public class TestSimpleBTree extends TestCase2 {
             
         }
         
-        public void dump(PrintStream out, int height, boolean recursive) {
-            
+        public boolean dump(PrintStream out, int height, boolean recursive) {
+
+            boolean ok = true;
             out.println(indent(height)+"Leaf: "+toString());
             out.println(indent(height)+"  parent="+getParent());
-            out.println(indent(height)+"  nkeys="+nkeys);
-            out.println(indent(height)+"  branchingFactor="+branchingFactor);
+            out.println(indent(height)+"  dirty=" + isDirty() + ", nkeys="
+                    + nkeys + ", branchingFactor=" + branchingFactor);
             out.println(indent(height)+"  keys="+Arrays.toString(keys));
+            { // verify keys are monotonically increasing.
+                int lastKey = NEGINF;
+                for (int i = 0; i < nkeys; i++) {
+                    if (keys[i] <= lastKey) {
+                        out.println(indent(height)
+                                + "ERROR keys out of order at index=" + i
+                                + ", lastKey=" + lastKey + ", keys[" + i + "]="
+                                + keys[i]);
+                        ok = false;
+                    }
+                    lastKey = keys[i];
+                }
+            }
             out.println(indent(height)+"  vals="+Arrays.toString(values));
+            return ok;
             
         }
         
