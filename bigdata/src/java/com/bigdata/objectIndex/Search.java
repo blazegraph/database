@@ -45,7 +45,7 @@ Modifications:
  * Created on Nov 12, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.objectIndex;
 
 
 /**

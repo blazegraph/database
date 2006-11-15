@@ -45,7 +45,7 @@ Modifications:
  * Created on Nov 12, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.objectIndex;
 
 import java.util.Random;
 
@@ -53,8 +53,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.objndx.TestSimpleBTree.AbstractNode;
-import com.bigdata.objndx.TestSimpleBTree.Node;
 
 /**
  * Unit tests for {@link Search}.
@@ -223,7 +221,7 @@ public class TestSearch extends TestCase {
              * random non-zero intervals.
              */
             
-            int lastKey = Node.NEGINF;
+            int lastKey = 0; // origin one, so this is negative infinity.
             
             for( int i=0; i<nkeys; i++ ) {
                 
@@ -273,7 +271,7 @@ public class TestSearch extends TestCase {
                  * random non-zero intervals.
                  */
                 
-                int lastKey = Node.NEGINF;
+                int lastKey = 0; // origin one, so this is negative infinity.
                 
                 for( int i=0; i<nkeys; i++ ) {
                     
