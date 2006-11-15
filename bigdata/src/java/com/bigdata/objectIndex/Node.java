@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import com.bigdata.objectIndex.TestSimpleBTree.Entry;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -165,6 +164,9 @@ public class Node extends AbstractNode {
 
         btree.nnodes++;
 
+        // Note: #of nodes and leaves does not reflect right sibling yet.
+        System.err.println("NEW ROOT: height="+btree.height);
+
     }
 
     /**
@@ -248,7 +250,13 @@ public class Node extends AbstractNode {
 
         }
 
-        // Scan for location in weak references.
+        /*
+         * Scan for location in weak references.
+         * 
+         * @todo Can this be made more efficient by considering the last key on
+         * the child and searching the parent for the index that must correspond
+         * to that child?
+         */
         for (int i = 0; i < nkeys; i++) {
 
             if (childRefs[i].get() == child) {
@@ -484,17 +492,19 @@ public class Node extends AbstractNode {
      * Split the node. The {@link BTree#nodeSplitter} is used to compute the
      * index (splitIndex) at which to split the node and a new rightSibling
      * {@link Node} is created. The key at the splitIndex is known as the
-     * splitKey. All keys and child references from splitIndex+1 are moved to
-     * the new rightSibling.
-     * </p><p>
+     * splitKey. The splitKey itself is lifted into the parent and does not
+     * appear in either this node or the rightSibling after the split. All keys
+     * and child references from splitIndex+1 are moved to the new rightSibling.
+     * The child reference for splitIndex remains in this node.
+     * </p>
+     * <p>
      * If this node is the root of the tree (no parent), then a new root
      * {@link Node} is created without any keys and is made the parent of this
      * node.
-     * </p><p>
+     * </p>
+     * <p>
      * In any case, we then insert( splitKey, rightSibling ) into the parent
-     * node, which may cause the parent node itself to split. Note that the
-     * splitKey is NOT present in either this node or the new rightSibling after
-     * the split.
+     * node, which may cause the parent node itself to split.
      * </p>
      * 
      * @see INodeSplitPolicy
@@ -515,12 +525,13 @@ public class Node extends AbstractNode {
         final int splitIndex = btree.nodeSplitter.splitNodeAt(this);
 
         // the key to be inserted into the parent node.
-        final int key = keys[splitIndex];
+        final int splitKey = keys[splitIndex];
 
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
 
-        System.err.print("SPLIT NODE: key=" + key + ": ");
+        System.err.print("SPLIT NODE: m=" + m + ", splitIndex=" + splitIndex
+                + ", splitKey=" + splitKey + ": ");
         dump(System.err);
 
         /* 
@@ -529,11 +540,13 @@ public class Node extends AbstractNode {
         
         int j = 0;
 
-        for (int i = splitIndex+1; i < m; i++, j++) {
+        for (int i = splitIndex + 1 ; i < m; i++, j++) {
 
-            if (i + 1 < m) {
+            if ( i + 1 < m) {
             
-                // Note: keys[m-1] is undefined.
+                /*
+                 * Note: keys[m-1] is undefined.
+                 */
                 rightSibling.keys[j] = keys[i];
                 
             }
@@ -570,8 +583,9 @@ public class Node extends AbstractNode {
                 
             }
 
-            /* 
-             * Clear out the old keys and values.
+            /*
+             * Clear out the old keys and values, including keys[splitIndex]
+             * which is being moved to the parent.
              */
 
             if (i + 1 < m) {
@@ -579,9 +593,9 @@ public class Node extends AbstractNode {
                 keys[i] = NEGINF;
                 
                 nkeys--; // one less key here.
-                
+
                 rightSibling.nkeys++; // more more key there.
-            
+                
             }
             
             childRefs[i] = null;
@@ -599,6 +613,7 @@ public class Node extends AbstractNode {
         
         // Note: A node may have zero keys, but it must have at least one child.
         assert nkeys >= 0;
+        assert rightSibling.nkeys >= 0;
 
         Node p = getParent();
 
@@ -617,7 +632,7 @@ public class Node extends AbstractNode {
          * insert(splitKey,rightSibling) into the parent node.  This may cause
          * the parent node itself to split.
          */
-        p.insertChild(key, rightSibling);
+        p.insertChild(splitKey, rightSibling);
 
         btree.nnodes++;
 
@@ -1115,33 +1130,48 @@ public class Node extends AbstractNode {
 
                 if (i == 0) {
 
-                    /*
-                     * Note: All keys on the first child MUST be LT the
-                     * first key on this node.
-                     */
+                    if (nkeys == 0) {
 
-                    if (child.keys[0] >= keys[0]) {
+                        /*
+                         * Note: a node with zero keys is valid. It MUST have a
+                         * single child. Such nodes arise when splitting a node
+                         * in a btree of order m := 3 when the splitIndex is
+                         * computed as m/2-1 = 0.  This is perfectly normal.
+                         */
+                        
+                    } else {
+                        /*
+                         * Note: All keys on the first child MUST be LT the
+                         * first key on this node.
+                         */
 
-                        out.println(indent(height + 1)
-                                + "ERROR first key on first child must be LT "
-                                + keys[0] + ", but found " + child.keys[0]);
+                        if (child.keys[0] >= keys[0]) {
 
-                        ok = false;
+                            out
+                                    .println(indent(height + 1)
+                                            + "ERROR first key on first child must be LT "
+                                            + keys[0] + ", but found "
+                                            + child.keys[0]);
 
+                            ok = false;
+
+                        }
+
+                        if (child.nkeys >= 1
+                                && child.keys[child.nkeys - 1] >= keys[0]) {
+
+                            out
+                                    .println(indent(height + 1)
+                                            + "ERROR last key on first child must be LT "
+                                            + keys[0] + ", but found "
+                                            + child.keys[child.nkeys - 1]);
+
+                            ok = false;
+
+                        }
+                        
                     }
-
-                    if (child.nkeys >= 1
-                            && child.keys[child.nkeys - 1] >= keys[0]) {
-
-                        out.println(indent(height + 1)
-                                + "ERROR last key on first child must be LT "
-                                + keys[0] + ", but found "
-                                + child.keys[child.nkeys - 1]);
-
-                        ok = false;
-
-                    }
-
+                    
                 } else if (i < nkeys) {
 
                     if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
@@ -1165,7 +1195,7 @@ public class Node extends AbstractNode {
                 } else {
 
                     /*
-                     * While there is a child for the last index of a node ,
+                     * While there is a child for the last index of a node,
                      * there is no key for that index.
                      */
 

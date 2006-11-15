@@ -7,8 +7,6 @@ import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
 
-import com.bigdata.objectIndex.TestSimpleBTree.Entry;
-import com.bigdata.objectIndex.TestSimpleBTree.EntryIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -220,11 +218,15 @@ public class Leaf extends AbstractNode {
         // index at which to split the leaf.
         final int splitIndex = btree.leafSplitter.splitLeafAt(this);
         
+        // assert that the split will generate two non-empty leafs.
+        assert splitIndex >= 1 && splitIndex < m;
+        
         final int splitKey = keys[splitIndex];
 
         final Leaf rightSibling = new Leaf(btree);
 
-        System.err.print("SPLIT LEAF: key=" + splitKey + ": ");
+        System.err.print("SPLIT LEAF: m=" + m + ", splitIndex=" + splitIndex
+                + ", splitKey=" + splitKey + ": ");
         dump(System.err);
 
         int j = 0;
@@ -243,6 +245,10 @@ public class Leaf extends AbstractNode {
 
         }
 
+        // assert that the leaves are not empty.
+        assert nkeys>0;
+        assert rightSibling.nkeys>0;
+        
         Node p = getParent();
 
         if (p == null) {

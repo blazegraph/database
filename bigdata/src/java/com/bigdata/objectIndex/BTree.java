@@ -9,9 +9,6 @@ import java.util.Set;
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.objectIndex.TestSimpleBTree.DefaultLeafSplitPolicy;
-import com.bigdata.objectIndex.TestSimpleBTree.DefaultNodeSplitPolicy;
-import com.bigdata.objectIndex.TestSimpleBTree.Entry;
 import com.bigdata.objectIndex.TestSimpleBTree.LeafEvictionListener;
 import com.bigdata.objectIndex.TestSimpleBTree.PO;
 import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
@@ -273,18 +270,52 @@ public class BTree {
      *            The dump is written on this stream.
      * 
      * @return true unless an inconsistency is detected.
-     * 
-     * @todo Compute the utilization of the tree.
      */
     boolean dump(PrintStream out) {
 
+        int[] utils = getUtilization();
+        
         out.println("height=" + height + ", #nodes=" + nnodes + ", #leaves="
-                + nleaves + ", #entries=" + nentries);
+                + nleaves + ", #entries=" + nentries + ", nodeUtil="
+                + utils[0]+ "%, leafUtil=" + utils[1]
+                + "%, utilization=" + utils[2]+"%");
 
         boolean ok = root.dump(out, 0, true);
 
         return ok;
 
+    }
+
+    /**
+     * Computes and returns the utilization of the tree. The utilization figures
+     * do not factor in the space requirements of nodes and leaves.
+     * 
+     * @return An array whose elements are:
+     *         <ul>
+     *         <li>0 - the leaf utilization percentage [0:100]. The leaf
+     *         utilization is computed as the #of values stored in the tree
+     *         divided by the #of values that could be stored in the #of
+     *         allocated leaves.</li>
+     *         <li>1 - the node utilization percentage [0:100]. The node
+     *         utilization is computed as the #of non-root nodes divided by the
+     *         #of non-root nodes that could be addressed by the tree.</li>
+     *         <li>2 - the total utilization percentage [0:100]. This is the
+     *         average of the leaf utilization and the node utilization.</li>
+     *         </ul>
+     */
+    public int[] getUtilization() {
+        
+        int numNonRootNodes = nnodes + nleaves - 1;
+        
+        int nodeUtilization = nnodes == 0 ? 100 : (100 * numNonRootNodes )
+                / (nnodes * branchingFactor);
+        
+        int leafUtilization = ( 100 * nentries ) / (nleaves * branchingFactor);
+        
+        int utilization = (nodeUtilization + leafUtilization) / 2;
+
+        return new int[]{nodeUtilization,leafUtilization,utilization};
+        
     }
 
     /**

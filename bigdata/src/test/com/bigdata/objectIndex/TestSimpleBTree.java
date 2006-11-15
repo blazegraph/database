@@ -53,12 +53,9 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Random;
 
 import junit.framework.AssertionFailedError;
@@ -66,7 +63,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 
 /**
@@ -172,7 +168,9 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  *       pages, and then reclaiming space where it becomes available on pages),
  *       and under random key generation. Does the tree stay nicely balanced for
  *       all scenarios? What about the average search time? Periodically verify
- *       that the tree remains fully ordered.
+ *       that the tree remains fully ordered.  Choose a split rule that works
+ *       well for mostly sequential and mostly monotonic keys with some removal
+ *       of entries (sparsity).
  * 
  * @todo test delete of keys, including the rotations required to keep the tree
  *       balanced.
@@ -450,8 +448,6 @@ public class TestSimpleBTree extends TestCase2 {
      * will have the same values in the same order. (This is a variation on the
      * previous test that inserts keys into the leaf using a slightly higher
      * level API).
-     * 
-     * @todo verify correct tracking on the tree of the #of entries.
      */
     public void test_insertIntoLeaf02() {
 
@@ -517,8 +513,6 @@ public class TestSimpleBTree extends TestCase2 {
      * @see Leaf#insert(int, com.bigdata.objndx.TestSimpleBTree.Entry)
      * @see Leaf#lookup(int)
      * @see Leaf#entryIterator()
-     * 
-     * @todo verify correct tracking on the tree of the #of entries.
      */
     public void test_insertIntoLeaf03() {
 
@@ -1289,10 +1283,8 @@ public class TestSimpleBTree extends TestCase2 {
      * 
      * @todo Force at least one other leaf to split and verify the outcome.
      *       Ideally, carry through the example until we can force the root
-     *       to split one more time.
-     * 
-     * @todo Carry through this example in gory detail both here and for the
-     *       case where m == 5 (or three, which might be easier) below.
+     *       to split one more time.  Note that this detailed test requires
+     *       a specific split rule.
      */
     public void test_splitRootLeaf01_even() {
 
@@ -1657,8 +1649,6 @@ public class TestSimpleBTree extends TestCase2 {
      * A stress test for sequential key insertion that runs with a variety of
      * branching factors and #of keys to insert.
      * 
-     * @todo The code fails at m := 3 due to fence posts.
-     * 
      * @todo as the tree grows larger we get into evictions. This test should
      * run with evictions disabled since evictions interact with the tree in
      * interesting ways.... But we should also do a stress test with evictions
@@ -1667,7 +1657,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_increasingKeySequence() {
 
-        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -1783,8 +1773,6 @@ public class TestSimpleBTree extends TestCase2 {
      * A stress test for sequential decreasing key insertions that runs with a
      * variety of branching factors and #of keys to insert.
      * 
-     * @todo The code fails at m := 3 due to fence posts.
-     * 
      * @todo as the tree grows larger we get into evictions. This test should
      *       run with evictions disabled since evictions interact with the tree
      *       in interesting ways.... But we should also do a stress test with
@@ -1794,7 +1782,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_decreasingKeySequence() {
 
-        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -1903,12 +1891,29 @@ public class TestSimpleBTree extends TestCase2 {
      * Stress test inserts random permutations of keys into btrees of order m
      * for several different btrees, #of keys to be inserted, and permutations
      * of keys.
+     * 
+     * @todo disable leaf eviction here and run more stress tests with leaf
+     *       eviction enabled once we have the suite working for cache eviction.
      */
-    public void test_splitWithBranchingFactor3() {
-    
-        int trace = 0;
+    public void test_stress_split() {
+
+        doSplitTest( 3, 0 );
         
-        int m = 3;
+        doSplitTest( 4, 0 );
+        
+        doSplitTest( 5, 0 );
+        
+        doSplitTest( 6, 0 );
+        
+    }
+    
+    /**
+     * Stress test helper inserts random permutations of keys into btrees of
+     * order m for several different btrees, #of keys to be inserted, and
+     * permutations of keys. Several random permutations of dense and sparse
+     * keys are inserted. The #of keys to be inserted is also varied.
+     */
+    public void doSplitTest(int m, int trace) {
         
         /*
          * Try several permutations of the key-value presentation order.
@@ -1916,6 +1921,8 @@ public class TestSimpleBTree extends TestCase2 {
         for( int i=0; i<20; i++ ) {
          
             doInsertRandomKeySequenceTest(m, m, trace);
+            
+            doInsertRandomSparseKeySequenceTest(m, m, trace);
             
         }
         
@@ -1926,6 +1933,8 @@ public class TestSimpleBTree extends TestCase2 {
          
             doInsertRandomKeySequenceTest(m, m*m, trace);
             
+            doInsertRandomSparseKeySequenceTest(m, m*m, trace);
+            
         }
         
         /*
@@ -1935,6 +1944,8 @@ public class TestSimpleBTree extends TestCase2 {
          
             doInsertRandomKeySequenceTest(m, m*m*m, trace);
             
+            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace);
+            
         }
         
         /*
@@ -1943,14 +1954,16 @@ public class TestSimpleBTree extends TestCase2 {
         for( int i=0; i<20; i++ ) {
          
             doInsertRandomKeySequenceTest(m, m*m*m*m, trace);
+
+            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace);
             
         }
         
     }
 
     /**
-     * Insert key value pairs into the tree in a random order and verify the
-     * expected entry traversal afterwards.
+     * Insert dense key-value pairs into the tree in a random order and verify
+     * the expected entry traversal afterwards.
      * 
      * @param m
      *            The branching factor. The tree.
@@ -1960,7 +1973,11 @@ public class TestSimpleBTree extends TestCase2 {
      *            The trace level (zero disables most tracing).
      */
     public void doInsertRandomKeySequenceTest(int m, int ninserts, int trace) {
-        
+
+        /*
+         * generate keys.  the keys are a dense monotonic sequence.
+         */
+
         int keys[] = new int[ninserts];
 
         Entry entries[] = new Entry[ninserts];
@@ -1970,6 +1987,45 @@ public class TestSimpleBTree extends TestCase2 {
             keys[i] = i+1; // Note: origin one.
             
             entries[i] = new Entry();
+            
+        }
+
+        doInsertRandomKeySequenceTest(m, keys, entries, trace);
+        
+    }
+
+    /**
+     * Insert a sequence of monotonically increase keys with random spacing into
+     * a tree in a random order and verify the expected entry traversal
+     * afterwards.
+     * 
+     * @param m
+     *            The branching factor. The tree.
+     * @param ninserts
+     *            The #of distinct key-value pairs to insert.
+     * @param trace
+     *            The trace level (zero disables most tracing).
+     */
+    public void doInsertRandomSparseKeySequenceTest(int m, int ninserts, int trace) {
+        
+        /*
+         * generate random keys.  the keys are a sparse monotonic sequence.
+         */
+        int keys[] = new int[ninserts];
+
+        Entry entries[] = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF;
+
+        for( int i=0; i<ninserts; i++ ) {
+        
+            int key = r.nextInt(100)+lastKey+1;
+            
+            keys[i] = key;
+            
+            entries[i] = new Entry();
+            
+            lastKey = key;
             
         }
 
@@ -1998,12 +2054,19 @@ public class TestSimpleBTree extends TestCase2 {
 
     }
 
+    /**
+     * Note: This error was actually a fence post in
+     * {@link Node#dump(java.io.PrintStream, int, boolean))}. That method was
+     * incorrectly reporting an error when nkeys was zero after a split of a
+     * node.
+     */
     public void test_errorSequence001() {
 
         int m = 3;
+        
         int[] order = new int[] { 0, 1, 6, 3, 7, 2, 4, 5, 8 };
 
-        doKnownKeySequenceTest( m, order, 0 );
+        doKnownKeySequenceTest( m, order, 3 );
         
     }
 
@@ -2054,9 +2117,10 @@ public class TestSimpleBTree extends TestCase2 {
      * @param trace
      *            The trace level (zero disables most tracing).
      */
-    public void doInsertKeySequenceTest(int m,int[] keys,Entry[] entries, int[] order, int trace){
+    public void doInsertKeySequenceTest(int m, int[] keys, Entry[] entries, int[] order, int trace){
 
         try {
+            
             SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
 
             BTree btree = new BTree(store, m);
@@ -2078,9 +2142,9 @@ public class TestSimpleBTree extends TestCase2 {
 
                 if (trace >= 2) {
 
-                    System.err.print("Before insert: index=" + i + ", key="
+                    System.err.println("Before insert: index=" + i + ", key="
                             + key);
-                    btree.dump(System.err);
+                    assertTrue(btree.dump(System.err));
 
                 }
 
@@ -2088,9 +2152,10 @@ public class TestSimpleBTree extends TestCase2 {
 
                 if (trace >= 2) {
 
-                    System.err.print("After insert: index=" + i + ", key="
+                    System.err.println("After insert: index=" + i + ", key="
                             + key);
-                    btree.dump(System.err);
+                    
+                    assertTrue(btree.dump(System.err));
 
                 }
 
@@ -2105,9 +2170,9 @@ public class TestSimpleBTree extends TestCase2 {
 
                     if (trace >= 1) {
 
-                        System.err.print("After split: ");
+                        System.err.println("After split: ");
 
-                        btree.dump(System.err);
+                        assertTrue(btree.dump(System.err));
 
                     }
 
@@ -2127,21 +2192,24 @@ public class TestSimpleBTree extends TestCase2 {
              */
             assertSameIterator(entries, btree.getRoot().entryIterator());
 
-        } catch (AssertionError ex) {
-            System.err.println("int m=" + m+";");
-            System.err.println("int ninserts="+keys.length+";");
-            System.err.print("int[] order = new int[]{");
-            for (int i = 0; i < keys.length; i++) {
-                if (i > 0)
-                    System.err.print(", ");
-                System.err.print(order[i]);
-            }
-            System.err.println("};");
-            throw ex;
         } catch (AssertionFailedError ex) {
             System.err.println("int m=" + m+";");
             System.err.println("int ninserts="+keys.length+";");
-            System.err.print("int[] order = new int[]{");
+            System.err.print("int[] keys   = new   int[]{");
+            for (int i = 0; i < keys.length; i++) {
+                if (i > 0)
+                    System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("};");
+            System.err.print("Entry[] vals = new Entry[]{");
+            for (int i = 0; i < keys.length; i++) {
+                if (i > 0)
+                    System.err.print(", ");
+                System.err.print(entries[order[i]]);
+            }
+            System.err.println("};");
+            System.err.print("int[] order  = new   int[]{");
             for (int i = 0; i < keys.length; i++) {
                 if (i > 0)
                     System.err.print(", ");
@@ -2157,9 +2225,6 @@ public class TestSimpleBTree extends TestCase2 {
      * A stress test for random key insertion using a that runs with a variety
      * of branching factors and #of keys to insert.
      * 
-     * @todo The code fails at m := 3 due to fence posts.  write a test for that
-     * case.
-     * 
      * @todo as the tree grows larger we get into evictions. This test should
      *       run with evictions disabled since evictions interact with the tree
      *       in interesting ways.... But we should also do a stress test with
@@ -2169,7 +2234,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_randomKeySequence() {
 
-        int[] branchingFactors = new int[]{/*3,*/4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -2197,27 +2262,6 @@ public class TestSimpleBTree extends TestCase2 {
      * 
      * @param ninserts
      *            The #of keys to insert.
-     * 
-     * FIXME there are errors on some runs, indicating that there is a fence
-     * post out there somewhere. Capture the keys for which it fails and create
-     * a deterministic test case for each failure.  Consider running all possible
-     * insert sequences for m=3, 4, 5, 6.
-     * 
-     * An error run : Different objects at index=8: expected=13, actual=16
-     * <pre>
-     * m=4
-     * keys=[14, 15, 7, 12, 5, 16, 9, 6, 13, 1, 11, 8, 10, 3, 4, 2]
-     * 
-     * and also
-     * 
-     * keys=[13, 1, 4, 3, 8, 6, 2, 10, 15, 5, 12, 11, 16, 7, 9, 14]
-     * </pre>
-     * 
-     * An error run - lookup after insert does not find a value for that key
-     * <pre>
-     * m=4
-     * keys=[14, 13, 5, 7, 10, 15, 3, 2, 12, 6, 1, 16, 8, 11, 9, 4]
-     * </pre>
      */
     public void doSplitWithRandomKeySequence(int m, int ninserts) {
 
@@ -3087,113 +3131,6 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-    }
-
-    public static class DefaultNodeSplitPolicy implements INodeSplitPolicy {
-
-        public int splitNodeAt(Node node) {
-
-            return node.branchingFactor/2-1;
-            
-        }
-        
-    }
-    
-    public static class DefaultLeafSplitPolicy implements ILeafSplitPolicy {
-
-        public int splitLeafAt(Leaf leaf) {
-            
-            return leaf.branchingFactor/2;
-            
-        }
-        
-    }
-    
-    /**
-     * Visits the {@link Entry}s of a {@link Leaf} in the external key ordering.
-     * There is exactly one entry per key for a leaf node.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo write test suite for {@link AbstractNode#entryIterator()}.
-     */
-    static class EntryIterator implements Iterator<Entry> {
-
-        private final Leaf leaf;
-
-        private int index = 0;
-
-        public EntryIterator(Leaf leaf) {
-
-            assert leaf != null;
-
-            this.leaf = leaf;
-
-        }
-
-        public boolean hasNext() {
-
-            return index < leaf.nkeys;
-
-        }
-
-        public Entry next() {
-
-            if (!hasNext()) {
-
-                throw new NoSuchElementException();
-
-            }
-
-            return leaf.values[index++];
-            
-        }
-
-        public void remove() {
-
-            throw new UnsupportedOperationException();
-
-        }
-
-    }
-
-    /**
-     * An entry in a {@link Leaf}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
-     */
-    public static class Entry implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        private static int nextId = 1;
-        private int id;
-        
-        /**
-         * Create a new entry.
-         */
-        public Entry() {
-            id = nextId++;
-        }
-
-        /**
-         * Copy constructor.
-         * 
-         * @param src
-         *            The source to be copied.
-         */
-        public Entry(Entry src) {
-            id = src.id;
-        }
-
-        public String toString() {
-            return ""+id;
-        }
-        
     }
 
 }

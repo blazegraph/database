@@ -107,7 +107,7 @@ public interface INodeSplitPolicy {
      * In general, you may choose to split on any key and the result is
      * always well-formed (the well-formedness constraint is #of child
      * references >= 1 and #of keys == #of child references - 1, note that
-     * the #of keys MAY be zero).
+     * the #of keys in a node MAY be zero).
      * </p>
      * 
      * @param node
