@@ -42,74 +42,24 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 16, 2006
  */
+
 package com.bigdata.objectIndex;
 
-import java.io.Serializable;
-
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+import com.bigdata.cache.HardReferenceCache;
+import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 /**
- * An entry in a {@link Leaf}.
+ * Interface to handle evictions of leaves from the hard reference queue.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
  */
-public class Entry implements Serializable, IObjectIndexEntry {
+public interface ILeafEvictionListener extends
+        HardReferenceCacheEvictionListener<PO> {
 
-    private static final long serialVersionUID = 1L;
+    public void evicted(HardReferenceCache<PO> cache, PO ref);
 
-    private static int nextId = 1;
-    private int id;
-    
-    /**
-     * Create a new entry.
-     */
-    public Entry() {
-        id = nextId++;
-    }
-
-    /**
-     * Copy constructor.
-     * 
-     * @param src
-     *            The source to be copied.
-     */
-    public Entry(IObjectIndexEntry src) {
-        id = (src instanceof Entry ?((Entry)src).id : nextId++);
-    }
-
-    public String toString() {
-        return ""+id;
-    }
-
-    public ISlotAllocation getCurrentVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public ISlotAllocation getPreExistingVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public short getVersionCounter() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public boolean isDeleted() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public boolean isPreExistingVersionOverwritten() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-    
 }

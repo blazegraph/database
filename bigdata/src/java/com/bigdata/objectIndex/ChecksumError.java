@@ -42,74 +42,26 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 5, 2006
  */
+
 package com.bigdata.objectIndex;
 
-import java.io.Serializable;
-
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
 /**
- * An entry in a {@link Leaf}.
+ * Exception thrown when the checksum field on a node or leaf does not match
+ * the checksum computed for the buffer from which the node or leaf is being
+ * read. This is a serious error and indicates bad logic and/or corrupt
+ * data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
  */
-public class Entry implements Serializable, IObjectIndexEntry {
-
-    private static final long serialVersionUID = 1L;
-
-    private static int nextId = 1;
-    private int id;
+public class ChecksumError extends RuntimeException {
     
-    /**
-     * Create a new entry.
-     */
-    public Entry() {
-        id = nextId++;
-    }
+    private static final long serialVersionUID = -9067118459184074756L;
 
-    /**
-     * Copy constructor.
-     * 
-     * @param src
-     *            The source to be copied.
-     */
-    public Entry(IObjectIndexEntry src) {
-        id = (src instanceof Entry ?((Entry)src).id : nextId++);
-    }
-
-    public String toString() {
-        return ""+id;
-    }
-
-    public ISlotAllocation getCurrentVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public ISlotAllocation getPreExistingVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public short getVersionCounter() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public boolean isDeleted() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public boolean isPreExistingVersionOverwritten() {
-        // TODO Auto-generated method stub
-        return false;
+    public ChecksumError(String msg) {
+        super( msg );
     }
     
 }

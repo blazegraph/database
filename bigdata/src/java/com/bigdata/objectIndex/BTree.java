@@ -1,3 +1,49 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Nov 15, 2006
+ */
 package com.bigdata.objectIndex;
 
 import java.io.PrintStream;
@@ -9,6 +55,8 @@ import java.util.Set;
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+import com.bigdata.objectIndex.TestSimpleBTree.IStore;
 import com.bigdata.objectIndex.TestSimpleBTree.LeafEvictionListener;
 import com.bigdata.objectIndex.TestSimpleBTree.PO;
 import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
@@ -44,16 +92,21 @@ public class BTree {
      * The minimum allowed branching factor (3).
      */
     static public final int MIN_BRANCHING_FACTOR = 3;
+    
+    /**
+     * The size of the hard reference queue used to defer leaf eviction.
+     */
+    static public final int DEFAULT_LEAF_CACHE_CAPACITY = 1000;
 
     /**
      * The persistence store.
      */
-    final protected SimpleStore<Integer, PO> store;
+    final protected IStore<Long, PO> store;
 
     /**
      * The branching factor for the btree.
      */
-    final protected int branchingFactor;
+    protected int branchingFactor;
 
     final public INodeSplitPolicy nodeSplitter = new DefaultNodeSplitPolicy();
 
@@ -93,7 +146,7 @@ public class BTree {
     /**
      * Writes dirty leaves onto the {@link #store} as they are evicted.
      */
-    final LeafEvictionListener<Integer, PO> listener;
+    final ILeafEvictionListener listener;
 
     /**
      * The root of the btree. This is initially a leaf until the leaf is
@@ -143,7 +196,7 @@ public class BTree {
      * @param branchingFactor
      *            The branching factor.
      */
-    public BTree(SimpleStore<Integer, PO> store, int branchingFactor) {
+    public BTree(IStore<Long, PO> store, int branchingFactor) {
 
         assert store != null;
 
@@ -153,9 +206,9 @@ public class BTree {
 
         this.branchingFactor = branchingFactor;
 
-        listener = new LeafEvictionListener<Integer, PO>(store);
+        listener = new LeafEvictionListener();
 
-        leaves = new HardReferenceCache<PO>(listener, 1000);
+        leaves = new HardReferenceCache<PO>(listener, DEFAULT_LEAF_CACHE_CAPACITY);
 
         this.root = new Leaf(this);
 
@@ -174,24 +227,12 @@ public class BTree {
      * 
      * @param store
      *            The persistence store.
-     * @param branchingFactor
-     *            The branching factor.
      * @param metadataId
      *            The persistent identifier of btree metadata.
-     * 
-     * @todo move the branching factor into the metadata record, but this
-     *       will remove the distinction between the btree constructors.
-     *       also, i would like to support different branching factors at
-     *       different levels, especially for the leaves.  if leaves can
-     *       have different #of values, then that can help quite a bit to
-     *       keep the tree dense.
      */
-    public BTree(SimpleStore<Integer, PO> store, int branchingFactor,
-            int metadataId) {
+    public BTree(IStore<Long, PO> store, long metadataId) {
 
         assert store != null;
-
-        assert branchingFactor > MIN_BRANCHING_FACTOR;
 
         assert height >= 0;
 
@@ -203,14 +244,12 @@ public class BTree {
 
         this.store = store;
 
-        this.branchingFactor = branchingFactor;
+        listener = new LeafEvictionListener();
 
-        listener = new LeafEvictionListener<Integer, PO>(store);
-
-        leaves = new HardReferenceCache<PO>(listener, 1000);
+        leaves = new HardReferenceCache<PO>(listener, DEFAULT_LEAF_CACHE_CAPACITY );
 
         // read the btree metadata record.
-        final int rootId = read(metadataId);
+        final long rootId = read(metadataId);
 
         /*
          * Read the root node of the btree.
@@ -242,7 +281,7 @@ public class BTree {
      * 
      * @return The entry or null if there is no entry for that key.
      */
-    public Entry lookup(int key) {
+    public IObjectIndexEntry lookup(int key) {
 
         return root.lookup(key);
 
@@ -257,7 +296,7 @@ public class BTree {
      * @return The entry stored under that key and null if there was no
      *         entry for that key.
      */
-    public Entry remove(int key) {
+    public IObjectIndexEntry remove(int key) {
 
         return root.remove(key);
 
@@ -329,13 +368,14 @@ public class BTree {
      * 
      * @return The persistent identifier for the metadata.
      */
-    int write() {
+    long write() {
 
-        int rootId = root.getIdentity();
+        long rootId = root.getIdentity();
 
         ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
 
-        buf.putInt(rootId);
+        buf.putLong(rootId);
+        buf.putInt(branchingFactor);
         buf.putInt(height);
         buf.putInt(nnodes);
         buf.putInt(nleaves);
@@ -355,12 +395,14 @@ public class BTree {
      *            
      * @return The persistent identifier of the root of the btree.
      */
-    int read(int metadataId) {
+    long read(long metadataId) {
 
         ByteBuffer buf = ByteBuffer.wrap(store._read(metadataId));
 
-        final int rootId = buf.getInt();
+        final long rootId = buf.getLong();
         System.err.println("rootId=" + rootId);
+        branchingFactor = buf.getInt();
+        assert branchingFactor >= MIN_BRANCHING_FACTOR;
         height = buf.getInt();
         assert height >= 0;
         nnodes = buf.getInt();
@@ -379,7 +421,8 @@ public class BTree {
      * 
      * @see #write(int)
      */
-    public static final int SIZEOF_METADATA = Bytes.SIZEOF_INT * 5;
+    public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
+            + Bytes.SIZEOF_INT * 5;
 
     /**
      * Commit dirty nodes using a post-order traversal that first writes any
@@ -389,7 +432,7 @@ public class BTree {
      * 
      * @return The persistent identity of the metadata record for the btree.
      */
-    public int commit() {
+    public long commit() {
 
         if (!root.isDirty()) {
 

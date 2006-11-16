@@ -1,3 +1,49 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Nov 15, 2006
+ */
 package com.bigdata.objectIndex;
 
 import java.io.IOException;
@@ -10,6 +56,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -18,7 +65,7 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
- * A non-leaf.
+ * A non-leaf node.
  * </p>
  * <p>
  * A non-leaf node with <code>m</code> children has <code>m-1</code>
@@ -69,7 +116,7 @@ public class Node extends AbstractNode {
      * external {@link #keys} array.
      * </p>
      */
-    protected int[] childKeys;
+    long[] childKeys;
 
     /**
      * Extends the super class implementation to add the node to a hard
@@ -86,9 +133,28 @@ public class Node extends AbstractNode {
 
     /**
      * De-serialization constructor.
+     * 
+     * @deprecated Not required when using {@link NodeSerializer}.
      */
     public Node() {
 
+    }
+
+    /**
+     * De-serialization constructor.
+     */
+    Node(BTree btree, long id, int nkeys, int[] keys, long[] childKeys) {
+
+        this( btree );
+
+        setIdentity(id);
+
+        this.nkeys = nkeys;
+        
+        System.arraycopy(keys, 0, this.keys, 0, nkeys);
+        
+        System.arraycopy(childKeys, 0, this.childKeys, 0, nkeys+1);
+        
     }
 
     /**
@@ -104,7 +170,7 @@ public class Node extends AbstractNode {
 
         childRefs = new WeakReference[branchingFactor];
 
-        childKeys = new int[branchingFactor];
+        childKeys = new long[branchingFactor];
 
     }
 
@@ -140,7 +206,7 @@ public class Node extends AbstractNode {
 
         childRefs = new WeakReference[branchingFactor];
 
-        childKeys = new int[branchingFactor];
+        childKeys = new long[branchingFactor];
 
         /*
          * Replace the root node on the tree.
@@ -199,7 +265,7 @@ public class Node extends AbstractNode {
 
         childRefs = new WeakReference[branchingFactor];
 
-        childKeys = new int[branchingFactor];
+        childKeys = new long[branchingFactor];
 
         // Copy keys.
         for (int i = 0; i < nkeys; i++) {
@@ -296,7 +362,7 @@ public class Node extends AbstractNode {
      * @param newChild
      *            The reference to the new child.
      */
-    void replaceChildRef(int oldChildKey, AbstractNode newChild) {
+    void replaceChildRef(long oldChildKey, AbstractNode newChild) {
 
         assert oldChildKey != NULL;
         assert newChild != null;
@@ -377,7 +443,7 @@ public class Node extends AbstractNode {
 
     }
 
-    public Entry lookup(int key) {
+    public IObjectIndexEntry lookup(int key) {
 
         int index = findChild(key);
 
@@ -396,7 +462,7 @@ public class Node extends AbstractNode {
      * @return The value stored under that key or null if the key was not
      *         found.
      */
-    public Entry remove(int key) {
+    public IObjectIndexEntry remove(int key) {
 
         int index = findChild(key);
 
@@ -607,7 +673,7 @@ public class Node extends AbstractNode {
         /* 
          * Clear the key that is being move into the parent.
          */
-        keys[splitIndex] = NULL;
+        keys[splitIndex] = NEGINF;
         
         nkeys--;
         
@@ -776,7 +842,7 @@ public class Node extends AbstractNode {
 
         if (child == null) {
 
-            int key = childKeys[index];
+            long key = childKeys[index];
 
             assert key != NULL;
 
@@ -1240,9 +1306,9 @@ public class Node extends AbstractNode {
         }
         // Note: nchildren == nkeys+1.
         for (int i = 0; i <= nkeys; i++) {
-            int childKey = childKeys[i];
+            long childKey = childKeys[i];
             assert childKey != NULL;
-            out.writeInt(childKey);
+            out.writeLong(childKey);
         }
     }
 
@@ -1255,15 +1321,15 @@ public class Node extends AbstractNode {
         keys = new int[branchingFactor - 1];
         dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
         childRefs = new WeakReference[branchingFactor];
-        childKeys = new int[branchingFactor];
+        childKeys = new long[branchingFactor];
         for (int i = 0; i < nkeys; i++) {
-            int key = in.readInt();
+            int key = in.read();
             assert key > NEGINF && key < POSINF;
             keys[i] = key;
         }
         // Note: nchildren == nkeys+1.
         for (int i = 0; i <= nkeys; i++) {
-            int childKey = in.readInt();
+            long childKey = in.readLong();
             assert childKey != NULL;
             childKeys[i] = childKey;
         }

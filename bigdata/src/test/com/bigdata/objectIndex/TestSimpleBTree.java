@@ -62,8 +62,7 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
-
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
  * <p>
@@ -384,7 +383,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf01() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int branchingFactor = 20;
         
@@ -451,7 +450,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf02() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int branchingFactor = 20;
         
@@ -516,7 +515,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf03() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int branchingFactor = 20;
         
@@ -572,7 +571,7 @@ public class TestSimpleBTree extends TestCase2 {
                     value, root.lookup(key));
             
             // verify the values iterator
-            Entry[] tmp = new Entry[root.nkeys];
+            IObjectIndexEntry[] tmp = new IObjectIndexEntry[root.nkeys];
             for( int j=0; j<root.nkeys; j++ ) {
                 tmp[j] = root.values[j];
             }
@@ -603,7 +602,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_low01() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -719,7 +718,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_low02() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -834,7 +833,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_low03() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -950,7 +949,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_high01() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -1066,7 +1065,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_high02() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -1288,7 +1287,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf01_even() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int m = 4;
 
@@ -1690,7 +1689,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithIncreasingKeySequence(int m,int ninserts) {
         
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         BTree btree = new BTree(store, m);
 
@@ -1814,7 +1813,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithDecreasingKeySequence(int m, int ninserts) {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         BTree btree = new BTree(store, m);
 
@@ -2121,7 +2120,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         try {
             
-            SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+            SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
             BTree btree = new BTree(store, m);
 
@@ -2265,7 +2264,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithRandomKeySequence(int m, int ninserts) {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         BTree btree = new BTree(store, m);
 
@@ -2379,12 +2378,12 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_commit01() {
 
-        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
+        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
 
         final int branchingFactor = 4;
         
-        final int metadataId;
-        final int rootId;
+        final long metadataId;
+        final long rootId;
         {
 
             BTree btree = new BTree(store, branchingFactor);
@@ -2405,11 +2404,11 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
         
-        final int metadata2;
+        final long metadata2;
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, branchingFactor, metadataId);
+            BTree btree = new BTree(store, metadataId);
 
             // verify rootId.
             assertEquals(rootId,btree.root.getIdentity());
@@ -2431,7 +2430,7 @@ public class TestSimpleBTree extends TestCase2 {
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = new BTree(store, branchingFactor, metadataId);
+            BTree btree = new BTree(store, metadataId);
 
             // verify rootId.
             assertEquals(rootId,btree.root.getIdentity());
@@ -2799,6 +2798,35 @@ public class TestSimpleBTree extends TestCase2 {
 //    }
     
     /**
+     * Persistence store interface for the {@link BTree}.
+     * 
+     * FIXME Refactor serialization until we can use either the journal or the
+     * simple store to test the btree. Also refactor Entry to a generic type to
+     * simplify btree testing without object index semantics (but not the key
+     * type, which is int[] and hence can not be made generic). Make the store
+     * key type a primitive in keeping with the journal, refactor the simple
+     * store for testing without the journal or just drop altogether?  Reconcile
+     * the use of the PO class.
+     */
+    public static interface IStore<K,T> {
+
+        public byte[] _read(K key);
+
+        public T read(K key);
+        
+        public K _insert(byte[] bytes);
+
+        public K insert(T value);
+        
+        /**
+         * @todo The object must also be marked as invalid.  Since we only
+         * pass in the key, the caller has to take care of that.
+         */
+        public void delete(K key);
+
+    }
+    
+    /**
      * Persistence store.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -2806,12 +2834,12 @@ public class TestSimpleBTree extends TestCase2 {
      * @param <K>
      * @param <T>
      */
-    public static class SimpleStore<K, T extends PO> {
+    public static class SimpleStore<K, T extends PO> implements IStore<K,T> {
 
         /**
          * Key factory.
          */
-        private int nextKey = 1;
+        private long nextKey = 1L;
 
         /**
          * "Persistence store" - access to objects by the key.
@@ -2854,7 +2882,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        public K nextId() {
+        private K nextId() {
 
             /*
              * Note: The use of generics breaks down here since we need a
@@ -2863,7 +2891,7 @@ public class TestSimpleBTree extends TestCase2 {
              * This can not be defined "generically", but it rather data type
              * and store semantics specific.
              */
-            K key = (K) new Integer(nextKey++);
+            K key = (K) new Long(nextKey++);
 
             return key;
 
@@ -2889,10 +2917,12 @@ public class TestSimpleBTree extends TestCase2 {
 
             T value = deserialize(bytes);
 
-            // Note: breaks generic isolation.
-            value.setIdentity(((Integer) key).intValue()); // set the key - no
-                                                            // back references
-                                                            // exist yet.
+            /*
+             * set the key - no back references exist yet.
+             * 
+             * Note: breaks generic isolation.
+             */
+            value.setIdentity(((Long) key).longValue());
 
             value.setDirty(false); // just read from the store.
 
@@ -2941,7 +2971,7 @@ public class TestSimpleBTree extends TestCase2 {
              * 
              * Note: breaks generic isolation.
              */
-            value.setIdentity(((Integer) key).intValue());
+            value.setIdentity(((Long) key).longValue());
 
             // just wrote on the store.
             value.setDirty(false);
@@ -2967,23 +2997,10 @@ public class TestSimpleBTree extends TestCase2 {
      * @param <T>
      *            The value type.
      */
-    public static class LeafEvictionListener<K, T extends PO> implements
-            HardReferenceCacheEvictionListener<T> {
+    public static class LeafEvictionListener implements
+            ILeafEvictionListener {
 
-        /**
-         * Persistence store.
-         */
-        private final SimpleStore<K, T> store;
-
-        public LeafEvictionListener(SimpleStore<K, T> store) {
-
-            assert store != null;
-
-            this.store = store;
-
-        }
-
-        public void evicted(HardReferenceCache<T> cache, T ref) {
+        public void evicted(HardReferenceCache<PO> cache, PO ref) {
 
             assert ref instanceof Leaf;
             
@@ -3009,7 +3026,7 @@ public class TestSimpleBTree extends TestCase2 {
         /**
          * Null reference for the store (zero).
          */
-        public final int NULL = 0;
+        public final long NULL = 0L;
 
         /**
          * The persistent identity.
@@ -3017,7 +3034,7 @@ public class TestSimpleBTree extends TestCase2 {
          * @exception IllegalStateException
          *                if the object is not persistent.
          */
-        public int getIdentity() throws IllegalStateException;
+        public long getIdentity() throws IllegalStateException;
 
         /**
          * True iff the object is persistent.
@@ -3054,7 +3071,7 @@ public class TestSimpleBTree extends TestCase2 {
          * The persistent identity (defined when the object is actually
          * persisted).
          */
-        transient private int key = NULL;
+        transient private long key = NULL;
 
         public boolean isPersistent() {
 
@@ -3062,7 +3079,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        public int getIdentity() throws IllegalStateException {
+        public long getIdentity() throws IllegalStateException {
 
             if (key == NULL)
                 throw new IllegalStateException();
@@ -3082,7 +3099,7 @@ public class TestSimpleBTree extends TestCase2 {
          * @throws IllegalStateException
          *             If the key is already defined.
          */
-        void setIdentity(int key) throws IllegalStateException {
+        void setIdentity(long key) throws IllegalStateException {
 
             if (key == NULL)
                 throw new IllegalArgumentException();

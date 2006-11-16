@@ -44,12 +44,15 @@ public class TestAll extends TestCase {
         // @todo test journal abort semantics for index.
         // @todo test journal restart semantics w/o shutdown.
         // @todo stress test (correctness).
-        
-//        suite.addTestSuite( TestChecksumUtility.class );
-//        suite.addTestSuite( TestNodeSerializer.class );
+
+        // test utility classes.
         suite.addTestSuite( TestSearch.class );
+        suite.addTestSuite( TestChecksumUtility.class );
+        // test basic tree operations.
         suite.addTestSuite( TestSimpleBTree.class );
-               
+        // test serialization
+        suite.addTestSuite( TestNodeSerializer.class );
+        // @todo test persistence (after testing serialization).
         return suite;
         
     }

@@ -366,7 +366,7 @@ import java.util.Properties;
  * when a row is an index node is a sufficiently large page.
  */
 
-public class Journal implements IStore {
+public class Journal implements IRawStore, IStore {
 
     // Make package private or just get rid of this : BTree is currently using it.
     public final SlotMath slotMath;

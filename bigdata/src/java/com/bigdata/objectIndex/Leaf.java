@@ -1,12 +1,61 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Nov 15, 2006
+ */
 package com.bigdata.objectIndex;
 
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.PrintStream;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -31,15 +80,51 @@ public class Leaf extends AbstractNode {
     /**
      * The values of the tree.
      */
-    protected Entry[] values;
+    protected IObjectIndexEntry[] values;
 
     /**
      * De-serialization constructor.
+     * 
+     * @deprecated This is not required when using the {@link NodeSerializer}
+     * and all of these clases should no longer implement {@link Serializable}
+     * or {@link Externalizable}
      */
     public Leaf() {
 
     }
 
+    /**
+     * De-serialization constructor.
+     */
+    Leaf(BTree btree, long id, int nkeys, int[] keys, IObjectIndexEntry[] values) {
+        
+        super(btree);
+
+        assert nkeys >=0 && nkeys< branchingFactor;
+        
+        assert keys != null;
+        
+        assert keys.length == branchingFactor;
+        
+        assert values != null;
+
+        assert values.length == branchingFactor;
+        
+        setIdentity(id);
+
+        this.nkeys = nkeys;
+        
+        this.keys = keys;
+        
+        this.values = values;
+
+        // Add to the hard reference queue.
+        btree.leaves.append(this);
+        
+
+    }
+
+    
     public Leaf(BTree btree) {
 
         super(btree);
@@ -175,7 +260,7 @@ public class Leaf extends AbstractNode {
 
     }
 
-    public Entry lookup(int key) {
+    public IObjectIndexEntry lookup(int key) {
 
         int index = Search.search(key, keys, nkeys);
 
@@ -376,7 +461,7 @@ public class Leaf extends AbstractNode {
      * @todo Write unit tests for maintaining the tree in balance as entries
      *       are removed.
      */
-    public Entry remove(int key) {
+    public IObjectIndexEntry remove(int key) {
 
         assert key > NEGINF && key < POSINF;
 
@@ -406,7 +491,7 @@ public class Leaf extends AbstractNode {
         }
 
         // The value that is being removed.
-        Entry entry = values[index];
+        IObjectIndexEntry entry = values[index];
 
         /*
          * Copy over the hole created when the key and value were removed

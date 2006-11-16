@@ -44,7 +44,7 @@ Modifications:
 /*
  * Created on Nov 5, 2006
  */
-package com.bigdata.objndx;
+package com.bigdata.objectIndex;
 
 import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
@@ -65,6 +65,9 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME nkeys semantics differ from first semantics.  The serializes need to be
+ * updated to reflect that difference.
  * 
  * FIXME Is there really any reason to have fixed size serialization? The key
  * impact seems to be the size of the non-leaf nodes (since they would require
@@ -99,6 +102,10 @@ class NodeSerializer {
 
     /**
      * The #of keys per node (aka branching factor).
+     * 
+     * @todo consider serializing this with each node and leave so that the
+     *       serialized nodes may be more dense and so that nodes and leaves may
+     *       vary their capacity.
      */
     final int pageSize;
 
@@ -111,7 +118,11 @@ class NodeSerializer {
 
     static final int SIZEOF_IS_LEAF = Bytes.SIZEOF_BYTE;
 
-    static final int SIZEOF_FIRST = Bytes.SIZEOF_SHORT;
+    /**
+     * #of keys in the node.  The #of children for a {@link Node} is nkeys + 1.
+     * The #of values for a leave is equal to the #of keys.
+     */
+    static final int SIZEOF_NKEYS = Bytes.SIZEOF_SHORT;
 
     /**
      * Size of a node or leaf reference. The value must be interpreted per
@@ -170,9 +181,15 @@ class NodeSerializer {
 
     /**
      * Offset of the short integer whose value is the non-negative index of
-     * the first valid key in this node.
+     * the #of keys in this node.
      */
-    static final int OFFSET_FIRST = OFFSET_IS_LEAF + SIZEOF_IS_LEAF;
+    static final int OFFSET_NKEYS = OFFSET_IS_LEAF + SIZEOF_IS_LEAF;
+
+    /**
+     * Offset of the short integer whose value is the non-negative index of
+     * branching factor for this node.
+     */
+    static final int OFFSET_ORDER = OFFSET_NKEYS+ SIZEOF_NKEYS;
 
     /*
      * @todo This is a possible location for a parent node reference. We might
@@ -191,7 +208,7 @@ class NodeSerializer {
      * @see Node#NEGINF_KEY
      * @see Node#POSINF_KEY
      */
-    static final int OFFSET_KEYS = OFFSET_FIRST + SIZEOF_FIRST;
+    static final int OFFSET_KEYS = OFFSET_ORDER + SIZEOF_NKEYS;
 
     /**
      * Offset to first value within the buffer for a non-leaf node. The
@@ -213,11 +230,11 @@ class NodeSerializer {
      */
     final int OFFSET_LEAF_VALUES;
 
-    /** Offset of the reference to prior leaf (iff leaf). */
-    final int OFFSET_LEAF_PRIOR;
-
-    /** Offset of the reference to prior leaf (iff leaf). */
-    final int OFFSET_LEAF_NEXT;
+//    /** Offset of the reference to prior leaf (iff leaf). */
+//    final int OFFSET_LEAF_PRIOR;
+//
+//    /** Offset of the reference to prior leaf (iff leaf). */
+//    final int OFFSET_LEAF_NEXT;
 
     /** total non-leaf node size. */
     final int NODE_SIZE;
@@ -264,10 +281,11 @@ class NodeSerializer {
         NODE_SIZE = OFFSET_NODE_VALUES + (SIZEOF_NODE_VALUE * pageSize);
 
         OFFSET_LEAF_VALUES = OFFSET_KEYS + (SIZEOF_KEY * pageSize);
-        OFFSET_LEAF_PRIOR = OFFSET_LEAF_VALUES
-                + (SIZEOF_LEAF_VALUE * pageSize);
-        OFFSET_LEAF_NEXT = OFFSET_LEAF_PRIOR + SIZEOF_REF;
-        LEAF_SIZE = OFFSET_LEAF_NEXT + SIZEOF_REF;
+//        OFFSET_LEAF_PRIOR = OFFSET_LEAF_VALUES
+//                + (SIZEOF_LEAF_VALUE * pageSize);
+//        OFFSET_LEAF_NEXT = OFFSET_LEAF_PRIOR + SIZEOF_REF;
+//        LEAF_SIZE = OFFSET_LEAF_NEXT + SIZEOF_REF;
+        LEAF_SIZE = OFFSET_LEAF_VALUES + (SIZEOF_LEAF_VALUE * pageSize);
 
         slotsPerNode = slotMath.getSlotCount(NODE_SIZE);
         slotsPerLeaf = slotMath.getSlotCount(LEAF_SIZE);
@@ -289,7 +307,7 @@ class NodeSerializer {
      *            
      * @return The de-serialized node.
      */
-    Node getNodeOrLeaf( ObjectIndex ndx, long recid, ByteBuffer buf) {
+    AbstractNode getNodeOrLeaf( ObjectIndex ndx, long recid, ByteBuffer buf) {
 
 //        assert ndx != null; // @todo enable this assertion.
         assert recid != 0L;
@@ -335,10 +353,9 @@ class NodeSerializer {
 
         assert buf != null;
         assert node != null;
-        assert !node._isLeaf;
-        assert node._first >= 0 && node._first < pageSize;
+        assert node.nkeys >= 0 && node.nkeys < pageSize;
         assert buf.remaining() == NODE_SIZE;
-
+        
         /*
          * common data.
          */
@@ -348,19 +365,18 @@ class NodeSerializer {
         buf.putInt(0); // will overwrite below with the checksum.
         // isLeaf
         buf.put((byte) 0); // this is a non-leaf node.
-        // first
-        buf.putShort((short) node._first);
+        // #of keys
+        buf.putShort((short) node.nkeys);
         // keys.
-        for (int i = 0; i < pageSize; i++) {
-            Integer key = (node._keys == null ? null : node._keys[i]);
-            buf.putInt(key == null ? 0 : key.intValue());
+        for (int i = 0; i < node.branchingFactor-1; i++) {
+            buf.putInt(node.keys[i]);
         }
         /*
          * non-leaf node specific data.
          */
         // values.
-        for (int i = 0; i < pageSize; i++) {
-            long val = (node._children == null ? 0L : node._children[i]);
+        for (int i = 0; i < node.branchingFactor; i++) {
+            long val = node.childKeys[i];
             putNodeRef(buf, val);
         }
         
@@ -412,8 +428,8 @@ class NodeSerializer {
         // isLeaf
         assert buf.get() == 0; // expecting a non-leaf node.
         
-        // first
-        final int first = buf.getShort();
+        // nkeys
+        final int nkeys = buf.getShort();
 
         // keys & values.
         
@@ -421,7 +437,7 @@ class NodeSerializer {
         
         long[] children = null;
         
-        if (first == pageSize-1) {
+        if (nkeys == pageSize-1) {
             
             /*
              * If there are no keys or values then there is nothing more to
@@ -433,19 +449,19 @@ class NodeSerializer {
         } else {
 
             // Skip over undefined keys.
-            buf.position(pos0+OFFSET_KEYS+first*SIZEOF_KEY);
+            buf.position(pos0+OFFSET_KEYS+nkeys*SIZEOF_KEY);
 
             keys = new int[pageSize];
             
-            int lastKey = Node.NEGINF_KEY;
+            int lastKey = Node.NEGINF;
             
-            for (int i = first; i < pageSize; i++) {
+            for (int i = nkeys; i < pageSize; i++) {
                 
                 int key = buf.getInt();
                 
                 assert key > lastKey; // verify keys are in ascending order.
                 
-                assert key < Node.POSINF_KEY; // verify keys in legal range.
+                assert key < Node.POSINF; // verify keys in legal range.
                 
                 keys[i] = lastKey = key;
                 
@@ -456,11 +472,11 @@ class NodeSerializer {
              */
 
             // Skip over undefined values.
-            buf.position(pos0+OFFSET_NODE_VALUES+first*SIZEOF_NODE_VALUE);
+            buf.position(pos0+OFFSET_NODE_VALUES+nkeys*SIZEOF_NODE_VALUE);
 
             children = new long[pageSize];
             
-            for (int i = first; i < pageSize; i++) {
+            for (int i = nkeys; i < pageSize; i++) {
                 
                 children[i] = getNodeRef(buf);
                 
@@ -471,7 +487,7 @@ class NodeSerializer {
         assert buf.position() == buf.limit();
 
         // Done.
-        return new Node(ndx, recid, pageSize, first, keys, children);
+        return new Node((BTree)ndx, recid, nkeys, keys, children);
 
     }
 
@@ -487,12 +503,11 @@ class NodeSerializer {
      * @param node
      *            The node. Must be a leaf node.
      */
-    void putLeaf(ByteBuffer buf, Node node) {
+    void putLeaf(ByteBuffer buf, Leaf node) {
 
         assert buf != null;
         assert node != null;
-        assert node._isLeaf;
-        assert node._first >= 0 && node._first < pageSize;
+        assert node.nkeys >= 0 && node.nkeys < pageSize;
         assert buf.remaining() == LEAF_SIZE;
 
         /*
@@ -505,18 +520,16 @@ class NodeSerializer {
         // isLeaf
         buf.put((byte) 1); // this is a leaf node.
         // first
-        buf.putShort((short) node._first);
+        buf.putShort((short) node.nkeys);
         // keys.
-        for (int i = 0; i < pageSize; i++) {
-            Integer key = (node._keys == null ? null : node._keys[i]);
-            buf.putInt(key == null ? 0 : key.intValue());
+        for (int i = 0; i < pageSize-1; i++) {
+            buf.putInt(node.keys[i]);
         }
         /*
          * leaf-node specific data.
          */
         for (int i = 0; i < pageSize; i++) { // write values[].
-            IObjectIndexEntry entry = (node._values == null ? null
-                    : (IObjectIndexEntry) node._values[i]);
+            IObjectIndexEntry entry = node.values[i];
             if (entry == null) {
                 buf.putShort((short) 0);
                 buf.putLong(0);
@@ -533,8 +546,8 @@ class NodeSerializer {
                         : preExistingVersionSlots.toLong()));
             }
         }
-        putNodeRef(buf, node._previous);
-        putNodeRef(buf, node._next);
+//        putNodeRef(buf, node._previous);
+//        putNodeRef(buf, node._next);
 
         assert buf.position() == buf.limit();
 
@@ -549,7 +562,7 @@ class NodeSerializer {
 
     }
 
-    Node getLeaf(ObjectIndex ndx,long recid,ByteBuffer buf) {
+    Leaf getLeaf(ObjectIndex ndx,long recid,ByteBuffer buf) {
         
 //        assert ndx != null; // @todo enable this assertion.
         assert recid != 0L;
@@ -573,11 +586,13 @@ class NodeSerializer {
             throw new ChecksumError("Invalid checksum: read " + readChecksum
                     + ", but computed " + computedChecksum);
         }
+        
         // isLeaf
         assert buf.get() == 1; // expecting a leaf node.
-        // first
-        final int first = buf.getShort();
 
+        // nkeys
+        final int nkeys = buf.getShort();
+        
         /*
          * keys and values.
          */
@@ -586,14 +601,14 @@ class NodeSerializer {
         
         IndexEntry[] values = null;
         
-        if (first == pageSize-1) {
+        if (nkeys == pageSize-1) {
         
             /*
              * If there are no keys or values then there is nothing more to
              * read.
              */
             
-            buf.position(pos0 + OFFSET_LEAF_PRIOR);
+            buf.position(pos0 + LEAF_SIZE);
             
         } else {
             
@@ -602,19 +617,19 @@ class NodeSerializer {
              */
 
             // Skip over undefined keys.
-            buf.position(pos0+OFFSET_KEYS+first*SIZEOF_KEY);
+            buf.position(pos0+OFFSET_KEYS+nkeys*SIZEOF_KEY);
 
             keys = new int[pageSize];
             
-            int lastKey = Node.NEGINF_KEY;
+            int lastKey = Node.NEGINF;
             
-            for (int i = first; i < pageSize; i++) {
+            for (int i = nkeys; i < pageSize; i++) {
                 
                 int key = buf.getInt();
                 
                 assert key > lastKey; // verify keys are in ascending order.
                 
-                assert key < Node.POSINF_KEY; // verify keys in legal range.
+                assert key < Node.POSINF; // verify keys in legal range.
                 
                 keys[i] = lastKey = key;
                 
@@ -625,12 +640,12 @@ class NodeSerializer {
              */
 
             // Skip over undefined values.
-            buf.position(pos0+OFFSET_LEAF_VALUES+first*SIZEOF_LEAF_VALUE);
+            buf.position(pos0+OFFSET_LEAF_VALUES+nkeys*SIZEOF_LEAF_VALUE);
 
             // values.
             values = new IndexEntry[pageSize];
             
-            for (int i = first; i < pageSize; i++) {
+            for (int i = nkeys; i < pageSize; i++) {
             
                 final short versionCounter = buf.getShort();
                 
@@ -644,15 +659,15 @@ class NodeSerializer {
             }
         }
 
-        final long previous = getNodeRef(buf);
-        
-        final long next = getNodeRef(buf);
+//        final long previous = getNodeRef(buf);
+//        
+//        final long next = getNodeRef(buf);
 
         assert buf.position() == buf.limit();
         
         // Done.
-        return new Node(ndx, recid, pageSize, first, keys, values,
-                previous, next);
+        return new Leaf((BTree)ndx, recid, nkeys, keys, values);
+//                previous, next);
 
     }
 
@@ -737,25 +752,6 @@ class NodeSerializer {
         }
         
         return longValue;
-        
-    }
-
-    /**
-     * Exception thrown when the checksum field on a node or leaf does not match
-     * the checksum computed for the buffer from which the node or leaf is being
-     * read. This is a serious error and indicates bad logic and/or corrupt
-     * data.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ChecksumError extends RuntimeException {
-        
-        private static final long serialVersionUID = -9067118459184074756L;
-
-        public ChecksumError(String msg) {
-            super( msg );
-        }
         
     }
 }

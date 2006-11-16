@@ -44,7 +44,7 @@ Modifications:
 /*
  * Created on Nov 5, 2006
  */
-package com.bigdata.objndx;
+package com.bigdata.objectIndex;
 
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;

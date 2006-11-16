@@ -1,9 +1,56 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Nov 15, 2006
+ */
 package com.bigdata.objectIndex;
 
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -370,7 +417,7 @@ public abstract class AbstractNode extends PO {
      *            The external key.
      * @return The value or null if there was no entry for that key.
      */
-    abstract public Entry remove(int key);
+    abstract public IObjectIndexEntry remove(int key);
 
     /**
      * Recursive search locates the entry for the probe key.
@@ -381,7 +428,7 @@ public abstract class AbstractNode extends PO {
      * @return The entry or <code>null</code> iff there is no entry for
      *         that key.
      */
-    abstract public Entry lookup(int key);
+    abstract public IObjectIndexEntry lookup(int key);
 
     /**
      * Writes the node on the store. The node MUST be dirty. If the node has
@@ -390,7 +437,7 @@ public abstract class AbstractNode extends PO {
      * 
      * @return The persistent identity assigned by the store.
      */
-    int write() {
+    long write() {
 
         assert isDirty();
         assert !isPersistent();
