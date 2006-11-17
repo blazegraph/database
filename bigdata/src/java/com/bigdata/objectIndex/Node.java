@@ -46,9 +46,6 @@ Modifications:
  */
 package com.bigdata.objectIndex;
 
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.util.Arrays;
@@ -87,7 +84,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class Node extends AbstractNode {
 
-    private static final long serialVersionUID = 1L;
+//    private static final long serialVersionUID = 1L;
 
     /**
      * Hard reference cache containing dirty child nodes (nodes or leaves).
@@ -143,18 +140,33 @@ public class Node extends AbstractNode {
     /**
      * De-serialization constructor.
      */
-    Node(BTree btree, long id, int nkeys, int[] keys, long[] childKeys) {
+    Node(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, long[] childKeys) {
 
-        this( btree );
+        super( btree, branchingFactor );
 
+        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+        
+        assert nkeys < branchingFactor;
+
+        assert keys.length == branchingFactor-1;
+
+        assert childKeys.length == branchingFactor;
+        
         setIdentity(id);
 
         this.nkeys = nkeys;
         
-        System.arraycopy(keys, 0, this.keys, 0, nkeys);
+        this.keys = keys;
         
-        System.arraycopy(childKeys, 0, this.childKeys, 0, nkeys+1);
-        
+        this.childKeys = childKeys;
+
+        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+
+        childRefs = new WeakReference[branchingFactor];
+
+        // must clear the dirty since we just de-serialized this node.
+        setDirty(false);
+
     }
 
     /**
@@ -162,7 +174,7 @@ public class Node extends AbstractNode {
      */
     Node(BTree btree) {
 
-        super(btree);
+        super(btree, btree.branchingFactor);
 
         keys = new int[branchingFactor - 1];
 
@@ -192,7 +204,7 @@ public class Node extends AbstractNode {
      */
     Node(BTree btree, AbstractNode oldRoot) {
 
-        super(oldRoot.btree);
+        super(btree, btree.branchingFactor);
 
         // Verify that this is the root.
         assert oldRoot == btree.root;
@@ -848,7 +860,7 @@ public class Node extends AbstractNode {
 
             assert btree != null;
 
-            child = (AbstractNode) btree.store.read(key);
+            child = btree.readNodeOrLeaf( key );
 
             /*
              * Patch btree reference since loaded from store. If the child
@@ -1291,48 +1303,54 @@ public class Node extends AbstractNode {
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
-        if (dirtyChildren.size() > 0) {
-            throw new IllegalStateException("Dirty children exist.");
-        }
-        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-        assert nkeys > 0;
-        out.writeInt(branchingFactor);
-        out.writeInt(nkeys);
-        for (int i = 0; i < nkeys; i++) {
-            int key = keys[i];
-            assert key > NEGINF && key < POSINF;
-            out.writeInt(key);
-        }
-        // Note: nchildren == nkeys+1.
-        for (int i = 0; i <= nkeys; i++) {
-            long childKey = childKeys[i];
-            assert childKey != NULL;
-            out.writeLong(childKey);
-        }
-    }
-
-    public void readExternal(ObjectInput in) throws IOException,
-            ClassNotFoundException {
-        branchingFactor = in.readInt();
-        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-        nkeys = in.readInt();
-        assert nkeys > 0;
-        keys = new int[branchingFactor - 1];
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
-        childRefs = new WeakReference[branchingFactor];
-        childKeys = new long[branchingFactor];
-        for (int i = 0; i < nkeys; i++) {
-            int key = in.read();
-            assert key > NEGINF && key < POSINF;
-            keys[i] = key;
-        }
-        // Note: nchildren == nkeys+1.
-        for (int i = 0; i <= nkeys; i++) {
-            long childKey = in.readLong();
-            assert childKey != NULL;
-            childKeys[i] = childKey;
-        }
-    }
+//    /**
+//     * @deprecated Drop the Externalizable interface for Node and Leaf.
+//     */
+//    public void writeExternal(ObjectOutput out) throws IOException {
+//        if (dirtyChildren.size() > 0) {
+//            throw new IllegalStateException("Dirty children exist.");
+//        }
+//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+//        assert nkeys > 0;
+//        out.writeInt(branchingFactor);
+//        out.writeInt(nkeys);
+//        for (int i = 0; i < nkeys; i++) {
+//            int key = keys[i];
+//            assert key > NEGINF && key < POSINF;
+//            out.writeInt(key);
+//        }
+//        // Note: nchildren == nkeys+1.
+//        for (int i = 0; i <= nkeys; i++) {
+//            long childKey = childKeys[i];
+//            assert childKey != NULL;
+//            out.writeLong(childKey);
+//        }
+//    }
+//
+//    /**
+//     * @deprecated Drop the Externalizable interface for Node and Leaf.
+//     */
+//    public void readExternal(ObjectInput in) throws IOException,
+//            ClassNotFoundException {
+//        branchingFactor = in.readInt();
+//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+//        nkeys = in.readInt();
+//        assert nkeys > 0;
+//        keys = new int[branchingFactor - 1];
+//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+//        childRefs = new WeakReference[branchingFactor];
+//        childKeys = new long[branchingFactor];
+//        for (int i = 0; i < nkeys; i++) {
+//            int key = in.read();
+//            assert key > NEGINF && key < POSINF;
+//            keys[i] = key;
+//        }
+//        // Note: nchildren == nkeys+1.
+//        for (int i = 0; i <= nkeys; i++) {
+//            long childKey = in.readLong();
+//            assert childKey != NULL;
+//            childKeys[i] = childKey;
+//        }
+//    }
 
 }

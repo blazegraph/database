@@ -47,14 +47,8 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
-import java.util.Random;
-
-import junit.framework.TestCase2;
-
-import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.journal.TestSimpleObjectIndex;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
@@ -64,10 +58,8 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractObjectIndexTestCase extends TestCase2 {
+abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase {
 
-    Random r = new Random();
-    
     /**
      * 
      */
@@ -91,12 +83,16 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
      *            bytes encoded into the reference - the reference is only
      *            syntactically valid and MUST NOT be dereferenced).
      */
-    private long nextNodeRef(boolean isLeaf, NodeSerializer nodeSer) {
+    private long nextNodeRef(boolean isLeaf, ObjectIndex ndx, NodeSerializer nodeSer) {
 
+        // random slot on the journal in [1:n-1].
         int firstSlot = r.nextInt(Integer.MAX_VALUE - 1) + 1;
 
-        return SlotMath.toLong(isLeaf ? nodeSer.LEAF_SIZE : nodeSer.NODE_SIZE,
-                firstSlot);
+        // #of bytes in the serialized record.
+        int nbytes = r.nextInt(256)+NodeSerializer.OFFSET_KEYS;
+
+        // convert to an encoded slot allocation.
+        return SlotMath.toLong(nbytes, firstSlot);
 
     }
 
@@ -190,15 +186,15 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
     public Node getRandomNode(ObjectIndex ndx, NodeSerializer nodeSer) {
 
         // #of keys per node.
-        final int pageSize = nodeSer.pageSize;
+        final int branchingFactor = ndx.branchingFactor;
         
-        final long recid = nextNodeRef(false,nodeSer); // ref. for this node.
+        final long id = nextNodeRef(false,ndx,nodeSer); // ref. for this node.
 
-        final int nkeys = r.nextInt(pageSize);
+        final int nkeys = r.nextInt(branchingFactor);
         
-        final int[] keys = new int[pageSize];
+        final int[] keys = new int[branchingFactor-1];
         
-        final long[] children = new long[pageSize];
+        final long[] children = new long[branchingFactor];
         
         // node with some valid keys and corresponding child refs.
 
@@ -209,9 +205,9 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
             // reference is to either a leaf or a non-leaf node.
             boolean isLeaf = r.nextBoolean();
 
-            lastKey = keys[i] = nextKey(pageSize, i, lastKey);
+            lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            children[i] = nextNodeRef(isLeaf, nodeSer);
+            children[i] = nextNodeRef(isLeaf, ndx, nodeSer);
 
         }
 
@@ -219,9 +215,9 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
 
         boolean isLeaf = r.nextBoolean();
         
-        children[nkeys] = nextNodeRef(isLeaf, nodeSer);
+        children[nkeys] = nextNodeRef(isLeaf, ndx, nodeSer);
 
-        return new Node((BTree) ndx, recid, nkeys, keys, children);
+        return new Node((BTree) ndx, id, branchingFactor, nkeys, keys, children);
 
     }
 
@@ -231,15 +227,15 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
     public Leaf getRandomLeaf(ObjectIndex ndx, NodeSerializer nodeSer) {
 
         // #of keys per node.
-        final int pageSize = nodeSer.pageSize;
+        final int branchingFactor = ndx.branchingFactor;
 
-        long recid = nextNodeRef(true, nodeSer); // ref. for this leaf.
+        long id = nextNodeRef(true, ndx, nodeSer); // ref. for this leaf.
 
-        int nkeys = r.nextInt(pageSize);
+        int nkeys = r.nextInt(branchingFactor)+1;
 
-        final int[] keys = new int[pageSize];
+        final int[] keys = new int[branchingFactor];
 
-        final IObjectIndexEntry[] values = new IndexEntry[pageSize];
+        final IObjectIndexEntry[] values = new IndexEntry[branchingFactor];
 
         // node with some valid keys and corresponding child refs.
 
@@ -252,7 +248,7 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
              */
 
             // the key.
-            lastKey = keys[i] = nextKey(pageSize, i, lastKey);
+            lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
             // when true, the entry marks a deleted version.
             boolean isDeleted = r.nextInt(100) < 10;
@@ -287,7 +283,7 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
 //        
 //        long next = hasNext ?nextNodeRef(true,nodeSer) : 0L;
 
-        return new Leaf((BTree)ndx,recid,nkeys,keys,values); //,previous,next);
+        return new Leaf((BTree)ndx,id,branchingFactor, nkeys,keys,values); //,previous,next);
 
     }
 
@@ -308,234 +304,6 @@ abstract public class AbstractObjectIndexTestCase extends TestCase2 {
         
     }
     
-    /**
-     * Compares two nodes (or leaves) for the same data.
-     * 
-     * @param n1
-     *            The expected node state.
-     * @param n2
-     *            The actual node state.
-     */
-    public void assertEquals(Node n1, Node n2 ) {
-
-        assertEquals("index",n1.btree,n2.btree);
-        
-        assertEquals("recid",n1.getIdentity(),n2.getIdentity());
-        
-        assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
-        
-        assertEquals("nkeys",n1.nkeys,n2.nkeys);
-
-        assertEquals("keys",n1.keys,n2.keys);
-        
-        assertEquals("children",n1.childKeys,n2.childKeys);
-        
-    }
-
-    /**
-     * Compares leaves for the same data.
-     * 
-     * @param n1
-     *            The expected leaf state.
-     * @param n2
-     *            The actual leaf state.
-     */
-    public void assertEquals(Leaf n1, Leaf n2 ) {
-
-        assertEquals("index",n1.btree,n2.btree);
-        
-        assertEquals("recid",n1.getIdentity(),n2.getIdentity());
-        
-        assertEquals("pageSize",n1.branchingFactor,n2.branchingFactor);
-        
-        assertEquals("first",n1.nkeys,n2.nkeys);
-
-        assertEquals("keys",n1.keys,n2.keys);
-        
-        assertEquals("values",n1.values,n2.values);
-        
-    }
-
-    /**
-     * Compare an array of {@link IObjectIndexEntry}s for consistent data.
-     * 
-     * @param expected
-     * @param actual
-     */
-    public void assertEquals( IObjectIndexEntry[] expected, IObjectIndexEntry[] actual )
-    {
-        assertEquals( null, expected, actual );
-    }
-
-    /**
-     * Compare an array of {@link IObjectIndexEntry}s for consistent data.
-     * 
-     * @param expected
-     * @param actual
-     */
-    public void assertEquals( String msg, IObjectIndexEntry[] expected, IObjectIndexEntry[] actual )
-    {
-
-        if( msg == null ) {
-            msg = "";
-        } else {
-            msg = msg + " : ";
-        }
-        
-        if( expected == null && actual == null ) {
-            
-            return;
-            
-        }
-        
-        if( expected == null && actual != null ) {
-            
-            fail( msg+"Expected a null array." );
-            
-        }
-        
-        if( expected != null && actual == null ) {
-            
-            fail( msg+"Not expecting a null array." );
-            
-        }
-        
-        assertEquals
-            ( msg+"length differs.",
-              expected.length,
-              actual.length
-              );
-        
-        for( int i=0; i<expected.length; i++ ) {
-            
-            assertEquals
-                ( msg+"values differ: index="+i,
-                  expected[ i ],
-                  actual[ i ]
-                  );
-            
-        }
-        
-    }
-    
-    /**
-     * Test two {@link IObjectIndexEntry entries} for consistent data.
-     * 
-     * @param expected
-     * @param actual
-     * 
-     * @todo Reuse for {@link TestSimpleObjectIndex}
-     */
-    public void assertEquals(IObjectIndexEntry expected,
-            IObjectIndexEntry actual) {
-        
-        assertEquals(null,expected,actual);
-        
-    }
-    
-    /**
-     * Test two {@link IObjectIndexEntry entries} for consistent data.
-     * 
-     * @param expected
-     * @param actual
-     * 
-     * @todo Reuse for {@link TestSimpleObjectIndex}
-     */
-    public void assertEquals(String msg, IObjectIndexEntry expected,
-            IObjectIndexEntry actual) {
-        
-        if( msg == null ) {
-            msg = "";
-        } else {
-            msg = msg + " : ";
-        }
-
-        if( expected == null) {
-            
-            assertNull(actual);
-            
-        } else {
-        
-            assertEquals(msg+"versionCounter", expected.getVersionCounter(), actual
-                    .getVersionCounter());
-
-            assertEquals(msg+"isDeleted", expected.isDeleted(), actual.isDeleted());
-
-            assertEquals(msg+"currentVersion", expected.getCurrentVersionSlots(),
-                    actual.getCurrentVersionSlots());
-
-            assertEquals(msg+"isPreExistingVersionOverwritten", expected
-                    .isPreExistingVersionOverwritten(), actual
-                    .isPreExistingVersionOverwritten());
-
-            assertEquals(msg+"preExistingVersion", expected
-                    .getPreExistingVersionSlots(), actual
-                    .getPreExistingVersionSlots());
-            
-        }
-        
-    }
-    
-    /**
-     * <p>
-     * Verify that the {@link ISlotAllocation}s are consistent.
-     * </p>
-     * 
-     * @param expected
-     *            The expected slot allocation.
-     * @param actual
-     *            The actual slot allocation.
-     */
-    public void assertEquals(ISlotAllocation expected, ISlotAllocation actual) {
-
-        assertEquals(null,expected,actual);
-
-    }
-
-    /**
-     * <p>
-     * Verify that the {@link ISlotAllocation}s are consistent.
-     * </p>
-     * <p>
-     * Note: This test presumes that contiguous allocations are being used.
-     * </p>
-     * 
-     * @param expected
-     *            The expected slot allocation.
-     * @param actual
-     *            The actual slot allocation.
-     */
-    public void assertEquals(String msg, ISlotAllocation expected, ISlotAllocation actual) {
-
-        if( msg == null ) {
-            msg = "";
-        } else {
-            msg = msg + " : ";
-        }
-
-        if( expected == null ) {
-            
-            assertNull(actual);
-            
-        } else {
-
-            if (!(expected instanceof ContiguousSlotAllocation)) {
-                fail("Not expecting: " + expected.getClass());
-            }
-
-            if (!(actual instanceof ContiguousSlotAllocation)) {
-                fail("Not expecting: " + actual.getClass());
-            }
-
-            assertEquals(msg + "firstSlot", expected.firstSlot(), actual
-                    .firstSlot());
-
-            assertEquals(msg + "byteCount", expected.getByteCount(), actual
-                    .getByteCount());
-        }
-
-    }
-
     /**
      * A non-persistence capable implementation of {@link IObjectIndexEntry}
      * used for unit tests.

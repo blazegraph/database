@@ -47,21 +47,13 @@
 
 package com.bigdata.objectIndex;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 
 import junit.framework.AssertionFailedError;
-import junit.framework.TestCase2;
 
-import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
@@ -186,10 +178,8 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSimpleBTree extends TestCase2 {
+public class TestSimpleBTree extends AbstractBTreeTestCase {
 
-    final Random r = new Random();
-    
     /**
      * 
      */
@@ -208,167 +198,6 @@ public class TestSimpleBTree extends TestCase2 {
     /*
      * test helpers.
      */
-
-    /**
-     * <p>
-     * Unit test for the {@link #getRandomKeys(int, int, int)} test helper. The
-     * test verifies fence posts by requiring the randomly generated keys to be
-     * dense in the target array. The test checks for several different kinds of
-     * fence post errors.
-     * </p>
-     * 
-     * <pre>
-     *   nkeys = 6;
-     *   min   = 1; (inclusive)
-     *   max   = min + nkeys = 7; (exclusive)
-     *   indices : [ 0 1 2 3 4 5 ]
-     *   keys    : [ 1 2 3 4 5 6 ]
-     * </pre>
-     */
-    public void test_randomKeys() {
-        
-        /*
-         * Note: You can raise or lower this value to increase the probability
-         * of triggering a fence post error. In practice, I have found that a
-         * fence post was reliably triggered at keys = 6.  After debugging, I
-         * then raised the #of keys to be generated to increase the likelyhood
-         * of triggering a fence post error.
-         */
-        final int nkeys = 20;
-        
-        final int min = 1;
-        
-        final int max = min + nkeys;
-        
-        final int[] keys = getRandomKeys(nkeys,min,max);
-        
-        assertNotNull( keys );
-        
-        assertEquals(nkeys,keys.length);
-        
-        System.err.println("keys  : "+Arrays.toString(keys));
-
-        Arrays.sort(keys);
-        
-        System.err.println("sorted: "+Arrays.toString(keys));
-        
-        // first key is the minimum value (the min is inclusive).
-        assertEquals(min,keys[0]);
-
-        // last key is the maximum minus one (since the max is exclusive).
-        assertEquals(max-1,keys[nkeys-1]);
-        
-        for( int i=0; i<nkeys; i++ ) {
-
-            // verify keys in range.
-            assertTrue( keys[i] >= min );
-            assertTrue( keys[i] < max );
-            
-            if( i > 0 ) {
-                
-                // verify monotonically increasing.
-                assertTrue( keys[i] > keys[i-1]);
-
-                // verify dense.
-                assertEquals( keys[i], keys[i-1]+1);
-                
-            }
-            
-        }
-        
-    }
-    
-    /**
-     * Test helper produces a set of distinct randomly selected external keys.
-     */
-    public int[] getRandomKeys(int nkeys) {
-        
-        return getRandomKeys(nkeys,Node.NEGINF+1,Node.POSINF);
-        
-    }
-    
-    /**
-     * <p>
-     * Test helper produces a set of distinct randomly selected external keys in
-     * the half-open range [fromKey:toKey).
-     * </p>
-     * <p>
-     * Note: An alternative to generating random keys is to generate known keys
-     * and then generate a random permutation of the key order.  This technique
-     * works well when you need to permutate the presentation of keys and values.
-     * See {@link TestCase2#getRandomOrder(int)}.
-     * </p>
-     * 
-     * @param nkeys
-     *            The #of keys to generate.
-     * @param fromKey
-     *            The smallest key value that may be generated (inclusive).
-     * @param toKey
-     *            The largest key value that may be generated (exclusive).
-     */
-    public int[] getRandomKeys(int nkeys,int fromKey,int toKey) {
-    
-        assert nkeys >= 1;
-        
-        assert fromKey > Node.NEGINF;
-        
-        assert toKey <= Node.POSINF;
-        
-        // Must be enough distinct values to populate the key range.
-        if( toKey - fromKey < nkeys ) {
-            
-            throw new IllegalArgumentException(
-                    "Key range too small to populate array" + ": nkeys="
-                            + nkeys + ", fromKey(inclusive)=" + fromKey
-                            + ", toKey(exclusive)=" + toKey);
-            
-        }
-        
-        final int[] keys = new int[nkeys];
-        
-        int n = 0;
-        
-        int tries = 0;
-        
-        while( n<nkeys ) {
-            
-            if( ++tries >= 100000 ) {
-                
-                throw new AssertionError(
-                        "Possible fence post : fromKey(inclusive)=" + fromKey
-                                + ", toKey(exclusive)=" + toKey + ", tries="
-                                + tries + ", n=" + n + ", "
-                                + Arrays.toString(keys));
-                
-            }
-            
-            final int key = r.nextInt(toKey - 1) + fromKey;
-
-            assert key >= fromKey;
-
-            assert key < toKey;
-
-            /*
-             * Note: This does a linear scan of the existing keys. We do NOT use
-             * a binary search since the keys are NOT sorted.
-             */
-            boolean exists = false;
-            for (int i = 0; i < n; i++) {
-                if (keys[i] == key) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (exists) continue;
-
-            // add the key.
-            keys[n++] = key;
-            
-        }
-        
-        return keys;
-        
-    }
     
     /*
      * insert, lookup, and value scan for leaves.
@@ -383,11 +212,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf01() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int branchingFactor = 20;
         
-        BTree btree = new BTree(store, branchingFactor);
+        BTree btree = getNoEvictionBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
         
@@ -450,11 +277,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf02() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int branchingFactor = 20;
         
-        BTree btree = new BTree(store, branchingFactor);
+        BTree btree = getNoEvictionBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
 
@@ -515,11 +340,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_insertIntoLeaf03() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int branchingFactor = 20;
         
-        BTree btree = new BTree(store, branchingFactor);
+        BTree btree = getNoEvictionBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
 
@@ -597,16 +420,12 @@ public class TestSimpleBTree extends TestCase2 {
     /**
      * Test causes the root leaf to be split such that the insert key goes into
      * the first position of the low leaf (the pre-existing roof leaf).
-     * 
-     * @todo the lowest key needs to be 2 not 1 so there is room for this insert.
      */
     public void test_splitRootLeaf_low01() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -718,11 +537,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_low02() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -833,11 +650,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_low03() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -949,11 +764,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_high01() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1065,11 +878,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_high02() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1287,11 +1098,9 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf01_even() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
         final int m = 4;
 
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1656,7 +1465,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_increasingKeySequence() {
 
-        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5};// 6,7,8,20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -1689,9 +1498,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithIncreasingKeySequence(int m,int ninserts) {
         
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1781,7 +1588,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_decreasingKeySequence() {
 
-        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5};// 6,7,8,20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -1813,9 +1620,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithDecreasingKeySequence(int m, int ninserts) {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1902,7 +1707,7 @@ public class TestSimpleBTree extends TestCase2 {
         
         doSplitTest( 5, 0 );
         
-        doSplitTest( 6, 0 );
+//        doSplitTest( 6, 0 );
         
     }
     
@@ -2120,9 +1925,7 @@ public class TestSimpleBTree extends TestCase2 {
 
         try {
             
-            SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
-            BTree btree = new BTree(store, m);
+            BTree btree = getNoEvictionBTree(m);
 
             int lastLeafCount = btree.nleaves;
 
@@ -2233,7 +2036,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void test_splitRootLeaf_randomKeySequence() {
 
-        int[] branchingFactors = new int[]{3,4,5,6};// 20,55,79,256,512,1024,4097};
+        int[] branchingFactors = new int[]{3,4,5};// 6,7,8,20,55,79,256,512,1024,4097};
         
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -2264,9 +2067,7 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public void doSplitWithRandomKeySequence(int m, int ninserts) {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
-        BTree btree = new BTree(store, m);
+        BTree btree = getNoEvictionBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -2368,435 +2169,7 @@ public class TestSimpleBTree extends TestCase2 {
         assertTrue(btree.dump(System.err));
         
     }
-    
-    /*
-     * Tests of commit processing (without triggering copy-on-write).
-     */
-    
-    /**
-     * Test commit of a new tree (the root is a leaf node).
-     */
-    public void test_commit01() {
-
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-
-        final int branchingFactor = 4;
         
-        final long metadataId;
-        final long rootId;
-        {
-
-            BTree btree = new BTree(store, branchingFactor);
-
-            assertTrue(btree.root.isDirty());
-
-            // Commit of tree with dirty root.
-            metadataId = btree.commit();
-
-            assertFalse(btree.root.isDirty());
-
-            rootId = btree.root.getIdentity();
-            
-            assertEquals("height", 0, btree.height);
-            assertEquals("#nodes", 0, btree.nnodes);
-            assertEquals("#leaves", 1, btree.nleaves);
-            assertEquals("#entries", 0, btree.nentries);
-
-        }
-        
-        final long metadata2;
-        {
-
-            // Load the tree.
-            BTree btree = new BTree(store, metadataId);
-
-            // verify rootId.
-            assertEquals(rootId,btree.root.getIdentity());
-
-            assertEquals("height", 0, btree.height);
-            assertEquals("#nodes", 0, btree.nnodes);
-            assertEquals("#leaves", 1, btree.nleaves);
-            assertEquals("#entries", 0, btree.nentries);
-
-            /*
-             * Commit of tree with clean root writes a new metadata record but
-             * does not change the rootId.
-             */
-            metadata2 = btree.commit();
-            assertNotSame( metadataId, metadata2 );
-
-        }
-
-        {   // re-verify.
-
-            // Load the tree.
-            BTree btree = new BTree(store, metadataId);
-
-            // verify rootId.
-            assertEquals(rootId,btree.root.getIdentity());
-
-            assertEquals("height", 0, btree.height);
-            assertEquals("#nodes", 0, btree.nnodes);
-            assertEquals("#leaves", 1, btree.nleaves);
-            assertEquals("#entries", 0, btree.nentries);
-
-        }
-        
-    }
-
-//    /**
-//     * Test commit of a tree with some structure.
-//     * 
-//     * FIXME Re-write commit test to use insert to store keys and drive splits and to verify
-//     * the post-condition structure with both node and entry iterators.
-//     */
-//    public void test_commit02() {
-//
-//        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
-//
-//        final int branchingFactor = 4;
-//        
-//        int metadataId;
-//        int node1Id;
-//        int leaf1Id, leaf2Id, leaf3Id;
-//        {
-//
-//            BTree btree = new BTree(store, branchingFactor);
-//
-//            /*
-//             * Replace the root leaf with a Node. This allows us to write the commit
-//             * test without having to rely on logic to split the root leaf on
-//             * overflow.
-//             */
-//            btree.root = new Node(btree);
-//
-//            // Create children and populate the tree structure.
-//            Node root = (Node) btree.getRoot();
-//            Leaf leaf1 = new Leaf(btree);
-//            Node node1 = new Node(btree);
-//            Leaf leaf2 = new Leaf(btree);
-//            Leaf leaf3 = new Leaf(btree);
-//
-//            root.addChild(1, node1);
-//            root.addChild(2, leaf1);
-//
-//            node1.addChild(1, leaf2);
-//            node1.addChild(2, leaf3);
-//
-//            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-//                    root }, root.postOrderIterator());
-//
-//            metadataId = btree.commit();
-//
-//            node1Id = node1.getIdentity();
-//
-//            leaf1Id = leaf1.getIdentity();
-//            leaf2Id = leaf2.getIdentity();
-//            leaf3Id = leaf3.getIdentity();
-//
-//        }
-//
-//        {
-//
-//            // Load the btree.
-//            BTree btree = new BTree(store, branchingFactor,metadataId);
-//
-//            Node root = (Node) btree.getRoot();
-//            assertEquals(metadataId, root.getIdentity());
-//            assertEquals(null,root.getParent());
-//            
-//            Node node1 = (Node) root.getChild(0);
-//            assertEquals(node1Id, node1.getIdentity());
-//            assertEquals(root,node1.getParent());
-//            
-//            Leaf leaf2 = (Leaf) node1.getChild(0);
-//            assertEquals(leaf2Id, leaf2.getIdentity());
-//            assertEquals(node1,leaf2.getParent());
-//            
-//            Leaf leaf3 = (Leaf) node1.getChild(1);
-//            assertEquals(leaf3Id, leaf3.getIdentity());
-//            assertEquals(node1,leaf3.getParent());
-//            
-//            Leaf leaf1 = (Leaf) root.getChild(1);
-//            assertEquals(leaf1Id, leaf1.getIdentity());
-//            assertEquals(root,leaf1.getParent());
-//            
-//            // verify post-order iterator for root.
-//            assertSameIterator(new AbstractNode[] { leaf2, leaf3, node1, leaf1,
-//                    root }, root.postOrderIterator());
-//
-//        }
-//
-//    }
-//
-//    /*
-//     * Tests of copy-on-write semantics.
-//     */
-//    
-//    /**
-//     * This simple test of the copy-on-write mechanism sets up a btree with an
-//     * immutable (aka persistent) root {@link Node} and then adds a child node
-//     * (a leaf). Adding the child to the immutable root triggers copy-on-write
-//     * which forces cloning of the original root node. The test verifies that
-//     * the new tree has the expected structure and that the old tree was not
-//     * changed by this operation.
-//     */
-//    public void test_copyOnWrite01() {
-//
-//        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
-//
-//        final int branchingFactor = 4;
-//        
-//        final int metadataId;
-//        final int rootId;
-//        final BTree oldBTree;
-//        {
-//            /*
-//             * Replace the root leaf with a node and write it on the store. This
-//             * gives us an immutable root node as a precondition for what
-//             * follows.
-//             */
-//            BTree btree = new BTree(store, branchingFactor);
-//
-//            Node root = new Node(btree);
-//            btree.root = root; // Note: replace root on the btree.
-//
-//            rootId = root.write();
-//
-//            metadataId = btree.commit();
-//            
-//            assertTrue("persistent", root.isPersistent());
-//            assertEquals("identity", rootId, root.getIdentity());
-//            
-//            oldBTree = btree;
-//
-//        }
-//
-//        int newMetadataId;
-//        int newRootId;
-//        int leaf1Id;
-//        { // Add a leaf node - this should trigger copy-on-write.
-//
-//            // load the btree.
-//            BTree btree = new BTree(store,branchingFactor,metadataId);
-//
-//            Node root = (Node) btree.getRoot();
-//            assertTrue("persistent", root.isPersistent());
-//            assertEquals("identity", rootId, root.getIdentity());
-//
-//            Leaf leaf1 = new Leaf(btree);
-//
-//            Node newRoot = root.addChild(/* external id */2, leaf1);
-//            assertNotSame(newRoot, root);
-//            assertEquals(newRoot,btree.getRoot()); // check : btree root was set?
-//            assertTrue("persistent", root.isPersistent());
-//            assertFalse("persistent", newRoot.isPersistent());
-//
-//            newMetadataId = btree.commit();
-//            
-//            newRootId = newRoot.getIdentity();
-//            
-//            leaf1Id = leaf1.getIdentity();
-//            
-//        }
-//
-//        { // Verify read back from the store.
-//
-//            BTree btree = new BTree(store,branchingFactor,newMetadataId);
-//
-//            // Verify we got the new root.
-//            Node root = (Node) btree.getRoot();
-//            assertTrue("persistent", root.isPersistent());
-//            assertEquals("identity", newRootId, root.getIdentity());
-//
-//            // Read back the child at index position 0.
-//            Leaf leaf1 = (Leaf) root.getChild(0);
-//            assertTrue("persistent", leaf1.isPersistent());
-//            assertEquals("identity", leaf1Id, leaf1.getIdentity());
-//
-//            assertSameIterator(new AbstractNode[] { leaf1, root }, root
-//                    .postOrderIterator());
-//            
-//        }
-//        
-//        { // Verify the old tree is unchanged.
-//            
-//            /*
-//             * Note: We do NOT reload the old tree for this test since we want
-//             * to make sure that its state was not modified and we have not done
-//             * a commit so a reload would just cause changes to be discarded if
-//             * there were any.
-//             */
-//            
-//            Node root = (Node) oldBTree.getRoot();
-//            
-//            assertSameIterator(new AbstractNode[] { root }, root
-//                    .postOrderIterator());
-//
-//        }
-//
-//    }
-//
-//    /**
-//     * <p>
-//     * Test of copy on write when the pre-condition is a committed tree with the
-//     * following committed structure:
-//     * </p>
-//     * 
-//     * <pre>
-//     *  root
-//     *    leaf1
-//     *    node1
-//     *      leaf2
-//     *      leaf3
-//     * </pre>
-//     * 
-//     * The test adds a leaf to node1 in the 3rd position. This should cause
-//     * node1 and the root node to both be cloned and a new root node set on the
-//     * tree. The post-modification structure is:
-//     * 
-//     * <pre>
-//     *  root
-//     *    leaf1
-//     *    node1
-//     *      leaf2
-//     *      leaf3
-//     *      leaf4
-//     * </pre>
-//     * 
-//     * @todo Do tests of copy-on-write that go down to the key-value level.
-//     */
-//    public void test_copyOnWrite02() {
-//
-//        SimpleStore<Integer, PO> store = new SimpleStore<Integer, PO>();
-//
-//        final int branchingFactor = 4;
-//        
-//        final int metadataId;
-//        final int rootId_v0;
-//        final int leaf1Id_v0;
-//        final int leaf3Id_v0;
-//        final int leaf2Id_v0;
-//        final int node1Id_v0;
-//        {
-//
-//            BTree btree = new BTree(store, branchingFactor);
-//
-//            // Create a root node and its children.
-//            Node root = new Node(btree);
-//            btree.root = root; // replace the root with a Node.
-//            Leaf leaf1 = new Leaf(btree);
-//            Node node1 = new Node(btree);
-//            Leaf leaf2 = new Leaf(btree);
-//            Leaf leaf3 = new Leaf(btree);
-//
-//            root.addChild(1, leaf1);
-//            root.addChild(2, node1);
-//
-//            node1.addChild(1, leaf2);
-//            node1.addChild(2, leaf3);
-//
-//            // verify post-order iterator for root.
-//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-//                    root }, root.postOrderIterator());
-//
-//            metadataId = btree.commit();
-//            leaf1Id_v0 = leaf1.getIdentity();
-//            leaf2Id_v0 = leaf2.getIdentity();
-//            leaf3Id_v0 = leaf3.getIdentity();
-//            node1Id_v0 = node1.getIdentity();
-//            rootId_v0  = btree.root.getIdentity();
-//            
-//        }
-//
-//        final int rootId_v1, leaf4Id_v0, node1Id_v1;
-//        {
-//
-//            /*
-//             * Read the tree back from the store and re-verify the tree
-//             * structure.
-//             */
-//            
-//            BTree btree = new BTree(store,branchingFactor,metadataId);
-//
-//            Node root = (Node) btree.getRoot();
-//            assertEquals(rootId_v0,root.getIdentity());
-//
-//            Leaf leaf1 = (Leaf) root.getChild(0);
-//            assertEquals(leaf1Id_v0, leaf1.getIdentity());
-//            assertEquals(root,leaf1.getParent());
-//
-//            Node node1 = (Node) root.getChild(1);
-//            assertEquals(node1Id_v0, node1.getIdentity());
-//            assertEquals(root,node1.getParent());
-//            
-//            Leaf leaf2 = (Leaf) node1.getChild(0);
-//            assertEquals(leaf2Id_v0, leaf2.getIdentity());
-//            assertEquals(node1,leaf2.getParent());
-//            
-//            Leaf leaf3 = (Leaf) node1.getChild(1);
-//            assertEquals(leaf3Id_v0, leaf3.getIdentity());
-//            assertEquals(node1,leaf3.getParent());
-//
-//            // re-verify post-order iterator for root.
-//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, node1,
-//                    root }, root.postOrderIterator());
-//
-//            /*
-//             * Add a new leaf to node1.  This triggers copy-on-write.
-//             */
-//            
-//            Leaf leaf4 = new Leaf(btree);
-//            Node node1_v1 = node1.addChild(/*external key*/3, leaf4);
-//
-//            // Verify that node1 was changed.
-//            assertNotSame( node1_v1, node1 );
-//            
-//            // Verify that the root node was changed.
-//            Node root_v1 = (Node) btree.getRoot();
-//            assertNotSame( root, root_v1 );
-//
-//            // verify post-order iterator for the original root.
-//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, 
-//                    node1, root }, root.postOrderIterator());
-//
-//            // verify post-order iterator for the new root.
-//            assertSameIterator(new AbstractNode[] { leaf1, leaf2, leaf3, leaf4,
-//                    node1_v1, root_v1 }, root_v1.postOrderIterator());
-//
-//            /*
-//             * Commit the tree, get the current identity for all nodes, and
-//             * verify that the nodes that should have been cloned by
-//             * copy-on-write do in fact have different persistent identity while
-//             * those that should not do not.
-//             */
-//            
-//            rootId_v1 = btree.commit();
-//            assertEquals( rootId_v1, root_v1.getIdentity() );
-//            assertNotSame( rootId_v0, rootId_v1 ); // changed.
-//
-//            assertEquals( leaf1Id_v0, leaf1.getIdentity() ); // unchanged.
-//            assertEquals( leaf2Id_v0, leaf2.getIdentity() ); // unchanged.
-//            assertEquals( leaf3Id_v0, leaf3.getIdentity() ); // unchanged.
-//            
-//            leaf4Id_v0 = leaf4.getIdentity(); // new.
-//            
-//            node1Id_v1 = node1.getIdentity();
-//            assertNotSame( node1Id_v0, node1Id_v1 ); // changed.
-//            
-//        }
-//        
-//        { // @todo reload and re-verify the new structure.
-//            
-//            
-//        }
-//        
-//        {
-//            // @todo verify the old tree was unchanged.
-//        }
-//
-//    }
-    
     /**
      * Persistence store interface for the {@link BTree}.
      * 
@@ -2810,13 +2183,11 @@ public class TestSimpleBTree extends TestCase2 {
      */
     public static interface IStore<K,T> {
 
-        public byte[] _read(K key);
-
-        public T read(K key);
+        public int getSlotSize();
         
-        public K _insert(byte[] bytes);
-
-        public K insert(T value);
+        public ByteBuffer read(K key,ByteBuffer buf);
+        
+        public K insert(ByteBuffer buf);
         
         /**
          * @todo The object must also be marked as invalid.  Since we only
@@ -2846,41 +2217,50 @@ public class TestSimpleBTree extends TestCase2 {
          */
         private final Map<K, byte[]> store = new HashMap<K, byte[]>();
 
-        private byte[] serialize(T po) {
-
-            try {
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ObjectOutputStream oos = new ObjectOutputStream(baos);
-                oos.writeObject(po);
-                oos.flush();
-                oos.close();
-                byte[] bytes = baos.toByteArray();
-                return bytes;
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
+        /**
+         * Returns 64.
+         */
+        public int getSlotSize() {
+        
+            return 64;
+            
         }
-
-        private T deserialize(byte[] bytes) {
-
-            try {
-
-                ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-                ObjectInputStream ois = new ObjectInputStream(bais);
-                T po = (T) ois.readObject();
-                return po;
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-            }
-
-        }
+        
+//        private byte[] serialize(T po) {
+//
+//            try {
+//
+//                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//                ObjectOutputStream oos = new ObjectOutputStream(baos);
+//                oos.writeObject(po);
+//                oos.flush();
+//                oos.close();
+//                byte[] bytes = baos.toByteArray();
+//                return bytes;
+//
+//            } catch (IOException ex) {
+//
+//                throw new RuntimeException(ex);
+//
+//            }
+//
+//        }
+//
+//        private T deserialize(byte[] bytes) {
+//
+//            try {
+//
+//                ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+//                ObjectInputStream ois = new ObjectInputStream(bais);
+//                T po = (T) ois.readObject();
+//                return po;
+//
+//            } catch (Exception ex) {
+//
+//                throw new RuntimeException(ex);
+//            }
+//
+//        }
 
         private K nextId() {
 
@@ -2897,118 +2277,102 @@ public class TestSimpleBTree extends TestCase2 {
 
         }
 
-        public byte[] _read(K key) {
+        public ByteBuffer read(K key,ByteBuffer buf) {
 
             byte[] bytes = store.get(key);
 
             if (bytes == null)
                 throw new IllegalArgumentException("Not found: key=" + key);
 
-            return bytes;
+            if( buf != null && buf.remaining() > bytes.length ) {
+                
+                buf.put(bytes);
+             
+                return buf;
+                
+            } else {
+            
+                return ByteBuffer.wrap(bytes);
+                
+            }
             
         }
         
-        public T read(K key) {
+//        public T read(K key) {
+//
+//            byte[] bytes = store.get(key);
+//
+//            if (bytes == null)
+//                throw new IllegalArgumentException("Not found: key=" + key);
+//
+//            T value = deserialize(bytes);
+//
+//            /*
+//             * set the key - no back references exist yet.
+//             * 
+//             * Note: breaks generic isolation.
+//             */
+//            value.setIdentity(((Long) key).longValue());
+//
+//            value.setDirty(false); // just read from the store.
+//
+//            return value;
+//
+//        }
 
-            byte[] bytes = store.get(key);
+        public K insert(ByteBuffer buf) {
 
-            if (bytes == null)
-                throw new IllegalArgumentException("Not found: key=" + key);
-
-            T value = deserialize(bytes);
-
-            /*
-             * set the key - no back references exist yet.
-             * 
-             * Note: breaks generic isolation.
-             */
-            value.setIdentity(((Long) key).longValue());
-
-            value.setDirty(false); // just read from the store.
-
-            return value;
-
-        }
-
-        public K _insert(byte[] bytes) {
-
-            assert bytes != null;
+            assert buf != null;
 
             K key = nextId();
 
-            store.put(key, bytes);
+            // @todo assumes not using a direct buffer.
+            store.put(key, buf.array());
 
             return key;
 
         }
 
-        public K insert(T value) {
-
-            assert value != null;
-            assert value.isDirty();
-            assert !value.isPersistent();
-
-            K key = nextId();
-
-            write(key, value);
-
-            return key;
-
-        }
-
-        protected void write(K key, T value) {
-
-            assert key != null;
-            assert value != null;
-            assert value.isDirty();
-
-            byte[] bytes = serialize(value);
-
-            store.put(key, bytes);
-
-            /*
-             * Set identity on persistent object.
-             * 
-             * Note: breaks generic isolation.
-             */
-            value.setIdentity(((Long) key).longValue());
-
-            // just wrote on the store.
-            value.setDirty(false);
-
-        }
+//        public K insert(T value) {
+//
+//            assert value != null;
+//            assert value.isDirty();
+//            assert !value.isPersistent();
+//
+//            K key = nextId();
+//
+//            write(key, value);
+//
+//            return key;
+//
+//        }
+//
+//        protected void write(K key, T value) {
+//
+//            assert key != null;
+//            assert value != null;
+//            assert value.isDirty();
+//
+//            byte[] bytes = serialize(value);
+//
+//            store.put(key, bytes);
+//
+//            /*
+//             * Set identity on persistent object.
+//             * 
+//             * Note: breaks generic isolation.
+//             */
+//            value.setIdentity(((Long) key).longValue());
+//
+//            // just wrote on the store.
+//            value.setDirty(false);
+//
+//        }
 
         // Note: Must also mark the object as invalid.
         public void delete(K key) {
 
             store.remove(key);
-
-        }
-
-    }
-
-    /**
-     * Hard reference cache eviction listener for leaves.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <K>
-     *            The key type.
-     * @param <T>
-     *            The value type.
-     */
-    public static class LeafEvictionListener implements
-            ILeafEvictionListener {
-
-        public void evicted(HardReferenceCache<PO> cache, PO ref) {
-
-            assert ref instanceof Leaf;
-            
-            if( ref.isDirty() ) {
-
-                ((Leaf)ref).write();
-                
-            }
 
         }
 
@@ -3064,8 +2428,8 @@ public class TestSimpleBTree extends TestCase2 {
      * @version $Id$
      * @param <K>
      */
-    abstract public static class PO implements IIdentityAccess, IDirty,
-            Externalizable {
+    abstract public static class PO implements IIdentityAccess, IDirty {
+//            , Externalizable {
 
         /**
          * The persistent identity (defined when the object is actually

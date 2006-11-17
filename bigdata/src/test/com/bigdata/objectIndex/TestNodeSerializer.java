@@ -82,63 +82,122 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      * 
      * @param slotSize
      *            The size of a slot on the journal.
-     * @param pageSize
+     * @param branchingFactor
      *            The #of keys in a node of the object index (aka the branching
      *            factor).
      */
-    public void showInfo(int slotSize,int pageSize) {
+    public void showInfo(int slotSize,int branchingFactor) {
 
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath,pageSize);
+        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
 
         System.err.println("Shared record format:");
+
         System.err.println("slotSize : " + slotSize);
+        
         System.err
-                .println("pageSize : " + pageSize + " (aka branching factor)");
+                .println("pageSize : " + branchingFactor + " (aka branching factor)");
+        
         System.err.println(" checksum: offset="
                 + NodeSerializer.OFFSET_CHECKSUM + ", size="
                 + NodeSerializer.SIZEOF_ADLER32);
+        
+        System.err.println(" nbytes  : offset=" + NodeSerializer.OFFSET_NBYTES
+                + ", size=" + NodeSerializer.SIZEOF_NBYTES);
+
         System.err.println(" isLeaf  : offset=" + NodeSerializer.OFFSET_IS_LEAF
                 + ", size=" + NodeSerializer.SIZEOF_IS_LEAF);
+        
+        System.err.println(" order   : offset=" + NodeSerializer.OFFSET_ORDER
+                + ", size=" + NodeSerializer.SIZEOF_ORDER);
+
         System.err.println(" nkeys   : offset=" + NodeSerializer.OFFSET_NKEYS
                 + ", size=" + NodeSerializer.SIZEOF_NKEYS);
-        System.err.println(" key[]   : offset=" + NodeSerializer.OFFSET_KEYS
-                + ", size=" + NodeSerializer.SIZEOF_KEY + ", #keys="
-                + nodeSer.pageSize + ", #bytes="
-                + (nodeSer.pageSize * NodeSerializer.SIZEOF_KEY));
 
-        System.err.println("Node specific record format:");
-        System.err.println(" value   : child node ref         ("+NodeSerializer.SIZEOF_REF+")");
-        System.err.println(" value   : total node value       ("+NodeSerializer.SIZEOF_NODE_VALUE+")");
-        System.err.println(" value[] : offset=" + nodeSer.OFFSET_NODE_VALUES
-                + ", size=" + NodeSerializer.SIZEOF_NODE_VALUE + ", #values="
-                + nodeSer.pageSize + ", #bytes="
-                + (nodeSer.pageSize * NodeSerializer.SIZEOF_NODE_VALUE));
-        System.err.println(" totals  : nodeSize=" + nodeSer.NODE_SIZE
-                + ", slotsPerNode=" + nodeSer.slotsPerNode
-                + ", #bytesInThoseSlots=" + (nodeSer.slotsPerNode * slotSize)
-                + ", wastePerNode="
-                + (nodeSer.slotsPerNode * slotSize - nodeSer.NODE_SIZE));
+        /*
+         * a node
+         */
+        {
 
-        System.err.println("Leaf specific record format:");
-        System.err.println(" value   : versionCounter         ("+NodeSerializer.SIZEOF_VERSION_COUNTER+")");
-        System.err.println(" value   : currentVersion ref     ("+NodeSerializer.SIZEOF_SLOTS+")");
-        System.err.println(" value   : preExistingVersion ref ("+NodeSerializer.SIZEOF_SLOTS+")");
-        System.err.println(" value   : total leaf value       ("+NodeSerializer.SIZEOF_LEAF_VALUE+")");
-        System.err.println(" value[] : offset=" + nodeSer.OFFSET_LEAF_VALUES
-                + ", size=" + NodeSerializer.SIZEOF_LEAF_VALUE + ", #values="
-                + nodeSer.pageSize + ", #bytes="
-                + (nodeSer.pageSize * NodeSerializer.SIZEOF_LEAF_VALUE));
-//        System.err.println(" prior   : offset=" + nodeSer.OFFSET_LEAF_PRIOR
-//                + ", size=" + NodeSerializer.SIZEOF_REF);
-//        System.err.println(" next    : offset=" + nodeSer.OFFSET_LEAF_NEXT
-//                + ", size=" + NodeSerializer.SIZEOF_REF);
-        System.err.println(" totals  : leafSize=" + nodeSer.LEAF_SIZE
-                + ", slotsPerLeaf=" + nodeSer.slotsPerLeaf
-                + ", #bytesInThoseSlots=" + (nodeSer.slotsPerLeaf * slotSize)
-                + ", wastePerNode="
-                + (nodeSer.slotsPerLeaf * slotSize - nodeSer.LEAF_SIZE));
+            int nkeys = branchingFactor - 1;
+            int nchildren = branchingFactor;
+            int keysSize = (nkeys * NodeSerializer.SIZEOF_KEY);
+            int valuesSize = (nchildren * NodeSerializer.SIZEOF_NODE_VALUE);
+            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
+            
+            System.err.println("Node specific record format:");
+            
+            System.err.println(" key[]   : offset="
+                    + NodeSerializer.OFFSET_KEYS + ", size="
+                    + NodeSerializer.SIZEOF_KEY + ", #keys=" + nkeys
+                    + ", #bytes=" + keysSize);
+            
+            System.err.println(" value   : child node ref         ("
+                    + NodeSerializer.SIZEOF_REF + ")");
+            
+            System.err.println(" value   : total node value       ("
+                    + NodeSerializer.SIZEOF_NODE_VALUE + ")");
+            
+            System.err.println(" value[] : offset="
+                    + offsetValues + ", size="
+                    + NodeSerializer.SIZEOF_NODE_VALUE + ", #values="
+                    + nchildren + ", #bytes="
+                    + valuesSize );
+
+            final int nodeSize = nodeSer.getSize(false, branchingFactor);
+
+            final int slotsPerNode = slotMath.getSlotCount(nodeSize);
+
+            System.err.println(" totals  : nodeSize=" + nodeSize
+                    + ", slotsPerNode=" + slotsPerNode
+                    + ", #bytesInThoseSlots=" + (slotsPerNode * slotSize)
+                    + ", wastePerNode=" + (slotsPerNode * slotSize - nodeSize));
+
+        }
+
+        /*
+         * a leaf
+         */
+        {
+            // assume #of keys == branching factor.
+            int nkeys = branchingFactor;
+            int keysSize = (nkeys * NodeSerializer.SIZEOF_KEY);
+            int valuesSize = (nkeys * NodeSerializer.SIZEOF_LEAF_VALUE);
+            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
+
+            System.err.println("Leaf specific record format:");
+            
+            System.err.println(" key[]   : offset="
+                    + NodeSerializer.OFFSET_KEYS + ", size="
+                    + NodeSerializer.SIZEOF_KEY + ", #keys=" + branchingFactor
+                    + ", #bytes=" + (nkeys * NodeSerializer.SIZEOF_KEY));
+            
+            System.err.println(" value   : versionCounter         ("
+                    + NodeSerializer.SIZEOF_VERSION_COUNTER + ")");
+            
+            System.err.println(" value   : currentVersion ref     ("
+                    + NodeSerializer.SIZEOF_SLOTS + ")");
+            
+            System.err.println(" value   : preExistingVersion ref ("
+                    + NodeSerializer.SIZEOF_SLOTS + ")");
+            
+            System.err.println(" value   : total leaf value       ("
+                    + NodeSerializer.SIZEOF_LEAF_VALUE + ")");
+
+            System.err.println(" value[] : offset=" + offsetValues + ", size="
+                    + NodeSerializer.SIZEOF_LEAF_VALUE + ", #values=" + nkeys
+                    + ", #bytes=" + valuesSize);
+
+            final int leafSize = nodeSer.getSize(true, branchingFactor - 1);
+
+            final int slotsPerLeaf = slotMath.getSlotCount(leafSize);
+
+            System.err.println(" totals  : leafSize=" + leafSize
+                    + ", slotsPerLeaf=" + slotsPerLeaf
+                    + ", #bytesInThoseSlots=" + (slotsPerLeaf * slotSize)
+                    + ", wastePerLeaf=" + (slotsPerLeaf * slotSize - leafSize));
+        }
         
         /*
          * @todo Compute the #of nodes, leaves, and depth for an index for N
@@ -170,26 +229,35 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
     /**
      * Show size info.
      */
-    public void test_sizeInfo_slotSize128_pageSize512() {
+    public void test_sizeInfo_slotSize64_pageSize512() {
         
-        showInfo(64, 256);
+        showInfo(64, 512);
         
     }
     
+//    /**
+//     * Show size info.
+//     */
+//    public void test_sizeInfo_slotSize256_pageSize1024() {
+//        
+//        showInfo(256,1024);
+//        
+//    }
+
     /**
      * Test of leaf serialization.
      */
     public void test_leaf_serialization01() {
         
         final int slotSize = 64;
+        
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        // This is the branching factor for the object index.
-        final int pageSize = 8;
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath,pageSize);
+        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
+        final int branchingFactor = 8;
         SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-        ObjectIndex ndx = new ObjectIndex(store, pageSize);
+        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
         
         // Create test node.
         final Leaf expected = getRandomLeaf(ndx,nodeSer);
@@ -210,12 +278,11 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final int slotSize = 64;
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        // This is the branching factor for the object index.
-        final int pageSize = 8;
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath,pageSize);
+        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
+        final int branchingFactor = 8;
         SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-        ObjectIndex ndx = new ObjectIndex(store, pageSize);
+        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
         final Leaf expected = getRandomLeaf(ndx,nodeSer);
@@ -223,14 +290,12 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         /*
          * Serialize onto a buffer.
          */
-        ByteBuffer buf = ByteBuffer.allocate(nodeSer.LEAF_SIZE);
+        ByteBuffer buf = ByteBuffer.allocate(nodeSer.getSize(expected));
         
         nodeSer.putLeaf(buf, expected);
         
         /*
-         * Prepare to read the buffer back as a node (vs a leaf).  This should
-         * fail on the simple test of the bytes remaining in the buffer, which
-         * is wrong for a node.
+         * Attempt to read the buffer back as a node (vs a leaf).
          */
         
         buf.clear(); // prepare for reading.
@@ -239,40 +304,9 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             
             nodeSer.getNode(ndx, expected.getIdentity(), buf);
             
-            fail("Expecting exception: "+IllegalArgumentException.class);
+            fail("Expecting exception: "+RuntimeException.class);
             
-        } catch( IllegalArgumentException ex ) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-
-        /*
-         * Setup a buffer that is right sized for a node and copy in the leaf
-         * data then verify that the de-serialization is correctly rejected.
-         */
-        
-        ByteBuffer buf2 = ByteBuffer.allocate(nodeSer.NODE_SIZE);
-        
-        // copy as much of the data as will fit.
-        buf.clear();
-        buf.limit(buf2.capacity());
-        buf2.put(buf);
-        
-        buf2.clear(); // prepare for reading.
-
-        /*
-         * Attempt to read leaf as node. This should generate a checksum error
-         * since the data was truncated in order to fit into a node-sized
-         * buffer.
-         */
-        try {
-
-            nodeSer.getNode(ndx, expected.getIdentity(), buf2);
-
-            fail("Expecting exception: "+ChecksumError.class);
-            
-        } catch( ChecksumError ex ) {
+        } catch( RuntimeException ex ) {
             
             System.err.println("Ignoring expected exception: "+ex);
             
@@ -288,12 +322,11 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final int slotSize = 64;
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        // This is the branching factor for the object index.
-        final int pageSize = 8;
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath,pageSize);
+        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
+        final int branchingFactor = 8;
         SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-        ObjectIndex ndx = new ObjectIndex(store, pageSize);
+        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
         final Node expected = getRandomNode(ndx,nodeSer);
@@ -301,14 +334,12 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         /*
          * Serialize onto a buffer.
          */
-        ByteBuffer buf = ByteBuffer.allocate(nodeSer.NODE_SIZE);
+        ByteBuffer buf = ByteBuffer.allocate(nodeSer.getSize(expected));
         
         nodeSer.putNode(buf, expected);
         
         /*
-         * Prepare to read the buffer back as a leaf (vs a node).  This should
-         * fail on the simple test of the bytes remaining in the buffer, which
-         * is wrong for a leaf.
+         * Attempt to read the buffer back as a leaf (vs a node).
          */
         
         buf.clear(); // prepare for reading.
@@ -317,38 +348,9 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             
             nodeSer.getLeaf(ndx, expected.getIdentity(), buf);
             
-            fail("Expecting exception: "+IllegalArgumentException.class);
+            fail("Expecting exception: "+RuntimeException.class);
             
-        } catch( IllegalArgumentException ex ) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-
-        /*
-         * Setup a buffer that is right sized for a leaf and copy in the node
-         * data then verify that the de-serialization is correctly rejected.
-         */
-        
-        ByteBuffer buf2 = ByteBuffer.allocate(nodeSer.LEAF_SIZE);
-        
-        buf.clear();
-        buf2.put(buf);
-        
-        buf2.clear(); // prepare for reading.
-
-        /*
-         * Attempt to node as leaf. This should generate a checksum error since
-         * the buffer contains more data (even if it is zeros) than were present
-         * in the original node.
-         */
-        try {
-
-            nodeSer.getLeaf(ndx, expected.getIdentity(), buf2);
-
-            fail("Expecting exception: "+ChecksumError.class);
-            
-        } catch( ChecksumError ex ) {
+        } catch( RuntimeException ex ) {
             
             System.err.println("Ignoring expected exception: "+ex);
             
@@ -364,12 +366,11 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final int slotSize = 64;
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        // This is the branching factor for the object index.
-        final int pageSize = 8;
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath,pageSize);
+        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
 
+        final int branchingFactor = 8;
         SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
-        ObjectIndex ndx = new ObjectIndex(store, pageSize);
+        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
         final Node expected = getRandomNode(ndx, nodeSer);
@@ -399,7 +400,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
 
         final boolean isLeaf = expected.isLeaf();
         
-        final int BUF_SIZE = isLeaf?nodeSer.LEAF_SIZE:nodeSer.NODE_SIZE;
+        final int BUF_SIZE = nodeSer.getSize(expected);
         
         ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
         
@@ -417,8 +418,9 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             System.err.println("buf: " + Arrays.toString(buf.array()));
         
         buf.flip(); // prepare for reading.
-        AbstractNode actual = nodeSer.getNodeOrLeaf(ndx, expected.getIdentity(),
-                buf);
+        
+        AbstractNode actual = nodeSer.getNodeOrLeaf(ndx,
+                expected.getIdentity(), buf);
 
         if (verbose)
             actual.dump(System.err);
@@ -479,23 +481,23 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
          * checksum error.
          */
 
-        final int first = buf2.getShort(NodeSerializer.OFFSET_NKEYS);
+        final int nkeys = buf2.getShort(NodeSerializer.OFFSET_NKEYS);
         
-        int randomFirst;
+        int randomNKeys;
         
         do {
             
-            randomFirst = r.nextInt(nodeSer.pageSize-1);
+            randomNKeys = r.nextInt(ndx.branchingFactor-1);
             
-        } while( randomFirst == first );
+        } while( randomNKeys == nkeys );
         
-        buf2.putShort(NodeSerializer.OFFSET_NKEYS,  (short) randomFirst );
+        buf2.putShort(NodeSerializer.OFFSET_NKEYS,  (short) randomNKeys );
         
         buf2.flip(); // prepare for re-reading.
         
         try {
         
-            nodeSer.getNodeOrLeaf(null,expected.getIdentity(),buf2);
+            nodeSer.getNodeOrLeaf(ndx,expected.getIdentity(),buf2);
             
             fail("Expecting: "+ChecksumError.class);
             
@@ -506,7 +508,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             
         }
         
-        assertEquals(expected,actual);
+        assertSameNodeOrLeaf(expected,actual);
 
         return actual;
         
@@ -537,7 +539,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      *            The #of random nodes per trial.
      */
     public void doStressTest(int ntrials,int nnodes) {
-        
+
         // Some slot sizes to choose from.
         int[] slotSizes = new int[]{32,48,64,96,112,128,256,512,1024};
         
@@ -548,15 +550,16 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
 
             // Choose the slot size randomly.
             final int slotSize = slotSizes[r.nextInt(slotSizes.length)];
+            
             final SlotMath slotMath = new SlotMath(slotSize);
+            
+            final NodeSerializer nodeSer = new NodeSerializer(slotMath);
 
             // Choose the branching factor randomly.
             final int pageSize = pageSizes[r.nextInt(pageSizes.length)];
 
-            final NodeSerializer nodeSer = new NodeSerializer(slotMath,
-                    pageSize);
-
             SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+
             ObjectIndex ndx = new ObjectIndex(store, pageSize);
 
             System.err.println("Trial " + trial + " of " + ntrials

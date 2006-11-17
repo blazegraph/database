@@ -34,25 +34,28 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Object Index");
 
-        // @todo test index node cache operations.
-        // @todo test basic tree operations (insert, find, key scan)
-        // @todo test basic tree manipulations (insert, rotate, split, etc).
-        // @todo test copy-on-write semantics.
-        // @todo test tree operations in journal context.
+        // test utility classes.
+        suite.addTestSuite( TestSearch.class );
+        // test basic tree operations.
+        suite.addTestSuite( TestSimpleBTree.class );
+        // test checksum computations (used by serialization).
+        suite.addTestSuite( TestChecksumUtility.class );
+        // test serialization
+        suite.addTestSuite( TestNodeSerializer.class );
+        // test the commit protocol w/o incremental leaf eviction.
+        suite.addTestSuite( TestCommit.class );
+        // @todo test incremental leaf eviction.
+        // @todo test copy-on-write semantics with post-commit tree.
+        // @todo test copy-on-write semantics with incremental leaf eviction.
+        // @todo test against IRawStore on journal (vs SimpleRawStore).
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.
         // @todo test journal restart semantics w/o shutdown.
         // @todo stress test (correctness).
+        // @todo test journal transaction isolation using the new object index.
+        // @todo test journal restart semantics once persistent allocation index is implemented.
 
-        // test utility classes.
-        suite.addTestSuite( TestSearch.class );
-        suite.addTestSuite( TestChecksumUtility.class );
-        // test basic tree operations.
-        suite.addTestSuite( TestSimpleBTree.class );
-        // test serialization
-        suite.addTestSuite( TestNodeSerializer.class );
-        // @todo test persistence (after testing serialization).
         return suite;
         
     }

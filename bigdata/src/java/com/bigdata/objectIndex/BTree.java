@@ -55,11 +55,10 @@ import java.util.Set;
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 import com.bigdata.objectIndex.TestSimpleBTree.IStore;
-import com.bigdata.objectIndex.TestSimpleBTree.LeafEvictionListener;
 import com.bigdata.objectIndex.TestSimpleBTree.PO;
-import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
 
 /**
  * <p>
@@ -94,6 +93,12 @@ public class BTree {
     static public final int MIN_BRANCHING_FACTOR = 3;
     
     /**
+     * The minimum hard reference queue capacity is two(2) in order to avoid
+     * cache evictions of the leaves participating in a split.
+     */
+    static public final int MIN_HARD_REFERENCE_QUEUE_CAPACITY = 2;
+    
+    /**
      * The size of the hard reference queue used to defer leaf eviction.
      */
     static public final int DEFAULT_LEAF_CACHE_CAPACITY = 1000;
@@ -108,8 +113,14 @@ public class BTree {
      */
     protected int branchingFactor;
 
+    /**
+     * Computes the split index when splitting a non-leaf {@link Node}.
+     */
     final public INodeSplitPolicy nodeSplitter = new DefaultNodeSplitPolicy();
 
+    /**
+     * Computes the split index when splitting a {@link Leaf}.
+     */
     final public ILeafSplitPolicy leafSplitter = new DefaultLeafSplitPolicy();
 
     /**
@@ -129,17 +140,16 @@ public class BTree {
     final Set<Node> nodes = new HashSet<Node>();
 
     /**
-     * Leaves are added to a hard reference queue when they are created or
-     * read from the store. On eviction from the queue the leaf is
-     * serialized by {@link #listener} against the {@link #store}. Once the
-     * leaf is no longer strongly reachable its weak references may be
-     * cleared by the VM.
-     * 
-     * @todo Write tests to verify incremental write of leaves driven by
-     *       eviction from this hard reference queue. This will require
-     *       controlling the cache size and #of references scanned in order
-     *       to force triggering of leaf eviction under controller
-     *       circumstances.
+     * Leaves are added to a hard reference queue when they are created or read
+     * from the store. On eviction from the queue the leaf is serialized by
+     * {@link #listener} against the {@link #store}. Once the leaf is no longer
+     * strongly reachable its weak references may be cleared by the VM. Note
+     * that leaves are evicted as new leaves are added to the hard reference
+     * queue. This occurs in two situations: (1) when a new leaf is created
+     * during a split of an existing leaf; and (2) when a leaf is read in from
+     * the store.  The minimum capacity for the hard reference queue is two (2)
+     * so that a split may occur without forcing eviction of either leaf in the
+     * split.
      */
     final HardReferenceCache<PO> leaves;
 
@@ -147,7 +157,19 @@ public class BTree {
      * Writes dirty leaves onto the {@link #store} as they are evicted.
      */
     final ILeafEvictionListener listener;
+    
+    /**
+     * Used to serialize and de-serialize the nodes and leaves of the tree.
+     */
+    final NodeSerializer nodeSer;
 
+    /**
+     * Used to serialize and de-serialize the nodes and leaves of the tree. This
+     * is pre-allocated to the maximum size of any node or leaf and the single
+     * buffer is then reused every time we read or write a node or a leaf.
+     */
+    final ByteBuffer buf;
+    
     /**
      * The root of the btree. This is initially a leaf until the leaf is
      * split, at which point it is replaced by a node. The root is also
@@ -195,30 +217,64 @@ public class BTree {
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
+     * @param listener
+     *            The {@link ILeafEvictionListener}
+     * @param headReferenceQueueCapacity
+     *            The capacity of the hard reference queue (minimum of 2 to
+     *            avoid cache evictions of the leaves participating in a split).
      */
-    public BTree(IStore<Long, PO> store, int branchingFactor) {
+    public BTree(IStore<Long, PO> store, int branchingFactor,
+            ILeafEvictionListener listener, int hardReferenceQueueCapacity) {
 
         assert store != null;
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
+        assert hardReferenceQueueCapacity >= MIN_HARD_REFERENCE_QUEUE_CAPACITY;
+        
         this.store = store;
 
         this.branchingFactor = branchingFactor;
 
-        listener = new LeafEvictionListener();
+        this.listener = listener;
 
-        leaves = new HardReferenceCache<PO>(listener, DEFAULT_LEAF_CACHE_CAPACITY);
+        this.leaves = new HardReferenceCache<PO>(listener,
+                hardReferenceQueueCapacity);
 
-        this.root = new Leaf(this);
+        this.nodeSer = new NodeSerializer(new SlotMath(store.getSlotSize()));
+        
+        int maxNodeOrLeafSize = Math.max(nodeSer
+                .getSize(false, branchingFactor), nodeSer.getSize(true,
+                branchingFactor - 1));
+        
+        System.err.println("maxNodeOrLeafSize="+maxNodeOrLeafSize);
+        
+        this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
 
         this.height = 0;
 
-        this.nnodes = 0;
+        this.nnodes = nleaves = nentries = 0;
+        
+        this.root = new Leaf(this);
+        
+    }
+    
+    /**
+     * Constructor for a new btree with the default {@link DefaultLeafEvictionListener}
+     * and a default hard reference cache size.
+     * 
+     * @param store
+     *            The persistence store.
+     * @param branchingFactor
+     *            The branching factor.
+     * 
+     * @see DefaultLeafEvictionListener
+     * @see #DEFAULT_LEAF_CACHE_CAPACITY
+     */
+   public BTree(IStore<Long, PO> store, int branchingFactor) {
 
-        this.nleaves = 1;
-
-        this.nentries = 0;
+        this(store, branchingFactor, new DefaultLeafEvictionListener(),
+                DEFAULT_LEAF_CACHE_CAPACITY);
 
     }
 
@@ -244,10 +300,20 @@ public class BTree {
 
         this.store = store;
 
-        listener = new LeafEvictionListener();
+        listener = new DefaultLeafEvictionListener();
 
         leaves = new HardReferenceCache<PO>(listener, DEFAULT_LEAF_CACHE_CAPACITY );
 
+        this.nodeSer = new NodeSerializer(new SlotMath(store.getSlotSize()));
+        
+        int maxNodeOrLeafSize = Math.max(nodeSer
+                .getSize(false, branchingFactor), nodeSer.getSize(true,
+                branchingFactor - 1));
+        
+        System.err.println("maxNodeOrLeafSize="+maxNodeOrLeafSize);
+        
+        this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
+        
         // read the btree metadata record.
         final long rootId = read(metadataId);
 
@@ -261,12 +327,46 @@ public class BTree {
          * reference cache, tree operations will speed up over time until
          * the entire non-leaf node structure is loaded.
          */
-        this.root = (AbstractNode) store.read(rootId);
-
-        this.root.setBTree(this);
+        this.root = readNodeOrLeaf( rootId );
 
     }
 
+    protected void writeNodeOrLeaf(AbstractNode node ) {
+
+        buf.clear();
+        
+        if( node.isLeaf() ) {
+        
+            nodeSer.putLeaf(buf, (Leaf)node);
+
+        } else {
+
+            nodeSer.putNode(buf, (Node) node);
+            
+        }
+        
+        final long id = store.insert(buf);
+
+        node.setIdentity(id);
+        
+        node.setDirty(false);
+        
+    }
+    
+    protected AbstractNode readNodeOrLeaf( long id ) {
+        
+        buf.clear();
+        
+        ByteBuffer tmp = store.read(id,buf);
+        
+        AbstractNode node = nodeSer.getNodeOrLeaf(this, id, tmp);
+        
+        node.setDirty(false);
+        
+        return node;
+        
+    }
+    
     /**
      * Insert an entry under the external key.
      */
@@ -381,7 +481,7 @@ public class BTree {
         buf.putInt(nleaves);
         buf.putInt(nentries);
 
-        return store._insert(buf.array());
+        return store.insert(buf);
 
     }
 
@@ -397,7 +497,7 @@ public class BTree {
      */
     long read(long metadataId) {
 
-        ByteBuffer buf = ByteBuffer.wrap(store._read(metadataId));
+        ByteBuffer buf = store.read(metadataId,null);
 
         final long rootId = buf.getLong();
         System.err.println("rootId=" + rootId);
@@ -417,9 +517,9 @@ public class BTree {
     }
 
     /**
-     * The #of bytes in the metadata record written by {@link #write(int)}.
+     * The #of bytes in the metadata record written by {@link #writeNodeOrLeaf(int)}.
      * 
-     * @see #write(int)
+     * @see #writeNodeOrLeaf(int)
      */
     public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
             + Bytes.SIZEOF_INT * 5;
@@ -434,63 +534,54 @@ public class BTree {
      */
     public long commit() {
 
-        if (!root.isDirty()) {
+        if (root.isDirty()) {
+
+            // #of dirty nodes (node or leave) written by commit.
+            int ndirty = 0;
+
+            // #of dirty leaves written by commit.
+            int nleaves = 0;
 
             /*
-             * Optimization : if the root node is not dirty then the
-             * children can not be dirty either.
+             * Traverse tree, writing dirty nodes onto the store.
+             * 
+             * Note: This iterator only visits dirty nodes.
              */
+            Iterator itr = root.postOrderIterator(true);
 
-            return root.getIdentity();
+            while (itr.hasNext()) {
 
-        }
+                AbstractNode node = (AbstractNode) itr.next();
 
-        // #of dirty nodes (node or leave) written by commit.
-        int ndirty = 0;
-        
-        // #of dirty leaves written by commit.
-        int nleaves = 0;
+                assert node.isDirty();
 
-        /*
-         * Traverse tree, writing dirty nodes onto the store.
-         * 
-         * Note: This iterator only visits dirty nodes.
-         */
-        Iterator itr = root.postOrderIterator(true);
+                // if (node.isDirty()) {
 
-        while (itr.hasNext()) {
+                if (node != root) {
 
-            AbstractNode node = (AbstractNode) itr.next();
+                    /*
+                     * The parent MUST be defined unless this is the root node.
+                     */
 
-            assert node.isDirty();
+                    TestSimpleBTree.assertNotNull(node.getParent());
 
-            //                if (node.isDirty()) {
+                }
 
-            if (node != root) {
+                // write the dirty node on the store.
+                node.write();
 
-                /*
-                 * The parent MUST be defined unless this is the root
-                 * node.
-                 */
+                ndirty++;
 
-                TestSimpleBTree.assertNotNull(node.getParent());
+                if (node instanceof Leaf)
+                    nleaves++;
+
+                // }
 
             }
 
-            // write the dirty node on the store.
-            node.write();
-
-            ndirty++;
-
-            if (node instanceof Leaf)
-                nleaves++;
-
-            //                }
-
+            System.err.println("commit: " + ndirty + " dirty nodes (" + nleaves
+                    + " leaves), rootId=" + root.getIdentity());
         }
-
-        System.err.println("commit: " + ndirty + " dirty nodes (" + nleaves
-                + " leaves), rootId=" + root.getIdentity());
 
         return write();
 

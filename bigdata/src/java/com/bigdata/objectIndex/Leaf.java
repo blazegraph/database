@@ -47,9 +47,6 @@ Modifications:
 package com.bigdata.objectIndex;
 
 import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.Arrays;
@@ -75,7 +72,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  */
 public class Leaf extends AbstractNode {
 
-    private static final long serialVersionUID = 1L;
+//    private static final long serialVersionUID = 1L;
 
     /**
      * The values of the tree.
@@ -96,11 +93,11 @@ public class Leaf extends AbstractNode {
     /**
      * De-serialization constructor.
      */
-    Leaf(BTree btree, long id, int nkeys, int[] keys, IObjectIndexEntry[] values) {
+    Leaf(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, IObjectIndexEntry[] values) {
         
-        super(btree);
+        super(btree, branchingFactor );
 
-        assert nkeys >=0 && nkeys< branchingFactor;
+        assert nkeys >=0 && nkeys<= branchingFactor;
         
         assert keys != null;
         
@@ -118,16 +115,23 @@ public class Leaf extends AbstractNode {
         
         this.values = values;
 
+        // must clear the dirty since we just de-serialized this leaf.
+        setDirty(false);
+
         // Add to the hard reference queue.
         btree.leaves.append(this);
         
-
     }
 
-    
+    /**
+     * Creates a new leaf, increments the #of leaves that belong to the btree,
+     * and adds the new leaf to the hard reference queue for the btree.
+     * 
+     * @param btree
+     */
     public Leaf(BTree btree) {
 
-        super(btree);
+        super(btree, btree.branchingFactor);
 
         // nkeys == nvalues for a Leaf.
         keys = new int[branchingFactor];
@@ -136,6 +140,8 @@ public class Leaf extends AbstractNode {
 
         // Add to the hard reference queue.
         btree.leaves.append(this);
+        
+        btree.nleaves++;
 
     }
 
@@ -352,8 +358,6 @@ public class Leaf extends AbstractNode {
          * the parent node itself to split.
          */
         p.insertChild(splitKey, rightSibling);
-
-        btree.nleaves++;
 
         // Return the high leaf.
         return rightSibling;
@@ -592,40 +596,40 @@ public class Leaf extends AbstractNode {
 
     }
 
-    /*
-     * Note: Serialization is fat since values are not strongly typed.
-     */
-    public void writeExternal(ObjectOutput out) throws IOException {
-        out.writeInt(branchingFactor);
-        out.writeInt(nkeys);
-        for (int i = 0; i < nkeys; i++) {
-            int key = keys[i];
-            assert keys[i] > NEGINF && keys[i] < POSINF;
-            out.writeInt(key);
-        }
-        for (int i = 0; i < nkeys; i++) {
-            Object value = values[i];
-            assert value != null;
-            out.writeObject(value);
-        }
-    }
-
-    public void readExternal(ObjectInput in) throws IOException,
-            ClassNotFoundException {
-        branchingFactor = in.readInt();
-        nkeys = in.readInt();
-        keys = new int[branchingFactor];
-        values = new Entry[branchingFactor];
-        for (int i = 0; i < nkeys; i++) {
-            int key = in.readInt();
-            assert keys[i] > NEGINF && keys[i] < POSINF;
-            keys[i] = key;
-        }
-        for (int i = 0; i < nkeys; i++) {
-            Entry value = (Entry) in.readObject();
-            assert value != null;
-            values[i] = value;
-        }
-    }
+//    /*
+//     * Note: Serialization is fat since values are not strongly typed.
+//     */
+//    public void writeExternal(ObjectOutput out) throws IOException {
+//        out.writeInt(branchingFactor);
+//        out.writeInt(nkeys);
+//        for (int i = 0; i < nkeys; i++) {
+//            int key = keys[i];
+//            assert keys[i] > NEGINF && keys[i] < POSINF;
+//            out.writeInt(key);
+//        }
+//        for (int i = 0; i < nkeys; i++) {
+//            Object value = values[i];
+//            assert value != null;
+//            out.writeObject(value);
+//        }
+//    }
+//
+//    public void readExternal(ObjectInput in) throws IOException,
+//            ClassNotFoundException {
+//        branchingFactor = in.readInt();
+//        nkeys = in.readInt();
+//        keys = new int[branchingFactor];
+//        values = new Entry[branchingFactor];
+//        for (int i = 0; i < nkeys; i++) {
+//            int key = in.readInt();
+//            assert keys[i] > NEGINF && keys[i] < POSINF;
+//            keys[i] = key;
+//        }
+//        for (int i = 0; i < nkeys; i++) {
+//            Entry value = (Entry) in.readObject();
+//            assert value != null;
+//            values[i] = value;
+//        }
+//    }
 
 }

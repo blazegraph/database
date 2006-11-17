@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
 
@@ -83,7 +84,7 @@ public class ChecksumUtility {
         assert buf != null;
         assert pos >= 0;
         assert limit > pos;
-        
+
         // reset before computing the checksum.
         chk.reset();
         
@@ -97,6 +98,12 @@ public class ChecksumUtility {
             
             final int len = limit - pos;
             
+            if (pos > bytes.length - len) {
+                
+                throw new BufferUnderflowException();
+            
+            }
+                
             chk.update(bytes, pos, len);
             
         } else {

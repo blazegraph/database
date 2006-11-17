@@ -46,6 +46,8 @@ Modifications:
  */
 package com.bigdata.objectIndex;
 
+import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
@@ -56,58 +58,54 @@ import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
- * An instance of this class is used to serialize and de-serialize nodes and
- * leaves of an {@link ObjectIndex} with a given #of keys per node (aka
- * branching factor). Leaf and non-leaf nodes have different serialization
- * formats and require a different capacity buffer, but their leading bytes use
- * the same format so that you can tell by inspection whether a buffer contains
- * a leaf or a non-leaf node.
+ * <p>
+ * An instance of this class is used to serialize and de-serialize the
+ * {@link Node}s and {@link Leaf}s of a {@link BTree}. Leaf and non-leaf
+ * records have different serialization formats, but their leading bytes use the
+ * same format so that you can tell by inspection whether a buffer contains a
+ * leaf or a non-leaf node.
+ * </p>
+ * <p>
+ * The methods defined by this class all work with {@link ByteBuffer}s. On
+ * read, the buffer must be positioned to the start of the data to be read.
+ * After a read, the buffer will be positioned to the first byte after the data
+ * read. If there is insufficient data available in the buffer then an
+ * {@link BufferUnderflowException} will be thrown. On write, the data will be
+ * written starting at the current buffer position. After a write the position
+ * will be updated to the first byte after the data written. If there is not
+ * enough space remaining in the buffer then a {@link BufferOverflowException}
+ * will be thrown.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME nkeys semantics differ from first semantics.  The serializes need to be
- * updated to reflect that difference.
+ * FIXME Modify the serialized "reference" form to be smaller by writing the #of
+ * slots and not the #of bytes in the serialized record and by also accepting
+ * pragamatic limits on both the #of slots that may be addressed in the journal
+ * for a given slot size.
  * 
- * FIXME Is there really any reason to have fixed size serialization? The key
- * impact seems to be the size of the non-leaf nodes (since they would require
- * the size of the child node). References can still be negative (long) integers
- * to differentiate leaf vs non-leaf nodes, but we can also figure out whether
- * the node is a leaf or not during de-serialization. The big win for accepting
- * variable size allocation is that we can "right fit" each node into free slots
- * on the journal. (Since node are immutable once written, it does not make
- * sense to write a constant size since we will never update the node in its
- * current allocation.)
+ * @todo Since the serialization record no longer has a fixed size, can we go a
+ *       little further and compute its maximum size for a node and then report
+ *       only the actual #of bytes used. This would let us pack some values and
+ *       could be a big savings. We could also explore key compression, which
+ *       might be very useful for an index that is expected to be dense. Perhaps
+ *       we could just use the extser package at this point - probably it is
+ *       safer to do this without extser so that it is simpler ("ready to
+ *       hand").
  * 
- * @todo Nodes will have hard references until they are ready to be serialized,
- *       at which point the hard references must be converted to
- *       {@link ISlotAllocation}s. The code below assumes that this conversion
- *       has already been performed and does not anticipate the runtime data
- *       structures that will be required to operate with hard references or
- *       {@link ISlotAllocation}s as appropriate. (An alternative design might
- *       be to assign negative long integers to transient nodes and convert
- *       those references when a node is serialized. However we do this, the
- *       reference concept needs to encapsulate both kinds of reference, provide
- *       for conversion of the reference type during (de-)serialization, and
- *       support copy-on-write semantics.)
+ * @todo Modify the test helpers to generate random nodes by splitting two
+ *       random leaves and assigning those leaves persistent identity and
+ *       restore the commented out assertion in {@link AbstractNode#getParent()}
  * 
- * @todo Consider making nodes and leafs the same size and just having more
- *       key/value pairs in nodes. That will give us a higher branching factor
- *       for nodes in combination with the same size allocations for leaves and
- *       nodes with the potential for better allocation behavior by the journal.
+ * @todo Generalize to allow non-int[] keys and other kinds of value[]s.
  */
-class NodeSerializer {
-
-    final SlotMath slotMath;
+public class NodeSerializer {
 
     /**
-     * The #of keys per node (aka branching factor).
-     * 
-     * @todo consider serializing this with each node and leave so that the
-     *       serialized nodes may be more dense and so that nodes and leaves may
-     *       vary their capacity.
+     * Used to compute the #of slots from the #of bytes.
      */
-    final int pageSize;
+    final protected SlotMath slotMath;
 
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
@@ -116,8 +114,24 @@ class NodeSerializer {
      */
     static final int SIZEOF_ADLER32 = Bytes.SIZEOF_INT;
 
+    /**
+     * The size of the field whose value is the length of the serialized record
+     * in bytes.
+     */
+    static final int SIZEOF_NBYTES = Bytes.SIZEOF_SHORT;
+    
+    /**
+     * The size of the boolean field indicating whether a serialized record
+     * contains is a node or a leaf.
+     */
     static final int SIZEOF_IS_LEAF = Bytes.SIZEOF_BYTE;
 
+    /**
+     * The size of the field containing the branching factor (aka order) for the
+     * serialized node.
+     */
+    static final int SIZEOF_ORDER = Bytes.SIZEOF_SHORT;
+    
     /**
      * #of keys in the node.  The #of children for a {@link Node} is nkeys + 1.
      * The #of values for a leave is equal to the #of keys.
@@ -128,7 +142,8 @@ class NodeSerializer {
      * Size of a node or leaf reference. The value must be interpreted per
      * {@link #putNodeRef(ByteBuffer, long)}.
      */
-    static final int SIZEOF_REF = Bytes.SIZEOF_INT;
+    static final int SIZEOF_REF = Bytes.SIZEOF_LONG;
+//    static final int SIZEOF_REF = Bytes.SIZEOF_INT;
 
     /**
      * The key is an int32 within segment persistent identifier.
@@ -174,29 +189,31 @@ class NodeSerializer {
     static final int OFFSET_CHECKSUM = 0;
 
     /**
+     * Offset of the int16 signed integer whose value is the #of bytes in the
+     * serialized record. This is written on the record so that we can validate
+     * the checksum immediately when attempting to read a record and thereby
+     * prevent inadvertent allocations of arrays for keys and values based on
+     * bad data.
+     */
+    static final int OFFSET_NBYTES = OFFSET_CHECKSUM + SIZEOF_ADLER32;
+    
+    /**
      * Offset of the byte whose value indicates whether this node is a leaf
      * (1) or a non-leaf node (0).
      */
-    static final int OFFSET_IS_LEAF = OFFSET_CHECKSUM + SIZEOF_ADLER32;
+    static final int OFFSET_IS_LEAF = OFFSET_NBYTES + SIZEOF_NBYTES;
 
     /**
      * Offset of the short integer whose value is the non-negative index of
      * the #of keys in this node.
      */
-    static final int OFFSET_NKEYS = OFFSET_IS_LEAF + SIZEOF_IS_LEAF;
+    static final int OFFSET_ORDER = OFFSET_IS_LEAF + SIZEOF_IS_LEAF;
 
     /**
      * Offset of the short integer whose value is the non-negative index of
-     * branching factor for this node.
+     * the #of keys in this node.
      */
-    static final int OFFSET_ORDER = OFFSET_NKEYS+ SIZEOF_NKEYS;
-
-    /*
-     * @todo This is a possible location for a parent node reference. We might
-     * need this in order to support copy-on-write. Alternatively, we could pass
-     * the parent node into recursive calls and clone nodes on the way back up
-     * making adjustments as necessary.
-     */
+    static final int OFFSET_NKEYS = OFFSET_ORDER + SIZEOF_ORDER;
 
     /**
      * Offset of the first key within the buffer. The keys are an array of int32
@@ -205,48 +222,10 @@ class NodeSerializer {
      * array. The capacity of the array is fixed by the {@link #pageSize}
      * specified for the index.
      * 
-     * @see Node#NEGINF_KEY
-     * @see Node#POSINF_KEY
+     * @see AbstractNode#NEGINF
+     * @see AbstractNode#POSINF
      */
-    static final int OFFSET_KEYS = OFFSET_ORDER + SIZEOF_NKEYS;
-
-    /**
-     * Offset to first value within the buffer for a non-leaf node. The
-     * values are an array of {@link ISlotAllocation}s encoded as long
-     * integers. Each value gives the location of the current version of the
-     * corresponding child node for the key having the same array index. The
-     * values are maintained in correspondence with the keys. The capacity
-     * of the array is fixed by the {@link #pageSize} specified for the
-     * index.
-     */
-    final int OFFSET_NODE_VALUES;
-
-    /**
-     * Offset to the first value within the buffer for a leaf node. The
-     * values are an array of serialized {@link IObjectIndexEntry} objects.
-     * The values are maintained in correspondence with the keys. The
-     * capacity of the array is fixed by the {@link #pageSize} specified for
-     * the index.
-     */
-    final int OFFSET_LEAF_VALUES;
-
-//    /** Offset of the reference to prior leaf (iff leaf). */
-//    final int OFFSET_LEAF_PRIOR;
-//
-//    /** Offset of the reference to prior leaf (iff leaf). */
-//    final int OFFSET_LEAF_NEXT;
-
-    /** total non-leaf node size. */
-    final int NODE_SIZE;
-
-    /** total leaf node size. */
-    final int LEAF_SIZE;
-
-    /** #of slots per non-leaf node. */
-    final int slotsPerNode;
-    
-    /** #of slots per leaf node. */
-    final int slotsPerLeaf;
+    static final int OFFSET_KEYS = OFFSET_NKEYS + SIZEOF_NKEYS;
     
     /**
      * The object index is used in a single threaded context. Therefore a
@@ -255,7 +234,9 @@ class NodeSerializer {
     private static final ChecksumUtility chk = new ChecksumUtility();
     
     private NodeSerializer() {
+        
         throw new UnsupportedOperationException();
+        
     }
 
     /**
@@ -265,73 +246,88 @@ class NodeSerializer {
      * @param slotMath
      *            Used to decode a long integer encoding an
      *            {@link ISlotAllocation}.
-     * 
-     * @param pageSize
-     *            The page size (aka branching factor).
      */
-    NodeSerializer(SlotMath slotMath, int pageSize) {
+    NodeSerializer(SlotMath slotMath) {
 
         assert slotMath != null;
-        assert pageSize > 0;
 
         this.slotMath = slotMath;
-        this.pageSize = pageSize;
+        
+    }
 
-        OFFSET_NODE_VALUES = OFFSET_KEYS + (SIZEOF_KEY * pageSize);
-        NODE_SIZE = OFFSET_NODE_VALUES + (SIZEOF_NODE_VALUE * pageSize);
+    /**
+     * The #of bytes requires to serialize this node or leaf.
+     * 
+     * @param node
+     *            The node or leaf.
+     * 
+     * @return The #of bytes required to serialize that node or leaf.
+     */
+    public int getSize(AbstractNode node) {
 
-        OFFSET_LEAF_VALUES = OFFSET_KEYS + (SIZEOF_KEY * pageSize);
-//        OFFSET_LEAF_PRIOR = OFFSET_LEAF_VALUES
-//                + (SIZEOF_LEAF_VALUE * pageSize);
-//        OFFSET_LEAF_NEXT = OFFSET_LEAF_PRIOR + SIZEOF_REF;
-//        LEAF_SIZE = OFFSET_LEAF_NEXT + SIZEOF_REF;
-        LEAF_SIZE = OFFSET_LEAF_VALUES + (SIZEOF_LEAF_VALUE * pageSize);
+        return getSize( node.isLeaf(), node.nkeys );
+        
+    }
+    
+    int getSize( boolean isLeaf, int nkeys ) {
+        
+        if (isLeaf) {
 
-        slotsPerNode = slotMath.getSlotCount(NODE_SIZE);
-        slotsPerLeaf = slotMath.getSlotCount(LEAF_SIZE);
+            int OFFSET_LEAF_VALUES = OFFSET_KEYS + (SIZEOF_KEY * nkeys);
 
+            int LEAF_SIZE = OFFSET_LEAF_VALUES + (SIZEOF_LEAF_VALUE * nkeys);
+
+            return LEAF_SIZE;
+
+        } else {
+
+            int OFFSET_NODE_VALUES = OFFSET_KEYS + (SIZEOF_KEY * nkeys);
+
+            int NODE_SIZE = OFFSET_NODE_VALUES
+                    + (SIZEOF_NODE_VALUE * (nkeys + 1));
+
+            return NODE_SIZE;
+
+        }
+        
     }
 
     /**
      * De-serialize a node or leaf. This method is used when the caller does not
      * know a-priori whether the reference is to a node or leaf. The decision is
-     * made based on inspection of the reference and verified by testing the
-     * data in the buffer.
+     * made based on inspection of the {@link #OFFSET_IS_LEAF} byte in the
+     * buffer.
      * 
-     * @param ndx
-     *            The object index.
-     * @param recid
-     *            The reference.
+     * @param btree
+     *            The btree.
+     * @param id
+     *            The persistent identitifer of the node or leaf being
+     *            de-serialized.
      * @param buf
      *            The buffer.
-     *            
+     * 
      * @return The de-serialized node.
      */
-    AbstractNode getNodeOrLeaf( ObjectIndex ndx, long recid, ByteBuffer buf) {
+    AbstractNode getNodeOrLeaf( BTree btree, long id, ByteBuffer buf) {
 
-//        assert ndx != null; // @todo enable this assertion.
-        assert recid != 0L;
+        assert btree != null;
+        assert id != 0L;
         assert buf != null;
         
-        final int nbytes = SlotMath.getByteCount(recid);
-        
-        if( nbytes == NODE_SIZE) {
-        
-            assert buf.get(OFFSET_IS_LEAF) == 0;
+        if (buf.limit() < OFFSET_KEYS) {
 
-            return getNode(ndx,recid,buf);
+            throw new RuntimeException(
+                    "Buffer is too small to contain a node or leaf.");
             
-        } else if( nbytes == LEAF_SIZE ) {
-            
-            assert buf.get(OFFSET_IS_LEAF) == 1;
+        }
+        
+        if( buf.get(OFFSET_IS_LEAF) == 1 ) {
 
-            return getLeaf(ndx,recid,buf);
+            return getLeaf(btree,id,buf);
 
         } else {
             
-            throw new AssertionError(
-                    "Allocation size matches neither node nor leaf: nbytes="
-                            + nbytes);
+            return getNode(btree,id,buf);
             
         }
 
@@ -343,80 +339,133 @@ class NodeSerializer {
      * @param buf
      *            The buffer. The node will be serialized starting at the
      *            current position. The position will be advanced as a side
-     *            effect. The remaining bytes in the buffer must equal
-     *            {@link #NODE_SIZE} as a pre-condition and will be ZERO(0)
-     *            as a post-condition.
+     *            effect.
      * @param node
-     *            The node. Must be a non-leaf node.
+     *            The node.
+     * 
+     * @exception BufferOverflowException
+     *                if there is not enough space remaining in the buffer.
      */
     void putNode(ByteBuffer buf, Node node) {
 
         assert buf != null;
         assert node != null;
-        assert node.nkeys >= 0 && node.nkeys < pageSize;
-        assert buf.remaining() == NODE_SIZE;
-        
+        assert node.branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+        assert node.branchingFactor < Short.MAX_VALUE;
+        assert node.nkeys >= 0 && node.nkeys < node.branchingFactor;
+
+        if (node.dirtyChildren.size() > 0) {
+
+            /*
+             * Note: You can not serialize a node that has dirty children since
+             * the childKeys[] array will not contain the persistent identity
+             * for any child that has not already been serialized.
+             */
+            
+            throw new IllegalStateException("Dirty children exist.");
+            
+        }
+
+        final int nkeys = node.nkeys;
+
         /*
          * common data.
          */
-        // checksum
-        // The offset at which to write the checksum.
+
         final int pos0 = buf.position();
+
+        // checksum
         buf.putInt(0); // will overwrite below with the checksum.
+
+        // #bytes
+        buf.putShort((short)0); // will overwrite below with the actual value.
+        
         // isLeaf
         buf.put((byte) 0); // this is a non-leaf node.
+        
+        // branching factor.
+        buf.putShort((short)node.branchingFactor);
+        
         // #of keys
         buf.putShort((short) node.nkeys);
+        
         // keys.
-        for (int i = 0; i < node.branchingFactor-1; i++) {
-            buf.putInt(node.keys[i]);
-        }
-        /*
-         * non-leaf node specific data.
-         */
-        // values.
-        for (int i = 0; i < node.branchingFactor; i++) {
-            long val = node.childKeys[i];
-            putNodeRef(buf, val);
+        
+        int lastKey = AbstractNode.NEGINF;
+        
+        for (int i = 0; i < nkeys; i++) {
+
+            final int key = node.keys[i];
+            
+            assert key > lastKey; // verify increasing and minimum.
+            
+            assert key < AbstractNode.POSINF; // verify maximum.
+
+            buf.putInt(key);
+            
+            lastKey = key;
+            
         }
         
-        assert buf.position() == buf.limit();
-
-        // compute checksum and write it on the buffer.
-        final int checksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
-                + NODE_SIZE);
-//        System.err.println("computed node checksum: "+checksum);
-        buf.putInt(pos0, checksum);
-        assert buf.getInt(pos0) == checksum;
-    
-        assert buf.position() == buf.limit();
-
-    }
-
-    Node getNode(ObjectIndex ndx,long recid,ByteBuffer buf) {
-
-//        assert ndx != null; // @todo enable this assertion.
-        assert recid != 0L;
-        assert buf != null;
-
-        if (buf.remaining() != NODE_SIZE) {
-            throw new IllegalArgumentException(
-                    "Wrong #bytes remaining in buffer for a non-leaf node: expected="
-                            + NODE_SIZE + ", actual=" + buf.remaining());
+        // values.
+        for (int i = 0; i <= nkeys; i++) {
+        
+            final long childKey = node.childKeys[i];
+            
+            // children MUST have assigned persistent identity.
+            assert childKey != 0L;
+            
+            putNodeRef(buf, childKey);
+            
         }
 
+        // #of bytes actually written.
+        final int nbytes = buf.position() - pos0;
+        assert nbytes>=OFFSET_KEYS;
+        assert nbytes<=Short.MAX_VALUE;
+        
+        // patch #of bytes written on the record format.
+        buf.putShort(pos0+OFFSET_NBYTES,(short)nbytes);
+        
+        // compute checksum for data written.
+        final int checksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
+                + nbytes);
+        
+//        System.err.println("computed node checksum: "+checksum);
+
+        // write the checksum into the buffer.
+        buf.putInt(pos0, checksum);
+        
+    }
+
+    Node getNode(BTree btree,long id,ByteBuffer buf) {
+
+        assert btree != null;
+        assert id != 0L;
+        assert buf != null;
+
+        final int remaining = buf.remaining();
+        
         /*
          * common data.
          */
-        
-        // checksum
+
         final int pos0 = buf.position();
-        
+
+        // checksum
         final int readChecksum = buf.getInt(); // read checksum.
 //        System.err.println("read checksum="+readChecksum);
-        
-        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
-                + NODE_SIZE);
+
+        // #of bytes in record. 
+        final int nbytes = buf.getShort();
+        assert nbytes>=OFFSET_KEYS;
+
+        /*
+         * verify checksum now that we know how many bytes of data we expect
+         * to read.
+         */
+        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32,
+                pos0 + nbytes);
         
         if (computedChecksum != readChecksum) {
         
@@ -424,70 +473,65 @@ class NodeSerializer {
                     + ", but computed " + computedChecksum);
             
         }
-        
+
         // isLeaf
-        assert buf.get() == 0; // expecting a non-leaf node.
+        if( buf.get() != 0 ) {
+
+            // expecting a non-leaf node.
+            throw new RuntimeException("Not a Node: id="+id);
+            
+        }
+
+        // branching factor.
+        final int branchingFactor = buf.getShort();
+
+        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
         // nkeys
         final int nkeys = buf.getShort();
 
-        // keys & values.
+        assert nkeys >= 0 && nkeys < branchingFactor;
+
+        // check the buffer size know that we known the #of keys.
+        assert remaining == getSize(false,nkeys );
+
+        final int[] keys = new int[branchingFactor - 1];
+
+        final long[] children = new long[branchingFactor];
+
+        /*
+         * keys.
+         */
         
-        int[] keys = null;
-        
-        long[] children = null;
-        
-        if (nkeys == pageSize-1) {
-            
-            /*
-             * If there are no keys or values then there is nothing more to
-             * read.
-             */
-            
-            buf.position(buf.limit()); // satisify post-condition.
-            
-        } else {
+        int lastKey = Node.NEGINF;
 
-            // Skip over undefined keys.
-            buf.position(pos0+OFFSET_KEYS+nkeys*SIZEOF_KEY);
+        for (int i = 0; i < nkeys; i++) {
 
-            keys = new int[pageSize];
-            
-            int lastKey = Node.NEGINF;
-            
-            for (int i = nkeys; i < pageSize; i++) {
-                
-                int key = buf.getInt();
-                
-                assert key > lastKey; // verify keys are in ascending order.
-                
-                assert key < Node.POSINF; // verify keys in legal range.
-                
-                keys[i] = lastKey = key;
-                
-            }
-            
-            /*
-             * non-leaf node specific data (children).
-             */
+            int key = buf.getInt();
 
-            // Skip over undefined values.
-            buf.position(pos0+OFFSET_NODE_VALUES+nkeys*SIZEOF_NODE_VALUE);
+            assert key > lastKey; // verify keys are in ascending order.
 
-            children = new long[pageSize];
-            
-            for (int i = nkeys; i < pageSize; i++) {
-                
-                children[i] = getNodeRef(buf);
-                
-            }
-            
+            assert key < Node.POSINF; // verify keys in legal range.
+
+            keys[i] = lastKey = key;
+
         }
 
-        assert buf.position() == buf.limit();
+        /*
+         * child references (nchildren == nkeys+1).
+         */
 
+        for (int i = 0; i <= nkeys; i++) {
+
+            children[i] = getNodeRef(buf);
+
+        }
+
+        // verify #of bytes actually read.
+        assert buf.position() - pos0 == nbytes;
+        
         // Done.
-        return new Node((BTree)ndx, recid, nkeys, keys, children);
+        return new Node( btree, id, branchingFactor, nkeys, keys, children);
 
     }
 
@@ -507,167 +551,195 @@ class NodeSerializer {
 
         assert buf != null;
         assert node != null;
-        assert node.nkeys >= 0 && node.nkeys < pageSize;
-        assert buf.remaining() == LEAF_SIZE;
-
-        /*
-         * common data.
-         */
-        // checksum
-        final int pos0 = buf.position(); // offset at which to write
-        // checksum.
-        buf.putInt(0); // will overwrite below with the checksum.
-        // isLeaf
-        buf.put((byte) 1); // this is a leaf node.
-        // first
-        buf.putShort((short) node.nkeys);
-        // keys.
-        for (int i = 0; i < pageSize-1; i++) {
-            buf.putInt(node.keys[i]);
-        }
-        /*
-         * leaf-node specific data.
-         */
-        for (int i = 0; i < pageSize; i++) { // write values[].
-            IObjectIndexEntry entry = node.values[i];
-            if (entry == null) {
-                buf.putShort((short) 0);
-                buf.putLong(0);
-                buf.putLong(0);
-            } else {
-                // May be null (indicates the current version is deleted).
-                final ISlotAllocation currentVersionSlots = entry.getCurrentVersionSlots();
-                // May be null (indicates first version in this isolation/tx).
-                final ISlotAllocation preExistingVersionSlots = entry.getPreExistingVersionSlots();
-                buf.putShort(entry.getVersionCounter());
-                buf.putLong((currentVersionSlots == null ? 0L
-                        : currentVersionSlots.toLong()));
-                buf.putLong((preExistingVersionSlots == null ? 0L
-                        : preExistingVersionSlots.toLong()));
-            }
-        }
-//        putNodeRef(buf, node._previous);
-//        putNodeRef(buf, node._next);
-
-        assert buf.position() == buf.limit();
-
-        // compute checksum and write it on the buffer.
-        final int checksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
-                + LEAF_SIZE);
-//        System.err.println("computed leaf checksum: "+checksum);
-        buf.putInt(pos0, checksum);
-        assert buf.getInt(pos0) == checksum;
-
-        assert buf.position() == buf.limit();
-
-    }
-
-    Leaf getLeaf(ObjectIndex ndx,long recid,ByteBuffer buf) {
+        assert node.nkeys >= 0 && node.nkeys <= node.branchingFactor;
         
-//        assert ndx != null; // @todo enable this assertion.
-        assert recid != 0L;
-        assert buf != null;
-        if (buf.remaining() != LEAF_SIZE) {
-            throw new IllegalArgumentException(
-                    "Wrong #bytes remaining in buffer for a leaf node: expected="
-                            + LEAF_SIZE + ", actual=" + buf.remaining());
-        }
+        final int remaining = buf.remaining();
+        
+        assert remaining >= getSize(true,node.nkeys);
 
+        final int nkeys = node.nkeys;
+        
         /*
          * common data.
          */
         // checksum
         final int pos0 = buf.position();
+
+        buf.putInt(0); // will overwrite below with the checksum.
+        
+        // nbytes
+        buf.putShort((short)0); // will overwrite below with the actual value.
+        
+        // isLeaf
+        buf.put((byte) 1); // this is a leaf node.
+        
+        // branching factor.
+        buf.putShort((short)node.branchingFactor);
+        
+        // #of keys
+        buf.putShort((short) node.nkeys);
+        
+        // keys.
+        
+        int lastKey = AbstractNode.NEGINF;
+        
+        for (int i = 0; i < nkeys; i++) {
+
+            final int key = node.keys[i];
+            
+            assert key > lastKey; // verify increasing and minimum.
+            
+            assert key < AbstractNode.POSINF; // verify maximum.
+
+            buf.putInt(key);
+            
+            lastKey = key;
+            
+        }
+        
+        /*
+         * values.
+         */
+        for (int i = 0; i < nkeys; i++) {
+
+            final IObjectIndexEntry entry = node.values[i];
+
+            assert entry != null;
+
+            // May be null (indicates the current version is deleted).
+            final ISlotAllocation currentVersionSlots = entry
+                    .getCurrentVersionSlots();
+
+            // May be null (indicates first version in this isolation/tx).
+            final ISlotAllocation preExistingVersionSlots = entry
+                    .getPreExistingVersionSlots();
+
+            buf.putShort(entry.getVersionCounter());
+
+            buf.putLong((currentVersionSlots == null ? 0L : currentVersionSlots
+                    .toLong()));
+
+            buf.putLong((preExistingVersionSlots == null ? 0L
+                    : preExistingVersionSlots.toLong()));
+
+        }
+
+        // #of bytes actually written.
+        final int nbytes = buf.position() - pos0;
+        assert nbytes>=OFFSET_KEYS;
+        assert nbytes<=Short.MAX_VALUE;
+        
+        // patch #of bytes written on the record format.
+        buf.putShort(pos0+OFFSET_NBYTES,(short)nbytes);
+       
+        // compute checksum
+        final int checksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
+                + nbytes);
+//        System.err.println("computed leaf checksum: "+checksum);
+        
+        // write checksum on buffer.
+        buf.putInt(pos0, checksum);
+
+    }
+
+    Leaf getLeaf(BTree btree,long id,ByteBuffer buf) {
+        
+        assert btree != null;
+        assert id != 0L;
+        assert buf != null;
+
+        final int remaining = buf.remaining();
+        
+        /*
+         * common data.
+         */
+        
+        final int pos0 = buf.position();
+
+        // checksum
         final int readChecksum = buf.getInt(); // read checksum.
 //        System.err.println("read checksum="+readChecksum);
-        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32, pos0
-                + LEAF_SIZE);
+        
+        // #bytes.
+        final int nbytes = buf.getShort();
+        
+        /*
+         * verify checksum.
+         */
+        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_ADLER32,
+                pos0 + nbytes);
+        
         if (computedChecksum != readChecksum) {
+        
             throw new ChecksumError("Invalid checksum: read " + readChecksum
                     + ", but computed " + computedChecksum);
+            
         }
         
         // isLeaf
-        assert buf.get() == 1; // expecting a leaf node.
+        if( buf.get() != 1 ) {
 
-        // nkeys
-        final int nkeys = buf.getShort();
-        
-        /*
-         * keys and values.
-         */
-        
-        int[] keys = null;
-        
-        IndexEntry[] values = null;
-        
-        if (nkeys == pageSize-1) {
-        
-            /*
-             * If there are no keys or values then there is nothing more to
-             * read.
-             */
+            // expecting a non-leaf node.
+            throw new RuntimeException("Not a Node: id="+id);
             
-            buf.position(pos0 + LEAF_SIZE);
-            
-        } else {
-            
-            /*
-             * Keys.
-             */
-
-            // Skip over undefined keys.
-            buf.position(pos0+OFFSET_KEYS+nkeys*SIZEOF_KEY);
-
-            keys = new int[pageSize];
-            
-            int lastKey = Node.NEGINF;
-            
-            for (int i = nkeys; i < pageSize; i++) {
-                
-                int key = buf.getInt();
-                
-                assert key > lastKey; // verify keys are in ascending order.
-                
-                assert key < Node.POSINF; // verify keys in legal range.
-                
-                keys[i] = lastKey = key;
-                
-            }
-            
-            /*
-             * leaf node specific data (values).
-             */
-
-            // Skip over undefined values.
-            buf.position(pos0+OFFSET_LEAF_VALUES+nkeys*SIZEOF_LEAF_VALUE);
-
-            // values.
-            values = new IndexEntry[pageSize];
-            
-            for (int i = nkeys; i < pageSize; i++) {
-            
-                final short versionCounter = buf.getShort();
-                
-                final long currentVersion = buf.getLong();
-                
-                final long preExistingVersion = buf.getLong();
-                
-                values[i] = new IndexEntry(slotMath, versionCounter,
-                            currentVersion, preExistingVersion);
-                
-            }
         }
 
-//        final long previous = getNodeRef(buf);
-//        
-//        final long next = getNodeRef(buf);
+        // branching factor
+        final int branchingFactor = buf.getShort();
 
-        assert buf.position() == buf.limit();
+        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+        
+        // nkeys
+        final int nkeys = buf.getShort();
+
+        assert nkeys >=0 && nkeys <= branchingFactor;
+        
+        assert remaining >= getSize(true,nkeys);
+
+        /*
+         * Keys.
+         */
+
+        final int[] keys = new int[branchingFactor];
+
+        int lastKey = Node.NEGINF;
+
+        for (int i = 0; i < nkeys; i++) {
+
+            int key = buf.getInt();
+
+            assert key > lastKey; // verify keys are in ascending order.
+
+            assert key < Node.POSINF; // verify keys in legal range.
+
+            keys[i] = lastKey = key;
+
+        }
+
+        /*
+         * Values.
+         */
+
+        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor];
+
+        for (int i = 0; i < nkeys; i++) {
+
+            final short versionCounter = buf.getShort();
+
+            final long currentVersion = buf.getLong();
+
+            final long preExistingVersion = buf.getLong();
+
+            values[i] = new IndexEntry(slotMath, versionCounter,
+                    currentVersion, preExistingVersion);
+
+        }
+
+        // verify #of bytes actually read.
+        assert buf.position() - pos0 == nbytes;
         
         // Done.
-        return new Leaf((BTree)ndx, recid, nkeys, keys, values);
-//                previous, next);
+        return new Leaf( btree, id, branchingFactor, nkeys, keys, values);
 
     }
 
@@ -687,36 +759,38 @@ class NodeSerializer {
      */
     private void putNodeRef(ByteBuffer buf, long longValue) {
 
-        if( longValue == 0L ) {
-
-            // Special case for null ref.
-            buf.putInt(0);
-            
-            return;
-            
-        }
+        buf.putLong(longValue);
         
-        final int nbytes = SlotMath.getByteCount(longValue);
-        
-        final int firstSlot = SlotMath.getFirstSlot(longValue);
-        
-        if( nbytes == NODE_SIZE) {
-        
-            // Store as firstSlot (positive integer).
-            buf.putInt(firstSlot);
-            
-        } else if( nbytes == LEAF_SIZE ) {
-            
-            // Store as -(firstSlot) (negative integer).
-            buf.putInt(-firstSlot);
-            
-        } else {
-            
-            throw new AssertionError(
-                    "Allocation size matches neither node nor leaf: firstSlot="
-                            + firstSlot + ", nbytes=" + nbytes);
-            
-        }
+//        if( longValue == 0L ) {
+//
+//            // Special case for null ref.
+//            buf.putInt(0);
+//            
+//            return;
+//            
+//        }
+//        
+//        final int nbytes = SlotMath.getByteCount(longValue);
+//        
+//        final int firstSlot = SlotMath.getFirstSlot(longValue);
+//        
+//        if( nbytes == NODE_SIZE) {
+//        
+//            // Store as firstSlot (positive integer).
+//            buf.putInt(firstSlot);
+//            
+//        } else if( nbytes == LEAF_SIZE ) {
+//            
+//            // Store as -(firstSlot) (negative integer).
+//            buf.putInt(-firstSlot);
+//            
+//        } else {
+//            
+//            throw new AssertionError(
+//                    "Allocation size matches neither node nor leaf: firstSlot="
+//                            + firstSlot + ", nbytes=" + nbytes);
+//            
+//        }
         
     }
 
@@ -733,25 +807,28 @@ class NodeSerializer {
      */
     private long getNodeRef(ByteBuffer buf) {
 
-        final int firstSlot = buf.getInt();
+        return buf.getLong();
         
-        final long longValue;
-        
-        if (firstSlot == 0) {
-            
-            longValue = 0;
-            
-        } else if (firstSlot > 0) {
-            
-            longValue = SlotMath.toLong(NODE_SIZE, firstSlot);
-            
-        } else {
-            
-            longValue = SlotMath.toLong(LEAF_SIZE, -firstSlot);
-            
-        }
-        
-        return longValue;
+//        final int firstSlot = buf.getInt();
+//        
+//        final long longValue;
+//        
+//        if (firstSlot == 0) {
+//            
+//            longValue = 0;
+//            
+//        } else if (firstSlot > 0) {
+//            
+//            longValue = SlotMath.toLong(NODE_SIZE, firstSlot);
+//            
+//        } else {
+//            
+//            longValue = SlotMath.toLong(LEAF_SIZE, -firstSlot);
+//            
+//        }
+//        
+//        return longValue;
         
     }
+
 }
