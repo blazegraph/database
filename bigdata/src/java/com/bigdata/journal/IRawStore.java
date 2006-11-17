@@ -59,6 +59,11 @@ import java.nio.ByteBuffer;
 public interface IRawStore {
 
     /**
+     * The #of bytes in a slot.
+     */
+    public int getSlotSize();
+    
+    /**
      * Write the data on the journal. This method is not isolated and does not
      * update the object index. It operates directly on the slots in the journal
      * and returns a {@link ISlotAllocation} that may be used to recover the

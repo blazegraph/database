@@ -50,9 +50,8 @@ package com.bigdata.objectIndex;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
-import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
 
 /**
  * Test case for {@link NodeSerializer}.
@@ -256,7 +255,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
         final int branchingFactor = 8;
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
         ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
         
         // Create test node.
@@ -281,7 +280,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
         final int branchingFactor = 8;
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
         ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
@@ -325,7 +324,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final NodeSerializer nodeSer = new NodeSerializer(slotMath);
         
         final int branchingFactor = 8;
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
         ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
@@ -369,7 +368,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final NodeSerializer nodeSer = new NodeSerializer(slotMath);
 
         final int branchingFactor = 8;
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
         ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
 
         // Create test node.
@@ -558,7 +557,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             // Choose the branching factor randomly.
             final int pageSize = pageSizes[r.nextInt(pageSizes.length)];
 
-            SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+            IRawStore store = new SimpleStore();
 
             ObjectIndex ndx = new ObjectIndex(store, pageSize);
 

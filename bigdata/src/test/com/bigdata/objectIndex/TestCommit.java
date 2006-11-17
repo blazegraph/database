@@ -49,8 +49,7 @@ package com.bigdata.objectIndex;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
-import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
+import com.bigdata.journal.IRawStore;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.
@@ -82,7 +81,7 @@ public class TestCommit extends TestCase2 {
      */
     public void test_commit01() {
 
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
 
         final int branchingFactor = 4;
         

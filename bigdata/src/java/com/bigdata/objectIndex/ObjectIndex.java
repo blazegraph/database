@@ -47,8 +47,7 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
-import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
+import com.bigdata.journal.IRawStore;
 
 /**
  * @todo this needs to be reconciled with {@link BTree}, {@link NodeSerializer}
@@ -63,11 +62,11 @@ public class ObjectIndex extends BTree {
      * @param store
      * @param branchingFactor
      */
-    public ObjectIndex(SimpleStore<Long, PO> store, int branchingFactor) {
+    public ObjectIndex(IRawStore store, int branchingFactor) {
         super(store, branchingFactor);
     }
 
-    public ObjectIndex(SimpleStore<Long, PO> store, long metadataId) {
+    public ObjectIndex(IRawStore store, long metadataId) {
         
         super(store,metadataId);
         

@@ -52,10 +52,9 @@ import java.util.Random;
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.ContiguousSlotAllocation;
+import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
-import com.bigdata.objectIndex.TestSimpleBTree.SimpleStore;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -353,7 +352,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public BTree getNoEvictionBTree(int branchingFactor) {
         
-        SimpleStore<Long, PO> store = new SimpleStore<Long, PO>();
+        IRawStore store = new SimpleStore();
 
         BTree btree = new BTree(store, branchingFactor,
                 new NoLeafEvictionListener(), 10000);

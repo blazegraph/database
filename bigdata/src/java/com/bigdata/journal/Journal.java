@@ -371,6 +371,12 @@ public class Journal implements IRawStore, IStore {
     // Make package private or just get rid of this : BTree is currently using it.
     public final SlotMath slotMath;
     
+    public int getSlotSize() {
+        
+        return slotMath.slotSize;
+        
+    }
+    
     /**
      * The implementation logic for the current {@link BufferMode}.
      * 

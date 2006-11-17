@@ -54,10 +54,11 @@ import java.util.Set;
 
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.Bytes;
+import com.bigdata.journal.ContiguousSlotAllocation;
+import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objectIndex.TestSimpleBTree.IStore;
 import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 /**
@@ -106,7 +107,7 @@ public class BTree {
     /**
      * The persistence store.
      */
-    final protected IStore<Long, PO> store;
+    final protected IRawStore store;
 
     /**
      * The branching factor for the btree.
@@ -223,7 +224,7 @@ public class BTree {
      *            The capacity of the hard reference queue (minimum of 2 to
      *            avoid cache evictions of the leaves participating in a split).
      */
-    public BTree(IStore<Long, PO> store, int branchingFactor,
+    public BTree(IRawStore store, int branchingFactor,
             ILeafEvictionListener listener, int hardReferenceQueueCapacity) {
 
         assert store != null;
@@ -271,7 +272,7 @@ public class BTree {
      * @see DefaultLeafEvictionListener
      * @see #DEFAULT_LEAF_CACHE_CAPACITY
      */
-   public BTree(IStore<Long, PO> store, int branchingFactor) {
+   public BTree(IRawStore store, int branchingFactor) {
 
         this(store, branchingFactor, new DefaultLeafEvictionListener(),
                 DEFAULT_LEAF_CACHE_CAPACITY);
@@ -286,7 +287,7 @@ public class BTree {
      * @param metadataId
      *            The persistent identifier of btree metadata.
      */
-    public BTree(IStore<Long, PO> store, long metadataId) {
+    public BTree(IRawStore store, long metadataId) {
 
         assert store != null;
 
@@ -345,19 +346,39 @@ public class BTree {
             
         }
         
-        final long id = store.insert(buf);
+        final long id = store.write(buf).toLong();
 
         node.setIdentity(id);
         
         node.setDirty(false);
         
     }
+
+    /**
+     * Convert the persistent identifier into an {@link ISlotAllocation}.
+     * 
+     * @param id
+     *            The persistent identifier.
+     *            
+     * @return The {@link ISlotAllocation}
+     */
+    protected ISlotAllocation asSlots(long id) {
+        
+        final int firstSlot = SlotMath.getFirstSlot(id);
+        
+        final int byteCount = SlotMath.getByteCount(id);
+
+        final int slotCount = nodeSer.slotMath.getSlotCount(byteCount);
+        
+        return new ContiguousSlotAllocation(byteCount, slotCount, firstSlot);
+
+    }
     
     protected AbstractNode readNodeOrLeaf( long id ) {
         
         buf.clear();
         
-        ByteBuffer tmp = store.read(id,buf);
+        ByteBuffer tmp = store.read(asSlots(id),buf);
         
         AbstractNode node = nodeSer.getNodeOrLeaf(this, id, tmp);
         
@@ -481,7 +502,7 @@ public class BTree {
         buf.putInt(nleaves);
         buf.putInt(nentries);
 
-        return store.insert(buf);
+        return store.write(buf).toLong();
 
     }
 
@@ -497,7 +518,7 @@ public class BTree {
      */
     long read(long metadataId) {
 
-        ByteBuffer buf = store.read(metadataId,null);
+        ByteBuffer buf = store.read(asSlots(metadataId),null);
 
         final long rootId = buf.getLong();
         System.err.println("rootId=" + rootId);
