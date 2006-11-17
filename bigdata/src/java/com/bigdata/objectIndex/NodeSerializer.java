@@ -553,10 +553,6 @@ public class NodeSerializer {
         assert node != null;
         assert node.nkeys >= 0 && node.nkeys <= node.branchingFactor;
         
-        final int remaining = buf.remaining();
-        
-        assert remaining >= getSize(true,node.nkeys);
-
         final int nkeys = node.nkeys;
         
         /*

@@ -47,6 +47,15 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+/**
+ * FIXME Modify the default policy for leaves (and nodes) to split "high" if the
+ * leaf/node as keys that are either nearly or completely dense. In those cases
+ * it is impossible / improbable that the openings created by splitting and m/2
+ * would ever be filled and splitting high will result in a more compact tree.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class DefaultLeafSplitPolicy implements ILeafSplitPolicy {
 
     /**

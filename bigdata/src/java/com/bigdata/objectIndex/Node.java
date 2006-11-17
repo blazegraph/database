@@ -252,15 +252,6 @@ public class Node extends AbstractNode {
      * 
      * @param src
      *            The source node.
-     * 
-     * FIXME Modify to steal the unmodified children by setting their parent
-     * fields to the new node. Stealing the parent means that the node can
-     * no longer be used by its previous ancestor. However, since the node
-     * state is unchanged (it is immutable) the slick trick would be to wrap
-     * the state node with a flyweight node having a different parent so
-     * that the node remained valid for its old parent. This probably means
-     * making getParent() abstract and moving the parent field into a
-     * flyweight class.
      */
     protected Node(Node src) {
 
@@ -287,11 +278,40 @@ public class Node extends AbstractNode {
         }
 
         // Note: There is always one more child than keys for a Node.
+        System.arraycopy(src.childKeys, 0, childKeys, 0, nkeys+1);
+
+        /*
+         * Steal the unmodified children by setting their parent fields to the
+         * new node. Stealing the parent means that the node can no longer be
+         * used by its previous ancestor.
+         * 
+         * @todo Since the node state is unchanged (it is immutable) the slick
+         * trick would be to wrap the state node with a flyweight node having a
+         * different parent so that the node remained valid for its old parent.
+         * This probably means making getParent() abstract and moving the parent
+         * field into a flyweight class. This would help if we had to rollback
+         * to a prior state of the tree without wanting to discard the
+         * deserialized nodes.
+         */
         for (int i = 0; i <= nkeys; i++) {
 
-            this.childKeys[i] = src.childKeys[i];
+            AbstractNode child = src.childRefs[i] == null ? null
+                    : src.childRefs[i].get();
 
+            if( child != null ) {
+                
+                // Steal the child.
+                child.parent = new WeakReference<Node>(this);
+                
+            }
+            
         }
+        
+        /*
+         * Remove the source node from the btree since it has been replaced by
+         * this node.
+         */ 
+        btree.nodes.remove(src);
 
     }
 

@@ -59,7 +59,6 @@ import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 /**
  * <p>
@@ -125,18 +124,19 @@ public class BTree {
     final public ILeafSplitPolicy leafSplitter = new DefaultLeafSplitPolicy();
 
     /**
-     * A hard reference hash map for nodes in the btree is used to ensure
-     * that nodes remain wired into memory. Dirty nodes are written to disk
-     * during commit using a pre-order traversal that first writes any dirty
-     * leaves and then (recursively) their parent nodes.
+     * A hard reference hash map for nodes in the btree is used to ensure that
+     * nodes remain wired into memory. Dirty nodes are written to disk during
+     * commit using a pre-order traversal that first writes any dirty leaves and
+     * then (recursively) their parent nodes.
      * 
-     * @todo Make sure that nodes are eventually removed from this set.
-     *       There are two ways to make that happen. One is to just use a
-     *       ring buffer with a large capacity.  This will serve a bit like
-     *       an MRU.  The other is to remove nodes from this set explicitly
-     *       on certain conditions.  For example, when a copy is made of an
-     *       immutable node the immutable node might be removed from this
-     *       set.
+     * @todo Make sure that nodes are eventually removed from this set. There
+     *       are two ways to make that happen. One is to just use a ring buffer
+     *       with a large capacity. This will serve a bit like an MRU. The other
+     *       is to remove nodes from this set explicitly on certain conditions.
+     *       For example, when a copy is made of an immutable node the immutable
+     *       node might be removed from this set.
+     * 
+     * @see AbstractNode#AbstractNode(AbstractNode)
      */
     final Set<Node> nodes = new HashSet<Node>();
 
@@ -148,9 +148,15 @@ public class BTree {
      * that leaves are evicted as new leaves are added to the hard reference
      * queue. This occurs in two situations: (1) when a new leaf is created
      * during a split of an existing leaf; and (2) when a leaf is read in from
-     * the store.  The minimum capacity for the hard reference queue is two (2)
+     * the store. The minimum capacity for the hard reference queue is two (2)
      * so that a split may occur without forcing eviction of either leaf in the
-     * split.
+     * split. Incremental writes basically make it impossible for the commit IO
+     * to get "too large" where too large is defined by the size of the hard
+     * reference cache.
+     * 
+     * @todo Only leaves are incrementally flushed, but it would be easy enough
+     *       to also incrementally flush nodes using
+     *       {@link #writeNodeRecursive(AbstractNode)}.
      */
     final HardReferenceCache<PO> leaves;
 
@@ -332,6 +338,72 @@ public class BTree {
 
     }
 
+    /**
+     * Write a dirty node and its children using a post-order traversal that
+     * first writes any dirty leaves and then (recursively) their parent nodes.
+     * The parent nodes are guarenteed to be dirty if there is a dirty child so
+     * this never triggers copy-on-write. This is used as part of the commit
+     * protocol where it is invoked with the root of the tree, but it may also
+     * be used to incrementally flush dirty non-root {@link Node}s.
+     * 
+     * @param root
+     *            The root of the hierarchy of nodes to be written. The node
+     *            MUST be dirty. The node this does NOT have to be the root of
+     *            the tree and it does NOT have to be a {@link Node}.
+     */
+    protected void writeNodeRecursive( AbstractNode root ) {
+
+        assert root != null;
+        
+        assert root.isDirty();
+        
+        assert ! root.isPersistent();
+        
+        // #of dirty nodes written (nodes or leaves)
+        int ndirty = 0;
+
+        // #of dirty leaves written.
+        int nleaves = 0;
+
+        /*
+         * Post-order traversal of children and this node itself.  Dirty
+         * nodes get written onto the store.
+         * 
+         * Note: This iterator only visits dirty nodes.
+         */
+        Iterator itr = root.postOrderIterator(true);
+
+        while (itr.hasNext()) {
+
+            AbstractNode node = (AbstractNode) itr.next();
+
+            assert node.isDirty();
+
+            if (node != this.root) {
+
+                /*
+                 * The parent MUST be defined unless this is the root node.
+                 */
+
+                TestSimpleBTree.assertNotNull(node.getParent());
+
+            }
+
+            // write the dirty node on the store.
+            node.write();
+
+            ndirty++;
+
+            if (node instanceof Leaf)
+                nleaves++;
+
+        }
+
+        System.err.println("write: " + ndirty + " dirty nodes (" + nleaves
+                + " leaves), rootId=" + root.getIdentity());
+        
+    }
+    
     protected void writeNodeOrLeaf(AbstractNode node ) {
 
         buf.clear();
@@ -430,6 +502,10 @@ public class BTree {
      *            The dump is written on this stream.
      * 
      * @return true unless an inconsistency is detected.
+     * 
+     * FIXME modify to use logging so that we can configure the dump to be very
+     * quite and log errors as such. This will let us also use it as a structure
+     * validation mechanism.
      */
     boolean dump(PrintStream out) {
 
@@ -547,9 +623,9 @@ public class BTree {
 
     /**
      * Commit dirty nodes using a post-order traversal that first writes any
-     * dirty leaves and then (recursively) their parent nodes. The parent
-     * nodes are guarenteed to be dirty if there is a dirty child so the
-     * commit never triggers copy-on-write.
+     * dirty leaves and then (recursively) their parent nodes. The parent nodes
+     * are guarenteed to be dirty if there is a dirty child so the commit never
+     * triggers copy-on-write.
      * 
      * @return The persistent identity of the metadata record for the btree.
      */
@@ -557,51 +633,8 @@ public class BTree {
 
         if (root.isDirty()) {
 
-            // #of dirty nodes (node or leave) written by commit.
-            int ndirty = 0;
-
-            // #of dirty leaves written by commit.
-            int nleaves = 0;
-
-            /*
-             * Traverse tree, writing dirty nodes onto the store.
-             * 
-             * Note: This iterator only visits dirty nodes.
-             */
-            Iterator itr = root.postOrderIterator(true);
-
-            while (itr.hasNext()) {
-
-                AbstractNode node = (AbstractNode) itr.next();
-
-                assert node.isDirty();
-
-                // if (node.isDirty()) {
-
-                if (node != root) {
-
-                    /*
-                     * The parent MUST be defined unless this is the root node.
-                     */
-
-                    TestSimpleBTree.assertNotNull(node.getParent());
-
-                }
-
-                // write the dirty node on the store.
-                node.write();
-
-                ndirty++;
-
-                if (node instanceof Leaf)
-                    nleaves++;
-
-                // }
-
-            }
-
-            System.err.println("commit: " + ndirty + " dirty nodes (" + nleaves
-                    + " leaves), rootId=" + root.getIdentity());
+            writeNodeRecursive( root );
+            
         }
 
         return write();

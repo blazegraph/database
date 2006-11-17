@@ -49,6 +49,7 @@ package com.bigdata.objectIndex;
 
 import java.util.Random;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.ContiguousSlotAllocation;
@@ -338,17 +339,20 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Return a new btree backed by a simple transient store.  The leaf cache
+     * Return a new btree backed by a simple transient store. The leaf cache
      * will be large and cache evictions will cause exceptions if they occur.
-     * This provides an indication if cache evictions are occurring so that
-     * the tests of basic tree operations in this test suite are known to be
-     * conducted in an environment without incremental writes of leaves onto
-     * the store.  This avoids copy-on-write scenarios and let's us test with
-     * the knowledge that there should always be a hard reference to a child
-     * or parent.
+     * This provides an indication if cache evictions are occurring so that the
+     * tests of basic tree operations in this test suite are known to be
+     * conducted in an environment without incremental writes of leaves onto the
+     * store. This avoids copy-on-write scenarios and let's us test with the
+     * knowledge that there should always be a hard reference to a child or
+     * parent.
      * 
      * @param branchingFactor
      *            The branching factor.
+     * 
+     * FIXME Refactor as an {@link IBTreeFactory} and update the test helpers
+     * and test harness to match.
      */
     public BTree getNoEvictionBTree(int branchingFactor) {
         
@@ -360,7 +364,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         return btree;
         
     }
-   
+    
 //    /**
 //     * <p>
 //     * Unit test for the {@link #getRandomKeys(int, int, int)} test helper. The
@@ -521,5 +525,589 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //        return keys;
 //        
 //    }
+
+    /**
+     * Test helper for {@link #test_splitRootLeaf_increasingKeySequence()}.
+     * creates a sequence of keys in increasing order and inserts them into the
+     * tree. Note that you do not know, in general, how many inserts it will
+     * take to split the root node since the split decisions are path dependent.
+     * They depend on the manner in which the leaves get filled, whether or not
+     * holes are created in the leaves, etc.
+     * 
+     * @param m
+     *            The branching factor.
+     * @param ninserts
+     *            The #of keys to insert.
+     */
+    public void doSplitWithIncreasingKeySequence(BTree btree, int m,int ninserts) {
+        
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a series of external keys in increasing order. When we
+         * insert these keys in sequence, the result is that all inserts go into
+         * the right-most leaf (this is the original leaf until the first split,
+         * and is thereafter always a new leaf).
+         */
+        
+        int[] keys = new int[ninserts];
+
+        Entry[] entries = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF + 1;
+        
+        for (int i = 0; i < ninserts; i++) {
+        
+            keys[i] = lastKey;
+            
+            entries[i] = new Entry();
+            
+            lastKey += 1;
+        
+        }
+
+        /*
+         * Do inserts.
+         */
+        
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < keys.length; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        // Note: The height, #of nodes, and #of leaves is path dependent.
+        assertEquals("#entries", keys.length, btree.nentries);
+
+        assertTrue(btree.dump(System.err));
+
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(entries, btree.getRoot().entryIterator());
+
+    }
+    
+    /**
+     * Creates a sequence of keys in decreasing order and inserts them into the
+     * tree. Note that you do not know, in general, how many inserts it will
+     * take to split the root node since the split decisions are path dependent.
+     * They depend on the manner in which the leaves get filled, whether or not
+     * holes are created in the leaves, etc.
+     * 
+     * @param m
+     *            The branching factor.
+     * @param ninserts
+     *            The #of keys to insert.
+     */
+    public void doSplitWithDecreasingKeySequence(BTree btree,int m, int ninserts) {
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a series of external keys in decreasing order. When we
+         * insert these keys in sequence, the result is that all inserts go into
+         * the left-most leaf (the original leaf).
+         */
+        
+        int[] keys = new int[ninserts];
+        Entry[] entries = new Entry[ninserts];
+        Entry[] reverseEntries = new Entry[ninserts];
+        {
+            int lastKey = ninserts;
+            int reverseIndex = ninserts - 1;
+            for (int i = 0; i < ninserts; i++) {
+                keys[i] = lastKey;
+                Entry entry = new Entry();
+                entries[i] = entry;
+                reverseEntries[reverseIndex--] = entry;
+                lastKey -= 1;
+            }
+        }
+
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < keys.length; i++) {
+
+            int key = keys[i];
+            
+            Entry entry = entries[i];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify entries in the expected order.
+         */
+        assertSameIterator(reverseEntries, btree.getRoot().entryIterator());
+
+        // Note: The height, #of nodes, and #of leaves is path dependent.
+        assertEquals("#entries", keys.length, btree.nentries);
+
+        assertTrue(btree.dump(System.err));
+        
+    }
+    
+    /**
+     * Stress test helper inserts random permutations of keys into btrees of
+     * order m for several different btrees, #of keys to be inserted, and
+     * permutations of keys. Several random permutations of dense and sparse
+     * keys are inserted. The #of keys to be inserted is also varied.
+     */
+    public void doSplitTest(int m, int trace) {
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m, trace);
+            
+            doInsertRandomSparseKeySequenceTest(m, m, trace);
+            
+        }
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m*m, trace);
+            
+            doInsertRandomSparseKeySequenceTest(m, m*m, trace);
+            
+        }
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m*m*m, trace);
+            
+            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace);
+            
+        }
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m*m*m*m, trace);
+
+            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace);
+            
+        }
+        
+    }
+
+    /**
+     * Insert dense key-value pairs into the tree in a random order and verify
+     * the expected entry traversal afterwards.
+     * 
+     * @param m
+     *            The branching factor. The tree.
+     * @param ninserts
+     *            The #of distinct key-value pairs to insert.
+     * @param trace
+     *            The trace level (zero disables most tracing).
+     */
+    public void doInsertRandomKeySequenceTest(int m, int ninserts, int trace) {
+
+        /*
+         * generate keys.  the keys are a dense monotonic sequence.
+         */
+
+        int keys[] = new int[ninserts];
+
+        Entry entries[] = new Entry[ninserts];
+        
+        for( int i=0; i<ninserts; i++ ) {
+        
+            keys[i] = i+1; // Note: origin one.
+            
+            entries[i] = new Entry();
+            
+        }
+
+        doInsertRandomKeySequenceTest(m, keys, entries, trace);
+        
+    }
+
+    /**
+     * Insert a sequence of monotonically increase keys with random spacing into
+     * a tree in a random order and verify the expected entry traversal
+     * afterwards.
+     * 
+     * @param m
+     *            The branching factor. The tree.
+     * @param ninserts
+     *            The #of distinct key-value pairs to insert.
+     * @param trace
+     *            The trace level (zero disables most tracing).
+     */
+    public void doInsertRandomSparseKeySequenceTest(int m, int ninserts, int trace) {
+        
+        /*
+         * generate random keys.  the keys are a sparse monotonic sequence.
+         */
+        int keys[] = new int[ninserts];
+
+        Entry entries[] = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF;
+
+        for( int i=0; i<ninserts; i++ ) {
+        
+            int key = r.nextInt(100)+lastKey+1;
+            
+            keys[i] = key;
+            
+            entries[i] = new Entry();
+            
+            lastKey = key;
+            
+        }
+
+        doInsertRandomKeySequenceTest(m, keys, entries, trace);
+        
+    }
+
+    /**
+     * Insert key value pairs into the tree in a random order and verify
+     * the expected entry traversal afterwards.
+     * 
+     * @param m
+     *            The branching factor. The tree.
+     * @param keys
+     *            The keys.
+     * @param entries
+     *            The entries.
+     * @param trace
+     *            The trace level (zero disables most tracing).
+     */
+    public void doInsertRandomKeySequenceTest(int m, int[] keys,
+            Entry[] entries, int trace) {
+
+        doInsertKeySequenceTest(m, keys, entries, getRandomOrder(keys.length),
+                trace);
+
+    }
+
+    /**
+     * Present a known sequence.
+     * 
+     * @param m
+     *            The branching factor.
+     * @param order
+     *            The key presentation sequence.
+     * @param trace
+     *            The trace level.
+     */
+    public void doKnownKeySequenceTest(int m, int[] order, int trace) {
+
+        int ninserts = order.length;
+        
+        int keys[] = new int[ninserts];
+
+        Entry entries[] = new Entry[ninserts];
+        
+        for( int i=0; i<ninserts; i++ ) {
+        
+            keys[i] = i+1; // Note: origin one.
+            
+            entries[i] = new Entry();
+            
+        }
+
+        doInsertKeySequenceTest(m, keys, entries, order, trace);
+
+    }
+    
+    /**
+     * Insert key value pairs into the tree in the specified order and verify
+     * the expected entry traversal afterwards.  If the test fails, then the
+     * details necessary to recreate the test (m, ninserts, and the order[])
+     * are printed out.
+     * 
+     * @param m
+     *            The branching factor. The tree.
+     * @param keys
+     *            The keys.
+     * @param entries
+     *            The entries.
+     * @param order
+     *            The order in which the key-entry pairs will be inserted.
+     * @param trace
+     *            The trace level (zero disables most tracing).
+     */
+    public void doInsertKeySequenceTest(int m, int[] keys, Entry[] entries, int[] order, int trace){
+
+        try {
+            
+            BTree btree = getNoEvictionBTree(m);
+
+            int lastLeafCount = btree.nleaves;
+
+            for (int i = 0; i < keys.length; i++) {
+
+                int key = keys[order[i]];
+
+                Entry entry = entries[order[i]];
+
+                System.err.println("index=" + i + ", key=" + key + ", entry="
+                        + entry);
+
+                assertEquals("#entries", i, btree.nentries);
+
+                assertNull(btree.lookup(key));
+
+                if (trace >= 2) {
+
+                    System.err.println("Before insert: index=" + i + ", key="
+                            + key);
+                    assertTrue(btree.dump(System.err));
+
+                }
+
+                btree.insert(key, entry);
+
+                if (trace >= 2) {
+
+                    System.err.println("After insert: index=" + i + ", key="
+                            + key);
+                    
+                    assertTrue(btree.dump(System.err));
+
+                }
+
+                assertEquals(entry, btree.lookup(key));
+
+                assertEquals("#entries", i + 1, btree.nentries);
+
+                if (btree.nleaves > lastLeafCount) {
+
+                    System.err.println("Split: i=" + i + ", key=" + key
+                            + ", nleaves=" + btree.nleaves);
+
+                    if (trace >= 1) {
+
+                        System.err.println("After split: ");
+
+                        assertTrue(btree.dump(System.err));
+
+                    }
+
+                    lastLeafCount = btree.nleaves;
+
+                }
+
+            }
+
+            // Note: The height, #of nodes, and #of leaves is path dependent.
+            assertEquals("#entries", keys.length, btree.nentries);
+
+            assertTrue(btree.dump(System.err));
+
+            /*
+             * Verify entries in the expected order.
+             */
+            assertSameIterator(entries, btree.getRoot().entryIterator());
+
+        } catch (AssertionFailedError ex) {
+            System.err.println("int m=" + m+";");
+            System.err.println("int ninserts="+keys.length+";");
+            System.err.print("int[] keys   = new   int[]{");
+            for (int i = 0; i < keys.length; i++) {
+                if (i > 0)
+                    System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("};");
+            System.err.print("Entry[] vals = new Entry[]{");
+            for (int i = 0; i < keys.length; i++) {
+                if (i > 0)
+                    System.err.print(", ");
+                System.err.print(entries[order[i]]);
+            }
+            System.err.println("};");
+            System.err.print("int[] order  = new   int[]{");
+            for (int i = 0; i < keys.length; i++) {
+                if (i > 0)
+                    System.err.print(", ");
+                System.err.print(order[i]);
+            }
+            System.err.println("};");
+            throw ex;
+        }
+
+    }
+
+
+    /**
+     * Creates a sequence of distinct keys in random order and inserts them into
+     * the tree. Note that the split decision points are path dependent and can
+     * not be predicated given random inserts.
+     * 
+     * @param m
+     *            The branching factor.
+     * 
+     * @param ninserts
+     *            The #of keys to insert.
+     */
+    public void doSplitWithRandomKeySequence(BTree btree,int m, int ninserts) {
+
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
+        /*
+         * Generate a sequence of keys in increasing order and a sequence of
+         * random indices into the keys (and values) that is used to present
+         * the key-value pairs in random order to insert(key,value).
+         */
+        
+        int[] keys = new int[ninserts];
+        Entry[] entries = new Entry[ninserts];
+        
+        int lastKey = Node.NEGINF+1;
+        for( int i=0; i<ninserts; i++) {
+            keys[i] = lastKey;
+            entries[i] = new Entry();
+            lastKey+=1;
+        }
+        
+        // Random indexing into the generated keys and values.
+        int[] order = getRandomOrder(ninserts);
+
+        try {
+            doRandomKeyInsertTest(btree,keys,entries, order);
+        }
+        catch( AssertionError ex ) {
+            System.err.println("m="+m);
+            System.err.print("keys=[");
+            for(int i=0; i<keys.length; i++ ) {
+                if( i>0 ) System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("]");
+            throw ex;
+        }
+        catch( AssertionFailedError ex ) {
+            System.err.println("m="+m);
+            System.err.print("keys=[");
+            for(int i=0; i<keys.length; i++ ) {
+                if( i>0 ) System.err.print(", ");
+                System.err.print(keys[order[i]]);
+            }
+            System.err.println("]");
+            throw ex;
+        }
+        
+    }
+
+    private void doRandomKeyInsertTest(BTree btree, int[] keys, Entry[] entries, int[] order ) {
+        
+        /*
+         * Insert keys into the tree.
+         */
+
+        int lastLeafCount = btree.nleaves;
+        
+        for (int i = 0; i < keys.length; i++) {
+
+            int key = keys[order[i]];
+            
+            Entry entry = entries[order[i]];
+            
+            System.err.println("i="+i+", key="+key);
+
+            assertEquals("#entries",i,btree.nentries);
+            
+            assertNull(btree.lookup(key));
+            
+            btree.insert(key, entry);
+
+            assertEquals(entry,btree.lookup(key));
+
+            assertEquals("#entries",i+1,btree.nentries);
+
+            if (btree.nleaves > lastLeafCount) {
+
+                System.err.println("Split: i=" + i + ", key=" + key
+                        + ", nleaves=" + btree.nleaves);
+
+                lastLeafCount = btree.nleaves;
+
+            }
+
+        }
+
+        /*
+         * Verify entries in the expected order. While we used a random
+         * presentation order, the entries MUST now be in the original generated
+         * order.
+         */
+        assertSameIterator(entries,btree.getRoot().entryIterator());
+
+        // Note: The height, #of nodes, and #of leaves are path dependent.
+        assertEquals("#entries", keys.length, btree.nentries);
+
+        assertTrue(btree.dump(System.err));
+        
+    }
 
 }

@@ -51,7 +51,6 @@ import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -291,9 +290,9 @@ public abstract class AbstractNode extends PO {
             } else {
 
                 /*
-                 * Recursive copy-on-write up the tree. This operations
-                 * stops as soon as we reach a parent node that is already
-                 * dirty and grounds out at the root in any case.
+                 * Recursive copy-on-write up the tree. This operations stops as
+                 * soon as we reach a parent node that is already dirty and
+                 * grounds out at the root in any case.
                  */
                 assert parent != null;
 
@@ -466,13 +465,11 @@ public abstract class AbstractNode extends PO {
             assert !parent.isPersistent();
 
             /*
-             * Set the persistent identity of the child on the
-             * parent.
+             * Set the persistent identity of the child on the parent.
              * 
-             * Note: A parent CAN NOT be serialized before all of
-             * its children have persistent identity since it needs
-             * to write the identity of each child in its
-             * serialization record.
+             * Note: A parent CAN NOT be serialized before all of its children
+             * have persistent identity since it needs to write the identity of
+             * each child in its serialization record.
              */
             parent.setChildRef(this);
 

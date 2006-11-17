@@ -42,23 +42,35 @@ Modifications:
 
 */
 /*
- * Created on Nov 16, 2006
+ * Created on Nov 17, 2006
  */
-
 package com.bigdata.objectIndex;
 
-import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
-
 /**
- * Interface to handle evictions of leaves from the hard reference queue.
+ * An interface that declares how we access the persistent identity of an
+ * object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeafEvictionListener extends
-        HardReferenceCacheEvictionListener<PO> {
+public interface IIdentityAccess {
 
-    public void evicted(HardReferenceCache<PO> cache, PO ref);
+    /**
+     * Null reference for the store (zero).
+     */
+    public final long NULL = 0L;
+
+    /**
+     * The persistent identity.
+     * 
+     * @exception IllegalStateException
+     *                if the object is not persistent.
+     */
+    public long getIdentity() throws IllegalStateException;
+
+    /**
+     * True iff the object is persistent.
+     */
+    public boolean isPersistent();
 
 }

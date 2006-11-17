@@ -42,23 +42,65 @@ Modifications:
 
 */
 /*
- * Created on Nov 16, 2006
+ * Created on Nov 17, 2006
  */
 
 package com.bigdata.objectIndex;
 
-import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import java.io.IOException;
+import java.util.Properties;
+
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
 
 /**
- * Interface to handle evictions of leaves from the hard reference queue.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeafEvictionListener extends
-        HardReferenceCacheEvictionListener<PO> {
+public class JournalBTreeFactory implements IBTreeFactory {
 
-    public void evicted(HardReferenceCache<PO> cache, PO ref);
+    final Properties properties;
+    
+    public Properties getProperties() {
+        
+        return properties;
+        
+    }
+    
+    public JournalBTreeFactory(Properties properties) {
+        
+        this.properties = properties;
 
+    }
+    
+    /**
+     * Return a btree backed by a journal with the indicated branching factor.
+     * 
+     * @param branchingFactor
+     *            The branching factor.
+     * 
+     * @return The btree.
+     */
+    public BTree getBTree(int branchingFactor) {
+
+        try {
+            
+            Properties properties = getProperties();
+
+            Journal journal = new Journal(properties);
+
+            // Note: permits evictions onto the journal.
+            BTree btree = new BTree(journal, branchingFactor);
+
+            return btree;
+
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+   
 }

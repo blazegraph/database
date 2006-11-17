@@ -47,7 +47,8 @@ public class TestAll extends TestCase {
         // @todo test incremental leaf eviction.
         // @todo test copy-on-write semantics with post-commit tree.
         // @todo test copy-on-write semantics with incremental leaf eviction.
-        // @todo test against IRawStore on journal (vs SimpleRawStore).
+        // @todo stress test against IRawStore on journal (vs SimpleRawStore).
+        suite.addTestSuite( TestBTreeWithJournal.class );
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.

@@ -47,7 +47,6 @@ Modifications:
 package com.bigdata.objectIndex;
 
 import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 /**
  * Hard reference cache eviction listener for leaves always throws an

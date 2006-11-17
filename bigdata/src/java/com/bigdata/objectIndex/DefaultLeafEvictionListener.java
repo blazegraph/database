@@ -47,10 +47,9 @@ Modifications:
 package com.bigdata.objectIndex;
 
 import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.objectIndex.TestSimpleBTree.PO;
 
 /**
- * Hard reference cache eviction listener for leaves writes the leaf onto the
+ * Hard reference cache eviction listener writes the node or leaf onto the
  * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -61,11 +60,28 @@ public class DefaultLeafEvictionListener implements
 
     public void evicted(HardReferenceCache<PO> cache, PO ref) {
 
-        assert ref instanceof Leaf;
-        
         if( ref.isDirty() ) {
 
-            ((Leaf)ref).write();
+            AbstractNode node = (AbstractNode) ref;
+            
+            if( node.isLeaf() ) {
+            
+                /*
+                 * A leaf is written out directly.
+                 */
+                ((AbstractNode)ref).write();
+                
+            } else {
+                
+                /*
+                 * A non-leaf node must be written out using a post-order
+                 * traversal so that all dirty children are written through
+                 * before the dirty parent.  This is required in order to
+                 * assign persistent identifiers to the dirty children.
+                 */
+                node.btree.writeNodeRecursive(node);
+                
+            }
             
         }
 

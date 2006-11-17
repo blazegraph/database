@@ -138,7 +138,10 @@ public class Leaf extends AbstractNode {
 
         values = new Entry[branchingFactor];
 
-        // Add to the hard reference queue.
+        /*
+         * Add to the hard reference queue. If the queue is full, then this will
+         * force the incremental write whatever gets evicted from the queue.
+         */
         btree.leaves.append(this);
         
         btree.nleaves++;

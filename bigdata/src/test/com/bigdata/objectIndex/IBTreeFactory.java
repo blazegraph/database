@@ -42,23 +42,27 @@ Modifications:
 
 */
 /*
- * Created on Nov 16, 2006
+ * Created on Nov 17, 2006
  */
 
 package com.bigdata.objectIndex;
 
-import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
-
 /**
- * Interface to handle evictions of leaves from the hard reference queue.
+ * Factory for btree objects used by the unit tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeafEvictionListener extends
-        HardReferenceCacheEvictionListener<PO> {
+public interface IBTreeFactory {
 
-    public void evicted(HardReferenceCache<PO> cache, PO ref);
-
+    /**
+     * Return a btree with the indicated branching factor.
+     * 
+     * @param branchingFactor
+     *            The branching factor.
+     * 
+     * @return The btree.
+     */
+    public BTree getBTree(int branchingFactor);
+   
 }
