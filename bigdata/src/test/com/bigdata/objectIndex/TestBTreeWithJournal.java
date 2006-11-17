@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
-import java.io.IOException;
 import java.util.Properties;
 
 import com.bigdata.journal.BufferMode;
@@ -64,6 +63,11 @@ import com.bigdata.journal.Options;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME These tests are still failing.  I have a test design to prove out the
+ * incremental write case and I should implement that in depth before trying to
+ * work it through further with the stress tests.  Also, the Entry needs to be
+ * generalized since the IObjectIndexEntry is not really supported as yet.
  * 
  * @todo Add stress test with periodic re-loading of the btree, tracking its
  *       expected state, and verifying that state.

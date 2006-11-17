@@ -258,6 +258,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         } else {
         
+            assertNotNull("actual",actual);
+            
             assertEquals(msg+"versionCounter", expected.getVersionCounter(), actual
                     .getVersionCounter());
 

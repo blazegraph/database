@@ -257,8 +257,15 @@ public class Node extends AbstractNode {
 
         super(src);
 
+        // This node must be mutable (it is a new node).
         assert isDirty();
         assert !isPersistent();
+        
+        /* The source must not be dirty.  We are cloning it so that we can
+         * make changes on it.
+         */
+        assert !src.isDirty();
+        assert src.isPersistent();
 
         keys = new int[branchingFactor - 1];
 
@@ -271,19 +278,15 @@ public class Node extends AbstractNode {
         childKeys = new long[branchingFactor];
 
         // Copy keys.
-        for (int i = 0; i < nkeys; i++) {
-
-            keys[i] = src.keys[i];
-
-        }
+        System.arraycopy(src.keys, 0, keys, 0, nkeys);
 
         // Note: There is always one more child than keys for a Node.
         System.arraycopy(src.childKeys, 0, childKeys, 0, nkeys+1);
 
         /*
-         * Steal the unmodified children by setting their parent fields to the
-         * new node. Stealing the parent means that the node can no longer be
-         * used by its previous ancestor.
+         * Steal strongly reachable unmodified children by setting their parent
+         * fields to the new node. Stealing the parent means that the node MUST
+         * NOT be used by its previous ancestor (our source node for this copy).
          * 
          * @todo Since the node state is unchanged (it is immutable) the slick
          * trick would be to wrap the state node with a flyweight node having a
@@ -298,11 +301,20 @@ public class Node extends AbstractNode {
             AbstractNode child = src.childRefs[i] == null ? null
                     : src.childRefs[i].get();
 
-            if( child != null ) {
-                
+            if (child != null) {
+
+                /*
+                 * Copy on write should never trigger for a dirty node and only
+                 * a dirty node can have dirty children.
+                 */
+                assert !child.isDirty();
+
                 // Steal the child.
                 child.parent = new WeakReference<Node>(this);
-                
+
+                // Keep a reference to the clean child.
+                childRefs[i] = new WeakReference<AbstractNode>(child);
+
             }
             
         }
@@ -310,6 +322,12 @@ public class Node extends AbstractNode {
         /*
          * Remove the source node from the btree since it has been replaced by
          * this node.
+         * 
+         * @todo mark the source as invalid if we develop a hash table based
+         * cache for nodes to ensure that we never access it by mistake using
+         * its persistent id. the current design only provides for access of
+         * nodes by navigation from the root, so we can never visit a node once
+         * it is no longer reachable from its parent.
          */ 
         btree.nodes.remove(src);
 
@@ -1100,19 +1118,44 @@ public class Node extends AbstractNode {
 
                 if (child != null) {
 
+                    if( child.parent == null || child.parent.get() == null ) {
+                        /*
+                         * the reference to the parent MUST exist since the we
+                         * are the parent and therefore the parent is strongly
+                         * reachable.
+                         */
+                        out.println(indent(height) + "  ERROR child["
+                                + i + "] does not have parent reference.");
+                        ok = false;
+                    }
+
+                    if( child.parent.get() != this ) {
+                        out.println(indent(height) + "  ERROR child["
+                                + i + "] has wrong parent.");
+                        ok = false;                        
+                    }
+                    
                     if (child.isDirty()) {
                         /*
-                         * Dirty child.
+                         * Dirty child.  The parent of a dirty child MUST also
+                         * be dirty.
                          */
+                        if( ! isDirty() ) {
+                            out.println(indent(height) + "  ERROR child["
+                                    + i + "] is dirty, but its parent is clean");
+                            ok = false;
+                        }
                         if (childRefs[i] == null) {
                             out.println(indent(height) + "  ERROR childRefs["
                                     + i + "] is null, but the child is dirty");
+                            ok = false;
                         }
                         if (childKeys[i] != NULL) {
                             out.println(indent(height) + "  ERROR childKeys["
                                     + i + "]=" + childKeys[i]
                                     + ", but MUST be " + NULL
                                     + " since the child is dirty");
+                            ok = false;
                         }
                         if (!dirtyChildren.contains(child)) {
                             out
@@ -1121,15 +1164,18 @@ public class Node extends AbstractNode {
                                             + i
                                             + " is dirty, but not on the dirty list: child="
                                             + child);
+                            ok = false;
                         }
                     } else {
                         /*
-                         * Clean child (ie, persistent).
+                         * Clean child (ie, persistent).  The parent of a clean
+                         * child may be either clear or dirty.
                          */
                         if (childKeys[i] == NULL) {
                             out.println(indent(height) + "  ERROR childKey["
                                     + i + "] is " + NULL
                                     + ", but child is not dirty");
+                            ok = false;
                         }
                         if (dirtyChildren.contains(child)) {
                             out
@@ -1138,6 +1184,7 @@ public class Node extends AbstractNode {
                                             + i
                                             + " is not dirty, but is on the dirty list: child="
                                             + child);
+                            ok = false;
                         }
                     }
 

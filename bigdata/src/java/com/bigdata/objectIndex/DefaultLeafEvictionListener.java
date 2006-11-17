@@ -69,7 +69,7 @@ public class DefaultLeafEvictionListener implements
                 /*
                  * A leaf is written out directly.
                  */
-                ((AbstractNode)ref).write();
+                node.btree.writeNodeOrLeaf(node);
                 
             } else {
                 

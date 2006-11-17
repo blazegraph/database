@@ -51,6 +51,9 @@ package com.bigdata.objectIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo This abstract class is only used by the {@link BTree}. Modify it so
+ *       that we directly test the member fields for better performance.
  */
 abstract public class PO implements IIdentityAccess, IDirty {
 
@@ -58,20 +61,20 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * The persistent identity (defined when the object is actually
      * persisted).
      */
-    transient private long key = NULL;
+    transient protected long identity = NULL;
 
     public boolean isPersistent() {
 
-        return key != NULL;
+        return identity != NULL;
 
     }
 
     public long getIdentity() throws IllegalStateException {
 
-        if (key == NULL)
+        if (identity == NULL)
             throw new IllegalStateException();
 
-        return key;
+        return identity;
 
     }
 
@@ -80,21 +83,21 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * 
      * Note: This method should not be public.
      * 
-     * @param key
-     *            The key.
+     * @param identity
+     *            The identity.
      * 
      * @throws IllegalStateException
-     *             If the key is already defined.
+     *             If the identity is already defined.
      */
     void setIdentity(long key) throws IllegalStateException {
 
         if (key == NULL)
             throw new IllegalArgumentException();
 
-        if (this.key != NULL)
+        if (this.identity != NULL)
             throw new IllegalStateException();
 
-        this.key = key;
+        this.identity = key;
 
     }
 
@@ -103,7 +106,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * deserialized from the store the dirty flag MUST be explicitly
      * cleared.
      */
-    transient private boolean dirty = true;
+    transient protected boolean dirty = true;
 
     public boolean isDirty() {
 
@@ -123,9 +126,9 @@ abstract public class PO implements IIdentityAccess, IDirty {
      */
     public String toString() {
 
-        if (key != NULL) {
+        if (identity != NULL) {
 
-            return super.toString() + "#" + key;
+            return super.toString() + "#" + identity;
 
         } else {
 

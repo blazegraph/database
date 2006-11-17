@@ -390,7 +390,7 @@ public class BTree {
             }
 
             // write the dirty node on the store.
-            node.write();
+            writeNodeOrLeaf(node);
 
             ndirty++;
 
@@ -404,7 +404,19 @@ public class BTree {
         
     }
     
-    protected void writeNodeOrLeaf(AbstractNode node ) {
+    /**
+     * Writes the node on the store. The node MUST be dirty. If the node has
+     * a parent, then the parent is notified of the persistent identity
+     * assigned to the node by the store.
+     * 
+     * @return The persistent identity assigned by the store.
+     */
+    protected long writeNodeOrLeaf(AbstractNode node ) {
+
+        assert node != null;
+        assert node.btree == this;
+        assert node.isDirty();
+        assert !node.isPersistent();
 
         buf.clear();
         
@@ -418,12 +430,38 @@ public class BTree {
             
         }
         
+        buf.flip();
+        
         final long id = store.write(buf).toLong();
 
         node.setIdentity(id);
         
         node.setDirty(false);
-        
+
+        // The parent should be defined unless this is the root node.
+        Node parent = node.getParent();
+
+        if (parent != null) {
+
+            // parent must be dirty if child is dirty.
+            assert parent.isDirty();
+
+            // parent must not be persistent if it is dirty.
+            assert !parent.isPersistent();
+
+            /*
+             * Set the persistent identity of the child on the parent.
+             * 
+             * Note: A parent CAN NOT be serialized before all of its children
+             * have persistent identity since it needs to write the identity of
+             * each child in its serialization record.
+             */
+            parent.setChildRef(node);
+
+        }
+
+        return id;
+
     }
 
     /**
@@ -431,7 +469,7 @@ public class BTree {
      * 
      * @param id
      *            The persistent identifier.
-     *            
+     * 
      * @return The {@link ISlotAllocation}
      */
     protected ISlotAllocation asSlots(long id) {

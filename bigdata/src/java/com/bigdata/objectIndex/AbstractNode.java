@@ -197,9 +197,11 @@ public abstract class AbstractNode extends PO {
          */
         super();
 
+        assert isDirty();
         assert !isPersistent();
-
         assert src != null;
+        assert !src.isDirty();
+        assert src.isPersistent();
 
         this.branchingFactor = src.btree.branchingFactor;
 
@@ -435,49 +437,6 @@ public abstract class AbstractNode extends PO {
      *         that key.
      */
     abstract public IObjectIndexEntry lookup(int key);
-
-    /**
-     * Writes the node on the store. The node MUST be dirty. If the node has
-     * a parent, then the parent is notified of the persistent identity
-     * assigned to the node by the store.
-     * 
-     * @return The persistent identity assigned by the store.
-     */
-    long write() {
-
-        assert isDirty();
-        assert !isPersistent();
-
-        /*
-         * Write the dirty node on the store.
-         */
-        btree.writeNodeOrLeaf( this );
-
-        // The parent should be defined unless this is the root node.
-        Node parent = getParent();
-
-        if (parent != null) {
-
-            // parent must be dirty if child is dirty.
-            assert parent.isDirty();
-
-            // parent must not be persistent if it is dirty.
-            assert !parent.isPersistent();
-
-            /*
-             * Set the persistent identity of the child on the parent.
-             * 
-             * Note: A parent CAN NOT be serialized before all of its children
-             * have persistent identity since it needs to write the identity of
-             * each child in its serialization record.
-             */
-            parent.setChildRef(this);
-
-        }
-
-        return getIdentity();
-
-    }
 
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).

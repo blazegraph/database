@@ -50,9 +50,7 @@ package com.bigdata.objectIndex;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
