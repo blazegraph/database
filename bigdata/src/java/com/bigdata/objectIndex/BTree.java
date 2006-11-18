@@ -52,6 +52,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ContiguousSlotAllocation;
@@ -86,6 +88,26 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * @version $Id$
  */
 public class BTree {
+    
+    /**
+     * Log for btree opeations (currently unused).
+     */
+    public static final Logger log = Logger.getLogger(BTree.class);
+    
+    /**
+     * Log for {@link BTree#dump(PrintStream)} and friends. 
+     */
+    public static final Logger dumpLog = Logger.getLogger(BTree.class.getName()+"#dump");
+    
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * The minimum allowed branching factor (3).
@@ -541,18 +563,16 @@ public class BTree {
      * 
      * @return true unless an inconsistency is detected.
      * 
-     * FIXME modify to use logging so that we can configure the dump to be very
-     * quite and log errors as such. This will let us also use it as a structure
-     * validation mechanism.
+     * @todo modify to write on log vs PrintStream.
      */
     boolean dump(PrintStream out) {
 
         int[] utils = getUtilization();
         
-        out.println("height=" + height + ", #nodes=" + nnodes + ", #leaves="
-                + nleaves + ", #entries=" + nentries + ", nodeUtil="
-                + utils[0]+ "%, leafUtil=" + utils[1]
-                + "%, utilization=" + utils[2]+"%");
+        out.println("height=" + height + ", branchingFactor=" + branchingFactor
+                + ", #nodes=" + nnodes + ", #leaves=" + nleaves + ", #entries="
+                + nentries + ", nodeUtil=" + utils[0] + "%, leafUtil="
+                + utils[1] + "%, utilization=" + utils[2] + "%");
 
         boolean ok = root.dump(out, 0, true);
 

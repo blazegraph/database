@@ -159,10 +159,12 @@ public abstract class AbstractNode extends PO {
     }
 
     /**
-     * De-serialization constructor used by subclasses.
+     * Disallowed.
      */
-    protected AbstractNode() {
+    private AbstractNode() {
 
+        throw new UnsupportedOperationException();
+        
     }
 
     /**

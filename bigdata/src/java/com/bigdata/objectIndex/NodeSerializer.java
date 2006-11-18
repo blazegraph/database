@@ -52,6 +52,8 @@ import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
 
+import org.CognitiveWeb.extser.LongPacker;
+
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
@@ -83,7 +85,13 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * FIXME Modify the serialized "reference" form to be smaller by writing the #of
  * slots and not the #of bytes in the serialized record and by also accepting
  * pragamatic limits on both the #of slots that may be addressed in the journal
- * for a given slot size.
+ * for a given slot size. If we use contiguous allocations (which are important
+ * for a disk-based {@link BufferMode}) then we could pack the firstSlot and
+ * the #of slots (#of bytes divided by the #of bytes per slot) as unsigned int31
+ * fields using {@link LongPacker} - the result will be more compact than if we
+ * just using the packing routine directly on the int64 value since both
+ * components are int31 values admissible to packing and both components will
+ * tend to have leading zeros.
  * 
  * @todo Since the serialization record no longer has a fixed size, can we go a
  *       little further and compute its maximum size for a node and then report

@@ -53,6 +53,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -84,33 +86,32 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class Node extends AbstractNode {
 
-//    private static final long serialVersionUID = 1L;
-
     /**
      * Hard reference cache containing dirty child nodes (nodes or leaves).
      */
     transient protected Set<AbstractNode> dirtyChildren;
 
     /**
-     * Weak references to child nodes (may be nodes or leaves). The capacity
-     * of this array is m+1, where m is the {@link #branchingFactor}.
+     * Weak references to child nodes (may be nodes or leaves). The capacity of
+     * this array is m+1, where m is the {@link #branchingFactor}. Valid
+     * indices are in [0:nkeys+1] since nchildren := nkeys+1 for a {@link Node}. 
      */
     transient protected WeakReference<AbstractNode>[] childRefs;
 
     /**
      * <p>
-     * The persistent keys of the childKeys nodes (may be nodes or leaves).
-     * The capacity of this array is m+1, where m is the
-     * {@link #branchingFactor}. The key is {@link #NULL} until the child
-     * has been persisted. The protocol for persisting child nodes requires
-     * that we use a pre-order traversal (the general case is a directed
-     * graph) so that we can update the keys on the parent before the parent
-     * itself is persisted.
+     * The persistent keys of the childKeys nodes (may be nodes or leaves). The
+     * capacity of this array is m+1, where m is the {@link #branchingFactor}.
+     * Valid indices are in [0:nkeys+1] since nchildren := nkeys+1 for a
+     * {@link Node}. The key is {@link #NULL} until the child has been
+     * persisted. The protocol for persisting child nodes requires that we use a
+     * pre-order traversal (the general case is a directed graph) so that we can
+     * update the keys on the parent before the parent itself is persisted.
      * </p>
      * <p>
-     * Note: It is an error if there is an attempt to serialize a node
-     * having a null entry in this array and a non-null entry in the
-     * external {@link #keys} array.
+     * Note: It is an error if there is an attempt to serialize a node having a
+     * null entry in this array and a non-null entry in the external
+     * {@link #keys} array.
      * </p>
      */
     long[] childKeys;
@@ -130,17 +131,8 @@ public class Node extends AbstractNode {
 
     /**
      * De-serialization constructor.
-     * 
-     * @deprecated Not required when using {@link NodeSerializer}.
      */
-    public Node() {
-
-    }
-
-    /**
-     * De-serialization constructor.
-     */
-    Node(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, long[] childKeys) {
+    protected Node(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, long[] childKeys) {
 
         super( btree, branchingFactor );
 
@@ -172,7 +164,7 @@ public class Node extends AbstractNode {
     /**
      * Used to create a new node when a node is split.
      */
-    Node(BTree btree) {
+    protected Node(BTree btree) {
 
         super(btree, btree.branchingFactor);
 
@@ -197,12 +189,8 @@ public class Node extends AbstractNode {
      * @param oldRoot
      *            The node that was previously the root of the tree (either a
      *            node or a leaf).
-     * 
-     * @todo The key is ignored and could be removed from the constructor
-     *       signature. The key gets added by
-     *       {@link AbstractNode#insertChild(int, AbstractNode)}
      */
-    Node(BTree btree, AbstractNode oldRoot) {
+    protected Node(BTree btree, AbstractNode oldRoot) {
 
         super(btree, btree.branchingFactor);
 
@@ -373,7 +361,7 @@ public class Node extends AbstractNode {
          * the child and searching the parent for the index that must correspond
          * to that child?
          */
-        for (int i = 0; i < nkeys; i++) {
+        for (int i = 0; i <= nkeys; i++) {
 
             if (childRefs[i].get() == child) {
 
@@ -392,8 +380,8 @@ public class Node extends AbstractNode {
         }
 
         /*
-         * @todo I have seen this triggered by increment writes of dirty
-         * leaves using the doSplitWithIncreasingKeySequence at m := 20.
+         * Note: This was being triggered by a failure to consider the last
+         * element in childRef, but that error has been fixed.
          */
         System.err.print("parent: ");
         this.dump(System.err);
@@ -426,7 +414,7 @@ public class Node extends AbstractNode {
         assert !newChild.isPersistent();
 
         // Scan for location in weak references.
-        for (int i = 0; i < nkeys; i++) {
+        for (int i = 0; i <= nkeys; i++) {
 
             if (childKeys[i] == oldChildKey) {
 
@@ -900,13 +888,6 @@ public class Node extends AbstractNode {
 
             child = btree.readNodeOrLeaf( key );
 
-            /*
-             * Patch btree reference since loaded from store. If the child
-             * is a {@link Node}, then it is also inserted into the hard
-             * reference cache of nodes maintained by the btree.
-             */
-            child.setBTree(btree);
-
             // patch parent reference since loaded from store.
             child.parent = new WeakReference<Node>(this);
 
@@ -1024,14 +1005,21 @@ public class Node extends AbstractNode {
     }
 
     public boolean dump(PrintStream out, int height, boolean recursive) {
+        
+        // True iff we will write out the node structure.
+        final boolean debug = BTree.dumpLog.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
+        // Set true iff an inconsistency is detected.
         boolean ok = true;
-        out.println(indent(height) + "Node: " + toString());
-        out.println(indent(height) + "  parent=" + getParent());
-        out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
-                + nkeys + ", nchildren=" + (nkeys + 1) + ", branchingFactor="
-                + branchingFactor);
-        out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+        
+        if (debug) {
+            out.println(indent(height) + "Node: " + toString());
+            out.println(indent(height) + "  parent=" + getParent());
+            out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
+                    + nkeys + ", nchildren=" + (nkeys + 1)
+                    + ", branchingFactor=" + branchingFactor);
+            out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+        }
         { // verify keys are monotonically increasing.
             int lastKey = NEGINF;
             for (int i = 0; i < nkeys; i++) {
@@ -1045,28 +1033,30 @@ public class Node extends AbstractNode {
                 lastKey = keys[i];
             }
         }
-        out.println(indent(height) + "  childKeys="
-                + Arrays.toString(childKeys));
-        out.print(indent(height) + "  childRefs=[");
-        for (int i = 0; i < branchingFactor; i++) {
-            if (i > 0)
-                out.print(", ");
-            if (childRefs[i] == null)
-                out.print("null");
-            else
-                out.print(childRefs[i].get());
+        if (debug) {
+            out.println(indent(height) + "  childKeys="
+                    + Arrays.toString(childKeys));
+            out.print(indent(height) + "  childRefs=[");
+            for (int i = 0; i < branchingFactor; i++) {
+                if (i > 0)
+                    out.print(", ");
+                if (childRefs[i] == null)
+                    out.print("null");
+                else
+                    out.print(childRefs[i].get());
+            }
+            out.println("]");
+            out.print(indent(height) + "  #dirtyChildren="
+                    + dirtyChildren.size() + " : {");
+            int n = 0;
+            Iterator<AbstractNode> itr = dirtyChildren.iterator();
+            while (itr.hasNext()) {
+                if (n++ > 0)
+                    out.print(", ");
+                out.print(itr.next());
+            }
+            out.println("}");
         }
-        out.println("]");
-        out.print(indent(height) + "  #dirtyChildren=" + dirtyChildren.size()
-                + " : {");
-        int n = 0;
-        Iterator<AbstractNode> itr = dirtyChildren.iterator();
-        while (itr.hasNext()) {
-            if (n++ > 0)
-                out.print(", ");
-            out.print(itr.next());
-        }
-        out.println("}");
 
         /*
          * Look for inconsistencies for children. A dirty child MUST NOT
@@ -1194,6 +1184,13 @@ public class Node extends AbstractNode {
 
         }
 
+        if( ! ok && ! debug ) {
+            
+            // FIXME show the node structure with the errors since we would not
+            // have seen it otherwise.
+            
+        }
+        
         if (recursive) {
 
             /*
@@ -1369,55 +1366,5 @@ public class Node extends AbstractNode {
         return ok;
 
     }
-
-//    /**
-//     * @deprecated Drop the Externalizable interface for Node and Leaf.
-//     */
-//    public void writeExternal(ObjectOutput out) throws IOException {
-//        if (dirtyChildren.size() > 0) {
-//            throw new IllegalStateException("Dirty children exist.");
-//        }
-//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-//        assert nkeys > 0;
-//        out.writeInt(branchingFactor);
-//        out.writeInt(nkeys);
-//        for (int i = 0; i < nkeys; i++) {
-//            int key = keys[i];
-//            assert key > NEGINF && key < POSINF;
-//            out.writeInt(key);
-//        }
-//        // Note: nchildren == nkeys+1.
-//        for (int i = 0; i <= nkeys; i++) {
-//            long childKey = childKeys[i];
-//            assert childKey != NULL;
-//            out.writeLong(childKey);
-//        }
-//    }
-//
-//    /**
-//     * @deprecated Drop the Externalizable interface for Node and Leaf.
-//     */
-//    public void readExternal(ObjectInput in) throws IOException,
-//            ClassNotFoundException {
-//        branchingFactor = in.readInt();
-//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-//        nkeys = in.readInt();
-//        assert nkeys > 0;
-//        keys = new int[branchingFactor - 1];
-//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
-//        childRefs = new WeakReference[branchingFactor];
-//        childKeys = new long[branchingFactor];
-//        for (int i = 0; i < nkeys; i++) {
-//            int key = in.read();
-//            assert key > NEGINF && key < POSINF;
-//            keys[i] = key;
-//        }
-//        // Note: nchildren == nkeys+1.
-//        for (int i = 0; i <= nkeys; i++) {
-//            long childKey = in.readLong();
-//            assert childKey != NULL;
-//            childKeys[i] = childKey;
-//        }
-//    }
 
 }

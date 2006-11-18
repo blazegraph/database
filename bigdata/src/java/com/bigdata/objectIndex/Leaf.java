@@ -46,11 +46,11 @@ Modifications:
  */
 package com.bigdata.objectIndex;
 
-import java.io.Externalizable;
 import java.io.PrintStream;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
+
+import org.apache.log4j.Level;
 
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
@@ -72,8 +72,6 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  */
 public class Leaf extends AbstractNode {
 
-//    private static final long serialVersionUID = 1L;
-
     /**
      * The values of the tree.
      */
@@ -81,19 +79,8 @@ public class Leaf extends AbstractNode {
 
     /**
      * De-serialization constructor.
-     * 
-     * @deprecated This is not required when using the {@link NodeSerializer}
-     * and all of these clases should no longer implement {@link Serializable}
-     * or {@link Externalizable}
      */
-    public Leaf() {
-
-    }
-
-    /**
-     * De-serialization constructor.
-     */
-    Leaf(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, IObjectIndexEntry[] values) {
+    protected Leaf(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, IObjectIndexEntry[] values) {
         
         super(btree, branchingFactor );
 
@@ -575,64 +562,55 @@ public class Leaf extends AbstractNode {
 
     public boolean dump(PrintStream out, int height, boolean recursive) {
 
+        // True iff we will write out the node structure.
+        final boolean debug = BTree.dumpLog.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+
+        // Set to false iff an inconsistency is detected.
         boolean ok = true;
-        out.println(indent(height) + "Leaf: " + toString());
-        out.println(indent(height) + "  parent=" + getParent());
-        out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
-                + nkeys + ", branchingFactor=" + branchingFactor);
-        out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+
+        if (debug) {
+        
+            out.println(indent(height) + "Leaf: " + toString());
+            
+            out.println(indent(height) + "  parent=" + getParent());
+            
+            out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
+                    + nkeys + ", branchingFactor=" + branchingFactor);
+            
+            out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+        }
+        
         { // verify keys are monotonically increasing.
+            
             int lastKey = NEGINF;
+            
             for (int i = 0; i < nkeys; i++) {
+            
                 if (keys[i] <= lastKey) {
+                
                     out.println(indent(height)
                             + "ERROR keys out of order at index=" + i
                             + ", lastKey=" + lastKey + ", keys[" + i + "]="
                             + keys[i]);
+                    
                     ok = false;
+                    
                 }
+                
                 lastKey = keys[i];
+                
             }
+            
         }
-        out.println(indent(height) + "  vals=" + Arrays.toString(values));
+        
+        if( debug ) {
+        
+            out.println(indent(height) + "  vals=" + Arrays.toString(values));
+            
+        }
+
         return ok;
 
     }
-
-//    /*
-//     * Note: Serialization is fat since values are not strongly typed.
-//     */
-//    public void writeExternal(ObjectOutput out) throws IOException {
-//        out.writeInt(branchingFactor);
-//        out.writeInt(nkeys);
-//        for (int i = 0; i < nkeys; i++) {
-//            int key = keys[i];
-//            assert keys[i] > NEGINF && keys[i] < POSINF;
-//            out.writeInt(key);
-//        }
-//        for (int i = 0; i < nkeys; i++) {
-//            Object value = values[i];
-//            assert value != null;
-//            out.writeObject(value);
-//        }
-//    }
-//
-//    public void readExternal(ObjectInput in) throws IOException,
-//            ClassNotFoundException {
-//        branchingFactor = in.readInt();
-//        nkeys = in.readInt();
-//        keys = new int[branchingFactor];
-//        values = new Entry[branchingFactor];
-//        for (int i = 0; i < nkeys; i++) {
-//            int key = in.readInt();
-//            assert keys[i] > NEGINF && keys[i] < POSINF;
-//            keys[i] = key;
-//        }
-//        for (int i = 0; i < nkeys; i++) {
-//            Entry value = (Entry) in.readObject();
-//            assert value != null;
-//            values[i] = value;
-//        }
-//    }
 
 }
