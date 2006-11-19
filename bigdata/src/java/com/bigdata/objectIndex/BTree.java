@@ -415,7 +415,8 @@ public class BTree {
                  * The parent MUST be defined unless this is the root node.
                  */
 
-                TestSimpleBTree.assertNotNull(node.getParent());
+                assert node.parent != null;
+                assert node.parent.get() != null;
 
             }
 

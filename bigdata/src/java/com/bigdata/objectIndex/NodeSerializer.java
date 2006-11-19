@@ -500,9 +500,6 @@ public class NodeSerializer {
 
         assert nkeys >= 0 && nkeys < branchingFactor;
 
-        // check the buffer size know that we known the #of keys.
-        assert remaining == getSize(false,nkeys );
-
         final int[] keys = new int[branchingFactor - 1];
 
         final long[] children = new long[branchingFactor];
@@ -695,8 +692,6 @@ public class NodeSerializer {
         final int nkeys = buf.getShort();
 
         assert nkeys >=0 && nkeys <= branchingFactor;
-        
-        assert remaining >= getSize(true,nkeys);
 
         /*
          * Keys.

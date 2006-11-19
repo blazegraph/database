@@ -123,6 +123,12 @@ public abstract class AbstractNode extends PO {
      * strongly reachable as long as the parent is either a root (held by the
      * {@link BTree}) or a dirty child (held by the {@link Node}). The parent
      * reference is set when a node is attached as the child of another node.
+     * 
+     * Note: When a node is cloned by {@link #copyOnWrite()} the parent
+     * references for its <em>clean</em> children are set to the new copy of
+     * the node. This is refered to in several places as "stealing" the children
+     * since they are no longer linked back to their old parents via their
+     * parent reference.
      */
     protected WeakReference<Node> parent = null;
 
@@ -284,6 +290,21 @@ public abstract class AbstractNode extends PO {
      * towards the root and during rotations.
      */
     protected AbstractNode copyOnWrite() {
+        
+        // Always invoked first for a leaf and thereafter in its other form.
+        assert isLeaf();
+        
+        return copyOnWrite(null);
+        
+    }
+    
+    /**
+     * 
+     * @param triggeredByChild
+     *            The child that triggered this event if any.
+     * @return
+     */
+    protected AbstractNode copyOnWrite(AbstractNode triggeredByChild) {
 
         if (isPersistent()) {
 
@@ -291,7 +312,7 @@ public abstract class AbstractNode extends PO {
 
             if (this instanceof Node) {
 
-                newNode = new Node((Node) this);
+                newNode = new Node((Node) this, triggeredByChild );
 
             } else {
 
@@ -321,7 +342,11 @@ public abstract class AbstractNode extends PO {
 
                 if (!parent.isDirty()) {
 
-                    parent = (Node) parent.copyOnWrite();
+                    /*
+                     * Note: pass up the old child since we want to avoid having
+                     * its parent reference reset.
+                     */
+                    parent = (Node) parent.copyOnWrite(this);
 
                 }
 

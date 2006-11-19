@@ -42,7 +42,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestChecksumUtility.class );
         // test serialization
         suite.addTestSuite( TestNodeSerializer.class );
-        // test the commit protocol w/o incremental leaf eviction.
+        // test the commit protocol w/o incremental leaf eviction @todo expand tests.
         suite.addTestSuite( TestCommit.class );
         // test incremental leaf eviction and copy-on-write scenarios.
         suite.addTestSuite( TestLeafEviction.class );

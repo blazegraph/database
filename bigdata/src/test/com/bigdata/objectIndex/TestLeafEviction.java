@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+import java.util.Arrays;
 import java.util.Stack;
 
 import junit.framework.AssertionFailedError;
@@ -99,8 +100,15 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
      * <p>
      * After validating leaf eviction, the test also performs a commit, so that
      * all nodes will be made immutable, and then inserts another key, which
-     * triggers copy-on-write, and validates the post-conditions.
+     * triggers copy-on-write, and validates the post-conditions, including the
+     * logic used to steal clean children from a cloned node.
      * </p>
+     * 
+     * @todo This test depends on the fact that we do not (currently) append
+     *       leaves onto the hard reference queue each time they are modified.
+     *       However, we probably should do so, which means that this test will
+     *       have to be modified to track the impact of those updates on the
+     *       hard reference queue.
      */
     public void test_leafEviction01() {
         
@@ -144,6 +152,14 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
             entries[i] = new Entry();
             
         }
+
+        /*
+         * Set up permutation of the indices in keys[] and entities[]
+         * that places them both into sorted order.
+         */
+        int[] order = new int[keys.length];
+        System.arraycopy(keys, 0, order, 0, keys.length);
+        Arrays.sort(order);
         
         int n = 0;
 
@@ -214,6 +230,8 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         assertEquals(new int[]{9,10,11,0},d.keys);
         // verify new queue state.
         assertEquals(new PO[]{b,d},hardReferenceQueue.toArray());
+        // verify keys on the root node.
+        assertEquals(new int[]{5,9,0},c.keys);
 
         /*
          * Insert a key (2) into (a). Since (a) was just evicted, this forces
@@ -228,7 +246,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         assertTrue(a.isPersistent());
         // verify that (a) is not dirty.
         assertFalse(a.isDirty());
-        // verify keys for a (@todo also vet values).
+        // verify keys for (a).
         assertEquals(new int[]{1,3,0,0},a.keys);
         // verify the queue state.
         assertEquals(new PO[]{b,d},hardReferenceQueue.toArray());
@@ -260,13 +278,98 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         assertEquals(new int[]{1,2,3,0},a1.keys);
         // verify the new queue state.
         assertEquals(new PO[]{d,a1},hardReferenceQueue.toArray());
+
+        /*
+         * Commit the tree. This will write any dirty leaves and nodes.
+         */
+        final long metadataId0 = btree.commit();
+
+        // verify that we can reload the tree.
+        new BTree(btree.store,metadataId0);
         
         /*
-         * @todo Should a.parent be cleared?
+         * Insert a key (4) into the btree that is still in memory. Since we
+         * just did a commit the entire btree should be persistent and clean -
+         * and hence immutable. The insert is directed in to the leaf (a1). It
+         * triggers copy-on-write of (a1), yeilding (a2). Copy-on-write
+         * percolates upwards until it reaches a dirty node. Since in this case
+         * the parent of (a1) is the root (c), this triggers copy-on-write for
+         * (c) as well, yeilding (c1). Finally, (c1) needs to "steal" the clean
+         * children from (c) by resetting their parent references to (c1).
          * 
-         * @todo Verify a was removed from the node set on the btree.
+         * Note: Copy-on-write for (a1) will evict (d). This eviction does
+         * nothing since (d) is already clean. Also note that being evicted does
+         * NOT mean that weak references to (d) are cleared. In general, there
+         * may be other references to (d), often on the hard reference queue
+         * itself. In this specific case, we have a hard reference to (d) so it
+         * will remain strongly reachable throughout this test.
          */
         
+        // verify that all nodes and leaves are clean and persistent.
+        assertFalse(a1.isDirty());
+        assertFalse(b.isDirty());
+        assertFalse(c.isDirty());
+        assertFalse(d.isDirty());
+        assertTrue(a1.isPersistent());
+        assertTrue(b.isPersistent());
+        assertTrue(c.isPersistent());
+        assertTrue(d.isPersistent());
+        // verify expected keys on (a1).
+        assertEquals(new int[]{1,2,3,0},a1.keys);
+        // verify the hard reference queue state.
+        assertEquals(new PO[]{d,a1},hardReferenceQueue.toArray());
+        // notify the listener that we expect an eviction.
+        listener.setExpectedRef(d);
+        // verify root is the expected node.
+        assertEquals(c,btree.root);
+        // verify (c) is the parent of (a1).
+        assertEquals(c,a1.parent.get());
+        // insert the key, forces copy-on-write of (a1=>a2) and (c=>c1).
+        btree.insert(keys[n], entries[n]); n++;
+        // verify that the leaf was evicted.
+        listener.assertEvicted();
+        // verify that the root node was replaced.
+        assertNotSame(c,btree.root);
+        // the new root node.
+        final Node c1 = (Node)btree.root;
+        // verify keys not changed on the old root node.
+        assertEquals(new int[]{5,9,0},c.keys);
+        // verify keys not changed on the new root node.
+        assertEquals(new int[]{5,9,0},c1.keys);
+        // verify that (a1) was replaced on (c1).
+        assertNotSame(a1,c1.getChild(0));
+        // the new copy of (a1) is (a2).
+        final Leaf a2 = (Leaf)c1.getChild(0);
+        // verify parent of (a2) is (c1).
+        assertEquals(c1,a2.parent.get());
+        // verify parent of (a1) is NOT changed (since a1 is being cloned).
+        assertEquals(c,a1.parent.get());
+        // verify (b) still the same.
+        assertEquals(b,c1.getChild(1));
+        // verify b.parent is (c1) (parent reference was changed).
+        assertEquals(c1,b.parent.get());
+        // verify (c) still the same.
+        assertEquals(d,c1.getChild(2));
+        // verify d.parent is (c1) (parent reference was changed).
+        assertEquals(c1,d.parent.get());
+        // verify keys on (a1) are NOT changed.
+        assertEquals(new int[]{1,2,3,0},a1.keys);
+        // verify keys on (a2) are changed.
+        assertEquals(new int[]{1,2,3,4},a2.keys);
+        // verify that (a2) is dirty and is not persistent.
+        assertTrue(a2.isDirty());
+        assertFalse(a2.isPersistent());
+        
+        /*
+         * verify the entire tree.
+         * 
+         * @todo this is failing for two reasons. First, we have not inserted
+         * the last key into the tree so the iterator will not visit the correct
+         * #of values. Second, the value copy mechanism is not true - it is
+         * halfway between some kind of notional test "Entry" and an
+         * IObjectIndexEntry and true to neither.
+         */
+//        assertSameIterator(entries, btree.root.entryIterator());
         
     }
 

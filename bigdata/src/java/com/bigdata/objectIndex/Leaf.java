@@ -524,17 +524,9 @@ public class Leaf extends AbstractNode {
 
     public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
 
-        if (dirtyNodesOnly) {
+        if (dirtyNodesOnly && ! isDirty() ) {
 
-            if (isDirty()) {
-
-                return new SingleValueIterator(this);
-
-            } else {
-
-                return EmptyIterator.DEFAULT;
-
-            }
+            return EmptyIterator.DEFAULT;
 
         } else {
 

@@ -241,10 +241,18 @@ public class Node extends AbstractNode {
      * 
      * @param src
      *            The source node.
+     * 
+     * @param triggeredByChild
+     *            The child that triggered the copy constructor. This should be
+     *            the immutable child NOT the one that was already cloned. This
+     *            information is used to avoid stealing the original child since
+     *            we already made a copy of it.
      */
-    protected Node(Node src) {
+    protected Node(Node src, AbstractNode triggeredByChild) {
 
         super(src);
+        
+        assert triggeredByChild != null;
 
         keys = new int[branchingFactor - 1];
 
@@ -280,7 +288,7 @@ public class Node extends AbstractNode {
             AbstractNode child = src.childRefs[i] == null ? null
                     : src.childRefs[i].get();
 
-            if (child != null) {
+            if (child != null && child != triggeredByChild) {
 
                 /*
                  * Copy on write should never trigger for a dirty node and only
@@ -302,7 +310,7 @@ public class Node extends AbstractNode {
          * Remove the source node from the btree since it has been replaced by
          * this node.
          * 
-         * @todo mark the source as invalid if we develop a hash table based
+         * @todo mark the [src] as invalid if we develop a hash table based
          * cache for nodes to ensure that we never access it by mistake using
          * its persistent id. the current design only provides for access of
          * nodes by navigation from the root, so we can never visit a node once
@@ -913,6 +921,12 @@ public class Node extends AbstractNode {
      */
     public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
 
+        if (dirtyNodesOnly && !isDirty()) {
+
+            return EmptyIterator.DEFAULT;
+
+        }
+
         /*
          * Iterator append this node to the iterator in the post-order
          * position.
@@ -928,12 +942,6 @@ public class Node extends AbstractNode {
      * does NOT visit this node.
      */
     private Iterator postOrderIterator1(final boolean dirtyNodesOnly) {
-
-        if (dirtyNodesOnly && !isDirty()) {
-
-            return EmptyIterator.DEFAULT;
-
-        }
 
         /*
          * Iterator visits the direct children, expanding them in turn with
@@ -955,6 +963,12 @@ public class Node extends AbstractNode {
                  */
 
                 AbstractNode child = (AbstractNode) childObj;
+
+                if (dirtyNodesOnly && !child.isDirty()) {
+
+                    return EmptyIterator.DEFAULT;
+
+                }
 
                 if (child instanceof Node) {
 
