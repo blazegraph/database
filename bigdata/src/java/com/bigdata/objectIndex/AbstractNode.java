@@ -263,31 +263,27 @@ public abstract class AbstractNode extends PO {
 
     /**
      * <p>
-     * Return this node iff it is dirty and otherwise return a copy of this
-     * node. If a copy is made of the node, then a copy will also be made of
-     * each parent of the node up to the root of the tree and the new root
-     * node will be set on the {@link BTree}. This method must MUST be
-     * invoked any time an mutative operation is requested for the node. For
-     * simplicity, it is invoked by the two primary mutative operations
-     * {@link #insert(int, com.bigdata.objndx.TestSimpleBTree.Entry)} and
-     * {@link #remove(int)}.
+     * Return this node iff it is dirty (aka mutable) and otherwise return a
+     * copy of this node. If a copy is made of the node, then a copy will also
+     * be made of each immutable parent of the node up to the first mutable
+     * parent or the root of the tree, which ever comes first.  If the root is
+     * copied, then the new root node will be set on the {@link BTree}. This
+     * method must MUST be invoked any time an mutative operation is requested
+     * for the node. For simplicity, it is invoked by the two primary mutative
+     * operations {@link #insert(int, Entry)} and {@link #remove(int)} and when
+     * a parent is {@link #split()} by an insert into a child.
      * </p>
      * <p>
      * Note: You can not modify a node that has been written onto the store.
-     * Instead, you have to clone the node causing it and all nodes up to
-     * the root to be dirty and transient. This method handles that cloning
-     * process, but the caller MUST test whether or not the node was copied
-     * by this method, MUST delegate the mutation operation to the copy iff
-     * a copy was made, and MUST result in an awareness in the caller that
-     * the copy exists and needs to be used in place of the immutable
-     * version of the node.
+     * Instead, you have to clone the node causing it and all nodes up to the
+     * root to be dirty and transient. This method handles that cloning process,
+     * but the caller MUST test whether or not the node was copied by this
+     * method, MUST delegate the mutation operation to the copy iff a copy was
+     * made, and MUST result in an awareness in the caller that the copy exists
+     * and needs to be used in place of the immutable version of the node.
      * </p>
      * 
      * @return Either this node or a copy of this node.
-     * 
-     * FIXME The comments above are not quite correct since you also need to
-     * invoke copyOnWrite when splits drive up the tree from a node or leaf
-     * towards the root and during rotations.
      */
     protected AbstractNode copyOnWrite() {
         
@@ -358,6 +354,40 @@ public abstract class AbstractNode extends PO {
 
         } else {
 
+            /*
+             * Since a clone was requested, we use this as an opportunity to 
+             * append a leaf onto the hard reference queue.  This helps us to
+             * ensure that leaves which have been touched recently will remain
+             * strongly reachable. 
+             */
+            if( isLeaf() ) {
+
+                /*
+                 * Do NOT append the reference onto the queue if it would cause
+                 * the eviction of the reference from the queue. This avoids
+                 * situations where we are validating that the leaf is mutable
+                 * so that we can modify it and appending the leaf onto the
+                 * queue would cause the leave to be evicted and hence made
+                 * immutable.
+                 * 
+                 * See DefaultLeafEviction.
+                 * 
+                 * FIXME This is probably not a sufficient mechanism. Either I
+                 * need to use a hard reference LRU cache (not a queue) or I
+                 * need to scan the queue for nodes that have been modified very
+                 * recently and NOT evict them (or ignore the eviction notice).
+                 * 
+                 * FIXME We should also append the reference on reads so that
+                 * recently read leaves are retained longer.
+                 */
+                if( btree.hardReferenceQueue.getTail() != this ) {
+
+                    btree.hardReferenceQueue.append(this);
+                
+                }
+                
+            }
+            
             return this;
 
         }

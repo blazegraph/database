@@ -36,7 +36,7 @@ public class TestAll extends TestCase {
 
         // test utility classes.
         suite.addTestSuite( TestSearch.class );
-        // test basic tree operations.
+        // test basic tree operations. @todo add tests of delete.
         suite.addTestSuite( TestSimpleBTree.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );

@@ -64,6 +64,41 @@ public class DefaultLeafEvictionListener implements
 
             AbstractNode node = (AbstractNode) ref;
             
+            /*
+             * Scan at least as many queue entries as their are levels in the
+             * btree.
+             */
+            final int nscan = Math.max(cache.nscan(), node.btree.height+1);
+
+            /*
+             * Scan the head of the hard reference queue to make sure that we do
+             * NOT write out a node that has been recently scanned or modified.
+             */
+            if( cache.scanHead(nscan,ref)) {
+                
+                /*
+                 * Since the reference appears in the head of the hard reference
+                 * queue we do NOT write out the node. Writing out the node
+                 * would cause it to become immutable, but it is critical that
+                 * we do NOT force a node to become immutable precisely at the
+                 * time when we are preparing to insert or split that node. If
+                 * we do not make this test here then the act of considering a
+                 * node may cause it to be appended to the queue and thereby
+                 * potentially force the node reference to be evicted from the
+                 * queue. Without this test, this scenario can result in the
+                 * node being evicted and becoming immutable exactly when we
+                 * need to write on it!
+                 * 
+                 * Note: This also reduce IOs in cases where we are very likely
+                 * to need to use the node again soon and avoids triggering
+                 * copy-on-write if we do need to reuse the node.  Thus this is
+                 * very much a win-win test.
+                 */
+
+                return;
+                
+            }
+            
             if( node.isLeaf() ) {
             
                 /*

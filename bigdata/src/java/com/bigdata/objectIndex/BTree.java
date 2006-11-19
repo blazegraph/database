@@ -134,6 +134,17 @@ public class BTree {
     static public final int DEFAULT_LEAF_CACHE_CAPACITY = 1000;
 
     /**
+     * The #of entries on the hard reference queue that will be scanned for a
+     * match before a new reference is appended to the queue. This trades off
+     * the cost of scanning entries on the queue, which is handled by the queue
+     * itself, against the cost of queue churn. Note that queue eviction drives
+     * IOs required to write the leaves on the store, but holding references on
+     * the queue means that those leaves will remain strongly reachable and
+     * thereby reduces IOs required to read the leaves from the store.
+     */
+    static public final int DEFAULT_LEAF_QUEUE_SCAN = 10;
+    
+    /**
      * The persistence store.
      */
     final protected IRawStore store;
@@ -310,7 +321,7 @@ public class BTree {
    public BTree(IRawStore store, int branchingFactor) {
 
         this(store, branchingFactor, new HardReferenceCache<PO>(
-                new DefaultLeafEvictionListener(), DEFAULT_LEAF_CACHE_CAPACITY));
+                new DefaultLeafEvictionListener(), DEFAULT_LEAF_CACHE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN));
 
     }
 

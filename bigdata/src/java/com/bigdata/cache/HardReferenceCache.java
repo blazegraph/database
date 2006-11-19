@@ -239,37 +239,11 @@ public class HardReferenceCache<T> {
         /*
          * Scan the last nscan references for this reference. If found, return
          * immediately.
-         * 
-         * Note: This loop goes backwards from the head.  Since the head is the
-         * insertion point, we decrement the head position before testing the
-         * reference.  If the head is zero, then we wrap around.  This carries
-         * the head back to the last index in the array (capacity-1).
-         *
-         * Note: This uses local variables to shadow the instance variables
-         * so that we do not modify the state of the cache as a side effect.
          */
-        {
-
-            int head = this.head;
-
-            int count = this.count;
-
-            for (int i = 0; i < nscan && count > 0; i++) {
-
-                head = (head == 0 ? capacity-1 : head - 1); // update head.
-
-                count--; // update #of references.
-
-                if( refs[head] == ref ) {
-                
-                    // Found a match.
-
-                    return false;
-
-                }
-
-            }
+        if (nscan > 0 && scanHead(nscan, ref)) {
             
+            return false;
+
         }
         
         if (count == capacity) {
@@ -397,6 +371,104 @@ public class HardReferenceCache<T> {
      */
     T[] array() {
         return refs;
+    }
+    
+    /**
+     * The reference at the tail of the queue. This is the next reference that
+     * will be evicted from the queue.
+     * 
+     * @todo We can also write getHead(), but note that the {@link #head} is the
+     *       insertion point NOT the index of the last reference inserted.
+     */
+    public T getTail() {
+        
+        return refs[tail];
+        
+    }
+
+    /**
+     * Scan the last nscan references for this reference. If found, return
+     * immediately.
+     * 
+     * @param nscan
+     *            The #of positions to scan, starting with the most recently
+     *            added reference.
+     * @param ref
+     *            The reference for which we are scanning.
+     *            
+     * @return True iff we found <i>ref</i> in the scanned queue positions.
+     */
+    public boolean scanHead(int nscan, T ref) {
+        assert nscan > 0;
+        assert ref != null;
+        /*
+         * Note: This loop goes backwards from the head.  Since the head is the
+         * insertion point, we decrement the head position before testing the
+         * reference.  If the head is zero, then we wrap around.  This carries
+         * the head back to the last index in the array (capacity-1).
+         *
+         * Note: This uses local variables to shadow the instance variables
+         * so that we do not modify the state of the cache as a side effect.
+         */
+        {
+
+            int head = this.head;
+
+            int count = this.count;
+
+            for (int i = 0; i < nscan && count > 0; i++) {
+
+                head = (head == 0 ? capacity-1 : head - 1); // update head.
+
+                count--; // update #of references.
+
+                if( refs[head] == ref ) {
+                
+                    // Found a match.
+
+                    return true;
+
+                }
+
+            }
+
+            return false;
+
+        }
+        
+    }
+    
+    /**
+     * Return true iff the reference is found in the first N positions scanning
+     * backwards from the tail of the queue.
+     * 
+     * @param nscan
+     *            The #of positions to be scanned. When one (1) only the tail of
+     *            the queue is scanned.
+     * @param ref
+     *            The reference to scan for.
+     * 
+     * @return True iff the reference is found in the last N queue positions
+     *         counting backwards from the tail.
+     * 
+     * FIXME Write unit tests for this method.
+     */
+    public boolean scanTail(int nscan, T ref) {
+
+        assert nscan > 0 ;
+        
+        assert ref != null;
+        
+        for( int n=0, i=tail; n<nscan; n++ ) {
+            
+            if( ref == refs[ i ] ) return true;
+            
+            i = (i + 1) % capacity; // update index.
+            
+        }
+        
+        return false;
+
     }
     
     /**

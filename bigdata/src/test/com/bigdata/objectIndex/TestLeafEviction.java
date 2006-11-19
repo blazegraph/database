@@ -103,12 +103,6 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
      * triggers copy-on-write, and validates the post-conditions, including the
      * logic used to steal clean children from a cloned node.
      * </p>
-     * 
-     * @todo This test depends on the fact that we do not (currently) append
-     *       leaves onto the hard reference queue each time they are modified.
-     *       However, we probably should do so, which means that this test will
-     *       have to be modified to track the impact of those updates on the
-     *       hard reference queue.
      */
     public void test_leafEviction01() {
         
@@ -117,13 +111,15 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
 
         /*
          * The hard reference queue has a capacity of two (2) leaves and does
-         * NOT scan for a matching reference before appending another reference
-         * to the queue. This gives the queue a deterministic behavior that is
-         * easy for us to test.
+         * only scans the last matching reference before appending another
+         * reference to the queue. This gives the queue a deterministic behavior
+         * that is easy for us to test. Since only the last reference touched is
+         * scanned, repeated touches of the same leaf do not result in state
+         * changes for the hard reference queue.
          */
-        final MyHardReferenceCache<PO> hardReferenceQueue = new MyHardReferenceCache<PO>(listener,2,0);
+        final MyHardReferenceCache<PO> hardReferenceQueue = new MyHardReferenceCache<PO>(listener,2,1);
         assertEquals(2,hardReferenceQueue.capacity());
-        assertEquals(0,hardReferenceQueue.nscan());
+        assertEquals(1,hardReferenceQueue.nscan());
         assertEquals(listener,hardReferenceQueue.getListener());
         
         // The btree.
