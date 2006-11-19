@@ -230,8 +230,9 @@ public class Node extends AbstractNode {
 
         btree.nnodes++;
 
-        // Note: #of nodes and leaves does not reflect right sibling yet.
-        System.err.println("NEW ROOT: height="+btree.height);
+        // Note: nnodes and nleaves might not reflect rightSibling yet.
+        BTree.log.info("NEW ROOT: height=" + btree.height + ", utilization="
+                + btree.getUtilization()[2] + "%");
 
     }
 
@@ -244,16 +245,6 @@ public class Node extends AbstractNode {
     protected Node(Node src) {
 
         super(src);
-
-        // This node must be mutable (it is a new node).
-        assert isDirty();
-        assert !isPersistent();
-        
-        /* The source must not be dirty.  We are cloning it so that we can
-         * make changes on it.
-         */
-        assert !src.isDirty();
-        assert src.isPersistent();
 
         keys = new int[branchingFactor - 1];
 
@@ -345,7 +336,7 @@ public class Node extends AbstractNode {
      * @exception IllegalArgumentException
      *                if the child is not a child of this node.
      */
-    void setChildRef(AbstractNode child) {
+    void setChildKey(AbstractNode child) {
 
         if (!child.isPersistent()) {
 
@@ -383,10 +374,10 @@ public class Node extends AbstractNode {
          * Note: This was being triggered by a failure to consider the last
          * element in childRef, but that error has been fixed.
          */
-        System.err.print("parent: ");
-        this.dump(System.err);
-        System.err.print("child : ");
-        child.dump(System.err);
+//        System.err.print("parent: ");
+//        this.dump(System.err);
+//        System.err.print("child : ");
+//        child.dump(System.err);
         throw new IllegalArgumentException("Not our child : child=" + child);
 
     }
@@ -634,9 +625,11 @@ public class Node extends AbstractNode {
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
 
-        System.err.print("SPLIT NODE: m=" + m + ", splitIndex=" + splitIndex
-                + ", splitKey=" + splitKey + ": ");
-        dump(System.err);
+        if (btree.DEBUG) {
+            BTree.log.debug("SPLIT NODE: m=" + m + ", splitIndex=" + splitIndex
+                    + ", splitKey=" + splitKey + ": ");
+            dump(System.err);
+        }
 
         /* 
          * copy keys and values to the new rightSibling.
@@ -903,7 +896,7 @@ public class Node extends AbstractNode {
                  * cleared by the VM.
                  */
 
-                btree.leaves.append((Leaf) child);
+                btree.hardReferenceQueue.append((Leaf) child);
 
             }
 
@@ -947,7 +940,7 @@ public class Node extends AbstractNode {
          * a recursive application of the post-order iterator.
          */
 
-        //            System.err.println("node: " + this);
+        // BTree.log.debug("node: " + this);
         return new Striterator(childIterator()).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
@@ -969,7 +962,7 @@ public class Node extends AbstractNode {
                      * The child is a Node (has children).
                      */
 
-                    //                        System.err.println("child is node: " + child);
+                    // BTree.log.debug("child is node: " + child);
                     // visit the children (recursive post-order traversal).
                     Striterator itr = new Striterator(((Node) child)
                             .postOrderIterator1(dirtyNodesOnly));
@@ -985,7 +978,7 @@ public class Node extends AbstractNode {
                      * The child is a leaf.
                      */
 
-                    //                        System.err.println("child is leaf: " + child);
+                    // BTree.log.debug("child is leaf: " + child);
                     // Visit the leaf itself.
                     return new SingleValueIterator(child);
 

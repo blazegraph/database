@@ -104,7 +104,14 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
     
     IBTreeFactory btreeFactory = new JournalBTreeFactory(getProperties());
     
-    int[] branchingFactors = new int[]{3,4,5,20,512};
+    /*
+     * @todo try large branching factors.
+     * 
+     * @todo For sequential keys and the simple split rule, m=128 causes the
+     * journal to exceed its initial extent. Try this again with a modified
+     * split rule that splits high for dense leaves.
+     */
+    int[] branchingFactors = new int[]{3,4,5,10,20,64};//,128};//,512};
     
     /**
      * A stress test for sequential key insertion that runs with a variety of

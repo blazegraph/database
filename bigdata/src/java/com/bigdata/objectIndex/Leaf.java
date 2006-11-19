@@ -106,7 +106,7 @@ public class Leaf extends AbstractNode {
         setDirty(false);
 
         // Add to the hard reference queue.
-        btree.leaves.append(this);
+        btree.hardReferenceQueue.append(this);
         
     }
 
@@ -129,7 +129,7 @@ public class Leaf extends AbstractNode {
          * Add to the hard reference queue. If the queue is full, then this will
          * force the incremental write whatever gets evicted from the queue.
          */
-        btree.leaves.append(this);
+        btree.hardReferenceQueue.append(this);
         
         btree.nleaves++;
 
@@ -145,11 +145,17 @@ public class Leaf extends AbstractNode {
 
         super(src);
 
+        nkeys = src.nkeys;
+
         // nkeys == nvalues for a Leaf.
         keys = new int[branchingFactor];
 
         values = new Entry[branchingFactor];
 
+        // copy keys.
+        System.arraycopy(src.keys, 0, keys, 0, nkeys);
+        
+        // copy values.
         for (int i = 0; i < nkeys; i++) {
 
             /*
@@ -161,7 +167,7 @@ public class Leaf extends AbstractNode {
         }
 
         // Add to the hard reference queue.
-        btree.leaves.append(this);
+        btree.hardReferenceQueue.append(this);
 
     }
 
@@ -306,9 +312,11 @@ public class Leaf extends AbstractNode {
 
         final Leaf rightSibling = new Leaf(btree);
 
-        System.err.print("SPLIT LEAF: m=" + m + ", splitIndex=" + splitIndex
-                + ", splitKey=" + splitKey + ": ");
-        dump(System.err);
+        if (btree.DEBUG) {
+            BTree.log.debug("SPLIT LEAF: m=" + m + ", splitIndex=" + splitIndex
+                    + ", splitKey=" + splitKey + ": ");
+            dump(System.err);
+        }
 
         int j = 0;
         for (int i = splitIndex; i < m; i++, j++) {

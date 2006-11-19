@@ -52,6 +52,7 @@ import java.util.Random;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+import com.bigdata.cache.HardReferenceCache;
 import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
@@ -114,8 +115,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertEquals("index",n1.btree,n2.btree);
         
-        // @todo identity available iff persistent.
-        assertEquals("id",n1.getIdentity(),n2.getIdentity());
+        assertEquals("dirty", n1.isDirty(), n2.isDirty());
+
+        assertEquals("persistent", n1.isPersistent(), n2.isPersistent());
+        
+        if (n1.isPersistent()) {
+            
+            assertEquals("id", n1.getIdentity(), n2.getIdentity());
+            
+        }
         
         assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
         
@@ -141,9 +149,16 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertEquals("index",n1.btree,n2.btree);
         
-        // @todo identity available iff persistent.
-        assertEquals("id",n1.getIdentity(),n2.getIdentity());
+        assertEquals("dirty", n1.isDirty(), n2.isDirty());
+
+        assertEquals("persistent", n1.isPersistent(), n2.isPersistent());
         
+        if (n1.isPersistent()) {
+            
+            assertEquals("id", n1.getIdentity(), n2.getIdentity());
+            
+        }
+
         assertEquals("pageSize",n1.branchingFactor,n2.branchingFactor);
         
         assertEquals("first",n1.nkeys,n2.nkeys);
@@ -361,7 +376,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         IRawStore store = new SimpleStore();
 
         BTree btree = new BTree(store, branchingFactor,
-                new NoLeafEvictionListener(), 10000);
+                new HardReferenceCache<PO>(new NoLeafEvictionListener(), 10000));
 
         return btree;
         
@@ -583,7 +598,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             Entry entry = entries[i];
             
-            System.err.println("i="+i+", key="+key);
+            if( i>0 && i % 10000 == 0 ) {
+                
+                System.err.println("i="+i+", key="+key);
+                
+            }
 
             assertEquals("#entries",i,btree.nentries);
             
@@ -597,8 +616,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             if (btree.nleaves > lastLeafCount) {
 
-                System.err.println("Split: i=" + i + ", key=" + key
-                        + ", nleaves=" + btree.nleaves);
+//                System.err.println("Split: i=" + i + ", key=" + key
+//                        + ", nleaves=" + btree.nleaves);
 
                 lastLeafCount = btree.nleaves;
 
@@ -666,7 +685,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             Entry entry = entries[i];
             
-            System.err.println("i="+i+", key="+key);
+            if( i>0 && i%10000 == 0 ) {
+            
+                System.err.println("i="+i+", key="+key);
+                
+            }
 
             assertEquals("#entries",i,btree.nentries);
             
@@ -680,8 +703,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             if (btree.nleaves > lastLeafCount) {
 
-                System.err.println("Split: i=" + i + ", key=" + key
-                        + ", nleaves=" + btree.nleaves);
+//                System.err.println("Split: i=" + i + ", key=" + key
+//                        + ", nleaves=" + btree.nleaves);
 
                 lastLeafCount = btree.nleaves;
 
@@ -909,8 +932,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 Entry entry = entries[order[i]];
 
-                System.err.println("index=" + i + ", key=" + key + ", entry="
+                if( i>0 && i%10000 == 0 ) {
+                    
+                    System.err.println("index=" + i + ", key=" + key + ", entry="
                         + entry);
+                    
+                }
 
                 assertEquals("#entries", i, btree.nentries);
 
@@ -941,8 +968,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 if (btree.nleaves > lastLeafCount) {
 
-                    System.err.println("Split: i=" + i + ", key=" + key
-                            + ", nleaves=" + btree.nleaves);
+                    if (trace >= 1) {
+
+                        System.err.println("Split: i=" + i + ", key=" + key
+                                + ", nleaves=" + btree.nleaves);
+                        
+                    }
 
                     if (trace >= 1) {
 
@@ -1075,7 +1106,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             Entry entry = entries[order[i]];
             
-            System.err.println("i="+i+", key="+key);
+            if( i >0 && i%10000 == 0 ) {
+            
+                System.err.println("i="+i+", key="+key);
+                
+            }
 
             assertEquals("#entries",i,btree.nentries);
             
@@ -1089,8 +1124,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             if (btree.nleaves > lastLeafCount) {
 
-                System.err.println("Split: i=" + i + ", key=" + key
-                        + ", nleaves=" + btree.nleaves);
+//                System.err.println("Split: i=" + i + ", key=" + key
+//                        + ", nleaves=" + btree.nleaves);
 
                 lastLeafCount = btree.nleaves;
 

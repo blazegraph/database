@@ -56,6 +56,10 @@ import com.bigdata.journal.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME Test commit protocol with more complex trees and also validate the
+ * state change for dirty and identity attributes for nodes and leaves as they
+ * are written by the commit protocol.
  */
 public class TestCommit extends TestCase2 {
 

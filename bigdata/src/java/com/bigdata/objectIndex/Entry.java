@@ -46,8 +46,6 @@ Modifications:
  */
 package com.bigdata.objectIndex;
 
-import java.io.Serializable;
-
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
@@ -59,9 +57,7 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * 
  * FIXME Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
  */
-public class Entry implements Serializable, IObjectIndexEntry {
-
-    private static final long serialVersionUID = 1L;
+public class Entry implements IObjectIndexEntry {
 
     private static int nextId = 1;
     private int id;

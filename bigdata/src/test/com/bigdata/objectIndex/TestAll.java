@@ -44,16 +44,16 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestNodeSerializer.class );
         // test the commit protocol w/o incremental leaf eviction.
         suite.addTestSuite( TestCommit.class );
-        // @todo test incremental leaf eviction.
-        // @todo test copy-on-write semantics with post-commit tree.
-        // @todo test copy-on-write semantics with incremental leaf eviction.
-        // @todo stress test against IRawStore on journal (vs SimpleRawStore).
+        // test incremental leaf eviction and copy-on-write scenarios.
+        suite.addTestSuite( TestLeafEviction.class );
+        // @todo test copy-on-write semantics with post-commit or re-loaded tree.
+        // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.
         // @todo test journal restart semantics w/o shutdown.
-        // @todo stress test (correctness).
+        // @todo stress test (correctness as object index for store).
         // @todo test journal transaction isolation using the new object index.
         // @todo test journal restart semantics once persistent allocation index is implemented.
 

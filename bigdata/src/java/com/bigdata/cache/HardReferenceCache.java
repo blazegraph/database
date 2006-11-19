@@ -404,7 +404,7 @@ public class HardReferenceCache<T> {
      * the relevant references from the backing array. Changes to this array
      * have NO effect on the state of the cache.
      */
-    T[] toArray() {
+    protected T[] toArray() {
         
         T[] ary = (T[])new Object[count];
         

@@ -549,19 +549,17 @@ public class NodeSerializer {
      * @param buf
      *            The buffer. The node will be serialized starting at the
      *            current position. The position will be advanced as a side
-     *            effect. The remaining bytes in the buffer must equal
-     *            {@link #LEAF_SIZE} as a pre-condition and will be ZERO(0) as a
-     *            post-condition.
-     * @param node
-     *            The node. Must be a leaf node.
+     *            effect.
+     * @param leaf
+     *            The leaf node.
      */
-    void putLeaf(ByteBuffer buf, Leaf node) {
+    void putLeaf(ByteBuffer buf, Leaf leaf) {
 
         assert buf != null;
-        assert node != null;
-        assert node.nkeys >= 0 && node.nkeys <= node.branchingFactor;
+        assert leaf != null;
+        assert leaf.nkeys >= 0 && leaf.nkeys <= leaf.branchingFactor;
         
-        final int nkeys = node.nkeys;
+        final int nkeys = leaf.nkeys;
         
         /*
          * common data.
@@ -578,10 +576,10 @@ public class NodeSerializer {
         buf.put((byte) 1); // this is a leaf node.
         
         // branching factor.
-        buf.putShort((short)node.branchingFactor);
+        buf.putShort((short)leaf.branchingFactor);
         
         // #of keys
-        buf.putShort((short) node.nkeys);
+        buf.putShort((short) leaf.nkeys);
         
         // keys.
         
@@ -589,7 +587,7 @@ public class NodeSerializer {
         
         for (int i = 0; i < nkeys; i++) {
 
-            final int key = node.keys[i];
+            final int key = leaf.keys[i];
             
             assert key > lastKey; // verify increasing and minimum.
             
@@ -606,7 +604,7 @@ public class NodeSerializer {
          */
         for (int i = 0; i < nkeys; i++) {
 
-            final IObjectIndexEntry entry = node.values[i];
+            final IObjectIndexEntry entry = leaf.values[i];
 
             assert entry != null;
 

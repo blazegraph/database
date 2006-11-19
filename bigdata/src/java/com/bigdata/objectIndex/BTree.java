@@ -52,6 +52,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceCache;
@@ -64,33 +65,40 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
  * <p>
- * BTree encapsulates metadata about the persistence capable index, but is
- * not itself a persistent object.
+ * BTree encapsulates metadata about the persistence capable index, but is not
+ * itself a persistent object.
  * </p>
  * <p>
- * Note: No mechanism is exposed for recovering a node or leaf of the tree
- * other than the root by its key. This is because the parent reference on
- * the node (or leaf) can only be set when it is read from the store in
- * context by its parent node.
+ * Note: No mechanism is exposed for recovering a node or leaf of the tree other
+ * than the root by its key. This is because the parent reference on the node
+ * (or leaf) can only be set when it is read from the store in context by its
+ * parent node.
  * </p>
  * <p>
- * Note: This implementation is NOT thread-safe. The object index is
- * intended for use within a single-threaded context.
+ * Note: This implementation is NOT thread-safe. The object index is intended
+ * for use within a single-threaded context.
  * </p>
  * <p>
- * Note: This iterators exposed by this implementation do NOT support
- * concurrent structural modification. Concurrent inserts or removals of
- * keys MAY produce incoherent traversal whether or not they result in
- * addition or removal of nodes in the tree.
+ * Note: This iterators exposed by this implementation do NOT support concurrent
+ * structural modification. Concurrent inserts or removals of keys MAY produce
+ * incoherent traversal whether or not they result in addition or removal of
+ * nodes in the tree.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Write accessor methods.
+ * @todo Parameterize the value type.
+ * @todo Refactor until the key type can be abstracted? I want to keep the use
+ *       of a primitive int for the keys for the object index, so I am not sure
+ *       if this will work out or if the code is better cloned to derive B+Trees
+ *       to support general purpose indices.
  */
 public class BTree {
     
     /**
-     * Log for btree opeations (currently unused).
+     * Log for btree opeations.
      */
     public static final Logger log = Logger.getLogger(BTree.class);
     
@@ -99,15 +107,15 @@ public class BTree {
      */
     public static final Logger dumpLog = Logger.getLogger(BTree.class.getName()+"#dump");
     
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * The minimum allowed branching factor (3).
@@ -156,7 +164,14 @@ public class BTree {
      *       with a large capacity. This will serve a bit like an MRU. The other
      *       is to remove nodes from this set explicitly on certain conditions.
      *       For example, when a copy is made of an immutable node the immutable
-     *       node might be removed from this set.
+     *       node might be removed from this set. Also, if we support
+     *       incremental writes of nodes, then newly written nodes could be
+     *       removed from this set as well - they would remain accessible via
+     *       {@link Node#childRefs} for their parent as long as the node
+     *       remained on the hard reference queue. I.e., we could just use
+     *       another hard reference queue for nodes in addition to the one that
+     *       we have for leaves.  The thing is that we may want to defer all node
+     *       writes until the commit.
      * 
      * @see AbstractNode#AbstractNode(AbstractNode)
      */
@@ -180,13 +195,8 @@ public class BTree {
      *       to also incrementally flush nodes using
      *       {@link #writeNodeRecursive(AbstractNode)}.
      */
-    final HardReferenceCache<PO> leaves;
+    final HardReferenceCache<PO> hardReferenceQueue;
 
-    /**
-     * Writes dirty leaves onto the {@link #store} as they are evicted.
-     */
-    final ILeafEvictionListener listener;
-    
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree.
      */
@@ -246,37 +256,34 @@ public class BTree {
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
-     * @param listener
-     *            The {@link ILeafEvictionListener}
      * @param headReferenceQueueCapacity
      *            The capacity of the hard reference queue (minimum of 2 to
      *            avoid cache evictions of the leaves participating in a split).
      */
     public BTree(IRawStore store, int branchingFactor,
-            ILeafEvictionListener listener, int hardReferenceQueueCapacity) {
+            HardReferenceCache<PO> hardReferenceQueue ) {
 
         assert store != null;
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
-        assert hardReferenceQueueCapacity >= MIN_HARD_REFERENCE_QUEUE_CAPACITY;
+        assert hardReferenceQueue.capacity() >= MIN_HARD_REFERENCE_QUEUE_CAPACITY;
         
         this.store = store;
 
         this.branchingFactor = branchingFactor;
 
-        this.listener = listener;
-
-        this.leaves = new HardReferenceCache<PO>(listener,
-                hardReferenceQueueCapacity);
+        this.hardReferenceQueue = hardReferenceQueue;
 
         this.nodeSer = new NodeSerializer(new SlotMath(store.getSlotSize()));
         
-        int maxNodeOrLeafSize = Math.max(nodeSer
-                .getSize(false, branchingFactor), nodeSer.getSize(true,
-                branchingFactor - 1));
+        int maxNodeOrLeafSize = Math.max(
+                // max size for a leaf.
+                nodeSer.getSize(true, branchingFactor),
+                // max size for a node.
+                nodeSer.getSize(false, branchingFactor - 1));
         
-        System.err.println("maxNodeOrLeafSize="+maxNodeOrLeafSize);
+        log.info("maxNodeOrLeafSize="+maxNodeOrLeafSize);
         
         this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
 
@@ -302,8 +309,8 @@ public class BTree {
      */
    public BTree(IRawStore store, int branchingFactor) {
 
-        this(store, branchingFactor, new DefaultLeafEvictionListener(),
-                DEFAULT_LEAF_CACHE_CAPACITY);
+        this(store, branchingFactor, new HardReferenceCache<PO>(
+                new DefaultLeafEvictionListener(), DEFAULT_LEAF_CACHE_CAPACITY));
 
     }
 
@@ -329,17 +336,18 @@ public class BTree {
 
         this.store = store;
 
-        listener = new DefaultLeafEvictionListener();
-
-        leaves = new HardReferenceCache<PO>(listener, DEFAULT_LEAF_CACHE_CAPACITY );
+        this.hardReferenceQueue = new HardReferenceCache<PO>(
+                new DefaultLeafEvictionListener(), DEFAULT_LEAF_CACHE_CAPACITY);
 
         this.nodeSer = new NodeSerializer(new SlotMath(store.getSlotSize()));
         
-        int maxNodeOrLeafSize = Math.max(nodeSer
-                .getSize(false, branchingFactor), nodeSer.getSize(true,
-                branchingFactor - 1));
-        
-        System.err.println("maxNodeOrLeafSize="+maxNodeOrLeafSize);
+        int maxNodeOrLeafSize = Math.max(
+                // max size for a leaf.
+                nodeSer.getSize(true, branchingFactor),
+                // max size for a node.
+                nodeSer.getSize(false, branchingFactor - 1));
+
+        log.info("maxNodeOrLeafSize="+maxNodeOrLeafSize);
         
         this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
         
@@ -421,7 +429,7 @@ public class BTree {
 
         }
 
-        System.err.println("write: " + ndirty + " dirty nodes (" + nleaves
+        log.info("write: " + ndirty + " dirty nodes (" + nleaves
                 + " leaves), rootId=" + root.getIdentity());
         
     }
@@ -433,13 +441,40 @@ public class BTree {
      * 
      * @return The persistent identity assigned by the store.
      */
-    protected long writeNodeOrLeaf(AbstractNode node ) {
+    protected long writeNodeOrLeaf( AbstractNode node ) {
 
         assert node != null;
         assert node.btree == this;
         assert node.isDirty();
         assert !node.isPersistent();
 
+        /*
+         * Note: The parent should be defined unless this is the root node.
+         * 
+         * Note: A parent CAN NOT be serialized before all of its children have
+         * persistent identity since it needs to write the identity of each
+         * child in its serialization record.
+         */
+        Node parent = node.getParent();
+
+        if (parent == null) {
+            
+            assert node == root;
+
+        } else {
+
+            // parent must be dirty if child is dirty.
+            assert parent.isDirty();
+
+            // parent must not be persistent if it is dirty.
+            assert !parent.isPersistent();
+            
+        }
+        
+        /*
+         * Serialize the node or leaf onto a shared buffer.
+         */
+        
         buf.clear();
         
         if( node.isLeaf() ) {
@@ -452,33 +487,31 @@ public class BTree {
             
         }
         
+        /*
+         * Flip the buffer and write the serialized node or leaf onto the store.
+         */
+        
         buf.flip();
         
         final long id = store.write(buf).toLong();
+
+        /*
+         * The node or leaf now has a persistent identity and is marked as
+         * clean. At this point is MUST be treated as being immutable. Any
+         * changes directed to this node or leaf MUST trigger copy-on-write.
+         */
 
         node.setIdentity(id);
         
         node.setDirty(false);
 
-        // The parent should be defined unless this is the root node.
-        Node parent = node.getParent();
+        /*
+         * Set the persistent identity of the child on the parent.
+         */
 
-        if (parent != null) {
-
-            // parent must be dirty if child is dirty.
-            assert parent.isDirty();
-
-            // parent must not be persistent if it is dirty.
-            assert !parent.isPersistent();
-
-            /*
-             * Set the persistent identity of the child on the parent.
-             * 
-             * Note: A parent CAN NOT be serialized before all of its children
-             * have persistent identity since it needs to write the identity of
-             * each child in its serialization record.
-             */
-            parent.setChildRef(node);
+        if( parent != null ) {
+            
+            parent.setChildKey(node);
 
         }
 
@@ -655,7 +688,7 @@ public class BTree {
         ByteBuffer buf = store.read(asSlots(metadataId),null);
 
         final long rootId = buf.getLong();
-        System.err.println("rootId=" + rootId);
+        log.info("rootId=" + rootId);
         branchingFactor = buf.getInt();
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
         height = buf.getInt();

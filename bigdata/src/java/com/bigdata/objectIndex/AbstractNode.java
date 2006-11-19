@@ -199,16 +199,37 @@ public abstract class AbstractNode extends PO {
          */
         super();
 
+
+        // This node must be mutable (it is a new node).
         assert isDirty();
         assert !isPersistent();
+        
+        /* The source must not be dirty.  We are cloning it so that we can
+         * make changes on it.
+         */
         assert src != null;
         assert !src.isDirty();
         assert src.isPersistent();
 
-        this.branchingFactor = src.btree.branchingFactor;
+        this.branchingFactor = src.branchingFactor;
 
+        /*
+         * Set the btree reference.
+         */
         setBTree(src.btree);
 
+        /*
+         * Copy the parent reference. The parent must be defined unless the
+         * source is the current root.
+         * 
+         * Note that we reuse the weak reference since it is immutable (it state
+         * is only changed by the VM, not by the application).
+         */
+
+        assert src==btree.root || (src.parent != null && src.parent.get() != null);
+        
+        this.parent = src.parent;
+        
     }
 
     /**
@@ -266,8 +287,6 @@ public abstract class AbstractNode extends PO {
 
         if (isPersistent()) {
 
-            Node parent = this.getParent();
-
             AbstractNode newNode;
 
             if (this instanceof Node) {
@@ -280,14 +299,14 @@ public abstract class AbstractNode extends PO {
 
             }
 
+            Node parent = this.getParent();
+
             if (btree.root == this) {
 
                 assert parent == null;
 
                 // Update the root node on the btree.
-
-                System.err
-                        .println("Copy-on-write : replaced root node on btree.");
+                BTree.log.info("Copy-on-write : replaced root node on btree.");
 
                 btree.root = newNode;
 
@@ -302,11 +321,11 @@ public abstract class AbstractNode extends PO {
 
                 if (!parent.isDirty()) {
 
-                    Node newParent = (Node) parent.copyOnWrite();
-
-                    newParent.replaceChildRef(this.getIdentity(), newNode);
+                    parent = (Node) parent.copyOnWrite();
 
                 }
+
+                parent.replaceChildRef(this.getIdentity(), newNode);
 
             }
 

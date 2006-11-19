@@ -82,6 +82,10 @@ public class DefaultLeafEvictionListener implements
                 node.btree.writeNodeRecursive(node);
                 
             }
+
+            // Verify the object is now persistent.
+            assert ! ref.dirty;
+            assert ref.identity != PO.NULL;
             
         }
 
