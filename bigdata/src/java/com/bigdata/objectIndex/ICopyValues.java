@@ -42,74 +42,39 @@ Modifications:
 
 */
 /*
- * Created on Nov 17, 2006
+ * Created on Nov 20, 2006
  */
 
 package com.bigdata.objectIndex;
 
-import java.io.IOException;
-import java.util.Properties;
-
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.Journal;
-
 /**
- * Factory for {@link BTree} backed by a {@link Journal}.
+ * Interface encapsulates knowledge required to copy references or clone objects
+ * when copy-on-write is invoked for a {@link Leaf}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated We can just steal the values instead.
  */
-public class JournalBTreeFactory implements IBTreeFactory {
+public interface ICopyValues {
 
-    final Properties properties;
-    
-    public Properties getProperties() {
-        
-        return properties;
-        
-    }
-    
-    public JournalBTreeFactory(Properties properties) {
-        
-        this.properties = properties;
-
-    }
-    
     /**
-     * Return a btree backed by a journal with the indicated branching factor.
-     * The serializer requires that values in leaves are {@link SimpleEntry}
-     * objects.
+     * This method is invoked when a {@link Leaf} is cloned and must a copy or
+     * clone the values. If the values are immutable objects, then their
+     * references may be copied. Otherwise, the value objects MUST be cloned,
+     * deep-copied, or whatever so that changes to the value objects in the new
+     * {@link Leaf} do NOT bleed back into the source {@link Leaf}.
      * 
-     * @param branchingFactor
-     *            The branching factor.
-     * 
-     * @return The btree.
+     * @param src
+     *            The array of objects on the source (immutable) leaf.
+     * @param dst
+     *            The array of objects on the new (mutable) leaf.
+     * @param nkeys
+     *            The #of valid keys in the source leaf. There is one object per
+     *            key for a leaf. Values [0:nkeys-1] will be defined in the
+     *            source array and must be copied to the same indices in the
+     *            destination array.
      */
-    public BTree getBTree(int branchingFactor) {
-
-        try {
-            
-            Properties properties = getProperties();
-
-            Journal journal = new Journal(properties);
-
-            final int leafQueueCapacity = 10000;
-            
-            final int nscan = 10;
-
-            BTree btree = new BTree(journal, branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                    new SimpleEntry.Serializer());
-
-            return btree;
-
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-   
+    public void copyValues(Object[] src, Object[] dst, int nkeys);
+    
 }

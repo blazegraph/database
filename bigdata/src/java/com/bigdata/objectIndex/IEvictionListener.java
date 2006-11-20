@@ -47,18 +47,21 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
-import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.HardReferenceQueue.HardReferenceCacheEvictionListener;
 
 /**
- * Interface to handle evictions of leaves from the hard reference queue.
+ * Interface to handle evictions of nodes or leaves from the hard reference
+ * queue. The listener is responsible for decrementing the
+ * {@link AbstractNode#referenceCount} and must write a dirty node or leaf onto
+ * the store when their reference counter reaches zero(0).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeafEvictionListener extends
+public interface IEvictionListener extends
         HardReferenceCacheEvictionListener<PO> {
 
-    public void evicted(HardReferenceCache<PO> cache, PO ref);
+    public void evicted(HardReferenceQueue<PO> cache, PO ref);
 
 }

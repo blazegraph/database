@@ -49,8 +49,6 @@ package com.bigdata.objectIndex;
 
 import java.util.Arrays;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
 /**
  * <p>
  * Test suite that seeks to develop a persistence capable B-Tree supporting
@@ -209,7 +207,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int branchingFactor = 20;
         
-        BTree btree = getNoEvictionBTree(branchingFactor);
+        IBTree btree = getBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
         
@@ -221,7 +219,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         while( nkeys < branchingFactor ) {
             
             // Valid random key.
-            int key = r.nextInt(Node.POSINF-1)+1;
+            int key = r.nextInt(IBTree.POSINF-1)+1;
             
             int index = Search.search(key, root.keys, root.nkeys);
             
@@ -245,7 +243,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
                     + " : nkeys=" + nkeys);
 
             // insert an entry under that key.
-            root.insert(key, index, new Entry() );
+            root.insert(key, index, new SimpleEntry() );
             
             nkeys++;
             
@@ -274,7 +272,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int branchingFactor = 20;
         
-        BTree btree = getNoEvictionBTree(branchingFactor);
+        IBTree btree = getBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
 
@@ -286,13 +284,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         while( nkeys < branchingFactor ) {
             
             // Valid random key.
-            int key = r.nextInt(Node.POSINF-1)+1;
+            int key = r.nextInt(IBTree.POSINF-1)+1;
 
             int nkeysBefore = root.nkeys;
             
             boolean exists = root.lookup(key) != null;
             
-            root.insert(key, new Entry() );
+            root.insert(key, new SimpleEntry() );
 
             if( nkeysBefore == root.nkeys ) {
                 
@@ -329,7 +327,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
      * sequences known to the unit test. The correct behavior of the
      * {@link Leaf#entryIterator()} is also tested.
      * 
-     * @see Leaf#insert(int, com.bigdata.objndx.TestSimpleBTree.Entry)
+     * @see Leaf#insert(int, com.bigdata.objndx.TestSimpleBTree.SimpleEntry)
      * @see Leaf#lookup(int)
      * @see Leaf#entryIterator()
      */
@@ -337,7 +335,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int branchingFactor = 20;
         
-        BTree btree = getNoEvictionBTree(branchingFactor);
+        IBTree btree = getBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
 
@@ -345,14 +343,14 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         int[] expectedKeys = new int[branchingFactor];
 
         // the value to insert for each key.
-        Entry[] expectedValues = new Entry[branchingFactor];
+        SimpleEntry[] expectedValues = new SimpleEntry[branchingFactor];
         
         /*
          * Generate keys and values. The keys are a monotonic progression with
          * random non-zero intervals.
          */
         
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
         
         for( int i=0; i<branchingFactor; i++ ) {
             
@@ -360,7 +358,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
             
             expectedKeys[ i ] = key;
             
-            expectedValues[ i ] = new Entry();
+            expectedValues[ i ] = new SimpleEntry();
             
             lastKey = key; 
             
@@ -370,7 +368,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
             int key = expectedKeys[i];
             
-            Entry value = expectedValues[i];
+            SimpleEntry value = expectedValues[i];
             
             assertEquals(i, root.nkeys );
             
@@ -389,7 +387,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
                     value, root.lookup(key));
             
             // verify the values iterator
-            IObjectIndexEntry[] tmp = new IObjectIndexEntry[root.nkeys];
+            Object[] tmp = new Object[root.nkeys];
             for( int j=0; j<root.nkeys; j++ ) {
                 tmp[j] = root.values[j];
             }
@@ -420,7 +418,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -433,13 +431,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // The keys to insert before the split.
         int[] keys = new int[]{2,11,21,31};
         
-        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        SimpleEntry[] entries = new SimpleEntry[]{new SimpleEntry(),new SimpleEntry(),new SimpleEntry(),new SimpleEntry()};
         
         for( int i=0; i<m; i++ ) {
         
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             assertNull(btree.lookup(key));
             
@@ -469,7 +467,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         int splitKey = 1;
 
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
 
         assertNull(btree.lookup(splitKey));
 
@@ -506,10 +504,10 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(2,leaf2.nkeys);
         assertEquals(new int[]{21,31,0,0},leaf2.keys);
 
-        assertSameIterator(new Entry[] { splitEntry, entries[0], entries[1] },
+        assertSameIterator(new SimpleEntry[] { splitEntry, entries[0], entries[1] },
                 leaf1.entryIterator());
 
-        assertSameIterator(new Entry[] { entries[2], entries[3] }, leaf2
+        assertSameIterator(new SimpleEntry[] { entries[2], entries[3] }, leaf2
                 .entryIterator());
 
         assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
@@ -521,7 +519,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
                 .postOrderIterator());
         
-        assertSameIterator(new Entry[] { splitEntry, entries[0], entries[1],
+        assertSameIterator(new SimpleEntry[] { splitEntry, entries[0], entries[1],
                 entries[2], entries[3] }, root.entryIterator());
 
     }
@@ -534,7 +532,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -547,13 +545,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // The keys to insert before the split.
         int[] keys = new int[]{1,11,21,31};
         
-        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        SimpleEntry[] entries = new SimpleEntry[]{new SimpleEntry(),new SimpleEntry(),new SimpleEntry(),new SimpleEntry()};
         
         for( int i=0; i<m; i++ ) {
         
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             assertNull(btree.lookup(key));
             
@@ -582,7 +580,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         int splitKey = 4;
 
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
 
         assertNull(btree.lookup(splitKey));
 
@@ -619,10 +617,10 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(2,leaf2.nkeys);
         assertEquals(new int[]{21,31,0,0},leaf2.keys);
 
-        assertSameIterator(new Entry[] { entries[0], splitEntry, entries[1] },
+        assertSameIterator(new SimpleEntry[] { entries[0], splitEntry, entries[1] },
                 leaf1.entryIterator());
 
-        assertSameIterator(new Entry[] { entries[2], entries[3] }, leaf2
+        assertSameIterator(new SimpleEntry[] { entries[2], entries[3] }, leaf2
                 .entryIterator());
 
         assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
@@ -634,7 +632,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
                 .postOrderIterator());
         
-        assertSameIterator(new Entry[] { entries[0], splitEntry, entries[1],
+        assertSameIterator(new SimpleEntry[] { entries[0], splitEntry, entries[1],
                 entries[2], entries[3] }, root.entryIterator());
 
     }
@@ -647,7 +645,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -660,13 +658,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // The keys to insert before the split.
         int[] keys = new int[]{1,11,21,31};
         
-        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        SimpleEntry[] entries = new SimpleEntry[]{new SimpleEntry(),new SimpleEntry(),new SimpleEntry(),new SimpleEntry()};
         
         for( int i=0; i<m; i++ ) {
         
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             assertNull(btree.lookup(key));
             
@@ -695,7 +693,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         int splitKey = 15;
 
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
 
         assertNull(btree.lookup(splitKey));
 
@@ -732,10 +730,10 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(2,leaf2.nkeys);
         assertEquals(new int[]{21,31,0,0},leaf2.keys);
 
-        assertSameIterator(new Entry[] { entries[0], entries[1], splitEntry },
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1], splitEntry },
                 leaf1.entryIterator());
 
-        assertSameIterator(new Entry[] { entries[2], entries[3] }, leaf2
+        assertSameIterator(new SimpleEntry[] { entries[2], entries[3] }, leaf2
                 .entryIterator());
 
         assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
@@ -747,7 +745,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
                 .postOrderIterator());
         
-        assertSameIterator(new Entry[] { entries[0], entries[1], splitEntry, 
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1], splitEntry, 
                 entries[2], entries[3] }, root.entryIterator());
 
     }
@@ -761,7 +759,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -774,13 +772,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // The keys to insert before the split.
         int[] keys = new int[]{1,11,21,31};
         
-        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        SimpleEntry[] entries = new SimpleEntry[]{new SimpleEntry(),new SimpleEntry(),new SimpleEntry(),new SimpleEntry()};
         
         for( int i=0; i<m; i++ ) {
         
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             assertNull(btree.lookup(key));
             
@@ -809,7 +807,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         int splitKey = 22;
 
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
 
         assertNull(btree.lookup(splitKey));
 
@@ -846,10 +844,10 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(3,leaf2.nkeys);
         assertEquals(new int[]{21,22,31,0},leaf2.keys);
 
-        assertSameIterator(new Entry[] { entries[0], entries[1] }, leaf1
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1] }, leaf1
                 .entryIterator());
 
-        assertSameIterator(new Entry[] { entries[2], splitEntry, entries[3] },
+        assertSameIterator(new SimpleEntry[] { entries[2], splitEntry, entries[3] },
                 leaf2.entryIterator());
 
         assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
@@ -861,7 +859,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
                 .postOrderIterator());
         
-        assertSameIterator(new Entry[] { entries[0], entries[1], entries[2],
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1], entries[2],
                 splitEntry, entries[3] }, root.entryIterator());
 
     }
@@ -875,7 +873,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -888,13 +886,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // The keys to insert before the split.
         int[] keys = new int[]{1,11,21,31};
         
-        Entry[] entries = new Entry[]{new Entry(),new Entry(),new Entry(),new Entry()};
+        SimpleEntry[] entries = new SimpleEntry[]{new SimpleEntry(),new SimpleEntry(),new SimpleEntry(),new SimpleEntry()};
         
         for( int i=0; i<m; i++ ) {
         
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             assertNull(btree.lookup(key));
             
@@ -923,7 +921,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         int splitKey = 40;
 
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
 
         assertNull(btree.lookup(splitKey));
 
@@ -960,10 +958,10 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(3,leaf2.nkeys);
         assertEquals(new int[]{21,31,40,0},leaf2.keys);
 
-        assertSameIterator(new Entry[] { entries[0], entries[1] }, leaf1
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1] }, leaf1
                 .entryIterator());
 
-        assertSameIterator(new Entry[] { entries[2], entries[3], splitEntry },
+        assertSameIterator(new SimpleEntry[] { entries[2], entries[3], splitEntry },
                 leaf2.entryIterator());
 
         assertSameIterator(new AbstractNode[] { leaf1 }, leaf1
@@ -975,7 +973,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertSameIterator(new AbstractNode[] { leaf1, leaf2, root }, root
                 .postOrderIterator());
         
-        assertSameIterator(new Entry[] { entries[0], entries[1], entries[2],
+        assertSameIterator(new SimpleEntry[] { entries[0], entries[1], entries[2],
                 entries[3], splitEntry }, root.entryIterator());
 
     }
@@ -1095,7 +1093,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         final int m = 4;
 
-        BTree btree = getNoEvictionBTree(m);
+        BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -1110,7 +1108,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
          
             int key = keys[i];
             
-            Entry entry = new Entry();
+            SimpleEntry entry = new SimpleEntry();
             
             assertNull(btree.lookup(key));
             
@@ -1135,7 +1133,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
 
         // Insert [key := 15] goes into leaf1 (forces split).
         System.err.print("leaf1 before split : "); leaf1.dump(System.err);
-        Entry splitEntry = new Entry();
+        SimpleEntry splitEntry = new SimpleEntry();
         assertNull(btree.lookup(15));
         btree.insert(15,splitEntry);
         System.err.print("leaf1 after split : "); leaf1.dump(System.err);
@@ -1176,17 +1174,17 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
                 .postOrderIterator());
 
         // Insert [key := 2] goes into leaf1, filling it to capacity.
-        root.insert(2,new Entry());
+        root.insert(2,new SimpleEntry());
         assertEquals("leaf1.nkeys",4,leaf1.nkeys);
         assertEquals("leaf1.keys",new int[]{1,2,11,15},leaf1.keys);
 
         // Insert [key := 22] goes into leaf2 (tests edge condition)
-        root.insert(22,new Entry());
+        root.insert(22,new SimpleEntry());
         assertEquals("leaf2.nkeys",3,leaf2.nkeys);
         assertEquals("leaf2.keys",new int[]{21,22,31,0},leaf2.keys);
 
         // Insert [key := 24] goes into leaf2, filling it to capacity.
-        root.insert(24,new Entry());
+        root.insert(24,new SimpleEntry());
         assertEquals("leaf2.nkeys",4,leaf2.nkeys);
         assertEquals("leaf2.keys",new int[]{21,22,24,31},leaf2.keys);
 
@@ -1208,7 +1206,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals("leaf1.nkeys",m,leaf1.nkeys);
         System.err.print("root  before split: ");root.dump(System.err);
         System.err.print("leaf1 before split: ");leaf1.dump(System.err);
-        root.insert(7,new Entry());
+        root.insert(7,new SimpleEntry());
         System.err.print("root  after split: ");root.dump(System.err);
         System.err.print("leaf1 after split: ");leaf1.dump(System.err);
         assertEquals("leaf1.nkeys",3,leaf1.nkeys);
@@ -1245,7 +1243,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals("leaf2.nkeys",m,leaf2.nkeys);
         System.err.print("root  before split: ");root.dump(System.err);
         System.err.print("leaf2 before split: ");leaf2.dump(System.err);
-        root.insert(23,new Entry());
+        root.insert(23,new SimpleEntry());
         System.err.print("root  after split: ");root.dump(System.err);
         System.err.print("leaf2 after split: ");leaf2.dump(System.err);
         assertEquals("leaf2.nkeys",3,leaf2.nkeys);
@@ -1285,27 +1283,27 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         assertEquals(root,node1);
 
         // Insert [key := 4] into leaf1, filling it to capacity.
-        btree.insert(4,new Entry());
+        btree.insert(4,new SimpleEntry());
         assertEquals("leaf1.nkeys",4,leaf1.nkeys);
         assertEquals("leaf1.keys",new int[]{1,2,4,7},leaf1.keys);
 
         // Insert [key := 17] into leaf3.
-        btree.insert(17,new Entry());
+        btree.insert(17,new SimpleEntry());
         assertEquals("leaf3.nkeys",3,leaf3.nkeys);
         assertEquals("leaf3.keys",new int[]{11,15,17,0},leaf3.keys);
 
         // Insert [key := 18] into leaf3, filling it to capacity.
-        btree.insert(18,new Entry());
+        btree.insert(18,new SimpleEntry());
         assertEquals("leaf3.nkeys",4,leaf3.nkeys);
         assertEquals("leaf3.keys",new int[]{11,15,17,18},leaf3.keys);
 
         // Insert [key := 35] into leaf4.
-        btree.insert(35,new Entry());
+        btree.insert(35,new SimpleEntry());
         assertEquals("leaf4.nkeys",3,leaf4.nkeys);
         assertEquals("leaf4.keys",new int[]{24,31,35,0},leaf4.keys);
 
         // Insert [key := 40] into leaf4, filling it to capacity.
-        btree.insert(40,new Entry());
+        btree.insert(40,new SimpleEntry());
         assertEquals("leaf4.nkeys",4,leaf4.nkeys);
         assertEquals("leaf4.keys",new int[]{24,31,35,40},leaf4.keys);
 
@@ -1331,7 +1329,7 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
         // goes into the _new_ leaf.
         leaf4.dump(System.err);
         leaf4.getParent().dump(System.err);
-        btree.insert(50,new Entry());
+        btree.insert(50,new SimpleEntry());
         leaf4.dump(System.err);
         leaf4.getParent().dump(System.err);
 
@@ -1425,13 +1423,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithIncreasingKeySequence( getNoEvictionBTree(m), m, m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m );
             
-            doSplitWithIncreasingKeySequence( getNoEvictionBTree(m), m, m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithIncreasingKeySequence( getNoEvictionBTree(m), m, m*m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithIncreasingKeySequence( getNoEvictionBTree(m), m, m*m*m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         
@@ -1449,13 +1447,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithDecreasingKeySequence( getNoEvictionBTree(m), m, m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m );
             
-            doSplitWithDecreasingKeySequence( getNoEvictionBTree(m), m, m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithDecreasingKeySequence( getNoEvictionBTree(m), m, m*m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithDecreasingKeySequence( getNoEvictionBTree(m), m, m*m*m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         
@@ -1488,13 +1486,13 @@ public class TestSimpleBTree extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithRandomKeySequence( getNoEvictionBTree(m), m, m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m );
             
-            doSplitWithRandomKeySequence( getNoEvictionBTree(m), m, m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithRandomKeySequence( getNoEvictionBTree(m), m, m*m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithRandomKeySequence( getNoEvictionBTree(m), m, m*m*m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         

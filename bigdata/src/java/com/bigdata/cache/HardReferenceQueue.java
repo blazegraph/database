@@ -53,7 +53,7 @@ package com.bigdata.cache;
  * cached, but objects are not recoverable from their reference. In order to
  * make an object recoverable, this cache must be wrapped by a weak reference
  * cache that implements a hash map for discovery of objects using their
- * persistent identifier. The {@link HardReferenceCache} has a capacity that
+ * persistent identifier. The {@link HardReferenceQueue} has a capacity that
  * determines the #of hard references that may be cached before an object is
  * evicted from the cache. Objects may be stored multiple times on the cache but
  * the nscan most recent references are always tested before appending a reference
@@ -78,7 +78,7 @@ package com.bigdata.cache;
  * 
  * @param <T> The reference type stored in the cache.
  */
-public class HardReferenceCache<T> {
+public class HardReferenceQueue<T> {
 
     /**
      * The listener to which cache eviction notices are reported.
@@ -123,7 +123,7 @@ public class HardReferenceCache<T> {
      *            The maximum #of references that can be stored on the cache.
      *            There is no guarentee that all stored references are distinct.
      */
-    public HardReferenceCache(HardReferenceCacheEvictionListener<T> listener,
+    public HardReferenceQueue(HardReferenceCacheEvictionListener<T> listener,
             int capacity) {
         
         this( listener, capacity, 10);
@@ -144,7 +144,7 @@ public class HardReferenceCache<T> {
      *            #of reference tests trads off against the latency of adding a
      *            reference to the cache.
      */
-    public HardReferenceCache(HardReferenceCacheEvictionListener<T> listener,
+    public HardReferenceQueue(HardReferenceCacheEvictionListener<T> listener,
             int capacity, int nscan) {
         
         if( listener == null ) throw new IllegalArgumentException();
@@ -515,7 +515,7 @@ public class HardReferenceCache<T> {
          * @param ref
          *            The reference that is being evicted from the cache.
          */
-        abstract public void evicted(HardReferenceCache<T> cache,T ref);
+        abstract public void evicted(HardReferenceQueue<T> cache,T ref);
         
     }
     

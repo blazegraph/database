@@ -52,11 +52,11 @@ import java.util.Stack;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.cache.HardReferenceCache;
-import com.bigdata.cache.HardReferenceCache.HardReferenceCacheEvictionListener;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.HardReferenceQueue.HardReferenceCacheEvictionListener;
 
 /**
- * Unit tests for {@link HardReferenceCache}.
+ * Unit tests for {@link HardReferenceQueue}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -79,7 +79,7 @@ public class TestHardReferenceCache extends TestCase2 {
         
         HardReferenceCacheEvictionListener<String> listener = new MyListener<String>();
         
-        HardReferenceCache<String> cache = new HardReferenceCache<String>(
+        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 100, 20);
 
         assertEquals("listener", listener, cache.getListener());
@@ -97,14 +97,14 @@ public class TestHardReferenceCache extends TestCase2 {
     public void test_ctor_correct_rejection() {
         
         try {
-            new HardReferenceCache<String>(null, 100);
+            new HardReferenceQueue<String>(null, 100);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expectedRefs exception: " + ex);
         }
 
         try {
-            new HardReferenceCache<String>(new MyListener<String>(), 0);
+            new HardReferenceQueue<String>(new MyListener<String>(), 0);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expectedRefs exception: " + ex);
@@ -119,7 +119,7 @@ public class TestHardReferenceCache extends TestCase2 {
 
         HardReferenceCacheEvictionListener<String> listener = new MyListener<String>();
 
-        HardReferenceCache<String> cache = new HardReferenceCache<String>(
+        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 100, 2 );
 
         try {
@@ -149,7 +149,7 @@ public class TestHardReferenceCache extends TestCase2 {
 
         MyListener<String> listener = new MyListener<String>();
 
-        HardReferenceCache<String> cache = new HardReferenceCache<String>(
+        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 5, 0 );
 
         final String ref0 = "0";
@@ -296,7 +296,7 @@ public class TestHardReferenceCache extends TestCase2 {
 
         MyListener<String> listener = new MyListener<String>();
 
-        HardReferenceCache<String> cache = new HardReferenceCache<String>(
+        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 5, 2 );
 
         final String ref0 = "0";
@@ -537,7 +537,7 @@ public class TestHardReferenceCache extends TestCase2 {
          *             if the evicted reference is not the next expected
          *             eviction reference or if no eviction is expected.
          */
-        public void evicted(HardReferenceCache<T> cache, T ref) {
+        public void evicted(HardReferenceQueue<T> cache, T ref) {
 
             assertNotNull("cache", cache);
             assertNotNull("ref", ref);

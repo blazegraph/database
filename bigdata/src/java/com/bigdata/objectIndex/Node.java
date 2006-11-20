@@ -55,8 +55,6 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -470,7 +468,7 @@ public class Node extends AbstractNode {
      * @param entry
      *            The value.
      */
-    public void insert(int key, Entry entry) {
+    public void insert(int key, Object entry) {
 
         int index = findChild(key);
 
@@ -480,7 +478,7 @@ public class Node extends AbstractNode {
 
     }
 
-    public IObjectIndexEntry lookup(int key) {
+    public Object lookup(int key) {
 
         int index = findChild(key);
 
@@ -499,7 +497,7 @@ public class Node extends AbstractNode {
      * @return The value stored under that key or null if the key was not
      *         found.
      */
-    public IObjectIndexEntry remove(int key) {
+    public Object remove(int key) {
 
         int index = findChild(key);
 
@@ -695,7 +693,7 @@ public class Node extends AbstractNode {
 
             if (i + 1 < m) {
             
-                keys[i] = NEGINF;
+                keys[i] = IBTree.NEGINF;
                 
                 nkeys--; // one less key here.
 
@@ -712,7 +710,7 @@ public class Node extends AbstractNode {
         /* 
          * Clear the key that is being move into the parent.
          */
-        keys[splitIndex] = NEGINF;
+        keys[splitIndex] = IBTree.NEGINF;
         
         nkeys--;
         
@@ -757,7 +755,7 @@ public class Node extends AbstractNode {
      */
     protected AbstractNode insertChild(int key, AbstractNode child) {
 
-        assert key > NEGINF && key < POSINF;
+        assert key > IBTree.NEGINF && key < IBTree.POSINF;
         assert child != null;
         assert child.isDirty(); // always dirty since it was just created.
         assert isDirty(); // must be dirty to permit mutation.
@@ -904,7 +902,7 @@ public class Node extends AbstractNode {
                  * cleared by the VM.
                  */
 
-                btree.hardReferenceQueue.append((Leaf) child);
+                btree.touch(child);
 
             }
 
@@ -1028,7 +1026,7 @@ public class Node extends AbstractNode {
             out.println(indent(height) + "  keys=" + Arrays.toString(keys));
         }
         { // verify keys are monotonically increasing.
-            int lastKey = NEGINF;
+            int lastKey = IBTree.NEGINF;
             for (int i = 0; i < nkeys; i++) {
                 if (keys[i] <= lastKey) {
                     out.println(indent(height)

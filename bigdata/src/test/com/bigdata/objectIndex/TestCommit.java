@@ -49,6 +49,7 @@ package com.bigdata.objectIndex;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 
 /**
@@ -93,7 +94,11 @@ public class TestCommit extends TestCase2 {
         final long rootId;
         {
 
-            BTree btree = new BTree(store, branchingFactor);
+            BTree btree = new BTree(store, branchingFactor,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    new SimpleEntry.Serializer());
 
             assertTrue(btree.root.isDirty());
 
@@ -115,7 +120,11 @@ public class TestCommit extends TestCase2 {
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, metadataId);
+            BTree btree = new BTree(store, metadataId,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    new SimpleEntry.Serializer());
 
             // verify rootId.
             assertEquals(rootId,btree.root.getIdentity());
@@ -138,7 +147,11 @@ public class TestCommit extends TestCase2 {
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = new BTree(store, metadataId);
+            BTree btree = new BTree(store, metadataId,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    new SimpleEntry.Serializer());
 
             // verify rootId.
             assertEquals(rootId,btree.root.getIdentity());

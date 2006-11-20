@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
@@ -83,7 +84,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
      *            bytes encoded into the reference - the reference is only
      *            syntactically valid and MUST NOT be dereferenced).
      */
-    private long nextNodeRef(boolean isLeaf, ObjectIndex ndx, NodeSerializer nodeSer) {
+    private long nextNodeRef(boolean isLeaf) {
 
         // random slot on the journal in [1:n-1].
         int firstSlot = r.nextInt(Integer.MAX_VALUE - 1) + 1;
@@ -148,7 +149,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         /*
          * The #of legal key values remaining.
          */
-        int range = Node.POSINF-lastKey-1;
+        int range = IBTree.POSINF-lastKey-1;
         
         assert range>0;
         
@@ -164,7 +165,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         range = range / positionsRemaining;
         
-        assert range < Node.POSINF;
+        assert range < IBTree.POSINF;
         
         /*
          * Generate a random key within the allowed range of legal keys.
@@ -173,22 +174,44 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         int key = r.nextInt(range)+min;
         
         assert key > lastKey;
-        assert key > Node.NEGINF;
-        assert key < Node.POSINF;
+        assert key > IBTree.NEGINF;
+        assert key < IBTree.POSINF;
         
         return key;
         
     }
     
     /**
+     * Generate a random entry for an {@link IObjectIndex}.
+     */
+    public IndexEntry getRandomEntry(SlotMath slotMath) {
+        
+        // when true, the entry marks a deleted version.
+        boolean isDeleted = r.nextInt(100) < 10;
+
+        // when true, a preExisting version is defined on the journal.
+        boolean isPreExisting = r.nextInt(100) < 50;
+
+        short versionCounter = nextVersionCounter();
+
+        long currentVersion = isDeleted ? 0L : nextVersionRef();
+
+        long preExistingVersion = isPreExisting ? nextVersionRef() : 0L;
+
+        return new IndexEntry(slotMath, versionCounter, currentVersion,
+                preExistingVersion);
+
+    }
+
+    /**
      * Generates a non-leaf node with random data.
      */
-    public Node getRandomNode(ObjectIndex ndx, NodeSerializer nodeSer) {
+    public Node getRandomNode(BTree ndx) {
 
         // #of keys per node.
         final int branchingFactor = ndx.branchingFactor;
         
-        final long id = nextNodeRef(false,ndx,nodeSer); // ref. for this node.
+        final long id = nextNodeRef(false); // ref. for this node.
 
         final int nkeys = r.nextInt(branchingFactor);
         
@@ -198,7 +221,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
 
         for (int i = 0; i < nkeys ; i++) {
 
@@ -207,7 +230,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            children[i] = nextNodeRef(isLeaf, ndx, nodeSer);
+            children[i] = nextNodeRef(isLeaf);
 
         }
 
@@ -215,7 +238,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         boolean isLeaf = r.nextBoolean();
         
-        children[nkeys] = nextNodeRef(isLeaf, ndx, nodeSer);
+        children[nkeys] = nextNodeRef(isLeaf);
 
         return new Node((BTree) ndx, id, branchingFactor, nkeys, keys, children);
 
@@ -224,22 +247,22 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     /**
      * Generates a leaf node with random data.
      */
-    public Leaf getRandomLeaf(ObjectIndex ndx, NodeSerializer nodeSer) {
+    public Leaf getRandomLeaf(BTree ndx) {
 
         // #of keys per node.
         final int branchingFactor = ndx.branchingFactor;
 
-        long id = nextNodeRef(true, ndx, nodeSer); // ref. for this leaf.
+        long id = nextNodeRef(true); // ref. for this leaf.
 
         int nkeys = r.nextInt(branchingFactor)+1;
 
         final int[] keys = new int[branchingFactor];
 
-        final IObjectIndexEntry[] values = new IndexEntry[branchingFactor];
+        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor];
 
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 
@@ -250,22 +273,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
             // the key.
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            // when true, the entry marks a deleted version.
-            boolean isDeleted = r.nextInt(100) < 10;
-
-            // when true, a preExisting version is defined on the journal.
-            boolean isPreExisting = r.nextInt(100) < 50;
-
-            short versionCounter = nextVersionCounter();
-
-            long currentVersion = isDeleted ? 0L : nextVersionRef();
-
-            long preExistingVersion = isPreExisting ? nextVersionRef() : 0L;
-
-            IndexEntry entry = new IndexEntry(nodeSer.slotMath, versionCounter,
-                    currentVersion, preExistingVersion);
-
-            values[i] = entry;
+            values[i] = getRandomEntry(ndx.store.getSlotMath());
 
         }
 
@@ -290,84 +298,84 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     /**
      * Generates a node or leaf (randomly) with random data.
      */
-    public AbstractNode getRandomNodeOrLeaf(ObjectIndex ndx,NodeSerializer nodeSer) {
+    public AbstractNode getRandomNodeOrLeaf(BTree ndx) {
 
         if( r.nextBoolean() ) {
             
-            return getRandomNode(ndx,nodeSer);
+            return getRandomNode(ndx);
             
         } else {
             
-            return getRandomLeaf(ndx,nodeSer);
+            return getRandomLeaf(ndx);
             
         }
         
     }
     
-    /**
-     * A non-persistence capable implementation of {@link IObjectIndexEntry}
-     * used for unit tests.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class MyIndexEntry implements IObjectIndexEntry {
-
-        private short versionCounter;
-        private ISlotAllocation currentVersionSlots;
-        private ISlotAllocation preExistingVersionSlots;
-
-        private MyIndexEntry() {
-
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        MyIndexEntry(short versionCounter,ISlotAllocation currentVersion, ISlotAllocation preExistingVersion ) {
-            this.versionCounter = versionCounter;
-            this.currentVersionSlots = currentVersion;
-            this.preExistingVersionSlots = preExistingVersion;
-        }
-        
-        public short getVersionCounter() {
-            
-            return versionCounter;
-            
-        }
-        
-        public boolean isDeleted() {
-            
-            return currentVersionSlots == null;
-            
-        }
-        
-        public boolean isPreExistingVersionOverwritten() {
-            
-            return preExistingVersionSlots != null;
-            
-        }
-        
-        public ISlotAllocation getCurrentVersionSlots() {
-
-            return currentVersionSlots;
-            
-        }
-        
-        public ISlotAllocation getPreExistingVersionSlots() {
-            
-            return preExistingVersionSlots;
-            
-        }
-        
-        /**
-         * Dumps the state of the entry.
-         */
-        public String toString() {
-            return "{versionCounter=" + versionCounter + ", currentVersion="
-                    + currentVersionSlots + ", preExistingVersion="
-                    + preExistingVersionSlots + "}";
-        }
-        
-    }
+//    /**
+//     * A non-persistence capable implementation of {@link IObjectIndexEntry}
+//     * used for unit tests.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static class MyIndexEntry implements IObjectIndexEntry {
+//
+//        private short versionCounter;
+//        private ISlotAllocation currentVersionSlots;
+//        private ISlotAllocation preExistingVersionSlots;
+//
+//        private MyIndexEntry() {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//        MyIndexEntry(short versionCounter,ISlotAllocation currentVersion, ISlotAllocation preExistingVersion ) {
+//            this.versionCounter = versionCounter;
+//            this.currentVersionSlots = currentVersion;
+//            this.preExistingVersionSlots = preExistingVersion;
+//        }
+//        
+//        public short getVersionCounter() {
+//            
+//            return versionCounter;
+//            
+//        }
+//        
+//        public boolean isDeleted() {
+//            
+//            return currentVersionSlots == null;
+//            
+//        }
+//        
+//        public boolean isPreExistingVersionOverwritten() {
+//            
+//            return preExistingVersionSlots != null;
+//            
+//        }
+//        
+//        public ISlotAllocation getCurrentVersionSlots() {
+//
+//            return currentVersionSlots;
+//            
+//        }
+//        
+//        public ISlotAllocation getPreExistingVersionSlots() {
+//            
+//            return preExistingVersionSlots;
+//            
+//        }
+//        
+//        /**
+//         * Dumps the state of the entry.
+//         */
+//        public String toString() {
+//            return "{versionCounter=" + versionCounter + ", currentVersion="
+//                    + currentVersionSlots + ", preExistingVersion="
+//                    + preExistingVersionSlots + "}";
+//        }
+//        
+//    }
 
 }

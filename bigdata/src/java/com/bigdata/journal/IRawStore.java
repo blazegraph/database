@@ -59,9 +59,9 @@ import java.nio.ByteBuffer;
 public interface IRawStore {
 
     /**
-     * The #of bytes in a slot.
+     * Encapsulates the slot operations.
      */
-    public int getSlotSize();
+    public SlotMath getSlotMath();
     
     /**
      * Write the data on the journal. This method is not isolated and does not

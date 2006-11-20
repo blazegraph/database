@@ -49,16 +49,14 @@ package com.bigdata.objectIndex;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
 /**
- * Visits the {@link Entry}s of a {@link Leaf} in the external key ordering.
- * There is exactly one entry per key for a leaf node.
+ * Visits the values of a {@link Leaf} in the external key ordering. There is
+ * exactly one value per key for a leaf node.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class EntryIterator implements Iterator<IObjectIndexEntry> {
+class EntryIterator implements Iterator {
 
     private final Leaf leaf;
 
@@ -78,7 +76,7 @@ class EntryIterator implements Iterator<IObjectIndexEntry> {
 
     }
 
-    public IObjectIndexEntry next() {
+    public Object next() {
 
         if (!hasNext()) {
 

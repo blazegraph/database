@@ -42,34 +42,30 @@ Modifications:
 
 */
 /*
- * Created on Nov 17, 2006
+ * Created on Nov 20, 2006
  */
+
 package com.bigdata.objectIndex;
 
-import com.bigdata.cache.HardReferenceCache;
-
 /**
- * Hard reference cache eviction listener for leaves always throws an
- * exception. This is used for some unit tests to ensure that cache
- * evictions are not occurring and that copy on write situations are
- * therefore never triggered (except that they will of course be triggered
- * following a commit).
+ * Default implementation only copies references and is sufficient IFF the
+ * values are immutable objects such as {@link String}. When mutable objects
+ * are used they MUST be cloned as only copying references will cause changes to
+ * the new leaf to bleed back into the old leaf.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated We can just steal the values instead.
  */
-public class NoLeafEvictionListener implements
-        ILeafEvictionListener {
+public class DefaultCopyValues implements ICopyValues {
 
-    public void evicted(HardReferenceCache<PO> cache, PO ref) {
+    public void copyValues(Object[] src, Object[] dst, int nkeys) {
 
-        assert ref instanceof Leaf;
-        
-        if( ref.isDirty() ) {
+        for (int i = 0; i < nkeys; i++) {
 
-            throw new UnsupportedOperationException(
-                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
-            
+            dst[i] = src[i];
+
         }
 
     }

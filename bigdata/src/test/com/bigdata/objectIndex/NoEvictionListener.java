@@ -42,70 +42,38 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 17, 2006
  */
 package com.bigdata.objectIndex;
 
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+import com.bigdata.cache.HardReferenceQueue;
 
 /**
- * An entry in a {@link Leaf}.
+ * Hard reference cache eviction listener for leaves always throws an
+ * exception. This is used for some unit tests to ensure that cache
+ * evictions are not occurring and that copy on write situations are
+ * therefore never triggered (except that they will of course be triggered
+ * following a commit).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Reconcile with {@link IObjectIndexEntry} and {@link NodeSerializer}.
+ * @see SimpleEntry#NoSerializer
  */
-public class Entry implements IObjectIndexEntry {
+public class NoEvictionListener implements
+        IEvictionListener {
 
-    private static int nextId = 1;
-    private int id;
-    
-    /**
-     * Create a new entry.
-     */
-    public Entry() {
-        id = nextId++;
+    public void evicted(HardReferenceQueue<PO> cache, PO ref) {
+
+        assert ref instanceof Leaf;
+        
+        if( ref.isDirty() ) {
+
+            throw new UnsupportedOperationException(
+                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
+            
+        }
+
     }
 
-    /**
-     * Copy constructor.
-     * 
-     * @param src
-     *            The source to be copied.
-     */
-    public Entry(IObjectIndexEntry src) {
-        id = (src instanceof Entry ?((Entry)src).id : nextId++);
-    }
-
-    public String toString() {
-        return ""+id;
-    }
-
-    public ISlotAllocation getCurrentVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public ISlotAllocation getPreExistingVersionSlots() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public short getVersionCounter() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public boolean isDeleted() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public boolean isPreExistingVersionOverwritten() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-    
 }

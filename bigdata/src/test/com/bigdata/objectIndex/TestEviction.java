@@ -52,7 +52,7 @@ import java.util.Stack;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.cache.HardReferenceCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 
 /**
@@ -61,29 +61,68 @@ import com.bigdata.journal.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLeafEviction extends AbstractBTreeTestCase {
+public class TestEviction extends AbstractBTreeTestCase {
 
     /**
      * 
      */
-    public TestLeafEviction() {
+    public TestEviction() {
     }
 
     /**
      * @param name
      */
-    public TestLeafEviction(String name) {
+    public TestEviction(String name) {
         super(name);
     }
 
-    public BTree getEvictionBTree(int branchingFactor,int cacheSize,HardReferenceCache<PO> hardReferenceQueue) {
-        
-        IRawStore store = new SimpleStore();
+    /**
+     * Factory for {@link BTree} as used in this test suite.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class BTreeFactory implements IBTreeFactory {
 
-        BTree btree = new BTree(store, branchingFactor, hardReferenceQueue);
-
-        return btree;
+        final int leafQueueCapacity;
         
+        final int nscan;
+        
+        public BTreeFactory(int leafQueueCapacity,int nscan) {
+
+            this.leafQueueCapacity = leafQueueCapacity;
+            
+            this.nscan = nscan;
+
+        }
+        
+        /**
+         * Return a btree backed by a journal with the indicated branching factor.
+         * The serializer requires that values in leaves are {@link SimpleEntry}
+         * objects.
+         * 
+         * @param branchingFactor
+         *            The branching factor.
+         * 
+         * @return The btree.
+         */
+        public BTree getBTree(int branchingFactor) {
+
+            IRawStore store = new SimpleStore();
+
+            final int leafQueueCapacity = 10000;
+
+            final int nscan = 10;
+
+            BTree btree = new BTree(store, branchingFactor,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            leafQueueCapacity, nscan),
+                    new SimpleEntry.Serializer());
+
+            return btree;
+
+        }
+       
     }
 
     /**
@@ -105,9 +144,17 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
      * </p>
      */
     public void test_leafEviction01() {
+
+        IRawStore store = new SimpleStore();
+
+        final int branchingFactor = 4;
         
+        final int leafQueueCapacity = 2;
+
+        final int nscan = 1;
+
         // listener initially disallows any evictions.
-        final MyLeafEvictionListener listener = new MyLeafEvictionListener();
+        final MyEvictionListener listener = new MyEvictionListener();
 
         /*
          * The hard reference queue has a capacity of two (2) leaves and does
@@ -117,16 +164,17 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
          * scanned, repeated touches of the same leaf do not result in state
          * changes for the hard reference queue.
          */
-        final MyHardReferenceCache<PO> hardReferenceQueue = new MyHardReferenceCache<PO>(listener,2,1);
-        assertEquals(2,hardReferenceQueue.capacity());
-        assertEquals(1,hardReferenceQueue.nscan());
-        assertEquals(listener,hardReferenceQueue.getListener());
+        final MyHardReferenceCache<PO> leafQueue = new MyHardReferenceCache<PO>(listener,2,1);
+        assertEquals(2,leafQueue.capacity());
+        assertEquals(1,leafQueue.nscan());
+        assertEquals(listener,leafQueue.getListener());
         
         // The btree.
-        final BTree btree = getEvictionBTree(4,2,hardReferenceQueue);
+        final BTree btree = new BTree(store, branchingFactor,
+                leafQueue, new SimpleEntry.Serializer());
         
         // The hard reference queue.
-        assertEquals(hardReferenceQueue,btree.hardReferenceQueue);
+        assertEquals(leafQueue,btree.leafQueue);
         
         // The initial root.
         final Leaf a = (Leaf) btree.getRoot();
@@ -135,17 +183,17 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
          * The expected state of the hard reference queue - it should only
          * contain the root leaf of the tree.
          */
-        assertEquals(new PO[]{a},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{a},leafQueue.toArray());
         
         // The known set of keys.
         int keys[] = new int[]{1,3,5,7,9,10,11,2,4};
 
         // Entries to be inserted with those keys (allows validation).
-        Entry entries[] = new Entry[keys.length];
+        SimpleEntry entries[] = new SimpleEntry[keys.length];
         
         for( int i=0; i<keys.length; i++) {
             
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             
         }
 
@@ -185,7 +233,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         assertEquals(new int[]{5,7,9,0},b.keys);
 
         // The hard reference queue should now contain both leaves.
-        assertEquals(new PO[]{a,b},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{a,b},leafQueue.toArray());
 
         // insert another key.
         btree.insert(keys[n], entries[n]); n++;
@@ -225,7 +273,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         // verify keys on the new leaf.
         assertEquals(new int[]{9,10,11,0},d.keys);
         // verify new queue state.
-        assertEquals(new PO[]{b,d},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{b,d},leafQueue.toArray());
         // verify keys on the root node.
         assertEquals(new int[]{5,9,0},c.keys);
 
@@ -245,7 +293,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         // verify keys for (a).
         assertEquals(new int[]{1,3,0,0},a.keys);
         // verify the queue state.
-        assertEquals(new PO[]{b,d},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{b,d},leafQueue.toArray());
         // set the expected eviction.
         listener.setExpectedRef(b);
         // insert the key, forces copy-on-write of (a) and eviction of (b).
@@ -273,7 +321,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         // verify expected keys on (a1).
         assertEquals(new int[]{1,2,3,0},a1.keys);
         // verify the new queue state.
-        assertEquals(new PO[]{d,a1},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{d,a1},leafQueue.toArray());
 
         /*
          * Commit the tree. This will write any dirty leaves and nodes.
@@ -281,7 +329,9 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         final long metadataId0 = btree.commit();
 
         // verify that we can reload the tree.
-        new BTree(btree.store,metadataId0);
+        new BTree(btree.store, metadataId0, new HardReferenceQueue<PO>(
+                new DefaultEvictionListener(), leafQueueCapacity, nscan),
+                new SimpleEntry.Serializer());
         
         /*
          * Insert a key (4) into the btree that is still in memory. Since we
@@ -313,7 +363,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         // verify expected keys on (a1).
         assertEquals(new int[]{1,2,3,0},a1.keys);
         // verify the hard reference queue state.
-        assertEquals(new PO[]{d,a1},hardReferenceQueue.toArray());
+        assertEquals(new PO[]{d,a1},leafQueue.toArray());
         // notify the listener that we expect an eviction.
         listener.setExpectedRef(d);
         // verify root is the expected node.
@@ -358,14 +408,8 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
         
         /*
          * verify the entire tree.
-         * 
-         * @todo this is failing for two reasons. First, we have not inserted
-         * the last key into the tree so the iterator will not visit the correct
-         * #of values. Second, the value copy mechanism is not true - it is
-         * halfway between some kind of notional test "Entry" and an
-         * IObjectIndexEntry and true to neither.
          */
-//        assertSameIterator(entries, btree.root.entryIterator());
+        assertSameIterator(entries, btree.root.entryIterator());
         
     }
 
@@ -376,8 +420,8 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class MyLeafEvictionListener extends
-            DefaultLeafEvictionListener {
+    public static class MyEvictionListener extends
+            DefaultEvictionListener {
 
         /**
          * Set the next N expected references for eviction notices.  You can
@@ -480,7 +524,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
          *             if the evicted reference is not the next expected
          *             eviction reference or if no eviction is expected.
          */
-        public void evicted(HardReferenceCache<PO> cache, PO ref) {
+        public void evicted(HardReferenceQueue<PO> cache, PO ref) {
 
             assertNotNull("cache", cache);
             assertNotNull("ref", ref);
@@ -531,7 +575,7 @@ public class TestLeafEviction extends AbstractBTreeTestCase {
      * @version $Id$
      * @param <T>
      */
-    public static class MyHardReferenceCache<T> extends HardReferenceCache<T> {
+    public static class MyHardReferenceCache<T> extends HardReferenceQueue<T> {
 
         public MyHardReferenceCache(HardReferenceCacheEvictionListener<T> listener, int capacity) {
             super(listener, capacity);

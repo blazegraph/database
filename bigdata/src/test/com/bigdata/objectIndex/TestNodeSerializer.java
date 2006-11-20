@@ -50,6 +50,7 @@ package com.bigdata.objectIndex;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
 
@@ -73,7 +74,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
     public TestNodeSerializer(String arg0) {
         super(arg0);
     }
-
+    
     /**
      * Prints out the offsets and various other sizing information for nodes and
      * leaves given the slotSize for the journal and the branching factor for
@@ -89,7 +90,9 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
 
         final SlotMath slotMath = new SlotMath(slotSize);
         
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
+        final IndexEntrySerializer valueSer = new IndexEntrySerializer(slotMath);
+        
+        final NodeSerializer nodeSer = new NodeSerializer(valueSer);
 
         System.err.println("Shared record format:");
 
@@ -162,7 +165,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             // assume #of keys == branching factor.
             int nkeys = branchingFactor;
             int keysSize = (nkeys * NodeSerializer.SIZEOF_KEY);
-            int valuesSize = (nkeys * NodeSerializer.SIZEOF_LEAF_VALUE);
+            int valuesSize = valueSer.getSize(nkeys);
             int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
 
             System.err.println("Leaf specific record format:");
@@ -173,19 +176,19 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
                     + ", #bytes=" + (nkeys * NodeSerializer.SIZEOF_KEY));
             
             System.err.println(" value   : versionCounter         ("
-                    + NodeSerializer.SIZEOF_VERSION_COUNTER + ")");
+                    + IndexEntrySerializer.SIZEOF_VERSION_COUNTER + ")");
             
             System.err.println(" value   : currentVersion ref     ("
-                    + NodeSerializer.SIZEOF_SLOTS + ")");
+                    + IndexEntrySerializer.SIZEOF_SLOTS + ")");
             
             System.err.println(" value   : preExistingVersion ref ("
-                    + NodeSerializer.SIZEOF_SLOTS + ")");
+                    + IndexEntrySerializer.SIZEOF_SLOTS + ")");
             
             System.err.println(" value   : total leaf value       ("
-                    + NodeSerializer.SIZEOF_LEAF_VALUE + ")");
+                    + IndexEntrySerializer.SIZEOF_LEAF_VALUE + ")");
 
             System.err.println(" value[] : offset=" + offsetValues + ", size="
-                    + NodeSerializer.SIZEOF_LEAF_VALUE + ", #values=" + nkeys
+                    + IndexEntrySerializer.SIZEOF_LEAF_VALUE + ", #values=" + nkeys
                     + ", #bytes=" + valuesSize);
 
             final int leafSize = nodeSer.getSize(true, branchingFactor - 1);
@@ -242,28 +245,42 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
 //        showInfo(256,1024);
 //        
 //    }
+    
+    /**
+     * Overrides to use the {@link IndexEntrySerializer}.
+     */
+    public BTree getBTree(int branchingFactor) {
+        
+        IRawStore store = new SimpleStore();
+        
+        final int leafQueueCapacity = 10000;
+        
+        final int nscan = 10;
+
+        BTree btree = new BTree(store, branchingFactor,
+                new HardReferenceQueue<PO>(new NoEvictionListener(),
+                        leafQueueCapacity, nscan), new IndexEntrySerializer(store
+                        .getSlotMath()));
+
+        return btree;
+        
+    }
 
     /**
      * Test of leaf serialization.
      */
     public void test_leaf_serialization01() {
         
-        final int slotSize = 64;
-        
-        final SlotMath slotMath = new SlotMath(slotSize);
-        
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
-        
         final int branchingFactor = 8;
-        IRawStore store = new SimpleStore();
-        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
+        
+        BTree ndx = getBTree(branchingFactor);
         
         // Create test node.
-        final Leaf expected = getRandomLeaf(ndx,nodeSer);
+        final Leaf expected = getRandomLeaf(ndx);
         
         expected.dump(System.err);
         
-        final Leaf actual = (Leaf)doRoundTripTest( true, ndx, nodeSer, expected );
+        final Leaf actual = (Leaf)doRoundTripTest( true, ndx, expected );
 
         actual.dump(System.err);
         
@@ -274,18 +291,15 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public void test_leaf_as_node_serialization_correct_rejection() {
         
-        final int slotSize = 64;
-        final SlotMath slotMath = new SlotMath(slotSize);
-        
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
-        
         final int branchingFactor = 8;
-        IRawStore store = new SimpleStore();
-        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
+
+        BTree ndx = getBTree(branchingFactor);
 
         // Create test node.
-        final Leaf expected = getRandomLeaf(ndx,nodeSer);
+        final Leaf expected = getRandomLeaf(ndx);
 
+        NodeSerializer nodeSer = ndx.getNodeSerializer();
+        
         /*
          * Serialize onto a buffer.
          */
@@ -318,18 +332,15 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public void test_node_as_leaf_serialization_correct_rejection() {
         
-        final int slotSize = 64;
-        final SlotMath slotMath = new SlotMath(slotSize);
-        
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
-        
         final int branchingFactor = 8;
-        IRawStore store = new SimpleStore();
-        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
+        
+        BTree ndx = getBTree( branchingFactor);
 
         // Create test node.
-        final Node expected = getRandomNode(ndx,nodeSer);
+        final Node expected = getRandomNode(ndx);
 
+        NodeSerializer nodeSer = ndx.getNodeSerializer();
+        
         /*
          * Serialize onto a buffer.
          */
@@ -362,21 +373,16 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public void test_node_serialization01() {
         
-        final int slotSize = 64;
-        final SlotMath slotMath = new SlotMath(slotSize);
-        
-        final NodeSerializer nodeSer = new NodeSerializer(slotMath);
-
         final int branchingFactor = 8;
-        IRawStore store = new SimpleStore();
-        ObjectIndex ndx = new ObjectIndex(store, branchingFactor);
+
+        BTree ndx = getBTree(branchingFactor);
 
         // Create test node.
-        final Node expected = getRandomNode(ndx, nodeSer);
+        final Node expected = getRandomNode(ndx);
 
         expected.dump(System.err);
 
-        final Node actual = (Node)doRoundTripTest( true, ndx, nodeSer, expected);
+        final Node actual = (Node)doRoundTripTest( true, ndx, expected);
 
         actual.dump(System.err);
 
@@ -387,17 +393,17 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      * 
      * @param ndx
      *            The object index.
-     * @param nodeSer
-     *            The node serialization helper.
      * @param expected
      *            The node or leaf to be serialized.
      *            
      * @return The de-serialized node or leaf.
      */
-    public AbstractNode doRoundTripTest(boolean verbose, ObjectIndex ndx,
-            NodeSerializer nodeSer, AbstractNode expected) {
+    public AbstractNode doRoundTripTest(boolean verbose, BTree ndx,
+            AbstractNode expected) {
 
         final boolean isLeaf = expected.isLeaf();
+        
+        NodeSerializer nodeSer = ndx.getNodeSerializer();
         
         final int BUF_SIZE = nodeSer.getSize(expected);
         
@@ -539,43 +545,110 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public void doStressTest(int ntrials,int nnodes) {
 
-        // Some slot sizes to choose from.
-        int[] slotSizes = new int[]{32,48,64,96,112,128,256,512,1024};
-        
         // Some branching factors to choose from.
-        int[] pageSizes = new int[]{8,16,32,48,64,96,112,128,256,512,1024};
+        int[] branchingFactors = new int[] { 8, 16, 32, 48, 64, 96, 112, 128,
+                256, 512, 1024 };
         
         for (int trial = 0; trial < ntrials; trial++) {
 
-            // Choose the slot size randomly.
-            final int slotSize = slotSizes[r.nextInt(slotSizes.length)];
-            
-            final SlotMath slotMath = new SlotMath(slotSize);
-            
-            final NodeSerializer nodeSer = new NodeSerializer(slotMath);
-
             // Choose the branching factor randomly.
-            final int pageSize = pageSizes[r.nextInt(pageSizes.length)];
+            final int branchingFactor = branchingFactors[r.nextInt(branchingFactors.length)];
 
-            IRawStore store = new SimpleStore();
-
-            ObjectIndex ndx = new ObjectIndex(store, pageSize);
+            BTree ndx = getBTree(branchingFactor);
 
             System.err.println("Trial " + trial + " of " + ntrials
-                    + " : testing " + nnodes + " random nodes: slotSize="
-                    + slotSize + ", branchingFactor=" + pageSize);
+                    + " : testing " + nnodes
+                    + " random nodes:  branchingFactor=" + branchingFactor);
             
             for( int i=0; i<nnodes; i++ ) {
                 
-                AbstractNode expected = getRandomNodeOrLeaf(ndx, nodeSer);
+                AbstractNode expected = getRandomNodeOrLeaf(ndx);
                 
-                doRoundTripTest( false, ndx, nodeSer, expected);
+                doRoundTripTest( false, ndx, expected);
                 
             }
             
         }
         
     }
+
+//    /**
+//     * A mostly non-functional implementation of the {@link IBTree} interface
+//     * designed to make it possible to test the {@link NodeSerializer} without
+//     * having to meet the structural requirements of a real B-Tree.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class MyBTree implements IBTree {
+//
+//        private final IRawStore store;
+//        private final int branchingFactor;
+//        
+//        public MyBTree(int branchingFactor) {
+//         
+//            this.store = new SimpleStore();
+//            
+//            this.branchingFactor = branchingFactor;
+//            
+//        }
+//        
+//        public long commit() {
+//            return 0;
+//        }
+//
+//        public int getBrachingFactor() {
+//            return branchingFactor;
+//        }
+//
+//        public int getEntryCount() {
+//            return 0;
+//        }
+//
+//        public int getHeight() {
+//            return 0;
+//        }
+//
+//        public int getLeafCount() {
+//            return 0;
+//        }
+//
+//        public ILeafSplitPolicy getLeafSplitPolicy() {
+//            return null;
+//        }
+//
+//        public int getNodeCount() {
+//            return 0;
+//        }
+//
+//        public NodeSerializer getNodeSerializer() {
+//            return null;
+//        }
+//
+//        public INodeSplitPolicy getNodeSplitPolicy() {
+//            return null;
+//        }
+//
+//        public AbstractNode getRoot() {
+//            return null;
+//        }
+//
+//        public IRawStore getStore() {
+//            return store;
+//        }
+//
+//        public void insert(int key, Object entry) {
+//        }
+//
+//        public Object lookup(int key) {
+//            return null;
+//        }
+//
+//        public Object remove(int key) {
+//            return null;
+//        }
+//        
+//    }
     
     /**
      * Run a large stress test.

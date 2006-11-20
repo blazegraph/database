@@ -75,12 +75,9 @@ public class SimpleStore implements IRawStore {
 
     private final int slotSize = 64;
     
-    /**
-     * Returns 64.
-     */
-    public int getSlotSize() {
+    public SlotMath getSlotMath() {
     
-        return slotSize;
+        return slotMath;
         
     }
 

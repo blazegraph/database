@@ -368,12 +368,11 @@ import java.util.Properties;
 
 public class Journal implements IRawStore, IStore {
 
-    // Make package private or just get rid of this : BTree is currently using it.
-    public final SlotMath slotMath;
+    final SlotMath slotMath;
     
-    public int getSlotSize() {
+    public SlotMath getSlotMath() {
         
-        return slotMath.slotSize;
+        return slotMath;
         
     }
     

@@ -41,11 +41,12 @@ public class TestAll extends TestCase {
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
         // test serialization
+        suite.addTestSuite( TestIndexEntrySerializer.class );
         suite.addTestSuite( TestNodeSerializer.class );
         // test the commit protocol w/o incremental leaf eviction @todo expand tests.
         suite.addTestSuite( TestCommit.class );
         // test incremental leaf eviction and copy-on-write scenarios.
-        suite.addTestSuite( TestLeafEviction.class );
+        suite.addTestSuite( TestEviction.class );
         // @todo test copy-on-write semantics with post-commit or re-loaded tree.
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
@@ -53,7 +54,7 @@ public class TestAll extends TestCase {
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.
         // @todo test journal restart semantics w/o shutdown.
-        // @todo stress test (correctness as object index for store).
+        // @todo stress test (correctness as object index for store for each journal mode).
         // @todo test journal transaction isolation using the new object index.
         // @todo test journal restart semantics once persistent allocation index is implemented.
 

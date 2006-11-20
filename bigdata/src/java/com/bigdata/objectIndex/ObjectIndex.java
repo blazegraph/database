@@ -47,29 +47,96 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+import java.util.TreeMap;
+
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.SimpleObjectIndex;
 
 /**
- * @todo this needs to be reconciled with {@link BTree}, {@link NodeSerializer}
- * and the object index unit tests.
+ * FIXME This needs to implement the object index semantics and provide a
+ * strongly typed API. We could just hide the btree as a field rather than
+ * extending it. The easy way to get the object index semantics is using a one
+ * for one substitution of the btree for a {@link TreeMap} in
+ * {@link SimpleObjectIndex}. We also need to write and apply a test suite and
+ * test the journal using the persistence capable object index and not just the
+ * {@link SimpleObjectIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ObjectIndex extends BTree {
+public class ObjectIndex extends BTree implements IObjectIndex {
 
     /**
      * @param store
      * @param branchingFactor
+     * @param hardReferenceQueue
      */
-    public ObjectIndex(IRawStore store, int branchingFactor) {
-        super(store, branchingFactor);
+    public ObjectIndex(IRawStore store, int branchingFactor,
+            HardReferenceQueue<PO> hardReferenceQueue) {
+
+        super(store, branchingFactor, hardReferenceQueue, new IndexEntrySerializer(
+                store.getSlotMath()));
+
     }
 
-    public ObjectIndex(IRawStore store, long metadataId) {
+    /**
+     * 
+     * @param store
+     * @param metadataId
+     * @param leafQueue
+     */
+    public ObjectIndex(IRawStore store, long metadataId, HardReferenceQueue<PO> leafQueue) {
         
-        super(store,metadataId);
+        super(store,metadataId,leafQueue, new IndexEntrySerializer(store.getSlotMath()));
         
     }
-    
+
+
+    /*
+     * IObjectIndex.
+     */
+
+    /**
+     * Add / update an entry in the object index.
+     * 
+     * @param id
+     *            The persistent id.
+     * @param slots
+     *            The slots on which the current version is written.
+     */
+    public void put(int id, ISlotAllocation slots) {
+
+        assert id > IBTree.NEGINF && id < IBTree.POSINF;
+
+    }
+
+    /**
+     * Return the slots on which the current version of the object is
+     * written.
+     * 
+     * @param id
+     *            The persistent id.
+     * @return The slots on which the current version is written.
+     */
+    public ISlotAllocation get(int id) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    /**
+     * Mark the object as deleted.
+     * 
+     * @param id
+     *            The persistent id.
+     */
+    public void delete(int id) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
 }

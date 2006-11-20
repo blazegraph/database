@@ -64,7 +64,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * @todo Consider removing synchronization for use in a single threaded context.
  * 
  * @todo This can be replaced by a hard reference ring buffer that scans the
- *       last N entries to minimize churn. See {@link HardReferenceCache}. This
+ *       last N entries to minimize churn. See {@link HardReferenceQueue}. This
  *       will change the delegation interfaces since the ring buffer does NOT
  *       support random access by the identifier.
  */

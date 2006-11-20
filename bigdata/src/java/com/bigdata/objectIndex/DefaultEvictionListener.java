@@ -44,72 +44,60 @@ Modifications:
 /*
  * Created on Nov 17, 2006
  */
-
 package com.bigdata.objectIndex;
 
-import java.io.IOException;
-import java.util.Properties;
-
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.Journal;
 
 /**
- * Factory for {@link BTree} backed by a {@link Journal}.
+ * Hard reference cache eviction listener writes the node or leaf onto the
+ * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JournalBTreeFactory implements IBTreeFactory {
+public class DefaultEvictionListener implements
+        IEvictionListener {
 
-    final Properties properties;
-    
-    public Properties getProperties() {
+    public void evicted(HardReferenceQueue<PO> cache, PO ref) {
+
+        AbstractNode node = (AbstractNode) ref;
+
+        /*
+         * Decrement the reference counter.  When it reaches zero (0) we will
+         * evict the node or leaf iff it is dirty.
+         */
         
-        return properties;
-        
-    }
-    
-    public JournalBTreeFactory(Properties properties) {
-        
-        this.properties = properties;
+        if (--node.referenceCount == 0) {
 
-    }
-    
-    /**
-     * Return a btree backed by a journal with the indicated branching factor.
-     * The serializer requires that values in leaves are {@link SimpleEntry}
-     * objects.
-     * 
-     * @param branchingFactor
-     *            The branching factor.
-     * 
-     * @return The btree.
-     */
-    public BTree getBTree(int branchingFactor) {
+            if (node.isDirty()) {
 
-        try {
-            
-            Properties properties = getProperties();
+                if (node.isLeaf()) {
 
-            Journal journal = new Journal(properties);
+                    /*
+                     * A leaf is written out directly.
+                     */
+                    node.btree.writeNodeOrLeaf(node);
 
-            final int leafQueueCapacity = 10000;
-            
-            final int nscan = 10;
+                } else {
 
-            BTree btree = new BTree(journal, branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                    new SimpleEntry.Serializer());
+                    /*
+                     * A non-leaf node must be written out using a post-order
+                     * traversal so that all dirty children are written through
+                     * before the dirty parent. This is required in order to
+                     * assign persistent identifiers to the dirty children.
+                     */
+                    node.btree.writeNodeRecursive(node);
 
-            return btree;
+                }
 
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
+                // Verify the object is now persistent.
+                assert !ref.dirty;
+                assert ref.identity != PO.NULL;
+
+            }
+
         }
-        
+
     }
-   
+
 }

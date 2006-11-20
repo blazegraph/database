@@ -52,7 +52,7 @@ import java.util.Random;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.cache.HardReferenceCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
@@ -165,15 +165,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assertEquals("keys",n1.keys,n2.keys);
         
-        assertEquals("values", n1.values, n2.values);
+//        assertEquals("values", n1.values, n2.values);
         
-//        for( int i=0; i<n1.nkeys; i++ ) {
-//
-//            assertEquals("values[" + i + "]",
-//                    (IObjectIndexEntry) n1.values[i],
-//                    (IObjectIndexEntry) n2.values[i]);
-//            
-//        }
+        for( int i=0; i<n1.nkeys; i++ ) {
+
+            assertEquals("values[" + i + "]",
+                    (IObjectIndexEntry) n1.values[i],
+                    (IObjectIndexEntry) n2.values[i]);
+            
+        }
         
     }
 
@@ -356,27 +356,33 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Return a new btree backed by a simple transient store. The leaf cache
-     * will be large and cache evictions will cause exceptions if they occur.
-     * This provides an indication if cache evictions are occurring so that the
-     * tests of basic tree operations in this test suite are known to be
-     * conducted in an environment without incremental writes of leaves onto the
-     * store. This avoids copy-on-write scenarios and let's us test with the
-     * knowledge that there should always be a hard reference to a child or
-     * parent.
+     * Return a new btree backed by a simple transient store but unwilling to
+     * write data onto the store.
+     * 
+     * The leaf cache will be large and cache evictions will cause exceptions if
+     * they occur. This provides an indication if cache evictions are occurring
+     * so that the tests of basic tree operations in this test suite are known
+     * to be conducted in an environment without incremental writes of leaves
+     * onto the store. This avoids copy-on-write scenarios and let's us test
+     * with the knowledge that there should always be a hard reference to a
+     * child or parent.
+     * 
+     * The {@link IValueSerializer} will also throw exception if invoked.
      * 
      * @param branchingFactor
      *            The branching factor.
-     * 
-     * FIXME Refactor as an {@link IBTreeFactory} and update the test helpers
-     * and test harness to match.
      */
-    public BTree getNoEvictionBTree(int branchingFactor) {
+    public BTree getBTree(int branchingFactor) {
         
         IRawStore store = new SimpleStore();
+        
+        final int leafQueueCapacity = 10000;
+        
+        final int nscan = 10;
 
         BTree btree = new BTree(store, branchingFactor,
-                new HardReferenceCache<PO>(new NoLeafEvictionListener(), 10000));
+                new HardReferenceQueue<PO>(new NoEvictionListener(),
+                        leafQueueCapacity, nscan), new SimpleEntry.NoSerializer());
 
         return btree;
         
@@ -572,15 +578,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         int[] keys = new int[ninserts];
 
-        Entry[] entries = new Entry[ninserts];
+        SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = Node.NEGINF + 1;
+        int lastKey = IBTree.NEGINF + 1;
         
         for (int i = 0; i < ninserts; i++) {
         
             keys[i] = lastKey;
             
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             
             lastKey += 1;
         
@@ -596,7 +602,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             if( i>0 && i % 10000 == 0 ) {
                 
@@ -663,14 +669,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         
         int[] keys = new int[ninserts];
-        Entry[] entries = new Entry[ninserts];
-        Entry[] reverseEntries = new Entry[ninserts];
+        SimpleEntry[] entries = new SimpleEntry[ninserts];
+        SimpleEntry[] reverseEntries = new SimpleEntry[ninserts];
         {
             int lastKey = ninserts;
             int reverseIndex = ninserts - 1;
             for (int i = 0; i < ninserts; i++) {
                 keys[i] = lastKey;
-                Entry entry = new Entry();
+                SimpleEntry entry = new SimpleEntry();
                 entries[i] = entry;
                 reverseEntries[reverseIndex--] = entry;
                 lastKey -= 1;
@@ -683,7 +689,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             int key = keys[i];
             
-            Entry entry = entries[i];
+            SimpleEntry entry = entries[i];
             
             if( i>0 && i%10000 == 0 ) {
             
@@ -765,16 +771,16 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
         
-        /*
-         * Try several permutations of the key-value presentation order.
-         */
-        for( int i=0; i<20; i++ ) {
-         
-            doInsertRandomKeySequenceTest(m, m*m*m*m, trace);
-
-            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace);
-            
-        }
+//        /*
+//         * Try several permutations of the key-value presentation order.
+//         */
+//        for( int i=0; i<20; i++ ) {
+//         
+//            doInsertRandomKeySequenceTest(m, m*m*m*m, trace);
+//
+//            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace);
+//            
+//        }
         
     }
 
@@ -797,13 +803,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         int keys[] = new int[ninserts];
 
-        Entry entries[] = new Entry[ninserts];
+        SimpleEntry entries[] = new SimpleEntry[ninserts];
         
         for( int i=0; i<ninserts; i++ ) {
         
             keys[i] = i+1; // Note: origin one.
             
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             
         }
 
@@ -830,9 +836,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         int keys[] = new int[ninserts];
 
-        Entry entries[] = new Entry[ninserts];
+        SimpleEntry entries[] = new SimpleEntry[ninserts];
         
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
 
         for( int i=0; i<ninserts; i++ ) {
         
@@ -840,7 +846,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             keys[i] = key;
             
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             
             lastKey = key;
             
@@ -864,7 +870,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The trace level (zero disables most tracing).
      */
     public void doInsertRandomKeySequenceTest(int m, int[] keys,
-            Entry[] entries, int trace) {
+            SimpleEntry[] entries, int trace) {
 
         doInsertKeySequenceTest(m, keys, entries, getRandomOrder(keys.length),
                 trace);
@@ -887,13 +893,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         int keys[] = new int[ninserts];
 
-        Entry entries[] = new Entry[ninserts];
+        SimpleEntry entries[] = new SimpleEntry[ninserts];
         
         for( int i=0; i<ninserts; i++ ) {
         
             keys[i] = i+1; // Note: origin one.
             
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             
         }
 
@@ -918,11 +924,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param trace
      *            The trace level (zero disables most tracing).
      */
-    public void doInsertKeySequenceTest(int m, int[] keys, Entry[] entries, int[] order, int trace){
+    public void doInsertKeySequenceTest(int m, int[] keys, SimpleEntry[] entries, int[] order, int trace){
 
         try {
             
-            BTree btree = getNoEvictionBTree(m);
+            BTree btree = getBTree(m);
 
             int lastLeafCount = btree.nleaves;
 
@@ -930,7 +936,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 int key = keys[order[i]];
 
-                Entry entry = entries[order[i]];
+                SimpleEntry entry = entries[order[i]];
 
                 if( i>0 && i%10000 == 0 ) {
                     
@@ -1009,7 +1015,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 System.err.print(keys[order[i]]);
             }
             System.err.println("};");
-            System.err.print("Entry[] vals = new Entry[]{");
+            System.err.print("SimpleEntry[] vals = new SimpleEntry[]{");
             for (int i = 0; i < keys.length; i++) {
                 if (i > 0)
                     System.err.print(", ");
@@ -1054,12 +1060,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         
         int[] keys = new int[ninserts];
-        Entry[] entries = new Entry[ninserts];
+        SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = Node.NEGINF+1;
+        int lastKey = IBTree.NEGINF+1;
         for( int i=0; i<ninserts; i++) {
             keys[i] = lastKey;
-            entries[i] = new Entry();
+            entries[i] = new SimpleEntry();
             lastKey+=1;
         }
         
@@ -1092,7 +1098,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
 
-    private void doRandomKeyInsertTest(BTree btree, int[] keys, Entry[] entries, int[] order ) {
+    private void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {
         
         /*
          * Insert keys into the tree.
@@ -1104,7 +1110,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             int key = keys[order[i]];
             
-            Entry entry = entries[order[i]];
+            SimpleEntry entry = entries[order[i]];
             
             if( i >0 && i%10000 == 0 ) {
             

@@ -52,12 +52,8 @@ import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
 
-import org.CognitiveWeb.extser.LongPacker;
-
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SlotMath;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
  * <p>
@@ -82,39 +78,25 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Modify the serialized "reference" form to be smaller by writing the #of
- * slots and not the #of bytes in the serialized record and by also accepting
- * pragamatic limits on both the #of slots that may be addressed in the journal
- * for a given slot size. If we use contiguous allocations (which are important
- * for a disk-based {@link BufferMode}) then we could pack the firstSlot and
- * the #of slots (#of bytes divided by the #of bytes per slot) as unsigned int31
- * fields using {@link LongPacker} - the result will be more compact than if we
- * just using the packing routine directly on the int64 value since both
- * components are int31 values admissible to packing and both components will
- * tend to have leading zeros.
- * 
- * @todo Since the serialization record no longer has a fixed size, can we go a
- *       little further and compute its maximum size for a node and then report
- *       only the actual #of bytes used. This would let us pack some values and
- *       could be a big savings. We could also explore key compression, which
- *       might be very useful for an index that is expected to be dense. Perhaps
- *       we could just use the extser package at this point - probably it is
- *       safer to do this without extser so that it is simpler ("ready to
- *       hand").
+ * @todo Compute the #of shared bytes (common prefix) for the low and high key,
+ *       write that prefix once, and then mask off that prefix for each key
+ *       written. This should substantially reduce the space required to write
+ *       the keys - even though the bulk of the space is dedicted to values not
+ *       keys.
  * 
  * @todo Modify the test helpers to generate random nodes by splitting two
  *       random leaves and assigning those leaves persistent identity and
  *       restore the commented out assertion in {@link AbstractNode#getParent()}
  * 
- * @todo Generalize to allow non-int[] keys and other kinds of value[]s.
+ * @todo Generalize to allow non-int[] keys.
  */
 public class NodeSerializer {
 
     /**
-     * Used to compute the #of slots from the #of bytes.
+     * An object that knows how to (de-)serialize the values on leaves.
      */
-    final protected SlotMath slotMath;
-
+    private IValueSerializer valueSerializer;
+    
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
      * {@link Checksum} API returns an int64 (aka long integer) value. The
@@ -159,34 +141,10 @@ public class NodeSerializer {
     static final int SIZEOF_KEY = Bytes.SIZEOF_INT;
 
     /**
-     * Size of an {@link ISlotsAllocation} encoded as a long integer. This is
-     * used for non-node references (references to data versions in the
-     * journal). Since we do not know the size of the referenced objects in
-     * advanced we can not serialize these as int32 and we have to serialize the
-     * full int64 value.
-     */
-    static final int SIZEOF_SLOTS = Bytes.SIZEOF_LONG;
-    
-    /**
      * Size of a value for a non-leaf node. The value must be interpreted per
      * {@link #putNodeRef(ByteBuffer, long)}.
      */
     static final int SIZEOF_NODE_VALUE = SIZEOF_REF;
-
-    /**
-     * Size of a version counter.
-     */
-    static final int SIZEOF_VERSION_COUNTER = Bytes.SIZEOF_SHORT;
-    
-    /**
-     * Size of a value for a leaf node. The value is an encoded
-     * {@link IObjectIndexEntry}.
-     */
-    static final int SIZEOF_LEAF_VALUE
-            = SIZEOF_VERSION_COUNTER // versionCounter
-            + SIZEOF_SLOTS // currentVersion (slots as long)
-            + SIZEOF_SLOTS // preExistingVersion (slots as long)
-            ;
 
     /**
      * Offset of the int32 value that is the {@link Adler32} checksum of the
@@ -230,8 +188,8 @@ public class NodeSerializer {
      * array. The capacity of the array is fixed by the {@link #pageSize}
      * specified for the index.
      * 
-     * @see AbstractNode#NEGINF
-     * @see AbstractNode#POSINF
+     * @see BTree#NEGINF
+     * @see BTree#POSINF
      */
     static final int OFFSET_KEYS = OFFSET_NKEYS + SIZEOF_NKEYS;
     
@@ -241,6 +199,9 @@ public class NodeSerializer {
      */
     private static final ChecksumUtility chk = new ChecksumUtility();
     
+    /**
+     * Constructor is disallowed.
+     */
     private NodeSerializer() {
         
         throw new UnsupportedOperationException();
@@ -248,18 +209,15 @@ public class NodeSerializer {
     }
 
     /**
-     * Constructor computes constants that depend only on the page size of
-     * the index.
-     * 
-     * @param slotMath
-     *            Used to decode a long integer encoding an
-     *            {@link ISlotAllocation}.
+     * @param valueSerializer
+     *            An object that knows how to (de-)serialize the values on
+     *            {@link Leaf leaves}.
      */
-    NodeSerializer(SlotMath slotMath) {
+    public NodeSerializer(IValueSerializer valueSerializer) {
 
-        assert slotMath != null;
+        assert valueSerializer != null;
 
-        this.slotMath = slotMath;
+        this.valueSerializer = valueSerializer;
         
     }
 
@@ -276,25 +234,36 @@ public class NodeSerializer {
         return getSize( node.isLeaf(), node.nkeys );
         
     }
-    
+
+    /**
+     * Return the maximum serialized size (in bytes) of a node or leaf.
+     * 
+     * @param isLeaf
+     *            True iff the maximum size will be reported for a leaf.
+     * @param nkeys
+     *            The #of keys for the node or leaf. Note that the maximum #of
+     *            keys for a node is one less than the maximum #of keys for a
+     *            leaf.
+     *            
+     * @return The maximum size of the serialized record in bytes.
+     */
     int getSize( boolean isLeaf, int nkeys ) {
         
         if (isLeaf) {
 
-            int OFFSET_LEAF_VALUES = OFFSET_KEYS + (SIZEOF_KEY * nkeys);
+            int keysSize = (SIZEOF_KEY * nkeys);
 
-            int LEAF_SIZE = OFFSET_LEAF_VALUES + (SIZEOF_LEAF_VALUE * nkeys);
+            int valuesSize = valueSerializer.getSize(nkeys);
 
-            return LEAF_SIZE;
+            return OFFSET_KEYS + keysSize + valuesSize;
 
         } else {
 
-            int OFFSET_NODE_VALUES = OFFSET_KEYS + (SIZEOF_KEY * nkeys);
+            int keysSize = (SIZEOF_KEY * nkeys);
 
-            int NODE_SIZE = OFFSET_NODE_VALUES
-                    + (SIZEOF_NODE_VALUE * (nkeys + 1));
+            int valuesSize = (SIZEOF_NODE_VALUE * (nkeys + 1));
 
-            return NODE_SIZE;
+            return OFFSET_KEYS + keysSize + valuesSize;
 
         }
         
@@ -399,7 +368,7 @@ public class NodeSerializer {
         
         // keys.
         
-        int lastKey = AbstractNode.NEGINF;
+        int lastKey = IBTree.NEGINF;
         
         for (int i = 0; i < nkeys; i++) {
 
@@ -407,7 +376,7 @@ public class NodeSerializer {
             
             assert key > lastKey; // verify increasing and minimum.
             
-            assert key < AbstractNode.POSINF; // verify maximum.
+            assert key < IBTree.POSINF; // verify maximum.
 
             buf.putInt(key);
             
@@ -452,8 +421,6 @@ public class NodeSerializer {
         assert id != 0L;
         assert buf != null;
 
-        final int remaining = buf.remaining();
-        
         /*
          * common data.
          */
@@ -508,7 +475,7 @@ public class NodeSerializer {
          * keys.
          */
         
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 
@@ -516,7 +483,7 @@ public class NodeSerializer {
 
             assert key > lastKey; // verify keys are in ascending order.
 
-            assert key < Node.POSINF; // verify keys in legal range.
+            assert key < IBTree.POSINF; // verify keys in legal range.
 
             keys[i] = lastKey = key;
 
@@ -580,7 +547,7 @@ public class NodeSerializer {
         
         // keys.
         
-        int lastKey = AbstractNode.NEGINF;
+        int lastKey = IBTree.NEGINF;
         
         for (int i = 0; i < nkeys; i++) {
 
@@ -588,7 +555,7 @@ public class NodeSerializer {
             
             assert key > lastKey; // verify increasing and minimum.
             
-            assert key < AbstractNode.POSINF; // verify maximum.
+            assert key < IBTree.POSINF; // verify maximum.
 
             buf.putInt(key);
             
@@ -599,29 +566,7 @@ public class NodeSerializer {
         /*
          * values.
          */
-        for (int i = 0; i < nkeys; i++) {
-
-            final IObjectIndexEntry entry = leaf.values[i];
-
-            assert entry != null;
-
-            // May be null (indicates the current version is deleted).
-            final ISlotAllocation currentVersionSlots = entry
-                    .getCurrentVersionSlots();
-
-            // May be null (indicates first version in this isolation/tx).
-            final ISlotAllocation preExistingVersionSlots = entry
-                    .getPreExistingVersionSlots();
-
-            buf.putShort(entry.getVersionCounter());
-
-            buf.putLong((currentVersionSlots == null ? 0L : currentVersionSlots
-                    .toLong()));
-
-            buf.putLong((preExistingVersionSlots == null ? 0L
-                    : preExistingVersionSlots.toLong()));
-
-        }
+        valueSerializer.putValues(buf, leaf.values, nkeys);
 
         // #of bytes actually written.
         final int nbytes = buf.position() - pos0;
@@ -647,8 +592,6 @@ public class NodeSerializer {
         assert id != 0L;
         assert buf != null;
 
-        final int remaining = buf.remaining();
-        
         /*
          * common data.
          */
@@ -699,7 +642,7 @@ public class NodeSerializer {
 
         final int[] keys = new int[branchingFactor];
 
-        int lastKey = Node.NEGINF;
+        int lastKey = IBTree.NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 
@@ -707,7 +650,7 @@ public class NodeSerializer {
 
             assert key > lastKey; // verify keys are in ascending order.
 
-            assert key < Node.POSINF; // verify keys in legal range.
+            assert key < IBTree.POSINF; // verify keys in legal range.
 
             keys[i] = lastKey = key;
 
@@ -717,20 +660,9 @@ public class NodeSerializer {
          * Values.
          */
 
-        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor];
+        final Object[] values = new Object[branchingFactor];
 
-        for (int i = 0; i < nkeys; i++) {
-
-            final short versionCounter = buf.getShort();
-
-            final long currentVersion = buf.getLong();
-
-            final long preExistingVersion = buf.getLong();
-
-            values[i] = new IndexEntry(slotMath, versionCounter,
-                    currentVersion, preExistingVersion);
-
-        }
+        valueSerializer.getValues(buf,values,nkeys);
 
         // verify #of bytes actually read.
         assert buf.position() - pos0 == nbytes;

@@ -70,6 +70,13 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo There needs to be a coupling between the page buffering strategy and
+ *       the slot allocation strategy in order for the latter to be efficient.
+ *       Note that you can "write behind" the current file pointer as long as
+ *       the position on which you are writing has not been evicted to the file.
+ *       This could be used to improve the placement of objects onto slots when
+ *       the slots have become somewhat fragmented.
+ * 
  * @todo Finish this implementation and integrate with the various
  *       {@link DirectBufferStrategy} and the {@link DiskOnlyStrategy} - those
  *       are the only two strategies that can utilize a page buffer.

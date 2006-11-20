@@ -52,8 +52,6 @@ import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 
@@ -75,12 +73,12 @@ public class Leaf extends AbstractNode {
     /**
      * The values of the tree.
      */
-    protected IObjectIndexEntry[] values;
+    protected Object[] values;
 
     /**
      * De-serialization constructor.
      */
-    protected Leaf(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, IObjectIndexEntry[] values) {
+    protected Leaf(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, Object[] values) {
         
         super(btree, branchingFactor );
 
@@ -106,7 +104,7 @@ public class Leaf extends AbstractNode {
         setDirty(false);
 
         // Add to the hard reference queue.
-        btree.hardReferenceQueue.append(this);
+        btree.touch(this);
         
     }
 
@@ -118,18 +116,18 @@ public class Leaf extends AbstractNode {
      */
     public Leaf(BTree btree) {
 
-        super(btree, btree.branchingFactor);
+        super(btree, btree.getBrachingFactor());
 
         // nkeys == nvalues for a Leaf.
         keys = new int[branchingFactor];
 
-        values = new Entry[branchingFactor];
+        values = new Object[branchingFactor];
 
         /*
          * Add to the hard reference queue. If the queue is full, then this will
          * force the incremental write whatever gets evicted from the queue.
          */
-        btree.hardReferenceQueue.append(this);
+        btree.touch(this);
         
         btree.nleaves++;
 
@@ -140,6 +138,8 @@ public class Leaf extends AbstractNode {
      * 
      * @param src
      *            The source node.
+     * 
+     * @see AbstractNode#copyOnWrite()
      */
     protected Leaf(Leaf src) {
 
@@ -150,24 +150,27 @@ public class Leaf extends AbstractNode {
         // nkeys == nvalues for a Leaf.
         keys = new int[branchingFactor];
 
-        values = new Entry[branchingFactor];
+        values = (Object[])new Object[branchingFactor];
 
-        // copy keys.
-        System.arraycopy(src.keys, 0, keys, 0, nkeys);
+        /*
+         * Note: Unless and until we have a means to recover leafs from a cache,
+         * we just steal the keys[] and values[] rather than making copies.
+         */
+
+        // steal keys.
+        keys = src.keys; src.keys = null;
         
-        // copy values.
-        for (int i = 0; i < nkeys; i++) {
-
-            /*
-             * Clone the value so that changes to the value in the new leaf
-             * do NOT bleed into the immutable src leaf.
-             */
-            this.values[i] = new Entry(src.values[i]);
-
-        }
-
+        // steal values.
+        values = src.values; src.values = null;
+        
+//        // copy keys.
+//        System.arraycopy(src.keys, 0, keys, 0, nkeys);
+//
+//        // copy values
+//        btree.copyValues( src.values, this.values, nkeys );
+        
         // Add to the hard reference queue.
-        btree.hardReferenceQueue.append(this);
+        btree.touch(this);
 
     }
 
@@ -191,7 +194,7 @@ public class Leaf extends AbstractNode {
      * @param entry
      *            The new entry.
      */
-    public void insert(int key, Entry entry) {
+    public void insert(int key, Object entry) {
 
         /*
          * Note: This is one of the few gateways for mutation of a leaf via
@@ -262,7 +265,7 @@ public class Leaf extends AbstractNode {
 
     }
 
-    public IObjectIndexEntry lookup(int key) {
+    public Object lookup(int key) {
 
         int index = Search.search(key, keys, nkeys);
 
@@ -326,7 +329,7 @@ public class Leaf extends AbstractNode {
             rightSibling.values[j] = values[i];
 
             // clear out the old keys and values.
-            keys[i] = NEGINF;
+            keys[i] = IBTree.NEGINF;
             values[i] = null;
 
             nkeys--; // one less key here.
@@ -376,7 +379,7 @@ public class Leaf extends AbstractNode {
      * @param entry
      *            The new entry.
      */
-    void insert(int key, int index, Entry entry) {
+    void insert(int key, int index, Object entry) {
 
         assert key != NULL;
         assert index >= 0 && index <= nkeys;
@@ -441,7 +444,7 @@ public class Leaf extends AbstractNode {
          * rather than relying on maintenance elsewhere.
          */
 
-        keys[index] = NEGINF; // an invalid key.
+        keys[index] = IBTree.NEGINF; // an invalid key.
 
         values[index] = null;
 
@@ -463,9 +466,7 @@ public class Leaf extends AbstractNode {
      * @todo Write unit tests for maintaining the tree in balance as entries
      *       are removed.
      */
-    public IObjectIndexEntry remove(int key) {
-
-        assert key > NEGINF && key < POSINF;
+    public Object remove(int key) {
 
         final int index = Search.search(key, keys, nkeys);
 
@@ -493,7 +494,7 @@ public class Leaf extends AbstractNode {
         }
 
         // The value that is being removed.
-        IObjectIndexEntry entry = values[index];
+        Object entry = values[index];
 
         /*
          * Copy over the hole created when the key and value were removed
@@ -510,7 +511,7 @@ public class Leaf extends AbstractNode {
 
         } else {
 
-            keys[index] = NEGINF;
+            keys[index] = IBTree.NEGINF;
 
             values[index] = null;
 
@@ -537,7 +538,7 @@ public class Leaf extends AbstractNode {
     }
 
     /**
-     * Iterator visits the defined {@link Entry}s in key order.
+     * Iterator visits the values in key order.
      * 
      * @todo define key range scan iterator. This would be implemented
      *       differently for a B+Tree since we could just scan leaves. For a
@@ -582,7 +583,7 @@ public class Leaf extends AbstractNode {
         
         { // verify keys are monotonically increasing.
             
-            int lastKey = NEGINF;
+            int lastKey = IBTree.NEGINF;
             
             for (int i = 0; i < nkeys; i++) {
             

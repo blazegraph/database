@@ -50,7 +50,7 @@ import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -70,16 +70,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public abstract class AbstractNode extends PO {
-
-    /**
-     * Negative infinity for the external keys.
-     */
-    static final int NEGINF = 0;
-
-    /**
-     * Positive infinity for the external keys.
-     */
-    static final int POSINF = Integer.MAX_VALUE;
 
     /**
      * The BTree.
@@ -131,6 +121,25 @@ public abstract class AbstractNode extends PO {
      * parent reference.
      */
     protected WeakReference<Node> parent = null;
+
+    /**
+     * The #of times that this node is present on the {@link HardReferenceQueue} .
+     * This value is incremented each time the node is added to the queue and is
+     * decremented each time the node is evicted from the queue. On eviction, if
+     * the counter is zero(0) after it is decremented then the node is written
+     * on the store. This mechanism is critical because it prevents a node
+     * entering the queue from forcing IO for the same node in the edge case
+     * where the node is also on the tail on the queue. Since the counter is
+     * incremented before it is added to the queue, it is guarenteed to be
+     * non-zero when the node forces its own eviction from the tail of the
+     * queue. Preventing this edge case is important since the node can
+     * otherwise become immutable at the very moment that it is touched to
+     * indicate that we are going to update its state, e.g., during an insert,
+     * split, or remove operation. This mechanism also helps to defer IOs since
+     * IO can not occur until the last reference to the node is evicted from the
+     * queue.
+     */
+    protected int referenceCount = 0;
 
     /**
      * The parent iff the node has been added as the child of another node
@@ -232,7 +241,8 @@ public abstract class AbstractNode extends PO {
          * is only changed by the VM, not by the application).
          */
 
-        assert src==btree.root || (src.parent != null && src.parent.get() != null);
+        assert src == btree.getRoot()
+                || (src.parent != null && src.parent.get() != null);
         
         this.parent = src.parent;
         
@@ -266,12 +276,13 @@ public abstract class AbstractNode extends PO {
      * Return this node iff it is dirty (aka mutable) and otherwise return a
      * copy of this node. If a copy is made of the node, then a copy will also
      * be made of each immutable parent of the node up to the first mutable
-     * parent or the root of the tree, which ever comes first.  If the root is
+     * parent or the root of the tree, which ever comes first. If the root is
      * copied, then the new root node will be set on the {@link BTree}. This
      * method must MUST be invoked any time an mutative operation is requested
      * for the node. For simplicity, it is invoked by the two primary mutative
-     * operations {@link #insert(int, Entry)} and {@link #remove(int)} and when
-     * a parent is {@link #split()} by an insert into a child.
+     * operations {@link #insert(int key, Object value)} and
+     * {@link #remove(int key)} and when a parent is {@link #split()} by an
+     * insert into a child.
      * </p>
      * <p>
      * Note: You can not modify a node that has been written onto the store.
@@ -346,6 +357,12 @@ public abstract class AbstractNode extends PO {
 
                 }
 
+                /*
+                 * Replace the reference to this child with the reference to the
+                 * new child. This makes the old child inaccessible via
+                 * navigation. It will be GCd once it falls off of the hard
+                 * reference queue.
+                 */
                 parent.replaceChildRef(this.getIdentity(), newNode);
 
             }
@@ -362,29 +379,7 @@ public abstract class AbstractNode extends PO {
              */
             if( isLeaf() ) {
 
-                /*
-                 * Do NOT append the reference onto the queue if it would cause
-                 * the eviction of the reference from the queue. This avoids
-                 * situations where we are validating that the leaf is mutable
-                 * so that we can modify it and appending the leaf onto the
-                 * queue would cause the leave to be evicted and hence made
-                 * immutable.
-                 * 
-                 * See DefaultLeafEviction.
-                 * 
-                 * FIXME This is probably not a sufficient mechanism. Either I
-                 * need to use a hard reference LRU cache (not a queue) or I
-                 * need to scan the queue for nodes that have been modified very
-                 * recently and NOT evict them (or ignore the eviction notice).
-                 * 
-                 * FIXME We should also append the reference on reads so that
-                 * recently read leaves are retained longer.
-                 */
-                if( btree.hardReferenceQueue.getTail() != this ) {
-
-                    btree.hardReferenceQueue.append(this);
-                
-                }
+                btree.touch(this);
                 
             }
             
@@ -430,8 +425,8 @@ public abstract class AbstractNode extends PO {
             private static final long serialVersionUID = 1L;
 
             /*
-             * Expand the {@link Entry} objects for each leaf visited in
-             * the post-order traversal.
+             * Expand the value objects for each leaf visited in the post-order
+             * traversal.
              */
             protected Iterator expand(Object childObj) {
                 /*
@@ -491,7 +486,7 @@ public abstract class AbstractNode extends PO {
      * @param entry
      *            The value.
      */
-    abstract public void insert(int key, Entry entry);
+    abstract public void insert(int key, Object entry);
 
     /**
      * Recursive search locates the appropriate leaf and removes and returns
@@ -499,9 +494,10 @@ public abstract class AbstractNode extends PO {
      * 
      * @param key
      *            The external key.
+     *            
      * @return The value or null if there was no entry for that key.
      */
-    abstract public IObjectIndexEntry remove(int key);
+    abstract public Object remove(int key);
 
     /**
      * Recursive search locates the entry for the probe key.
@@ -512,7 +508,7 @@ public abstract class AbstractNode extends PO {
      * @return The entry or <code>null</code> iff there is no entry for
      *         that key.
      */
-    abstract public IObjectIndexEntry lookup(int key);
+    abstract public Object lookup(int key);
 
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).

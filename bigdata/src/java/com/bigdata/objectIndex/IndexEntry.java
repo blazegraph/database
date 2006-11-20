@@ -51,7 +51,7 @@ import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
- * A non-persistence capable implementation of {@link IObjectIndexEntry}.
+ * A persistence capable implementation of {@link IObjectIndexEntry}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,11 +60,11 @@ class IndexEntry implements IObjectIndexEntry {
 
     private final SlotMath slotMath;
 
-    private short versionCounter;
+    short versionCounter;
 
-    private long currentVersion;
+    long currentVersion;
 
-    private long preExistingVersion;
+    long preExistingVersion;
 
     private IndexEntry() {
 

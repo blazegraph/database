@@ -47,8 +47,10 @@ Modifications:
 
 package com.bigdata.objectIndex;
 
+import java.io.IOException;
 import java.util.Properties;
 
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -64,17 +66,8 @@ import com.bigdata.journal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME These tests are still failing.  I have a test design to prove out the
- * incremental write case and I should implement that in depth before trying to
- * work it through further with the stress tests.  Also, the Entry needs to be
- * generalized since the IObjectIndexEntry is not really supported as yet.
- * 
  * @todo Add stress test with periodic re-loading of the btree, tracking its
  *       expected state, and verifying that state.
- * 
- * @todo Support testing against each of the journal modes, at least for the
- *       integration test with the btree as the object index implementation for
- *       the journal.
  */
 public class TestBTreeWithJournal extends AbstractBTreeTestCase {
 
@@ -102,16 +95,54 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
 
     private Properties properties;
     
-    IBTreeFactory btreeFactory = new JournalBTreeFactory(getProperties());
+    /**
+     * Return a btree backed by a journal with the indicated branching factor.
+     * The serializer requires that values in leaves are {@link SimpleEntry}
+     * objects.
+     * 
+     * @param branchingFactor
+     *            The branching factor.
+     * 
+     * @return The btree.
+     */
+    public BTree getBTree(int branchingFactor) {
+
+        try {
+            
+            Properties properties = getProperties();
+
+            Journal journal = new Journal(properties);
+
+            // A modest leaf queue capacity.
+            final int leafQueueCapacity = 500;
+            
+            final int nscan = 10;
+
+            BTree btree = new BTree(journal, branchingFactor,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            leafQueueCapacity, nscan),
+                    new SimpleEntry.Serializer());
+
+            return btree;
+
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
     
     /*
-     * @todo try large branching factors.
+     * @todo try large branching factors, but limit the total #of keys inserted
+     * or the running time will be too long (I am using an expontential #of keys
+     * by default).
      * 
      * @todo For sequential keys and the simple split rule, m=128 causes the
      * journal to exceed its initial extent. Try this again with a modified
      * split rule that splits high for dense leaves.
      */
-    int[] branchingFactors = new int[]{3,4,5,10,20,64};//,128};//,512};
+    int[] branchingFactors = new int[]{3,4,5,10,20};//,64};//,128};//,512};
     
     /**
      * A stress test for sequential key insertion that runs with a variety of
@@ -123,13 +154,13 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithIncreasingKeySequence( btreeFactory.getBTree(m), m, m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m );
             
-            doSplitWithIncreasingKeySequence( btreeFactory.getBTree(m), m, m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithIncreasingKeySequence( btreeFactory.getBTree(m), m, m*m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithIncreasingKeySequence( btreeFactory.getBTree(m), m, m*m*m*m );
+            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         
@@ -145,13 +176,13 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithDecreasingKeySequence( btreeFactory.getBTree(m), m, m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m );
             
-            doSplitWithDecreasingKeySequence( btreeFactory.getBTree(m), m, m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithDecreasingKeySequence( btreeFactory.getBTree(m), m, m*m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithDecreasingKeySequence( btreeFactory.getBTree(m), m, m*m*m*m );
+            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         
@@ -167,34 +198,33 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithRandomKeySequence( btreeFactory.getBTree(m), m, m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m );
             
-            doSplitWithRandomKeySequence( btreeFactory.getBTree(m), m, m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithRandomKeySequence( btreeFactory.getBTree(m), m, m*m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithRandomKeySequence( btreeFactory.getBTree(m), m, m*m*m*m );
+            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         
     }
 
-    // FIXME refactor use of IBTreeFactory so that we can run this test.
-//    /**
-//     * Stress test inserts random permutations of keys into btrees of order m
-//     * for several different btrees, #of keys to be inserted, and permutations
-//     * of keys.
-//     */
-//    public void test_stress_split() {
-//
-//        for(int i=0; i<branchingFactors.length; i++) {
-//            
-//            int m = branchingFactors[i];
-//        
-//            doSplitTest( m, 0 );
-//        
-//        }
-//        
-//    }
+    /**
+     * Stress test inserts random permutations of keys into btrees of order m
+     * for several different btrees, #of keys to be inserted, and permutations
+     * of keys.
+     */
+    public void test_stress_split() {
+
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+        
+            doSplitTest( m, 0 );
+        
+        }
+        
+    }
     
 }
