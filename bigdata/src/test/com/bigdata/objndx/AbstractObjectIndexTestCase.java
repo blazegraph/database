@@ -247,8 +247,16 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         children[nkeys] = nextNodeRef(isLeaf);
 
-        return new Node((BTree) ndx, id, branchingFactor, nkeys, keys, children);
+        /*
+         * create the node and set it as the root to fake out the btree.
+         */
+        
+        Node node = new Node(ndx, id, branchingFactor, nkeys, keys, children);
+        
+        ndx.root = node;
 
+        return node;
+        
     }
 
     /**
@@ -298,7 +306,15 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 //        
 //        long next = hasNext ?nextNodeRef(true,nodeSer) : 0L;
 
-        return new Leaf((BTree)ndx,id,branchingFactor, nkeys,keys,values); //,previous,next);
+        /*
+         * create the leaf and set it as the root to fake out the btree.
+         */
+
+        Leaf leaf = new Leaf(ndx,id,branchingFactor, nkeys,keys,values); //,previous,next);
+        
+        ndx.root = leaf;
+        
+        return leaf;
 
     }
 

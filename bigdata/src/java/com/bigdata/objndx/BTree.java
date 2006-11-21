@@ -65,13 +65,21 @@ import com.bigdata.journal.SlotMath;
 /**
  * <p>
  * BTree encapsulates metadata about the persistence capable index, but is not
- * itself a persistent object.
+ * itself a persistent object.  This class is somewhat specialized for its role
+ * as an object index.
  * </p>
  * <p>
  * Note: No mechanism is exposed for recovering a node or leaf of the tree other
  * than the root by its key. This is because the parent reference on the node
  * (or leaf) can only be set when it is read from the store in context by its
  * parent node.
+ * </p>
+ * <p>
+ * Note: This is NOT a B+Tree since the leaves can not be stitched together with
+ * prior and next references without forming cycles that make it impossible to
+ * write out the leaves of the btree. This restriction arises because each time
+ * we write out a node or leaf it is assigned a persistent identifier as an
+ * unavoidable artifact of providing isolation for the object index.
  * </p>
  * <p>
  * Note: This implementation is NOT thread-safe. The object index is intended
@@ -118,7 +126,7 @@ public class BTree implements IBTree {
      * The minimum hard reference queue capacity is two(2) in order to avoid
      * cache evictions of the leaves participating in a split.
      */
-    static public final int MIN_HARD_REFERENCE_QUEUE_CAPACITY = 2;
+    static public final int DEFAULT_LEAF_QUEUE_CAPACITY = 2;
     
     /**
      * The size of the hard reference queue used to defer leaf eviction.
@@ -130,9 +138,9 @@ public class BTree implements IBTree {
      * match before a new reference is appended to the queue. This trades off
      * the cost of scanning entries on the queue, which is handled by the queue
      * itself, against the cost of queue churn. Note that queue eviction drives
-     * IOs required to write the leaves on the store, but holding references on
-     * the queue means that those leaves will remain strongly reachable and
-     * thereby reduces IOs required to read the leaves from the store.
+     * IOs required to write the leaves on the store, but incremental writes
+     * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
+     * is dirty.
      */
     static public final int DEFAULT_LEAF_QUEUE_SCAN = 10;
     
@@ -149,12 +157,12 @@ public class BTree implements IBTree {
     /**
      * Computes the split index when splitting a non-leaf {@link Node}.
      */
-    final public INodeSplitPolicy nodeSplitter = new DefaultNodeSplitPolicy();
+    final public INodeSplitPolicy nodeSplitter;
 
     /**
      * Computes the split index when splitting a {@link Leaf}.
      */
-    final public ILeafSplitPolicy leafSplitter = new DefaultLeafSplitPolicy();
+    final public ILeafSplitPolicy leafSplitter;
 
     public IRawStore getStore() {
         
@@ -186,7 +194,7 @@ public class BTree implements IBTree {
         
     }
 
-    public int getEntryCount() {
+    public int size() {
         
         return nentries;
         
@@ -266,14 +274,12 @@ public class BTree implements IBTree {
      * @param node
      *            The node or leaf.
      * 
-     * FIXME Touch leafs on read as well.
+     * @todo Touch nodes on read and write as well and write tests for
+     *       incremental node eviction.
      * 
-     * FIXME Touch nodes on read and write as well and write tests for
-     * incremental node eviction.
-     * 
-     * FIXME Refactor to use a separate hard reference queue for nodes. This
-     * will allow incremental writes of parts of the tree that are not being
-     * accessed.
+     * @todo Refactor to use a separate hard reference queue for nodes. This
+     *       will allow incremental writes of parts of the tree that are not
+     *       being accessed.
      */
     protected void touch(AbstractNode node) {
 
@@ -349,6 +355,10 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
+     * @param nodeSplitter
+     *            The policy for choosing the key on which to split a node.
+     * @param leafSplitter
+     *            The policy for choosing the key on which to split a leaf.
      * @param headReferenceQueueCapacity
      *            The capacity of the hard reference queue (minimum of 2 to
      *            avoid cache evictions of the leaves participating in a split).
@@ -357,18 +367,29 @@ public class BTree implements IBTree {
      *            {@link Leaf}.
      */
     public BTree(IRawStore store, int branchingFactor,
-            HardReferenceQueue<PO> hardReferenceQueue, IValueSerializer valueSer ) {
+            INodeSplitPolicy nodeSplitter, ILeafSplitPolicy leafSplitter,
+            HardReferenceQueue<PO> hardReferenceQueue, IValueSerializer valueSer) {
 
         assert store != null;
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
-        assert hardReferenceQueue.capacity() >= MIN_HARD_REFERENCE_QUEUE_CAPACITY;
+        assert nodeSplitter != null;
+        
+        assert leafSplitter != null;
+        
+        assert hardReferenceQueue.capacity() >= DEFAULT_LEAF_QUEUE_CAPACITY;
+        
+        assert valueSer != null;
         
         this.store = store;
 
         this.branchingFactor = branchingFactor;
 
+        this.nodeSplitter = nodeSplitter;
+        
+        this.leafSplitter = leafSplitter;
+        
         this.leafQueue = hardReferenceQueue;
 
         this.nodeSer = new NodeSerializer(valueSer);
@@ -390,25 +411,6 @@ public class BTree implements IBTree {
         this.root = new Leaf(this);
         
     }
-    
-//    /**
-//     * Constructor for a new btree with the default {@link DefaultEvictionListener}
-//     * and a default hard reference cache size.
-//     * 
-//     * @param store
-//     *            The persistence store.
-//     * @param branchingFactor
-//     *            The branching factor.
-//     * 
-//     * @see DefaultEvictionListener
-//     * @see #DEFAULT_LEAF_CACHE_CAPACITY
-//     */
-//   public BTree(IRawStore store, int branchingFactor) {
-//
-//        this(store, branchingFactor, new HardReferenceQueue<PO>(
-//                new DefaultEvictionListener(), DEFAULT_LEAF_CACHE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN));
-//
-//    }
 
     /**
      * Constructor for an existing btree.
@@ -417,16 +419,26 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param metadataId
      *            The persistent identifier of btree metadata.
+     * @param nodeSplitter
+     *            The policy for choosing the key on which to split a node.
+     * @param leafSplitter
+     *            The policy for choosing the key on which to split a leaf.
      * @param leafQueue
      *            The hard reference queue for {@link Leaf}s.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
      */
-    public BTree(IRawStore store, long metadataId, HardReferenceQueue<PO> leafQueue, IValueSerializer valueSer) {
+    public BTree(IRawStore store, long metadataId,
+            INodeSplitPolicy nodeSplitter, ILeafSplitPolicy leafSplitter,
+            HardReferenceQueue<PO> leafQueue, IValueSerializer valueSer) {
 
         assert store != null;
 
+        assert nodeSplitter != null;
+        
+        assert leafSplitter != null;
+        
         assert leafQueue != null;
         
         assert valueSer != null;
@@ -441,6 +453,10 @@ public class BTree implements IBTree {
 
         this.store = store;
 
+        this.nodeSplitter = nodeSplitter;
+        
+        this.leafSplitter = leafSplitter;
+        
         this.leafQueue = leafQueue;
 
         this.nodeSer = new NodeSerializer(valueSer);
@@ -682,13 +698,13 @@ public class BTree implements IBTree {
         
     }
     
-    public void insert(int key, Object entry) {
+    public Object insert(int key, Object entry) {
 
         assert key > NEGINF && key < POSINF;
         
         assert entry != null;
         
-        root.insert(key, entry);
+        return root.insert(key, entry);
 
     }
 
@@ -720,6 +736,15 @@ public class BTree implements IBTree {
      */
     boolean dump(PrintStream out) {
 
+            return dump(BTree.dumpLog.getEffectiveLevel(), out );
+
+    }
+        
+    public boolean dump(Level level, PrintStream out) {
+            
+        // True iff we will write out the node structure.
+        final boolean debug = level.toInt() <= Level.DEBUG.toInt();
+
         int[] utils = getUtilization();
         
         out.println("height=" + height + ", branchingFactor=" + branchingFactor
@@ -727,7 +752,7 @@ public class BTree implements IBTree {
                 + nentries + ", nodeUtil=" + utils[0] + "%, leafUtil="
                 + utils[1] + "%, utilization=" + utils[2] + "%");
 
-        boolean ok = root.dump(out, 0, true);
+        boolean ok = root.dump(level, out, 0, true);
 
         return ok;
 

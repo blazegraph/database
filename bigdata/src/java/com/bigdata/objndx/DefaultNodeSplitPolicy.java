@@ -49,6 +49,15 @@ package com.bigdata.objndx;
 
 public class DefaultNodeSplitPolicy implements INodeSplitPolicy {
 
+    private DefaultNodeSplitPolicy() {
+        
+    }
+    
+    /**
+     * Singleton.
+     */
+    public static final INodeSplitPolicy INSTANCE = new DefaultNodeSplitPolicy();
+
     /**
      * Splits a m/2-1, where m is the maximum #of children for the node.
      */

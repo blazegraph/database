@@ -186,15 +186,24 @@ public class Leaf extends AbstractNode {
     /**
      * Inserts an entry under an external key. The caller MUST ensure by
      * appropriate navigation of parent nodes that the external key either
-     * exists in or belongs in this node.  If the leaf is full, then it is
-     * split before the insert.
+     * exists in or belongs in this node. If the leaf is full, then it is split
+     * before the insert.
      * 
      * @param key
      *            The external key.
      * @param entry
      *            The new entry.
+     * 
+     * @return The previous value or <code>null</code> if the key was not
+     *         found.
+     * 
+     * @todo add boolean replace parameter and return the existing value or null
+     *       if there was no existing value. When replace is false and the key
+     *       exists, return ??? to indicate that the value was not inserted?
      */
-    public void insert(int key, Object entry) {
+    public Object insert(int key, Object entry) {
+
+        btree.touch(this);
 
         /*
          * Note: This is one of the few gateways for mutation of a leaf via
@@ -206,9 +215,30 @@ public class Leaf extends AbstractNode {
 
         if (copy != this) {
 
-            copy.insert(key, entry);
+            return copy.insert(key, entry);
 
-            return;
+        }
+
+        /*
+         * Search for the key.
+         * 
+         * Note: We do NOT search before triggering copy-on-write for an object
+         * index since an insert always triggers a mutation.
+         */
+        int index = Search.search(key, keys, nkeys);
+
+        if (index >= 0) {
+
+            /*
+             * The key is already present in the leaf, so we are updating an
+             * existing entry.  For this case we do NOT split the leaf.
+             */
+
+            Object tmp = values[index];
+
+            values[index] = entry;
+
+            return tmp;
 
         }
 
@@ -216,44 +246,31 @@ public class Leaf extends AbstractNode {
 
             /*
              * Split this leaf into a low leaf (this leaf) and a high leaf
-             * (returned by split()). If the key is greater than or equal to
-             * the first key in the high leaf then the insert is directed
-             * into the high leaf.
+             * (returned by split()). If the key is greater than or equal to the
+             * first key in the high leaf then the insert is directed into the
+             * high leaf.  Otherwise it does into this leaf (the low leaf).
              */
 
             Leaf leaf2 = (Leaf) split();
 
             if (key >= leaf2.keys[0]) {
 
-                leaf2.insert(key, entry);
+                // direct insert into the high leaf.
+                return leaf2.insert(key, entry);
 
-                return;
+            } else {
+
+                // direct insert into the low leaf.
+                return this.insert(key, entry);
 
             }
-
+           
         }
 
-        int index = Search.search(key, keys, nkeys);
-
-        if (index >= 0) {
-
-            /*
-             * The key is already present in the leaf.
-             * 
-             * @todo This is where we would handle replacement of the
-             * existing value.
-             * 
-             * Note: We do NOT search before triggering copy-on-write for an
-             * object index since an insert always triggers a mutation
-             * (unlike a standard btree which can report that the key
-             * already exists, we will actually modify the value as part of
-             * the object index semantics).
-             */
-
-            return;
-
-        }
-
+        /*
+         * The insert goes into this leaf and the leaf is not at capacity.
+         */
+        
         // Convert the position to obtain the insertion point.
         index = -index - 1;
 
@@ -263,10 +280,15 @@ public class Leaf extends AbstractNode {
         // one more entry in the btree.
         btree.nentries++;
 
+        // the key was not found.
+        return null;
+
     }
 
     public Object lookup(int key) {
 
+        btree.touch(this);
+        
         int index = Search.search(key, keys, nkeys);
 
         if (index < 0) {
@@ -459,14 +481,12 @@ public class Leaf extends AbstractNode {
      * 
      * @return The value stored under that key or null.
      * 
-     * @todo write unit tests for removing keys in terms of the keys and
-     *       values remaining in the leaf, lookup reporting false
-     *       afterwards, and not visiting the deleted entry.
-     * 
      * @todo Write unit tests for maintaining the tree in balance as entries
      *       are removed.
      */
     public Object remove(int key) {
+
+        btree.touch(this);
 
         final int index = Search.search(key, keys, nkeys);
 
@@ -493,15 +513,44 @@ public class Leaf extends AbstractNode {
 
         }
 
+        assert nkeys>0;
+
         // The value that is being removed.
         Object entry = values[index];
 
         /*
          * Copy over the hole created when the key and value were removed
-         * from the leaf. 
+         * from the leaf.
+         * 
+         * Given: 
+         * keys : [ 1 2 3 4 ]
+         * vals : [ a b c d ]
+         * 
+         * Remove(1):
+         * index := 0
+         * length = nkeys(4) - index(0) - 1 = 3;
+         * 
+         * Remove(3):
+         * index := 2;
+         * length = nkeys(4) - index(2) - 1 = 1;
+         * 
+         * Remove(4):
+         * index := 3
+         * length = nkeys(4) - index(3) - 1 = 0;
+         * 
+         * Given: 
+         * keys : [ 1      ]
+         * vals : [ a      ]
+         * 
+         * Remove(1):
+         * index := 0
+         * length = nkeys(1) - index(0) - 1 = 0;
          */
 
-        final int length = nkeys - index;
+        /*
+         * Copy down to cover up the hole.
+         */
+        final int length = nkeys - index - 1;
 
         if (length > 0) {
 
@@ -509,14 +558,18 @@ public class Leaf extends AbstractNode {
 
             System.arraycopy(values, index + 1, values, index, length);
 
-        } else {
-
-            keys[index] = IBTree.NEGINF;
-
-            values[index] = null;
-
         }
 
+        /* 
+         * Erase the key/value that was exposed by this operation.
+         */
+        keys[ nkeys-1 ] = IBTree.NEGINF;
+        values[ nkeys-1 ] = null;
+
+        // One less key in the leaf.
+        nkeys--;
+        
+        // One less entry in the tree.
         btree.nentries--;
 
         return entry;
@@ -563,9 +616,14 @@ public class Leaf extends AbstractNode {
 
     public boolean dump(PrintStream out, int height, boolean recursive) {
 
-        // True iff we will write out the node structure.
-        final boolean debug = BTree.dumpLog.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+        return dump(BTree.dumpLog.getEffectiveLevel(), out, height, recursive);
 
+    }
+     
+    public boolean dump(Level level, PrintStream out, int height, boolean recursive) {
+
+        boolean debug = level.toInt() <= Level.DEBUG.toInt();
+        
         // Set to false iff an inconsistency is detected.
         boolean ok = true;
 

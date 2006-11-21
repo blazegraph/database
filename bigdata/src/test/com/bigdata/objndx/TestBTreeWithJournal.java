@@ -122,6 +122,8 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             final int nscan = 10;
 
             BTree btree = new BTree(journal, branchingFactor,
+                    DefaultNodeSplitPolicy.INSTANCE,
+                    DefaultLeafSplitPolicy.INSTANCE,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             leafQueueCapacity, nscan),
                     new SimpleEntry.Serializer());

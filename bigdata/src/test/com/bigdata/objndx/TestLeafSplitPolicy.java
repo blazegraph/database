@@ -42,64 +42,74 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 20, 2006
  */
 
 package com.bigdata.objndx;
 
+
 /**
- * An adaptive split policy splits the leaf at m/2, where m is the
- * branchingFactor or higher if the keys in the leaf are either nearly or
- * completely dense. In those cases it is impossible / improbable that the
- * openings created by splitting and m/2 would ever be filled and splitting high
- * will result in a more compact tree.
+ * FIXME write tests for {@link DefaultLeafSplitPolicy}. Those tests should
+ * verify the math using simple examples and also assess the impact on the
+ * utilization in leaves under "near sequential" and "random but asymptotic to
+ * dense sequential" key insertion scenariors.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultLeafSplitPolicy implements ILeafSplitPolicy {
+public class TestLeafSplitPolicy extends AbstractBTreeTestCase {
 
-    private DefaultLeafSplitPolicy() {
-        
+    /**
+     * 
+     */
+    public TestLeafSplitPolicy() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestLeafSplitPolicy(String name) {
+        super(name);
     }
     
-    /**
-     * Singleton.
-     */
-    public static final ILeafSplitPolicy INSTANCE = new DefaultLeafSplitPolicy();
-    
-    /**
-     * Splits at m/2, where m is the maximum #of key / values for the leaf.
-     */
-    public int splitLeafAt(Leaf leaf) {
-
-        final int m = leaf.branchingFactor;
+    public void test_simpleSplitRule01() {
         
-        final int nkeys = leaf.nkeys;
-        
-        // the largest key for the leaf.
-        final int high = leaf.keys[nkeys-1];
-        
-        // the smallest key for the leaf.
-        final int low = leaf.keys[0];
+        ILeafSplitPolicy splitter = SimpleLeafSplitPolicy.INSTANCE;
         
         /*
-         * The #of unused keys in the leaf. When zero, the keys in the leaf are
-         * dense and it is not possible to insert another key into the leaf
-         * because there are no key that could be directed to the leaf that are
-         * not already in use by the leaf.
+         * @todo Create a btree with a branching factor.
+         * 
+         * @todo populate the root leaf with known keys.
+         * 
+         * @todo verify the computed split index.
          */
-        final int nfree = high - low;
-
-        // standard practice.
-        final int splitLow = m >> 1;
         
-        final int splitHigh = m - nfree - 1;
-        
-        if( splitHigh > splitLow ) return splitHigh;
-        
-        return splitLow;
-
     }
 
+    public void test_defaultSplitRule01() {
+        
+        ILeafSplitPolicy splitter = DefaultLeafSplitPolicy.INSTANCE;
+        
+        /*
+         * @todo Create a btree with a branching factor.
+         * 
+         * @todo populate the root leaf with known keys.  choose examples that
+         * are dense and that are sparse.
+         * 
+         * @todo verify the computed split index.
+         */
+        
+    }
+
+    /**
+     * @todo compare utilization with the simple and default leaf split rules
+     *       for sequential key insertion, near sequential key insertion, and a
+     *       pattern that reflects the expected assignment of persistent
+     *       identifiers for bigdata read-optimized database pages.
+     * 
+     */
+    public void test_defaultSplitRule02() {
+    
+    }
+    
 }

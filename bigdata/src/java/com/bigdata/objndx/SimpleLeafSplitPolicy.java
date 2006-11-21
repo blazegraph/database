@@ -42,57 +42,32 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 20, 2006
  */
+
 package com.bigdata.objndx;
 
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-
 /**
- * Visits the direct children of a node in the external key ordering.
+ * Splits the leaf at m/2 where m is the branching factor.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write tests for this.
  */
-class ChildIterator implements Iterator<AbstractNode> {
+public class SimpleLeafSplitPolicy implements ILeafSplitPolicy {
 
-    private final Node node;
-
-    private int index = 0;
-
-    public ChildIterator(Node node) {
-
-        assert node != null;
-
-        this.node = node;
-
+    private SimpleLeafSplitPolicy() {
+        
     }
+    
+    /**
+     * Singleton.
+     */
+    public static final ILeafSplitPolicy INSTANCE = new SimpleLeafSplitPolicy();
 
-    public boolean hasNext() {
-
-        // Note: nchildren == nkeys+1 for a Node.
-        return index <= node.nkeys;
-
-    }
-
-    public AbstractNode next() {
-
-        if (!hasNext()) {
-
-            throw new NoSuchElementException();
-
-        }
-
-        return node.getChild(index++);
-    }
-
-    public void remove() {
-
-        throw new UnsupportedOperationException();
-
+    public int splitLeafAt(Leaf leaf) {
+        
+        return leaf.branchingFactor >> 1;
+        
     }
 
 }

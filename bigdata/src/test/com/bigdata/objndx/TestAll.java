@@ -36,12 +36,15 @@ public class TestAll extends TestCase {
 
         // test utility classes.
         suite.addTestSuite( TestSearch.class );
-        // test basic tree operations. @todo add tests of delete.
-        suite.addTestSuite( TestSimpleBTree.class );
+        // test the split rule for a leaf.
+        suite.addTestSuite( TestLeafSplitPolicy.class );
+        // test basic tree operations (insert, lookup, remove, and split).
+        suite.addTestSuite( TestBTree.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
-        // test serialization
+        // test index entry serialization
         suite.addTestSuite( TestIndexEntrySerializer.class );
+        // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
         // test the commit protocol w/o incremental leaf eviction @todo expand tests.
         suite.addTestSuite( TestCommit.class );

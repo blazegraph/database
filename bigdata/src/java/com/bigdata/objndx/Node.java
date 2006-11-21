@@ -273,7 +273,7 @@ public class Node extends AbstractNode {
          * fields to the new node. Stealing the parent means that the node MUST
          * NOT be used by its previous ancestor (our source node for this copy).
          * 
-         * @todo Since the node state is unchanged (it is immutable) the slick
+         * Note: Since the node state is unchanged (it is immutable) a slick
          * trick would be to wrap the state node with a flyweight node having a
          * different parent so that the node remained valid for its old parent.
          * This probably means making getParent() abstract and moving the parent
@@ -467,14 +467,17 @@ public class Node extends AbstractNode {
      *            The external key.
      * @param entry
      *            The value.
+     * 
+     * @return The previous value or <code>null</code> if the key was not
+     *         found.
      */
-    public void insert(int key, Object entry) {
+    public Object insert(int key, Object entry) {
 
         int index = findChild(key);
 
         AbstractNode child = getChild(index);
 
-        child.insert(key, entry);
+        return child.insert(key, entry);
 
     }
 
@@ -512,39 +515,48 @@ public class Node extends AbstractNode {
      * 
      * The interpretation of the key index for a node is as follows. When
      * searching nodes of the tree, we search for the index in keys[] of the
-     * first key value greater than or equal (GTE) to the probe key and then
-     * choose the child having the same index as the GTE key match. For
-     * example,
+     * first key value greater than or equal (GTE) to the probe key. If the
+     * match is equal, then we choose the child at index + 1. Otherwise we
+     * choose the child having the same index as the GTE key match. For example,
      * 
      * <pre>
      * keys[]  : [ 5 9 12 ]
      * child[] : [ a b  c  d ]
      * </pre>
      * 
-     * A probe with keys up to <code>5</code> matches at index zero (0)
-     * and we choose the 1st child, a, which is at index zero (0).
+     * A probe with keys up to <code>4</code> matches at index zero (0) and we
+     * choose the 1st child, a, which is at index zero (0).
      * 
-     * A probe with keys in [6:9] matches at index one (1) and we choose the
-     * 2nd child, b, which is at index one (1).
+     * A probe whose key is <code>5</code> matches at index zero (0) exactly
+     * and we choose the child at <code>index + 1</code>, b, which is at
+     * index one (1).
      * 
-     * A probe with keys in [10:12] matches at index two (2) and we choose
-     * the 3rd child, c, which is at index two (2).
+     * A probe with keys in [6:8] matches at index one (1) and we choose the 2nd
+     * child, b, which is at index one (1). A probe with <code>9</code> also
+     * matches at index one (1), but we choose <code>index+1</code> equals two
+     * (2) since this is an exact key match.
      * 
-     * A probe with keys greater than 12 exceeds all keys in the node and
-     * always matches the last child in that node. In this case, d, which is
-     * at index three (3).
+     * A probe with keys in [10:11] matches at index two (2) and we choose the
+     * 3rd child, c, which is at index two (2). A probe with <code>12</code>
+     * also matches at index two (2), but we choose <code>index+1</code>
+     * equals three (3) since this is an exact key match.
      * 
-     * Note that we never stop a search on a node, even when there is an
-     * exact match on a key. All values are stored in the leaves and we
-     * always descend until we reach the leaf in which a value for the key
-     * would be stored. A test on the keys of that leaf is then conclusive -
-     * either a value is stored in the leaf for that key or it is not stored
-     * in the tree.
+     * A probe with keys greater than 12 exceeds all keys in the node and always
+     * matches the last child in that node. In this case, d, which is at index
+     * three (3).
+     * 
+     * Note that we never stop a search on a node, even when there is an exact
+     * match on a key. All values are stored in the leaves and we always descend
+     * until we reach the leaf in which a value for the key would be stored. A
+     * test on the keys of that leaf is then conclusive - either a value is
+     * stored in the leaf for that key or it is not stored in the tree.
      * 
      * @param key
      *            The probe (an external key).
      * 
      * @return The child to be searched next for that key.
+     * 
+     * @see TestBTree#test_node_findChild()
      */
     public int findChild(int key) {
 
@@ -553,10 +565,10 @@ public class Node extends AbstractNode {
         if (index >= 0) {
 
             /*
-             * exact match.
+             * exact match - use the next child.
              */
 
-            return index;
+            return index + 1;
 
         } else {
 
@@ -610,10 +622,6 @@ public class Node extends AbstractNode {
      * 
      * @see INodeSplitPolicy
      * @see BTree#nodeSplitter
-     * 
-     * @todo Review copyOnWrite triggers when splitting a node. Basically,
-     *       everything up to the root will need to be mutable even if the split
-     *       does not reach that high.
      */
     protected AbstractNode split() {
 
@@ -805,32 +813,17 @@ public class Node extends AbstractNode {
         /*
          * copy down per-key data.
          */
-        final int keyCount = nkeys - index;
+        final int length = nkeys - index;
 
-        if (keyCount > 0)
-            System.arraycopy(keys, index, keys, index + 1, keyCount);
-
-        /*
-         * Note: This is equivilent to (nkeys + 1) - (index+1). (nkeys+1) is
-         * equivilent to nchildren while (index+1) is the position at which
-         * the new child reference is written. So, childCount == keyCount.
-         * 
-         * @todo Refactor to use only one [count/length] parameter and
-         * update comments.  Avoid invoking the copy operation when the count
-         * is zero.
-         */
-        final int childCount = nkeys - index;
+        if (length > 0)
+            System.arraycopy(keys, index, keys, index + 1, length);
 
         /*
          * copy down per-child data. #children == nkeys+1. child[0] is
          * always defined.
          */
-        System
-                .arraycopy(childKeys, index + 1, childKeys, index + 2,
-                        childCount);
-        System
-                .arraycopy(childRefs, index + 1, childRefs, index + 2,
-                        childCount);
+        System.arraycopy(childKeys, index + 1, childKeys, index + 2, length);
+        System.arraycopy(childRefs, index + 1, childRefs, index + 2, length);
 
         /*
          * Insert key at index.
@@ -942,12 +935,25 @@ public class Node extends AbstractNode {
     private Iterator postOrderIterator1(final boolean dirtyNodesOnly) {
 
         /*
-         * Iterator visits the direct children, expanding them in turn with
-         * a recursive application of the post-order iterator.
+         * Iterator visits the direct children, expanding them in turn with a
+         * recursive application of the post-order iterator.
+         * 
+         * When dirtyNodesOnly is true we use a child iterator that makes a best
+         * effort to only visit dirty nodes. Especially, the iterator MUST NOT
+         * force children to be loaded from disk if the are not resident since
+         * dirty nodes are always resident.
+         * 
+         * In order to guarentee that a node will still be dirty by the time
+         * that the caller visits it the iterator must touch the node, thereby
+         * placing it into the appropriate hard reference queue and incrementing
+         * its reference counter. Evictions do NOT cause IO when the reference
+         * is non-zero, so the node will not be made persistent as a result of
+         * other node touches. However, the node can still be made persistent if
+         * the caller explicitly writes the node onto the store.
          */
 
         // BTree.log.debug("node: " + this);
-        return new Striterator(childIterator()).addFilter(new Expander() {
+        return new Striterator(childIterator(dirtyNodesOnly)).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -1002,17 +1008,34 @@ public class Node extends AbstractNode {
 
     /**
      * Iterator visits the direct child nodes in the external key ordering.
+     * 
+     * @param dirtyNodesOnly
+     *            When true, only the direct dirty child nodes will be visited.
      */
-    public Iterator childIterator() {
+    public Iterator childIterator(boolean dirtyNodesOnly) {
 
-        return new ChildIterator(this);
+        if( dirtyNodesOnly ) {
+            
+            return new DirtyChildIterator(this);
+            
+        } else {
+            
+            return new ChildIterator(this);
+            
+        }
 
     }
 
     public boolean dump(PrintStream out, int height, boolean recursive) {
+
+        return dump(BTree.dumpLog.getEffectiveLevel(), out, height, recursive);
+
+    }
+    
+    public boolean dump(Level level, PrintStream out, int height, boolean recursive) {
         
         // True iff we will write out the node structure.
-        final boolean debug = BTree.dumpLog.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+        final boolean debug = level.toInt() <= Level.DEBUG.toInt();
 
         // Set true iff an inconsistency is detected.
         boolean ok = true;
@@ -1348,7 +1371,7 @@ public class Node extends AbstractNode {
 
                 }
 
-                if (!child.dump(out, height + 1, true)) {
+                if (!child.dump(level, out, height + 1, true)) {
 
                     ok = false;
 

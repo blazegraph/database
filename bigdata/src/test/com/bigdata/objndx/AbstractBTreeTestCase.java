@@ -374,7 +374,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * with the knowledge that there should always be a hard reference to a
      * child or parent.
      * 
-     * The {@link IValueSerializer} will also throw exception if invoked.
+     * The {@link IValueSerializer} will throw an exception if invoked.
+     * 
+     * The {@link SimpleLeafSplitPolicy} is used.
      * 
      * @param branchingFactor
      *            The branching factor.
@@ -388,6 +390,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         final int nscan = 10;
 
         BTree btree = new BTree(store, branchingFactor,
+                DefaultNodeSplitPolicy.INSTANCE,
+                SimpleLeafSplitPolicy.INSTANCE,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan), new SimpleEntry.NoSerializer());
 

@@ -98,6 +98,11 @@ public class TestEviction extends AbstractBTreeTestCase {
      * triggers copy-on-write, and validates the post-conditions, including the
      * logic used to steal clean children from a cloned node.
      * </p>
+     * 
+     * @todo The manner in which the {@link BTree#leafQueue} is used has been
+     *       changed somewhat since I wrote this test and the test needs to be
+     *       updated. One way to do that is to do incremental writes by hand
+     *       rather than through the eviction mechanism.
      */
     public void test_leafEviction01() {
 
@@ -127,6 +132,8 @@ public class TestEviction extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(store, branchingFactor,
+                DefaultNodeSplitPolicy.INSTANCE,
+                DefaultLeafSplitPolicy.INSTANCE,
                 leafQueue, new SimpleEntry.Serializer());
         
         // The hard reference queue.
@@ -285,7 +292,10 @@ public class TestEviction extends AbstractBTreeTestCase {
         final long metadataId0 = btree.commit();
 
         // verify that we can reload the tree.
-        new BTree(btree.store, metadataId0, new HardReferenceQueue<PO>(
+        new BTree(btree.store, metadataId0,
+                DefaultNodeSplitPolicy.INSTANCE,
+                DefaultLeafSplitPolicy.INSTANCE,
+                new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(), leafQueueCapacity, nscan),
                 new SimpleEntry.Serializer());
         

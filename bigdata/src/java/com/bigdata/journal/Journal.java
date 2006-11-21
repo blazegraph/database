@@ -364,6 +364,15 @@ import java.util.Properties;
  * structure that models a keyrange as sorted data on disk, i.e., the rows are
  * arranged in sorted order. As far as I can tell, these become the same thing
  * when a row is an index node is a sufficiently large page.
+ * 
+ * FIXME Consider a journal that combines log information destined for multiple
+ * segments on the same host. With one journal per segment, we have sequential
+ * access per journal but the head must seek from one journal to the next. With
+ * one journal for N segments, there is less head seek time. This probably does
+ * NOT make the basic concurrency control logic any more complex, but it
+ * probably does make it more complex to move a segment from one host to
+ * another. That can be handled by differentiating the host on which the data
+ * resides on disk from the host serving requests for a segment.
  */
 
 public class Journal implements IRawStore, IStore {

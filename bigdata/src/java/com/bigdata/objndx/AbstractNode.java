@@ -50,6 +50,8 @@ import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -163,11 +165,8 @@ public abstract class AbstractNode extends PO {
         /*
          * The parent is allowed to be null iff this is the root of the
          * btree.
-         * 
-         * FIXME Restore this assertion - it is commented out to allow
-         * the {@link TestNodeSerializer} to run.
          */
-//        assert (this == btree.root && p == null) || p != null;
+        assert (this == btree.root && p == null) || p != null;
 
         return p;
 
@@ -476,17 +475,20 @@ public abstract class AbstractNode extends PO {
     abstract protected AbstractNode split();
 
     /**
-     * Recursive search locates the approprate leaf and inserts the entry
-     * under the key. The leaf is split iff necessary. Splitting the leaf
-     * can cause splits to cascade up towards the root. If the root is split
-     * then the total depth of the tree is inceased by one.
+     * Recursive search locates the approprate leaf and inserts the entry under
+     * the key. The leaf is split iff necessary. Splitting the leaf can cause
+     * splits to cascade up towards the root. If the root is split then the
+     * total depth of the tree is inceased by one.
      * 
      * @param key
      *            The external key.
      * @param entry
      *            The value.
+     * 
+     * @return The previous value or <code>null</code> if the key was not
+     *         found.
      */
-    abstract public void insert(int key, Object entry);
+    abstract public Object insert(int key, Object entry);
 
     /**
      * Recursive search locates the appropriate leaf and removes and returns
@@ -520,13 +522,30 @@ public abstract class AbstractNode extends PO {
      */
     public boolean dump(PrintStream out) {
 
-        return dump(out, 0, false);
+        return dump(BTree.dumpLog.getEffectiveLevel(), out, 0, false);
 
     }
+
+//    /**
+//     * Dump the data onto the {@link PrintStream}.
+//     * 
+//     * @param out
+//     *            Where to write the dump.
+//     * @param height
+//     *            The height of this node in the tree.
+//     * @param recursive
+//     *            When true, the node will be dumped recursively using a
+//     *            pre-order traversal.
+//     *            
+//     * @return True unless an inconsistency was detected.
+//     */
+//    abstract public boolean dump(PrintStream out, int height, boolean recursive);
 
     /**
      * Dump the data onto the {@link PrintStream}.
      * 
+     * @param level
+     *            The logging level.
      * @param out
      *            Where to write the dump.
      * @param height
@@ -534,10 +553,10 @@ public abstract class AbstractNode extends PO {
      * @param recursive
      *            When true, the node will be dumped recursively using a
      *            pre-order traversal.
-     *            
+     * 
      * @return True unless an inconsistency was detected.
      */
-    abstract public boolean dump(PrintStream out, int height, boolean recursive);
+    abstract public boolean dump(Level level, PrintStream out, int height, boolean recursive);
 
     /**
      * Returns a string that may be used to indent a dump of the nodes in

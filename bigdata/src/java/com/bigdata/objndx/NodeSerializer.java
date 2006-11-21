@@ -81,8 +81,9 @@ import com.bigdata.journal.ISlotAllocation;
  * @todo Compute the #of shared bytes (common prefix) for the low and high key,
  *       write that prefix once, and then mask off that prefix for each key
  *       written. This should substantially reduce the space required to write
- *       the keys - even though the bulk of the space is dedicted to values not
- *       keys.
+ *       the keys.  Review the rest of the serialized form and see if there are
+ *       other opportunities to pack things down (e.g., node references can be
+ *       packed just like we are doing in {@link IndexEntrySerializer}).
  * 
  * @todo Modify the test helpers to generate random nodes by splitting two
  *       random leaves and assigning those leaves persistent identity and

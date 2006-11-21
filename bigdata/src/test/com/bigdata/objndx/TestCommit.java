@@ -98,6 +98,8 @@ public class TestCommit extends TestCase2 {
         {
 
             BTree btree = new BTree(store, branchingFactor,
+                    DefaultNodeSplitPolicy.INSTANCE,
+                    DefaultLeafSplitPolicy.INSTANCE,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_LEAF_CACHE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),
@@ -124,6 +126,8 @@ public class TestCommit extends TestCase2 {
 
             // Load the tree.
             BTree btree = new BTree(store, metadataId,
+                    DefaultNodeSplitPolicy.INSTANCE,
+                    DefaultLeafSplitPolicy.INSTANCE,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_LEAF_CACHE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),
@@ -151,6 +155,8 @@ public class TestCommit extends TestCase2 {
 
             // Load the tree.
             BTree btree = new BTree(store, metadataId,
+                    DefaultNodeSplitPolicy.INSTANCE,
+                    DefaultLeafSplitPolicy.INSTANCE,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_LEAF_CACHE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),

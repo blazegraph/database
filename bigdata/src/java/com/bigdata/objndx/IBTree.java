@@ -94,7 +94,7 @@ public interface IBTree {
      * The #of entries (aka values) in the btree. This is zero (0) for a new
      * btree.
      */
-    public int getEntryCount();
+    public int size();
 
     /**
      * The object responsible for (de-)serializing the nodes and leaves of the
@@ -133,8 +133,16 @@ public interface IBTree {
 
     /**
      * Insert an entry under the external key.
+     * 
+     * @param key
+     *            The external key.
+     * @param entry
+     *            The value.
+     *            
+     * @return The previous entry under that key or <code>null</code> if the
+     *         key was not found.
      */
-    public void insert(int key, Object entry);
+    public Object insert(int key, Object entry);
 
     /**
      * Lookup an entry for an external key.

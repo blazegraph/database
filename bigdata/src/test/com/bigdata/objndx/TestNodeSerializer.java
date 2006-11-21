@@ -243,6 +243,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final int nscan = 10;
 
         BTree btree = new BTree(store, branchingFactor,
+                DefaultNodeSplitPolicy.INSTANCE,
+                DefaultLeafSplitPolicy.INSTANCE,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan), new IndexEntrySerializer(store
                         .getSlotMath()));

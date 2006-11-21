@@ -89,6 +89,8 @@ class SimpleEntry {
         
         if( this == o ) return true;
         
+        if( o == null ) return false;
+        
         return id == ((SimpleEntry)o).id;
         
     }
