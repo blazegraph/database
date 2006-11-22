@@ -65,7 +65,7 @@ import com.bigdata.journal.SlotMath;
 /**
  * <p>
  * BTree encapsulates metadata about the persistence capable index, but is not
- * itself a persistent object.  This class is somewhat specialized for its role
+ * itself a persistent object. This class is somewhat specialized for its role
  * as an object index.
  * </p>
  * <p>
@@ -91,6 +91,13 @@ import com.bigdata.journal.SlotMath;
  * incoherent traversal whether or not they result in addition or removal of
  * nodes in the tree.
  * </p>
+ * 
+ * FIXME add counters, nano timers, and track storage used by the object index.
+ * The goal is to know how much of the time of the server is consumed by the
+ * object index, what percentage of the store is dedicated to the object index,
+ * how expensive it is to do some scan-based operations (merged down, delete of
+ * transactional isolated persistent index), and evaluate the buffer strategy by
+ * comparing accesses with IOs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -507,6 +514,8 @@ public class BTree implements IBTree {
         
         assert root.isDirty();
         
+        assert ! root.isDeleted();
+
         assert ! root.isPersistent();
         
         /*
@@ -579,6 +588,7 @@ public class BTree implements IBTree {
         assert node != null;
         assert node.btree == this;
         assert node.isDirty();
+        assert !node.isDeleted();
         assert !node.isPersistent();
 
         /*
@@ -867,6 +877,20 @@ public class BTree implements IBTree {
 
         return write();
 
+    }
+    
+    /**
+     * Delete all nodes and leaves in this btree.
+     * 
+     * FIXME We need an iterator that visits only the nodes since we do not need
+     * to fetch the leaves in order to delete them. The order does not matter if
+     * we delete all at once. However, this might introduce latency when the
+     * object index for a historical transaction is reclaimed.
+     */
+    public void delete() {
+        
+        throw new UnsupportedOperationException();
+        
     }
 
 }

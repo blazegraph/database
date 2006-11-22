@@ -64,6 +64,30 @@ import com.bigdata.journal.SimpleObjectIndex;
  * test the journal using the persistence capable object index and not just the
  * {@link SimpleObjectIndex}.
  * 
+ * @todo Review the logic that isolations mutations on the object index. For
+ *       example, a delete of an object does not remove an entry from the base
+ *       object index but rather records that the object is marked as deleted in
+ *       that entry. When the isolated object index is merged down onto the
+ *       global object index entries for objects that are marked as deleted are
+ *       then deleted on the global index. When the transaction commits, the
+ *       state change in the global index is atomically committed.
+ * 
+ * @todo Verify that we cause the storage allocated to the object index to be
+ *       released when it is not longer accessible, e.g., the transaction
+ *       commits or objects have been deleted and are no longer visible so we
+ *       now remove their entries from the object index -- this can cause leaves
+ *       and nodes in the object index to become empty, at which point they are
+ *       deleted.
+ * 
+ * @todo Consider whether a call back "IValueSetter" would make it possible to
+ *       update the value on the leaf in a more sophisticated manner. E.g.,
+ *       rather than having to lookup to see if a value exists and then insert
+ *       the value, we could pass in a lamba expression that gets evaluated in
+ *       context and is able to distinguish between a value that did not exist
+ *       and one that does exist. Ideally we could offer three options at that
+ *       point : test, set, and delete, but just test/set is fine for most
+ *       purposes since remove(key) has the same effect.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

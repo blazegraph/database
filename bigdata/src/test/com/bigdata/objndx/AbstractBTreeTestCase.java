@@ -47,7 +47,12 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
+import java.util.TreeMap;
+
+import org.apache.log4j.Level;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
@@ -1164,4 +1169,196 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
 
+
+    /**
+     * Stress test helper performs random inserts, removal and lookup operations
+     * and compares the behavior of the {@link BTree} against ground truth as
+     * tracked by a {@link TreeMap}.
+     * 
+     * Note: This test uses dense keys, but that is not a requirement.
+     * 
+     * @param m
+     *            The branching factor
+     * @param nkeys
+     *            The #of distinct keys.
+     * @param ntrials
+     *            The #of trials.
+     * 
+     * FIXME add logic to validate that we do not wind up with empty nodes or
+     *       empty leaves.
+     */
+    public void doInsertLookupRemoveStressTest(int m,int nkeys,int ntrials) {
+        
+        Integer[] keys = new Integer[nkeys];
+        
+        SimpleEntry[] vals = new SimpleEntry[nkeys];
+
+        for( int i=0; i<nkeys; i++ ) {
+            
+            keys[i] = i+1; // Note: this produces dense keys with origin ONE(1).
+            
+            vals[i] = new SimpleEntry();
+            
+        }
+        
+        final BTree btree = getBTree(m);
+
+        /*
+         * Run test.
+         */
+        Map<Integer,SimpleEntry> expected = new TreeMap<Integer,SimpleEntry>();
+        
+        for( int i=0; i<ntrials; i++ ) {
+            
+            boolean insert = r.nextBoolean();
+            
+            int index = r.nextInt(nkeys);
+            
+            Integer key = keys[index];
+            
+            SimpleEntry val = vals[index];
+            
+            if( insert ) {
+                
+//                System.err.println("insert("+key+", "+val+")");
+                SimpleEntry old = expected.put(key, val);
+                
+                SimpleEntry old2 = (SimpleEntry) btree.insert(key.intValue(), val);
+                
+//                btree.dump(Level.DEBUG,System.err);
+                
+                assertEquals(old, old2);
+
+            } else {
+                
+//                System.err.println("remove("+key+")");
+                SimpleEntry old = expected.remove(key);
+                
+                SimpleEntry old2 = (SimpleEntry) btree.remove(key.intValue());
+                
+//                btree.dump(Level.DEBUG,System.err);
+                
+                assertEquals(old, old2);
+                
+            }
+
+            if( i % 100 == 0 ) {
+
+                /*
+                 * Validate the keys and entries.
+                 */
+                
+                assertEquals("#entries", expected.size(), btree.size());
+                
+                Iterator<Map.Entry<Integer,SimpleEntry>> itr = expected.entrySet().iterator();
+                
+                while( itr.hasNext()) { 
+                    
+                    Map.Entry<Integer,SimpleEntry> entry = itr.next();
+                    
+                    assertEquals("lookup(" + entry.getKey() + ")", entry
+                            .getValue(), btree
+                            .lookup(entry.getKey().intValue()));
+                    
+                }
+                
+            }
+            
+        }
+        
+        assertTrue( btree.dump(System.err) );
+        
+    }
+
+    /**
+     * Stress test for building up a tree and then removing all keys in a random
+     * order. The test populates a btree with enough keys to split the root leaf
+     * at least once then verifies that delete correctly removes each keys and
+     * any unused leaves and finally replaces the root node with a root leaf.
+     * All inserted keys are eventually deleted by this test and the end state
+     * is an empty btree of height zero(0) having a single root leaf.
+     */
+    public void doRemoveStructureStressTest(int m, int nkeys) {
+        
+        BTree btree = getBTree(m);
+        
+        Integer[] keys = new Integer[nkeys];
+        
+        SimpleEntry[] vals = new SimpleEntry[nkeys];
+
+        for( int i=0; i<nkeys; i++ ) {
+            
+            keys[i] = i+1; // Note: this produces dense keys with origin ONE(1).
+            
+            vals[i] = new SimpleEntry();
+            
+        }
+        
+        /*
+         * populate the btree.
+         */
+        for( int i=0; i<nkeys; i++) {
+            
+            // lookup does not find key.
+            assertNull(btree.insert(keys[i], vals[i]));
+            
+            // insert key and val.
+            assertEquals(vals[i],btree.lookup(keys[i]));
+
+            // reinsert finds key and returns existing value.
+            assertEquals(vals[i],btree.insert(keys[i], vals[i]));
+
+            assertEquals("size", i + 1, btree.size());
+            
+        }
+        
+        /*
+         * verify the total order.
+         */
+        assertSameIterator(vals, btree.getRoot().entryIterator());
+        
+        assertTrue(btree.dump(Level.DEBUG,System.out));
+        
+        /*
+         * Remove the keys one by one, verifying that leafs are deallocated
+         */
+        
+        int[] order = getRandomOrder(nkeys);
+        
+        for( int i=0; i<nkeys; i++ ) {
+
+            int key = keys[order[i]];
+            
+            SimpleEntry val = vals[order[i]];
+            
+            System.err.println("i="+i+", key="+key+", val="+val);
+            
+            // lookup finds the key, return the correct value.
+            assertEquals("lookup("+key+")", val,btree.lookup(key));
+            
+            // remove returns the existing key.
+            assertEquals("remove(" + key+")", val, btree.remove(key));
+            
+            // verify structure.
+            assertTrue(btree.dump(Level.ERROR,System.out));
+
+            // lookup no longer finds the key.
+            assertNull("lookup("+key+")",btree.lookup(key));
+
+        }
+        
+        /*
+         * Verify the post-condition for the tree, which is an empty root leaf.
+         * If the height, #of nodes, or #of leaves are reported incorrectly then
+         * empty leaves probably were not removed from the tree or the root node
+         * was not converted into a root leaf when the tree reached m entries.
+         */
+        assertTrue(btree.dump(Level.DEBUG,System.out));
+        assertEquals("#entries", 0, btree.nentries);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("height", 0, btree.height);
+
+    }
+    
 }

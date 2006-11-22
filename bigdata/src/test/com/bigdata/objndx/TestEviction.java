@@ -102,7 +102,8 @@ public class TestEviction extends AbstractBTreeTestCase {
      * @todo The manner in which the {@link BTree#leafQueue} is used has been
      *       changed somewhat since I wrote this test and the test needs to be
      *       updated. One way to do that is to do incremental writes by hand
-     *       rather than through the eviction mechanism.
+     *       rather than through the eviction mechanism.  I also need to think
+     *       about a test for incremental node eviction.
      */
     public void test_leafEviction01() {
 

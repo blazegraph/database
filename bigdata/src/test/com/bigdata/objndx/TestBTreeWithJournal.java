@@ -231,5 +231,45 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
         }
         
     }
+
+    /**
+     * Stress test of insert, removal and lookup of keys in the tree (allows
+     * splitting of the root leaf).
+     */
+    public void test_insertLookupRemoveKeyTreeStressTest() {
+
+        int nkeys = 5000;
+        
+        int ntrials = 50000;
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+
+            if( m == 3 ) continue;  // FIXME fenceposts at m == 3.
+            doInsertLookupRemoveStressTest(m, nkeys, ntrials);
+            
+        }
+
+    }
     
+    /**
+     * Stress test for building up a tree and then removing all keys in a random
+     * order.
+     */
+    public void test_stress_removeStructure() {
+       
+        int nkeys = 5000;
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+            
+            if( m == 3 ) continue;  // FIXME fenceposts at m == 3.
+            doRemoveStructureStressTest(m,nkeys);
+            
+        }
+
+    }
+
 }

@@ -473,16 +473,16 @@ public class Leaf extends AbstractNode {
     }
 
     /**
-     * If the key is found on this leaf, then ensures that the leaf is
-     * mutable and removes the key and value.
+     * If the key is found on this leaf, then ensures that the leaf is mutable
+     * and removes the key and value.
      * 
      * @param key
      *            The external key.
      * 
      * @return The value stored under that key or null.
      * 
-     * @todo Write unit tests for maintaining the tree in balance as entries
-     *       are removed.
+     * @todo This implementation does not maintain the tree in balance. Research
+     *       what is involved to do that.
      */
     public Object remove(int key) {
 
@@ -571,7 +571,23 @@ public class Leaf extends AbstractNode {
         
         // One less entry in the tree.
         btree.nentries--;
+        assert btree.nentries >= 0;
 
+        if( nkeys == 0 && btree.root != this ) {
+                
+            /*
+             * The leaf is empty and this is not the root of the tree. We need
+             * to detach the leaf from its parent node and then delete the leaf
+             * from the store.
+             * 
+             * Note: We do not trigger copy-on-write here since leaf is mutable
+             * therefore all ancestors of the leaf MUST be mutable.
+             */
+            
+            getParent().removeChild(this);
+            
+        }
+        
         return entry;
 
     }
@@ -668,6 +684,19 @@ public class Leaf extends AbstractNode {
             
         }
 
+        /*
+         * FIXME uncomment this once we keep the tree balanced during deletes.
+         * Without maintaining the tree in balance we wind up deleting leaves
+         * from the bottom up, with the consequence that not all leaves are at
+         * the same height.
+         */
+        
+//        if( height != btree.height ) {
+//            
+//            out.println("WARN: height="+height+", but btree height="+btree.height);
+//            
+//        }
+        
         return ok;
 
     }

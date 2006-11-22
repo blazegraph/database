@@ -69,6 +69,16 @@ public class DefaultEvictionListener implements
         
         if (--node.referenceCount == 0) {
 
+            if( node.isDeleted() ) {
+                
+                /*
+                 * Deleted nodes are ignored as the are evicted from the queue.
+                 */
+                
+                return;
+                
+            }
+            
             if (node.isDirty()) {
 
                 if (node.isLeaf()) {

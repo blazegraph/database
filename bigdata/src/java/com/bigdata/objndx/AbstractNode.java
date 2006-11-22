@@ -143,6 +143,28 @@ public abstract class AbstractNode extends PO {
      */
     protected int referenceCount = 0;
 
+    public void delete() {
+        
+        if( deleted ) {
+            
+            throw new IllegalStateException();
+            
+        }
+
+        if( identity != NULL ) {
+            
+            /*
+             * Deallocate the object on the store.
+             */
+
+            btree.store.delete(btree.asSlots(identity));
+            
+        }
+        
+        deleted = true;
+        
+    }
+
     /**
      * The parent iff the node has been added as the child of another node
      * and the parent reference has not been cleared.

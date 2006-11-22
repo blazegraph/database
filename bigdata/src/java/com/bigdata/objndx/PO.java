@@ -63,16 +63,30 @@ abstract public class PO implements IIdentityAccess, IDirty {
      */
     transient protected long identity = NULL;
 
+    /**
+     * True iff the object is deleted.
+     */
+    transient protected boolean deleted = false;
+    
     public boolean isPersistent() {
 
         return identity != NULL;
 
     }
 
+    public boolean isDeleted() {
+        
+        return deleted;
+        
+    }
+    
     public long getIdentity() throws IllegalStateException {
 
-        if (identity == NULL)
+        if (identity == NULL) {
+            
             throw new IllegalStateException();
+
+        }
 
         return identity;
 
@@ -91,11 +105,23 @@ abstract public class PO implements IIdentityAccess, IDirty {
      */
     void setIdentity(long key) throws IllegalStateException {
 
-        if (key == NULL)
-            throw new IllegalArgumentException();
+        if (key == NULL) {
 
-        if (this.identity != NULL)
-            throw new IllegalStateException();
+            throw new IllegalArgumentException();
+            
+        }
+
+        if (this.identity != NULL) {
+
+            throw new IllegalStateException("Object already persistent");
+            
+        }
+        
+        if( this.deleted) {
+            
+            throw new IllegalStateException("Object is deleted");
+            
+        }
 
         this.identity = key;
 
@@ -122,17 +148,30 @@ abstract public class PO implements IIdentityAccess, IDirty {
 
     /**
      * Extends the basic behavior to display the persistent identity of the
-     * object iff the object is persistent.
+     * object iff the object is persistent and to mark objects that have been
+     * deleted.
      */
     public String toString() {
 
+        final String s;
+        
         if (identity != NULL) {
 
-            return super.toString() + "#" + identity;
+            s = super.toString() + "#" + identity;
 
         } else {
 
-            return super.toString();
+            s = super.toString();
+
+        }
+
+        if (deleted) {
+
+            return s + "(deleted)";
+
+        } else {
+
+            return s;
 
         }
 

@@ -58,18 +58,19 @@ import java.util.NoSuchElementException;
  * </p>
  * <p>
  * In order to guarentee that a node will still be dirty by the time that the
- * caller visits it the iterator must touch the node, thereby placing it into
- * the appropriate hard reference queue and incrementing its reference counter.
- * Evictions do NOT cause IO when the reference is non-zero, so the node will
- * not be made persistent as a result of other node touches. However, the node
- * can still be made persistent if the caller explicitly writes the node onto
- * the store.
+ * caller visits it the iterator must touch the node (or hold a hard reference),
+ * thereby placing it into the appropriate hard reference queue and incrementing
+ * its reference counter. Evictions do NOT cause IO when the reference is
+ * non-zero, so the node will not be made persistent as a result of other node
+ * touches. However, the node can still be made persistent if the caller
+ * explicitly writes the node onto the store.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Write tests for this.
+ * FIXME Write tests for this, including the fact that the child must remain
+ * strongly reachable.
  */
 class DirtyChildIterator implements Iterator<AbstractNode> {
 

@@ -72,5 +72,20 @@ public interface IIdentityAccess {
      * True iff the object is persistent.
      */
     public boolean isPersistent();
+    
+    /**
+     * True iff an object has been logically deleted.
+     */
+    public boolean isDeleted();
 
+    /**
+     * Deletes the persistence capable object. Both transient and persistent
+     * objects may be logically deleted. If the object is persistent then its
+     * space on the store is deallocated.
+     * 
+     * @throws IllegalStateException
+     *             if the object is already deleted.
+     */
+    public void delete() throws IllegalStateException;
+    
 }

@@ -473,6 +473,8 @@ public class Node extends AbstractNode {
      */
     public Object insert(int key, Object entry) {
 
+        assert !isDeleted();
+
         int index = findChild(key);
 
         AbstractNode child = getChild(index);
@@ -482,6 +484,8 @@ public class Node extends AbstractNode {
     }
 
     public Object lookup(int key) {
+
+        assert !isDeleted();
 
         int index = findChild(key);
 
@@ -501,6 +505,8 @@ public class Node extends AbstractNode {
      *         found.
      */
     public Object remove(int key) {
+
+        assert !isDeleted();
 
         int index = findChild(key);
 
@@ -848,13 +854,305 @@ public class Node extends AbstractNode {
     }
 
     /**
+     * Invoked when a non-root node or leaf has no more keys to detach the child
+     * from its parent. If the node is reduced to nkeys == 0 (nchildren == 1),
+     * then the node is replaced by its last remaining child. If the node is the
+     * root of the tree, then the root of the tree is also updated. The child is
+     * deleted as a post-condition.
+     * 
+     * Note: deletes do NOT reverse splits exactly unless we cause siblings to
+     * be merged into a single child when the #of keys across the siblings would
+     * fit in one child. For example, once a leaf has been split into a node and
+     * two siblings merely deleting the key on which the leaf was split will NOT
+     * force the leaves to be merged and hence they will remain split. The split
+     * is not undone until the node that is the parent of the leaves is reduced
+     * to a single child.
+     * 
+     * @param child
+     *            The child.
+     */
+    protected void removeChild(AbstractNode child) {
+        
+        assert child != null;
+        assert !child.isDeleted();
+        assert !child.isPersistent();
+
+        assert !isDeleted();
+        assert !isPersistent();
+
+        System.err.println("removeChild("+child+")");
+        
+        /*
+         * There MUST be at least one key in a node or we wind up trying to
+         * remove the lastChild and not having a child left over to replace this
+         * node on its parent.
+         * 
+         * @todo There will be a fencepost when m == 3 since splits can produce
+         * a node with nkeys == 0.
+         */
+        assert nkeys>0;
+
+        // Scan for location in weak references.
+        for (int i = 0; i <= nkeys; i++) {
+
+            if (childRefs[i] != null && childRefs[i].get() == child) {
+
+                /*
+                 * Copy over the hole created when the child is removed
+                 * from the node.
+                 * 
+                 * Given:          v-- remove @ index = 0
+                 *       index:    0  1  2
+                 * root  keys : [ 21 24  0 ]
+                 *                              index
+                 * leaf1 keys : [  1  2  7  - ]   0 <--remove @ index = 0
+                 * leaf2 keys : [ 21 22 23  - ]   1
+                 * leaf4 keys : [ 24 31  -  - ]   2
+                 * 
+                 * This can also be represented as
+                 * 
+                 * ( leaf1, 21, leaf2, 24, leaf4 )
+                 * 
+                 * and we remove the sequence ( leaf1, 21 ) leaving a well-formed node.
+                 * 
+                 * Remove(leaf1):
+                 * index := 0
+                 * nkeys = 2 
+                 * nchildren := nkeys(2) + 1 = 3
+                 * lenChildCopy := #children(3) - index(0) - 1 = 2 
+                 * lenKeyCopy := lengthChildCopy - 1 = 1
+                 * copyChildren from index+1(1) to index(0) lengthChildCopy(2)
+                 * copyKeys from index+1(1) to index(0) lengthKeyCopy(1)
+                 * erase keys[ nkeys - 1 = 1 ]
+                 * erase children[ nkeys = 2 ]
+                 * 
+                 * post-condition:
+                 *       index:    0  1  2
+                 * root  keys : [ 24  0  0 ]
+                 *                              index
+                 * leaf2 keys : [ 21 22 23  - ]   0
+                 * leaf4 keys : [ 24 31  -  - ]   1
+                 */
+
+                /*
+                 * Copy down to cover up the hole.
+                 */
+                final int index = i;
+
+                // #of children to copy (equivilent to nchildren - index - 1)
+                final int lengthChildCopy = nkeys - index;
+                
+                // #of keys to copy.
+                final int lengthKeyCopy = lengthChildCopy - 1;
+
+                if ( lengthKeyCopy > 0 ) {
+
+                    System.arraycopy(keys, index + 1, keys, index, lengthKeyCopy);
+                    
+                }
+
+                if( lengthChildCopy > 0 ) {
+                    
+                    System.arraycopy(childKeys, index + 1, childKeys, index, lengthChildCopy);
+
+                    System.arraycopy(childRefs, index + 1, childRefs, index, lengthChildCopy);
+                    
+                }
+
+                /* 
+                 * Erase the data that were exposed by this operation.  Note that
+                 * there is one fewer keys than children so ....
+                 */
+                
+                if( nkeys > 0 ) {
+
+                    // erase the last key position.
+                    keys[ nkeys-1 ] = IBTree.NEGINF;
+                    
+                }
+                
+                // erase the last child position.
+                childKeys[nkeys] = NULL;
+                childRefs[nkeys] = null;
+
+                // Remove the child from the dirty list.
+                dirtyChildren.remove(child);
+
+                // Clear the parent on the old child.
+                child.parent = null;
+
+                // one less the key in this node.
+                nkeys--;
+
+                if( child.isLeaf() ) {
+                    
+                    btree.nleaves--;
+                    
+                } else {
+                    
+                    btree.nnodes--;
+                    
+                }
+
+                // Deallocate the child.
+                child.delete();
+
+                if( nkeys == 0 ) {
+
+                    /*
+                     * The node has no more keys. While we permit this condition
+                     * when splitting a node (it occurs in a tree with m := 3 on
+                     * a split at m/2-1 = 0), we use it to trigger merging when
+                     * a child is removed.
+                     * 
+                     * Since nkeys == 0, nchildren == 1. The lastChild is always
+                     * at index 0. We simply replace this node with the
+                     * lastChild. This operation does NOT change the persistent
+                     * state of the child so we do not trigger copy-on-write.
+                     * All we change is the transient state (child.parent).
+                     * 
+                     * If this node is the root, then the last child becomes the
+                     * new root of the tree and we adjust the tree height.  This
+                     * can occur when lastChild is another Node or a Leaf.  In 
+                     * the latter case, lastChild becomes the new root leaf of
+                     * the tree. In either case we update [btree.root] to point
+                     * to lastChild.
+                     * 
+                     * Note: we do not need to trigger copy on write for the
+                     * parent since this node is already mutable and therefore
+                     * all ancestors of this node must also be mutable.
+                     */
+                    
+                    AbstractNode lastChild = getChild(0);
+                    
+                    Node parent = getParent();
+                    
+                    if( parent == null ) {
+                        
+                        /*
+                         * Replace the root of the tree.
+                         */
+                        System.err
+                                .println("Replacing root with lastChild: root="
+                                        + btree.root + ", node=" + this
+                                        + ", lastChild=" + lastChild);
+                        assert btree.root == this;
+                        assert btree.nentries == lastChild.nkeys;
+                        
+                        btree.root = lastChild;
+
+                        // one less level in the btree.
+                        btree.height--;
+                        
+                    } else {
+                        
+                        /*
+                         * replace this node with its last child on its
+                         * parent.
+                         */
+
+                        assert btree.root != this;
+                        
+                        System.err
+                                .println("Replacing node on parent with lastChild: parent="
+                                        + parent
+                                        + ", node="
+                                        + this
+                                        + ", lastChild=" + lastChild);
+
+                        parent.replaceChild(this,lastChild);
+                        
+                    }
+                    
+                    // deallocate this node.
+                    this.delete();
+                    
+                    // one less node in the tree.
+                    btree.nnodes--;
+                    
+                }
+
+                return;
+
+            }
+
+        }
+
+        throw new IllegalArgumentException("Not our child : child=" + child);
+
+    }
+    
+    /**
+     * This is invoked by {@link #removeChild(AbstractNode)} when the node is
+     * reduced to a single child in order to replace the reference to the node
+     * on its parent with the reference to the node's sole remaining child.
+     * 
+     * @param oldChild
+     *            The node.
+     * @param newChild
+     *            The node's sole remaining child. This MAY be persistent since
+     *            this operation does NOT change the persistent state of the
+     *            newChild but only updates its transient state (e.g., its
+     *            parent reference).
+     */
+    protected void replaceChild(AbstractNode oldChild,AbstractNode newChild) {
+        
+        assert oldChild != null;
+        assert !oldChild.isDeleted();
+        assert !oldChild.isPersistent();
+        assert oldChild.parent.get() == this;
+        assert oldChild.nkeys == 0;
+        
+        assert newChild != null;
+        assert !newChild.isDeleted();
+//        assert !newChild.isPersistent(); // MAY be persistent - does not matter.
+        assert newChild.parent.get() == oldChild;
+
+        assert oldChild != newChild;
+
+        assert !isDeleted();
+        assert !isPersistent();
+
+        // Scan for location in weak references.
+        for (int i = 0; i <= nkeys; i++) {
+
+            if (childRefs[i] != null && childRefs[i].get() == oldChild) {
+
+                dirtyChildren.remove(oldChild);
+                
+                if( newChild.isDirty() ) {
+                    
+                    dirtyChildren.add(newChild);
+                    
+                }
+                
+                // set the persistent key for the new child.
+                childKeys[i] = (newChild.isPersistent()?newChild.getIdentity():NULL);
+                
+                // set the reference to the new child.
+                childRefs[i] = new WeakReference<AbstractNode>(newChild);
+                
+                // Reuse the weak reference from the oldChild.
+                newChild.parent = oldChild.parent;
+             
+                return;
+                
+            }
+            
+        }
+        
+        throw new IllegalArgumentException("Not our child : child=" + oldChild);
+
+    }
+    
+    /**
      * Return the child node or leaf at the specified index in this node. If
      * the node is not in memory then it is read from the store.
      * 
      * @param index
      *            The index in [0:nkeys].
      * 
-     * @return The child node or leaf.
+     * @return The child node or leaf and never null.
      */
     public AbstractNode getChild(int index) {
 
@@ -1344,23 +1642,28 @@ public class Node extends AbstractNode {
                     
                 } else if (i < nkeys) {
 
-                    if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
-
-                        /*
-                         * While each key in a node always is the first key
-                         * of some leaf, we are only testing the direct
-                         * children here. Therefore if the children are not
-                         * leaves then we can not cross check their first
-                         * key with the keys on this node.
-                         */
-                        out.println(indent(height + 1)
-                                + "ERROR first key on child leaf must be "
-                                + keys[i - 1] + ", not " + child.keys[0]
-                                + " at index=" + i);
-
-                        ok = false;
-
-                    }
+                    /*
+                     * Note: This condition is violated under our "delete" rule
+                     * by removeChild().
+                     */
+                    
+//                    if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
+//
+//                        /*
+//                         * While each key in a node always is the first key
+//                         * of some leaf, we are only testing the direct
+//                         * children here. Therefore if the children are not
+//                         * leaves then we can not cross check their first
+//                         * key with the keys on this node.
+//                         */
+//                        out.println(indent(height + 1)
+//                                + "ERROR first key on child leaf must be "
+//                                + keys[i - 1] + ", not " + child.keys[0]
+//                                + " at index=" + i);
+//
+//                        ok = false;
+//
+//                    }
 
                 } else {
 
