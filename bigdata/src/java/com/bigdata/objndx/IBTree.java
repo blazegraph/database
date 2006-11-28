@@ -103,18 +103,6 @@ public interface IBTree {
     public NodeSerializer getNodeSerializer();
 
     /**
-     * The object responsible for choosing the index at which to split a
-     * {@link Node}.
-     */
-    public INodeSplitPolicy getNodeSplitPolicy();
-
-    /**
-     * The object responsible for choosing the index at which to split a
-     * {@link Leaf}.
-     */
-    public ILeafSplitPolicy getLeafSplitPolicy();
-
-    /**
      * Positive infinity for the external keys.
      */
     public static final int POSINF = Integer.MAX_VALUE;

@@ -51,8 +51,6 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.zip.Adler32;
 
-import com.bigdata.objndx.ChecksumUtility;
-
 import junit.framework.TestCase;
 
 /**

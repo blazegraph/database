@@ -330,7 +330,7 @@ public class NodeSerializer {
         assert node != null;
         assert node.branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         assert node.branchingFactor < Short.MAX_VALUE;
-        assert node.nkeys >= 0 && node.nkeys < node.branchingFactor;
+        assert node.nkeys >= node.minKeys && node.nkeys < node.maxKeys;
 
         if (node.dirtyChildren.size() > 0) {
 
@@ -522,7 +522,8 @@ public class NodeSerializer {
 
         assert buf != null;
         assert leaf != null;
-        assert leaf.nkeys >= 0 && leaf.nkeys <= leaf.branchingFactor;
+        assert (leaf.parent == null || leaf.nkeys >= leaf.minKeys)
+                && leaf.nkeys <= leaf.maxKeys;
         
         final int nkeys = leaf.nkeys;
         

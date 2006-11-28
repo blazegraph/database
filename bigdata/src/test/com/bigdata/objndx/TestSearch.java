@@ -49,9 +49,6 @@ package com.bigdata.objndx;
 
 import java.util.Random;
 
-import com.bigdata.objndx.AbstractNode;
-import com.bigdata.objndx.Search;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;

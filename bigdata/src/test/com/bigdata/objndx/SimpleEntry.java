@@ -49,8 +49,6 @@ package com.bigdata.objndx;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.Bytes;
-import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.Leaf;
 
 /**
  * Test helper provides an entry (aka value) for a {@link Leaf}.
@@ -76,6 +74,12 @@ class SimpleEntry {
     public SimpleEntry(int id){
     
         this.id = id;
+        
+    }
+    
+    public int id() {
+        
+        return id;
         
     }
     

@@ -80,15 +80,31 @@ public abstract class AbstractNode extends PO {
      * This requires a custom method to read the node with the btree reference
      * on hand so that we can set this field.
      */
-    transient protected BTree btree;
+    final transient protected BTree btree;
 
     /**
      * The branching factor (#of slots for keys or values).
      */
-    transient protected int branchingFactor;
+    final transient protected int branchingFactor;
+    
+    /**
+     * The minimum #of keys. For a {@link Node}, the minimum #of children is
+     * <code>minKeys + 1</code>. For a {@link Leaf}, the minimum #of values
+     * is <code>minKeys</code>.
+     */
+    final transient protected int minKeys;
+    
+    /**
+     * The maximum #of keys.  For a {@link Node}, the maximum #of children is
+     * <code>maxKeys + 1</code>.  For a {@link Leaf}, the maximum #of values is
+     * <code>maxKeys</code>.
+     */
+    final transient protected int maxKeys;
 
     /**
-     * The #of valid keys for this node.
+     * The #of valid keys for this node or leaf.  For a {@link Node}, the #of
+     * children is always <code>nkeys+1</code>.  For a {@link Leaf}, the #of
+     * values is always the same as the #of keys.
      */
     protected int nkeys = 0;
 
@@ -96,7 +112,7 @@ public abstract class AbstractNode extends PO {
      * The external keys for the B+Tree. The #of keys depends on whether this is
      * a {@link Node} or a {@link Leaf}. A leaf has one key per value - that
      * is, the maximum #of keys for a leaf is specified by the branching factor.
-     * In contrast a node has n-1 keys where n is the maximum #of children (aka
+     * In contrast a node has m-1 keys where m is the maximum #of children (aka
      * the branching factor). Therefore this field is initialized by the
      * {@link Leaf} or {@link Node} - NOT by the {@link AbstractNode}.
      * 
@@ -204,9 +220,21 @@ public abstract class AbstractNode extends PO {
     }
 
     /**
+     * All constructors delegate to this constructor to set the btree and
+     * branching factor and to compute the minimum and maximum #of keys for the
+     * node. This isolates the logic required for computing the minimum and
+     * maximum capacity and encapsulates it as <code>final</code> data fields
+     * rather than permitting that logic to be replicated throughout the code
+     * with the corresponding difficulty in ensuring that the logic is correct
+     * throughout.
      * 
      * @param btree
+     *            The btree to which the node belongs.
      * @param branchingFactor
+     *            The branching factor for the node. By passing the branching
+     *            factor rather than using the branching factor declared on the
+     *            btree we are able to support different branching factors at
+     *            different levels of the tree.
      */
     protected AbstractNode(BTree btree, int branchingFactor) {
 
@@ -214,9 +242,33 @@ public abstract class AbstractNode extends PO {
 
         assert branchingFactor>=BTree.MIN_BRANCHING_FACTOR;
         
+        this.btree = btree;
+
         this.branchingFactor = branchingFactor;
 
-        setBTree(btree);
+//        // true iff the branching factor is odd (3,5,7,etc.)
+//        final boolean odd = (branchingFactor&1) == 1;
+        
+        /*
+         * Compute the minimum #of children/values. this is the same whether
+         * this is a Node or a Leaf.
+         */
+        final int minChildren = (branchingFactor+1)>>1;
+        
+        this.minKeys = isLeaf() ? minChildren : minChildren - 1;
+        
+        // The maximum #of keys is easy to compute.
+        this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
+        
+        /*
+         * If this is a {@link Node} then ensures that the btree holds a hard
+         * reference to the node.
+         */
+        if( !isLeaf() ) {
+                
+            btree.nodes.add((Node)this);
+
+        }
 
     }
 
@@ -233,8 +285,7 @@ public abstract class AbstractNode extends PO {
          * persistence capable object, but it is not yet persistent and we
          * do not want to copy the persistent identity of the source object.
          */
-        super();
-
+        this(src.btree,src.branchingFactor);
 
         // This node must be mutable (it is a new node).
         assert isDirty();
@@ -246,13 +297,6 @@ public abstract class AbstractNode extends PO {
         assert src != null;
         assert !src.isDirty();
         assert src.isPersistent();
-
-        this.branchingFactor = src.branchingFactor;
-
-        /*
-         * Set the btree reference.
-         */
-        setBTree(src.btree);
 
         /*
          * Copy the parent reference. The parent must be defined unless the
@@ -270,40 +314,13 @@ public abstract class AbstractNode extends PO {
     }
 
     /**
-     * This method MUST be used to set the btree reference. This method
-     * verifies that the btree reference is not already set. It is extended
-     * by {@link Node#setBTree(BTree)} to ensure that the btree holds a hard
-     * reference to the node.
-     * 
-     * @param btree
-     *            The btree.
-     */
-    void setBTree(BTree btree) {
-
-        assert btree != null;
-
-        if (this.btree != null) {
-
-            throw new IllegalStateException();
-
-        }
-
-        this.btree = btree;
-
-    }
-
-    /**
      * <p>
-     * Return this node iff it is dirty (aka mutable) and otherwise return a
-     * copy of this node. If a copy is made of the node, then a copy will also
-     * be made of each immutable parent of the node up to the first mutable
-     * parent or the root of the tree, which ever comes first. If the root is
-     * copied, then the new root node will be set on the {@link BTree}. This
-     * method must MUST be invoked any time an mutative operation is requested
-     * for the node. For simplicity, it is invoked by the two primary mutative
-     * operations {@link #insert(int key, Object value)} and
-     * {@link #remove(int key)} and when a parent is {@link #split()} by an
-     * insert into a child.
+     * Return this leaf iff it is dirty (aka mutable) and otherwise return a
+     * copy of this leaf. If a copy is made of the leaf, then a copy will also
+     * be made of each immutable parent up to the first mutable parent or the
+     * root of the tree, which ever comes first. If the root is copied, then the
+     * new root will be set on the {@link BTree}. This method must MUST be
+     * invoked any time an mutative operation is requested for the leaf.
      * </p>
      * <p>
      * Note: You can not modify a node that has been written onto the store.
@@ -315,7 +332,7 @@ public abstract class AbstractNode extends PO {
      * and needs to be used in place of the immutable version of the node.
      * </p>
      * 
-     * @return Either this node or a copy of this node.
+     * @return Either this leaf or a copy of this leaf.
      */
     protected AbstractNode copyOnWrite() {
         
@@ -327,10 +344,29 @@ public abstract class AbstractNode extends PO {
     }
     
     /**
+     * <p>
+     * Return this node or leaf iff it is dirty (aka mutable) and otherwise
+     * return a copy of this node or leaf. If a copy is made of the node, then a
+     * copy will also be made of each immutable parent up to the first mutable
+     * parent or the root of the tree, which ever comes first. If the root is
+     * copied, then the new root will be set on the {@link BTree}. This method
+     * must MUST be invoked any time an mutative operation is requested for the
+     * leaf.
+     * </p>
+     * <p>
+     * Note: You can not modify a node that has been written onto the store.
+     * Instead, you have to clone the node causing it and all nodes up to the
+     * root to be dirty and transient. This method handles that cloning process,
+     * but the caller MUST test whether or not the node was copied by this
+     * method, MUST delegate the mutation operation to the copy iff a copy was
+     * made, and MUST result in an awareness in the caller that the copy exists
+     * and needs to be used in place of the immutable version of the node.
+     * </p>
      * 
      * @param triggeredByChild
      *            The child that triggered this event if any.
-     * @return
+     * 
+     * @return Either this node or a copy of this node.
      */
     protected AbstractNode copyOnWrite(AbstractNode triggeredByChild) {
 
@@ -470,6 +506,59 @@ public abstract class AbstractNode extends PO {
     }
 
     /**
+     * <p>
+     * Invariants:
+     * <ul>
+     * <li>A node with nkeys + 1 children.</li>
+     * <li>A node must have between [m/2:m] children (alternatively, between
+     * [m/2-1:m-1] keys since nkeys + 1 == nchildren for a node).</li>
+     * <li>A leaf has no children and has between [m/2:m] key-value pairs (the
+     * same as the #of children on a node).</li>
+     * <li>The root leaf may be deficient (may have less than m/2 key-value
+     * pairs).</li>
+     * </ul>
+     * where <code>m</code> is the branching factor and a node is understood
+     * to be a non-leaf node in the tree.
+     * </p>
+     * <p>
+     * In addition, all leaves are at the same level (not tested by this
+     * assertion).
+     * </p>
+     */
+    protected final void assertInvariants() {
+
+        try {
+
+            /*
+             * either the root or the parent is reachable.
+             */
+            assert btree.root == this
+                    || (this.parent != null && this.parent.get() != null);
+
+            if (btree.root != this) {
+
+                // not the root, so the min #of keys must be observed.
+                assert nkeys >= minKeys;
+
+            }
+
+            // max #of keys.
+            assert nkeys <= maxKeys;
+
+        } catch (AssertionError ex) {
+
+            BTree.log.fatal("Invariants failed\n"
+                    + ex.getStackTrace()[0].toString());
+            
+            dump(Level.FATAL, System.err);
+            
+            throw ex;
+            
+        }
+
+    }
+
+    /**
      * True iff this is a leaf node.
      */
     abstract public boolean isLeaf();
@@ -494,7 +583,12 @@ public abstract class AbstractNode extends PO {
      * 
      * @return The high node (or leaf) created by the split.
      */
-    abstract protected AbstractNode split();
+    abstract protected AbstractNode split(int key);
+    
+    /**
+     * Join this node (must be deficient) with either its left or right sibling.
+     */
+    abstract protected void join();
 
     /**
      * Recursive search locates the approprate leaf and inserts the entry under
@@ -544,24 +638,25 @@ public abstract class AbstractNode extends PO {
      */
     public boolean dump(PrintStream out) {
 
-        return dump(BTree.dumpLog.getEffectiveLevel(), out, 0, false);
+        return dump(BTree.dumpLog.getEffectiveLevel(), out);
 
     }
 
-//    /**
-//     * Dump the data onto the {@link PrintStream}.
-//     * 
-//     * @param out
-//     *            Where to write the dump.
-//     * @param height
-//     *            The height of this node in the tree.
-//     * @param recursive
-//     *            When true, the node will be dumped recursively using a
-//     *            pre-order traversal.
-//     *            
-//     * @return True unless an inconsistency was detected.
-//     */
-//    abstract public boolean dump(PrintStream out, int height, boolean recursive);
+    /**
+     * Dump the data onto the {@link PrintStream}.
+     * 
+     * @param level
+     *            The logging level.
+     * @param out
+     *            Where to write the dump.
+     *            
+     * @return True unless an inconsistency was detected.
+     */
+    public boolean dump(Level level,PrintStream out) {
+
+        return dump(level, out, -1, false);
+
+    }
 
     /**
      * Dump the data onto the {@link PrintStream}.
@@ -571,7 +666,9 @@ public abstract class AbstractNode extends PO {
      * @param out
      *            Where to write the dump.
      * @param height
-     *            The height of this node in the tree.
+     *            The height of this node in the tree or -1 iff you need to
+     *            invoke this method on a node or leaf whose height in the tree
+     *            is not known.
      * @param recursive
      *            When true, the node will be dumped recursively using a
      *            pre-order traversal.
@@ -591,6 +688,14 @@ public abstract class AbstractNode extends PO {
      */
     protected static String indent(int height) {
 
+        if( height == -1 ) {
+        
+            // The height is not defined.
+            
+            return "";
+            
+        }
+        
         return ws.substring(0, height * 4);
 
     }

@@ -64,9 +64,9 @@ import com.bigdata.journal.SlotMath;
 
 /**
  * <p>
- * BTree encapsulates metadata about the persistence capable index, but is not
- * itself a persistent object. This class is somewhat specialized for its role
- * as an object index.
+ * This class implements a variant of a B+Tree in which all values are stored in
+ * leaves, but the leaves are not connected with prior-next links. This
+ * constraint arises from the requirement to support a copy-on-write policy.
  * </p>
  * <p>
  * Note: No mechanism is exposed for recovering a node or leaf of the tree other
@@ -75,15 +75,15 @@ import com.bigdata.journal.SlotMath;
  * parent node.
  * </p>
  * <p>
- * Note: This is NOT a B+Tree since the leaves can not be stitched together with
- * prior and next references without forming cycles that make it impossible to
- * write out the leaves of the btree. This restriction arises because each time
- * we write out a node or leaf it is assigned a persistent identifier as an
- * unavoidable artifact of providing isolation for the object index.
+ * Note: the leaves can not be stitched together with prior and next references
+ * without forming cycles that make it impossible to write out the leaves of the
+ * btree. This restriction arises because each time we write out a node or leaf
+ * it is assigned a persistent identifier as an unavoidable artifact of
+ * providing isolation for the object index.
  * </p>
  * <p>
- * Note: This implementation is NOT thread-safe. The object index is intended
- * for use within a single-threaded context.
+ * Note: This implementation is NOT thread-safe. The index is intended for use
+ * within a single-threaded context.
  * </p>
  * <p>
  * Note: This iterators exposed by this implementation do NOT support concurrent
@@ -98,6 +98,28 @@ import com.bigdata.journal.SlotMath;
  * how expensive it is to do some scan-based operations (merged down, delete of
  * transactional isolated persistent index), and evaluate the buffer strategy by
  * comparing accesses with IOs.
+ * 
+ * @todo refactor to support long keys (vs int).
+ * 
+ * @todo refactor to support generic key types.
+ * 
+ * @todo refactor object index implementation into two variants providing
+ *       isolation. In one the objects are referenced but exist outside of the
+ *       index. This is the current design. In the other, then objects are
+ *       stored as part of the values in the index. This is a clustered object
+ *       index design and is identicaly to the design where non-int64 keys are
+ *       used for the index. The latter design requires that we replace the
+ *       currentSlots reference with the current version data. The advantage of
+ *       this design is two fold. First, the index may be split into multiple
+ *       segments and therefore scales out. Second, objects with key locality
+ *       have retrieval locality as well. The former design has an advantage iff
+ *       the objects are migrated to a read-optimized segment in which the int64
+ *       identifier directly addresses the object in a slot on a page. Making
+ *       clustering work effectively with the int64 object index by reference
+ *       design probably requires mechanisms for assigning persistent
+ *       identifiers based on expected locality of reference, e.g., late
+ *       assignment of identifiers to persistence capable transient objects or
+ *       an explicit notion of clustering rules or "local" objects.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -164,13 +186,13 @@ public class BTree implements IBTree {
     /**
      * Computes the split index when splitting a non-leaf {@link Node}.
      */
-    final public INodeSplitPolicy nodeSplitter;
+    final public INodeSplitRule nodeSplitRule;
 
     /**
-     * Computes the split index when splitting a {@link Leaf}.
+     * Computes the split index when splitting a non-leaf {@link Node}.
      */
-    final public ILeafSplitPolicy leafSplitter;
-
+    final public ILeafSplitRule leafSplitRule;
+    
     public IRawStore getStore() {
         
         return store;
@@ -213,18 +235,6 @@ public class BTree implements IBTree {
         
     }
     
-    public INodeSplitPolicy getNodeSplitPolicy() {
-
-        return nodeSplitter;
-        
-    }
-    
-    public ILeafSplitPolicy getLeafSplitPolicy() {
-
-        return leafSplitter;
-        
-    }
-    
     /**
      * A hard reference hash map for nodes in the btree is used to ensure that
      * nodes remain wired into memory. Dirty nodes are written to disk during
@@ -242,8 +252,11 @@ public class BTree implements IBTree {
      *       {@link Node#childRefs} for their parent as long as the node
      *       remained on the hard reference queue. I.e., we could just use
      *       another hard reference queue for nodes in addition to the one that
-     *       we have for leaves.  The thing is that we may want to defer all node
+     *       we have for leaves. The thing is that we may want to defer all node
      *       writes until the commit.
+     * 
+     * @todo replace with the use of a hard reference queue and incremental
+     *       eviction of nodes.
      * 
      * @see AbstractNode#AbstractNode(AbstractNode)
      */
@@ -362,10 +375,6 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
-     * @param nodeSplitter
-     *            The policy for choosing the key on which to split a node.
-     * @param leafSplitter
-     *            The policy for choosing the key on which to split a leaf.
      * @param headReferenceQueueCapacity
      *            The capacity of the hard reference queue (minimum of 2 to
      *            avoid cache evictions of the leaves participating in a split).
@@ -374,17 +383,12 @@ public class BTree implements IBTree {
      *            {@link Leaf}.
      */
     public BTree(IRawStore store, int branchingFactor,
-            INodeSplitPolicy nodeSplitter, ILeafSplitPolicy leafSplitter,
             HardReferenceQueue<PO> hardReferenceQueue, IValueSerializer valueSer) {
 
         assert store != null;
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
-        assert nodeSplitter != null;
-        
-        assert leafSplitter != null;
-        
         assert hardReferenceQueue.capacity() >= DEFAULT_LEAF_QUEUE_CAPACITY;
         
         assert valueSer != null;
@@ -393,14 +397,14 @@ public class BTree implements IBTree {
 
         this.branchingFactor = branchingFactor;
 
-        this.nodeSplitter = nodeSplitter;
-        
-        this.leafSplitter = leafSplitter;
-        
         this.leafQueue = hardReferenceQueue;
 
+        // @todo debug and substitute the FastLeafSplitRule.
+        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
+        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
+
         this.nodeSer = new NodeSerializer(valueSer);
-        
+
         int maxNodeOrLeafSize = Math.max(
                 // max size for a leaf.
                 nodeSer.getSize(true, branchingFactor),
@@ -426,10 +430,6 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param metadataId
      *            The persistent identifier of btree metadata.
-     * @param nodeSplitter
-     *            The policy for choosing the key on which to split a node.
-     * @param leafSplitter
-     *            The policy for choosing the key on which to split a leaf.
      * @param leafQueue
      *            The hard reference queue for {@link Leaf}s.
      * @param valueSer
@@ -437,15 +437,10 @@ public class BTree implements IBTree {
      *            {@link Leaf}.
      */
     public BTree(IRawStore store, long metadataId,
-            INodeSplitPolicy nodeSplitter, ILeafSplitPolicy leafSplitter,
             HardReferenceQueue<PO> leafQueue, IValueSerializer valueSer) {
 
         assert store != null;
 
-        assert nodeSplitter != null;
-        
-        assert leafSplitter != null;
-        
         assert leafQueue != null;
         
         assert valueSer != null;
@@ -460,11 +455,18 @@ public class BTree implements IBTree {
 
         this.store = store;
 
-        this.nodeSplitter = nodeSplitter;
-        
-        this.leafSplitter = leafSplitter;
-        
         this.leafQueue = leafQueue;
+        
+        /*
+         * read the btree metadata record. this tells us the branchingFactor and
+         * the root node identifier, both of which we need below to initialize
+         * the btree.
+         */
+        final long rootId = read(metadataId);
+
+        // @todo debug and substitute the FastLeafSplitRule.
+        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
+        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
 
         this.nodeSer = new NodeSerializer(valueSer);
         
@@ -477,9 +479,6 @@ public class BTree implements IBTree {
         log.info("maxNodeOrLeafSize="+maxNodeOrLeafSize);
         
         this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
-        
-        // read the btree metadata record.
-        final long rootId = read(metadataId);
 
         /*
          * Read the root node of the btree.
@@ -704,6 +703,21 @@ public class BTree implements IBTree {
         
         node.setDirty(false);
         
+        if (node instanceof Leaf) {
+
+            /*
+             * Leaves are added to a hard reference queue. On eviction
+             * from the queue the leaf is serialized. Once the leaf is
+             * no longer strongly reachable its weak references may be
+             * cleared by the VM.
+             * 
+             * @todo also place nodes onto a queue.
+             */
+
+            touch(node);
+
+        }
+
         return node;
         
     }

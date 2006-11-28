@@ -42,32 +42,46 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on Nov 27, 2006
  */
-
 package com.bigdata.objndx;
 
 /**
- * Splits the leaf at m/2 where m is the branching factor.
+ * Interface for computing the splitIndex and separatorKey when splitting a
+ * {@link Leaf}.  When a {@link Leaf} is split, the original {@link Leaf} is
+ * retained, a new rightSibling of the leaf is created, and a separatorKey is
+ * inserted into the parent.  The splitIndex is the index of the first key to
+ * be moved to the rightSibling.  The separatorKey defines the lowest key value
+ * that may enter into the rightSibling and may be either one of the keys from
+ * the leaf that is being split or the insert key itself.
+ * 
+ * Note: This API does not permit a single global instance to be shared since
+ * that would mean static private state for the instance and invocations by
+ * concurrent but distinct btrees would result in corruptions. All leaves of a
+ * btree need to have the same branching factor and that is constrant for the
+ * life of the tree. This API should therefore be initialized once per btree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleLeafSplitPolicy implements ILeafSplitPolicy {
-
-    private SimpleLeafSplitPolicy() {
-        
-    }
+public interface ILeafSplitRule {
     
     /**
-     * Singleton.
+     * Return the splitIndex (the index of the first key to move to the
+     * rightSibling) and set the separatorKey as a side effect whose state is
+     * accessible using {@link #getSeparatorKey()}.
+     * 
+     * @param keys
+     * @param insertKey
+     * @return
      */
-    public static final ILeafSplitPolicy INSTANCE = new SimpleLeafSplitPolicy();
+    public int getSplitIndex(int[] keys, int insertKey );
 
-    public int splitLeafAt(Leaf leaf) {
-        
-        return leaf.branchingFactor >> 1;
-        
-    }
+    /**
+     * The separatorKey to be inserted into the parent.
+     * 
+     * @return
+     */
+    public int getSeparatorKey();
 
 }

@@ -42,64 +42,55 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Nov 28, 2006
  */
 
 package com.bigdata.objndx;
 
 /**
- * An adaptive split policy splits the leaf at m/2, where m is the
- * branchingFactor or higher if the keys in the leaf are either nearly or
- * completely dense. In those cases it is impossible / improbable that the
- * openings created by splitting and m/2 would ever be filled and splitting high
- * will result in a more compact tree.
+ * FIXME Try writing a test that splits a node that is generated directly
+ * (rather than by inserts). The child pointers will all be null, but I can
+ * assign my own child pointers and then just test the split logic.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultLeafSplitPolicy implements ILeafSplitPolicy {
+public class TestSplitNode extends AbstractBTreeTestCase {
 
-    private DefaultLeafSplitPolicy() {
-        
+    /**
+     * 
+     */
+    public TestSplitNode() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestSplitNode(String name) {
+        super(name);
     }
     
-    /**
-     * Singleton.
-     */
-    public static final ILeafSplitPolicy INSTANCE = new DefaultLeafSplitPolicy();
-    
-    /**
-     * Splits at m/2, where m is the maximum #of key / values for the leaf.
-     */
-    public int splitLeafAt(Leaf leaf) {
+    public void test_splitNode01() {
+        
+        BTree btree = getBTree(3);
+        
+        Node a = new Node(btree);
+        btree.root = a;
+        a.nkeys = 2;
+        a.keys = new int[]{5,7};
+        Node b = (Node) a.split(3); // b is the rightSibling of a.
+        
+        Node c = (Node)btree.root;
+        assertEquals(a,c.getChild(0));
+        assertEquals(b,c.getChild(1));
 
-        final int m = leaf.branchingFactor;
+        assertEquals(1,a.nkeys);
+        assertEquals(new int[]{3,0},a.keys);
+        assertEquals(1,b.nkeys);
+        assertEquals(new int[]{5,0},b.keys);
+        assertEquals(1,c.nkeys);
+        assertEquals(new int[]{7,0},c.keys);
         
-        final int nkeys = leaf.nkeys;
-        
-        // the largest key for the leaf.
-        final int high = leaf.keys[nkeys-1];
-        
-        // the smallest key for the leaf.
-        final int low = leaf.keys[0];
-        
-        /*
-         * The #of unused keys in the leaf. When zero, the keys in the leaf are
-         * dense and it is not possible to insert another key into the leaf
-         * because there are no key that could be directed to the leaf that are
-         * not already in use by the leaf.
-         */
-        final int nfree = high - low;
-
-        // standard practice.
-        final int splitLow = m >> 1;
-        
-        final int splitHigh = m - nfree - 1;
-        
-        if( splitHigh > splitLow ) return splitHigh;
-        
-        return splitLow;
-
     }
 
 }

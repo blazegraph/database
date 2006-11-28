@@ -55,9 +55,6 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IndexEntry;
-import com.bigdata.objndx.IndexEntrySerializer;
 import com.bigdata.objndx.IndexEntrySerializer.ByteBufferInputStream;
 import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
 

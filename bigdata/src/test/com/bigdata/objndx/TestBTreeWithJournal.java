@@ -54,9 +54,6 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.DefaultEvictionListener;
-import com.bigdata.objndx.PO;
 
 /**
  * Stress tests of the {@link BTree} writing on the {@link Journal}. This does
@@ -122,8 +119,6 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             final int nscan = 10;
 
             BTree btree = new BTree(journal, branchingFactor,
-                    DefaultNodeSplitPolicy.INSTANCE,
-                    DefaultLeafSplitPolicy.INSTANCE,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             leafQueueCapacity, nscan),
                     new SimpleEntry.Serializer());

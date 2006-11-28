@@ -51,13 +51,6 @@ import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objndx.AbstractNode;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IBTree;
-import com.bigdata.objndx.IndexEntry;
-import com.bigdata.objndx.Leaf;
-import com.bigdata.objndx.Node;
-import com.bigdata.objndx.NodeSerializer;
 
 /**
  * Abstract test case defines utility methods for testing the object index and
@@ -220,7 +213,10 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         final long id = nextNodeRef(false); // ref. for this node.
 
-        final int nkeys = r.nextInt(branchingFactor);
+        int nchildren = r.nextInt((branchingFactor+1)/2)+(branchingFactor+1)/2;
+        assert nchildren>=(branchingFactor+1)/2;
+        assert nchildren<=branchingFactor;
+        int nkeys = nchildren-1;
         
         final int[] keys = new int[branchingFactor-1];
         
@@ -269,7 +265,9 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         long id = nextNodeRef(true); // ref. for this leaf.
 
-        int nkeys = r.nextInt(branchingFactor)+1;
+        int nkeys = r.nextInt((branchingFactor+1)/2)+(branchingFactor+1)/2;
+        assert nkeys>=(branchingFactor+1)/2;
+        assert nkeys<=branchingFactor;
 
         final int[] keys = new int[branchingFactor];
 
@@ -335,70 +333,4 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
     }
     
-//    /**
-//     * A non-persistence capable implementation of {@link IObjectIndexEntry}
-//     * used for unit tests.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static class MyIndexEntry implements IObjectIndexEntry {
-//
-//        private short versionCounter;
-//        private ISlotAllocation currentVersionSlots;
-//        private ISlotAllocation preExistingVersionSlots;
-//
-//        private MyIndexEntry() {
-//
-//            throw new UnsupportedOperationException();
-//            
-//        }
-//        
-//        MyIndexEntry(short versionCounter,ISlotAllocation currentVersion, ISlotAllocation preExistingVersion ) {
-//            this.versionCounter = versionCounter;
-//            this.currentVersionSlots = currentVersion;
-//            this.preExistingVersionSlots = preExistingVersion;
-//        }
-//        
-//        public short getVersionCounter() {
-//            
-//            return versionCounter;
-//            
-//        }
-//        
-//        public boolean isDeleted() {
-//            
-//            return currentVersionSlots == null;
-//            
-//        }
-//        
-//        public boolean isPreExistingVersionOverwritten() {
-//            
-//            return preExistingVersionSlots != null;
-//            
-//        }
-//        
-//        public ISlotAllocation getCurrentVersionSlots() {
-//
-//            return currentVersionSlots;
-//            
-//        }
-//        
-//        public ISlotAllocation getPreExistingVersionSlots() {
-//            
-//            return preExistingVersionSlots;
-//            
-//        }
-//        
-//        /**
-//         * Dumps the state of the entry.
-//         */
-//        public String toString() {
-//            return "{versionCounter=" + versionCounter + ", currentVersion="
-//                    + currentVersionSlots + ", preExistingVersion="
-//                    + preExistingVersionSlots + "}";
-//        }
-//        
-//    }
-
 }

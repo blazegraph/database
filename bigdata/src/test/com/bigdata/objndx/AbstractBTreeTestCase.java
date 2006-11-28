@@ -52,23 +52,16 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 
-import org.apache.log4j.Level;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
+
+import org.apache.log4j.Level;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objndx.AbstractNode;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IBTree;
-import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.Leaf;
-import com.bigdata.objndx.Node;
-import com.bigdata.objndx.PO;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -137,6 +130,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
         
+        assertEquals("minKeys",n1.minKeys,n2.minKeys);
+        
+        assertEquals("maxKeys",n1.maxKeys,n2.maxKeys);
+        
         assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
         
         assertEquals("nkeys",n1.nkeys,n2.nkeys);
@@ -171,7 +168,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        assertEquals("pageSize",n1.branchingFactor,n2.branchingFactor);
+        assertEquals("minKeys",n1.minKeys,n2.minKeys);
+        
+        assertEquals("maxKeys",n1.maxKeys,n2.maxKeys);
+        
+        assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
         
         assertEquals("first",n1.nkeys,n2.nkeys);
 
@@ -395,8 +396,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         final int nscan = 10;
 
         BTree btree = new BTree(store, branchingFactor,
-                DefaultNodeSplitPolicy.INSTANCE,
-                SimpleLeafSplitPolicy.INSTANCE,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan), new SimpleEntry.NoSerializer());
 

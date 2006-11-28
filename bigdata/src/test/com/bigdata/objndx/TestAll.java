@@ -34,11 +34,25 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Object Index");
 
-        // test utility classes.
+        // test search of int[] keys.
         suite.addTestSuite( TestSearch.class );
-        // test the split rule for a leaf.
-        suite.addTestSuite( TestLeafSplitPolicy.class );
-        // test basic tree operations (insert, lookup, remove, and split).
+        // test ILeafSplitRule - see src/architecture/btree.xls
+        suite.addTestSuite( TestLeafSplitRule.class );
+        // test INodeSplitRule - see src/architecture/btree.xls
+        suite.addTestSuite( TestNodeSplitRule.class );
+        // test assertions that test for node/leaf invariants.
+        suite.addTestSuite( TestInvariants.class );
+        // test finding a child of a node by its key.
+        suite.addTestSuite( TestFindChild.class );
+        // test insert, lookup, and remove for root leaf w/o splitting it.
+        suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
+        // test splitting the root leaf.
+        suite.addTestSuite( TestSplitRootLeaf.class );
+        // test splitting and joining the root leaf (no more than two levels).
+        suite.addTestSuite( TestSplitJoinRootLeaf.class );
+        // test splitting and joining with more than two levels.
+        suite.addTestSuite( TestSplitJoinThreeLevels.class );
+        // stress test basic tree operations w/o IO.
         suite.addTestSuite( TestBTree.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );

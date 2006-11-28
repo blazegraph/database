@@ -102,8 +102,6 @@ public class ObjectIndex extends BTree implements IObjectIndex {
             HardReferenceQueue<PO> hardReferenceQueue) {
 
         super(store, branchingFactor,
-                DefaultNodeSplitPolicy.INSTANCE,
-                DefaultLeafSplitPolicy.INSTANCE,
                 hardReferenceQueue, new IndexEntrySerializer(
                 store.getSlotMath()));
 
@@ -118,8 +116,6 @@ public class ObjectIndex extends BTree implements IObjectIndex {
     public ObjectIndex(IRawStore store, long metadataId, HardReferenceQueue<PO> leafQueue) {
         
         super(store,metadataId,
-                DefaultNodeSplitPolicy.INSTANCE,
-                DefaultLeafSplitPolicy.INSTANCE,
                 leafQueue,
                 new IndexEntrySerializer(store.getSlotMath()));
         

@@ -42,74 +42,63 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on Nov 27, 2006
  */
 
 package com.bigdata.objndx;
 
-
 /**
- * FIXME write tests for {@link DefaultLeafSplitPolicy}. Those tests should
- * verify the math using simple examples and also assess the impact on the
- * utilization in leaves under "near sequential" and "random but asymptotic to
- * dense sequential" key insertion scenariors.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLeafSplitPolicy extends AbstractBTreeTestCase {
+public class TestFindChild extends AbstractBTreeTestCase {
 
     /**
      * 
      */
-    public TestLeafSplitPolicy() {
+    public TestFindChild() {
     }
 
     /**
      * @param name
      */
-    public TestLeafSplitPolicy(String name) {
+    public TestFindChild(String name) {
         super(name);
-    }
-    
-    public void test_simpleSplitRule01() {
-        
-        ILeafSplitPolicy splitter = SimpleLeafSplitPolicy.INSTANCE;
-        
-        /*
-         * @todo Create a btree with a branching factor.
-         * 
-         * @todo populate the root leaf with known keys.
-         * 
-         * @todo verify the computed split index.
-         */
-        
-    }
-
-    public void test_defaultSplitRule01() {
-        
-        ILeafSplitPolicy splitter = DefaultLeafSplitPolicy.INSTANCE;
-        
-        /*
-         * @todo Create a btree with a branching factor.
-         * 
-         * @todo populate the root leaf with known keys.  choose examples that
-         * are dense and that are sparse.
-         * 
-         * @todo verify the computed split index.
-         */
-        
     }
 
     /**
-     * @todo compare utilization with the simple and default leaf split rules
-     *       for sequential key insertion, near sequential key insertion, and a
-     *       pattern that reflects the expected assignment of persistent
-     *       identifiers for bigdata read-optimized database pages.
-     * 
+     * A test of {@link Node#findChild(int key)}.
      */
-    public void test_defaultSplitRule02() {
-    
+    public void test_node_findChild() {
+     
+        int m = 4;
+        
+        BTree btree = getBTree(m);
+
+        /*
+         * Create a test node.  We do not both to build this up from scratch
+         * by inserting keys into the tree.
+         */
+        //  keys[]  : [ 5 9 12 ]
+        //  child[] : [ a b  c  d ]
+
+        Node node = new Node(btree, 1, m, 3, new int[] { 5, 9, 12 },
+                new long[] { 1, 2, 3, 4 });
+        
+        assertEquals(0,node.findChild(1));
+        assertEquals(0,node.findChild(2));
+        assertEquals(0,node.findChild(3));
+        assertEquals(0,node.findChild(4));
+        assertEquals(1,node.findChild(5));
+        assertEquals(1,node.findChild(6));
+        assertEquals(1,node.findChild(7));
+        assertEquals(1,node.findChild(8));
+        assertEquals(2,node.findChild(9));
+        assertEquals(2,node.findChild(10));
+        assertEquals(2,node.findChild(11));
+        assertEquals(3,node.findChild(12));
+        assertEquals(3,node.findChild(13));
+        
     }
     
 }

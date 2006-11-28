@@ -47,9 +47,6 @@ Modifications:
 package com.bigdata.objndx;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.objndx.IEvictionListener;
-import com.bigdata.objndx.Leaf;
-import com.bigdata.objndx.PO;
 
 /**
  * Hard reference cache eviction listener for leaves always throws an

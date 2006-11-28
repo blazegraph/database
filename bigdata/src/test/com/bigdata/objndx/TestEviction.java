@@ -54,11 +54,6 @@ import junit.framework.AssertionFailedError;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.DefaultEvictionListener;
-import com.bigdata.objndx.Leaf;
-import com.bigdata.objndx.Node;
-import com.bigdata.objndx.PO;
 
 /**
  * Test suite for the incremental eviction of leaves onto the store.
@@ -133,8 +128,6 @@ public class TestEviction extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(store, branchingFactor,
-                DefaultNodeSplitPolicy.INSTANCE,
-                DefaultLeafSplitPolicy.INSTANCE,
                 leafQueue, new SimpleEntry.Serializer());
         
         // The hard reference queue.
@@ -294,8 +287,6 @@ public class TestEviction extends AbstractBTreeTestCase {
 
         // verify that we can reload the tree.
         new BTree(btree.store, metadataId0,
-                DefaultNodeSplitPolicy.INSTANCE,
-                DefaultLeafSplitPolicy.INSTANCE,
                 new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(), leafQueueCapacity, nscan),
                 new SimpleEntry.Serializer());

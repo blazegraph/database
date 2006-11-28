@@ -50,17 +50,11 @@ package com.bigdata.objndx;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.AbstractNode;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.ChecksumError;
-import com.bigdata.objndx.IndexEntrySerializer;
-import com.bigdata.objndx.Leaf;
-import com.bigdata.objndx.Node;
-import com.bigdata.objndx.NodeSerializer;
-import com.bigdata.objndx.PO;
 
 /**
  * Test case for {@link NodeSerializer}.
@@ -243,8 +237,6 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final int nscan = 10;
 
         BTree btree = new BTree(store, branchingFactor,
-                DefaultNodeSplitPolicy.INSTANCE,
-                DefaultLeafSplitPolicy.INSTANCE,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan), new IndexEntrySerializer(store
                         .getSlotMath()));
@@ -415,7 +407,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
                 expected.getIdentity(), buf);
 
         if (verbose)
-            actual.dump(System.err);
+            actual.dump(Level.DEBUG,System.err);
 
         // write on buf2.
         ByteBuffer buf2 = ByteBuffer.allocate(BUF_SIZE);
