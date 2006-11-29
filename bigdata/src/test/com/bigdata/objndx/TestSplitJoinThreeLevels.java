@@ -83,10 +83,6 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * the minimum #of children (for a node) or values (for a leaf) is two (2)
      * and the maximum #of children (for a node) or values (for a leaf) is three
      * (3). This makes it very easy to provoke splits and joins.
-     * 
-     * FIXME write tests for split/join of nodes for all of the edge conditions
-     * at m == 3, e.g., join(this,rightSibling), join(this,leftSibling), causing
-     * merges with the right or left sibling, etc.
      */
     public void test_splitJoinBranchingFactor3() {
 

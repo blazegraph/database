@@ -409,155 +409,157 @@ public class Leaf extends AbstractNode {
 
     }
 
-    /**
-     * Invoked when a leaf has become deficient (too few keys/values). This
-     * method is never invoked for the root leaf therefore the parent of this
-     * leaf must be defined. Further, since the minimum #of children is two (2)
-     * for the smallest branching factor three (3), there is always a sibling to
-     * consider.
-     * 
-     * consider the immediate siblings. if either is materialized and has more
-     * than the minimum #of values, then redistribute the values evenly between
-     * this leaf and that sibling and update the separation key in the parent to
-     * reflect the new partitioning of the values between the leaves. if either
-     * is materialized and has only the minimum #of values, then merge this leaf
-     * with that sibling and update the parent by removing the separator key.
-     * 
-     * If no materialized immediate sibling meets these criteria, then first
-     * materialize and test the right sibling. if the right sibling does not
-     * meet these criteria, then materialize and test the left sibling.
-     * 
-     * Note that (a) we prefer to merge a materialized sibling with this leaf to
-     * materializing a sibling; and (b) merging siblings is the only way that a
-     * separator key is removed from a parent. If the parent becomes deficient
-     * through merging then join is invoked on the parent as well. Note that
-     * join is never invoked on the root node (or leaf) since it by definition
-     * has no siblings.
-     * 
-     * Note that we must invoked copy-on-write before modifying a sibling.
-     * However, the parent of the leave MUST already be mutable (aka dirty)
-     * since that is a precondition for removing a key from the leaf. This means
-     * that copy-on-write will not force the parent to be cloned.
-     */
-    protected void join() {
-
-        // verify that this leaf is deficient.
-        assert nkeys < minKeys;
-        // verify that the leaf is mutable.
-        assert isDirty();
-        assert !isPersistent();
-        // verify that the leaf is not the root.
-        assert btree.root != this;
-        
-        final Node parent = getParent();
-
-        /*
-         * Look for, but do not materialize, the left and right siblings.
-         * 
-         * Note that we defer invoking copy-on-write for the left/right sibling
-         * until we are sure which sibling we will use.
-         */
-        
-        Leaf rightSibling = (Leaf) parent.getRightSibling(this,false);
-        
-        Leaf leftSibling = (Leaf) parent.getLeftSibling(this,false);
-        
-        /*
-         * prefer a sibling that is already materialized.
-         */
-        if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys ) {
-
-            redistributeKeys((Leaf)rightSibling.copyOnWrite());
-            
-            return;
-            
-        }
-
-        if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
-
-            redistributeKeys((Leaf)leftSibling.copyOnWrite());
-            
-            return;
-            
-        }
-        
-        /*
-         * if either sibling was not materialized, then materialize and test
-         * that sibling.
-         */
-        if( rightSibling == null ) {
-            
-            rightSibling = (Leaf) parent.getRightSibling(this,true);
-            
-            if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys  ) {
-
-                redistributeKeys((Leaf)rightSibling.copyOnWrite());
-                
-                return;
-                
-            }
-
-        }
-
-        if( leftSibling == null ) {
-            
-            leftSibling = (Leaf) parent.getLeftSibling(this,true);
-            
-            if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
-
-                redistributeKeys((Leaf)leftSibling.copyOnWrite());
-                
-                return;
-                
-            }
-
-        }
-
-        /*
-         * by now the left and right siblings have both been materialized. At
-         * least one sibling must be non-null. Since neither sibling was over
-         * the minimum, we now merge this node with a sibling and remove the
-         * separator key from the parent.
-         */
-        
-        if( rightSibling != null ) {
-            
-            merge(rightSibling);
-            
-            return;
-            
-        } else if( leftSibling != null ) {
-            
-            merge(leftSibling);
-            
-            return;
-            
-        } else {
-            
-            throw new AssertionError();
-            
-        }
-        
-    }
+//    /**
+//     * Invoked when a leaf has become deficient (too few keys/values). This
+//     * method is never invoked for the root leaf therefore the parent of this
+//     * leaf must be defined. Further, since the minimum #of children is two (2)
+//     * for the smallest branching factor three (3), there is always a sibling to
+//     * consider.
+//     * 
+//     * consider the immediate siblings. if either is materialized and has more
+//     * than the minimum #of values, then redistribute the values evenly between
+//     * this leaf and that sibling and update the separation key in the parent to
+//     * reflect the new partitioning of the values between the leaves. if either
+//     * is materialized and has only the minimum #of values, then merge this leaf
+//     * with that sibling and update the parent by removing the separator key.
+//     * 
+//     * If no materialized immediate sibling meets these criteria, then first
+//     * materialize and test the right sibling. if the right sibling does not
+//     * meet these criteria, then materialize and test the left sibling.
+//     * 
+//     * Note that (a) we prefer to merge a materialized sibling with this leaf to
+//     * materializing a sibling; and (b) merging siblings is the only way that a
+//     * separator key is removed from a parent. If the parent becomes deficient
+//     * through merging then join is invoked on the parent as well. Note that
+//     * join is never invoked on the root node (or leaf) since it by definition
+//     * has no siblings.
+//     * 
+//     * Note that we must invoked copy-on-write before modifying a sibling.
+//     * However, the parent of the leaf MUST already be mutable (aka dirty) since
+//     * that is a precondition for removing a key from the leaf. This means that
+//     * copy-on-write will not force the parent to be cloned.
+//     * 
+//     * @todo this logic in this method is identical for nodes and leaves and
+//     *       could be refactored into {@link AbstractNode}. However, the logic
+//     *       for merging and redistributing keys is specific to a {@link Node}
+//     *       or a {@link Leaf} since they have different internal arrays that
+//     *       must be considered.
+//     */
+//    protected void join() {
+//
+//        // verify that this leaf is deficient.
+//        assert nkeys < minKeys;
+//        // verify that the leaf is mutable.
+//        assert isDirty();
+//        assert !isPersistent();
+//        // verify that the leaf is not the root.
+//        assert btree.root != this;
+//        
+//        final Node parent = getParent();
+//
+//        /*
+//         * Look for, but do not materialize, the left and right siblings.
+//         * 
+//         * Note that we defer invoking copy-on-write for the left/right sibling
+//         * until we are sure which sibling we will use.
+//         */
+//        
+//        Leaf rightSibling = (Leaf) parent.getRightSibling(this,false);
+//        
+//        Leaf leftSibling = (Leaf) parent.getLeftSibling(this,false);
+//        
+//        /*
+//         * prefer a sibling that is already materialized.
+//         */
+//        if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys ) {
+//
+//            redistributeKeys((Leaf)rightSibling.copyOnWrite());
+//            
+//            return;
+//            
+//        }
+//
+//        if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
+//
+//            redistributeKeys((Leaf)leftSibling.copyOnWrite());
+//            
+//            return;
+//            
+//        }
+//        
+//        /*
+//         * if either sibling was not materialized, then materialize and test
+//         * that sibling.
+//         */
+//        if( rightSibling == null ) {
+//            
+//            rightSibling = (Leaf) parent.getRightSibling(this,true);
+//            
+//            if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys  ) {
+//
+//                redistributeKeys((Leaf)rightSibling.copyOnWrite());
+//                
+//                return;
+//                
+//            }
+//
+//        }
+//
+//        if( leftSibling == null ) {
+//            
+//            leftSibling = (Leaf) parent.getLeftSibling(this,true);
+//            
+//            if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
+//
+//                redistributeKeys((Leaf)leftSibling.copyOnWrite());
+//                
+//                return;
+//                
+//            }
+//
+//        }
+//
+//        /*
+//         * by now the left and right siblings have both been materialized. At
+//         * least one sibling must be non-null. Since neither sibling was over
+//         * the minimum, we now merge this node with a sibling and remove the
+//         * separator key from the parent.
+//         */
+//        
+//        if( rightSibling != null ) {
+//            
+//            merge(rightSibling);
+//            
+//            return;
+//            
+//        } else if( leftSibling != null ) {
+//            
+//            merge(leftSibling);
+//            
+//            return;
+//            
+//        } else {
+//            
+//            throw new AssertionError();
+//            
+//        }
+//        
+//    }
     
     /**
-     * Redistributes some of the keys from the specified sibling into this leaf
-     * in order to bring this leaf up to at least the minimum #of keys. This
-     * also updates a separator key in the parent for the right most leaf of
-     * (this, sibling).
+     * Redistributes a key from the specified sibling into this leaf in order to
+     * bring this leaf up to the minimum #of keys. This also updates the
+     * separator key in the parent for the right most of (this, sibling).
      * 
      * @param sibling
      *            A direct sibling of this leaf (either the left or right
      *            sibling). The sibling MUST be mutable.
-     * 
-     * @todo this moves only one key. is it better to move more keys at once so
-     *       we to most-evenly redistribute the keys? under what circumstances
-     *       does this make a difference and how much of a difference does it
-     *       make?  the choice certainly impacts the ability to write detailed
-     *       tests.
      */
-    protected void redistributeKeys(Leaf sibling) {
+    protected void redistributeKeys(AbstractNode sibling) {
 
+        // the sibling of a leaf must be a leaf.
+        final Leaf s = (Leaf) sibling;
+        
         assert isDirty();
         assert !isDeleted();
         assert !isPersistent();
@@ -566,17 +568,17 @@ public class Leaf extends AbstractNode {
         // verify that this leaf is under minimum capacity by one key.
         assert nkeys == minKeys - 1;
         
-        assert sibling != null;
+        assert s != null;
         // the sibling MUST be _OVER_ the minimum #of keys/values.
-        assert sibling.nkeys > minKeys;
-        assert sibling.isDirty();
-        assert !sibling.isDeleted();
-        assert !sibling.isPersistent();
+        assert s.nkeys > minKeys;
+        assert s.isDirty();
+        assert !s.isDeleted();
+        assert !s.isPersistent();
         
         final Node p = getParent();
         
         // children of the same node.
-        assert sibling.getParent() == p;
+        assert s.getParent() == p;
         
         /*
          * The index of this leaf in its parent. we note this before we
@@ -588,7 +590,7 @@ public class Leaf extends AbstractNode {
          * determine which leaf is earlier in the key ordering and get the
          * index of the sibling.
          */
-        if( keys[nkeys-1] < sibling.keys[0]) {
+        if( keys[nkeys-1] < s.keys[0]) {
         
             /*
              * redistributeKeys(this,rightSibling). all we have to do is move
@@ -599,25 +601,25 @@ public class Leaf extends AbstractNode {
              */
 
             // copy the first key from the rightSibling.
-            keys[nkeys] = sibling.keys[0];
-            values[nkeys] = sibling.values[0];
+            keys[nkeys] = s.keys[0];
+            values[nkeys] = s.values[0];
             
             // copy down the keys on the right sibling to cover up the hole.
-            System.arraycopy(sibling.keys, 1, sibling.keys, 0, sibling.nkeys-1);
-            System.arraycopy(sibling.values, 1, sibling.values, 0, sibling.nkeys-1);
+            System.arraycopy(s.keys, 1, s.keys, 0, s.nkeys-1);
+            System.arraycopy(s.values, 1, s.values, 0, s.nkeys-1);
 
             // erase exposed key/value on rightSibling that is no longer defined.
-            sibling.keys[sibling.nkeys-1] = BTree.NEGINF;
-            sibling.values[sibling.nkeys-1] = null;
+            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.values[s.nkeys-1] = null;
 
             // update the separator key for the rightSibling.
-            p.keys[index] = sibling.keys[0];
+            p.keys[index] = s.keys[0];
 
-            sibling.nkeys--;
+            s.nkeys--;
             this.nkeys++;
             
             assertInvariants();
-            sibling.assertInvariants();
+            s.assertInvariants();
 
         } else {
             
@@ -634,18 +636,18 @@ public class Leaf extends AbstractNode {
             System.arraycopy(values, 0, values, 1, nkeys);
             
             // move the last key/value from the leftSibling to this leaf.
-            keys[0] = sibling.keys[sibling.nkeys-1];
-            values[0] = sibling.values[sibling.nkeys-1];
-            sibling.keys[sibling.nkeys-1] = BTree.NEGINF;
-            sibling.values[sibling.nkeys-1] = null;
-            sibling.nkeys--;
+            keys[0] = s.keys[s.nkeys-1];
+            values[0] = s.values[s.nkeys-1];
+            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.values[s.nkeys-1] = null;
+            s.nkeys--;
             this.nkeys++;
             
             // update the separator key for this leaf.
             p.keys[index-1] = keys[0];
 
             assertInvariants();
-            sibling.assertInvariants();
+            s.assertInvariants();
 
         }
 
@@ -661,24 +663,27 @@ public class Leaf extends AbstractNode {
      *            A direct sibling of this leaf (does NOT need to be mutable).
      *            The sibling MUST have exactly the minimum #of keys.
      */
-    protected void merge(Leaf sibling) {
+    protected void merge(AbstractNode sibling) {
         
-        assert sibling != null;
-        assert !sibling.isDeleted();
+        // the sibling of a leaf must be a leaf.
+        final Leaf s = (Leaf)sibling;
+        
+        assert s != null;
+        assert !s.isDeleted();
         // the sibling MUST at the minimum #of keys/values.
-        assert sibling.nkeys == sibling.minKeys;
+        assert s.nkeys == s.minKeys;
 
         final Node p = getParent();
         
         // children of the same node.
-        assert sibling.getParent() == p;
+        assert s.getParent() == p;
 
         /*
          * determine which leaf is earlier in the key ordering so that we know
          * whether the sibling's keys will be inserted at the front of this
          * leaf's keys or appended to this leaf's keys.
          */
-        if( keys[nkeys-1] < sibling.keys[0]) {
+        if( keys[nkeys-1] < s.keys[0]) {
             
             /*
              * merge( this, rightSibling ). the keys and values from this leaf
@@ -696,13 +701,13 @@ public class Leaf extends AbstractNode {
             /*
              * Copy in the keys and values from the sibling.
              */
-            System.arraycopy(sibling.keys, 0, this.keys, nkeys, sibling.nkeys);
-            System.arraycopy(sibling.values, 0, this.values, nkeys, sibling.nkeys);
+            System.arraycopy(s.keys, 0, this.keys, nkeys, s.nkeys);
+            System.arraycopy(s.values, 0, this.values, nkeys, s.nkeys);
             
             /* 
              * Adjust the #of keys in this leaf.
              */
-            this.nkeys += sibling.nkeys;
+            this.nkeys += s.nkeys;
 
             /*
              * Note: in this case we have to replace the separator key for this
@@ -730,14 +735,14 @@ public class Leaf extends AbstractNode {
              */
             
             // move keys and values down by sibling.nkeys positions.
-            System.arraycopy(this.keys, 0, this.keys, sibling.nkeys, this.nkeys);
-            System.arraycopy(this.values, 0, this.values, sibling.nkeys, this.nkeys);
+            System.arraycopy(this.keys, 0, this.keys, s.nkeys, this.nkeys);
+            System.arraycopy(this.values, 0, this.values, s.nkeys, this.nkeys);
             
             // copy keys and values from the sibling to index 0 of this leaf.
-            System.arraycopy(sibling.keys, 0, this.keys, 0, sibling.nkeys);
-            System.arraycopy(sibling.values, 0, this.values, 0, sibling.nkeys);
+            System.arraycopy(s.keys, 0, this.keys, 0, s.nkeys);
+            System.arraycopy(s.values, 0, this.values, 0, s.nkeys);
             
-            this.nkeys += sibling.nkeys;
+            this.nkeys += s.nkeys;
             
             assertInvariants();
             
@@ -747,7 +752,7 @@ public class Leaf extends AbstractNode {
          * The sibling leaf is now empty. We need to detach the leaf from its
          * parent node and then delete the leaf from the store.
          */
-        p.removeChild(sibling);
+        p.removeChild(s);
         
     }
     

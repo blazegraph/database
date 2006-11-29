@@ -767,7 +767,234 @@ public class Node extends AbstractNode {
         return rightSibling;
 
     }
+    
+    /**
+     * Redistributes a key from the specified sibling into this node in order to
+     * bring this node up to the minimum #of keys. This also updates a separator
+     * key in the parent for the right most of (this, sibling).
+     * 
+     * @param sibling
+     *            A direct sibling of this node (either the left or right
+     *            sibling). The sibling MUST be mutable.
+     */
+    protected void redistributeKeys(AbstractNode sibling) {
 
+        // the sibling of a Node must be a Node.
+        final Node s = (Node) sibling;
+        
+        assert isDirty();
+        assert !isDeleted();
+        assert !isPersistent();
+        // verify that this leaf is deficient.
+        assert nkeys < minKeys;
+        // verify that this leaf is under minimum capacity by one key.
+        assert nkeys == minKeys - 1;
+        
+        assert s != null;
+        // the sibling MUST be _OVER_ the minimum #of keys/values.
+        assert s.nkeys > minKeys;
+        assert s.isDirty();
+        assert !s.isDeleted();
+        assert !s.isPersistent();
+        
+        final Node p = getParent();
+        
+        // children of the same node.
+        assert s.getParent() == p;
+        
+        /*
+         * The index of this leaf in its parent. we note this before we
+         * start mucking with the keys.
+         */
+        final int index = p.getIndexOf(this);
+        
+        /*
+         * determine which leaf is earlier in the key ordering and get the
+         * index of the sibling.
+         */
+        if( keys[nkeys-1] < s.keys[0]) {
+        
+            /*
+             * redistributeKeys(this,rightSibling). all we have to do is move
+             * the first key from the rightSibling to the end of the keys in
+             * this node. we then close up the hole that this left at index 0 in
+             * the rightSibling. finally, we update the separator key for the
+             * rightSibling to the new key in its first index position.
+             */
+
+            // copy the first key from the rightSibling.
+            keys[nkeys] = s.keys[0];
+            childRefs[nkeys] = s.childRefs[0];
+            childKeys[nkeys] = s.childKeys[0];
+            // FIXME verify fenceposts and update dirtyChildren.
+            
+            // copy down the keys on the right sibling to cover up the hole.
+            System.arraycopy(s.keys, 1, s.keys, 0, s.nkeys-1);
+            System.arraycopy(s.childRefs, 1, s.childRefs, 0, s.nkeys);
+            System.arraycopy(s.childKeys, 1, s.childKeys, 0, s.nkeys);
+            // FIXME verify fenceposts and update dirtyChildren.
+
+            // erase exposed key/value on rightSibling that is no longer defined.
+            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.childRefs[s.nkeys] = null;
+            s.childKeys[s.nkeys] = NULL;
+            // FIXME verify fenceposts and update dirtyChildren.
+
+            // update the separator key for the rightSibling.
+            p.keys[index] = s.keys[0];
+
+            s.nkeys--;
+            this.nkeys++;
+            
+            assertInvariants();
+            s.assertInvariants();
+
+        } else {
+            
+            /*
+             * redistributeKeys(leftSibling,this). all we have to do is copy
+             * down the keys in this node by one position and move the last key
+             * from the leftSibling into the first position in this node. We
+             * then replace the separation key for this node on the parent with
+             * the key that we copied from the leftSibling.
+             */
+            
+            // copy down by one.
+            System.arraycopy(keys, 0, keys, 1, nkeys);
+            System.arraycopy(childRefs, 0, childRefs, 1, nkeys+1);
+            System.arraycopy(childKeys, 0, childKeys, 1, nkeys+1);
+            // FIXME verify fenceposts and update dirtyChildren.
+            
+            // move the last key/value from the leftSibling to this leaf.
+            keys[0] = s.keys[s.nkeys-1];
+            childRefs[0] = s.childRefs[s.nkeys];
+            childKeys[0] = s.childKeys[s.nkeys];
+            s.keys[s.nkeys] = BTree.NEGINF;
+            s.childRefs[s.nkeys] = null;
+            s.childKeys[s.nkeys] = NULL;
+            s.nkeys--;
+            this.nkeys++;
+            
+            // update the separator key for this leaf.
+            p.keys[index-1] = keys[0];
+
+            assertInvariants();
+            s.assertInvariants();
+
+        }
+
+    }
+
+    /**
+     * Merge the keys and values from the sibling into this node, delete the
+     * sibling from the store and remove the sibling from the parent. This will
+     * trigger recursive {@link AbstractNode#join()} if the parent node is now
+     * deficient.
+     * 
+     * @param sibling
+     *            A direct sibling of this node (does NOT need to be mutable).
+     *            The sibling MUST have exactly the minimum #of keys.
+     */
+    protected void merge(AbstractNode sibling) {
+
+        // the sibling of a Node must be a Node.
+        final Node s = (Node) sibling;
+
+        assert s != null;
+        assert !s.isDeleted();
+        // the sibling MUST at the minimum #of keys/values.
+        assert s.nkeys == s.minKeys;
+
+        final Node p = getParent();
+        
+        // children of the same node.
+        assert s.getParent() == p;
+
+        /*
+         * determine which node is earlier in the key ordering so that we know
+         * whether the sibling's keys will be inserted at the front of this
+         * nodes's keys or appended to this nodes's keys.
+         */
+        if( keys[nkeys-1] < s.keys[0]) {
+            
+            /*
+             * merge( this, rightSibling ). the keys and values from this node
+             * will appear in their current position and the keys and values
+             * from the rightSibling will be appended after the last key/value
+             * in this node.
+             */
+
+            /*
+             * The index of this node in its parent. we note this before we
+             * start mucking with the keys.
+             */
+            final int index = p.getIndexOf(this);
+            
+            /*
+             * Copy in the keys and children from the sibling.
+             */
+            System.arraycopy(s.keys, 0, this.keys, nkeys, s.nkeys);
+            System.arraycopy(s.childRefs, 0, this.childRefs, nkeys, s.nkeys+1);
+            System.arraycopy(s.childKeys, 0, this.childKeys, nkeys, s.nkeys+1);
+            
+            // FIXME move the dirtyChildren information and verify fenceposts.
+            
+            /* 
+             * Adjust the #of keys in this leaf.
+             */
+            this.nkeys += s.nkeys;
+
+            /*
+             * Note: in this case we have to replace the separator key for this
+             * node with the separator key for its right sibling.
+             * 
+             * Note: This temporarily causes the duplication of a separator key
+             * in the parent. However, the separator key for the right sibling
+             * will be deleted when the sibling is removed from the parent
+             * below.
+             */
+            p.keys[index] = p.keys[index+1];
+            
+            assertInvariants();
+            
+        } else {
+            
+            /*
+             * merge( leftSibling, this ). the keys and values from this node
+             * will be move down by sibling.nkeys positions and then the keys
+             * and values from the sibling will be copied into this node
+             * starting at index zero(0).
+             * 
+             * Note: in this case the separator key in the parent node does not
+             * change.
+             */
+            
+            // move keys and children down by sibling.nkeys positions.
+            System.arraycopy(this.keys, 0, this.keys, s.nkeys, this.nkeys);
+            System.arraycopy(this.childRefs, 0, this.childRefs, s.nkeys, this.nkeys+1);
+            System.arraycopy(this.childKeys, 0, this.childKeys, s.nkeys, this.nkeys+1);
+//          FIXME move the dirtyChildren information and verify fenceposts.
+            
+            // copy keys and values from the sibling to index 0 of this leaf.
+            System.arraycopy(s.keys, 0, this.keys, 0, s.nkeys);
+            System.arraycopy(s.childRefs, 0, this.childRefs, 0, s.nkeys+1);
+            System.arraycopy(s.childKeys, 0, this.childKeys, 0, s.nkeys+1);            
+//          FIXME move the dirtyChildren information and verify fenceposts.
+            
+            this.nkeys += s.nkeys;
+            
+            assertInvariants();
+            
+        }
+        
+        /*
+         * The sibling leaf is now empty. We need to detach the leaf from its
+         * parent node and then delete the leaf from the store.
+         */
+        p.removeChild(s);
+        
+    }
+    
     /**
      * Invoked to insert a key and reference for a child created when
      * another child of this node is split.
@@ -862,41 +1089,6 @@ public class Node extends AbstractNode {
 
         assertInvariants();
 
-    }
-
-    /**
-     * Invoked when a node has become deficient (too few children). This method
-     * is responsible for producing a well-formed tree by either re-distributing
-     * children among this node and an immediate sibling or by merging this node
-     * and an immediate sibling.
-     * 
-     * consider the immediate siblings. if either is materialized and has more
-     * than the minimum #of children, then redistribute the children evenly
-     * between this node and that sibling and update the separation key in the
-     * parent to reflect the new partitioning of the children. if either is
-     * materialized and has only the minimum #of children, then merge this node
-     * with that sibling and update the parent by removing the separator key.
-     * 
-     * If no materialized immediate sibling meets these criteria, then first
-     * materialize and test the right sibling. if the right sibling does not
-     * meet these criteria, then materialize and test the left sibling.
-     * 
-     * Note that (a) we prefer to merge a materialized sibling with this node to
-     * materializing a sibling; and (b) merging siblings is the only way that a
-     * separator key is removed from a parent. If the parent becomes deficient
-     * through merging then join is invoked on the parent as well. Note that
-     * join is never invoked on the root node (or leaf) since it by definition
-     * has no siblings.
-     * 
-     * FIXME Implement Node.join()
-     */
-    protected void join() {
-        
-        // verify that this node is deficient.
-        assert nkeys < minKeys;
-        
-        throw new UnsupportedOperationException();
-        
     }
     
     /**

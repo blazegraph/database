@@ -307,12 +307,13 @@ public class BTree implements IBTree {
 
         node.referenceCount++;
   
-        assert node.isLeaf();
+//        assert node.isLeaf();
         
-//        if (node.isLeaf()) {
+        if (node.isLeaf()) {
 
             leafQueue.append(node);
 
+        }
 //        } else {
 //
 //            leafQueue.append(node);
@@ -399,10 +400,6 @@ public class BTree implements IBTree {
 
         this.leafQueue = hardReferenceQueue;
 
-//        // @todo debug and substitute the FastLeafSplitRule.
-//        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
-//        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
-
         this.nodeSer = new NodeSerializer(valueSer);
 
         int maxNodeOrLeafSize = Math.max(
@@ -463,10 +460,6 @@ public class BTree implements IBTree {
          * the btree.
          */
         final long rootId = read(metadataId);
-
-//        // @todo debug and substitute the FastLeafSplitRule.
-//        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
-//        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
 
         this.nodeSer = new NodeSerializer(valueSer);
         

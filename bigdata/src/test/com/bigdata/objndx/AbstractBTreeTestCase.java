@@ -1286,9 +1286,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The #of distinct keys.
      * @param ntrials
      *            The #of trials.
-     * 
-     * FIXME add logic to validate that we do not wind up with empty nodes or
-     *       empty leaves.
      */
     public void doInsertLookupRemoveStressTest(int m,int nkeys,int ntrials) {
         

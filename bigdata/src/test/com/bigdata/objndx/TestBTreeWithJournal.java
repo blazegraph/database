@@ -138,9 +138,8 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
      * or the running time will be too long (I am using an expontential #of keys
      * by default).
      * 
-     * @todo For sequential keys and the simple split rule, m=128 causes the
-     * journal to exceed its initial extent. Try this again with a modified
-     * split rule that splits high for dense leaves.
+     * Note: For sequential keys, m=128 causes the journal to exceed its initial
+     * extent.
      */
     int[] branchingFactors = new int[]{3,4,5,10,20};//,64};//,128};//,512};
     
@@ -241,7 +240,6 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
 
-            if( m == 3 ) continue;  // FIXME fenceposts at m == 3.
             doInsertLookupRemoveStressTest(m, nkeys, ntrials);
             
         }
@@ -260,7 +258,6 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            if( m == 3 ) continue;  // FIXME fenceposts at m == 3.
             doRemoveStructureStressTest(m,nkeys);
             
         }
