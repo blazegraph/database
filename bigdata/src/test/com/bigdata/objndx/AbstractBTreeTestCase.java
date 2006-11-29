@@ -86,6 +86,110 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         super(name);
     }
     
+    /**
+     * Test helper verifies the #of keys, their ordered values, and that all
+     * keys beyond the last defined key are {@link IBTree#NEGINF}.
+     * 
+     * @param msg
+     *            A label, typically the node name.
+     * @param keys
+     *            An array containing the expected defined keys. The #of values
+     *            in this array should be exactly the #of defined keys (that is,
+     *            do not include trailing zeros or attempt to size the array to
+     *            the branching factor of the tree).
+     */
+    public void assertKeys(String msg, int[] keys, AbstractNode node ) {
+        
+        assert keys != null;
+        
+        int nkeys = keys.length;
+        
+        if( msg == null ) {
+            
+            msg = "";
+            
+        }
+
+        // verify the capacity of the keys[] on the node.
+        assertEquals(msg+"keys[] capacity", node.maxKeys+1, node.keys.length );
+        
+        // verify the #of defined keys.
+        assertEquals(msg+"nkeys", nkeys, node.nkeys);
+        
+        // verify ordered values for the defined keys.
+        for( int i=0; i<nkeys; i++ ) {
+
+            assertEquals(msg+"keys["+i+"]", keys[i], node.keys[i]);
+            
+        }
+        
+        // verify the undefined keys are all NEGINF.
+        for( int i=nkeys; i<node.keys.length; i++ ) {
+            
+            assertEquals(msg+"keys["+i+"]", IBTree.NEGINF, node.keys[i]);
+            
+        }
+        
+    }
+
+    public void assertKeys(int[] keys, AbstractNode node ) {
+        
+        assertKeys("",keys,node);
+        
+    }
+    
+    /**
+     * Test helper verifies the #of values, their ordered values, and that all
+     * values beyond the last defined value are <code>null</code>.
+     * 
+     * @param msg
+     *            A label, typically the node name.
+     * @param values
+     *            An array containing the expected defined values. The #of
+     *            values in this array should be exactly the #of defined values
+     *            (that is, do not include trailing nulls or attempt to size the
+     *            array to the branching factor of the tree).
+     */
+    public void assertValues(String msg, Object[] values, Leaf leaf ) {
+        
+        assert values != null;
+        
+        int nvalues = values.length;
+        
+        if( msg == null ) {
+            
+            msg = "";
+            
+        }
+
+        // verify the capacity of the values[] on the node.
+        assertEquals(msg+"values[] capacity", leaf.maxKeys+1, leaf.values.length );
+        
+        // verify the #of defined values (same as the #of defined keys).
+        assertEquals(msg+"nvalues", nvalues, leaf.nkeys);
+        
+        // verify ordered values for the defined values.
+        for( int i=0; i<nvalues; i++ ) {
+
+            assertEquals(msg+"values["+i+"]", values[i], leaf.values[i]);
+            
+        }
+        
+        // verify the undefined values are all null.
+        for( int i=nvalues; i<leaf.values.length; i++ ) {
+            
+            assertEquals(msg+"values["+i+"]", null, leaf.values[i]);
+            
+        }
+        
+    }
+
+    public void assertValues(Object[] values, Leaf leaf ) {
+        
+        assertValues("",values,leaf);
+        
+    }
+    
     public void assertSameNodeOrLeaf(AbstractNode n1, AbstractNode n2 ) {
         
         if( n1 == n2 ) return;
@@ -649,7 +753,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // Note: The height, #of nodes, and #of leaves is path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
 
-        assertTrue(btree.dump(System.err));
+        assertTrue(btree.dump(/*Level.DEBUG,*/System.err));
 
         /*
          * Verify entries in the expected order.

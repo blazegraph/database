@@ -71,14 +71,33 @@ import cutthecrap.utils.striterators.Striterator;
 public class Node extends AbstractNode {
 
     /**
+     * <p>
      * Hard reference cache containing dirty child nodes (nodes or leaves).
+     * </p>
+     * <p>
+     * This cache is pre-sized to its maximum capacity, which is
+     * <code>branchingFactor+1</code>. While there are at most
+     * <code>branchingFactor</code> children for a node, the cache is sized
+     * one larger to allow for the child reference corresponding to the key that
+     * causes overflow and forces the split may be inserted. This greatly
+     * simplifies the logic for computing the split point and performing the
+     * split.
+     * </p>
      */
     transient protected Set<AbstractNode> dirtyChildren;
 
     /**
+     * <p>
      * Weak references to child nodes (may be nodes or leaves). The capacity of
      * this array is m, where m is the {@link #branchingFactor}. Valid indices
      * are in [0:nkeys+1] since nchildren := nkeys+1 for a {@link Node}.
+     * </p>
+     * <p>
+     * This array is dimensioned to one more than the maximum capacity so that
+     * the child reference corresponding to the key that causes overflow and
+     * forces the split may be inserted. This greatly simplifies the logic for
+     * computing the split point and performing the split.
+     * </p>
      */
     transient protected WeakReference<AbstractNode>[] childRefs;
 
@@ -97,11 +116,39 @@ public class Node extends AbstractNode {
      * null entry in this array and a non-null entry in the external
      * {@link #keys} array.
      * </p>
+     * <p>
+     * This array is dimensioned to one more than the maximum capacity so that
+     * the child reference corresponding to the key that causes overflow and
+     * forces the split may be inserted. This greatly simplifies the logic for
+     * computing the split point and performing the split.
+     * </p>
      */
     long[] childKeys;
 
     /**
      * De-serialization constructor.
+     * 
+     * @param btree
+     *            The tree to which the node belongs.
+     * @param id
+     *            The persistent identity of the node.
+     * @param branchingFactor
+     *            The branching factor for the node (the maximum #of children
+     *            allowed for the node).
+     * @param nkeys
+     *            The #of defined keys in <i>keys</i>.
+     * @param keys
+     *            The external keys (the array reference is copied NOT the array
+     *            contents). The array MUST be dimensioned to
+     *            <code>branchingFactor</code> to allow room for the insert
+     *            key that places the node temporarily over capacity during a
+     *            split.
+     * @param childKeys
+     *            The persistent identity for the direct children (the array
+     *            reference is copied NOT the array contents). The array MUST be
+     *            dimensioned to <code>branchingFactor+1</code> to allow room
+     *            for the insert key that places the node temporarily over
+     *            capacity during a split.
      */
     protected Node(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, long[] childKeys) {
 
@@ -111,9 +158,9 @@ public class Node extends AbstractNode {
         
         assert nkeys < branchingFactor;
 
-        assert keys.length == branchingFactor-1;
+        assert keys.length == branchingFactor;
 
-        assert childKeys.length == branchingFactor;
+        assert childKeys.length == branchingFactor+1;
         
         setIdentity(id);
 
@@ -123,9 +170,9 @@ public class Node extends AbstractNode {
         
         this.childKeys = childKeys;
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
-        childRefs = new WeakReference[branchingFactor];
+        childRefs = new WeakReference[branchingFactor+1];
 
         // must clear the dirty since we just de-serialized this node.
         setDirty(false);
@@ -139,13 +186,13 @@ public class Node extends AbstractNode {
 
         super(btree, btree.branchingFactor);
 
-        keys = new int[branchingFactor - 1];
+        keys = new int[branchingFactor];
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
-        childRefs = new WeakReference[branchingFactor];
+        childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor];
+        childKeys = new long[branchingFactor+1];
 
     }
 
@@ -171,13 +218,13 @@ public class Node extends AbstractNode {
         // The old root must be dirty when it is being split.
         assert oldRoot.isDirty();
 
-        keys = new int[branchingFactor - 1];
+        keys = new int[branchingFactor];
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
-        childRefs = new WeakReference[branchingFactor];
+        childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor];
+        childKeys = new long[branchingFactor+1];
 
         /*
          * Replace the root node on the tree.
@@ -225,16 +272,24 @@ public class Node extends AbstractNode {
         
         assert triggeredByChild != null;
 
-        keys = new int[branchingFactor - 1];
+        keys = new int[branchingFactor];
 
         nkeys = src.nkeys;
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor);
+        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
-        childRefs = new WeakReference[branchingFactor];
+        childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor];
+        childKeys = new long[branchingFactor+1];
 
+        /*
+         * @todo Unless and until we have a means to recover leafs from a cache,
+         * can we just steal the keys[] and values[] rather than making copies?
+         * We are already doing this for the Leaf copy constructor, but I am not
+         * convinced that the situations are the same without further
+         * inspection. This is only at optimization - what is at stake is less
+         * churn on the heap.
+         */
         // Copy keys.
         System.arraycopy(src.keys, 0, keys, 0, nkeys);
 
@@ -420,8 +475,10 @@ public class Node extends AbstractNode {
      *         found.
      */
     public Object insert(int key, Object entry) {
-
+        
         assert !isDeleted();
+        
+        assertInvariants();
 
         int index = findChild(key);
 
@@ -558,13 +615,14 @@ public class Node extends AbstractNode {
 
     /**
      * <p>
-     * Split the node. The {@link BTree#nodeSplitRule} is used to compute the
-     * index (splitIndex) at which to split the node and a new rightSibling
-     * {@link Node} is created. The key at the splitIndex is known as the
-     * splitKey. The splitKey itself is lifted into the parent and does not
+     * Split an over-capacity node (a node with <code>maxKeys+1</code> keys),
+     * creating a new rightSibling. The splitIndex is <code>(maxKeys+1)/2</code>.
+     * The key at the splitIndex is the separatorKey. Unlike when we split a
+     * {@link Leaf}, the separatorKey is lifted into the parent and does not
      * appear in either this node or the rightSibling after the split. All keys
-     * and child references from splitIndex+1 are moved to the new rightSibling.
-     * The child reference for splitIndex remains in this node.
+     * and child references from <code>splitIndex+1</code> (inclusive) are
+     * moved to the new rightSibling. The child reference at
+     * <code>splitIndex</code> remains in this node.
      * </p>
      * <p>
      * If this node is the root of the tree (no parent), then a new root
@@ -572,37 +630,37 @@ public class Node extends AbstractNode {
      * node.
      * </p>
      * <p>
-     * In any case, we then insert( splitKey, rightSibling ) into the parent
+     * In any case, we then insert( separatorKey, rightSibling ) into the parent
      * node, which may cause the parent node itself to split.
      * </p>
-     * 
-     * @see BTree#nodeSplitRule
-     * 
-     * FIXME Can I write tests of {@link Node#split(int)} without creating the
-     * preconditions? E.g., by direct construction of a node with the
-     * appropriate keys and no children?
      */
-    protected AbstractNode split(int insertKey) {
+    protected AbstractNode split() {
 
         assert isDirty(); // MUST be mutable.
-        assertInvariants();
-        assert nkeys == maxKeys;
+        assert nkeys == maxKeys+1; // MUST be over capacity by one.
 
-        // the #of child references.
-        final int m = branchingFactor;
+        /*
+         * The #of child references. (this is +1 since the node is over capacity
+         * by one).
+         */
+        final int nchildren = branchingFactor+1;
         
-        // index at which to split the leaf.
-        final int splitIndex = btree.nodeSplitRule.getSplitIndex(keys,insertKey);
+        /*
+         * Index at which to split the leaf.
+         */
+        final int splitIndex = (maxKeys+1)/2;
 
-        // the key at that index, which becomes the separator key in the parent.
-        final int separatorKey = btree.nodeSplitRule.getSeparatorKey();
+        /*
+         * The key at that index, which becomes the separator key in the parent.
+         */
+        final int separatorKey = keys[splitIndex];
 
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
 
         if (btree.DEBUG) {
-            BTree.log.debug("SPLIT NODE: nkeys=" + nkeys + ", insertKey=" + insertKey
-                    + ", splitIndex=" + splitIndex + ", separatorKey="
+            BTree.log.debug("SPLIT NODE: nkeys=" + nkeys + ", splitIndex="
+                    + splitIndex + ", separatorKey="
                     + separatorKey + ": ");
             dump(System.err);
         }
@@ -613,12 +671,12 @@ public class Node extends AbstractNode {
         
         int j = 0;
 
-        for (int i = splitIndex + 1 ; i < m; i++, j++) {
+        for (int i = splitIndex + 1 ; i < nchildren; i++, j++) {
 
-            if ( i + 1 < m) {
+            if ( i + 1 < nchildren) {
             
                 /*
-                 * Note: keys[m-1] is undefined.
+                 * Note: keys[nchildren-1] is undefined.
                  */
                 rightSibling.keys[j] = keys[i];
                 
@@ -661,7 +719,7 @@ public class Node extends AbstractNode {
              * which is being moved to the parent.
              */
 
-            if (i + 1 < m) {
+            if (i + 1 < nchildren) {
             
                 keys[i] = IBTree.NEGINF;
                 
@@ -705,15 +763,6 @@ public class Node extends AbstractNode {
 
         btree.nnodes++;
 
-        /*
-         * Note: do NOT validate the invariants until after the insert key has
-         * been inserted since either this node or the new rightSibling is
-         * always deficient after a split.
-         */
-//        assertInvariants();
-//        p.assertInvariants();
-//        rightSibling.assertInvariants();
-        
         // Return the high node.
         return rightSibling;
 
@@ -730,46 +779,11 @@ public class Node extends AbstractNode {
      */
     protected void insertChild(int key, AbstractNode child) {
 
+        assertInvariants();
         assert key > IBTree.NEGINF && key < IBTree.POSINF;
         assert child != null;
         assert child.isDirty(); // always dirty since it was just created.
         assert isDirty(); // must be dirty to permit mutation.
-
-        if (nkeys == keys.length) {
-
-            /*
-             * This node is full. First split the node, then figure out which
-             * node the insert actually goes into and direct the insert to that
-             * node.
-             * 
-             * Note: the decision to insert into the high or low child after the
-             * split MUST be made in terms of the new separator key and NOT the
-             * low key of the new rightSibling. This is because a split
-             * considers the insert key as well. If the insert key needs to go
-             * into the low value of the rightSibling, then split() will report
-             * the insertKey as the separatorKey.
-             */
-
-            Node rightSibling = (Node) split(key);
-
-            Node p = getParent();
-            
-            Node insertNode = (Node) p.getChild( p.findChild(key) );
-            
-            insertNode.insertChild(key, child);
-
-            /*
-             * Note: Do NOT test the invariants here since we have not inserted
-             * the insertKey yet and one of either this node or its new
-             * rightSibling will be deficient until we do.
-             */
-//            assertInvariants();
-//            p.assertInvariants();
-//            rightSibling.assertInvariants();
-            
-            return;
-
-        }
 
         /*
          * Find the location where this key belongs. When a new node is
@@ -827,6 +841,26 @@ public class Node extends AbstractNode {
         child.parent = new WeakReference<Node>(this);
 
         nkeys++;
+
+        if (nkeys == maxKeys+1) {
+
+            /*
+             * The node is over capacity so we split the node, creating a new
+             * rightSibling and insert( separatorKey, rightSibling ) into the
+             * parent.
+             */
+
+            Node rightSibling = (Node) split();
+
+            // assert additional post-split invariants.
+            getParent().assertInvariants();
+            rightSibling.assertInvariants();
+            
+            return;
+
+        }
+
+        assertInvariants();
 
     }
 
@@ -1430,7 +1464,7 @@ public class Node extends AbstractNode {
         // Set true iff an inconsistency is detected.
         boolean ok = true;
         
-        if (nkeys < minKeys) {
+        if (parent != null && nkeys < minKeys) {
             // min keys failure.
             out.println("ERROR: too few keys: m=" + branchingFactor
                     + ", minKeys=" + minKeys + ", nkeys=" + nkeys + ", isLeaf="

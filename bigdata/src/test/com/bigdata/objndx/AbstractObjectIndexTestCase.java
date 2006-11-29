@@ -218,9 +218,9 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         assert nchildren<=branchingFactor;
         int nkeys = nchildren-1;
         
-        final int[] keys = new int[branchingFactor-1];
+        final int[] keys = new int[branchingFactor];
         
-        final long[] children = new long[branchingFactor];
+        final long[] children = new long[branchingFactor+1];
         
         // node with some valid keys and corresponding child refs.
 
@@ -269,9 +269,9 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         assert nkeys>=(branchingFactor+1)/2;
         assert nkeys<=branchingFactor;
 
-        final int[] keys = new int[branchingFactor];
+        final int[] keys = new int[branchingFactor+1];
 
-        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor];
+        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor+1];
 
         // node with some valid keys and corresponding child refs.
 

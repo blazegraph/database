@@ -183,15 +183,15 @@ public class BTree implements IBTree {
      */
     protected int branchingFactor;
 
-    /**
-     * Computes the split index when splitting a non-leaf {@link Node}.
-     */
-    final public INodeSplitRule nodeSplitRule;
-
-    /**
-     * Computes the split index when splitting a non-leaf {@link Node}.
-     */
-    final public ILeafSplitRule leafSplitRule;
+//    /**
+//     * Computes the split index when splitting a non-leaf {@link Node}.
+//     */
+//    final public INodeSplitRule nodeSplitRule;
+//
+//    /**
+//     * Computes the split index when splitting a non-leaf {@link Node}.
+//     */
+//    final public ILeafSplitRule leafSplitRule;
     
     public IRawStore getStore() {
         
@@ -399,9 +399,9 @@ public class BTree implements IBTree {
 
         this.leafQueue = hardReferenceQueue;
 
-        // @todo debug and substitute the FastLeafSplitRule.
-        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
-        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
+//        // @todo debug and substitute the FastLeafSplitRule.
+//        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
+//        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
 
         this.nodeSer = new NodeSerializer(valueSer);
 
@@ -464,9 +464,9 @@ public class BTree implements IBTree {
          */
         final long rootId = read(metadataId);
 
-        // @todo debug and substitute the FastLeafSplitRule.
-        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
-        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
+//        // @todo debug and substitute the FastLeafSplitRule.
+//        this.nodeSplitRule = new SlowNodeSplitRule(branchingFactor-1);
+//        this.leafSplitRule = new SlowLeafSplitRule(branchingFactor);
 
         this.nodeSer = new NodeSerializer(valueSer);
         

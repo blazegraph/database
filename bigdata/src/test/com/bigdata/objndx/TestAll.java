@@ -36,10 +36,6 @@ public class TestAll extends TestCase {
 
         // test search of int[] keys.
         suite.addTestSuite( TestSearch.class );
-        // test ILeafSplitRule - see src/architecture/btree.xls
-        suite.addTestSuite( TestLeafSplitRule.class );
-        // test INodeSplitRule - see src/architecture/btree.xls
-        suite.addTestSuite( TestNodeSplitRule.class );
         // test assertions that test for node/leaf invariants.
         suite.addTestSuite( TestInvariants.class );
         // test finding a child of a node by its key.

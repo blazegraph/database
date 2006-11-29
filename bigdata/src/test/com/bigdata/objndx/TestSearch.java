@@ -95,11 +95,7 @@ public class TestSearch extends TestCase {
      * correct lookup of keys that exist and the correct insertion point when
      * the key does not exist.
      * 
-     * @todo expand to test when nkeys != keys.length.
-     * 
-     * @todo Consider test helper to compare the first N elements from arrays
-     *       that may have different lengths. This would make it easier to focus
-     *       on the keys that must be defined.
+     * @todo expand to test when nkeys != keys.length using a new test helper?
      */
     public void test_keySearch01()
     {

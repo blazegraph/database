@@ -71,7 +71,15 @@ import cutthecrap.utils.striterators.SingleValueIterator;
 public class Leaf extends AbstractNode {
 
     /**
-     * The values of the tree.
+     * <p>
+     * The values of the tree. There is one value per key for a leaf.
+     * </p>
+     * <p>
+     * This array is dimensioned to one more than the maximum capacity so that
+     * the value corresponding to the key that causes overflow and forces the
+     * split may be inserted. This greatly simplifies the logic for computing
+     * the split point and performing the split.
+     * </p>
      */
     protected Object[] values;
 
@@ -89,10 +97,14 @@ public class Leaf extends AbstractNode {
      *            elements in <i>values</i>).
      * @param keys
      *            The keys (the array reference is copied, NOT the array
-     *            contents).
+     *            contents). The keys array MUST be dimensions to
+     *            <code>branchingFactor+1</code> to allow room for the insert
+     *            key that forces a split.
      * @param values
      *            The values (the array reference is copied, NOT the array
-     *            values).
+     *            values).The values array MUST be dimensions to
+     *            <code>branchingFactor+1</code> to allow room for the value
+     *            corresponding to the insert key that forces a split.
      */
     protected Leaf(BTree btree, long id, int branchingFactor, int nkeys,
             int[] keys, Object[] values) {
@@ -103,11 +115,11 @@ public class Leaf extends AbstractNode {
         
         assert keys != null;
         
-        assert keys.length == branchingFactor;
+        assert keys.length == branchingFactor+1;
         
         assert values != null;
 
-        assert values.length == branchingFactor;
+        assert values.length == branchingFactor+1;
         
         setIdentity(id);
 
@@ -135,10 +147,9 @@ public class Leaf extends AbstractNode {
 
         super(btree, btree.getBrachingFactor());
 
-        // nkeys == nvalues for a Leaf.
-        keys = new int[branchingFactor];
+        keys = new int[branchingFactor+1];
 
-        values = new Object[branchingFactor];
+        values = new Object[branchingFactor+1];
 
         /*
          * Add to the hard reference queue. If the queue is full, then this will
@@ -165,9 +176,9 @@ public class Leaf extends AbstractNode {
         nkeys = src.nkeys;
 
         // nkeys == nvalues for a Leaf.
-        keys = new int[branchingFactor];
+        keys = new int[branchingFactor+1];
 
-        values = (Object[])new Object[branchingFactor];
+        values = (Object[])new Object[branchingFactor+1];
 
         /*
          * Note: Unless and until we have a means to recover leafs from a cache,
@@ -220,13 +231,15 @@ public class Leaf extends AbstractNode {
      */
     public Object insert(int key, Object entry) {
 
+        assertInvariants();
+        
         btree.touch(this);
 
         /*
-         * Note: This is one of the few gateways for mutation of a leaf via
-         * the main btree API (insert, lookup, delete). By ensuring that we
-         * have a mutable leaf here, we can assert that the leaf must be
-         * mutable in other methods.
+         * Note: This is one of the few gateways for mutation of a leaf via the
+         * main btree API (insert, lookup, delete). By ensuring that we have a
+         * mutable leaf here, we can assert that the leaf must be mutable in
+         * other methods.
          */
         Leaf copy = (Leaf) copyOnWrite();
 
@@ -248,7 +261,7 @@ public class Leaf extends AbstractNode {
 
             /*
              * The key is already present in the leaf, so we are updating an
-             * existing entry.  For this case we do NOT split the leaf.
+             * existing entry.
              */
 
             Object tmp = values[index];
@@ -259,42 +272,8 @@ public class Leaf extends AbstractNode {
 
         }
 
-        if (nkeys == maxKeys) {
-
-            /*
-             * Split this leaf into a low leaf (this leaf) and a high leaf
-             * (returned by split()). If the key is greater than or equal to the
-             * first key in the high leaf then the insert is directed into the
-             * high leaf. Otherwise it goes into this leaf (the low leaf).
-             * 
-             * Note: the decision to insert into the high or low leaf MUST be
-             * made in terms of the new separator key and NOT the low key of the
-             * high leaf. this is because a split considers the insert key as
-             * well. When necessary, the insertKey is reported as the new
-             * separatorKey such that the insertKey will be directed into the
-             * new rightSibling.
-             */
-
-            Leaf rightSibling = (Leaf) split(key);
-
-            Node p = getParent();
-            
-            Leaf insertLeaf = (Leaf) p.getChild( p.findChild(key) );
-            
-            final Object oldValue = insertLeaf.insert(key, entry);
-           
-            // assert invarients post-split.
-            assertInvariants();
-            rightSibling.assertInvariants();
-            getParent().assertInvariants();
-
-            // return the old value.
-            return oldValue;
-            
-        }
-
         /*
-         * The insert goes into this leaf and the leaf is not at capacity.
+         * The insert goes into this leaf.
          */
         
         // Convert the position to obtain the insertion point.
@@ -305,6 +284,23 @@ public class Leaf extends AbstractNode {
 
         // one more entry in the btree.
         btree.nentries++;
+
+        if (nkeys == maxKeys+1) {
+
+            /*
+             * The insert caused the leaf to overflow, so now we split the leaf.
+             */
+
+            Leaf rightSibling = (Leaf) split();
+
+            // assert additional invarients post-split.
+            rightSibling.assertInvariants();
+            getParent().assertInvariants();
+
+        }
+
+        // assert invarients post-split.
+        assertInvariants();
 
         // the key was not found.
         return null;
@@ -331,44 +327,50 @@ public class Leaf extends AbstractNode {
 
     /**
      * <p>
-     * Split the leaf. The {@link BTree#leafSplitRule} is used to compute the
-     * index (splitIndex) at which to split the leaf and a new rightSibling
-     * {@link Leaf} is created and the separatorKey to be inserted into the
-     * parent. All keys and values starting with splitIndex are moved to the new
-     * rightSibling. If this leaf is the root of the tree (no parent), then a
-     * new root {@link Node} is created without any keys and is made the parent
-     * of this leaf. In any case, we then insert( separatorKey, rightSibling )
-     * into the parent node, which may cause the parent node itself to split.
+     * Split an over capacity leaf (a leaf with maxKeys+1 keys), creating a new
+     * rightSibling. The splitIndex (the index of the first key to move to the
+     * rightSibling) is <code>(maxKeys+1)/2</code>. The key at the splitIndex
+     * is also inserted as the new separatorKey into the parent. All keys and
+     * values starting with splitIndex are moved to the new rightSibling. If
+     * this leaf is the root of the tree (no parent), then a new root
+     * {@link Node} is created without any keys and is made the parent of this
+     * leaf. In any case, we then insert( separatorKey, rightSibling ) into the
+     * parent node, which may cause the parent node itself to split.
      * </p>
      * 
      * @return The new rightSibling leaf.
      */
-    protected AbstractNode split(int insertKey) {
+    protected AbstractNode split() {
 
         // MUST be mutable.
         assert isDirty();
-        assertInvariants();
-        // MUST be at maximum capacity.
-        assert nkeys == maxKeys;
+        // MUST be an overflow.
+        assert nkeys == maxKeys+1;
 
-        // index at which to split the leaf.
-        final int splitIndex = btree.leafSplitRule.getSplitIndex(keys,insertKey);
+        /*
+         * The splitIndex is the index of the first key/value to move to the new
+         * rightSibling.
+         */
+        final int splitIndex = (maxKeys+1)/2;
 
-        // the key at that index, which becomes the separator key in the parent.
-        final int separatorKey = btree.leafSplitRule.getSeparatorKey();
+        /*
+         * The key at the splitIndex also serves as the separator key when we
+         * insert( separatorKey, rightSibling ) into the parent.
+         */
+        final int separatorKey = keys[splitIndex];
 
         // the new rightSibling of this leaf.
         final Leaf rightSibling = new Leaf(btree);
 
         if (btree.DEBUG) {
-            BTree.log.debug("SPLIT LEAF: nkeys=" + nkeys + ", insertKey=" + insertKey
-                    + ", splitIndex=" + splitIndex + ", separatorKey="
+            BTree.log.debug("SPLIT LEAF: nkeys=" + nkeys + ", splitIndex="
+                    + splitIndex + ", separatorKey="
                     + separatorKey + ": ");
             dump(System.err);
         }
 
         int j = 0;
-        for (int i = splitIndex; i < maxKeys; i++, j++) {
+        for (int i = splitIndex; i <= maxKeys; i++, j++) {
 
             // copy key and value to the new leaf.
             rightSibling.keys[j] = keys[i];
@@ -402,17 +404,10 @@ public class Leaf extends AbstractNode {
          */
         p.insertChild(separatorKey, rightSibling);
 
-        // Note: do NOT test the invariants until after the insert key has been
-        // inserted.
-//        assertInvariants();
-//        rightSibling.assertInvariants();
-//        p.assertInvariants();
-
         // Return the high leaf.
         return rightSibling;
 
     }
-
 
     /**
      * Invoked when a leaf has become deficient (too few keys/values). This
@@ -772,53 +767,35 @@ public class Leaf extends AbstractNode {
      */
     protected void insert(int key, int index, Object entry) {
 
-        assert key != NULL;
+        assert key != BTree.NEGINF;
         assert index >= 0 && index <= nkeys;
         assert entry != null;
 
-        /*
-         * Note: do NOT test the invariants here since this may be called on an
-         * undercapacity post-split leaf in order to bring it up to its minimum
-         * capacity.
-         */
-//        assertInvariants();
+        if (index < nkeys) {
 
-        if (nkeys == keys.length) {
-
-            throw new RuntimeException("Overflow: key=" + key + ", index="
-                    + index);
-
-        } else {
-
-            if (index < nkeys) {
-
-                /* index = 2;
-                 * nkeys = 6;
-                 * 
-                 * [ 0 1 2 3 4 5 ]
-                 *       ^ index
-                 * 
-                 * count = keys - index = 4;
-                 */
-                final int count = nkeys - index;
-
-                assert count >= 1;
-
-                copyDown(index, count);
-
-            }
-
-            /*
-             * Insert at index.
+            /* index = 2;
+             * nkeys = 6;
+             * 
+             * [ 0 1 2 3 4 5 ]
+             *       ^ index
+             * 
+             * count = keys - index = 4;
              */
-            keys[index] = key; // defined by AbstractNode
-            values[index] = entry; // defined by Leaf.
+            final int count = nkeys - index;
+            
+            assert count >= 1;
+
+            copyDown(index, count);
 
         }
 
-        nkeys++;
+        /*
+         * Insert at index.
+         */
+        keys[index] = key; // defined by AbstractNode
+        values[index] = entry; // defined by Leaf.
 
-        assertInvariants();
+        nkeys++;
 
     }
 

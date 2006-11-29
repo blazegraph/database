@@ -119,12 +119,11 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
         assertEquals("#entries", 0, btree.nentries);
-        btree.dump(System.err);
+        assertTrue(btree.dump(System.err));
 
         Leaf a = (Leaf) btree.getRoot();
-        assertEquals(0,a.nkeys);
-        assertEquals(new int[]{0,0,0},a.keys);
-        assertEquals(new Object[]{null,null,null},a.values);
+        assertKeys(new int[]{},a);
+        assertValues(new Object[]{},a);
         
         int n = 0;
         
@@ -137,10 +136,9 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertEquals(1,a.nkeys);
-            assertEquals(new int[]{5,0,0},a.keys);
-            assertEquals(new Object[]{vals[0],null,null},a.values);
-            btree.dump(System.err);
+            assertKeys(new int[]{5},a);
+            assertValues(new Object[]{vals[0]},a);
+            assertTrue(btree.dump(System.err));
         }
 
         { // insert(6,6)
@@ -152,10 +150,9 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertEquals(2,a.nkeys);
-            assertEquals(new int[]{5,6,0},a.keys);
-            assertEquals(new Object[]{vals[0],vals[1],null},a.values);
-            btree.dump(System.err);
+            assertKeys(new int[]{5,6},a);
+            assertValues(new Object[]{vals[0],vals[1]},a);
+            assertTrue(btree.dump(System.err));
         }
         
         /*
@@ -174,10 +171,9 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertEquals(3,a.nkeys);
-            assertEquals(new int[]{5,6,7},a.keys);
-            assertEquals(new Object[]{vals[0],vals[1],vals[2]},a.values);
-            btree.dump(System.err);
+            assertKeys(new int[]{5,6,7},a);
+            assertValues(new Object[]{vals[0],vals[1],vals[2]},a);
+            assertTrue(btree.dump(System.err));
         }
 
         /*
@@ -203,28 +199,25 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
-            btree.dump(Level.DEBUG,System.err);
+            assertTrue(btree.dump(Level.DEBUG,System.err));
             
             // validate new root (c).
             c = (Node)btree.getRoot();
-            assertEquals(1,c.nkeys);
-            assertEquals(new int[]{7,0},c.keys);
+            assertKeys(new int[]{7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
             assertNull(c.childRefs[2]);
             b = (Leaf)c.getChild(1);
             
             // validate original leaf (a).
-            assertEquals(2,a.nkeys);
-            assertEquals(new int[]{5,6,0},a.keys);
-            assertEquals(new Object[]{vals[0],vals[1],null},a.values);
+            assertKeys(new int[]{5,6},a);
+            assertValues(new Object[]{vals[0],vals[1]},a);
             
             // validate new leaf (b).
-            assertEquals(2,b.nkeys);
-            assertEquals(new int[]{7,8,0},b.keys);
-            assertEquals(new Object[]{vals[2],vals[3],null},b.values);
+            assertKeys(new int[]{7,8},b);
+            assertValues(new Object[]{vals[2],vals[3]},b);
             
-            btree.dump(System.err);
+            assertTrue(btree.dump(System.err));
         }
         
         /*
@@ -246,11 +239,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
-            btree.dump(Level.DEBUG,System.err);
+            assertTrue(btree.dump(Level.DEBUG,System.err));
             // validate original leaf (a).
-            assertEquals(3,a.nkeys);
-            assertEquals(new int[]{3,5,6},a.keys);
-            assertEquals(new Object[]{vals[4],vals[0],vals[1]},a.values);
+            assertKeys(new int[]{3,5,6},a);
+            assertValues(new Object[]{vals[4],vals[0],vals[1]},a);
             
         }
 
@@ -275,30 +267,26 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
-            btree.dump(Level.DEBUG,System.err);
+            assertTrue(btree.dump(Level.DEBUG,System.err));
             
             // validate root (c).
-            assertEquals(2,c.nkeys);
-            assertEquals(new int[]{5,7},c.keys);
+            assertKeys(new int[]{5,7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.childRefs[1]);
             d = (Leaf) c.getChild(1);
             assertEquals(b,c.getChild(2));
             
             // validate original leaf (a).
-            assertEquals(2,a.nkeys);
-            assertEquals(new int[]{3,4,0},a.keys);
-            assertEquals(new Object[]{vals[4],vals[5],null},a.values);
+            assertKeys(new int[]{3,4},a);
+            assertValues(new Object[]{vals[4],vals[5]},a);
             
             // validate new leaf (d).
-            assertEquals(2,d.nkeys);
-            assertEquals(new int[]{5,6,0},d.keys);
-            assertEquals(new Object[]{vals[0],vals[1],null},d.values);
+            assertKeys(new int[]{5,6},d);
+            assertValues(new Object[]{vals[0],vals[1]},d);
             
             // validate leaf (b).
-            assertEquals(2,b.nkeys);
-            assertEquals(new int[]{7,8,0},b.keys);
-            assertEquals(new Object[]{vals[2],vals[3],null},b.values);
+            assertKeys(new int[]{7,8},b);
+            assertValues(new Object[]{vals[2],vals[3]},b);
             
         }
         
@@ -313,12 +301,11 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
-            btree.dump(Level.DEBUG,System.err);
+            assertTrue(btree.dump(Level.DEBUG,System.err));
             
             // validate original leaf (a).
-            assertEquals(3,a.nkeys);
-            assertEquals(new int[]{2,3,4},a.keys);
-            assertEquals(new Object[]{vals[6],vals[4],vals[5]},a.values);
+            assertKeys(new int[]{2,3,4},a);
+            assertValues(new Object[]{vals[6],vals[4],vals[5]},a);
             
         }
         
@@ -359,47 +346,40 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate the new root(g).
             assertNotSame(c,btree.getRoot());
             g = (Node)btree.getRoot();
-            assertEquals(1,g.nkeys);
-            assertEquals(new int[]{5,0},g.keys);
+            assertKeys(new int[]{5},g);
             assertEquals(c,g.getChild(0));
             assertNotNull(g.childRefs[1]);
             f = (Node) g.getChild(1);
             assertNull(g.childRefs[2]);
             
             // validate old root (c).
-            assertEquals(1,c.nkeys);
-            assertEquals(new int[]{3,0},c.keys);
+            assertKeys(new int[]{3},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.childRefs[1]);
             e = (Leaf) c.getChild(1);
             assertNull(c.childRefs[2]);
             
             // validate node(f) split from the old root split(c)->(c,f).
-            assertEquals(1,f.nkeys);
-            assertEquals(new int[]{7,0},f.keys);
+            assertKeys(new int[]{7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
             assertNull(f.childRefs[2]);
             
             // validate original leaf (a), which was re-split into (a,e).
-            assertEquals(2,a.nkeys);
-            assertEquals(new int[]{1,2,0},a.keys);
-            assertEquals(new Object[]{vals[7],vals[6],null},a.values);
+            assertKeys(new int[]{1,2},a);
+            assertValues(new Object[]{vals[7],vals[6]},a);
             
             // validate new leaf (e).
-            assertEquals(2,e.nkeys);
-            assertEquals(new int[]{3,4,0},e.keys);
-            assertEquals(new Object[]{vals[4],vals[5],null},e.values);
+            assertKeys(new int[]{3,4},e);
+            assertValues(new Object[]{vals[4],vals[5]},e);
             
             // validate new leaf (d).
-            assertEquals(2,d.nkeys);
-            assertEquals(new int[]{5,6,0},d.keys);
-            assertEquals(new Object[]{vals[0],vals[1],null},d.values);
+            assertKeys(new int[]{5,6},d);
+            assertValues(new Object[]{vals[0],vals[1]},d);
             
             // validate leaf (b).
-            assertEquals(2,b.nkeys);
-            assertEquals(new int[]{7,8,0},b.keys);
-            assertEquals(new Object[]{vals[2],vals[3],null},b.values);
+            assertKeys(new int[]{7,8},b);
+            assertValues(new Object[]{vals[2],vals[3]},b);
 
         }
         

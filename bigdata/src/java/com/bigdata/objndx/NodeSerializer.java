@@ -468,9 +468,9 @@ public class NodeSerializer {
 
         assert nkeys >= 0 && nkeys < branchingFactor;
 
-        final int[] keys = new int[branchingFactor - 1];
+        final int[] keys = new int[branchingFactor];
 
-        final long[] children = new long[branchingFactor];
+        final long[] children = new long[branchingFactor+1];
 
         /*
          * keys.
@@ -642,7 +642,7 @@ public class NodeSerializer {
          * Keys.
          */
 
-        final int[] keys = new int[branchingFactor];
+        final int[] keys = new int[branchingFactor+1];
 
         int lastKey = IBTree.NEGINF;
 
@@ -662,7 +662,7 @@ public class NodeSerializer {
          * Values.
          */
 
-        final Object[] values = new Object[branchingFactor];
+        final Object[] values = new Object[branchingFactor+1];
 
         valueSerializer.getValues(buf,values,nkeys);
 

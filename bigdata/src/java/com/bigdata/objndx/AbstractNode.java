@@ -119,6 +119,11 @@ public abstract class AbstractNode extends PO {
      * The interpretation of the key index for a leaf is one to one - key[0]
      * corresponds to value[0].
      * 
+     * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
+     * one more than the maximum capacity so that the key that causes overflow
+     * and forces the split may be inserted.  This greatly simplifies the logic
+     * for computing the split point and performing the split.
+     * 
      * @see #findChild(int key)
      * @see Search#search(int, int[], int)
      */
@@ -565,25 +570,12 @@ public abstract class AbstractNode extends PO {
 
     /**
      * <p>
-     * Split a node or leaf. This node (or leaf) is the "low" node (or leaf)
-     * and will contain the lower half of the keys. The split creates a
-     * "high" node (or leaf) to contain the high half of the keys. When this
-     * is the root, the split also creates a new root {@link Node}.
+     * Split a node or leaf that is over capacity (by one).
      * </p>
-     * <p>
-     * Note: Splits are triggered on insert into a full node or leaf. The
-     * first key of the high node is inserted into the parent of the split
-     * node. The caller must test whether the key that is being inserted is
-     * greater than or equal to this key. If it is, then the insert goes
-     * into the high node. Otherwise it goes into the low node.
-     * </p>
-     * 
-     * @param key
-     *            The external key.
      * 
      * @return The high node (or leaf) created by the split.
      */
-    abstract protected AbstractNode split(int key);
+    abstract protected AbstractNode split();
     
     /**
      * Join this node (must be deficient) with either its left or right sibling.

@@ -69,16 +69,22 @@ public class TestSplitNode extends AbstractBTreeTestCase {
     public TestSplitNode(String name) {
         super(name);
     }
-    
+
+    /*
+     * FIXME Work through the code for split. This test may or may not help
+     * since it is focused on the behavior of split (vs insert) and I either I
+     * need to adapt the test to the post-conditions of split (vs insert) or I
+     * need to just get the split code right. The former is more noble....
+     */
     public void test_splitNode01() {
         
         BTree btree = getBTree(3);
         
         Node a = new Node(btree);
         btree.root = a;
-        a.nkeys = 2;
-        a.keys = new int[]{5,7};
-        Node b = (Node) a.split(3); // b is the rightSibling of a.
+        a.nkeys = 3;
+        a.keys = new int[]{3,5,7};
+        Node b = (Node) a.split(); // b is the rightSibling of a.
         
         Node c = (Node)btree.root;
         assertEquals(a,c.getChild(0));

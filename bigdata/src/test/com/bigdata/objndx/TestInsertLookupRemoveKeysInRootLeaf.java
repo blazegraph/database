@@ -53,8 +53,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * 
- * insert, lookup, and value scan for leaves.
+ * Test insert, lookup, and value scan for leaves.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,7 +70,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
      * @param name
      */
     public TestInsertLookupRemoveKeysInRootLeaf(String name) {
+
         super(name);
+        
     }
 
     /**
@@ -133,7 +134,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         Arrays.sort(expectedKeys);
         
         // verify that the leaf has the same keys in the same order.
-        assertEquals( expectedKeys, root.keys );
+        assertKeys( expectedKeys, root);
         
     }
     
@@ -194,7 +195,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         Arrays.sort(expectedKeys);
         
         // verify that the leaf has the same keys in the same order.
-        assertEquals( expectedKeys, root.keys );
+        assertKeys( expectedKeys, root );
         
     }
 
@@ -274,10 +275,10 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         }
 
         // verify that the leaf has the same keys in the same order.
-        assertEquals( "keys", expectedKeys, root.keys );
+        assertKeys( "keys", expectedKeys, root);
 
         // verify that the leaf has the same values in the same order.
-        assertEquals( "values", expectedValues, root.values );
+        assertValues( "values", expectedValues, root );
         
         // verify the expected behavior of the iterator.
         assertSameIterator( "values", expectedValues, root.entryIterator() );
@@ -319,32 +320,27 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         assertEquals(root,btree.getRoot());
         
         // validate
-        assertEquals(4,root.nkeys);
-        assertEquals(new int[]{1,2,3,4},root.keys);
+        assertKeys(new int[]{1,2,3,4},root);
         assertSameIterator(new Object[]{e1,e2,e3,e4}, root.entryIterator());
 
         // remove (2).
         assertEquals(e2,root.remove(2));
-        assertEquals(3,root.nkeys);
-        assertEquals(new int[]{1,3,4,0},root.keys);
+        assertKeys(new int[]{1,3,4},root);
         assertSameIterator(new Object[]{e1,e3,e4}, root.entryIterator());
 
         // remove (1).
         assertEquals(e1,root.remove(1));
-        assertEquals(2,root.nkeys);
-        assertEquals(new int[]{3,4,0,0},root.keys);
+        assertKeys(new int[]{3,4},root);
         assertSameIterator(new Object[]{e3,e4}, root.entryIterator());
 
         // remove (4).
         assertEquals(e4,root.remove(4));
-        assertEquals(1,root.nkeys);
-        assertEquals(new int[]{3,0,0,0},root.keys);
+        assertKeys(new int[]{3},root);
         assertSameIterator(new Object[]{e3}, root.entryIterator());
 
         // remove (3).
         assertEquals(e3,root.remove(3));
-        assertEquals(0,root.nkeys);
-        assertEquals(new int[]{0,0,0,0},root.keys);
+        assertKeys(new int[]{},root);
         assertSameIterator(new Object[]{}, root.entryIterator());
 
         assertNull(root.remove(1));
