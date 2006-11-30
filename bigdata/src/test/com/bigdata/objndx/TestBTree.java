@@ -51,6 +51,11 @@ package com.bigdata.objndx;
  * Stress tests for basic tree operations (insert, lookup, and remove) without
  * causing node or leaf evictions (IO is disabled).
  * 
+ * @todo make sure that we have a stress test that removes keys in forward
+ *       order, one that removes keys in reverse order, and one that removes
+ *       keys in a random order. This will help to excercise the code paths for
+ *       join(), merge(sibling), and redistributeKeys(sibling).
+ * 
  * @todo test tree under sequential insertion, nearly sequential insertion
  *       (based on a model identifier generation for the read-optimized
  *       database, including filling up pages, eventually releasing space on

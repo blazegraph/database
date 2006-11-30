@@ -264,13 +264,16 @@ public class Node extends AbstractNode {
      *            The child that triggered the copy constructor. This should be
      *            the immutable child NOT the one that was already cloned. This
      *            information is used to avoid stealing the original child since
-     *            we already made a copy of it.
+     *            we already made a copy of it.  It is [null] when this information
+     *            is not available, e.g., when the copyOnWrite action is triggered
+     *            by a join() and we are cloning the sibling before we redistribute
+     *            a key to the node/leaf on which the join was invoked,
      */
     protected Node(Node src, AbstractNode triggeredByChild) {
 
         super(src);
         
-        assert triggeredByChild != null;
+//        assert triggeredByChild != null;
 
         keys = new int[branchingFactor];
 
@@ -777,7 +780,7 @@ public class Node extends AbstractNode {
      *            A direct sibling of this node (either the left or right
      *            sibling). The sibling MUST be mutable.
      */
-    protected void redistributeKeys(AbstractNode sibling) {
+    protected void redistributeKeys(AbstractNode sibling,boolean isRightSibling) {
 
         // the sibling of a Node must be a Node.
         final Node s = (Node) sibling;
@@ -812,7 +815,7 @@ public class Node extends AbstractNode {
          * determine which leaf is earlier in the key ordering and get the
          * index of the sibling.
          */
-        if( keys[nkeys-1] < s.keys[0]) {
+        if( isRightSibling/*keys[nkeys-1] < s.keys[0]*/) {
         
             /*
              * redistributeKeys(this,rightSibling). all we have to do is move
@@ -822,23 +825,26 @@ public class Node extends AbstractNode {
              * rightSibling to the new key in its first index position.
              */
 
-            // copy the first key from the rightSibling.
+            // Mopy the first key/child from the rightSibling.
             keys[nkeys] = s.keys[0];
             childRefs[nkeys] = s.childRefs[0];
             childKeys[nkeys] = s.childKeys[0];
-            // FIXME verify fenceposts and update dirtyChildren.
+            AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
+            if( child!=null && child.isDirty() ) {
+                if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+                if(!dirtyChildren.add(child)) throw new AssertionError();
+                child.parent = new WeakReference<Node>(this);
+            }
             
             // copy down the keys on the right sibling to cover up the hole.
             System.arraycopy(s.keys, 1, s.keys, 0, s.nkeys-1);
             System.arraycopy(s.childRefs, 1, s.childRefs, 0, s.nkeys);
             System.arraycopy(s.childKeys, 1, s.childKeys, 0, s.nkeys);
-            // FIXME verify fenceposts and update dirtyChildren.
 
             // erase exposed key/value on rightSibling that is no longer defined.
             s.keys[s.nkeys-1] = BTree.NEGINF;
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
-            // FIXME verify fenceposts and update dirtyChildren.
 
             // update the separator key for the rightSibling.
             p.keys[index] = s.keys[0];
@@ -863,12 +869,17 @@ public class Node extends AbstractNode {
             System.arraycopy(keys, 0, keys, 1, nkeys);
             System.arraycopy(childRefs, 0, childRefs, 1, nkeys+1);
             System.arraycopy(childKeys, 0, childKeys, 1, nkeys+1);
-            // FIXME verify fenceposts and update dirtyChildren.
             
-            // move the last key/value from the leftSibling to this leaf.
+            // move the last key/child from the leftSibling to this node.
             keys[0] = s.keys[s.nkeys-1];
             childRefs[0] = s.childRefs[s.nkeys];
             childKeys[0] = s.childKeys[s.nkeys];
+            AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
+            if( child!=null && child.isDirty() ) {
+                if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+                if(!dirtyChildren.add(child)) throw new AssertionError();
+                child.parent = new WeakReference<Node>(this);
+            }
             s.keys[s.nkeys] = BTree.NEGINF;
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
@@ -895,13 +906,17 @@ public class Node extends AbstractNode {
      *            A direct sibling of this node (does NOT need to be mutable).
      *            The sibling MUST have exactly the minimum #of keys.
      */
-    protected void merge(AbstractNode sibling) {
+    protected void merge(AbstractNode sibling,boolean isRightSibling) {
 
         // the sibling of a Node must be a Node.
         final Node s = (Node) sibling;
 
         assert s != null;
         assert !s.isDeleted();
+        // verify that this node is deficient.
+        assert nkeys < minKeys;
+        // verify that this node is under minimum capacity by one key.
+        assert nkeys == minKeys - 1;
         // the sibling MUST at the minimum #of keys/values.
         assert s.nkeys == s.minKeys;
 
@@ -915,13 +930,13 @@ public class Node extends AbstractNode {
          * whether the sibling's keys will be inserted at the front of this
          * nodes's keys or appended to this nodes's keys.
          */
-        if( keys[nkeys-1] < s.keys[0]) {
+        if( isRightSibling/*keys[nkeys-1] < s.keys[0]*/) {
             
             /*
              * merge( this, rightSibling ). the keys and values from this node
-             * will appear in their current position and the keys and values
-             * from the rightSibling will be appended after the last key/value
-             * in this node.
+             * will appear in their current position, the separatorKey from the
+             * parent is appended after the last key in this node, and the keys
+             * and children from the rightSibling are then appended as well.
              */
 
             /*
@@ -931,13 +946,32 @@ public class Node extends AbstractNode {
             final int index = p.getIndexOf(this);
             
             /*
-             * Copy in the keys and children from the sibling.
+             * Get the separator key in the parent and append it to the keys in
+             * this node.
+             */
+            this.keys[nkeys++] = p.keys[index];
+            
+            /*
+             * Copy in the keys and children from the sibling. Note that the
+             * children are copied to the position nkeys NOT nkeys+1 since the
+             * first child needs to appear at the same position as the
+             * separatorKey that we copied from the parent.
              */
             System.arraycopy(s.keys, 0, this.keys, nkeys, s.nkeys);
             System.arraycopy(s.childRefs, 0, this.childRefs, nkeys, s.nkeys+1);
             System.arraycopy(s.childKeys, 0, this.childKeys, nkeys, s.nkeys+1);
             
-            // FIXME move the dirtyChildren information and verify fenceposts.
+            // update parent on children
+            for( int i=0; i<s.nkeys+1; i++ ) {
+                AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
+                if( child!=null) {
+                    child.parent = new WeakReference<Node>(this);
+                    if( child.isDirty() ) {
+                        // record hard references for dirty children.
+                        dirtyChildren.add(child);
+                    }
+                }
+            }
             
             /* 
              * Adjust the #of keys in this leaf.
@@ -961,35 +995,60 @@ public class Node extends AbstractNode {
             
             /*
              * merge( leftSibling, this ). the keys and values from this node
-             * will be move down by sibling.nkeys positions and then the keys
-             * and values from the sibling will be copied into this node
-             * starting at index zero(0).
+             * will be move down by sibling.nkeys+1 positions, the keys and
+             * values from the sibling will be copied into this node starting at
+             * index zero(0), and finally the separatorKey from the parent will
+             * be copied into the position after the last sibling key and before
+             * the position of the first key copied down in this node to avoid
+             * overwrite (that is, we copy the separatorKey from the parent to
+             * this.keys[s.nkeys]).
              * 
-             * Note: in this case the separator key in the parent node does not
-             * change.
+             * Note: we do not update the separator key in the parent because
+             * the separatorKey will be removed when we remove the leftSibling
+             * from the parent at the end of this method.
              */
             
-            // move keys and children down by sibling.nkeys positions.
-            System.arraycopy(this.keys, 0, this.keys, s.nkeys, this.nkeys);
-            System.arraycopy(this.childRefs, 0, this.childRefs, s.nkeys, this.nkeys+1);
-            System.arraycopy(this.childKeys, 0, this.childKeys, s.nkeys, this.nkeys+1);
-//          FIXME move the dirtyChildren information and verify fenceposts.
+            /*
+             * The index of this node in its parent. we note this before we
+             * start mucking with the keys.
+             */
+            final int index = p.getIndexOf(this);
+            
+            // move keys and children down by sibling.nkeys+1 positions.
+            System.arraycopy(this.keys, 0, this.keys, s.nkeys+1, this.nkeys);
+            System.arraycopy(this.childRefs, 0, this.childRefs, s.nkeys+1, this.nkeys+1);
+            System.arraycopy(this.childKeys, 0, this.childKeys, s.nkeys+1, this.nkeys+1);
             
             // copy keys and values from the sibling to index 0 of this leaf.
             System.arraycopy(s.keys, 0, this.keys, 0, s.nkeys);
             System.arraycopy(s.childRefs, 0, this.childRefs, 0, s.nkeys+1);
-            System.arraycopy(s.childKeys, 0, this.childKeys, 0, s.nkeys+1);            
-//          FIXME move the dirtyChildren information and verify fenceposts.
+            System.arraycopy(s.childKeys, 0, this.childKeys, 0, s.nkeys+1);
+
+            // copy the separatorKey from the parent.
+            this.keys[s.nkeys] = p.keys[index-1];
             
-            this.nkeys += s.nkeys;
+            // update parent on children.
+            for( int i=0; i<s.nkeys+1; i++ ) {
+                AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
+                if( child!=null) {
+                    child.parent = new WeakReference<Node>(this);
+                    if( child.isDirty() ) {
+                        // record hard references for dirty children.
+                        dirtyChildren.add(child);
+                    }
+                }
+            }
+
+            // we gain nkeys from the sibling and one key from the parent.
+            this.nkeys += s.nkeys + 1;
             
             assertInvariants();
             
         }
         
         /*
-         * The sibling leaf is now empty. We need to detach the leaf from its
-         * parent node and then delete the leaf from the store.
+         * The sibling is now empty. We need to detach the sibling from its
+         * parent node and then delete the sibling from the store.
          */
         p.removeChild(s);
         
@@ -1221,7 +1280,7 @@ public class Node extends AbstractNode {
          * called - for things to be coherent you would have to discover the
          * index of the children before modifying their keys.
          * 
-         * @see Leaf#merge(Leaf sibling)
+         * @see Leaf#merge(Leaf sibling,boolean isRightSibling)
          */
 
         for (int i = 0; i <= nkeys; i++) {
@@ -1240,13 +1299,22 @@ public class Node extends AbstractNode {
     
     /**
      * Invoked when a non-root node or leaf has no more keys to detach the child
-     * from its parent. If the node becomes deficiant, then the node is joined
+     * from its parent. If the node becomes deficient, then the node is joined
      * witn one of its immediate siblings. If the node is the root of the tree,
      * then the root of the tree is also updated. The child is deleted as a
      * post-condition.
      * 
      * @param child
      *            The child (does NOT need to be mutable).
+     * 
+     * @todo I am a bit suspicious of this method. it appears to be removing the
+     *       key and child at the same index rather than the key at index-1 and
+     *       the child at index. This interacts with how the separator key gets
+     *       updated (or appears to get updated) when a child is removed. That
+     *       logic occurs in {@link Leaf#merge(AbstractNode, boolean)} and in
+     *       {@link Node#merge(AbstractNode, boolean)}. It may be that I can
+     *       simplify things a bit further by making this adjustment here and in
+     *       those merge() methods.
      */
     protected void removeChild(AbstractNode child) {
         
@@ -1265,6 +1333,8 @@ public class Node extends AbstractNode {
         int i = getIndexOf(child);
 
         /*
+         * Note: these comments may be dated and need review.
+         * 
          * Copy over the hole created when the child is removed
          * from the node.
          * 
@@ -1371,8 +1441,7 @@ public class Node extends AbstractNode {
             /*
              * the root node is allowed to become deficient, but once we are
              * reduced to having no more keys in the root node it is replaced by
-             * the last remaining child. that child MUST be a leaf which then
-             * becomes the root leaf.
+             * the last remaining child.
              */
             if (nkeys == 0 && !isLeaf()) {
 
@@ -1380,14 +1449,14 @@ public class Node extends AbstractNode {
 
                 lastChild.assertInvariants();
 
-                assert lastChild.isLeaf();
-                assert btree.nentries == lastChild.nkeys;
-
                 System.err.println("Replacing root node: root=" + btree.root
                         + ", node=" + this + ", lastChild=" + lastChild);
 
                 // replace the root node with a root leaf.
                 btree.root = lastChild;
+                
+                // clear the parent reference since this is now the root.
+                lastChild.parent = null;
 
                 // one less level in the btree.
                 btree.height--;
@@ -1658,23 +1727,25 @@ public class Node extends AbstractNode {
         
         if (parent != null && nkeys < minKeys) {
             // min keys failure.
-            out.println("ERROR: too few keys: m=" + branchingFactor
-                    + ", minKeys=" + minKeys + ", nkeys=" + nkeys + ", isLeaf="
-                    + isLeaf());
+            out.println(indent(height) + "ERROR: too few keys: m="
+                    + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
+                    + nkeys + ", isLeaf=" + isLeaf());
             ok = false;
         }
 
         if (nkeys > maxKeys) {
             // max keys failure.
-            out.println("ERROR: too many keys: m=" + branchingFactor
-                    + ", maxKeys=" + maxKeys + ", nkeys=" + nkeys + ", isLeaf="
-                    + isLeaf());
+            out.println(indent(height) + "ERROR: too many keys: m="
+                    + branchingFactor + ", maxKeys=" + maxKeys + ", nkeys="
+                    + nkeys + ", isLeaf=" + isLeaf());
             ok = false;
         }
 
-        if(this == btree.root) {
-            if( parent != null ) {
-                out.println("ERROR: this is the root, but the parent is not null.");
+        if (this == btree.root) {
+            if (parent != null) {
+                out
+                        .println(indent(height)
+                                + "ERROR: this is the root, but the parent is not null.");
                 ok = false;
             }
         } else {
@@ -1683,11 +1754,14 @@ public class Node extends AbstractNode {
              * having the parent be reachable. However, we actually want to
              * maintain both -- a parent MUST always be reachable.
              */
-            if( parent == null) {
-                out.println("ERROR: the parent reference MUST be defined for a non-root node.");
+            if (parent == null) {
+                out
+                        .println(indent(height)
+                                + "ERROR: the parent reference MUST be defined for a non-root node.");
                 ok = false;
-            } else if( parent.get() == null) {
-                out.println("ERROR: the parent is not strongly reachable.");
+            } else if (parent.get() == null) {
+                out.println(indent(height)
+                        + "ERROR: the parent is not strongly reachable.");
                 ok = false;
             }
         }
@@ -1704,15 +1778,26 @@ public class Node extends AbstractNode {
         }
         { // verify keys are monotonically increasing.
             int lastKey = IBTree.NEGINF;
-            for (int i = 0; i < Math.min(nkeys,branchingFactor); i++) {
-                if (keys[i] <= lastKey) {
+            for (int i = 0; i < branchingFactor; i++) {
+                if (i < nkeys) {
+                    // defined keys.
+                    if (keys[i] <= lastKey) {
+                        out.println(indent(height)
+                                + "  ERROR keys out of order at index=" + i
+                                + ", lastKey=" + lastKey + ", keys[" + i + "]="
+                                + keys[i]);
+                        ok = false;
+                    }
+                    lastKey = keys[i];
+                } else if (keys[i] != IBTree.NEGINF) {
+                    // undefined keys.
                     out.println(indent(height)
-                            + "ERROR keys out of order at index=" + i
-                            + ", lastKey=" + lastKey + ", keys[" + i + "]="
-                            + keys[i]);
+                            + "  ERROR expecting NEGINF("
+                            + IBTree.NEGINF + ") at index=" + i + ", nkeys="
+                            + nkeys + ", but found keys[" + i
+                            + "]=" + keys[i]);
                     ok = false;
                 }
-                lastKey = keys[i];
             }
         }
         if (debug) {
@@ -1750,7 +1835,7 @@ public class Node extends AbstractNode {
          * This also verifies that all entries beyond nchildren (nkeys+1)
          * are unused.
          */
-        for (int i = 0; i < branchingFactor; i++) {
+        for (int i = 0; i < branchingFactor+1; i++) {
 
             if (i > nkeys) {
 
@@ -1881,27 +1966,45 @@ public class Node extends AbstractNode {
 
             Set<AbstractNode> dirty = new HashSet<AbstractNode>();
 
-            for (int i = 0; i <= nkeys; i++) {
+            for (int i = 0; i <= /*nkeys*/branchingFactor; i++) {
 
                 if (childRefs[i] == null && childKeys[i] == 0) {
 
-                    /*
-                     * This let's us dump a tree with some kinds of
-                     * structural problems (missing child reference or key).
-                     */
+                    if (i <= nkeys) {
 
-                    out.println(indent(height + 1)
-                            + "ERROR can not find child at index=" + i
-                            + ", skipping this index.");
+                        /*
+                         * This let's us dump a tree with some kinds of
+                         * structural problems (missing child reference or key).
+                         */
 
-                    ok = false;
+                        out.println(indent(height + 1)
+                                + "ERROR can not find child at index=" + i
+                                + ", skipping this index.");
+
+                        ok = false;
+
+                    } else {
+                        
+                        /*
+                         * We expect null child entries beyond nkeys+1.
+                         */
+                        
+                    }
 
                     continue;
 
                 }
 
-                AbstractNode child = getChild(i);
-
+                /*
+                 * Note: this works around the assert test for the index in
+                 * getChild(index) but is not able/willing to follow a childKey
+                 * to a child that is not memory resident.
+                 */
+//                AbstractNode child = getChild(i);
+                AbstractNode child = childRefs[i]==null?null:childRefs[i].get();
+                
+                if( child != null ) {
+                    
                 if (child.parent == null) {
 
                     out
@@ -1998,19 +2101,17 @@ public class Node extends AbstractNode {
                     
                 } else if (i < nkeys) {
 
-                    /*
-                     * Note: This condition is violated under our "delete" rule
-                     * by removeChild().
-                     */
-                    
+// Note: The delete rule does not preserve this characteristic since we do not
+// update the separatorKey for a leaf when removing its left most key.
+//
 //                    if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
 //
 //                        /*
-//                         * While each key in a node always is the first key
-//                         * of some leaf, we are only testing the direct
-//                         * children here. Therefore if the children are not
-//                         * leaves then we can not cross check their first
-//                         * key with the keys on this node.
+//                         * While each key in a node always is the first key of
+//                         * some leaf, we are only testing the direct children
+//                         * here. Therefore if the children are not leaves then
+//                         * we can not cross check their first key with the keys
+//                         * on this node.
 //                         */
 //                        out.println(indent(height + 1)
 //                                + "ERROR first key on child leaf must be "
@@ -2033,6 +2134,8 @@ public class Node extends AbstractNode {
                 if (!child.dump(level, out, height + 1, true)) {
 
                     ok = false;
+
+                }
 
                 }
 

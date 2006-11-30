@@ -55,6 +55,9 @@ import java.lang.ref.WeakReference;
  * 
  * Note: Assertions MUST be enabled or this test suite will show failures.
  * 
+ * Note: The keys[] array MUST be dimensions to one more than the maximum #of
+ * keys allowed in order to permit temporary overflow during insert().
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -97,14 +100,14 @@ public class TestInvariants extends AbstractBTreeTestCase {
         // valid leaf.
         {
             l.nkeys = 2;
-            l.keys = new int[]{2,0,0};
+            l.keys = new int[]{2,0,0,0};
             l.assertInvariants();
         }
 
         // valid leaf.
         {
             l.nkeys = 3;
-            l.keys = new int[]{2,3,5};
+            l.keys = new int[]{2,3,5,0};
             l.assertInvariants();
         }
         
@@ -113,7 +116,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 1;
-            l.keys = new int[]{2,0,0};
+            l.keys = new int[]{2,0,0,0};
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -125,7 +128,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 4;
-            l.keys = new int[]{2,3,5};
+            l.keys = new int[]{2,3,5,0};
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -158,21 +161,21 @@ public class TestInvariants extends AbstractBTreeTestCase {
         // valid leaf.
         {
             l.nkeys = 2;
-            l.keys = new int[]{2,3,0,0};
+            l.keys = new int[]{2,3,0,0,0};
             l.assertInvariants();
         }
 
         // valid leaf.
         {
             l.nkeys = 3;
-            l.keys = new int[]{2,3,5,0};
+            l.keys = new int[]{2,3,5,0,0};
             l.assertInvariants();
         }
         
         // valid leaf.
         {
             l.nkeys = 4;
-            l.keys = new int[]{2,3,5,7};
+            l.keys = new int[]{2,3,5,7,0};
             l.assertInvariants();
         }
         
@@ -181,7 +184,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 1;
-            l.keys = new int[]{2,0,0,0};
+            l.keys = new int[]{2,0,0,0,0};
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -193,7 +196,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 5;
-            l.keys = new int[]{2,3,5,7};
+            l.keys = new int[]{2,3,5,7,0};
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {

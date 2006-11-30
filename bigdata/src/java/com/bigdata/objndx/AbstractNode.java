@@ -578,47 +578,60 @@ public abstract class AbstractNode extends PO {
     abstract protected AbstractNode split();
     
     /**
+     * <p>
      * Join this node (must be deficient) with either its left or right sibling.
-     * 
-     * Invoked when a leaf has become deficient (too few keys/values). This
-     * method is never invoked for the root leaf therefore the parent of this
-     * leaf must be defined. Further, since the minimum #of children is two (2)
-     * for the smallest branching factor three (3), there is always a sibling to
-     * consider.
-     * 
-     * consider the immediate siblings. if either is materialized and has more
-     * than the minimum #of values, then redistribute the values evenly between
-     * this leaf and that sibling and update the separation key in the parent to
-     * reflect the new partitioning of the values between the leaves. if either
-     * is materialized and has only the minimum #of values, then merge this leaf
-     * with that sibling and update the parent by removing the separator key.
-     * 
+     * A join will either cause a single key and value (child) to be
+     * redistributed from a sibling to this leaf (node) or it will cause a
+     * sibling leaf (node) to be merged into this leaf (node). Both situations
+     * also cause the separator key in the parent to be adjusted.
+     * </p>
+     * <p>
+     * Join is invoked when a leaf has become deficient (too few keys/values).
+     * This method is never invoked for the root leaf therefore the parent of
+     * this leaf must be defined. Further, since the minimum #of children is two
+     * (2) for the smallest branching factor three (3), there is always a
+     * sibling to consider.
+     * </p>
+     * <p>
+     * Join first considers the immediate siblings. if either is materialized
+     * and has more than the minimum #of values, then it redistributes one key
+     * and value (child) from the sibling into this leaf (node). If either
+     * sibling is materialized and has only the minimum #of values, then it
+     * merges this leaf (node) with that sibling.
+     * </p>
+     * <p>
      * If no materialized immediate sibling meets these criteria, then first
      * materialize and test the right sibling. if the right sibling does not
      * meet these criteria, then materialize and test the left sibling.
-     * 
+     * </p>
+     * <p>
      * Note that (a) we prefer to merge a materialized sibling with this leaf to
      * materializing a sibling; and (b) merging siblings is the only way that a
      * separator key is removed from a parent. If the parent becomes deficient
      * through merging then join is invoked on the parent as well. Note that
      * join is never invoked on the root node (or leaf) since it by definition
      * has no siblings.
-     * 
+     * </p>
+     * <p>
      * Note that we must invoked copy-on-write before modifying a sibling.
      * However, the parent of the leaf MUST already be mutable (aka dirty) since
      * that is a precondition for removing a key from the leaf. This means that
      * copy-on-write will not force the parent to be cloned.
-     * 
-     * Note: this logic in this method is identical for nodes and leaves and
-     * could be refactored into {@link AbstractNode}. However, the logic for
-     * merging and redistributing keys is specific to a {@link Node} or a
-     * {@link Leaf} since they have different internal arrays that must be
-     * considered.
+     * </p>
      */
     protected void join() {
+        
+        /*
+         * copyOnWrite() wants to know the child that triggered the action when
+         * that information is available. However we do not have that
+         * information in this case so we use a [null] trigger.
+         */
+        final AbstractNode t = null; // a [null] trigger node.
 
         // verify that this node is deficient.
         assert nkeys < minKeys;
+        // verify that this leaf is under minimum capacity by one key.
+        assert nkeys == minKeys - 1;
         // verify that the node is mutable.
         assert isDirty();
         assert !isPersistent();
@@ -634,27 +647,29 @@ public abstract class AbstractNode extends PO {
          * until we are sure which sibling we will use.
          */
         
-        AbstractNode rightSibling = (AbstractNode) parent.getRightSibling(this,false);
-        
-        AbstractNode leftSibling = (AbstractNode) parent.getLeftSibling(this,false);
+        AbstractNode rightSibling = (AbstractNode) parent.getRightSibling(this,
+                false);
+
+        AbstractNode leftSibling = (AbstractNode) parent.getLeftSibling(this,
+                false);
         
         /*
          * prefer a sibling that is already materialized.
          */
-        if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys ) {
+        if (rightSibling != null && rightSibling.nkeys > rightSibling.minKeys) {
 
-            redistributeKeys(rightSibling.copyOnWrite());
-            
+            redistributeKeys(rightSibling.copyOnWrite(t), true);
+
             return;
-            
+
         }
 
-        if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
+        if (leftSibling != null && leftSibling.nkeys > leftSibling.minKeys) {
 
-            redistributeKeys(leftSibling.copyOnWrite());
-            
+            redistributeKeys(leftSibling.copyOnWrite(t), false);
+
             return;
-            
+
         }
         
         /*
@@ -667,7 +682,7 @@ public abstract class AbstractNode extends PO {
             
             if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys  ) {
 
-                redistributeKeys(rightSibling.copyOnWrite());
+                redistributeKeys(rightSibling.copyOnWrite(t),true);
                 
                 return;
                 
@@ -681,7 +696,7 @@ public abstract class AbstractNode extends PO {
             
             if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
 
-                redistributeKeys(leftSibling.copyOnWrite());
+                redistributeKeys(leftSibling.copyOnWrite(t),false);
                 
                 return;
                 
@@ -698,13 +713,13 @@ public abstract class AbstractNode extends PO {
         
         if( rightSibling != null ) {
             
-            merge(rightSibling);
+            merge(rightSibling,true);
             
             return;
             
         } else if( leftSibling != null ) {
             
-            merge(leftSibling);
+            merge(leftSibling,false);
             
             return;
             
@@ -721,16 +736,21 @@ public abstract class AbstractNode extends PO {
      * 
      * @param sibling
      *            The sibling.
+     * @param isRightSibling
+     *            True iff the sibling is the rightSibling of this node.
      */
-    abstract protected void redistributeKeys(AbstractNode sibling);
-    
+    abstract protected void redistributeKeys(AbstractNode sibling,
+            boolean isRightSibling);
+
     /**
      * Merge the sibling into this node.
      * 
      * @param sibling
      *            The sibling.
+     * @param isRightSibling
+     *            True iff the sibling is the rightSibling of this node.
      */
-    abstract protected void merge(AbstractNode sibling);
+    abstract protected void merge(AbstractNode sibling, boolean isRightSibling);
 
     /**
      * Recursive search locates the approprate leaf and inserts the entry under
