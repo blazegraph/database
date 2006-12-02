@@ -48,8 +48,6 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.util.Arrays;
-import java.util.Map;
-import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 
@@ -96,9 +94,9 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * {@link Node#redistributeKeys(AbstractNode, boolean)} that are not
      * excercised by this test.
      * 
-     * @see #test_splitJoinBranchingFactor3a()
+     * @see #test_removeOrder3a()
      */
-    public void test_splitJoinBranchingFactor3() {
+    public void test_removeOrder3a() {
 
         /*
          * Generate keys, values, and visitation order.
@@ -422,11 +420,11 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue("before removing keys", btree.dump(Level.DEBUG,System.err));
         
         /*
-         * remove(1) triggers a cascade of operations: a.join(e) calls a.merge(e)
-         * and c.removeChild(3,e).  This forces c.join(f), which calls c.merge(f)
-         * and g.removeChild(5,f).  Since (g) now has a single child we replace
-         * the root with (c).  e, f, and g are deleted as we go.
-         * 
+         * step#1 : remove(1) triggers a cascade of operations: a.join(e) calls
+         * a.merge(e) and c.removeChild(3,e). This forces c.join(f), which calls
+         * c.merge(f) and g.removeChild(5,f). Since (g) now has a single child
+         * we replace the root with (c). e, f, and g are deleted as we go.
+         *
          * postcondition:
          * 
          * c.keys[ 5 7 x ]
@@ -459,7 +457,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(g.isDeleted());
 
         /*
-         * remove(2) - simple operation just removes(2) from (a).
+         * step#2 : remove(2) - simple operation just removes(2) from (a).
          */
         assertEquals(v2,btree.remove(2));
         assertTrue("after remove(2)", btree.dump(Level.DEBUG,System.err));
@@ -467,8 +465,8 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertValues(new Object[]{v3,v4},a);
         
         /*
-         * remove(4) triggers a.join(d), which in turn calls a.merge(d) and
-         * causes c.removeChild(5,d).
+         * step#3 : remove(4) triggers a.join(d), which in turn calls a.merge(d)
+         * and causes c.removeChild(5,d).
          */
         assertEquals(v4,btree.remove(4));
         assertTrue("after remove(4)", btree.dump(Level.DEBUG,System.err));
@@ -487,7 +485,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(d.isDeleted());
 
         /*
-         * remove(8) triggers b.join(a), which in turn calls
+         * step#4 : remove(8) triggers b.join(a), which in turn calls
          * b.redistributeKeys(a) which sends (6,v6) to (b) and updates the
          * separatorKey in (c) to (6).
          */
@@ -506,7 +504,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertNull(c.childRefs[2]);
 
         /*
-         * remove(6) triggers b.join(a), which calls b.merge(a) and
+         * step#5 : remove(6) triggers b.join(a), which calls b.merge(a) and
          * c.removeChild(-,a). Since (c) now has a single child we replace the
          * root of the tree with (b).
          */
@@ -542,14 +540,14 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
     }
     
     /**
-     * Variant of {@link #test_splitJoinBranchingFactor3()} that excercises some
+     * Variant of {@link #test_removeOrder3a()} that excercises some
      * different code paths while removing keys by choosing a different order in
      * which to remove some keys. Both tests build the same initial tree.
      * However, this tests begins by removing a key (7) from the right edge of
      * the tree while the other test beings by removing a key (1) from the left
      * edge of the tree.
      */
-    public void test_splitJoinBranchingFactor3b() {
+    public void test_removeOrder3b() {
 
         /*
          * Generate keys, values, and visitation order.
@@ -873,10 +871,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue("before removing keys", btree.dump(Level.DEBUG,System.err));
         
         /*
-         * remove(7) triggers a cascade of operations: b.join(d) calls b.merge(d)
-         * and f.removeChild(-,d).  This forces f.join(c), which calls f.merge(c)
-         * and g.removeChild(-,c).  Since (g) now has a single child we replace
-         * the root with (f).  d, c, and g are deleted as we go.
+         * step#1 : remove(7) triggers a cascade of operations: b.join(d) calls
+         * b.merge(d) and f.removeChild(-,d). This forces f.join(c), which calls
+         * f.merge(c) and g.removeChild(-,c). Since (g) now has a single child
+         * we replace the root with (f). d, c, and g are deleted as we go.
          *
          * postcondition:
          * 
@@ -910,10 +908,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(g.isDeleted());
 
         /*
-         * remove(3) triggers e.join(b) which calls e.redistributeKeys(b) and
-         * sends (5,v5) to e. (This tests the code path for redistribution of
-         * keys with a rightSibling of a leaf).
-         * 
+         * step#2 : remove(3) triggers e.join(b) which calls
+         * e.redistributeKeys(b) and sends (5,v5) to e. (This tests the code
+         * path for redistribution of keys with a rightSibling of a leaf).
+         *
          * postcondition:
          * 
          * f.keys[ 3 6 x ]
@@ -940,9 +938,9 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals(b,f.getChild(2));
 
         /*
-         * remove(8) triggers b.join(e) which calls b.merge(e), which updates
-         * the separator in (f) to the separator for the leftSibling which is
-         * (3) and then invokes f.removeChild(e).
+         * step#3 : remove(8) triggers b.join(e) which calls b.merge(e), which
+         * updates the separator in (f) to the separator for the leftSibling
+         * which is (3) and then invokes f.removeChild(e).
          * 
          * postcondition:
          * 
@@ -970,10 +968,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(e.isDeleted());
 
         /*
-         * remove(2) triggers a.join(b) which triggers a.redistributeKeys(b)
-         * which sends (4,v4) to (a) and updates the separatorKey on (f) to
-         * (5).
-         * 
+         * step#4 : remove(2) triggers a.join(b) which triggers
+         * a.redistributeKeys(b) which sends (4,v4) to (a) and updates the
+         * separatorKey on (f) to (5).
+         *
          * postcondition:
          * 
          * f.keys[ 3 - x ]
@@ -997,10 +995,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertNull(f.childRefs[2]);
         
         /*
-         * remove(1) triggers a.join(b) which calls a.merge(b) and
+         * step#5 : remove(1) triggers a.join(b) which calls a.merge(b) and
          * f.removeChild(b). Since this leaves (f) with only one child, we make
          * (a) the new root of the tree.
-         * 
+         *
          * postcondition:
          * 
          * a.keys[ 4 5 6 ]
@@ -1158,7 +1156,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      *       sibling since it is not possible to test those code paths with a
      *       tree of order less than 4.
      */
-    public void test_splitJoinBranchingFactor4() {
+    public void test_removeOrder4a() {
 
         fail("re-write this test");
         
