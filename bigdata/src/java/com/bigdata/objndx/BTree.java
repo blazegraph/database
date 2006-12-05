@@ -92,16 +92,72 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
- * FIXME add counters, nano timers, and track storage used by the object index.
- * The goal is to know how much of the time of the server is consumed by the
- * object index, what percentage of the store is dedicated to the object index,
- * how expensive it is to do some scan-based operations (merged down, delete of
- * transactional isolated persistent index), and evaluate the buffer strategy by
- * comparing accesses with IOs.
+ * @todo support key range iterators that allow concurrent structural
+ *       modification. structural mutations in a b+tree are relatively limited.
+ *       When prior-next references are available, an iterator should be easily
+ *       able to adjust for insertion and removal of keys.
  * 
- * @todo refactor to support long keys (vs int).
+ * @todo support efficient insert of sorted data.
  * 
- * @todo refactor to support generic key types.
+ * @todo support efficient conditional inserts, e.g., if this key does not exist
+ *       then insert this value.
+ * 
+ * @todo add counters, nano timers, and track storage used by the index. The
+ *       goal is to know how much of the time of the server is consumed by the
+ *       index, what percentage of the store is dedicated to the index, how
+ *       expensive it is to do some scan-based operations (merged down, delete
+ *       of transactional isolated persistent index), and evaluate the buffer
+ *       strategy by comparing accesses with IOs.
+ * 
+ * @todo develop metrics for insert rate for various scenarios, including
+ *       sequential integer keys, random URLs, etc.
+ * 
+ * @todo refactor to support long keys (vs int), or more generally, to support
+ *       efficient storage when the key datatype is a primitive.
+ * 
+ * @todo refactor to support generic key types. we can reuse most of the code
+ *       but there will need to be better encapuslation of the operations on
+ *       keys (insert, remove, split, join).
+ * 
+ * @todo support extensible comparators that allow for custom key types.
+ * 
+ * @todo drop the jdbm-based btree implementation in favor of this one.
+ * 
+ * @todo consider using extser an option for serialization so that we can
+ *       continually evolve the node and leaf formats. we will also need a node
+ *       serializer that does NOT use extser in order to store the persistent
+ *       extser mappings themselves, and perhaps for other things such as an
+ *       index of the index ranges that are multiplexed on a given journal.
+ * 
+ * @todo efficient support for large branching factors requires a more
+ *       sophisticated approach to maintaining the key order within a node or
+ *       leaf. E.g., using a red-black tree or adaptive packed memory array.
+ * 
+ * @todo support key compression (prefix and suffix compression and split
+ *       interval trickery).
+ * 
+ * @todo split cache for nodes and leaves.
+ * 
+ * @todo evict subranges by touching the node on the way up so that a node that
+ *       is evicted from the hard reference cache will span a subrange that can
+ *       be evicted together. this will help to preserve locality on disk. with
+ *       this approach leaves might be evicted indepdently, but also as part of
+ *       a node subrange eviction.
+ * 
+ * @todo maintain prior-next references among leaves in memory even if we are
+ *       not able to write them onto the disk. when reading in a leaf, always
+ *       set the prior/next reference iff the corresponding leaf is in memory -
+ *       this is easily handled by checking the weak references on the parent
+ *       node.
+ * 
+ * @todo since forward scans are much more common, change the post-order
+ *       iterator for commit processing to use a reverse traversal so that we
+ *       can write the next leaf field whenever we evict a sequence of leaves as
+ *       part of a sub-range commit.
+ * 
+ * @todo pre-fetch leaves for range scans? this really does require asynchronous
+ *       IO, which is not available for many platforms (it is starting to show
+ *       up in linux 2.6 kernals).
  * 
  * @todo refactor object index implementation into two variants providing
  *       isolation. In one the objects are referenced but exist outside of the
@@ -120,6 +176,13 @@ import com.bigdata.journal.SlotMath;
  *       identifiers based on expected locality of reference, e.g., late
  *       assignment of identifiers to persistence capable transient objects or
  *       an explicit notion of clustering rules or "local" objects.
+ * 
+ * @todo Support periodic rebuilding (for locality rather than packing purposes
+ *       since we have packed index nodes in any case). A goal would be to have
+ *       both contiguous leaves with prior/next references intack and to have
+ *       the index nodes in a known block on disk for efficient loading. Writes
+ *       on a rebuilt index would naturally cause locality to degrade until the
+ *       index was rebuilt.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -887,8 +950,6 @@ public class BTree implements IBTree {
     }
     
     /**
-     * Delete all nodes and leaves in this btree.
-     * 
      * FIXME We need an iterator that visits only the nodes since we do not need
      * to fetch the leaves in order to delete them. The order does not matter if
      * we delete all at once. However, this might introduce latency when the
@@ -897,6 +958,12 @@ public class BTree implements IBTree {
     public void delete() {
         
         throw new UnsupportedOperationException();
+        
+    }
+
+    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
+
+        return new RangeIterator(this,fromKey,toKey);
         
     }
 

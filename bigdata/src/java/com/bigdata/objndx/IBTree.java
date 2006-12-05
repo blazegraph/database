@@ -149,7 +149,23 @@ public interface IBTree {
      *         entry for that key.
      */
     public Object remove(int key);
+    
+    /**
+     * Deallocate all storage associated with this btree (nodes, leaves, and
+     * the metadata record for the btree itself).
+     */
+    public void delete();
 
+    /**
+     * Return an iterator that visits key-value pairs in a half-open key range.
+     * 
+     * @param fromKey
+     *            The lowest key that will be visited (inclusive).
+     * @param toKey
+     *            The first key that will not be visited (exclusive).
+     */
+    public IRangeIterator rangeIterator(Object fromKey, Object toKey);
+    
     /**
      * Commit dirty nodes using a post-order traversal that first writes any
      * dirty leaves and then (recursively) their parent nodes. The parent nodes

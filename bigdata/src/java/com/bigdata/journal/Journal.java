@@ -373,6 +373,103 @@ import java.util.Properties;
  * probably does make it more complex to move a segment from one host to
  * another. That can be handled by differentiating the host on which the data
  * resides on disk from the host serving requests for a segment.
+ * 
+ * FIXME I've been considering the problem of a distributed index more. A
+ * mutiplexed journal holding segments for one or more clustered indices
+ * (containing anything from database rows to generic objects to terms to
+ * triples) would provide fast write absorption and good read rates without a
+ * secondary read-optimized segment. If this is combined with pipelined journals
+ * for per-index segment redundency (a given segment is replicated on N=3+
+ * hosts) then we can have both failover and load-balancing for read-intensive
+ * segments.
+ * 
+ * Clustered indices support (re-)distribution and redundency since their rows
+ * are their essential data while the index simply provides efficient access.
+ * Therefore the same objects may be written onto multiple replications of an
+ * index range hosted by different journals. The object data will remain
+ * invariant, but the entailed index data will be different for each journal on
+ * which the object is written.
+ * 
+ * This requires a variety of metadata for each index segment. If a segment is
+ * defined by an index identifier and a separator key, then the metadata model
+ * needs to identify the master journal for a given segment (writes are directed
+ * to this journal) and the secondary journals for the segment (the master
+ * writes through to the secondary journals using a pipeline). Likewise, the
+ * journal must be able to identify the root for any given committed state of
+ * each index range written on that journal.
+ * 
+ * We need to track write load and read load per index range in the journal, per
+ * journal, per IO channel, per disk, per host, and per network segment. Write
+ * load can be reduced by splitting a segment, by using a host with faster
+ * resources, or by reducing other utilization of the host. The latter would
+ * include the case of preferring reads from a secondary journal for that index
+ * segment. It is an extremely cheap action to offload readers to a secondary
+ * service. Likewise, failover of the master for an index range is also
+ * inexpensive since the data are already in place on several secondaries,
+ * 
+ * A new replication of an index range may be built up gradually, e.g., by
+ * moving a leaf at a time and piplining only the sub-range of the index range
+ * that has been already mirrored. For simplicity, the new copy of the index
+ * range would not be visible in the index metadata until a full copy of the
+ * index range was life. Registration of the copy with the metadata index is
+ * then trivial. Until that time, the metadata index would only know that a copy
+ * was being developed. If one of the existing replicas is not heavily loaded
+ * then it can handle the creation of the new copy.
+ * 
+ * The nut to crack is that if the journal exceeds the capacity to readily
+ * buffer directly, then we are faced with the prospect of having the index
+ * nodes scattered over the disk with poor locality. This makes it a relatively
+ * expensive operation to clone part of an index. In contrast, if we can fully
+ * buffer a journal during this operation then we face one large sequential read
+ * followed by sustained (network or disk) IO (depending on where we are
+ * extracting the index range).
+ * 
+ * We need an efficient means to allocate storage within the journal extent.
+ * This is linked to the issue of deallocation of inaccessible historical
+ * versions and load balancing. If load balancing is handled by rollover to an
+ * existing replication of an index range, then load balancing is a very fast
+ * action.
+ * 
+ * One alternative is to freeze the journal every ~200M and start a new one (or
+ * alternatively to reuse the same journal segment by logically releasing slots
+ * as historical data versions are no longer accessible to readers). With this
+ * approach the journal could be treated as a WORM store and allocation would be
+ * optimized (next free N bytes, so we don't even need to use slots). In this
+ * model we would use small index (order 64) nodes in the journal (since it is
+ * fully buffered IO is not a problem and this minimizes the cost of inserts and
+ * deletions). Either once the journal is frozen or periodically during its life
+ * we would evict an index to a perfect index segment on disk (write the leaves
+ * out in a linear sequence, complete with prior-next references, and build up a
+ * perfect index over those leaves - the branching factor here can be much
+ * higher in order to reduce the tree depth and optimize IO). The perfect index
+ * would have to have "delete" entries to mark deleted keys. Periodically we
+ * would merge evicted index segments. The goal is to balance write absorbtion
+ * and concurrency control within memory and using pure sequantial IO against
+ * 100:1 or better data on disk with random seeks for reading any given leaf.
+ * The index nodes would be written densely after the leaves such that it would
+ * be possible to fully buffer the index nodes with a single sequential IO. A
+ * key range scan would likewise be a sequential IO since we would know the
+ * start and end leaf for the key range directly from the index. A read would
+ * first resolve against the current journal, then the prior journal iff one is
+ * in the process of be paritioned out into individual perfect index segments,
+ * and then against those index segments in order. A "point" read would
+ * therefore be biased to be more efficient for "recently" written data, but
+ * reads otherwise must present a merged view of the data in each remaining
+ * historical perfect index that covers at least part of the key range.
+ * Periodically the index segments could be fully merged, at which point we
+ * would no longer have any delete entries in a given perfect index segment.
+ * 
+ * At one extreme there will be one journal per disk and the journal will use
+ * the entire disk partition. In a pure write scenario the disk would perform
+ * only sequential IO. However, applications will also need to read data from
+ * disk. Read and write buffers need to be split. Write buffers are used to
+ * defer IOs until large sequential IOs may be realized. Read buffers are used
+ * for pre-fetching when the data on disk is much larger than the available RAM
+ * and the expectation of reuse is low while the expectation of completing a
+ * sequential scan is high. Direct buffering may be used for hot-spots but
+ * requires a means to bound the locality of the buffered segment, e.g., by not
+ * multiplexing an index segment that will be directly buffered and providing a
+ * sufficient resource abundence for high performance.
  */
 
 public class Journal implements IRawStore, IStore {
