@@ -56,6 +56,7 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ContiguousSlotAllocation;
@@ -73,6 +74,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     Random r = new Random();
     
+    /**
+     * Logger for the test suites in this package.
+     */
+    protected static final Logger log = Logger.getLogger
+    ( AbstractBTreeTestCase.class
+      );
+
     /**
      * 
      */
@@ -1167,6 +1175,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public void doSplitWithRandomKeySequence(BTree btree,int m, int ninserts) {
 
+        log.info("m="+m+", ninserts="+ninserts);
+
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
@@ -1214,10 +1224,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             System.err.println("]");
             throw ex;
         }
-        
+
+        log.info(btree.counters.toString());
+
     }
 
     private void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {
+        
+        log.info("m="+btree.getBrachingFactor()+", nkeys="+keys.length);
         
         /*
          * Insert keys into the tree.
@@ -1268,8 +1282,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // Note: The height, #of nodes, and #of leaves are path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
 
-        assertTrue(btree.dump(System.err));
+        assertTrue(btree.dump(Level.ERROR,System.err));
         
+        log.info(btree.counters.toString());
+
     }
 
 
@@ -1288,6 +1304,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The #of trials.
      */
     public void doInsertLookupRemoveStressTest(int m,int nkeys,int ntrials) {
+        
+        log.info("m="+m+", nkeys="+nkeys+", ntrials="+ntrials);
         
         Integer[] keys = new Integer[nkeys];
         
@@ -1325,7 +1343,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
                 SimpleEntry old2 = (SimpleEntry) btree.insert(key.intValue(), val);
                 
-//                btree.dump(Level.DEBUG,System.err);
+                assertTrue(btree.dump(Level.ERROR,System.err));
                 
                 assertEquals(old, old2);
 
@@ -1336,7 +1354,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
                 SimpleEntry old2 = (SimpleEntry) btree.remove(key.intValue());
                 
-//                btree.dump(Level.DEBUG,System.err);
+                assertTrue(btree.dump(Level.ERROR,System.err));
                 
                 assertEquals(old, old2);
                 
@@ -1368,6 +1386,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertTrue( btree.dump(System.err) );
         
+        log.info(btree.counters.toString());
+
     }
 
     /**
@@ -1379,6 +1399,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * is an empty btree of height zero(0) having a single root leaf.
      */
     public void doRemoveStructureStressTest(int m, int nkeys) {
+        
+        log.info("m="+m+", nkeys="+nkeys);
         
         BTree btree = getBTree(m);
         
@@ -1417,7 +1439,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         assertSameIterator(vals, btree.getRoot().entryIterator());
         
-        assertTrue(btree.dump(Level.DEBUG,System.out));
+        assertTrue(btree.dump(Level.ERROR,System.out));
         
         /*
          * Remove the keys one by one, verifying that leafs are deallocated
@@ -1431,7 +1453,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             SimpleEntry val = vals[order[i]];
             
-            System.err.println("i="+i+", key="+key+", val="+val);
+            //System.err.println("i="+i+", key="+key+", val="+val);
             
             // lookup finds the key, return the correct value.
             assertEquals("lookup("+key+")", val,btree.lookup(key));
@@ -1453,11 +1475,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * empty leaves probably were not removed from the tree or the root node
          * was not converted into a root leaf when the tree reached m entries.
          */
-        assertTrue(btree.dump(Level.DEBUG,System.out));
+        assertTrue(btree.dump(Level.ERROR,System.out));
         assertEquals("#entries", 0, btree.nentries);
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
         assertEquals("height", 0, btree.height);
+        log.info(btree.counters.toString());
 
     }
     

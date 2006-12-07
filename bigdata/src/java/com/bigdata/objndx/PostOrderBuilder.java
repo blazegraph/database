@@ -77,6 +77,13 @@ import com.bigdata.journal.IRawStore;
  * @version $Id$
  * 
  * @see "Post-order B-Tree Construction" by Lawerence West, ACM 1992.
+ * @see "Batch-Construction of B+-Trees" by Kim and Won, ACM 2001.
+ * 
+ * FIXME West's algorithm is for a b-tree, not a b+-tree. Therefore it assumes
+ * that there are key-value pairs in all nodes of the tree rather than in just
+ * the leaves of the tree. This will require a pervasive adaptation in order to
+ * work. The approach outlined by Kim and Won is designed for B+-Trees, but it
+ * appears to be less efficient on first glance.
  * 
  * FIXME Implement the post-order builder. Support each of the use cases,
  * including external sorting.

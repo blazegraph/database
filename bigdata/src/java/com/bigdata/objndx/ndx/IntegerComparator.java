@@ -42,56 +42,47 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on Nov 9, 2005
  */
+package com.bigdata.objndx.ndx;
 
-package com.bigdata.objndx;
+import java.util.Comparator;
 
-import java.nio.ByteBuffer;
+import org.CognitiveWeb.extser.Stateless;
+
 
 /**
- * (De-)serialize the values in a {@link Leaf}.
+ * Comparator for {@link Integer} values.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author thompsonbry
  * @version $Id$
  */
-public interface IValueSerializer {
+final public class IntegerComparator implements Comparator, Stateless
+{
 
     /**
-     * The maximum size of a sequence of serialized values in bytes. This is
-     * used to compute the maximum required size of a buffer to (de-)serialize
-     * nodes and values.
      * 
-     * @param n
-     *            The #of values in the sequence.
      */
-    public int getSize(int n);
-    
-    /**
-     * De-serialize the {@link Leaf}s values from the buffer.
-     * 
-     * @param buf
-     *            The buffer.
-     * @param values
-     *            The array into which the values must be written.
-     * @param n
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be read from the buffer and
-     *            written on the array.
-     */
-    public void getValues(ByteBuffer buf, Object[] values, int n);
+    private static final long serialVersionUID = -8621494590722068427L;
 
     /**
-     * Serialize the {@link Leaf}'s values onto the buffer.
-     * 
-     * @param buf
-     *            The buffer.
-     * @param values
-     *            The array of values from the {@link Leaf}.
-     * @param n The
-     *            #of valid values in the array. The values in indices [0:n-1]
-     *            are defined and must be written.
+     * Deserialization constructor. 
      */
-    public void putValues(ByteBuffer buf, Object[] values,int n);
+    public IntegerComparator() {
+        super();
+    }
+
+    public int compare( Object obj1, Object obj2 )
+    {
+        int v1 = ( (Integer) obj1 ).intValue();
+        int v2 = ( (Integer) obj2 ).intValue();
+
+        return v1 - v2;
+
+    }
+
+    public boolean equals( Object o ) {
+        return this == o || o instanceof IntegerComparator;
+    }
 
 }

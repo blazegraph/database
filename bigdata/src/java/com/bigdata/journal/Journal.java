@@ -470,8 +470,10 @@ import java.util.Properties;
  * requires a means to bound the locality of the buffered segment, e.g., by not
  * multiplexing an index segment that will be directly buffered and providing a
  * sufficient resource abundence for high performance.
+ * 
+ * @todo I need to revisit the assumptions for very large objects in the face of
+ *       the recent / planned redesign.
  */
-
 public class Journal implements IRawStore, IStore {
 
     final SlotMath slotMath;

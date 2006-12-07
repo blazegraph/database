@@ -174,7 +174,7 @@ public class Node extends AbstractNode {
 
         childRefs = new WeakReference[branchingFactor+1];
 
-        // must clear the dirty since we just de-serialized this node.
+        // must clear the dirty flag since we just de-serialized this node.
         setDirty(false);
 
     }
@@ -248,9 +248,13 @@ public class Node extends AbstractNode {
 
         btree.nnodes++;
 
+        btree.counters.rootsSplit++;
+
         // Note: nnodes and nleaves might not reflect rightSibling yet.
-        BTree.log.info("NEW ROOT: height=" + btree.height + ", utilization="
-                + btree.getUtilization()[2] + "%");
+        if (btree.INFO) {
+            BTree.log.info("increasing tree height: height=" + btree.height
+                    + ", utilization=" + btree.getUtilization()[2] + "%");
+        }
 
     }
 
@@ -264,10 +268,15 @@ public class Node extends AbstractNode {
      *            The child that triggered the copy constructor. This should be
      *            the immutable child NOT the one that was already cloned. This
      *            information is used to avoid stealing the original child since
-     *            we already made a copy of it.  It is [null] when this information
-     *            is not available, e.g., when the copyOnWrite action is triggered
-     *            by a join() and we are cloning the sibling before we redistribute
-     *            a key to the node/leaf on which the join was invoked,
+     *            we already made a copy of it. It is [null] when this
+     *            information is not available, e.g., when the copyOnWrite
+     *            action is triggered by a join() and we are cloning the sibling
+     *            before we redistribute a key to the node/leaf on which the
+     *            join was invoked.
+     * 
+     * FIXME Can't we just test to see if the child already has this node as its
+     * parent reference and then skip it? If so, then that would remove a
+     * toublesome parameter from the API.
      */
     protected Node(Node src, AbstractNode triggeredByChild) {
 
@@ -330,7 +339,7 @@ public class Node extends AbstractNode {
 
                 // Keep a reference to the clean child.
                 childRefs[i] = new WeakReference<AbstractNode>(child);
-
+                    
             }
             
         }
@@ -458,6 +467,8 @@ public class Node extends AbstractNode {
 
         }
 
+        System.err.println("this: "); dump(Level.DEBUG,System.err);
+        System.err.println("newChild: "); newChild.dump(Level.DEBUG,System.err);
         throw new IllegalArgumentException("Not our child : oldChildKey="
                 + oldChildKey);
 
@@ -574,7 +585,7 @@ public class Node extends AbstractNode {
      * 
      * @see TestBTree#test_node_findChild()
      */
-    public int findChild(int key) {
+    protected int findChild(int key) {
 
         int index = Search.search(key, keys, nkeys);
 
@@ -642,6 +653,8 @@ public class Node extends AbstractNode {
         assert isDirty(); // MUST be mutable.
         assert nkeys == maxKeys+1; // MUST be over capacity by one.
 
+        btree.counters.nodesSplit++;
+        
         /*
          * The #of child references. (this is +1 since the node is over capacity
          * by one).
@@ -661,11 +674,10 @@ public class Node extends AbstractNode {
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
 
-        if (btree.DEBUG) {
-            BTree.log.debug("SPLIT NODE: nkeys=" + nkeys + ", splitIndex="
-                    + splitIndex + ", separatorKey="
-                    + separatorKey + ": ");
-            dump(System.err);
+        if (INFO) {
+            log.info("this=" + this + ", nkeys=" + nkeys + ", splitIndex="
+                    + splitIndex + ", separatorKey=" + separatorKey);
+            if(DEBUG) dump(Level.DEBUG,System.err);
         }
 
         /* 
@@ -776,6 +788,12 @@ public class Node extends AbstractNode {
      * bring this node up to the minimum #of keys. This also updates a separator
      * key in the parent for the right most of (this, sibling).
      * 
+     * When a key is redistributed from a sibling, the key in the sibling is
+     * rotated into the parent where it replaces the current separatorKey and
+     * that separatorKey is brought down into this node. The child corresponding
+     * to the key is simply moved from the sibling into this node (rather than
+     * rotating it through the parent).
+     * 
      * @param sibling
      *            A direct sibling of this node (either the left or right
      *            sibling). The sibling MUST be mutable.
@@ -805,6 +823,15 @@ public class Node extends AbstractNode {
         // children of the same node.
         assert s.getParent() == p;
         
+        if (INFO) {
+            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            }
+        }
+        
         /*
          * The index of this leaf in its parent. we note this before we
          * start mucking with the keys.
@@ -818,22 +845,25 @@ public class Node extends AbstractNode {
         if( isRightSibling/*keys[nkeys-1] < s.keys[0]*/) {
         
             /*
-             * redistributeKeys(this,rightSibling). all we have to do is move
-             * the first key from the rightSibling to the end of the keys in
-             * this node. we then close up the hole that this left at index 0 in
-             * the rightSibling. finally, we update the separator key for the
-             * rightSibling to the new key in its first index position.
+             * redistributeKeys(this,rightSibling). all we have to do is replace
+             * the separatorKey in the parent with the first key from the
+             * rightSibling and copy the old separatorKey from the parent to the
+             * end of the keys in this node. we then close up the hole that this
+             * left at index 0 in the rightSibling.
              */
 
             // Mopy the first key/child from the rightSibling.
-            keys[nkeys] = s.keys[0];
-            childRefs[nkeys] = s.childRefs[0];
-            childKeys[nkeys] = s.childKeys[0];
-            AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
-            if( child!=null && child.isDirty() ) {
-                if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-                if(!dirtyChildren.add(child)) throw new AssertionError();
+            keys[nkeys] = p.keys[index]; // copy the separatorKey from the parent.
+            p.keys[index] = s.keys[0]; // update the separatorKey from the rightSibling.
+            childRefs[nkeys+1] = s.childRefs[0]; // copy the child from the rightSibling.
+            childKeys[nkeys+1] = s.childKeys[0];
+            AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
+            if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
+                if( child.isDirty() ) {
+                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+                    if(!dirtyChildren.add(child)) throw new AssertionError();
+                }
             }
             
             // copy down the keys on the right sibling to cover up the hole.
@@ -846,9 +876,6 @@ public class Node extends AbstractNode {
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
 
-            // update the separator key for the rightSibling.
-            p.keys[index] = s.keys[0];
-
             s.nkeys--;
             this.nkeys++;
             
@@ -859,10 +886,10 @@ public class Node extends AbstractNode {
             
             /*
              * redistributeKeys(leftSibling,this). all we have to do is copy
-             * down the keys in this node by one position and move the last key
-             * from the leftSibling into the first position in this node. We
-             * then replace the separation key for this node on the parent with
-             * the key that we copied from the leftSibling.
+             * down the keys in this node by one position, copy the separatorKey
+             * from the parent into the hole that we just opened up, copy the
+             * child data across, and update the separatorKey in the parent with
+             * the last key from the leftSibling.
              */
             
             // copy down by one.
@@ -871,23 +898,23 @@ public class Node extends AbstractNode {
             System.arraycopy(childKeys, 0, childKeys, 1, nkeys+1);
             
             // move the last key/child from the leftSibling to this node.
-            keys[0] = s.keys[s.nkeys-1];
+            keys[0] = p.keys[index-1]; // copy the separatorKey from the parent.
+            p.keys[index-1] = s.keys[s.nkeys-1]; // update the separatorKey
             childRefs[0] = s.childRefs[s.nkeys];
             childKeys[0] = s.childKeys[s.nkeys];
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
-            if( child!=null && child.isDirty() ) {
-                if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-                if(!dirtyChildren.add(child)) throw new AssertionError();
+            if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
+                if(child.isDirty()) {
+                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+                    if(!dirtyChildren.add(child)) throw new AssertionError();
+                }
             }
-            s.keys[s.nkeys] = BTree.NEGINF;
+            s.keys[s.nkeys-1] = BTree.NEGINF;
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
             s.nkeys--;
             this.nkeys++;
-            
-            // update the separator key for this leaf.
-            p.keys[index-1] = keys[0];
 
             assertInvariants();
             s.assertInvariants();
@@ -924,6 +951,15 @@ public class Node extends AbstractNode {
         
         // children of the same node.
         assert s.getParent() == p;
+
+        if (INFO) {
+            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            }
+        }
 
         /*
          * determine which node is earlier in the key ordering so that we know
@@ -962,10 +998,11 @@ public class Node extends AbstractNode {
             System.arraycopy(s.childKeys, 0, this.childKeys, nkeys, s.nkeys+1);
             
             // update parent on children
+            WeakReference<Node> weakRef = new WeakReference<Node>(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
-                    child.parent = new WeakReference<Node>(this);
+                    child.parent = weakRef;
                     if( child.isDirty() ) {
                         // record hard references for dirty children.
                         dirtyChildren.add(child);
@@ -1028,10 +1065,11 @@ public class Node extends AbstractNode {
             this.keys[s.nkeys] = p.keys[index-1];
             
             // update parent on children.
+            WeakReference<Node> weakRef = new WeakReference<Node>(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
-                    child.parent = new WeakReference<Node>(this);
+                    child.parent = weakRef;
                     if( child.isDirty() ) {
                         // record hard references for dirty children.
                         dirtyChildren.add(child);
@@ -1166,7 +1204,7 @@ public class Node extends AbstractNode {
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
-    public AbstractNode getLeftSibling(AbstractNode child, boolean materialize) {
+    protected AbstractNode getLeftSibling(AbstractNode child, boolean materialize) {
 
         int i = getIndexOf(child);
 
@@ -1184,9 +1222,13 @@ public class Node extends AbstractNode {
             AbstractNode sibling = childRefs[index] == null ? null
                     : childRefs[index].get();
 
-            if (sibling == null && materialize) {
+            if (sibling == null) {
+                
+                if( materialize ) {
 
-                sibling = getChild(index);
+                    sibling = getChild(index);
+                    
+                }
 
             } else {
 
@@ -1216,7 +1258,7 @@ public class Node extends AbstractNode {
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
-    public AbstractNode getRightSibling(AbstractNode child, boolean materialize) {
+    protected AbstractNode getRightSibling(AbstractNode child, boolean materialize) {
 
         int i = getIndexOf(child);
 
@@ -1328,7 +1370,13 @@ public class Node extends AbstractNode {
 
         assertInvariants();
 
-        System.err.println("removeChild("+child+")");
+        if (INFO) {
+            log.info("this="+this+", child="+child);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+                System.err.println("child"); child.dump(Level.DEBUG,System.err);
+            }
+        }
 
         int i = getIndexOf(child);
 
@@ -1449,9 +1497,13 @@ public class Node extends AbstractNode {
 
                 lastChild.assertInvariants();
 
-                System.err.println("Replacing root node: root=" + btree.root
-                        + ", node=" + this + ", lastChild=" + lastChild);
-
+                if(DEBUG) {
+                    log.debug("replacing root: root=" + btree.root + ", node="
+                            + this + ", lastChild=" + lastChild);
+                    System.err.println("root"); btree.root.dump(Level.DEBUG,System.err);
+                    System.err.println("this"); this.dump(Level.DEBUG,System.err);
+                    System.err.println("lastChild"); lastChild.dump(Level.DEBUG,System.err);
+                }
                 // replace the root node with a root leaf.
                 btree.root = lastChild;
                 
@@ -1466,6 +1518,13 @@ public class Node extends AbstractNode {
 
                 // one less node in the tree.
                 btree.nnodes--;
+
+                if(btree.INFO) {
+                    BTree.log.info("reduced tree height: height="
+                            + btree.height + ", newRoot=" + btree.root);
+                }
+                
+                btree.counters.rootsJoined++;
 
             }
 
@@ -1553,7 +1612,7 @@ public class Node extends AbstractNode {
      * 
      * @return The child node or leaf and never null.
      */
-    public AbstractNode getChild(int index) {
+    protected AbstractNode getChild(int index) {
 
         assert index >= 0 && index <= nkeys;
 
@@ -1889,7 +1948,18 @@ public class Node extends AbstractNode {
                     if( child.parent.get() != this ) {
                         out.println(indent(height) + "  ERROR child["
                                 + i + "] has wrong parent.");
-                        ok = false;                        
+                        ok = false;                
+//                        // some extra stuff used to track down a bug.
+                        if(!ok) {
+                        if( level == Level.DEBUG ) {
+                            // dump the child also and exit.
+                            System.err.println("child"); child.dump(Level.DEBUG,System.err);
+                            throw new AssertionError();
+                        } else {
+                            // recursive call to get debug level dump.
+                            System.err.println("this"); this.dump(Level.DEBUG,System.err);
+                        }
+                        }
                     }
                     
                     if (child.isDirty()) {

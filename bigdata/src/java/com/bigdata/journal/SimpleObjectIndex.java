@@ -57,6 +57,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * This is a prototype implementation in order to proof out the concept for
  * transactional isolation. This implementation NOT persistence capable.
  * 
+ * FIXME Integrate the new persistence capable B+-Tree support to provide a
+ * persistence capable object index. The btree support provides copy-on-write,
+ * which means that we do not need to close the base object index when starting
+ * a new transaction. Other changes that need to be explored are (a) making the
+ * objects inline within the index (clustered object index) vs managing
+ * allocated slots on the {@link IRawStore}. This would result in a change to
+ * the {@link IObjectIndexEntry} API. Also, the solution should be general in
+ * that any kind of btree can be used with transactional isolation and multiple
+ * btrees can be used at the same time with transactional isolation; and (b)
+ * exploring opportunities for further efficiencies by moving some of the update
+ * logic into a callback or behavior extension for the btree insert/update
+ * method.
+ * 
  * FIXME Write lots of tests for this interface as well as for transactional
  * isolation at the {@link Journal} and {@link Tx} API level. We will reuse
  * those for the persistence capable object index implementation.

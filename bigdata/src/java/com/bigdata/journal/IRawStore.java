@@ -50,11 +50,22 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 /**
- * An interface exposing low-level persistence store operations.  This interface
+ * An interface exposing low-level persistence store operations. This interface
  * does NOT provide transactional isolation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Refactor to reflect the offset and length of the allocation and require
+ *       that all allocations are contiguous. The case of a journal with fixed
+ *       size slots can be handled by either special interpretation of the size
+ *       field or by rounding up the object size to the slot size. Either way, a
+ *       journal with fixed size slots is required iff we are supporting GC of
+ *       versions no longer accessible to readers and reuse of deallocated space
+ *       within the journal. If the architecture instead snapshots journals and
+ *       divides their index key ranges into perfect btree segment files then we
+ *       can do WORM style (perfect fit) allocations and allocations can be
+ *       modeled by a simple "nextOffset" counter.
  */
 public interface IRawStore {
 

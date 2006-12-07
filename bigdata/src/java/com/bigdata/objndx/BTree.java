@@ -92,6 +92,77 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
+ * @todo we could defer splits by redistributing keys to left/right siblings
+ *       that are under capacity - this makes the tree a b*-tree. however, this
+ *       is not critical since the journal is designed to be fully buffered and
+ *       the index segments are read-only but it would reduce memory by reducing
+ *       the #of nodes -- and we can expect that the siblings will be either 
+ *       resident or in the direct buffer for the journal
+ * 
+ * @todo should this btree should intrinsically support isolation of inline
+ *       objects by carrying the necessary metadata for each index entry. note
+ *       that the original isolation scheme effectively carried references to
+ *       the objects on the journal (slot allocations) rather than having them
+ *       inline. we probably do not need to know where the historical versions
+ *       is since we only need to release it on the journal if we are trying to
+ *       keep a single file and reuse deallocated space. if we just discard
+ *       entire journal extents once their data has been migrated into perfect
+ *       segments then we never need to do that deallocation. this leaves us
+ *       with a version counter (similar to a timestamp, and perhaps replaceable
+ *       by a timestamp) and the object itself. if we make the timestamp part of
+ *       the key, then all that we are left with is the object itself.
+ * 
+ * @todo refactor to support generic key types. we can reuse most of the code
+ *       but there will need to be better encapuslation of the operations on
+ *       keys (insert, remove, split, join). we will also need to define a key
+ *       serializer interface and support custom key comparators. When the data
+ *       type is bounded or a primitive then we need to know the representation
+ *       for negative infinity (e.g., null or the smallest value of the data
+ *       type) and when positive infinity is defined then we need to know that.
+ *       We also need to know the successor of a key for various half-open to
+ *       closed range conversions, though that can be handled above the level of
+ *       the btree I believe. the index should remain efficient in terms of its
+ *       storage when the key type is a java primitive, e.g., int, long, float
+ *       or double. once the key type must be treated as an object we are unable
+ *       to avoid an allocation for each key read from the store and we are
+ *       unable to maintain locality of reference for the keys. Where warrented,
+ *       I could explore specialized APIs for operations on a btree with
+ *       primitive keys, e.g., int keys. This is definately a tweak and not
+ *       worth considering further until I can show that heap churn for the
+ *       parameters passed into the btree API is a problem.
+ * 
+ * @todo consider using extser an option for serialization so that we can
+ *       continually evolve the node and leaf formats. we will also need a node
+ *       serializer that does NOT use extser in order to store the persistent
+ *       extser mappings themselves, and perhaps for other things such as an
+ *       index of the index ranges that are multiplexed on a given journal.
+ *       finally, we will need to use extser to simplify reopening an index so
+ *       that we can recover its key serializer, value serializer, and key
+ *       comparator as well as various configuration values from its metadata
+ *       record. that encapsulation will have to be layered over the basic btree
+ *       class so that we can use a more parameterized btree instance to support
+ *       extser itself. there will also need to be metadata maintained about the
+ *       perfect index range segments so that we know how to decompress blocks,
+ *       deserialize keys and values, and compare keys.
+ * 
+ * @todo model out the metadata index design to locate the components of an
+ *       index key range. this will include the journal on which writes for the
+ *       key range are multiplexed with other key ranges on either the same or
+ *       other indices, any frozen snapshot of a journal that is being processed
+ *       into index segment files, and those index segment files themselves. if
+ *       a key range is always mapped (multiplexed) to a process on a host, then
+ *       the historical journal snapshots and index key range files can be
+ *       managed by the host rather than showing up in the metadata index
+ *       directly.
+ * 
+ * @todo drop the jdbm-based btree implementation in favor of this one.
+ * 
+ * @todo support column store style indices (key, column, timestamp), locality
+ *       groups that partition the key space so that we can fully buffer parts
+ *       of the index that matter, automated version history policies that
+ *       expire old values based on either an external timestamp or write time
+ *       on the server.
+ * 
  * @todo support key range iterators that allow concurrent structural
  *       modification. structural mutations in a b+tree are relatively limited.
  *       When prior-next references are available, an iterator should be easily
@@ -102,36 +173,8 @@ import com.bigdata.journal.SlotMath;
  * @todo support efficient conditional inserts, e.g., if this key does not exist
  *       then insert this value.
  * 
- * @todo add counters, nano timers, and track storage used by the index. The
- *       goal is to know how much of the time of the server is consumed by the
- *       index, what percentage of the store is dedicated to the index, how
- *       expensive it is to do some scan-based operations (merged down, delete
- *       of transactional isolated persistent index), and evaluate the buffer
- *       strategy by comparing accesses with IOs.
- * 
  * @todo develop metrics for insert rate for various scenarios, including
  *       sequential integer keys, random URLs, etc.
- * 
- * @todo refactor to support long keys (vs int), or more generally, to support
- *       efficient storage when the key datatype is a primitive.
- * 
- * @todo refactor to support generic key types. we can reuse most of the code
- *       but there will need to be better encapuslation of the operations on
- *       keys (insert, remove, split, join).
- * 
- * @todo support extensible comparators that allow for custom key types.
- * 
- * @todo drop the jdbm-based btree implementation in favor of this one.
- * 
- * @todo consider using extser an option for serialization so that we can
- *       continually evolve the node and leaf formats. we will also need a node
- *       serializer that does NOT use extser in order to store the persistent
- *       extser mappings themselves, and perhaps for other things such as an
- *       index of the index ranges that are multiplexed on a given journal.
- * 
- * @todo efficient support for large branching factors requires a more
- *       sophisticated approach to maintaining the key order within a node or
- *       leaf. E.g., using a red-black tree or adaptive packed memory array.
  * 
  * @todo support key compression (prefix and suffix compression and split
  *       interval trickery).
@@ -184,6 +227,16 @@ import com.bigdata.journal.SlotMath;
  *       on a rebuilt index would naturally cause locality to degrade until the
  *       index was rebuilt.
  * 
+ * @todo Note that efficient support for large branching factors requires a more
+ *       sophisticated approach to maintaining the key order within a node or
+ *       leaf. E.g., using a red-black tree or adaptive packed memory array.
+ *       However, we can use smaller branching factors for btrees in the journal
+ *       and use a separate implementation for bulk generating and reading
+ *       "perfect" read-only key range segments.
+ * 
+ * @todo Support bloom filters. Figure out whether they go in front of an index
+ *       or just an index range segment.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -192,22 +245,22 @@ public class BTree implements IBTree {
     /**
      * Log for btree opeations.
      */
-    public static final Logger log = Logger.getLogger(BTree.class);
+    protected static final Logger log = Logger.getLogger(BTree.class);
     
     /**
      * Log for {@link BTree#dump(PrintStream)} and friends. 
      */
-    public static final Logger dumpLog = Logger.getLogger(BTree.class.getName()+"#dump");
+    protected static final Logger dumpLog = Logger.getLogger(BTree.class.getName()+"#dump");
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * The minimum allowed branching factor (3).
@@ -222,8 +275,23 @@ public class BTree implements IBTree {
     
     /**
      * The size of the hard reference queue used to defer leaf eviction.
+     * 
+     * @todo if the journal is fully buffered, then the only IO that we are
+     *       talking about is serialization of the leaves onto the buffer with
+     *       incremental writes through to disk and NO random reads (since the
+     *       entire store is buffered in RAM, even though it writes through to
+     *       disk).
+     * 
+     * @todo The leaf cache capacity is effectively multiplied by the branching
+     *       factor so it makes sense that we would use a smaller leaf cache
+     *       when the branching factor was larger. This is a good reason for
+     *       moving the default for this parameter inside of the btree
+     *       implementation.
+     * 
+     * @todo testing with a large leaf cache and a large branching factor means
+     *       that you nearly never evict leaves
      */
-    static public final int DEFAULT_LEAF_CACHE_CAPACITY = 1000;
+    static public final int DEFAULT_LEAF_CACHE_CAPACITY = 500;
 
     /**
      * The #of entries on the hard reference queue that will be scanned for a
@@ -246,15 +314,68 @@ public class BTree implements IBTree {
      */
     protected int branchingFactor;
 
-//    /**
-//     * Computes the split index when splitting a non-leaf {@link Node}.
-//     */
-//    final public INodeSplitRule nodeSplitRule;
-//
-//    /**
-//     * Computes the split index when splitting a non-leaf {@link Node}.
-//     */
-//    final public ILeafSplitRule leafSplitRule;
+    /**
+     * A helper class that collects statistics on the btree.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo add nano timers and track storage used by the index. The goal is to
+     *       know how much of the time of the server is consumed by the index,
+     *       what percentage of the store is dedicated to the index, how
+     *       expensive it is to do some scan-based operations (merged down,
+     *       delete of transactional isolated persistent index), and evaluate
+     *       the buffer strategy by comparing accesses with IOs.
+     */
+    public class Counters {
+
+        int nfinds = 0;
+        int ninserts = 0;
+        int nremoves = 0;
+        int rootsSplit = 0;
+        int rootsJoined = 0;
+        int nodesSplit = 0;
+        int nodesJoined = 0;
+        int leavesSplit = 0;
+        int leavesJoined = 0; // @todo also merge vs redistribution of keys on remove (and delete if b*-tree)
+        int nodesCopyOnWrite = 0;
+        int leavesCopyOnWrite = 0;
+        int nodesRead = 0;
+        int leavesRead = 0;
+        int nodesWritten = 0;
+        int leavesWritten = 0;
+        long bytesRead = 0L;
+        long bytesWritten = 0L;
+
+        // @todo consider changing to logging so that the format will be nicer
+        // or just improve the formatting.
+        public String toString() {
+            
+            return 
+            "height="+height+
+            ", #nodes="+nnodes+
+            ", #leaves="+nleaves+
+            ", #entries="+nentries+
+            ", #find="+nfinds+
+            ", #insert="+ninserts+
+            ", #remove="+nremoves+
+            ", #roots split="+rootsSplit+
+            ", #roots joined="+rootsJoined+
+            ", #nodes split="+nodesSplit+
+            ", #nodes joined="+nodesJoined+
+            ", #leaves split="+leavesSplit+
+            ", #leaves joined="+leavesJoined+
+            ", #nodes copyOnWrite="+nodesCopyOnWrite+
+            ", #leaves copyOnWrite="+leavesCopyOnWrite+
+            ", read ("+nodesRead+" nodes, "+leavesRead+" leaves, "+bytesRead+" bytes)"+
+            ", wrote ("+nodesWritten+" nodes, "+leavesWritten+" leaves, "+bytesWritten+" bytes)"
+            ;
+            
+        }
+
+    }
+    
+    protected final Counters counters = new Counters();
     
     public IRawStore getStore() {
         
@@ -632,9 +753,10 @@ public class BTree implements IBTree {
     }
     
     /**
-     * Writes the node on the store. The node MUST be dirty. If the node has
-     * a parent, then the parent is notified of the persistent identity
-     * assigned to the node by the store.
+     * Writes the node on the store (non-recursive). The node MUST be dirty. If
+     * the node has a parent, then the parent is notified of the persistent
+     * identity assigned to the node by the store.  This method is NOT recursive
+     * and dirty children of a node will NOT be visited.
      * 
      * @return The persistent identity assigned by the store.
      */
@@ -691,10 +813,14 @@ public class BTree implements IBTree {
         
             nodeSer.putLeaf(buf, (Leaf)node);
 
+            counters.leavesWritten++;
+            
         } else {
 
             nodeSer.putNode(buf, (Node) node);
-            
+
+            counters.nodesWritten++;
+
         }
         
         /*
@@ -703,8 +829,12 @@ public class BTree implements IBTree {
         
         buf.flip();
         
-        final long id = store.write(buf).toLong();
+        ISlotAllocation slots = store.write(buf);
+        
+        final long id = slots.toLong();
 
+        counters.bytesWritten += slots.getByteCount();
+        
         /*
          * The node or leaf now has a persistent identity and is marked as
          * clean. At this point is MUST be treated as being immutable. Any
@@ -753,26 +883,27 @@ public class BTree implements IBTree {
         
         buf.clear();
         
-        ByteBuffer tmp = store.read(asSlots(id),buf);
+        ISlotAllocation slots = asSlots(id);
+        
+        ByteBuffer tmp = store.read(slots,buf);
         
         AbstractNode node = nodeSer.getNodeOrLeaf(this, id, tmp);
         
         node.setDirty(false);
         
         if (node instanceof Leaf) {
+            
+            counters.leavesRead++;
 
-            /*
-             * Leaves are added to a hard reference queue. On eviction
-             * from the queue the leaf is serialized. Once the leaf is
-             * no longer strongly reachable its weak references may be
-             * cleared by the VM.
-             * 
-             * @todo also place nodes onto a queue.
-             */
-
-            touch(node);
-
+        } else {
+            
+            counters.nodesRead++;
+            
         }
+
+        counters.bytesRead += slots.getByteCount();
+        
+        touch(node);
 
         return node;
         
@@ -780,16 +911,24 @@ public class BTree implements IBTree {
     
     public Object insert(int key, Object entry) {
 
+        counters.ninserts++;
+        
         assert key > NEGINF && key < POSINF;
         
         assert entry != null;
-        
+
+        if(INFO) {
+            log.info("key="+key+", entry="+entry);
+        }
+
         return root.insert(key, entry);
 
     }
 
     public Object lookup(int key) {
 
+        counters.nfinds++;
+        
         assert key > IBTree.NEGINF && key < IBTree.POSINF;
 
         return root.lookup(key);
@@ -798,7 +937,13 @@ public class BTree implements IBTree {
 
     public Object remove(int key) {
 
+        counters.nremoves++;
+        
         assert key > IBTree.NEGINF && key < IBTree.POSINF;
+
+        if(INFO) {
+            log.info("key="+key);
+        }
 
         return root.remove(key);
 
@@ -816,21 +961,24 @@ public class BTree implements IBTree {
      */
     boolean dump(PrintStream out) {
 
-            return dump(BTree.dumpLog.getEffectiveLevel(), out );
+        return dump(BTree.dumpLog.getEffectiveLevel(), out );
 
     }
         
     public boolean dump(Level level, PrintStream out) {
             
         // True iff we will write out the node structure.
-        final boolean debug = level.toInt() <= Level.DEBUG.toInt();
+        final boolean info = level.toInt() <= Level.INFO.toInt();
 
         int[] utils = getUtilization();
         
-        out.println("height=" + height + ", branchingFactor=" + branchingFactor
-                + ", #nodes=" + nnodes + ", #leaves=" + nleaves + ", #entries="
-                + nentries + ", nodeUtil=" + utils[0] + "%, leafUtil="
-                + utils[1] + "%, utilization=" + utils[2] + "%");
+        if (info) {
+            log.info("height=" + height + ", branchingFactor="
+                    + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
+                    + nleaves + ", #entries=" + nentries + ", nodeUtil="
+                    + utils[0] + "%, leafUtil=" + utils[1] + "%, utilization="
+                    + utils[2] + "%");
+        }
 
         boolean ok = root.dump(level, out, 0, true);
 
@@ -937,6 +1085,18 @@ public class BTree implements IBTree {
     public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
             + Bytes.SIZEOF_INT * 5;
 
+    /**
+     * @todo reconcile the notion of a commit with transactional isolation vs
+     *       simply flushing to the store. This could really be renamed "flush".
+     *       An atomic commit would validate all indices in the journal that are
+     *       touched within a given transaction and then merge down the indices
+     *       into the global scope on the transaction, flush each index in the
+     *       global scope, and then write a new root block in which were
+     *       recorded the location of the metadata block of each index defined
+     *       for the journal. Those indices that were modified by the
+     *       transaction will have new metadata blocks while those that were not
+     *       modified should reuse their old metadata block.
+     */
     public long commit() {
 
         if (root.isDirty()) {

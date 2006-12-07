@@ -46,10 +46,13 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.cache.HardReferenceQueue;
 
 /**
- * Hard reference cache eviction listener writes the node or leaf onto the
+ * Hard reference cache eviction listener writes a dirty node or leaf onto the
  * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -57,6 +60,21 @@ import com.bigdata.cache.HardReferenceQueue;
  */
 public class DefaultEvictionListener implements
         IEvictionListener {
+
+    /**
+     * Log for eviction of dirty leaves and nodes. 
+     */
+    public static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     public void evicted(HardReferenceQueue<PO> cache, PO ref) {
 
@@ -74,6 +92,8 @@ public class DefaultEvictionListener implements
                 /*
                  * Deleted nodes are ignored as the are evicted from the queue.
                  */
+
+                if( DEBUG ) log.debug("ignoring deleted");
                 
                 return;
                 
@@ -86,6 +106,9 @@ public class DefaultEvictionListener implements
                     /*
                      * A leaf is written out directly.
                      */
+                    
+                    if(INFO) log.info("Evicting dirty leaf: "+node);
+                    
                     node.btree.writeNodeOrLeaf(node);
 
                 } else {
@@ -96,6 +119,9 @@ public class DefaultEvictionListener implements
                      * before the dirty parent. This is required in order to
                      * assign persistent identifiers to the dirty children.
                      */
+
+                    if(INFO) log.info("Evicting dirty node: "+node);
+                    
                     node.btree.writeNodeRecursive(node);
 
                 }

@@ -285,6 +285,13 @@ public class Leaf extends AbstractNode {
         // one more entry in the btree.
         btree.nentries++;
 
+        if (INFO) {
+            log.info("this="+this+", key="+key+", value="+entry);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+            }
+        }
+
         if (nkeys == maxKeys+1) {
 
             /*
@@ -347,6 +354,8 @@ public class Leaf extends AbstractNode {
         // MUST be an overflow.
         assert nkeys == maxKeys+1;
 
+        btree.counters.leavesSplit++;
+
         /*
          * The splitIndex is the index of the first key/value to move to the new
          * rightSibling.
@@ -362,11 +371,10 @@ public class Leaf extends AbstractNode {
         // the new rightSibling of this leaf.
         final Leaf rightSibling = new Leaf(btree);
 
-        if (btree.DEBUG) {
-            BTree.log.debug("SPLIT LEAF: nkeys=" + nkeys + ", splitIndex="
-                    + splitIndex + ", separatorKey="
-                    + separatorKey + ": ");
-            dump(System.err);
+        if (INFO) {
+            log.info("this=" + this + ", nkeys=" + nkeys + ", splitIndex="
+                    + splitIndex + ", separatorKey=" + separatorKey);
+            if(DEBUG) dump(Level.DEBUG,System.err);
         }
 
         int j = 0;
@@ -442,7 +450,16 @@ public class Leaf extends AbstractNode {
         
         // children of the same node.
         assert s.getParent() == p;
-        
+
+        if (INFO) {
+            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            }
+        }
+
         /*
          * The index of this leaf in its parent. we note this before we
          * start mucking with the keys.
@@ -544,6 +561,15 @@ public class Leaf extends AbstractNode {
         
         // children of the same node.
         assert s.getParent() == p;
+
+        if (INFO) {
+            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            }
+        }
 
         /*
          * determine which leaf is earlier in the key ordering so that we know
@@ -754,6 +780,13 @@ public class Leaf extends AbstractNode {
 
         // The value that is being removed.
         Object entry = values[index];
+
+        if (INFO) {
+            log.info("this="+this+", key="+key+", value="+entry+", index="+index);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+            }
+        }
 
         /*
          * Copy over the hole created when the key and value were removed

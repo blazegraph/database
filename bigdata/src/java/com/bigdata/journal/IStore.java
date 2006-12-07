@@ -54,6 +54,10 @@ import java.nio.ByteBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo refactor to reflect direct use of the index into which the data are
+ *       being inserted, e.g., an object index (int keys) or some other index
+ *       with arbitrary key type.
  */
 public interface IStore {
 

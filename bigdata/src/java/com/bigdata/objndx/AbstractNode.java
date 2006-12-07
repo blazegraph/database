@@ -51,6 +51,7 @@ import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 
@@ -72,6 +73,36 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public abstract class AbstractNode extends PO {
+
+    /**
+     * Log for node and leaf operations.
+     * <dl>
+     * <dt>info</dt>
+     * <dd> A high level trace of insert, split, joint, and remove operations.
+     * You MUST test on {@link #INFO} before generating log messages at this
+     * level to avoid string concatenation operations would otherwise kill
+     * performance.</dd>
+     * <dt></dt>
+     * <dd> A low level trace including a lot of dumps of leaf and node state. *
+     * You MUST test on {@link #DEBUG} before generating log messages at this
+     * level to avoid string concatenation operations would otherwise kill
+     * performance.</dd>
+     * </dl>
+     * 
+     * @see BTree#log
+     * @see BTree#dumpLog
+     */
+    protected static final Logger log = Logger.getLogger(AbstractNode.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * The BTree.
@@ -377,15 +408,29 @@ public abstract class AbstractNode extends PO {
 
         if (isPersistent()) {
 
+            if(INFO) {
+                log.info("this="+this+", trigger="+triggeredByChild);
+                if( DEBUG ) {
+                    System.err.println("this"); dump(Level.DEBUG,System.err);
+                    if( triggeredByChild != null ) {
+                        System.err.println("trigger"); triggeredByChild.dump(Level.DEBUG,System.err);
+                    }
+                }
+            }
+            
             AbstractNode newNode;
 
             if (this instanceof Node) {
 
                 newNode = new Node((Node) this, triggeredByChild );
+                
+                btree.counters.nodesCopyOnWrite++;
 
             } else {
 
                 newNode = new Leaf((Leaf) this);
+
+                btree.counters.leavesCopyOnWrite++;
 
             }
 
@@ -396,7 +441,7 @@ public abstract class AbstractNode extends PO {
                 assert parent == null;
 
                 // Update the root node on the btree.
-                BTree.log.info("Copy-on-write : replaced root node on btree.");
+                log.info("Copy-on-write : replaced root node on btree.");
 
                 btree.root = newNode;
 
@@ -434,16 +479,12 @@ public abstract class AbstractNode extends PO {
         } else {
 
             /*
-             * Since a clone was requested, we use this as an opportunity to 
-             * append a leaf onto the hard reference queue.  This helps us to
-             * ensure that leaves which have been touched recently will remain
-             * strongly reachable. 
+             * Since a clone was requested, we use this as an opportunity to
+             * touch the hard reference queue. This helps us to ensure that
+             * nodes which have been touched recently will remain strongly
+             * reachable.
              */
-            if( isLeaf() ) {
-
-                btree.touch(this);
-                
-            }
+            btree.touch(this);
             
             return this;
 
@@ -552,7 +593,7 @@ public abstract class AbstractNode extends PO {
 
         } catch (AssertionError ex) {
 
-            BTree.log.fatal("Invariants failed\n"
+            log.fatal("Invariants failed\n"
                     + ex.getStackTrace()[0].toString());
             
             dump(Level.FATAL, System.err);
@@ -639,6 +680,23 @@ public abstract class AbstractNode extends PO {
         assert btree.root != this;
         
         final Node parent = getParent();
+
+        if (INFO) {
+            log.info("this="+this);
+            if(DEBUG) {
+                System.err.println("this"); dump(Level.DEBUG,System.err);
+            }
+        }
+        
+        if( this instanceof Leaf ) {
+
+            btree.counters.leavesJoined++;
+
+        } else {
+            
+            btree.counters.nodesJoined++;
+
+        }
 
         /*
          * Look for, but do not materialize, the left and right siblings.
@@ -738,6 +796,20 @@ public abstract class AbstractNode extends PO {
      *            The sibling.
      * @param isRightSibling
      *            True iff the sibling is the rightSibling of this node.
+     * 
+     * @todo redistribution should proceed until the node and the sibling have
+     *       an equal #of keys (or perhaps more exactly until the node would
+     *       have more keys than the sibling if another key was redistributed
+     *       into the node from the sibling). this takes advantage of the fact
+     *       that the node and the sibling are known to be in memory to bring
+     *       them to the point where they are equally full. along the same lines
+     *       when both siblings are resident we could actually redistribute keys
+     *       from both siblings into the node until the keys were equally
+     *       distributed among the node and its siblings.
+     * 
+     * @todo a b*-tree variant simply uses redistribution of keys among siblings
+     *       during insert to defer a split until the node and its siblings are
+     *       all full.
      */
     abstract protected void redistributeKeys(AbstractNode sibling,
             boolean isRightSibling);
