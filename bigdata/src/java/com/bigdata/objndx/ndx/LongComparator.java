@@ -62,6 +62,9 @@ final public class LongComparator implements Comparator, Stateless {
      */
     private static final long serialVersionUID = -8500641232895627449L;
 
+    // @todo declare global instances for all comparators.
+    public static final LongComparator INSTANCE = new LongComparator();
+    
     /**
      * Deserialization constructor.
      */

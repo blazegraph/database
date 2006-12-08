@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.Comparator;
 
 /**
  * Utility class for searching arrays that may be only partly filled with
@@ -58,9 +59,19 @@ package com.bigdata.objndx;
 public class Search {
 
     /**
-     * Binary search wins over linear search when there are this many keys.
+     * <p>
+     * Binary search is choosen over linear search when there are this many keys.
+     * </p>
+     * <p>
+     * Note: the comparison is very close at small N and binary generally takes
+     * over quickly. This value was choosen to prefer linear search only for
+     * very small N. There is a fair amount of variability in the performance
+     * test comparison of linear vs binary search so the decision winds up being
+     * somewhat arbitrary.
+     * </p>
      */
-    public static final int BINARY_WINS = 48;
+    public static final int BINARY_WINS_INT = 24;
+    public static final int BINARY_WINS_LONG = 24;
     
     /**
      * Search array for key.
@@ -84,7 +95,7 @@ public class Search {
     static final public int search(final int key, final int[] keys,
             final int nkeys) {
 
-        if (nkeys < BINARY_WINS) {
+        if (nkeys < BINARY_WINS_INT) {
 
             // @todo backport this change to generic-data.
 
@@ -143,6 +154,213 @@ public class Search {
                 low = mid + 1;
 
             } else if (midVal > key) {
+
+                high = mid - 1;
+
+            } else {
+
+                // Found: return offset.
+
+                return mid;
+
+            }
+
+        }
+
+        // Not found: return insertion point.
+
+        return -(low + 1);
+
+    }
+
+    /**
+     * Search array for key.
+     * 
+     * @param key
+     *            The key for the search.
+     * 
+     * @param keys
+     *            The array of keys.
+     * 
+     * @param nkeys
+     *            Only the first nkeys values are searched. This makes it
+     *            possible to search arrays that are only partly filled.
+     * 
+     * @return index of the search key, if it is contained in the array;
+     *         otherwise, <code>(-(insertion point) - 1)</code>. The
+     *         insertion point is defined as the point at which the key would be
+     *         inserted into the array. Note that this guarantees that the
+     *         return value will be >= 0 if and only if the key is found.
+     */
+    static final public int search(final long key, final long[] keys,
+            final int nkeys) {
+
+        if (nkeys < BINARY_WINS_LONG) {
+
+            // @todo backport this change to generic-data.
+
+            return linearSearch(key, keys, nkeys);
+
+        } else {
+
+            return binarySearch(key, keys, nkeys);
+
+        }
+
+    }
+
+    /**
+     * Linear search implementation obeying the contract of
+     * {@link #search(long, long[], int)}
+     */
+    static final public int linearSearch(final long key, final long[] keys,
+            final int nkeys) {
+
+        for (int i = 0; i < nkeys; i++) {
+
+            long val = keys[i];
+
+            if (val == key)
+                return i;
+
+            if (val > key)
+                return -(i + 1);
+
+        }
+
+        return -(nkeys + 1);
+
+    }
+
+    /**
+     * Binary search implementation obeying the contract of
+     * {@link #search(long, long[], int)}
+     */
+    static final public int binarySearch(final long key, final long[] keys,
+            final int nkeys) {
+
+        int low = 0;
+
+        int high = nkeys - 1;
+
+        while (low <= high) {
+
+            final int mid = (low + high) >> 1;
+
+            final long midVal = keys[mid];
+
+            if (midVal < key) {
+
+                low = mid + 1;
+
+            } else if (midVal > key) {
+
+                high = mid - 1;
+
+            } else {
+
+                // Found: return offset.
+
+                return mid;
+
+            }
+
+        }
+
+        // Not found: return insertion point.
+
+        return -(low + 1);
+
+    }
+
+    /**
+     * Search array for key.
+     * 
+     * @param key
+     *            The key for the search.
+     * 
+     * @param keys
+     *            The array of keys.
+     * 
+     * @param nkeys
+     *            Only the first nkeys values are searched. This makes it
+     *            possible to search arrays that are only partly filled.
+     * 
+     * @param compartor
+     *            The comparison method.
+     * 
+     * @return index of the search key, if it is contained in the array;
+     *         otherwise, <code>(-(insertion point) - 1)</code>. The
+     *         insertion point is defined as the point at which the key would be
+     *         inserted into the array. Note that this guarantees that the
+     *         return value will be >= 0 if and only if the key is found.
+     */
+    static final public int search(final Object key, final Object[] keys,
+            final int nkeys, final Comparator comparator) {
+
+        if (nkeys < BINARY_WINS_LONG) {
+
+            // @todo backport this change to generic-data.
+
+            return linearSearch(key, keys, nkeys, comparator);
+
+        } else {
+
+            return binarySearch(key, keys, nkeys, comparator);
+
+        }
+
+    }
+
+    /**
+     * Linear search implementation obeying the contract of
+     * {@link #search(Object, Object[], int, Comparator)}
+     */
+    static final public int linearSearch(final Object key, final Object[] keys,
+            final int nkeys, final Comparator comparator) {
+
+        for (int i = 0; i < nkeys; i++) {
+
+            Object val = keys[i];
+
+            int ret = comparator.compare(val, key);
+            
+            if (ret == 0)
+                return i;
+
+            if (ret>0)
+                return -(i + 1);
+
+        }
+
+        return -(nkeys + 1);
+
+    }
+
+    /**
+     * Binary search implementation obeying the contract of
+     * {@link #search(Object, Object[], int, Comparator)
+     */
+    static final public int binarySearch(final Object key, final Object[] keys,
+            final int nkeys, Comparator comparator) {
+
+        int low = 0;
+
+        int high = nkeys - 1;
+
+        while (low <= high) {
+
+            final int mid = (low + high) >> 1;
+
+            final Object midVal = keys[mid];
+
+            int ret = comparator.compare(midVal, key);
+            
+            if (ret < 0) {
+
+                low = mid + 1;
+
+            } else if (ret > 0) {
 
                 high = mid - 1;
 

@@ -47,20 +47,24 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.Comparator;
 import java.util.Random;
+
+import com.bigdata.objndx.ndx.LongComparator;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-
 /**
  * Unit tests for {@link Search}.
+ * 
+ * @todo expand to test when nkeys != keys.length using a new test helper?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSearch extends TestCase {
+abstract public class TestSearch extends TestCase {
 
     public TestSearch() {
     }
@@ -73,31 +77,30 @@ public class TestSearch extends TestCase {
         
         TestSuite suite = new TestSuite("Search");
         
-        suite.addTestSuite(TestSearch.class);
         suite.addTestSuite(TestBinarySearch.class);
         suite.addTestSuite(TestLinearSearch.class);
         
         return suite;
 
     }
+
+    /*
+     * abstract search methods are implemented by subclasses for testing the
+     * linear vs binary search code.
+     */
     
+    abstract int search(int key,int[]keys,int nkeys);
     
-    public int search(int key,int[]keys,int nkeys) {
-    
-        return Search.search(key,keys,nkeys);
-        
-    }
+    abstract int search(long key,long[]keys,int nkeys);
+
+    abstract int search(Object key,Object []keys,int nkeys,Comparator comparator);
 
     /**
-     * Test binary search for keys in a node. The binary search routine is
-     * implemented just once, by {@link AbstractNode#keySearch(int)}. This test
-     * sets up some keys, adjusts the #of defined keys, and then verifies both
-     * correct lookup of keys that exist and the correct insertion point when
-     * the key does not exist.
-     * 
-     * @todo expand to test when nkeys != keys.length using a new test helper?
+     * Test search for keys in a node. This test sets up some keys, adjusts the
+     * #of defined keys, and then verifies both correct lookup of keys that
+     * exist and the correct insertion point when the key does not exist.
      */
-    public void test_keySearch01()
+    public void test_intArrayKeySearch01()
     {
     
         // The general formula for the record offset is:
@@ -159,11 +162,158 @@ public class TestSearch extends TestCase {
 
     }
 
+    /**
+     * Test search for keys in a node. This test sets up some keys, adjusts the
+     * #of defined keys, and then verifies both correct lookup of keys that
+     * exist and the correct insertion point when the key does not exist.
+     */
+    public void test_longArrayKeySearch01()
+    {
+    
+        // The general formula for the record offset is:
+        //
+        //    offset := sizeof(record) * ( index - 1 )
+        //
+        // The general formula for the insertion point is:
+        //
+        //    insert := - ( offset + 1 )
+        //
+        // where [offset] is the offset of the record before which the
+        // new record should be inserted.
+
+        long[] keys = new long[5];
+
+        int i = 0;
+        keys[i++] = 5;  // offset := 0, insert before := -1
+        keys[i++] = 7;  // offset := 1, insert before := -2
+        keys[i++] = 9;  // offset := 2, insert before := -3
+        keys[i++] = 11; // offset := 3, insert before := -4
+        keys[i++] = 13; // offset := 4, insert before := -5
+                        //              insert  after := -6
+        int nkeys = 5;
+
+        //
+        // verify offset of record found.
+        //
+
+        // Verify finds the first record in the array.
+        assertEquals(0, search(5,keys,nkeys));
+
+        // Verify finds the 2nd record in the array.
+        assertEquals(1, search(7,keys,nkeys));
+
+        // Verify finds the penultimate record in the array.
+        assertEquals(3, search(11,keys,nkeys));
+
+        // Verify finds the last record in the array.
+        assertEquals(4, search(13,keys,nkeys));
+
+        //
+        // verify insertion points (key not found).
+        //
+
+        // Verify insertion point for key less than any value in the
+        // array.
+        assertEquals(-1, search(4,keys,nkeys));
+
+        // Verify insertion point for key between first and 2nd
+        // records.
+        assertEquals(-2, search(6,keys,nkeys));
+
+        // Verify insertion point for key between penultimate and last
+        // records.
+        assertEquals(-5, search(12,keys,nkeys));
+
+        // Verify insertion point for key greater than the last record.
+        assertEquals(-6, search(14,keys,nkeys));
+
+    }
+
+    /**
+     * Test search for keys in a node. This test sets up some keys, adjusts the
+     * #of defined keys, and then verifies both correct lookup of keys that
+     * exist and the correct insertion point when the key does not exist.
+     */
+    public void test_genericArrayKeySearch01()
+    {
+    
+        // The general formula for the record offset is:
+        //
+        //    offset := sizeof(record) * ( index - 1 )
+        //
+        // The general formula for the insertion point is:
+        //
+        //    insert := - ( offset + 1 )
+        //
+        // where [offset] is the offset of the record before which the
+        // new record should be inserted.
+
+        Long[] keys = new Long[5];
+
+        int i = 0;
+        keys[i++] = 5L;  // offset := 0, insert before := -1
+        keys[i++] = 7L;  // offset := 1, insert before := -2
+        keys[i++] = 9L;  // offset := 2, insert before := -3
+        keys[i++] = 11L; // offset := 3, insert before := -4
+        keys[i++] = 13L; // offset := 4, insert before := -5
+                        //              insert  after := -6
+        int nkeys = 5;
+
+        Comparator comparator = LongComparator.INSTANCE;
+        //
+        // verify offset of record found.
+        //
+
+        // Verify finds the first record in the array.
+        assertEquals(0, search(5L,keys,nkeys,comparator));
+
+        // Verify finds the 2nd record in the array.
+        assertEquals(1, search(7L,keys,nkeys,comparator));
+
+        // Verify finds the penultimate record in the array.
+        assertEquals(3, search(11L,keys,nkeys,comparator));
+
+        // Verify finds the last record in the array.
+        assertEquals(4, search(13L,keys,nkeys,comparator));
+
+        //
+        // verify insertion points (key not found).
+        //
+
+        // Verify insertion point for key less than any value in the
+        // array.
+        assertEquals(-1, search(4L,keys,nkeys,comparator));
+
+        // Verify insertion point for key between first and 2nd
+        // records.
+        assertEquals(-2, search(6L,keys,nkeys,comparator));
+
+        // Verify insertion point for key between penultimate and last
+        // records.
+        assertEquals(-5, search(12L,keys,nkeys,comparator));
+
+        // Verify insertion point for key greater than the last record.
+        assertEquals(-6, search(14L,keys,nkeys,comparator));
+
+    }
+
     public static class TestLinearSearch extends TestSearch {
         
         public int search(int key,int[]keys,int nkeys) {
             
             return Search.linearSearch(key,keys,nkeys);
+            
+        }
+
+        public int search(long key,long[]keys,int nkeys) {
+            
+            return Search.linearSearch(key,keys,nkeys);
+            
+        }
+
+        public int search(Object key,Object[]keys,int nkeys,Comparator comparator) {
+            
+            return Search.linearSearch(key,keys,nkeys,comparator);
             
         }
 
@@ -174,6 +324,18 @@ public class TestSearch extends TestCase {
         public int search(int key,int[]keys,int nkeys) {
             
             return Search.binarySearch(key,keys,nkeys);
+            
+        }
+        
+        public int search(long key,long[]keys,int nkeys) {
+            
+            return Search.binarySearch(key,keys,nkeys);
+            
+        }
+        
+        public int search(Object key,Object[]keys,int nkeys,Comparator comparator) {
+            
+            return Search.binarySearch(key,keys,nkeys,comparator);
             
         }
         
@@ -197,7 +359,11 @@ public class TestSearch extends TestCase {
 
         public void testPerformance() {
             
-            doPerformanceTest(10000);
+            int ntrials = 50000;
+            
+            doIntArrayPerformanceTest(ntrials);
+            
+            doLongArrayPerformanceTest(ntrials);
             
         }
 
@@ -206,30 +372,13 @@ public class TestSearch extends TestCase {
         /**
          * Warms up the code by running a bunch of searches.
          */
-        public void warmUp() {
+        public void warmUpIntSearch() {
             
             int nkeys = 100;
             
-            int keys[] = new int[nkeys];
+            int[] keys = getRandomIntKeys(nkeys);
             
-            /*
-             * Generate keys. The keys are a monotonic progression with
-             * random non-zero intervals.
-             */
-            
-            int lastKey = 0; // origin one, so this is negative infinity.
-            
-            for( int i=0; i<nkeys; i++ ) {
-                
-                int key = lastKey + r.nextInt(100) + 1;
-                
-                keys[ i ] = key;
-                
-                lastKey = key; 
-                
-            }
-
-            System.err.println("Warming code.");
+            System.err.println("Warming int[] search code.");
             
             int ntrials = 100;
 
@@ -241,8 +390,81 @@ public class TestSearch extends TestCase {
 
             }
 
-            System.err.println("Warmed code.");
+            System.err.println("Warmed int[] search code.");
             
+        }
+
+        /**
+         * Warms up the code by running a bunch of searches.
+         */
+        public void warmUpLongSearch() {
+            
+            int nkeys = 100;
+            
+            long[] keys = getRandomLongKeys(nkeys);
+            
+            System.err.println("Warming long[] search code.");
+            
+            int ntrials = 100;
+
+            for (int i = 0; i < 1000; i++) {
+
+                doTest(true, ntrials, nkeys, keys);
+
+                doTest(false, ntrials, nkeys, keys);
+
+            }
+
+            System.err.println("Warmed long[] search code.");
+            
+        }
+
+        /**
+         * Generate keys. The keys are a monotonic progression with
+         * random non-zero intervals.
+         */
+        public int[] getRandomIntKeys(int nkeys) {
+
+            int keys[] = new int[nkeys];
+
+            int lastKey = 0; // origin one, so this is negative infinity.
+
+            for (int i = 0; i < nkeys; i++) {
+
+                int key = lastKey + r.nextInt(100) + 1;
+
+                keys[i] = key;
+
+                lastKey = key;
+
+            }
+        
+            return keys;
+
+        }
+
+        /**
+         * Generate keys. The keys are a monotonic progression with
+         * random non-zero intervals.
+         */
+        public long[] getRandomLongKeys(int nkeys) {
+
+            long keys[] = new long[nkeys];
+
+            long lastKey = 0; // origin one, so this is negative infinity.
+
+            for (int i = 0; i < nkeys; i++) {
+
+                long key = lastKey + r.nextInt(100) + 1;
+
+                keys[i] = key;
+
+                lastKey = key;
+
+            }
+        
+            return keys;
+
         }
 
         /**
@@ -250,40 +472,76 @@ public class TestSearch extends TestCase {
          * 
          * @param ntrials
          */
-        public void doPerformanceTest(int ntrials) {
+        public void doIntArrayPerformanceTest(int ntrials) {
 
-            warmUp();
+            warmUpIntSearch();
             
-            int[] capacity = new int[]{8,16,32,48,64,96,128,256,512,768,1024};
+            /*
+             * Note: searching large arrays first since that warms up the code
+             * even further and the difference between the linear vs binary
+             * algorithms will only show up at small N, which we test last with
+             * the "warmest" code.
+             */ 
+            //int[] capacity = new int[]{8,16,32,48,64,96,128,256,512,768,1024};
+            int[] capacity = new int[]{1024,768,512,256,128,96,64,48,32,24,16,12,8,4};
             
             for( int k = 0; k < capacity.length; k++ ) {
                 
                 int nkeys = capacity[k];
                 
-                int[] keys = new int[nkeys];
-                
-                /*
-                 * Generate keys. The keys are a monotonic progression with
-                 * random non-zero intervals.
-                 */
-                
-                int lastKey = 0; // origin one, so this is negative infinity.
-                
-                for( int i=0; i<nkeys; i++ ) {
-                    
-                    int key = lastKey + r.nextInt(100) + 1;
-                    
-                    keys[ i ] = key;
-                    
-                    lastKey = key; 
-                    
-                }
+                int[] keys = getRandomIntKeys(nkeys);
 
                 long elapsedLinear = doTest(true,ntrials,nkeys,keys);
                 
                 long elapsedBinary = doTest(false,ntrials,nkeys,keys);
 
-                System.err.println("nkeys="
+                System.err.println("int[]: nkeys="
+                        + nkeys
+                        + ", trials="
+                        + ntrials
+                        + ", elapsedLinear="
+                        + elapsedLinear
+                        + "ns"
+                        + ", elapsedBinary="
+                        + elapsedBinary
+                        + "ns"
+                        + (elapsedLinear < elapsedBinary ? ", linear wins"
+                                : ", binary wins") + " by "
+                        + Math.abs(elapsedLinear - elapsedBinary) + "ns");
+
+            }
+            
+        }
+        
+        /**
+         * Performance test comparing binary vs linear search.
+         * 
+         * @param ntrials
+         */
+        public void doLongArrayPerformanceTest(int ntrials) {
+
+            warmUpLongSearch();
+            
+            /*
+             * Note: searching large arrays first since that warms up the code
+             * even further and the difference between the linear vs binary
+             * algorithms will only show up at small N, which we test last with
+             * the "warmest" code.
+             */ 
+            //int[] capacity = new int[]{8,16,32,48,64,96,128,256,512,768,1024};
+            int[] capacity = new int[]{1024,768,512,256,128,96,64,48,32,24,16,12,8,4};
+            
+            for( int k = 0; k < capacity.length; k++ ) {
+                
+                int nkeys = capacity[k];
+                
+                long[] keys = getRandomLongKeys(nkeys);
+
+                long elapsedLinear = doTest(true,ntrials,nkeys,keys);
+                
+                long elapsedBinary = doTest(false,ntrials,nkeys,keys);
+
+                System.err.println("long[]: nkeys="
                         + nkeys
                         + ", trials="
                         + ntrials
@@ -313,6 +571,44 @@ public class TestSearch extends TestCase {
                 int index = r.nextInt(nkeys);
                 
                 int key = keys[ index ];
+                
+                final int index2;
+                
+                long beginNanos = System.nanoTime();
+                
+                if( linear ) {
+                    
+                    index2 = Search.linearSearch(key, keys, nkeys);
+                    
+                } else {
+                    
+                    index2 = Search.binarySearch(key, keys, nkeys);
+                    
+                }
+                
+                elapsedNanos += System.nanoTime() - beginNanos;
+                
+                // make sure the search result is correct.
+                assertEquals(index,index2);
+                
+            }
+            
+            return elapsedNanos;
+
+        }
+
+        /**
+         * Time a bunch of searches.
+         */
+        public long doTest(boolean linear,int ntrials, int nkeys, long[] keys) {
+            
+            long elapsedNanos = 0;
+            
+            for( int i=0; i<ntrials; i++ ) {
+                
+                int index = r.nextInt(nkeys);
+                
+                long key = keys[ index ];
                 
                 final int index2;
                 

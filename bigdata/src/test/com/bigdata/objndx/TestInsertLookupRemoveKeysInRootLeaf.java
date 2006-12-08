@@ -275,10 +275,10 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         }
 
         // verify that the leaf has the same keys in the same order.
-        assertKeys( "keys", expectedKeys, root);
+        assertKeys( expectedKeys, root);
 
         // verify that the leaf has the same values in the same order.
-        assertValues( "values", expectedValues, root );
+        assertValues( expectedValues, root );
         
         // verify the expected behavior of the iterator.
         assertSameIterator( "values", expectedValues, root.entryIterator() );
