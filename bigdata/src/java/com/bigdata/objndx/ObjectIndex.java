@@ -136,7 +136,7 @@ public class ObjectIndex extends BTree implements IObjectIndex {
      */
     public void put(int id, ISlotAllocation slots) {
 
-        assert id > IBTree.NEGINF && id < IBTree.POSINF;
+//        assert id > BTree.NEGINF && id < BTree.POSINF;
 
     }
 

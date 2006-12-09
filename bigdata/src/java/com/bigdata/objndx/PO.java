@@ -68,19 +68,19 @@ abstract public class PO implements IIdentityAccess, IDirty {
      */
     transient protected boolean deleted = false;
     
-    public boolean isPersistent() {
+    final public boolean isPersistent() {
 
         return identity != NULL;
 
     }
 
-    public boolean isDeleted() {
+    final public boolean isDeleted() {
         
         return deleted;
         
     }
     
-    public long getIdentity() throws IllegalStateException {
+    final public long getIdentity() throws IllegalStateException {
 
         if (identity == NULL) {
             
@@ -134,7 +134,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
      */
     transient protected boolean dirty = true;
 
-    public boolean isDirty() {
+    final public boolean isDirty() {
 
         return dirty;
 

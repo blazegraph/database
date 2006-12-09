@@ -63,6 +63,12 @@ import com.bigdata.journal.Bytes;
 public class Int32OIdKeySerializer implements IKeySerializer {
 
     public static final IKeySerializer INSTANCE = new Int32OIdKeySerializer();
+
+    /**
+     * The value of the key that represents a null reference. This is the
+     * minimum legal value for an int32 identifier.
+     */
+    static final int NEGINF = 0;
     
     public int getSize(int n) {
         
@@ -74,7 +80,7 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
         final int[] a = (int[]) keys;
         
-        int lastKey = IBTree.NEGINF;
+        int lastKey = NEGINF;
         
         for (int i = 0; i < nkeys; i++) {
 
@@ -82,7 +88,7 @@ public class Int32OIdKeySerializer implements IKeySerializer {
             
             assert key > lastKey; // verify increasing and minimum.
             
-            assert key < IBTree.POSINF; // verify maximum.
+//            assert key < BTree.POSINF; // verify maximum.
 
             buf.putInt(key);
             
@@ -96,7 +102,7 @@ public class Int32OIdKeySerializer implements IKeySerializer {
         
         final int[] keys = new int[capacity];
 
-        int lastKey = IBTree.NEGINF;
+        int lastKey = NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 
@@ -104,7 +110,7 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
             assert key > lastKey; // verify keys are in ascending order.
 
-            assert key < IBTree.POSINF; // verify keys in legal range.
+//            assert key < BTree.POSINF; // verify keys in legal range.
 
             keys[i] = lastKey = key;
 

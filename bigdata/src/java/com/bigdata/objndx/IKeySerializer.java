@@ -82,6 +82,16 @@ public interface IKeySerializer {
      * @return The array into which the keys were written. Note that this return
      *         type declaration makes it possible to return either an array of
      *         primitives or an array of objects.
+     * 
+     * @todo refactor so that the node serializer can control the allocation of
+     *       key[] arrays with an eye to reuse of a pool. To do this the key
+     *       serializer needs to declare the {@link ArrayType} and we need to
+     *       define a method on {@link AbstractNode} or {@link ArrayType} or
+     *       somewhere for creating an array of the corresponding type.  The
+     *       signature on this method will then be changed to pass the key[]
+     *       as an Object and to not provide maxKeys, i.e., parallel to 
+     *       {@link IValueSerializer#getValues(ByteBuffer, Object[], int)}
+     *       but with Object in place of Object[] for the key[]s.
      */
     public Object getKeys(ByteBuffer buf, int nkeys,int maxKeys);
 

@@ -149,7 +149,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         /*
          * The #of legal key values remaining.
          */
-        int range = IBTree.POSINF-lastKey-1;
+        int range = Integer.MAX_VALUE-lastKey-1;
         
         assert range>0;
         
@@ -165,7 +165,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         range = range / positionsRemaining;
         
-        assert range < IBTree.POSINF;
+        assert range < Integer.MAX_VALUE;
         
         /*
          * Generate a random key within the allowed range of legal keys.
@@ -174,8 +174,8 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         int key = r.nextInt(range)+min;
         
         assert key > lastKey;
-        assert key > IBTree.NEGINF;
-        assert key < IBTree.POSINF;
+//        assert key > BTree.NEGINF;
+        assert key < Integer.MAX_VALUE;
         
         return key;
         
@@ -206,10 +206,10 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     /**
      * Generates a non-leaf node with random data.
      */
-    public Node getRandomNode(BTree ndx) {
+    public Node getRandomNode(BTree btree) {
 
         // #of keys per node.
-        final int branchingFactor = ndx.branchingFactor;
+        final int branchingFactor = btree.branchingFactor;
         
         final long id = nextNodeRef(false); // ref. for this node.
 
@@ -224,7 +224,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = IBTree.NEGINF;
+        int lastKey = btree.NEGINF;
 
         for (int i = 0; i < nkeys ; i++) {
 
@@ -247,9 +247,9 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
          * create the node and set it as the root to fake out the btree.
          */
         
-        Node node = new Node(ndx, id, branchingFactor, nkeys, keys, children);
+        Node node = new Node(btree, id, branchingFactor, nkeys, keys, children);
         
-        ndx.root = node;
+        btree.root = node;
 
         return node;
         
@@ -258,10 +258,10 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     /**
      * Generates a leaf node with random data.
      */
-    public Leaf getRandomLeaf(BTree ndx) {
+    public Leaf getRandomLeaf(BTree btree) {
 
         // #of keys per node.
-        final int branchingFactor = ndx.branchingFactor;
+        final int branchingFactor = btree.branchingFactor;
 
         long id = nextNodeRef(true); // ref. for this leaf.
 
@@ -275,7 +275,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = IBTree.NEGINF;
+        int lastKey = btree.NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 
@@ -286,7 +286,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
             // the key.
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            values[i] = getRandomEntry(ndx.store.getSlotMath());
+            values[i] = getRandomEntry(btree.store.getSlotMath());
 
         }
 
@@ -308,9 +308,9 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
          * create the leaf and set it as the root to fake out the btree.
          */
 
-        Leaf leaf = new Leaf(ndx,id,branchingFactor, nkeys,keys,values); //,previous,next);
+        Leaf leaf = new Leaf(btree,id,branchingFactor, nkeys,keys,values); //,previous,next);
         
-        ndx.root = leaf;
+        btree.root = leaf;
         
         return leaf;
 

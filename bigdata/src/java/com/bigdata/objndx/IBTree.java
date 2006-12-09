@@ -50,13 +50,7 @@ package com.bigdata.objndx;
 import com.bigdata.journal.IRawStore;
 
 /**
- * Interface for a B-Tree having integer keys and arbitrary values. The key
- * range is restricted to ({@link #NEGINF}:{@link #POSINF}). The interface
- * and its implementation provide specialized support for an object index from
- * int32 within segment persistent identifiers to the metadata required by the
- * concurrency control policy to track both the current state of the object,
- * detect write-write conflicts, and efficiently garbage collect historical
- * versions that are no longer accessible to any active transaction.
+ * Interface for a B-Tree mapping arbitrary non-null keys to arbitrary values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -103,16 +97,6 @@ public interface IBTree {
     public NodeSerializer getNodeSerializer();
 
     /**
-     * Positive infinity for the external keys.
-     */
-    public static final int POSINF = Integer.MAX_VALUE;
-
-    /**
-     * Negative infinity for the external keys.
-     */
-    public static final int NEGINF = 0;
-
-    /**
      * The root of the btree. This is initially a leaf until the leaf is
      * split, at which point it is replaced by a node. The root is also
      * replaced each time copy-on-write triggers a cascade of updates.
@@ -130,14 +114,14 @@ public interface IBTree {
      * @return The previous entry under that key or <code>null</code> if the
      *         key was not found.
      */
-    public Object insert(int key, Object entry);
+    public Object insert(Object key, Object entry);
 
     /**
      * Lookup an entry for an external key.
      * 
      * @return The entry or null if there is no entry for that key.
      */
-    public Object lookup(int key);
+    public Object lookup(Object key);
 
     /**
      * Remove the entry for the external key.
@@ -148,7 +132,7 @@ public interface IBTree {
      * @return The entry stored under that key and null if there was no
      *         entry for that key.
      */
-    public Object remove(int key);
+    public Object remove(Object key);
     
     /**
      * Deallocate all storage associated with this btree (nodes, leaves, and
@@ -173,6 +157,21 @@ public interface IBTree {
      * triggers copy-on-write.
      * 
      * @return The persistent identity of the metadata record for the btree.
+     * 
+     * @todo update javadoc - this is basically a checkpoint. the commit
+     *       protocol is at the journal level and involves validating and
+     *       merging down onto the corresponding global index.
+     * 
+     * does the following javadoc belong on this class or in a journal api?
+     * 
+     * <pre>
+     *   The interface and its implementation provide specialized support for
+     *   transactional isolation object index from int32 within segment persistent
+     *   identifiers to the metadata required by the concurrency control policy to
+     *   track both the current state of the object, detect write-write conflicts, and
+     *   efficiently garbage collect historical versions that are no longer accessible
+     *   to any active transaction.
+     * </pre>
      */
     public long commit();
 

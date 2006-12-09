@@ -42,32 +42,51 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on Dec 9, 2006
  */
 
 package com.bigdata.objndx;
 
+import java.util.Comparator;
+
 /**
- * Default implementation only copies references and is sufficient IFF the
- * values are immutable objects such as {@link String}. When mutable objects
- * are used they MUST be cloned as only copying references will cause changes to
- * the new leaf to bleed back into the old leaf.
+ * Interface defining the legal bounds on the value of keys for an index, 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @deprecated We can just steal the values instead.
  */
-public class DefaultCopyValues implements ICopyValues {
+public interface IKeyBounds {
 
-    public void copyValues(Object[] src, Object[] dst, int nkeys) {
+    /**
+     * Assert that a key is within the legal bounds.
+     */
+    public void assertBounds();
 
-        for (int i = 0; i < nkeys; i++) {
+    /**
+     * The key that is used as negative infinity. When the key type is a
+     * primitive data type such as <code>long</code> this MUST return
+     * non-null. For non-primitive key types this MUST return <code>null</code>.
+     * 
+     * @todo consider renaming this to getInvalidKey() or getNullKey().  the
+     * concept of the key bounds is captured by a different methods on this
+     * api.
+     */
+    public Object getNegInf();
 
-            dst[i] = src[i];
+    /**
+     * The enumeration value indicating the data type used to store keys in
+     * the nodes and leaves of the tree.  When a key corresponds to a primitive
+     * data type, then you generally want to use an array of that primitive data
+     * type.  The only exception would be an application which needed to use the
+     * full value range for the primitive data type and which was therefore forced
+     * to use an Object to store each key value.
+     */
+    public ArrayType getArrayType();
 
-        }
-
-    }
-
+//    /**
+//     * The comparator that will be used to compare keys iff the keys are NOT
+//     * primitive data types.
+//     */
+//    public Comparator getComparator();
+    
 }

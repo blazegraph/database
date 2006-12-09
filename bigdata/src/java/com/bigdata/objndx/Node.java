@@ -150,7 +150,7 @@ public class Node extends AbstractNode {
      *            for the insert key that places the node temporarily over
      *            capacity during a split.
      */
-    protected Node(BTree btree, long id, int branchingFactor, int nkeys, int[] keys, long[] childKeys) {
+    protected Node(BTree btree, long id, int branchingFactor, int nkeys, Object keys, long[] childKeys) {
 
         super( btree, branchingFactor );
 
@@ -158,7 +158,7 @@ public class Node extends AbstractNode {
         
         assert nkeys < branchingFactor;
 
-        assert keys.length == branchingFactor;
+        assertKeyTypeAndLength(btree, keys, branchingFactor);
 
         assert childKeys.length == branchingFactor+1;
         
@@ -488,7 +488,7 @@ public class Node extends AbstractNode {
      * @return The previous value or <code>null</code> if the key was not
      *         found.
      */
-    public Object insert(int key, Object entry) {
+    public Object insert(Object key, Object entry) {
         
         assert !isDeleted();
         
@@ -502,7 +502,7 @@ public class Node extends AbstractNode {
 
     }
 
-    public Object lookup(int key) {
+    public Object lookup(Object key) {
 
         assert !isDeleted();
 
@@ -523,7 +523,7 @@ public class Node extends AbstractNode {
      * @return The value stored under that key or null if the key was not
      *         found.
      */
-    public Object remove(int key) {
+    public Object remove(Object key) {
 
         assert !isDeleted();
 
@@ -585,9 +585,9 @@ public class Node extends AbstractNode {
      * 
      * @see TestBTree#test_node_findChild()
      */
-    protected int findChild(int key) {
+    protected int findChild(Object key) {
 
-        int index = Search.search(key, keys, nkeys);
+        int index = search(key);
 
         if (index >= 0) {
 
@@ -669,7 +669,7 @@ public class Node extends AbstractNode {
         /*
          * The key at that index, which becomes the separator key in the parent.
          */
-        final int separatorKey = keys[splitIndex];
+        final Object separatorKey = getKey(splitIndex);
 
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
@@ -693,7 +693,8 @@ public class Node extends AbstractNode {
                 /*
                  * Note: keys[nchildren-1] is undefined.
                  */
-                rightSibling.keys[j] = keys[i];
+//                rightSibling.setKey(j, getKey(i));
+                rightSibling.copyKey(j, this, i);
                 
             }
             
@@ -736,7 +737,7 @@ public class Node extends AbstractNode {
 
             if (i + 1 < nchildren) {
             
-                keys[i] = IBTree.NEGINF;
+                setKey(i, btree.NEGINF);
                 
                 nkeys--; // one less key here.
 
@@ -753,7 +754,7 @@ public class Node extends AbstractNode {
         /* 
          * Clear the key that is being move into the parent.
          */
-        keys[splitIndex] = IBTree.NEGINF;
+        setKey(splitIndex,btree.NEGINF);
         
         nkeys--;
 
@@ -853,8 +854,10 @@ public class Node extends AbstractNode {
              */
 
             // Mopy the first key/child from the rightSibling.
-            keys[nkeys] = p.keys[index]; // copy the separatorKey from the parent.
-            p.keys[index] = s.keys[0]; // update the separatorKey from the rightSibling.
+//            setKey(nkeys, p.getKey(index)); // copy the separatorKey from the parent.
+            copyKey(nkeys, p, index); // copy the separatorKey from the parent.
+//            p.setKey(index, s.getKey(0)); // update the separatorKey from the rightSibling.
+            p.copyKey(index, s, 0); // update the separatorKey from the rightSibling.
             childRefs[nkeys+1] = s.childRefs[0]; // copy the child from the rightSibling.
             childKeys[nkeys+1] = s.childKeys[0];
             AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
@@ -872,7 +875,7 @@ public class Node extends AbstractNode {
             System.arraycopy(s.childKeys, 1, s.childKeys, 0, s.nkeys);
 
             // erase exposed key/value on rightSibling that is no longer defined.
-            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.setKey(s.nkeys-1, btree.NEGINF);
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
 
@@ -898,8 +901,10 @@ public class Node extends AbstractNode {
             System.arraycopy(childKeys, 0, childKeys, 1, nkeys+1);
             
             // move the last key/child from the leftSibling to this node.
-            keys[0] = p.keys[index-1]; // copy the separatorKey from the parent.
-            p.keys[index-1] = s.keys[s.nkeys-1]; // update the separatorKey
+//            setKey(0, p.getKey(index-1)); // copy the separatorKey from the parent.
+            copyKey(0, p, index-1); // copy the separatorKey from the parent.
+//            p.setKey(index-1, s.getKey(s.nkeys-1)); // update the separatorKey
+            p.copyKey(index-1, s, s.nkeys-1); // update the separatorKey
             childRefs[0] = s.childRefs[s.nkeys];
             childKeys[0] = s.childKeys[s.nkeys];
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
@@ -910,7 +915,7 @@ public class Node extends AbstractNode {
                     if(!dirtyChildren.add(child)) throw new AssertionError();
                 }
             }
-            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.setKey(s.nkeys-1, btree.NEGINF);
             s.childRefs[s.nkeys] = null;
             s.childKeys[s.nkeys] = NULL;
             s.nkeys--;
@@ -985,7 +990,8 @@ public class Node extends AbstractNode {
              * Get the separator key in the parent and append it to the keys in
              * this node.
              */
-            this.keys[nkeys++] = p.keys[index];
+//            this.setKey(nkeys++, p.getKey(index));
+            this.copyKey(nkeys++, p, index);
             
             /*
              * Copy in the keys and children from the sibling. Note that the
@@ -1024,7 +1030,8 @@ public class Node extends AbstractNode {
              * will be deleted when the sibling is removed from the parent
              * below.
              */
-            p.keys[index] = p.keys[index+1];
+//            p.setKey(index, p.getKey(index+1));
+            p.copyKey(index, p, index+1);
             
             assertInvariants();
             
@@ -1062,7 +1069,8 @@ public class Node extends AbstractNode {
             System.arraycopy(s.childKeys, 0, this.childKeys, 0, s.nkeys+1);
 
             // copy the separatorKey from the parent.
-            this.keys[s.nkeys] = p.keys[index-1];
+            //this.setKey(s.nkeys, p.getKey(index - 1));
+            this.copyKey(s.nkeys, p, index - 1);
             
             // update parent on children.
             WeakReference<Node> weakRef = new WeakReference<Node>(this);
@@ -1101,10 +1109,10 @@ public class Node extends AbstractNode {
      * @param child
      *            The new node.
      */
-    protected void insertChild(int key, AbstractNode child) {
+    protected void insertChild(Object key, AbstractNode child) {
 
         assertInvariants();
-        assert key > IBTree.NEGINF && key < IBTree.POSINF;
+//        assert key > IBTree.NEGINF && key < IBTree.POSINF;
         assert child != null;
         assert child.isDirty(); // always dirty since it was just created.
         assert isDirty(); // must be dirty to permit mutation.
@@ -1116,7 +1124,7 @@ public class Node extends AbstractNode {
          * the key goes into keys[0] but we have to copyDown by one anyway
          * to avoid stepping on the existing child.
          */
-        int index = Search.search(key, keys, nkeys);
+        int index = search(key);
 
         if (index >= 0) {
 
@@ -1151,7 +1159,7 @@ public class Node extends AbstractNode {
         /*
          * Insert key at index.
          */
-        keys[index] = key;
+        setKey(index, key);
 
         /*
          * Insert child at index+1.
@@ -1454,7 +1462,7 @@ public class Node extends AbstractNode {
         if (nkeys > 0) {
 
             // erase the last key position.
-            keys[nkeys - 1] = IBTree.NEGINF;
+            setKey(nkeys - 1, btree.NEGINF);
 
         }
 
@@ -1833,31 +1841,14 @@ public class Node extends AbstractNode {
                     + nkeys + ", nchildren=" + (nkeys + 1) + ", minKeys="
                     + minKeys + ", maxKeys=" + maxKeys + ", branchingFactor="
                     + branchingFactor);
-            out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+            out.println(indent(height) + "  keys=" + keysAsString(keys));
         }
-        { // verify keys are monotonically increasing.
-            int lastKey = IBTree.NEGINF;
-            for (int i = 0; i < branchingFactor; i++) {
-                if (i < nkeys) {
-                    // defined keys.
-                    if (keys[i] <= lastKey) {
-                        out.println(indent(height)
-                                + "  ERROR keys out of order at index=" + i
-                                + ", lastKey=" + lastKey + ", keys[" + i + "]="
-                                + keys[i]);
-                        ok = false;
-                    }
-                    lastKey = keys[i];
-                } else if (keys[i] != IBTree.NEGINF) {
-                    // undefined keys.
-                    out.println(indent(height)
-                            + "  ERROR expecting NEGINF("
-                            + IBTree.NEGINF + ") at index=" + i + ", nkeys="
-                            + nkeys + ", but found keys[" + i
-                            + "]=" + keys[i]);
-                    ok = false;
-                }
-            }
+        // verify keys are monotonically increasing.
+        try {
+            assertKeysMonotonic();
+        } catch (AssertionError ex) {
+            out.println(indent(height) + "  ERROR: "+ex);
+            ok = false;
         }
         if (debug) {
             out.println(indent(height) + "  childKeys="
@@ -2141,29 +2132,37 @@ public class Node extends AbstractNode {
                          * Note: All keys on the first child MUST be LT the
                          * first key on this node.
                          */
-
-                        if (child.keys[0] >= keys[0]) {
+                        Object k0 = getKey(0);
+                        Object ck0 = child.getKey(0);
+//                      if (ck0 >= k0) {
+                         if( compare(ck0,k0) >= 0 ) {
+//                        if (ck0 >= k0) {
 
                             out
                                     .println(indent(height + 1)
                                             + "ERROR first key on first child must be LT "
-                                            + keys[0] + ", but found "
-                                            + child.keys[0]);
+                                            + k0 + ", but found "
+                                            + child.getKey(0));
 
                             ok = false;
 
                         }
 
-                        if (child.nkeys >= 1
-                                && child.keys[child.nkeys - 1] >= keys[0]) {
+                        if (child.nkeys >= 1 ) {
+                            
+                            Object ckn = child.getKey(child.nkeys-1);
+                        
+//                            if( ckn >= k0) {
+                            if (compare(ckn, k0) >= 0) {
 
-                            out
-                                    .println(indent(height + 1)
+                            out.println(indent(height + 1)
                                             + "ERROR last key on first child must be LT "
-                                            + keys[0] + ", but found "
-                                            + child.keys[child.nkeys - 1]);
+                                            + k0 + ", but found "
+                                            + child.getKey(child.nkeys - 1));
 
                             ok = false;
+                            
+                            }
 
                         }
                         

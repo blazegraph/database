@@ -172,7 +172,7 @@ public class TestEviction extends AbstractBTreeTestCase {
         btree.insert(keys[n], entries[n]); n++;
         btree.insert(keys[n], entries[n]); n++;
         // verify the keys in the root leaf before the split.
-        assertEquals(new int[]{1,3,5,7},a.keys);
+        assertKeys(new int[]{1,3,5,7},a);
         
         /*
          * Split the root leaf (a). This creates another leaf (b) and a new root
@@ -183,11 +183,11 @@ public class TestEviction extends AbstractBTreeTestCase {
         assertEquals("height",1,btree.height);
         assertNotSame("root",a,btree.root);
         final Node c = (Node) btree.root;
-        assertEquals(new int[]{5,0,0},c.keys);
+        assertKeys(new int[]{5},c);
         assertEquals( a, c.getChild(0));
-        assertEquals(new int[]{1,3,0,0},a.keys);
+        assertKeys(new int[]{1,3},a);
         final Leaf b = (Leaf) c.getChild(1);
-        assertEquals(new int[]{5,7,9,0},b.keys);
+        assertKeys(new int[]{5,7,9},b);
 
         // The hard reference queue should now contain both leaves.
         assertEquals(new PO[]{a,b},leafQueue.toArray());
@@ -199,7 +199,7 @@ public class TestEviction extends AbstractBTreeTestCase {
          * Split (b).
          */
         // verify the state of (b) before the split.
-        assertEquals(new int[]{5,7,9,10},b.keys);
+        assertKeys(new int[]{5,7,9,10},b);
         // the split should evict (a).
         listener.setExpectedRef(a);
         // verify that (a) is dirty and not persistent.
@@ -224,15 +224,15 @@ public class TestEviction extends AbstractBTreeTestCase {
         // verify that (a) has (c) as its parent.
         assertEquals(c,a.parent.get());
         // verify keys on (b) post-split.
-        assertEquals(new int[]{5,7,0,0},b.keys);
+        assertKeys(new int[]{5,7},b);
         // get the new leaf (d).
         final Leaf d = (Leaf)c.getChild(2);
         // verify keys on the new leaf.
-        assertEquals(new int[]{9,10,11,0},d.keys);
+        assertKeys(new int[]{9,10,11},d);
         // verify new queue state.
         assertEquals(new PO[]{b,d},leafQueue.toArray());
         // verify keys on the root node.
-        assertEquals(new int[]{5,9,0},c.keys);
+        assertKeys(new int[]{5,9},c);
 
         /*
          * Insert a key (2) into (a). Since (a) was just evicted, this forces
@@ -248,7 +248,7 @@ public class TestEviction extends AbstractBTreeTestCase {
         // verify that (a) is not dirty.
         assertFalse(a.isDirty());
         // verify keys for (a).
-        assertEquals(new int[]{1,3,0,0},a.keys);
+        assertKeys(new int[]{1,3},a);
         // verify the queue state.
         assertEquals(new PO[]{b,d},leafQueue.toArray());
         // set the expected eviction.
@@ -274,9 +274,9 @@ public class TestEviction extends AbstractBTreeTestCase {
         // verify that (a1) is dirty.
         assertTrue(a1.isDirty());
         // verify keys on (a) were NOT changed.
-        assertEquals(new int[]{1,3,0,0},a.keys);
+        assertKeys(new int[]{1,3},a);
         // verify expected keys on (a1).
-        assertEquals(new int[]{1,2,3,0},a1.keys);
+        assertKeys(new int[]{1,2,3},a1);
         // verify the new queue state.
         assertEquals(new PO[]{d,a1},leafQueue.toArray());
 
@@ -319,7 +319,7 @@ public class TestEviction extends AbstractBTreeTestCase {
         assertTrue(c.isPersistent());
         assertTrue(d.isPersistent());
         // verify expected keys on (a1).
-        assertEquals(new int[]{1,2,3,0},a1.keys);
+        assertKeys(new int[]{1,2,3},a1);
         // verify the hard reference queue state.
         assertEquals(new PO[]{d,a1},leafQueue.toArray());
         // notify the listener that we expect an eviction.
@@ -337,9 +337,9 @@ public class TestEviction extends AbstractBTreeTestCase {
         // the new root node.
         final Node c1 = (Node)btree.root;
         // verify keys not changed on the old root node.
-        assertEquals(new int[]{5,9,0},c.keys);
+        assertKeys(new int[]{5,9},c);
         // verify keys not changed on the new root node.
-        assertEquals(new int[]{5,9,0},c1.keys);
+        assertKeys(new int[]{5,9},c1);
         // verify that (a1) was replaced on (c1).
         assertNotSame(a1,c1.getChild(0));
         // the new copy of (a1) is (a2).
@@ -357,9 +357,9 @@ public class TestEviction extends AbstractBTreeTestCase {
         // verify d.parent is (c1) (parent reference was changed).
         assertEquals(c1,d.parent.get());
         // verify keys on (a1) are NOT changed.
-        assertEquals(new int[]{1,2,3,0},a1.keys);
+        assertKeys(new int[]{1,2,3},a1);
         // verify keys on (a2) are changed.
-        assertEquals(new int[]{1,2,3,4},a2.keys);
+        assertKeys(new int[]{1,2,3,4},a2);
         // verify that (a2) is dirty and is not persistent.
         assertTrue(a2.isDirty());
         assertFalse(a2.isPersistent());

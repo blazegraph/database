@@ -42,39 +42,55 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on Dec 9, 2006
  */
 
 package com.bigdata.objndx;
 
 /**
- * Interface encapsulates knowledge required to copy references or clone objects
- * when copy-on-write is invoked for a {@link Leaf}.
+ * Enumeration identifies whether the keys are an array of some primitive data
+ * type or an array of instances of some Class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @deprecated We can just steal the values instead.
  */
-public interface ICopyValues {
-
-    /**
-     * This method is invoked when a {@link Leaf} is cloned and must a copy or
-     * clone the values. If the values are immutable objects, then their
-     * references may be copied. Otherwise, the value objects MUST be cloned,
-     * deep-copied, or whatever so that changes to the value objects in the new
-     * {@link Leaf} do NOT bleed back into the source {@link Leaf}.
-     * 
-     * @param src
-     *            The array of objects on the source (immutable) leaf.
-     * @param dst
-     *            The array of objects on the new (mutable) leaf.
-     * @param nkeys
-     *            The #of valid keys in the source leaf. There is one object per
-     *            key for a leaf. Values [0:nkeys-1] will be defined in the
-     *            source array and must be copied to the same indices in the
-     *            destination array.
-     */
-    public void copyValues(Object[] src, Object[] dst, int nkeys);
-    
-}
+enum ArrayType {
+        BYTE(),
+        CHAR(),
+        SHORT(),
+        INT(),
+        LONG(),
+        FLOAT(),
+        DOUBLE(),
+        OBJECT();
+        private ArrayType(){}
+        static public ArrayType getArrayType(Object ary) {
+            if(ary == null ) throw new IllegalArgumentException("null");
+            String className = ary.getClass().getName();
+            if(className.charAt(0)!='[') {
+                throw new IllegalArgumentException("not an array type");
+            }
+            char ch = className.charAt(1);
+            switch(ch) {
+//            boolean  Z  
+//            byte  B  
+            case 'B': return BYTE;
+//            char  C  
+            case 'C': return CHAR;
+//            class or interface  Lclassname;
+            case 'L': return OBJECT;
+//            double  D  
+            case 'D': return DOUBLE;
+//            float  F  
+            case 'F': return FLOAT;
+//            int  I  
+            case 'I': return INT;
+//            long  J  
+            case 'J': return LONG;
+//            short  S  
+            case 'S': return SHORT;
+            }
+            throw new UnsupportedOperationException(
+                    "unsupported primitive array type: " + className);
+        }
+    }

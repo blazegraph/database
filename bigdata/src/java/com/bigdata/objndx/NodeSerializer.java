@@ -192,9 +192,6 @@ public class NodeSerializer {
      * keys are maintained in sorted order and are filled from the end of the
      * array. The capacity of the array is fixed by the {@link #pageSize}
      * specified for the index.
-     * 
-     * @see BTree#NEGINF
-     * @see BTree#POSINF
      */
     static final int OFFSET_KEYS = OFFSET_NKEYS + SIZEOF_NKEYS;
     

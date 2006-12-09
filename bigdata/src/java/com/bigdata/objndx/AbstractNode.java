@@ -48,6 +48,7 @@ package com.bigdata.objndx;
 
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
@@ -158,8 +159,10 @@ public abstract class AbstractNode extends PO {
      * @see #findChild(int key)
      * @see Search#search(int, int[], int)
      */
-    protected int[] keys;
+//    protected int[] keys;
 //    protected Integer[] keys;
+//    protected Object[] keys;
+    protected Object keys;
 
     /**
      * The parent of this node. This is null for the root node. The parent is
@@ -605,6 +608,231 @@ public abstract class AbstractNode extends PO {
 
     }
 
+    static protected final void assertKeyTypeAndLength(BTree btree, Object keys,int length) {
+        
+        assert btree != null;
+        assert keys != null;
+        ArrayType keyType = ArrayType.getArrayType(keys);
+        assert btree.keyType == keyType;
+        assert getLength(keys) == length;
+    }
+    
+    /**
+     * Return the length of the key array (its dimension). This method works for
+     * both primitive and object array types.
+     * 
+     * @param keys
+     *            The key array.
+     * 
+     * @return Its length.
+     */
+    final static protected int getLength(Object keys) {
+        switch(ArrayType.getArrayType(keys)) {
+        case BYTE: return ((byte[])keys).length;
+        case SHORT: return ((short[])keys).length;
+        case CHAR: return ((char[])keys).length;
+        case INT: return ((int[])keys).length;
+        case LONG: return ((long[])keys).length;
+        case FLOAT: return ((float[])keys).length;
+        case DOUBLE: return ((double[])keys).length;
+        case OBJECT: return ((Object[])keys).length;
+        default: throw new UnsupportedOperationException();
+        }
+    }
+    
+    /**
+     * Verify keys are monotonically increasing.
+     */
+    protected final void assertKeysMonotonic() {
+
+        Object lastKey = btree.NEGINF;
+
+        int limit = getLength(keys);
+        
+        for (int i = 0; i < limit; i++) {
+
+            Object key = getKey(i);
+
+            if (i < nkeys) {
+                
+                if (compare(key,lastKey) <= 0) {
+
+                    throw new AssertionError("Keys out of order at index=" + i
+                            + ", lastKey=" + lastKey + ", keys[" + i + "]="
+                            + key);
+
+                }
+
+            } else if (((Integer)key) != btree.NEGINF) {
+                
+                // undefined keys.
+                throw new AssertionError("Expecting NEGINF(" + btree.NEGINF
+                        + ") at index=" + i + ", nkeys=" + nkeys
+                        + ", but found keys[" + i + "]=" + key);
+                
+            }
+
+            lastKey = key;
+
+        }
+
+    }
+    
+    /**
+     * Generic key comparison.
+     * 
+     * Note: This is used only for ease in debugging routines. All key
+     * comparison for search is performed within data type specific methods.
+     * 
+     * @param k1
+     *            A key (non-null).
+     * @param k2
+     *            Another key (non-null).
+     * 
+     * @return a negative integer, zero, or a positive integer as the first
+     *         argument is less than, equal to, or greater than the second.
+     * 
+     * @see #search(Object)
+     */
+    final protected int compare(Object k1,Object k2) {
+        switch(btree.keyType) {
+        case BYTE: return ((Byte)k1).compareTo((Byte)k2);
+        case SHORT: return ((Short)k1).compareTo((Short)k2);
+        case CHAR: return ((Character)k1).compareTo((Character)k2);
+        case INT: return ((Integer)k1).compareTo((Integer)k2);
+        case LONG: return ((Long)k1).compareTo((Long)k2);
+        case FLOAT: return ((Float)k1).compareTo((Float)k2);
+        case DOUBLE: return ((Double)k1).compareTo((Double)k2);
+        case OBJECT: return btree.comparator.compare(k1,k2);
+        default: throw new UnsupportedOperationException();
+        }        
+    }
+    
+    /**
+     * A type agnostic wrapper directs the request to a type appropriate search
+     * implementation based on the key type as defined for the btree.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return index of the search key, if it is contained in the array;
+     *         otherwise, <code>(-(insertion point) - 1)</code>. The
+     *         insertion point is defined as the point at which the key would be
+     *         inserted into the array. Note that this guarantees that the
+     *         return value will be >= 0 if and only if the key is found.
+     */
+    final protected int search(Object key) {
+        switch(btree.keyType) {
+        // @todo handle at least float, double here and in Search.java
+        case INT: return Search.search(((Integer)key).intValue(), (int[])keys, nkeys);
+        case LONG: return Search.search(((Long)key).longValue(), (long[])keys, nkeys);
+        case OBJECT: return Search.search(key, (Object[])keys, nkeys,btree.comparator);
+        default: throw new UnsupportedOperationException();
+        }
+    }
+
+    /**
+     * The value of the key at the specified index.
+     * 
+     * @param index
+     *            The key index in [0:maxKeys-1].
+     *            
+     * @return The value of the key at that index. If the key is a primitive
+     *         data type then it will be autoboxed as an instance of its
+     *         corresponding Class.
+     *         
+     * @see #setKey(int, Object)
+     * @see #copyKey(int, AbstractNode, int)
+     */
+    final protected Object getKey(int index) {
+//        assert index >=0 && index < maxKeys;
+        switch(btree.keyType) {
+        case BYTE: return ((byte[])keys)[index];
+        case SHORT: return ((short[])keys)[index];
+        case CHAR: return ((char[])keys)[index];
+        case INT: return ((int[])keys)[index];
+        case LONG: return ((long[])keys)[index];
+        case FLOAT: return ((float[])keys)[index];
+        case DOUBLE: return ((double[])keys)[index];
+        case OBJECT: return ((Object[])keys)[index];
+        default: throw new UnsupportedOperationException();
+        }        
+    }
+    
+    /**
+     * Update the value of the key at the specified index.
+     * 
+     * @param index
+     *            The key index in [0:maxKeys-1];
+     * @param key
+     *            The value to be assigned to the key at that index. If the keys
+     *            are represented as a primitive data type then the
+     *            corresponding primitive value for the key will be extracted.
+     * 
+     * @see #copyKey(int, AbstractNode, int)
+     * @see #getKey(int)
+     */
+    final protected void setKey(int index,Object key) {
+//        assert index >=0 && index < maxKeys;
+        switch(btree.keyType) {
+        case BYTE: ((byte[])keys)[index] = (Byte)key; break;
+        case SHORT: ((short[])keys)[index] = (Short)key; break;
+        case CHAR: ((char[])keys)[index] = (Character)key; break;
+        case INT: ((int[])keys)[index] = (Integer)key; break;
+        case LONG: ((long[])keys)[index] = (Long)key; break;
+        case FLOAT: ((float[])keys)[index] = (Float)key; break;
+        case DOUBLE: ((double[])keys)[index] = (Double)key; break;
+        case OBJECT: ((Object[])keys)[index] = key; break;
+        default: throw new UnsupportedOperationException();
+        }        
+    }
+    
+    /**
+     * Copy a key from the source node into this node. This method does not
+     * modify the source node. This method does not update the #of keys in this
+     * node. This method has the substantial advantage that primitive keys are
+     * not boxed and unboxed solely to perform the cop.
+     * 
+     * @param dstpos
+     *            The index position to which the key will be copied on this
+     *            node.
+     * @param src
+     *            The source node from which the key will be copied.
+     * @param srcpos
+     *            The index position from which the key will be copied.
+     */
+    final protected void copyKey(int dstpos,AbstractNode src,int srcpos) {
+//          assert index >=0 && index < maxKeys;
+          switch(btree.keyType) {
+          case BYTE: ((byte[])keys)[dstpos] = ((byte[])src.keys)[srcpos]; break;
+          case SHORT: ((short[])keys)[dstpos] = ((short[])src.keys)[srcpos]; break;
+          case CHAR: ((char[])keys)[dstpos] = ((char[])src.keys)[srcpos]; break;
+          case INT: ((int[])keys)[dstpos] = ((int[])src.keys)[srcpos]; break;
+          case LONG: ((long[])keys)[dstpos] = ((long[])src.keys)[srcpos]; break;
+          case FLOAT: ((float[])keys)[dstpos] = ((float[])src.keys)[srcpos]; break;
+          case DOUBLE: ((double[])keys)[dstpos] = ((double[])src.keys)[srcpos]; break;
+          case OBJECT: ((Object[])keys)[dstpos] = ((Object[])src.keys)[srcpos]; break;
+          default: throw new UnsupportedOperationException();
+          }     
+    }
+    
+    /**
+     * Return a representation of the keys.
+     */
+    static protected String keysAsString(Object keys) {
+        switch(ArrayType.getArrayType(keys)) {
+        case BYTE: return Arrays.toString((byte[])keys);
+        case SHORT: return Arrays.toString((short[])keys);
+        case CHAR: return Arrays.toString((char[])keys);
+        case INT: return Arrays.toString((int[])keys);
+        case LONG: return Arrays.toString((long[])keys);
+        case FLOAT: return Arrays.toString((float[])keys);
+        case DOUBLE: return Arrays.toString((double[])keys);
+        case OBJECT: return Arrays.toString((Object[])keys);
+        default: throw new UnsupportedOperationException();
+        }
+    }
+    
     /**
      * True iff this is a leaf node.
      */
@@ -839,7 +1067,7 @@ public abstract class AbstractNode extends PO {
      * @return The previous value or <code>null</code> if the key was not
      *         found.
      */
-    abstract public Object insert(int key, Object entry);
+    abstract public Object insert(Object key, Object entry);
 
     /**
      * Recursive search locates the appropriate leaf and removes and returns
@@ -850,7 +1078,7 @@ public abstract class AbstractNode extends PO {
      *            
      * @return The value or null if there was no entry for that key.
      */
-    abstract public Object remove(int key);
+    abstract public Object remove(Object key);
 
     /**
      * Recursive search locates the entry for the probe key.
@@ -861,7 +1089,7 @@ public abstract class AbstractNode extends PO {
      * @return The entry or <code>null</code> iff there is no entry for
      *         that key.
      */
-    abstract public Object lookup(int key);
+    abstract public Object lookup(Object key);
 
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).

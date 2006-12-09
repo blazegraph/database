@@ -107,15 +107,13 @@ public class Leaf extends AbstractNode {
      *            corresponding to the insert key that forces a split.
      */
     protected Leaf(BTree btree, long id, int branchingFactor, int nkeys,
-            int[] keys, Object[] values) {
+            Object keys, Object[] values) {
         
         super(btree, branchingFactor );
 
         assert nkeys >=0 && nkeys<= branchingFactor;
         
-        assert keys != null;
-        
-        assert keys.length == branchingFactor+1;
+        assertKeyTypeAndLength( btree, keys, branchingFactor+1 );
         
         assert values != null;
 
@@ -229,7 +227,7 @@ public class Leaf extends AbstractNode {
      *       if there was no existing value. When replace is false and the key
      *       exists, return ??? to indicate that the value was not inserted?
      */
-    public Object insert(int key, Object entry) {
+    public Object insert(Object key, Object entry) {
 
         assertInvariants();
         
@@ -255,7 +253,7 @@ public class Leaf extends AbstractNode {
          * Note: We do NOT search before triggering copy-on-write for an object
          * index since an insert always triggers a mutation.
          */
-        int index = Search.search(key, keys, nkeys);
+        int index = search(key);
 
         if (index >= 0) {
 
@@ -314,11 +312,11 @@ public class Leaf extends AbstractNode {
 
     }
 
-    public Object lookup(int key) {
+    public Object lookup(Object key) {
 
         btree.touch(this);
         
-        int index = Search.search(key, keys, nkeys);
+        int index = search(key);
 
         if (index < 0) {
 
@@ -366,7 +364,7 @@ public class Leaf extends AbstractNode {
          * The key at the splitIndex also serves as the separator key when we
          * insert( separatorKey, rightSibling ) into the parent.
          */
-        final int separatorKey = keys[splitIndex];
+        final Object separatorKey = getKey(splitIndex);
 
         // the new rightSibling of this leaf.
         final Leaf rightSibling = new Leaf(btree);
@@ -381,11 +379,13 @@ public class Leaf extends AbstractNode {
         for (int i = splitIndex; i <= maxKeys; i++, j++) {
 
             // copy key and value to the new leaf.
-            rightSibling.keys[j] = keys[i];
+//            rightSibling.setKey(j, getKey(i));
+            rightSibling.copyKey(j,this,i);
+            
             rightSibling.values[j] = values[i];
 
             // clear out the old keys and values.
-            keys[i] = IBTree.NEGINF;
+            setKey(i, btree.NEGINF);
             values[i] = null;
 
             nkeys--; // one less key here.
@@ -481,7 +481,8 @@ public class Leaf extends AbstractNode {
              */
 
             // copy the first key from the rightSibling.
-            keys[nkeys] = s.keys[0];
+//            setKey(nkeys, s.getKey(0));
+            copyKey(nkeys,s,0);
             values[nkeys] = s.values[0];
             
             // copy down the keys on the right sibling to cover up the hole.
@@ -489,11 +490,12 @@ public class Leaf extends AbstractNode {
             System.arraycopy(s.values, 1, s.values, 0, s.nkeys-1);
 
             // erase exposed key/value on rightSibling that is no longer defined.
-            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.setKey(s.nkeys-1, btree.NEGINF);
             s.values[s.nkeys-1] = null;
 
             // update the separator key for the rightSibling.
-            p.keys[index] = s.keys[0];
+//            p.setKey(index, s.getKey(0));
+            p.copyKey(index,s,0);
 
             s.nkeys--;
             this.nkeys++;
@@ -516,15 +518,17 @@ public class Leaf extends AbstractNode {
             System.arraycopy(values, 0, values, 1, nkeys);
             
             // move the last key/value from the leftSibling to this leaf.
-            keys[0] = s.keys[s.nkeys-1];
+//            setKey(0, s.getKey(s.nkeys-1));
+            copyKey(0,s,s.nkeys-1);
             values[0] = s.values[s.nkeys-1];
-            s.keys[s.nkeys-1] = BTree.NEGINF;
+            s.setKey(s.nkeys-1, btree.NEGINF);
             s.values[s.nkeys-1] = null;
             s.nkeys--;
             this.nkeys++;
             
             // update the separator key for this leaf.
-            p.keys[index-1] = keys[0];
+//            p.setKey(index-1,getKey(0));
+            p.copyKey(index-1, this, 0);
 
             assertInvariants();
             s.assertInvariants();
@@ -611,7 +615,8 @@ public class Leaf extends AbstractNode {
              * will be deleted when the sibling is removed from the parent
              * below.
              */
-            p.keys[index] = p.keys[index+1];
+//            p.setKey(index, p.getKey(index+1));
+            p.copyKey(index, p, index+1 );
             
             assertInvariants();
             
@@ -628,14 +633,6 @@ public class Leaf extends AbstractNode {
              * from the parent at the end of this method.  This also has the
              * effect of giving this leaf its left sibling's separatorKey.
              */
-//          * The separator key in the parent is updated to the new lowest
-//          * value key in this leaf.
-
-//            /*
-//             * The index of this leaf in its parent. we note this before we
-//             * start mucking with the keys.
-//             */
-//            final int index = p.getIndexOf(this);
             
             // move keys and values down by sibling.nkeys positions.
             System.arraycopy(this.keys, 0, this.keys, s.nkeys, this.nkeys);
@@ -646,9 +643,6 @@ public class Leaf extends AbstractNode {
             System.arraycopy(s.values, 0, this.values, 0, s.nkeys);
             
             this.nkeys += s.nkeys;
-
-//            // update the separatorKey in the parent.
-//            p.keys[index-1] = this.keys[0];
 
             assertInvariants();
             
@@ -676,9 +670,9 @@ public class Leaf extends AbstractNode {
      * @param entry
      *            The new entry.
      */
-    protected void insert(int key, int index, Object entry) {
+    protected void insert(Object key, int index, Object entry) {
 
-        assert key != BTree.NEGINF;
+//        assert key != BTree.NEGINF;
         assert index >= 0 && index <= nkeys;
         assert entry != null;
 
@@ -703,7 +697,7 @@ public class Leaf extends AbstractNode {
         /*
          * Insert at index.
          */
-        keys[index] = key; // defined by AbstractNode
+        setKey(index, key); // defined by AbstractNode
         values[index] = entry; // defined by Leaf.
 
         nkeys++;
@@ -732,7 +726,7 @@ public class Leaf extends AbstractNode {
          * rather than relying on maintenance elsewhere.
          */
 
-        keys[index] = IBTree.NEGINF; // an invalid key.
+        setKey(index, btree.NEGINF); // an invalid key.
 
         values[index] = null;
 
@@ -747,13 +741,13 @@ public class Leaf extends AbstractNode {
      * 
      * @return The value stored under that key or null.
      */
-    public Object remove(int key) {
+    public Object remove(Object key) {
 
         assertInvariants();
         
         btree.touch(this);
 
-        final int index = Search.search(key, keys, nkeys);
+        final int index = search(key);
 
         if (index < 0) {
 
@@ -833,7 +827,7 @@ public class Leaf extends AbstractNode {
         /* 
          * Erase the key/value that was exposed by this operation.
          */
-        keys[ nkeys-1 ] = IBTree.NEGINF;
+        setKey( nkeys-1, btree.NEGINF);
         values[ nkeys-1 ] = null;
 
         // One less entry in the tree.
@@ -957,40 +951,13 @@ public class Leaf extends AbstractNode {
             ok = false;
             
         }
-        
-        { // verify keys are monotonically increasing.
-            
-            int lastKey = IBTree.NEGINF;
-            
-            for (int i = 0; i < branchingFactor+1; i++) {
-            
-                if( i<nkeys) {
-                    
-                if (keys[i] <= lastKey) {
-                
-                    out.println(indent(height)
-                            + "  ERROR keys out of order at index=" + i
-                            + ", lastKey=" + lastKey + ", keys[" + i + "]="
-                            + keys[i]);
-                    
-                    ok = false;
-                    
-                }
-                
-                lastKey = keys[i];
 
-                } else if (keys[i] != IBTree.NEGINF) {
-                    // undefined keys.
-                    out.println(indent(height)
-                            + "  ERROR expecting NEGINF("
-                            + IBTree.NEGINF + ") at index=" + i + ", nkeys="
-                            + nkeys + ", but found keys[" + i
-                            + "]=" + keys[i]);
-                    ok = false;
-                }  
-                
-            }
-            
+        // verify keys are monotonically increasing.
+        try {
+            assertKeysMonotonic();
+        } catch (AssertionError ex) {
+            out.println(indent(height) + "  ERROR: "+ex);
+            ok = false;
         }
         
         if (debug || ! ok ) {
@@ -1005,7 +972,7 @@ public class Leaf extends AbstractNode {
                     + ", minKeys=" + minKeys + ", maxKeys=" + maxKeys
                     + ", branchingFactor=" + branchingFactor);
             
-            out.println(indent(height) + "  keys=" + Arrays.toString(keys));
+            out.println(indent(height) + "  keys=" + keysAsString(keys));
         
             out.println(indent(height) + "  vals=" + Arrays.toString(values));
             

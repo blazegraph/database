@@ -100,14 +100,14 @@ public class TestInvariants extends AbstractBTreeTestCase {
         // valid leaf (specific values of keys are ignored).
         {
             l.nkeys = 2;
-            l.keys = new int[]{2,0,0,0};
+            l.keys = new int[4];
             l.assertInvariants();
         }
 
         // valid leaf.
         {
             l.nkeys = 3;
-            l.keys = new int[]{2,3,5,0};
+            l.keys = new int[4];
             l.assertInvariants();
         }
         
@@ -116,7 +116,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 1;
-            l.keys = new int[]{2,0,0,0};
+            l.keys = new int[4];
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -128,7 +128,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 4;
-            l.keys = new int[]{2,3,5,0};
+            l.keys = new int[4];
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -158,24 +158,24 @@ public class TestInvariants extends AbstractBTreeTestCase {
         assertEquals("minKeys",2,l.minKeys);
         assertEquals("maxKeys",4,l.maxKeys);        
 
-        // valid leaf.
+        // valid leaf (specific values and data type of keys are ignored).
         {
             l.nkeys = 2;
-            l.keys = new int[]{2,3,0,0,0};
+            l.keys = new int[5];
             l.assertInvariants();
         }
 
         // valid leaf.
         {
             l.nkeys = 3;
-            l.keys = new int[]{2,3,5,0,0};
+            l.keys = new int[5];
             l.assertInvariants();
         }
         
         // valid leaf.
         {
             l.nkeys = 4;
-            l.keys = new int[]{2,3,5,7,0};
+            l.keys = new int[5];
             l.assertInvariants();
         }
         
@@ -184,7 +184,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 1;
-            l.keys = new int[]{2,0,0,0,0};
+            l.keys = new int[5];
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {
@@ -196,7 +196,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
          */
         try {
             l.nkeys = 5;
-            l.keys = new int[]{2,3,5,7,0};
+            l.keys = new int[5];
             l.assertInvariants();
             fail("Expecting: " + AssertionError.class);
         } catch (AssertionError ex) {

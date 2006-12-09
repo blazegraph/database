@@ -98,9 +98,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         while( nkeys < branchingFactor ) {
             
             // Valid random key.
-            int key = r.nextInt(IBTree.POSINF-1)+1;
+            int key = r.nextInt(Integer.MAX_VALUE-1)+1;
             
-            int index = Search.search(key, root.keys, root.nkeys);
+            int index = Search.search(key, (int[])root.keys, root.nkeys);
             
             if( index >= 0 ) {
                 
@@ -163,7 +163,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         while( nkeys < branchingFactor ) {
             
             // Valid random key.
-            int key = r.nextInt(IBTree.POSINF-1)+1;
+            int key = r.nextInt(Integer.MAX_VALUE-1)+1;
 
             int nkeysBefore = root.nkeys;
             
@@ -214,7 +214,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int branchingFactor = 20;
         
-        IBTree btree = getBTree(branchingFactor);
+        BTree btree = getBTree(branchingFactor);
 
         Leaf root = (Leaf) btree.getRoot();
 
@@ -229,7 +229,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
          * random non-zero intervals.
          */
         
-        int lastKey = IBTree.NEGINF;
+        int lastKey = btree.NEGINF;
         
         for( int i=0; i<branchingFactor; i++ ) {
             

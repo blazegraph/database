@@ -48,6 +48,7 @@ package com.bigdata.objndx;
 
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -61,6 +62,7 @@ import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * <p>
@@ -92,6 +94,10 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
+ * @todo Profile the heap and the code and determine if we are spending too much
+ *       time autoboxing when using a primitive key type, notably int[] or
+ *       long[].
+ *       
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
  *       is not critical since the journal is designed to be fully buffered and
@@ -337,7 +343,7 @@ public class BTree implements IBTree {
         int nodesSplit = 0;
         int nodesJoined = 0;
         int leavesSplit = 0;
-        int leavesJoined = 0; // @todo also merge vs redistribution of keys on remove (and delete if b*-tree)
+        int leavesJoined = 0; // @todo also merge vs redistribution of keys on remove (and insert if b*-tree)
         int nodesCopyOnWrite = 0;
         int leavesCopyOnWrite = 0;
         int nodesRead = 0;
@@ -519,6 +525,26 @@ public class BTree implements IBTree {
     final ByteBuffer buf;
     
     /**
+     * The type for keys for this btree.
+     * 
+     * @todo refactor into a constructor parameter and make persistent iff
+     *       layered over extser. this is not quite equivilent to the ke
+     *       serializer or the definition of POSINF/NEGINF, but it is strongly
+     *       correlated.
+     */
+    final ArrayType keyType = ArrayType.INT;
+
+    /**
+     * The comparator used iff the key type is not a primitive data type. When
+     * the key type is a primitive data type then comparison is performed using
+     * the operations for EQ, GT, LT, etc. rather than a {@link Comparator}.
+     * 
+     * @todo refactor into constructor parameter and make persistent iff layered
+     *       over extser.
+     */
+    final Comparator comparator = IntegerComparator.INSTANCE;
+    
+    /**
      * The root of the btree. This is initially a leaf until the leaf is
      * split, at which point it is replaced by a node. The root is also
      * replaced each time copy-on-write triggers a cascade of updates.
@@ -546,6 +572,22 @@ public class BTree implements IBTree {
      * The #of entries in the btree.  This is zero (0) for a new btree.
      */
     int nentries;
+
+    /**
+     * Negative infinity for the external keys.
+     * 
+     * FIXME refactor to isolate with the comparator and the key serializer.
+     * NEGINF is used a lot is will be defined as null for Object[] keys. POSINF
+     * is only used in some range checks and those will have to be relaxed or
+     * make into an interface. We test EQ, GT, and LT for these constants and
+     * those tests only make sense for primitive types with natural order. For
+     * Object[] keys we can only test != NEGINF (aka null).
+     * 
+     * @todo rename as "NULL" since it means a null reference and hence an
+     * invalid key more than it means anything else.
+     */
+    static protected final int NEGINF = 0;
+    // protected final Object NEGINF;
 
     public AbstractNode getRoot() {
 
@@ -911,11 +953,12 @@ public class BTree implements IBTree {
         
     }
     
-    public Object insert(int key, Object entry) {
+    public Object insert(Object key, Object entry) {
 
-        counters.ninserts++;
+        if( key == null ) throw new IllegalArgumentException();
+        if( entry == null ) throw new IllegalArgumentException();
         
-        assert key > NEGINF && key < POSINF;
+        counters.ninserts++;
         
         assert entry != null;
 
@@ -927,21 +970,21 @@ public class BTree implements IBTree {
 
     }
 
-    public Object lookup(int key) {
+    public Object lookup(Object key) {
+
+        if( key == null ) throw new IllegalArgumentException();
 
         counters.nfinds++;
         
-        assert key > IBTree.NEGINF && key < IBTree.POSINF;
-
         return root.lookup(key);
 
     }
 
-    public Object remove(int key) {
+    public Object remove(Object key) {
+
+        if( key == null ) throw new IllegalArgumentException();
 
         counters.nremoves++;
-        
-        assert key > IBTree.NEGINF && key < IBTree.POSINF;
 
         if(INFO) {
             log.info("key="+key);
