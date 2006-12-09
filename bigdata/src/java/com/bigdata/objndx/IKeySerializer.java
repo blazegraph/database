@@ -72,14 +72,18 @@ public interface IKeySerializer {
      * 
      * @param buf
      *            The buffer.
-     * @param keys
-     *            The array into which the keys must be written.
-     * @param n
+     * @param nkeys
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be read from the buffer and
      *            written on the array.
+     * @param capacity
+     *            The capacity of the key array to be returned.
+     * 
+     * @return The array into which the keys were written. Note that this return
+     *         type declaration makes it possible to return either an array of
+     *         primitives or an array of objects.
      */
-    public void getKeys(ByteBuffer buf, Object[] keys, int n);
+    public Object getKeys(ByteBuffer buf, int nkeys,int maxKeys);
 
     /**
      * Serialize the keys onto the buffer.
@@ -87,11 +91,13 @@ public interface IKeySerializer {
      * @param buf
      *            The buffer.
      * @param keys
-     *            The array of keys from a {@link Leaf} or {@link Node}.
-     * @param n
+     *            The array of keys from a {@link Leaf} or {@link Node}. Note
+     *            that this parameter type declaration makes it possible to
+     *            pass either an array of primitives or an array of objects.
+     * @param nkeys
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be written.
      */
-    public void putKeys(ByteBuffer buf, Object[] keys,int n);
+    public void putKeys(ByteBuffer buf, Object keys,int nkeys);
 
 }

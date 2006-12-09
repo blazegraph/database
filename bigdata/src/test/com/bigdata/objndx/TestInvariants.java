@@ -97,7 +97,7 @@ public class TestInvariants extends AbstractBTreeTestCase {
         assertEquals("minKeys",2,l.minKeys);
         assertEquals("maxKeys",3,l.maxKeys);
         
-        // valid leaf.
+        // valid leaf (specific values of keys are ignored).
         {
             l.nkeys = 2;
             l.keys = new int[]{2,0,0,0};

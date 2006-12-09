@@ -62,6 +62,8 @@ public final class StringComparator implements Comparator, Serializable, Statele
 
     private static final long serialVersionUID = 3162584716956701139L;
 
+    public static final Comparator INSTANCE = new StringComparator();
+
     public StringComparator() {
         super();
     }

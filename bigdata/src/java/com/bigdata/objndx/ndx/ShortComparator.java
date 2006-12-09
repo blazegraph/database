@@ -62,6 +62,8 @@ final public class ShortComparator implements Comparator, Stateless
      */
     private static final long serialVersionUID = -5707429933918392989L;
 
+    public static final Comparator INSTANCE = new ShortComparator();
+
     /**
      * Deserialization constructor.
      */

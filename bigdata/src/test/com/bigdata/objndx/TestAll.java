@@ -34,8 +34,8 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Object Index");
 
-        // test search of int[] keys.
-        suite.addTestSuite( TestSearch.class );
+        // test key search routines (linear and binary and various key types).
+        suite.addTest( TestSearch.suite() );
         // test assertions that test for node/leaf invariants.
         suite.addTestSuite( TestInvariants.class );
         // test finding a child of a node by its key.
@@ -63,6 +63,7 @@ public class TestAll extends TestCase {
         // @todo test copy-on-write semantics with post-commit or re-loaded tree.
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
+        // @todo test with alternative key types.
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.

@@ -584,7 +584,8 @@ public class BTree implements IBTree {
 
         this.leafQueue = hardReferenceQueue;
 
-        this.nodeSer = new NodeSerializer(valueSer);
+        this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
+                valueSer);
 
         int maxNodeOrLeafSize = Math.max(
                 // max size for a leaf.
@@ -645,7 +646,8 @@ public class BTree implements IBTree {
          */
         final long rootId = read(metadataId);
 
-        this.nodeSer = new NodeSerializer(valueSer);
+        this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
+                valueSer);
         
         int maxNodeOrLeafSize = Math.max(
                 // max size for a leaf.

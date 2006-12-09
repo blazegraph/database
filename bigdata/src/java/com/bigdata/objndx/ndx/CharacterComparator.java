@@ -60,6 +60,8 @@ final public class CharacterComparator implements Comparator, Stateless
 
     private static final long serialVersionUID = -8835628913602753639L;
 
+    public static final Comparator INSTANCE = new CharacterComparator();
+
     /**
      * Deserialization constructor.
      */

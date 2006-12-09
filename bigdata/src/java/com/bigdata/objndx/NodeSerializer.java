@@ -85,18 +85,22 @@ import com.bigdata.journal.ISlotAllocation;
  *       other opportunities to pack things down (e.g., node references can be
  *       packed just like we are doing in {@link IndexEntrySerializer}).
  * 
- * @todo Modify the test helpers to generate random nodes by splitting two
- *       random leaves and assigning those leaves persistent identity and
- *       restore the commented out assertion in {@link AbstractNode#getParent()}
+ * @todo use allocation pools for node, leaf, key[], and value[] objects?
  * 
- * @todo Generalize to allow non-int[] keys.
+ * @todo pack various fields that are non-negative integers (#of keys, branching
+ * factor, etc).
  */
 public class NodeSerializer {
 
     /**
+     * An object that knows how to (de-)serialize keys.
+     */
+    private final IKeySerializer keySerializer;
+
+    /**
      * An object that knows how to (de-)serialize the values on leaves.
      */
-    private IValueSerializer valueSerializer;
+    private final IValueSerializer valueSerializer;
     
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
@@ -210,14 +214,22 @@ public class NodeSerializer {
     }
 
     /**
+     * @param keySerializer
+     *            An object that knows how to (de-)serialize the keys on
+     *            {@link Node}s and {@link Leaf leaves} of a btree.
+     *            
      * @param valueSerializer
      *            An object that knows how to (de-)serialize the values on
      *            {@link Leaf leaves}.
      */
-    public NodeSerializer(IValueSerializer valueSerializer) {
+    public NodeSerializer(IKeySerializer keySerializer, IValueSerializer valueSerializer) {
+
+        assert keySerializer != null;
 
         assert valueSerializer != null;
 
+        this.keySerializer = keySerializer;
+        
         this.valueSerializer = valueSerializer;
         
     }
@@ -368,22 +380,7 @@ public class NodeSerializer {
         buf.putShort((short) node.nkeys);
         
         // keys.
-        
-        int lastKey = IBTree.NEGINF;
-        
-        for (int i = 0; i < nkeys; i++) {
-
-            final int key = node.keys[i];
-            
-            assert key > lastKey; // verify increasing and minimum.
-            
-            assert key < IBTree.POSINF; // verify maximum.
-
-            buf.putInt(key);
-            
-            lastKey = key;
-            
-        }
+        keySerializer.putKeys(buf, node.keys, node.nkeys);
         
         // values.
         for (int i = 0; i <= nkeys; i++) {
@@ -468,28 +465,15 @@ public class NodeSerializer {
 
         assert nkeys >= 0 && nkeys < branchingFactor;
 
-        final int[] keys = new int[branchingFactor];
-
         final long[] children = new long[branchingFactor+1];
 
         /*
-         * keys.
+         * Keys.
          */
         
-        int lastKey = IBTree.NEGINF;
-
-        for (int i = 0; i < nkeys; i++) {
-
-            int key = buf.getInt();
-
-            assert key > lastKey; // verify keys are in ascending order.
-
-            assert key < IBTree.POSINF; // verify keys in legal range.
-
-            keys[i] = lastKey = key;
-
-        }
-
+        final int[] keys = (int[]) keySerializer.getKeys(buf, nkeys,
+                branchingFactor);
+        
         /*
          * child references (nchildren == nkeys+1).
          */
@@ -548,22 +532,7 @@ public class NodeSerializer {
         buf.putShort((short) leaf.nkeys);
         
         // keys.
-        
-        int lastKey = IBTree.NEGINF;
-        
-        for (int i = 0; i < nkeys; i++) {
-
-            final int key = leaf.keys[i];
-            
-            assert key > lastKey; // verify increasing and minimum.
-            
-            assert key < IBTree.POSINF; // verify maximum.
-
-            buf.putInt(key);
-            
-            lastKey = key;
-            
-        }
+        keySerializer.putKeys(buf, leaf.keys, leaf.nkeys);
         
         /*
          * values.
@@ -642,21 +611,8 @@ public class NodeSerializer {
          * Keys.
          */
 
-        final int[] keys = new int[branchingFactor+1];
-
-        int lastKey = IBTree.NEGINF;
-
-        for (int i = 0; i < nkeys; i++) {
-
-            int key = buf.getInt();
-
-            assert key > lastKey; // verify keys are in ascending order.
-
-            assert key < IBTree.POSINF; // verify keys in legal range.
-
-            keys[i] = lastKey = key;
-
-        }
+        final int[] keys = (int[]) keySerializer.getKeys(buf, nkeys,
+                branchingFactor + 1);
 
         /*
          * Values.

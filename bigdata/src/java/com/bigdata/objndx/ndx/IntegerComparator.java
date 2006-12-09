@@ -65,6 +65,8 @@ final public class IntegerComparator implements Comparator, Stateless
      */
     private static final long serialVersionUID = -8621494590722068427L;
 
+    public static final Comparator INSTANCE = new IntegerComparator();
+
     /**
      * Deserialization constructor. 
      */

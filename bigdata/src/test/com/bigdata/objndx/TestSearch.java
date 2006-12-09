@@ -365,59 +365,11 @@ abstract public class TestSearch extends TestCase {
             
             doLongArrayPerformanceTest(ntrials);
             
+            doLongObjectArrayPerformanceTest(ntrials);
+            
         }
 
         Random r = new Random(); 
-
-        /**
-         * Warms up the code by running a bunch of searches.
-         */
-        public void warmUpIntSearch() {
-            
-            int nkeys = 100;
-            
-            int[] keys = getRandomIntKeys(nkeys);
-            
-            System.err.println("Warming int[] search code.");
-            
-            int ntrials = 100;
-
-            for (int i = 0; i < 1000; i++) {
-
-                doTest(true, ntrials, nkeys, keys);
-
-                doTest(false, ntrials, nkeys, keys);
-
-            }
-
-            System.err.println("Warmed int[] search code.");
-            
-        }
-
-        /**
-         * Warms up the code by running a bunch of searches.
-         */
-        public void warmUpLongSearch() {
-            
-            int nkeys = 100;
-            
-            long[] keys = getRandomLongKeys(nkeys);
-            
-            System.err.println("Warming long[] search code.");
-            
-            int ntrials = 100;
-
-            for (int i = 0; i < 1000; i++) {
-
-                doTest(true, ntrials, nkeys, keys);
-
-                doTest(false, ntrials, nkeys, keys);
-
-            }
-
-            System.err.println("Warmed long[] search code.");
-            
-        }
 
         /**
          * Generate keys. The keys are a monotonic progression with
@@ -468,14 +420,36 @@ abstract public class TestSearch extends TestCase {
         }
 
         /**
+         * Generate keys. The keys are a monotonic progression with
+         * random non-zero intervals.
+         */
+        public Long[] getRandomLongObjectKeys(int nkeys) {
+
+            Long keys[] = new Long[nkeys];
+
+            long lastKey = 0; // origin one, so this is negative infinity.
+
+            for (int i = 0; i < nkeys; i++) {
+
+                long key = lastKey + r.nextInt(100) + 1;
+
+                keys[i] = key; // autobox to Long.
+
+                lastKey = key;
+
+            }
+        
+            return keys;
+
+        }
+
+        /**
          * Performance test comparing binary vs linear search.
          * 
          * @param ntrials
          */
         public void doIntArrayPerformanceTest(int ntrials) {
 
-            warmUpIntSearch();
-            
             /*
              * Note: searching large arrays first since that warms up the code
              * even further and the difference between the linear vs binary
@@ -519,8 +493,6 @@ abstract public class TestSearch extends TestCase {
          * @param ntrials
          */
         public void doLongArrayPerformanceTest(int ntrials) {
-
-            warmUpLongSearch();
             
             /*
              * Note: searching large arrays first since that warms up the code
@@ -542,6 +514,52 @@ abstract public class TestSearch extends TestCase {
                 long elapsedBinary = doTest(false,ntrials,nkeys,keys);
 
                 System.err.println("long[]: nkeys="
+                        + nkeys
+                        + ", trials="
+                        + ntrials
+                        + ", elapsedLinear="
+                        + elapsedLinear
+                        + "ns"
+                        + ", elapsedBinary="
+                        + elapsedBinary
+                        + "ns"
+                        + (elapsedLinear < elapsedBinary ? ", linear wins"
+                                : ", binary wins") + " by "
+                        + Math.abs(elapsedLinear - elapsedBinary) + "ns");
+
+            }
+            
+        }
+        
+        /**
+         * Performance test comparing binary vs linear search.
+         * 
+         * @param ntrials
+         */
+        public void doLongObjectArrayPerformanceTest(int ntrials) {
+            
+            /*
+             * Note: searching large arrays first since that warms up the code
+             * even further and the difference between the linear vs binary
+             * algorithms will only show up at small N, which we test last with
+             * the "warmest" code.
+             */ 
+            //int[] capacity = new int[]{8,16,32,48,64,96,128,256,512,768,1024};
+            int[] capacity = new int[]{1024,768,512,256,128,96,64,48,32,24,16,12,8,4};
+            
+            for( int k = 0; k < capacity.length; k++ ) {
+                
+                int nkeys = capacity[k];
+                
+                Long[] keys = getRandomLongObjectKeys(nkeys);
+                
+                Comparator comparator = LongComparator.INSTANCE;
+
+                long elapsedLinear = doTest(true,ntrials,nkeys,keys,comparator);
+                
+                long elapsedBinary = doTest(false,ntrials,nkeys,keys,comparator);
+
+                System.err.println("Long[]: nkeys="
                         + nkeys
                         + ", trials="
                         + ntrials
@@ -635,6 +653,45 @@ abstract public class TestSearch extends TestCase {
 
         }
 
+        /**
+         * Time a bunch of searches.
+         */
+        public long doTest(boolean linear, int ntrials, int nkeys,
+                Object[] keys, Comparator comparator) {
+
+            long elapsedNanos = 0;
+
+            for (int i = 0; i < ntrials; i++) {
+
+                int index = r.nextInt(nkeys);
+
+                Object key = keys[index];
+
+                final int index2;
+
+                long beginNanos = System.nanoTime();
+
+                if (linear) {
+
+                    index2 = Search.linearSearch(key, keys, nkeys,comparator);
+
+                } else {
+
+                    index2 = Search.binarySearch(key, keys, nkeys,comparator);
+
+                }
+
+                elapsedNanos += System.nanoTime() - beginNanos;
+
+                // make sure the search result is correct.
+                assertEquals(index, index2);
+
+            }
+
+            return elapsedNanos;
+
+        }
+
     }
-    
+
 }

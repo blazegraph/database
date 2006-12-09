@@ -72,6 +72,7 @@ public class Search {
      */
     public static final int BINARY_WINS_INT = 24;
     public static final int BINARY_WINS_LONG = 24;
+    public static final int BINARY_WINS_OBJECT = 12;
     
     /**
      * Search array for key.
@@ -298,7 +299,7 @@ public class Search {
     static final public int search(final Object key, final Object[] keys,
             final int nkeys, final Comparator comparator) {
 
-        if (nkeys < BINARY_WINS_LONG) {
+        if (nkeys < BINARY_WINS_OBJECT) {
 
             // @todo backport this change to generic-data.
 

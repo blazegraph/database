@@ -63,6 +63,8 @@ final public class DoubleComparator implements Comparator, Stateless
      */
     private static final long serialVersionUID = 3656872571306567672L;
 
+    public static final Comparator INSTANCE = new DoubleComparator();
+
     /**
      * Deserialization constructor.
      */

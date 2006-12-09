@@ -62,6 +62,8 @@ final public class ByteComparator implements Comparator, Stateless
      */
     private static final long serialVersionUID = 4466827001169834709L;
 
+    public static final Comparator INSTANCE = new ByteComparator();
+
     /**
      * Deserialization constructor. 
      */

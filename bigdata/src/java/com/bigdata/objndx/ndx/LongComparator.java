@@ -58,12 +58,11 @@ import org.CognitiveWeb.extser.Stateless;
 final public class LongComparator implements Comparator, Stateless {
 
     /**
-     *  
+     * @todo change serialVersionUIDs or migrate back to generic-native.
      */
     private static final long serialVersionUID = -8500641232895627449L;
 
-    // @todo declare global instances for all comparators.
-    public static final LongComparator INSTANCE = new LongComparator();
+    public static final Comparator INSTANCE = new LongComparator();
     
     /**
      * Deserialization constructor.

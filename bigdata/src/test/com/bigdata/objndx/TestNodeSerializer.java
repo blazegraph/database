@@ -96,7 +96,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         
         final IndexEntrySerializer valueSer = new IndexEntrySerializer(slotMath);
         
-        final NodeSerializer nodeSer = new NodeSerializer(valueSer);
+        final NodeSerializer nodeSer = new NodeSerializer(
+                Int32OIdKeySerializer.INSTANCE, valueSer);
 
         System.err.println("Shared record format:");
 

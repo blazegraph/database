@@ -63,6 +63,8 @@ final public class FloatComparator implements Comparator, Stateless
      */
     private static final long serialVersionUID = -8177592489196496278L;
 
+    public static final Comparator INSTANCE = new FloatComparator();
+
     /**
      * Deserialization constructor.
      */
