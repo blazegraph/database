@@ -63,6 +63,7 @@ import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -140,7 +141,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Byte) node.btree.NEGINF)
+                    .byteValue(), actualKeys[i]);
             
         }
         
@@ -166,7 +168,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Character) node.btree.NEGINF)
+                    .charValue(), actualKeys[i]);
             
         }
         
@@ -192,7 +195,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Short) node.btree.NEGINF)
+                    .shortValue(), actualKeys[i]);
             
         }
         
@@ -218,7 +222,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
+                    .intValue(), actualKeys[i]);
             
         }
         
@@ -255,7 +260,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
+                    .intValue(), actualKeys[i]);
             
         }
         
@@ -281,7 +287,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Long) node.btree.NEGINF)
+                    .longValue(), actualKeys[i]);
             
         }
         
@@ -307,7 +314,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Float) node.btree.NEGINF)
+                    .floatValue(), actualKeys[i]);
             
         }
         
@@ -333,7 +341,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys[" + i + "]", ((Double) node.btree.NEGINF)
+                    .doubleValue(), actualKeys[i]);
             
         }
         
@@ -359,7 +368,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify the undefined keys are all NEGINF.
         for( int i=nkeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("keys["+i+"]", BTree.NEGINF, actualKeys[i]);
+            assertEquals("keys["+i+"]", node.btree.NEGINF, actualKeys[i]);
             
         }
         
@@ -726,9 +735,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         final int nscan = 10;
 
-        BTree btree = new BTree(store, branchingFactor,
+        BTree btree = new BTree(store,
+                ArrayType.INT,
+                branchingFactor,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
-                        leafQueueCapacity, nscan), new SimpleEntry.NoSerializer());
+                        leafQueueCapacity, nscan),
+                        Integer.valueOf(0),
+                        null, // no comparator for primitive key type.
+                        Int32OIdKeySerializer.INSTANCE,
+                        new SimpleEntry.NoSerializer());
 
         return btree;
         
@@ -926,7 +941,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = btree.NEGINF + 1;
+        int lastKey = ((Integer)btree.NEGINF).intValue() + 1;
         
         for (int i = 0; i < ninserts; i++) {
         
@@ -1410,7 +1425,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         int[] keys = new int[ninserts];
         SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = btree.NEGINF+1;
+        int lastKey = ((Integer)btree.NEGINF).intValue() + 1;
         for( int i=0; i<ninserts; i++) {
             keys[i] = lastKey;
             entries[i] = new SimpleEntry();

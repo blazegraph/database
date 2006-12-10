@@ -229,7 +229,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
          * random non-zero intervals.
          */
         
-        int lastKey = btree.NEGINF;
+        int lastKey = ((Integer)btree.NEGINF).intValue() + 1;
         
         for( int i=0; i<branchingFactor; i++ ) {
             

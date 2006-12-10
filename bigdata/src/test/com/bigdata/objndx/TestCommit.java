@@ -51,6 +51,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.
@@ -94,10 +95,15 @@ public class TestCommit extends TestCase2 {
         final long rootId;
         {
 
-            BTree btree = new BTree(store, branchingFactor,
+            BTree btree = new BTree(store,
+                    ArrayType.INT,
+                    branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            Integer.valueOf(0),
+                            null, // no comparator for primitive key type.
+                            Int32OIdKeySerializer.INSTANCE,
                     new SimpleEntry.Serializer());
 
             assertTrue(btree.root.isDirty());
@@ -122,8 +128,11 @@ public class TestCommit extends TestCase2 {
             // Load the tree.
             BTree btree = new BTree(store, metadataId,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            Integer.valueOf(0),
+                            null, // no comparator for primitive key type.
+                            Int32OIdKeySerializer.INSTANCE,
                     new SimpleEntry.Serializer());
 
             // verify rootId.
@@ -149,8 +158,11 @@ public class TestCommit extends TestCase2 {
             // Load the tree.
             BTree btree = new BTree(store, metadataId,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_CACHE_CAPACITY,
+                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
                             BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            Integer.valueOf(0),
+                            null, // no comparator for primitive key type.
+                            Int32OIdKeySerializer.INSTANCE,
                     new SimpleEntry.Serializer());
 
             // verify rootId.

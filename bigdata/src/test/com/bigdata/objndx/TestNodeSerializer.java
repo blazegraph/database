@@ -55,6 +55,7 @@ import org.apache.log4j.Level;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Test case for {@link NodeSerializer}.
@@ -237,9 +238,15 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         
         final int nscan = 10;
 
-        BTree btree = new BTree(store, branchingFactor,
+        BTree btree = new BTree(store,
+                ArrayType.INT,
+                branchingFactor,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
-                        leafQueueCapacity, nscan), new IndexEntrySerializer(store
+                        leafQueueCapacity, nscan),
+                        Integer.valueOf(0),
+                        null, // no comparator for primitive key type.
+                        Int32OIdKeySerializer.INSTANCE,
+                        new IndexEntrySerializer(store
                         .getSlotMath()));
 
         return btree;

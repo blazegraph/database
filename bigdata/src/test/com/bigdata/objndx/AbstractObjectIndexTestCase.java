@@ -62,6 +62,12 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase {
 
     /**
+     * The object identifier whose value has the semantics of [null].  The valid
+     * range of object identifiers is (0:maxint). 
+     */
+    protected static final int NEGINF = 0;
+    
+    /**
      * 
      */
     public AbstractObjectIndexTestCase() {
@@ -224,7 +230,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = btree.NEGINF;
+        int lastKey = NEGINF;
 
         for (int i = 0; i < nkeys ; i++) {
 
@@ -275,7 +281,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         // node with some valid keys and corresponding child refs.
 
-        int lastKey = btree.NEGINF;
+        int lastKey = NEGINF;
 
         for (int i = 0; i < nkeys; i++) {
 

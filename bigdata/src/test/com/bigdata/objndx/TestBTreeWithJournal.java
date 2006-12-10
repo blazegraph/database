@@ -54,6 +54,7 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Stress tests of the {@link BTree} writing on the {@link Journal}. This does
@@ -118,9 +119,14 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             final int nscan = 10;
 
-            BTree btree = new BTree(journal, branchingFactor,
+            BTree btree = new BTree(journal,
+                    ArrayType.INT,
+                    branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             leafQueueCapacity, nscan),
+                            Integer.valueOf(0),
+                            null, // no comparator for primitive key type.
+                            Int32OIdKeySerializer.INSTANCE,
                     new SimpleEntry.Serializer());
 
             return btree;

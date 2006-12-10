@@ -54,6 +54,7 @@ import junit.framework.AssertionFailedError;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Test suite for the incremental eviction of leaves onto the store.
@@ -127,8 +128,15 @@ public class TestEviction extends AbstractBTreeTestCase {
         assertEquals(listener,leafQueue.getListener());
         
         // The btree.
-        final BTree btree = new BTree(store, branchingFactor,
-                leafQueue, new SimpleEntry.Serializer());
+        final BTree btree = new BTree(
+                store,
+                ArrayType.INT,
+                branchingFactor,
+                leafQueue,
+                Integer.valueOf(0),
+                null, // no comparator for primitive key type.
+                Int32OIdKeySerializer.INSTANCE,
+                new SimpleEntry.Serializer());
         
         // The hard reference queue.
         assertEquals(leafQueue,btree.leafQueue);
@@ -289,6 +297,9 @@ public class TestEviction extends AbstractBTreeTestCase {
         new BTree(btree.store, metadataId0,
                 new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(), leafQueueCapacity, nscan),
+                Integer.valueOf(0),
+                null, // no comparator for primitive key type.
+                Int32OIdKeySerializer.INSTANCE,
                 new SimpleEntry.Serializer());
         
         /*

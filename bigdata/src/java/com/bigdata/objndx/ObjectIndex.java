@@ -54,6 +54,7 @@ import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * FIXME This needs to implement the object index semantics and provide a
@@ -101,9 +102,14 @@ public class ObjectIndex extends BTree implements IObjectIndex {
     public ObjectIndex(IRawStore store, int branchingFactor,
             HardReferenceQueue<PO> hardReferenceQueue) {
 
-        super(store, branchingFactor,
-                hardReferenceQueue, new IndexEntrySerializer(
-                store.getSlotMath()));
+        super(store,
+                ArrayType.INT,
+                branchingFactor,
+                hardReferenceQueue,
+                Integer.valueOf(0),
+                null, // no comparator for primitive key type.
+                Int32OIdKeySerializer.INSTANCE,
+                new IndexEntrySerializer(store.getSlotMath()));
 
     }
 
@@ -117,6 +123,9 @@ public class ObjectIndex extends BTree implements IObjectIndex {
         
         super(store,metadataId,
                 leafQueue,
+                Integer.valueOf(0),
+                null, // no comparator for primitive key type.
+                Int32OIdKeySerializer.INSTANCE,
                 new IndexEntrySerializer(store.getSlotMath()));
         
     }

@@ -62,7 +62,6 @@ import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * <p>
@@ -277,7 +276,7 @@ public class BTree implements IBTree {
      * The minimum hard reference queue capacity is two(2) in order to avoid
      * cache evictions of the leaves participating in a split.
      */
-    static public final int DEFAULT_LEAF_QUEUE_CAPACITY = 2;
+    static public final int MINIMUM_LEAF_QUEUE_CAPACITY = 2;
     
     /**
      * The size of the hard reference queue used to defer leaf eviction.
@@ -297,7 +296,7 @@ public class BTree implements IBTree {
      * @todo testing with a large leaf cache and a large branching factor means
      *       that you nearly never evict leaves
      */
-    static public final int DEFAULT_LEAF_CACHE_CAPACITY = 500;
+    static public final int DEFAULT_LEAF_QUEUE_CAPACITY = 500;
 
     /**
      * The #of entries on the hard reference queue that will be scanned for a
@@ -525,26 +524,58 @@ public class BTree implements IBTree {
     final ByteBuffer buf;
     
     /**
-     * The type for keys for this btree.
+     * The type for keys for this btree.  The key type may be a primitive data
+     * type or {@link Object}.
      * 
-     * @todo refactor into a constructor parameter and make persistent iff
-     *       layered over extser. this is not quite equivilent to the ke
-     *       serializer or the definition of POSINF/NEGINF, but it is strongly
-     *       correlated.
+     * @see ArrayType
      */
-    final ArrayType keyType = ArrayType.INT;
+    final ArrayType keyType;
 
     /**
      * The comparator used iff the key type is not a primitive data type. When
      * the key type is a primitive data type then comparison is performed using
      * the operations for EQ, GT, LT, etc. rather than a {@link Comparator}.
      * 
-     * @todo refactor into constructor parameter and make persistent iff layered
-     *       over extser.
+     * @todo extend to permit comparison of the value as well as the key so that
+     *       a total order can be established that permits key duplicates with
+     *       distinct value attributes -or- support duplicates by put(k,v) vs
+     *       add(k,v) and set(k,v) semantics and provision a given tree either
+     *       to permit duplicates or not.
      */
-    final Comparator comparator = IntegerComparator.INSTANCE;
+    final Comparator comparator;
     
     /**
+     * An invalid key. This is used primarily as the value of keys that are not
+     * defined within a node or a leaf of the tree. The value choosen for a
+     * primitive data type is arbitrary, but common choices are zero (0), -1,
+     * and the largest negative value in the value space for the data type. When
+     * the btree is serving as an object identifier index, then the value
+     * choosen is always zero(0) since it also carries the semantics of a null
+     * reference. When the keys are Objects then the value choosen MUST be
+     * <code>null</code>. The need to have an illegal value for keys of a
+     * primitive data necessarily imposes a restriction of a value that may not
+     * appear as a legal key.
+     * 
+     * @todo rename as "NULL" since it means a null reference and hence an
+     *       invalid key more than it means anything else.
+     *       
+     * @todo do we actually need an illegal value for primitive keys or is this
+     *       just paranoia that insists on unused keys being NEGINF vs whatever
+     *       the last key value was (essentially garbage). As long as the code
+     *       never looks at an unused key I think that things should be ok. As
+     *       far as I can tell there is not any requirement for a key less than
+     *       any valid key in the btree implementation. We do use NEGINF in
+     *       several assertions and test suites in both the sense of the value
+     *       that an unused key must have an in the sense of a value less than
+     *       any legal key. There used to be a concept of POSINF but it proved
+     *       useless except as part of range checking the keys and key range
+     *       restrictions are best imposed, by subclassing or application
+     *       constraints, or be a more declarative interface.
+     */
+//    static protected final int NEGINF = 0;
+     protected final Object NEGINF;
+
+     /**
      * The root of the btree. This is initially a leaf until the leaf is
      * split, at which point it is replaced by a node. The root is also
      * replaced each time copy-on-write triggers a cascade of updates.
@@ -573,22 +604,6 @@ public class BTree implements IBTree {
      */
     int nentries;
 
-    /**
-     * Negative infinity for the external keys.
-     * 
-     * FIXME refactor to isolate with the comparator and the key serializer.
-     * NEGINF is used a lot is will be defined as null for Object[] keys. POSINF
-     * is only used in some range checks and those will have to be relaxed or
-     * make into an interface. We test EQ, GT, and LT for these constants and
-     * those tests only make sense for primitive types with natural order. For
-     * Object[] keys we can only test != NEGINF (aka null).
-     * 
-     * @todo rename as "NULL" since it means a null reference and hence an
-     * invalid key more than it means anything else.
-     */
-    static protected final int NEGINF = 0;
-    // protected final Object NEGINF;
-
     public AbstractNode getRoot() {
 
         return root;
@@ -602,23 +617,89 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
-     * @param headReferenceQueueCapacity
-     *            The capacity of the hard reference queue (minimum of 2 to
-     *            avoid cache evictions of the leaves participating in a split).
+     * @param headReferenceQueue
+     *            The hard reference queue. The minimum capacity is 2 to avoid
+     *            cache evictions of the leaves participating in a split. A
+     *            reasonable capacity is specified by
+     *            {@link #DEFAULT_LEAF_QUEUE_CAPACITY}.
+     * @param keyType
+     *            The btree can store keys in an array of the specified
+     *            primitive data type or in an {@link Object} array. The latter
+     *            is required for general purpose keys, but int, long, float, or
+     *            double keys may use a primitive data type for better memory
+     *            efficiency and less heap churn.
+     * @param NEGINF
+     *            When keyType is {@link ArrayType#OBJECT} then this MUST be
+     *            <code>null</code>. Otherwise this MUST be an instance of
+     *            the Class corresponding to the primitive data type for the
+     *            key, e.g., {@link Integer} for <code>int</code> keys, and
+     *            the value of that instance is generally choosen to be zero(0).
+     * @param comparator
+     *            When keyType is {@link ArrayType#OBJECT} this is the
+     *            comparator used to place the keys into a total ordering. It
+     *            must be null for otherwise.
+     * @param keySer
+     *            Object that knows how to (de-)serialize the keys in a
+     *            {@link Node} or a {@link Leaf} of the tree.
      * @param valueSer
-     *            Object that knows how to (de-)serializes the values in a
+     *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
      */
-    public BTree(IRawStore store, int branchingFactor,
-            HardReferenceQueue<PO> hardReferenceQueue, IValueSerializer valueSer) {
+    public BTree(
+            IRawStore store,
+            ArrayType keyType,
+            int branchingFactor,
+            HardReferenceQueue<PO> hardReferenceQueue,
+            Object NEGINF,
+            Comparator comparator,
+            IKeySerializer keySer,
+            IValueSerializer valueSer)
+    {
 
         assert store != null;
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
-        assert hardReferenceQueue.capacity() >= DEFAULT_LEAF_QUEUE_CAPACITY;
+        assert hardReferenceQueue.capacity() >= MINIMUM_LEAF_QUEUE_CAPACITY;
+        
+        assert keyType != null;
+        
+        assert keySer != null;
         
         assert valueSer != null;
+        
+        if( keyType == ArrayType.OBJECT ) {
+            
+            if (NEGINF != null) {
+
+                throw new IllegalArgumentException(
+                        "NEGINF must be null when not using a primitive key type.");
+
+            }
+
+            if( comparator == null ) {
+                
+                throw new IllegalArgumentException(
+                        "A comparator must be specified unless using a primitive key type.");
+                
+            }
+            
+        } else {
+            
+            if( NEGINF == null ) {
+                
+                throw new IllegalArgumentException(
+                        "NEGINF must be non-null when using a primtive key type.");
+                
+            }
+            
+            if( comparator != null ) {
+                
+                throw new IllegalArgumentException("The comparator must be null when using a primitive key type");
+                
+            }
+            
+        }
         
         this.store = store;
 
@@ -626,7 +707,13 @@ public class BTree implements IBTree {
 
         this.leafQueue = hardReferenceQueue;
 
-        this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
+        this.keyType = keyType;
+        
+        this.NEGINF = NEGINF;
+        
+        this.comparator = comparator;
+
+        this.nodeSer = new NodeSerializer(keySer,
                 valueSer);
 
         int maxNodeOrLeafSize = Math.max(
@@ -659,34 +746,46 @@ public class BTree implements IBTree {
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
+     * 
+     * @todo deserialize the keySer, valueSer, comparator, and NEGINF from the
+     *       metadata record.
      */
-    public BTree(IRawStore store, long metadataId,
-            HardReferenceQueue<PO> leafQueue, IValueSerializer valueSer) {
+    public BTree(
+            IRawStore store,
+            long metadataId,
+            HardReferenceQueue<PO> leafQueue,
+            Object NEGINF,
+            Comparator comparator,
+            IKeySerializer keySer,
+            IValueSerializer valueSer)
+    {
 
         assert store != null;
 
         assert leafQueue != null;
         
+        assert keySer != null;
+        
         assert valueSer != null;
         
-        assert height >= 0;
-
-        assert nnodes >= 0;
-
-        assert nleaves >= 0;
-
-        assert nentries >= 0;
-
         this.store = store;
 
         this.leafQueue = leafQueue;
+
+        this.comparator = comparator;
+        
+        this.NEGINF = NEGINF;
         
         /*
          * read the btree metadata record. this tells us the branchingFactor and
          * the root node identifier, both of which we need below to initialize
          * the btree.
          */
-        final long rootId = read(metadataId);
+        final Metadata md = readMetadata(metadataId);
+        
+        final long rootId = md.rootId;
+        
+        keyType = md.keyType;
 
         this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
                 valueSer);
@@ -1074,7 +1173,7 @@ public class BTree implements IBTree {
      * 
      * @return The persistent identifier for the metadata.
      */
-    long write() {
+    long writeMetadata() {
 
         long rootId = root.getIdentity();
 
@@ -1086,6 +1185,7 @@ public class BTree implements IBTree {
         buf.putInt(nnodes);
         buf.putInt(nleaves);
         buf.putInt(nentries);
+        buf.putInt(keyType.intValue());
 
         return store.write(buf).toLong();
 
@@ -1101,34 +1201,93 @@ public class BTree implements IBTree {
      *            
      * @return The persistent identifier of the root of the btree.
      */
-    long read(long metadataId) {
+    Metadata readMetadata(long metadataId) {
 
         ByteBuffer buf = store.read(asSlots(metadataId),null);
 
         final long rootId = buf.getLong();
-        log.info("rootId=" + rootId);
+        
         branchingFactor = buf.getInt();
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
+        
         height = buf.getInt();
         assert height >= 0;
+        
         nnodes = buf.getInt();
         assert nnodes >= 0;
+        
         nleaves = buf.getInt();
         assert nleaves >= 0;
+        
         nentries = buf.getInt();
         assert nentries >= 0;
+        
+        ArrayType keyType = ArrayType.parseInt( buf.getInt() );
 
-        return rootId;
+        if( keyType == ArrayType.OBJECT ) {
+            
+            if (NEGINF != null) {
+
+                throw new IllegalArgumentException(
+                        "NEGINF must be null when not using a primitive key type.");
+
+            }
+
+            if( comparator == null ) {
+                
+                throw new IllegalArgumentException(
+                        "A comparator must be specified unless using a primitive key type.");
+                
+            }
+            
+        } else {
+            
+            if( NEGINF == null ) {
+                
+                throw new IllegalArgumentException(
+                        "NEGINF must be non-null when using a primtive key type.");
+                
+            }
+            
+            if( comparator != null ) {
+                
+                throw new IllegalArgumentException("The comparator must be null when using a primitive key type");
+                
+            }
+            
+        }
+        
+        log.info("rootId=" + rootId + ", branchingFactor=" + branchingFactor
+                + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
+                + nleaves + ", nentries=" + nentries + ", keyType=" + keyType);
+
+        Metadata md = new Metadata();
+        md.rootId = rootId;
+        md.keyType = keyType;
+        return md;
 
     }
 
     /**
-     * The #of bytes in the metadata record written by {@link #writeNodeOrLeaf(int)}.
+     * Used to pass multiple values out of {@link BTree#readMetadata} so that
+     * various final fields can be set in the constructor form that loads an
+     * existing tree from a store.
      * 
-     * @see #writeNodeOrLeaf(int)
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class Metadata {
+       
+        public long rootId;
+        public ArrayType keyType;
+        
+    }
+    
+    /**
+     * The #of bytes in the metadata record written by {@link #writeMetadata()}.
      */
     public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
-            + Bytes.SIZEOF_INT * 5;
+            + Bytes.SIZEOF_INT * 6;
 
     /**
      * @todo reconcile the notion of a commit with transactional isolation vs
@@ -1150,7 +1309,7 @@ public class BTree implements IBTree {
             
         }
 
-        return write();
+        return writeMetadata();
 
     }
     

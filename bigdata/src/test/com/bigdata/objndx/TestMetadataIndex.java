@@ -53,6 +53,7 @@ import java.util.Vector;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * A test suite that will be evolved into a metadata index designed to locate
@@ -96,14 +97,23 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /**
          * Create a new tree.
          * 
+         * @todo change the key type to a general purpose one.
+         * 
          * @param store
          * @param branchingFactor
          */
         public MetadataIndex(IRawStore store, int branchingFactor) {
-            super(store, branchingFactor, new HardReferenceQueue<PO>(
+            super(store,
+                    ArrayType.INT,
+                    branchingFactor,
+                    new HardReferenceQueue<PO>(
                     new DefaultEvictionListener(),
-                    BTree.DEFAULT_LEAF_CACHE_CAPACITY,
-                    BTree.DEFAULT_LEAF_QUEUE_SCAN), new IndexSegmentMetadata.Serializer());
+                    BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
+                    BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    Integer.valueOf(0),
+                    null, // no comparator for primitive key type.
+                    Int32OIdKeySerializer.INSTANCE,
+                    new IndexSegmentMetadata.Serializer());
         }
 
         /**
@@ -115,8 +125,12 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         public MetadataIndex(IRawStore store, long metadataId) {
             super(store, metadataId, new HardReferenceQueue<PO>(
                     new DefaultEvictionListener(),
-                    BTree.DEFAULT_LEAF_CACHE_CAPACITY,
-                    BTree.DEFAULT_LEAF_QUEUE_SCAN), new IndexSegmentMetadata.Serializer());
+                    BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
+                    BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    Integer.valueOf(0),
+                    null, // no comparator for primitive key type.
+                    Int32OIdKeySerializer.INSTANCE,
+                    new IndexSegmentMetadata.Serializer());
         }
 
         /**
