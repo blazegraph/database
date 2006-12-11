@@ -58,6 +58,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexEntrySerializer.class );
         // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
+        // test iterator semantics for visiting only "dirty" nodes or leaves.
+        suite.addTestSuite( TestDirtyIterators.class );
         // test the commit protocol w/o incremental leaf eviction @todo expand tests.
         suite.addTestSuite( TestCommit.class );
         // test incremental leaf eviction and copy-on-write scenarios.
@@ -65,7 +67,8 @@ public class TestAll extends TestCase {
         // @todo test copy-on-write semantics with post-commit or re-loaded tree.
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
-        // @todo test with alternative key types.
+        // test alternative key types (String and long[]) for simple RDF data model.
+        suite.addTestSuite( TestTripleStore.class );
         // @todo test tree operations for correct isolation and GC behaviors.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.

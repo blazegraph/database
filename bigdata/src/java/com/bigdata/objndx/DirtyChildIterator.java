@@ -51,26 +51,12 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * <p>
  * Visits the direct dirty children of a {@link Node} in the external key
  * ordering. Since dirty nodes are always resident this iterator never forces a
  * child to be loaded from the store.
- * </p>
- * <p>
- * In order to guarentee that a node will still be dirty by the time that the
- * caller visits it the iterator must touch the node (or hold a hard reference),
- * thereby placing it into the appropriate hard reference queue and incrementing
- * its reference counter. Evictions do NOT cause IO when the reference is
- * non-zero, so the node will not be made persistent as a result of other node
- * touches. However, the node can still be made persistent if the caller
- * explicitly writes the node onto the store.
- * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Write tests for this, including the fact that the child must remain
- * strongly reachable.
  */
 class DirtyChildIterator implements Iterator<AbstractNode>,
         IKeyVisitor<AbstractNode> {
@@ -84,9 +70,9 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
 
     /**
      * The next child to return or null if we need to scan for the next child.
-     * We use a hard reference to make sure that a dirty child can not be
-     * written out incrementally and have its reference swept in between a call
-     * to {@link #hasNext()} and the corresponding call to {@link #next()}.
+     * We always test to verify that the child is in fact dirty in
+     * {@link #next()} since it may have been written out between
+     * {@link #hasNext()} and {@link #next()}.
      */
     private AbstractNode child = null;
 
@@ -104,6 +90,14 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
         
     }
 
+    /**
+     * @return true iff there is a dirty child having a separator key greater
+     *         than the last visited dirty child at the moment that this method
+     *         was invoked. If this method returns <code>true</code> then an
+     *         immediate invocation of {@link #next()} will succeed. However,
+     *         that guarentee does not hold if intervening code forces the
+     *         scheduled dirty child to be written onto the store.
+     */
     public boolean hasNext() {
 
         /*
@@ -132,6 +126,12 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
             if( child == null ) continue;
             
             if( ! child.isDirty() ) continue;
+
+            /*
+             * Touch the child so that it will not be a candidate for eviction
+             * to the store.
+             */ 
+            node.btree.touch(node);
             
             break;
             
@@ -150,42 +150,28 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
         }
 
         assert child != null;
-        
-        assert child.isDirty();
-        
-//        if( child == null ) {
-//            
-//            AbstractNode tmp = node.getChild(index++);
-//            
-//            assert tmp.isDirty();
-//            
-//            return tmp;
-//            
-//        } else {
-            
-            AbstractNode tmp = child;
-            
-            // advance the index where the scan will start next() time.
-            index++;
-//
-//            assert tmp.isDirty();
 
-            // clear the reference to force another scan.
-            child = null;
-            
-            return tmp;
-            
-//        }
-        
+        assert child.isDirty();
+
+        AbstractNode tmp = child;
+
+        // advance the index where the scan will start next() time.
+        index++;
+
+        // clear the reference to force another scan.
+        child = null;
+
+        return tmp;
+
     }
 
     // FIXME either implement getKey() or do not implement that interface.
     public Object getKey() {
-    
+
         throw new UnsupportedOperationException();
-        
+
     }
-    
+
     /**
      * @exception UnsupportedOperationException
      */

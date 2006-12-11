@@ -51,21 +51,6 @@ package com.bigdata.objndx;
  * Stress tests for basic tree operations (insert, lookup, and remove) without
  * causing node or leaf evictions (IO is disabled).
  * 
- * @todo make sure that we have a stress test that removes keys in forward
- *       order, one that removes keys in reverse order, and one that removes
- *       keys in a random order. This will help to excercise the code paths for
- *       join(), merge(sibling), and redistributeKeys(sibling).
- * 
- * @todo test tree under sequential insertion, nearly sequential insertion
- *       (based on a model identifier generation for the read-optimized
- *       database, including filling up pages, eventually releasing space on
- *       pages, and then reclaiming space where it becomes available on pages),
- *       and under random key generation. Does the tree stay nicely balanced for
- *       all scenarios? What about the average search time? Periodically verify
- *       that the tree remains fully ordered. Choose a split rule that works
- *       well for mostly sequential and mostly monotonic keys with some removal
- *       of entries (sparsity).
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -101,8 +86,7 @@ public class TestBTree extends AbstractBTreeTestCase {
      */
     public void test_stress_removeStructure() {
        
-        // FIXME Try with nkeys=100 when debugged.
-        int nkeys = 20;
+        int nkeys = 1000;
         
         doRemoveStructureStressTest(3,nkeys);
 

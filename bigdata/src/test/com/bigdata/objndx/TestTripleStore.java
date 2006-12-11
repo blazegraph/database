@@ -107,12 +107,8 @@ import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
  * from a fully connected matrix in the appropriate space.
  * <p>
  * 
- * @todo add logic to actually insert stuff into indices. this will require a
- *       refactor of the btree package to support generic keys with comparator
- *       methods.
- * 
  * @todo Note that a very interesting solution for RDF places all data into a
- *       statement index and then uses block compression techniques to remove
+ *       statement index and then use block compression techniques to remove
  *       frequent terms, e.g., the repeated parts of the value. Also note that
  *       there will be no "value" for an rdf statement since existence is all.
  *       The key completely encodes the statement. So, another approach is to
@@ -176,8 +172,6 @@ import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
  * there are little odd spots in RDF - handling bnodes, typed literals, and the
  * concept of a total sort order for the statement index.
  * 
- * @todo verify that we are not generating heap churn by needless allocations.
- * 
  * @todo Note that the target platform will use a 200M journal extent and freeze
  *       the extent when it gets full, opening a new extent. Once a frozen
  *       journal contains committed state, we can evict the indices from the
@@ -199,7 +193,11 @@ import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
  *       persistence capable differential indices and the load could even span
  *       more than one journal extent.
  * 
- * @todo What about BNodes? These need to get in here somewhere....
+ * @todo What about BNodes? These need to get in here somewhere.... So does
+ *       support for language tag literals and data type literals. XML (or other
+ *       large value literals) will cause problems unless they are factored into
+ *       large object references if we actually store values directly in the
+ *       statement index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -572,7 +570,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             static final IKeySerializer INSTANCE = new KeySerializer();
             
             /**
-             * FIXME There is no fixed upper limit for Ustrings in general,
+             * FIXME There is no fixed upper limit for URLs or strings in general,
              * therefore the btree may have to occasionally resize its buffer to
              * accomodate very long variable length keys.
              */
@@ -686,12 +684,52 @@ public class TestTripleStore extends AbstractBTreeTestCase {
     }
     
     /**
+     * Large scale insert test.
+     * 
      * @param args
+     *            unused - just edit the code.
+     * 
+     * FIXME This needs to be worked through until the btrees are smoothly being
+     * evicted onto the journal. Right now it appears to build up too much
+     * overhead, presumably because we are defering all node evictions (only
+     * leaves have an eviction queue).
+     * 
+     * FIXME The journal should smoothly be snapshot and perfect indices built
+     * over time. However, very large RDF loads should probably use a bulk load
+     * mechanism that is somewhat decoupled from the normal transactional
+     * isolation mechanism. E.g., bulk load begins when isolation grows too
+     * large and works by evicting perfect index segments onto the disk. Since
+     * bulk loads can run for a long time, reconciling the bulk transaction to
+     * existing data would be time consuming as well. There are probably a lot
+     * of ways to cheat, including if we are using context we can insist that
+     * bulk loads do not overlap with existing contexts.
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
-        // @todo parameterized runs or bulk loads in main()
-        
+        // small
+        int nclass = 30;
+        int nproperty = 20;
+        int nliteral = 20;
+        int litsize = 100;
+
+        // moderate
+//        int nclass = 300; // @todo at 300 this will force the journal to be extended on commit.
+//        int nproperty = 20;
+//        int nliteral = 20;
+//        int litsize = 100;
+
+//      // large
+//      int nclass = 5000;
+//      int nproperty = 20;
+//      int nliteral = 30;
+////      int nliteral = 0;
+//      int litsize = 300;
+    
+        TestTripleStore test = new TestTripleStore();
+        test.setUp();
+        test.doTest( nclass, nproperty, nliteral, litsize );
+        test.tearDown();
+            
     }
 
     /**
@@ -1025,11 +1063,11 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
                     // Progress marker and incremental statistics.
 
-                    if( index > 0 && index % 1000 == 0 ) {
+                    if( index > 0 && index % 10000 == 0 ) {
                         
                         System.err.print( "." );
 
-                        if( index % 5000 == 0 ) {
+                        if( index % 100000 == 0 ) {
 
 //                    commit(); // @todo restore use of incremental commit?
 
@@ -1204,9 +1242,31 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             
             if( t instanceof URI ) {
                 
-                String uri = ((URI)t).getURI();
+                URI uri = (URI)t;
                 
-                return ndx_uri.insert(uri);
+                /*
+                 * Note: The #1 cause of heap churn is URI.getURI() which
+                 * appends the localName to the namespace.
+                 * 
+                 * FIXME Reduce heap churn here. One way is to simply use a
+                 * String or char[] rather than the URIImpl class to model the
+                 * URI. Another is to allow the URI into the index, but to
+                 * serialize it as a char[] and to read it back into a variant
+                 * URI implementation that does not break it down into namespace
+                 * and localName.
+                 * 
+                 * @todo The SPO objects are another source of heap churn. This
+                 * could be addressed by allowing the index to manage an array
+                 * of primitive data types or a ByteBuffer so that we could
+                 * handle the s:p:o elements of the key as if they were a
+                 * primitive data type. This would mean more copying of data
+                 * during insert and remove on a leaf, but less allocation.
+                 */
+                _term.setLength(0);
+                _term.append(uri.getNamespace());
+                _term.append(uri.getLocalName());
+                
+                return ndx_uri.insert(_term.toString());
                 
             } else if( t instanceof Literal ) {
                 
@@ -1239,6 +1299,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             }
             
         }
+        StringBuilder _term = new StringBuilder(4096);
         
         /**
          * @todo restart safety requires that the individual indices are flushed
@@ -1265,42 +1326,67 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          *       concurrent writers, and concurrent writes with concurrent
          *       query.
          */
+        public void test_tiny() throws IOException {
+
+            // tiny
+            int nclass = 3;
+            int nproperty = 2;
+            int nliteral = 2;
+            int litsize = 100;
+
+            doTest( nclass, nproperty, nliteral, litsize );
+
+        }
+
         public void test_small() throws IOException {
 
-//            // tiny
-//            int nclass = 3;
-//            int nproperty = 2;
-//            int nliteral = 2;
-//            int litsize = 100;
-
-            // small.
-      int nclass = 30;
-      int nproperty = 20;
-      int nliteral = 20;
-      int litsize = 100;
+            int nclass = 30;
+            int nproperty = 20;
+            int nliteral = 20;
+            int litsize = 100;
       
-            // moderate.
-//      int nclass = 5000;
-//      int nproperty = 20;
-//      int nliteral = 30;
-////      int nliteral = 0;
-//      int litsize = 300;
-      
-    doTest( nclass, nproperty, nliteral, litsize );
+            doTest( nclass, nproperty, nliteral, litsize );
     
         }
 
+        /**
+         * This tests nearly a million triples.
+         * 
+         * <pre>
+         * Sustained insert rate: #statements=880000, elapsed=7422, stmts/sec=118566
+         * </pre>
+         */
+        public void test_moderate() throws IOException {
+
+            int nclass = 200; // @todo at 300 this will force the journal to be extended on commit.
+            int nproperty = 20;
+            int nliteral = 20;
+            int litsize = 100;
+      
+            doTest( nclass, nproperty, nliteral, litsize );
+            
+//          // moderate.
+//          int nclass = 5000;
+//          int nproperty = 20;
+//          int nliteral = 30;
+////          int nliteral = 0;
+//          int litsize = 300;
+
+        }
+        
         public void setUp() throws Exception {
         
             Properties properties = getProperties();
 
-            String file = properties.getProperty(Options.FILE);
+            String filename = properties.getProperty(Options.FILE);
             
-            if( file != null ) {
+            if( filename != null ) {
                 
-                if(! new File(file).delete() ) {
+                File file = new File(filename);
+                
+                if(file.exists() && ! file.delete() ) {
                     
-                    throw new RuntimeException("Could not delete file: "+file);
+                    throw new RuntimeException("Could not delete file: "+file.getAbsoluteFile());
                     
                 }
                 

@@ -93,15 +93,18 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
+ * FIXME do incremental evictions of nodes as well as leaves and verify that the
+ * heap does not grow unruly for extended inserts.
+ * 
  * @todo Profile the heap and the code and determine if we are spending too much
  *       time autoboxing when using a primitive key type, notably int[] or
  *       long[].
- *       
+ * 
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
  *       is not critical since the journal is designed to be fully buffered and
  *       the index segments are read-only but it would reduce memory by reducing
- *       the #of nodes -- and we can expect that the siblings will be either 
+ *       the #of nodes -- and we can expect that the siblings will be either
  *       resident or in the direct buffer for the journal
  * 
  * @todo should this btree should intrinsically support isolation of inline
@@ -116,25 +119,6 @@ import com.bigdata.journal.SlotMath;
  *       with a version counter (similar to a timestamp, and perhaps replaceable
  *       by a timestamp) and the object itself. if we make the timestamp part of
  *       the key, then all that we are left with is the object itself.
- * 
- * @todo refactor to support generic key types. we can reuse most of the code
- *       but there will need to be better encapuslation of the operations on
- *       keys (insert, remove, split, join). we will also need to define a key
- *       serializer interface and support custom key comparators. When the data
- *       type is bounded or a primitive then we need to know the representation
- *       for negative infinity (e.g., null or the smallest value of the data
- *       type) and when positive infinity is defined then we need to know that.
- *       We also need to know the successor of a key for various half-open to
- *       closed range conversions, though that can be handled above the level of
- *       the btree I believe. the index should remain efficient in terms of its
- *       storage when the key type is a java primitive, e.g., int, long, float
- *       or double. once the key type must be treated as an object we are unable
- *       to avoid an allocation for each key read from the store and we are
- *       unable to maintain locality of reference for the keys. Where warrented,
- *       I could explore specialized APIs for operations on a btree with
- *       primitive keys, e.g., int keys. This is definately a tweak and not
- *       worth considering further until I can show that heap churn for the
- *       parameters passed into the btree API is a problem.
  * 
  * @todo consider using extser an option for serialization so that we can
  *       continually evolve the node and leaf formats. we will also need a node
@@ -173,13 +157,10 @@ import com.bigdata.journal.SlotMath;
  *       When prior-next references are available, an iterator should be easily
  *       able to adjust for insertion and removal of keys.
  * 
- * @todo support efficient insert of sorted data.
+ * @todo support efficient insert of sorted data (batch or bulk insert).
  * 
  * @todo support efficient conditional inserts, e.g., if this key does not exist
  *       then insert this value.
- * 
- * @todo develop metrics for insert rate for various scenarios, including
- *       sequential integer keys, random URLs, etc.
  * 
  * @todo support key compression (prefix and suffix compression and split
  *       interval trickery).
@@ -192,11 +173,11 @@ import com.bigdata.journal.SlotMath;
  *       this approach leaves might be evicted indepdently, but also as part of
  *       a node subrange eviction.
  * 
- * @todo maintain prior-next references among leaves in memory even if we are
- *       not able to write them onto the disk. when reading in a leaf, always
- *       set the prior/next reference iff the corresponding leaf is in memory -
- *       this is easily handled by checking the weak references on the parent
- *       node.
+ * @todo maintain prior-next references among leaves (and nodes?) in memory even
+ *       if we are not able to write them onto the disk. when reading in a leaf,
+ *       always set the prior/next reference iff the corresponding leaf is in
+ *       memory - this is easily handled by checking the weak references on the
+ *       parent node.
  * 
  * @todo since forward scans are much more common, change the post-order
  *       iterator for commit processing to use a reverse traversal so that we

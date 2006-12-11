@@ -63,7 +63,6 @@ import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -914,6 +913,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * They depend on the manner in which the leaves get filled, whether or not
      * holes are created in the leaves, etc.
      * 
+     * Once all keys have been inserted into the tree the keys are removed in
+     * forward order (from the smallest to the largest). This stresses a
+     * specific pattern of joining leaves and nodes together with their right
+     * sibling.
+     * 
      * @param m
      *            The branching factor.
      * @param ninserts
@@ -998,6 +1002,24 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         assertSameIterator(entries, btree.getRoot().entryIterator());
 
+        // remove keys in forward order.
+        {
+            
+            for( int i=0; i<keys.length; i++ ) {
+                
+                assertEquals(entries[i],btree.lookup(keys[i]));
+                assertEquals(entries[i],btree.remove(keys[i]));
+                assertEquals(null,btree.lookup(keys[i]));
+                
+            }
+            
+        }
+        
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
     }
     
     /**
@@ -1007,6 +1029,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * They depend on the manner in which the leaves get filled, whether or not
      * holes are created in the leaves, etc.
      * 
+     * Once all keys have been inserted into the tree the keys are removed in
+     * reverse order (from the largest to the smallest). This stresses a
+     * specific pattern of joining leaves and nodes together with their left
+     * sibling.
+     * 
      * @param m
      *            The branching factor.
      * @param ninserts
@@ -1014,6 +1041,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public void doSplitWithDecreasingKeySequence(BTree btree,int m, int ninserts) {
 
+        log.info("m="+m+", ninserts="+ninserts);
+        
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
@@ -1085,6 +1114,24 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assertTrue(btree.dump(System.err));
         
+        // remove keys in reverse order.
+        {
+        
+            for( int i=0; i<keys.length; i++ ) {
+                
+                assertEquals(entries[i],btree.lookup(keys[i]));
+                assertEquals(entries[i],btree.remove(keys[i]));
+                assertEquals(null,btree.lookup(keys[i]));
+
+            }
+            
+        }
+        
+        assertEquals("height", 0, btree.height);
+        assertEquals("#nodes", 0, btree.nnodes);
+        assertEquals("#leaves", 1, btree.nleaves);
+        assertEquals("#entries", 0, btree.nentries);
+
     }
     
     /**

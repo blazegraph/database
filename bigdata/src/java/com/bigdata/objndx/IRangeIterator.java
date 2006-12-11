@@ -56,11 +56,6 @@ import java.util.Iterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRangeIterator extends Iterator {
-
-    /**
-     * Return the key for the current value.
-     */
-    public Object getKey();
+public interface IRangeIterator extends Iterator, IKeyVisitor {
 
 }
