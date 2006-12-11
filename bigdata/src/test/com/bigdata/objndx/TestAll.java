@@ -48,6 +48,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestSplitJoinRootLeaf.class );
         // test splitting and joining with more than two levels.
         suite.addTestSuite( TestSplitJoinThreeLevels.class );
+        // test iterator semantics.
+        suite.addTestSuite( TestIterators.class );
         // stress test basic tree operations w/o IO.
         suite.addTestSuite( TestBTree.class );
         // test checksum computations (used by serialization).

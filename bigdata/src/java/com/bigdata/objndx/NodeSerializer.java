@@ -95,12 +95,12 @@ public class NodeSerializer {
     /**
      * An object that knows how to (de-)serialize keys.
      */
-    private final IKeySerializer keySerializer;
+    protected final IKeySerializer keySerializer;
 
     /**
      * An object that knows how to (de-)serialize the values on leaves.
      */
-    private final IValueSerializer valueSerializer;
+    protected final IValueSerializer valueSerializer;
     
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
@@ -140,10 +140,10 @@ public class NodeSerializer {
     static final int SIZEOF_REF = Bytes.SIZEOF_LONG;
 //    static final int SIZEOF_REF = Bytes.SIZEOF_INT;
 
-    /**
-     * The key is an int32 within segment persistent identifier.
-     */
-    static final int SIZEOF_KEY = Bytes.SIZEOF_INT;
+//    /**
+//     * The key is an int32 within segment persistent identifier.
+//     */
+//    static final int SIZEOF_KEY = Bytes.SIZEOF_INT;
 
     /**
      * Size of a value for a non-leaf node. The value must be interpreted per
@@ -238,6 +238,10 @@ public class NodeSerializer {
      *            The node or leaf.
      * 
      * @return The #of bytes required to serialize that node or leaf.
+     * 
+     * FIXME There is no fixed upper limit for URIs (or strings in general),
+     * therefore the btree may have to occasionally resize its buffer to
+     * accomodate very long variable length keys.
      */
     public int getSize(AbstractNode node) {
 
@@ -259,17 +263,15 @@ public class NodeSerializer {
      */
     int getSize( boolean isLeaf, int nkeys ) {
         
-        if (isLeaf) {
+        int keysSize = keySerializer.getSize(nkeys);
 
-            int keysSize = (SIZEOF_KEY * nkeys);
+        if (isLeaf) {
 
             int valuesSize = valueSerializer.getSize(nkeys);
 
             return OFFSET_KEYS + keysSize + valuesSize;
 
         } else {
-
-            int keysSize = (SIZEOF_KEY * nkeys);
 
             int valuesSize = (SIZEOF_NODE_VALUE * (nkeys + 1));
 
@@ -337,9 +339,10 @@ public class NodeSerializer {
 
         assert buf != null;
         assert node != null;
-        assert node.branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-        assert node.branchingFactor < Short.MAX_VALUE;
-        assert node.nkeys >= node.minKeys && node.nkeys < node.maxKeys;
+        node.assertInvariants();
+//        assert node.branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+//        assert node.branchingFactor < Short.MAX_VALUE;
+//        assert node.nkeys >= node.minKeys && node.nkeys <= node.maxKeys;
 
         if (node.dirtyChildren.size() > 0) {
 
@@ -468,11 +471,13 @@ public class NodeSerializer {
          * Keys.
          */
         
-        final int[] keys = (int[]) keySerializer.getKeys(buf, nkeys,
+        final Object keys = AbstractNode.allocKeys(btree.keyType, 
                 branchingFactor);
+
+        keySerializer.getKeys(buf, keys, nkeys);
         
         /*
-         * child references (nchildren == nkeys+1).
+         * Child references (nchildren == nkeys+1).
          */
 
         for (int i = 0; i <= nkeys; i++) {
@@ -608,8 +613,10 @@ public class NodeSerializer {
          * Keys.
          */
 
-        final int[] keys = (int[]) keySerializer.getKeys(buf, nkeys,
-                branchingFactor + 1);
+        final Object keys = AbstractNode.allocKeys(btree.keyType, 
+                branchingFactor+1);
+
+        keySerializer.getKeys(buf, keys, nkeys);
 
         /*
          * Values.

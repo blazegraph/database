@@ -52,9 +52,9 @@ import java.util.NoSuchElementException;
 
 /**
  * <p>
- * Visits the direct dirty children of a node in the external key ordering. This
- * iterator does NOT force children to be loaded from disk if the are not
- * resident since dirty nodes are always resident.
+ * Visits the direct dirty children of a {@link Node} in the external key
+ * ordering. Since dirty nodes are always resident this iterator never forces a
+ * child to be loaded from the store.
  * </p>
  * <p>
  * In order to guarentee that a node will still be dirty by the time that the
@@ -72,7 +72,8 @@ import java.util.NoSuchElementException;
  * FIXME Write tests for this, including the fact that the child must remain
  * strongly reachable.
  */
-class DirtyChildIterator implements Iterator<AbstractNode> {
+class DirtyChildIterator implements Iterator<AbstractNode>,
+        IKeyVisitor<AbstractNode> {
 
     private final Node node;
     
@@ -92,7 +93,8 @@ class DirtyChildIterator implements Iterator<AbstractNode> {
     /**
      * 
      * @param node
-     *            The node whose direct children will be visited in key order.
+     *            The node whose direct dirty children will be visited in key
+     *            order.
      */
     public DirtyChildIterator(Node node) {
 
@@ -129,7 +131,9 @@ class DirtyChildIterator implements Iterator<AbstractNode> {
             
             if( child == null ) continue;
             
-            if( child.isDirty() ) continue;
+            if( ! child.isDirty() ) continue;
+            
+            break;
             
         }
         
@@ -145,22 +149,46 @@ class DirtyChildIterator implements Iterator<AbstractNode> {
 
         }
 
-        if( child == null ) {
-            
-            return node.getChild(index++);
-            
-        } else {
+        assert child != null;
+        
+        assert child.isDirty();
+        
+//        if( child == null ) {
+//            
+//            AbstractNode tmp = node.getChild(index++);
+//            
+//            assert tmp.isDirty();
+//            
+//            return tmp;
+//            
+//        } else {
             
             AbstractNode tmp = child;
             
+            // advance the index where the scan will start next() time.
+            index++;
+//
+//            assert tmp.isDirty();
+
+            // clear the reference to force another scan.
             child = null;
             
             return tmp;
             
-        }
+//        }
         
     }
 
+    // FIXME either implement getKey() or do not implement that interface.
+    public Object getKey() {
+    
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * @exception UnsupportedOperationException
+     */
     public void remove() {
 
         throw new UnsupportedOperationException();

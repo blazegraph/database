@@ -55,7 +55,6 @@ import org.apache.log4j.Level;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * Test case for {@link NodeSerializer}.
@@ -90,6 +89,9 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      * @param branchingFactor
      *            The #of keys in a node of the object index (aka the branching
      *            factor).
+     * 
+     * @todo this test helper is rather specific to the concept of an object
+     *       index and therefore somewhat dated.
      */
     public void showInfo(int slotSize,int branchingFactor) {
 
@@ -130,15 +132,16 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
 
             int nkeys = branchingFactor - 1;
             int nchildren = branchingFactor;
-            int keysSize = (nkeys * NodeSerializer.SIZEOF_KEY);
+            int keysSize = nodeSer.keySerializer.getSize(nkeys);
             int valuesSize = (nchildren * NodeSerializer.SIZEOF_NODE_VALUE);
             int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
             
             System.err.println("Node specific record format:");
             
             System.err.println(" key[]   : offset="
-                    + NodeSerializer.OFFSET_KEYS + ", size="
-                    + NodeSerializer.SIZEOF_KEY + ", #keys=" + nkeys
+                    + NodeSerializer.OFFSET_KEYS +
+//                    ", size="+ NodeSerializer.SIZEOF_KEY +
+                    ", #keys=" + nkeys
                     + ", #bytes=" + keysSize);
             
             System.err.println(" value   : child node ref         ("
@@ -170,16 +173,17 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         {
             // assume #of keys == branching factor.
             int nkeys = branchingFactor;
-            int keysSize = (nkeys * NodeSerializer.SIZEOF_KEY);
+            int keysSize = nodeSer.keySerializer.getSize(nkeys);
             int valuesSize = valueSer.getSize(nkeys);
             int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
 
             System.err.println("Leaf specific record format:");
             
             System.err.println(" key[]   : offset="
-                    + NodeSerializer.OFFSET_KEYS + ", size="
-                    + NodeSerializer.SIZEOF_KEY + ", #keys=" + branchingFactor
-                    + ", #bytes=" + (nkeys * NodeSerializer.SIZEOF_KEY));
+                    + NodeSerializer.OFFSET_KEYS +
+//                    ", size="+ NodeSerializer.SIZEOF_KEY +
+                    ", #keys=" + branchingFactor
+                    + ", #bytes=" + keysSize);
             
             System.err.println(" value   : versionCounter         ("
                     + IndexEntrySerializer.SIZEOF_VERSION_COUNTER + ")");

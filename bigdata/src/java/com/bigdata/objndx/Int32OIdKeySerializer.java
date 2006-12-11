@@ -98,9 +98,9 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
     }
 
-    public Object getKeys(ByteBuffer buf, int nkeys, int capacity) {
+    public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
         
-        final int[] keys = new int[capacity];
+        final int[] a = (int[])keys;
 
         int lastKey = NEGINF;
 
@@ -112,11 +112,9 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
 //            assert key < BTree.POSINF; // verify keys in legal range.
 
-            keys[i] = lastKey = key;
+            a[i] = lastKey = key;
 
         }
-        
-        return keys;
         
     }
 

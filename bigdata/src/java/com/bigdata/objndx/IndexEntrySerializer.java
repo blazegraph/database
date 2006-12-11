@@ -73,6 +73,11 @@ import com.bigdata.journal.SlotMath;
  * 
  * @todo Since we are packing the versionCounter we could get away with using an
  *       int32 or even int64 field.
+ * 
+ * @todo the version counter will probably become the transaction timestamp and
+ *       the object will probably be moved inline so that it is stored in the
+ *       leaf of the tree rather than scattered randomly in the journal and the
+ *       distributed store.
  */
 public class IndexEntrySerializer implements IValueSerializer {
 

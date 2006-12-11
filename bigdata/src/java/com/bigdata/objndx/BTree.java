@@ -273,6 +273,11 @@ public class BTree implements IBTree {
     static public final int MIN_BRANCHING_FACTOR = 3;
     
     /**
+     * The default branching factor.
+     */
+    static public final int DEFAULT_BRANCHING_FACTOR = 64;
+    
+    /**
      * The minimum hard reference queue capacity is two(2) in order to avoid
      * cache evictions of the leaves participating in a split.
      */
@@ -716,6 +721,11 @@ public class BTree implements IBTree {
         this.nodeSer = new NodeSerializer(keySer,
                 valueSer);
 
+         /*
+          * FIXME There is no fixed upper limit for URIs (or strings in
+          * general), therefore the btree may have to occasionally resize its
+          * buffer to accomodate very long variable length keys.
+          */
         int maxNodeOrLeafSize = Math.max(
                 // max size for a leaf.
                 nodeSer.getSize(true, branchingFactor),
@@ -790,6 +800,11 @@ public class BTree implements IBTree {
         this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
                 valueSer);
         
+        /*
+         * FIXME There is no fixed upper limit for URIs (or strings in
+         * general), therefore the btree may have to occasionally resize its
+         * buffer to accomodate very long variable length keys.
+         */
         int maxNodeOrLeafSize = Math.max(
                 // max size for a leaf.
                 nodeSer.getSize(true, branchingFactor),
@@ -822,20 +837,20 @@ public class BTree implements IBTree {
      * protocol where it is invoked with the root of the tree, but it may also
      * be used to incrementally flush dirty non-root {@link Node}s.
      * 
-     * @param root
+     * @param node
      *            The root of the hierarchy of nodes to be written. The node
      *            MUST be dirty. The node this does NOT have to be the root of
      *            the tree and it does NOT have to be a {@link Node}.
      */
-    protected void writeNodeRecursive( AbstractNode root ) {
+    protected void writeNodeRecursive( AbstractNode node ) {
 
-        assert root != null;
+        assert node != null;
         
-        assert root.isDirty();
+        assert node.isDirty();
         
-        assert ! root.isDeleted();
+        assert ! node.isDeleted();
 
-        assert ! root.isPersistent();
+        assert ! node.isPersistent();
         
         /*
          * Note we have to permit the reference counter to be positive and not
@@ -847,7 +862,7 @@ public class BTree implements IBTree {
          * they would be GC'd soon as since they would no longer be strongly
          * reachable.
          */
-        assert root.referenceCount >= 0;
+        assert node.referenceCount >= 0;
         
         // #of dirty nodes written (nodes or leaves)
         int ndirty = 0;
@@ -861,37 +876,37 @@ public class BTree implements IBTree {
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        Iterator itr = root.postOrderIterator(true);
+        Iterator itr = node.postOrderIterator(true);
 
         while (itr.hasNext()) {
 
-            AbstractNode node = (AbstractNode) itr.next();
+            AbstractNode t = (AbstractNode) itr.next();
 
-            assert node.isDirty();
+            assert t.isDirty();
 
-            if (node != this.root) {
+            if (t != this.root) {
 
                 /*
                  * The parent MUST be defined unless this is the root node.
                  */
 
-                assert node.parent != null;
-                assert node.parent.get() != null;
+                assert t.parent != null;
+                assert t.parent.get() != null;
 
             }
 
             // write the dirty node on the store.
-            writeNodeOrLeaf(node);
+            writeNodeOrLeaf(t);
 
             ndirty++;
 
-            if (node instanceof Leaf)
+            if (t instanceof Leaf)
                 nleaves++;
 
         }
 
         log.info("write: " + ndirty + " dirty nodes (" + nleaves
-                + " leaves), rootId=" + root.getIdentity());
+                + " leaves), rootId=" + node.getIdentity());
         
     }
     
@@ -988,13 +1003,13 @@ public class BTree implements IBTree {
         
         node.setDirty(false);
 
-        /*
-         * Set the persistent identity of the child on the parent.
-         */
-
         if( parent != null ) {
             
+            // Set the persistent identity of the child on the parent.
             parent.setChildKey(node);
+
+            // Remove from the dirty list on the parent.
+            parent.dirtyChildren.remove(node);
 
         }
 
@@ -1186,6 +1201,8 @@ public class BTree implements IBTree {
         buf.putInt(nleaves);
         buf.putInt(nentries);
         buf.putInt(keyType.intValue());
+        
+        buf.flip(); // prepare for writing.
 
         return store.write(buf).toLong();
 

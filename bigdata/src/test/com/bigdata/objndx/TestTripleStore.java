@@ -48,24 +48,37 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.io.BufferedWriter;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.util.Comparator;
 import java.util.Properties;
 
+import org.CognitiveWeb.extser.LongPacker;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Bytes;
+import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.ndx.IntegerComparator;
+import com.bigdata.objndx.IndexEntrySerializer.ByteBufferInputStream;
+import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a
@@ -212,8 +225,13 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
             properties = super.getProperties();
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+//                    .toString());
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
                     .toString());
+            properties.setProperty(Options.SEGMENT, "0");
+            properties.setProperty(Options.FILE, getName()+".jnl");
 
         }
 
@@ -222,53 +240,451 @@ public class TestTripleStore extends AbstractBTreeTestCase {
     }
 
     private Properties properties;
-    
+
     /**
-     * Return a btree backed by a journal with the indicated branching factor.
-     * The serializer requires that values in leaves are {@link SimpleEntry}
-     * objects.
+     * A persistent index for RDF {@link Statement}s.
      * 
-     * @param branchingFactor
-     *            The branching factor.
-     * 
-     * @return The btree.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    public BTree getBTree(int branchingFactor) {
+    public static class SPOIndex extends BTree {
 
-        try {
-            
-            Properties properties = getProperties();
-
-            Journal journal = new Journal(properties);
-
-            // A modest leaf queue capacity.
-            final int leafQueueCapacity = 500;
-            
-            final int nscan = 10;
-
-            /*
-             * @todo change the key type to general purpose.
-             */
-            BTree btree = new BTree(journal,
-                    ArrayType.INT,
-                    branchingFactor,
+        /**
+         * Create a new statement index.
+         * 
+         * @param store
+         *            The backing store.
+         */
+        public SPOIndex(IRawStore store) {
+            super(store,
+                    ArrayType.OBJECT, // generic keys
+                    DEFAULT_BRANCHING_FACTOR,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                    new SimpleEntry.Serializer());
+                            DEFAULT_LEAF_QUEUE_CAPACITY,
+                            DEFAULT_LEAF_QUEUE_SCAN),
+                    null, // NEGINF
+                    SPOComparator.INSTANCE,
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
+        
+        /**
+         * Load a statement index from the store.
+         * 
+         * @param store
+         *            The backing store.
+         * @param metadataId
+         *            The metadata record identifier for the index.
+         */
+        public SPOIndex(IRawStore store, long metadataId) {
+            super(  store,
+                    metadataId,
+                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_LEAF_QUEUE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN),
+                    null, // NEGINF
+                    SPOComparator.INSTANCE,
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
 
-            return btree;
+        /**
+         * Places statements into a total ordering for the SPO index.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class SPOComparator implements Comparator<SPO> {
 
-        } catch (IOException ex) {
+            static final Comparator INSTANCE = new SPOComparator();
             
-            throw new RuntimeException(ex);
+            public int compare(SPO o1, SPO o2) {
+                
+                return o1.compareTo(o2);
+                
+            }
+            
+        }
+        
+        /**
+         * Key class for the SPO index. The key is comprised of long integer
+         * identifies assigned by a term index to each term in the statement.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        public static class SPO implements Comparable<SPO>{
+            final long s;
+            final long p;
+            final long o;
+            public SPO(long s,long p,long o) {
+                this.s = s;
+                this.p = p;
+                this.o = o;
+            }
+            public int compareTo(SPO t) {
+                long ret = s - t.s;
+                if( ret == 0 ) {
+                    ret = p - t.p;
+                    if( ret == 0 ) {
+                        ret = o - t.o;
+                    }
+                }
+                if( ret == 0 ) return 0;
+                if( ret > 0 ) return 1;
+                return -1;
+            }
+        }
+
+        /**
+         * Key serializer for the SPO index.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class KeySerializer implements IKeySerializer {
+
+            static final IKeySerializer INSTANCE = new KeySerializer();
+            
+            public int getSize(int n) {
+                
+                return (Bytes.SIZEOF_LONG * 3) * n;
+                
+            }
+
+            public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
+
+                Object[] a = (Object[])keys;
+                
+                DataInputStream is = new DataInputStream( new ByteBufferInputStream(buf) );
+                
+                try {
+
+                    for (int i = 0; i < nkeys; i++) {
+
+                        long s = LongPacker.unpackLong(is);
+                        long p = LongPacker.unpackLong(is);
+                        long o = LongPacker.unpackLong(is);
+                        
+                        a[i] = new SPO(s, p, o);
+                        
+                    }
+
+                }
+
+                catch (EOFException ex) {
+
+                    RuntimeException ex2 = new BufferUnderflowException();
+
+                    ex2.initCause(ex);
+
+                    throw ex2;
+
+                }
+
+                catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            public void putKeys(ByteBuffer buf, Object keys, int nkeys) {
+
+                Object[] a = (Object[])keys;
+                
+                DataOutputStream os = new DataOutputStream(
+                        new ByteBufferOutputStream(buf));
+
+                try {
+
+                    for (int i = 0; i < nkeys; i++) {
+
+                        SPO key = (SPO)a[i];
+
+                        LongPacker.packLong(os, key.s);
+                        LongPacker.packLong(os, key.p);
+                        LongPacker.packLong(os, key.o);
+
+                    }
+
+                    os.flush();
+
+                }
+
+                catch (EOFException ex) {
+
+                    RuntimeException ex2 = new BufferOverflowException();
+
+                    ex2.initCause(ex);
+
+                    throw ex2;
+
+                }
+
+                catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+        }
+
+        /**
+         * Note: There is no additional data serialized with a statement at this
+         * time so the value serializer is essentially a nop. All the
+         * information is in the keys.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         * 
+         * @todo could serialize the statement values with the statement to
+         *       avoid reverse lookup indices.
+         *       
+         * @todo could mark inferred vs explicit vs axiom statements.
+         */
+        public static class ValueSerializer implements IValueSerializer {
+
+            static final IValueSerializer INSTANCE = new ValueSerializer();
+            
+            public int getSize(int n) {
+                return 0;
+            }
+
+            public void getValues(ByteBuffer buf, Object[] values, int n) {
+                return;
+            }
+
+            public void putValues(ByteBuffer buf, Object[] values, int n) {
+                return;
+            }
             
         }
         
     }
+    
+    /**
+     * A persistent index for {@link String} keys.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class StringIndex extends BTree {
 
+        /**
+         * The next identifier to be assigned to a string inserted into this
+         * index.
+         * 
+         * @todo this needs to be (a) shared across all transactional instances
+         *       of this index; (b) restart safe; and (c) set into a namespace
+         *       that is unique to the journal so that multiple writers on
+         *       multiple journals for a single distributed database can not
+         *       collide.
+         */
+        protected long nextId = 1;
+        
+        /**
+         * Create a new index.
+         * 
+         * @param store
+         *            The backing store.
+         */
+        public StringIndex(IRawStore store) {
+            super(store,
+                    ArrayType.OBJECT, // generic keys
+                    DEFAULT_BRANCHING_FACTOR,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            DEFAULT_LEAF_QUEUE_CAPACITY,
+                            DEFAULT_LEAF_QUEUE_SCAN),
+                    null, // NEGINF
+                    StringComparator.INSTANCE,
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
+        
+        /**
+         * Load an index from the store.
+         * 
+         * @param store
+         *            The backing store.
+         * @param metadataId
+         *            The metadata record identifier for the index.
+         */
+        public StringIndex(IRawStore store, long metadataId) {
+            super(  store,
+                    metadataId,
+                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_LEAF_QUEUE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN),
+                    null, // NEGINF
+                    StringComparator.INSTANCE,
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
+
+        public long insert(String s) {
+            
+            Long id = (Long)lookup(s);
+            
+            if( id == null ) {
+                
+                id = nextId++;
+                
+                insert(s,id);
+                
+            }
+            
+            return id;
+            
+        }
+        
+        /**
+         * Places URIs into a total ordering.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class StringComparator implements Comparator<String> {
+
+            static final Comparator INSTANCE = new StringComparator();
+            
+            public int compare(String o1, String o2) {
+                
+                return o1.compareTo(o2);
+                
+            }
+            
+        }
+        
+        /**
+         * Key serializer.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class KeySerializer implements IKeySerializer {
+
+            static final IKeySerializer INSTANCE = new KeySerializer();
+            
+            /**
+             * FIXME There is no fixed upper limit for Ustrings in general,
+             * therefore the btree may have to occasionally resize its buffer to
+             * accomodate very long variable length keys.
+             */
+            public int getSize(int n) {
+                
+                return 4096*n;
+                
+            }
+
+            public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
+
+                Object[] a = (Object[])keys;
+
+                DataInputStream is = new DataInputStream( new ByteBufferInputStream(buf) );
+                
+                try {
+
+                    for (int i = 0; i < nkeys; i++) {
+
+                        a[i] = is.readUTF();
+
+                    }
+
+                }
+
+                catch (EOFException ex) {
+
+                    RuntimeException ex2 = new BufferUnderflowException();
+
+                    ex2.initCause(ex);
+
+                    throw ex2;
+
+                }
+
+                catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            public void putKeys(ByteBuffer buf, Object keys, int nkeys) {
+
+                if( nkeys == 0 ) return;
+                
+                Object[] a = (Object[]) keys;
+
+                DataOutputStream os = new DataOutputStream(
+                        new ByteBufferOutputStream(buf));
+
+                try {
+
+                    for (int i = 0; i < nkeys; i++) {
+
+                        os.writeUTF((String)a[i]);
+
+                    }
+
+                    os.flush();
+
+                }
+
+                catch (EOFException ex) {
+
+                    RuntimeException ex2 = new BufferOverflowException();
+
+                    ex2.initCause(ex);
+
+                    throw ex2;
+
+                }
+
+                catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+        }
+
+        /**
+         * Note: There is no additional data serialized with a String. All the
+         * information is in the keys.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        public static class ValueSerializer implements IValueSerializer {
+
+            static final IValueSerializer INSTANCE = new ValueSerializer();
+            
+            public int getSize(int n) {
+                return 0;
+            }
+
+            public void getValues(ByteBuffer buf, Object[] values, int n) {
+                return;
+            }
+
+            public void putValues(ByteBuffer buf, Object[] values, int n) {
+                return;
+            }
+            
+        }
+        
+    }
+    
     /**
      * @param args
      */
@@ -390,14 +806,6 @@ public class TestTripleStore extends AbstractBTreeTestCase {
         /**
          * Primary driver for the insert rate test.
          * 
-         * Note: This uses the value factory for the repository, which means
-         * that the URI, Literal, etc. objects are all specific to the backend
-         * under test. This is a bit of an optimization for repositories that
-         * have a persistent object semantics. It is unlikely to benefit
-         * repositories based on a remote database connection as much as those
-         * based on a local persistence store.
-         * <p>
-         * 
          * @param nclass
          *            The #of distinct classes.
          * 
@@ -426,10 +834,14 @@ public class TestTripleStore extends AbstractBTreeTestCase {
         final URI[] cspace = new URI[ nclass ];
         final URI[] pspace = new URI[ nproperty ];
         final URI[] tspace = new URI[] {
-        new URIImpl( XMLSchema.xsInteger ),
-        new URIImpl( XMLSchema.xsFloat )
+                // uncomment to get data typed literals.
+//        new URIImpl( XMLSchema.xsInteger ),
+//        new URIImpl( XMLSchema.xsFloat )
         };
-        final String[] langSpace = new String[]{"en","de"};
+        final String[] langSpace = new String[]{
+                // uncomment to get language typed literals.
+//                "en","de"
+                };
         final int nliteral2 =
                 nliteral + 
             nliteral * tspace.length +
@@ -493,7 +905,12 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
             }
 
-            commit();
+            /* Note: a commit is not necessary here since we are not using
+             * the persistence capable backend to create the values, just
+             * the default memory-resident implementation classes provided
+             * by openrdf.
+             */
+//            commit();
             
             long elapsed = System.currentTimeMillis() - begin;
 
@@ -614,7 +1031,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
                         if( index % 5000 == 0 ) {
 
-                    commit();
+//                    commit(); // @todo restore use of incremental commit?
 
                     long now = System.currentTimeMillis();
 
@@ -654,6 +1071,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
         }
 
         commit();
+        journal.commit();
 
         long elapsed = System.currentTimeMillis() - begin;
 
@@ -701,25 +1119,6 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
         }
 
-        public void doTest()
-            throws IOException
-        {
-
-//            int nclass = 300;
-//            int nproperty = 20;
-//            int nliteral = 200;
-//            int litsize = 100;
-            
-            int nclass = 5000;
-            int nproperty = 20;
-//            int nliteral = 30;
-            int nliteral = 0;
-            int litsize = 300;
-            
-        doTest( nclass, nproperty, nliteral, litsize );
-
-        }
-        
         /**
          * Returns the quantity <i>n</i> expressed as a per-second rate or
          * "N/A" if the elapsed time is zero.
@@ -752,31 +1151,135 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
         }
         
-        // FIXME add to indices.
+        /**
+         * add to indices.
+         * 
+         * @todo optimize by sorting terms into buffers and doing batch lookup/
+         *       insert on terms, then create buffer of long[] for each
+         *       statement based on the assigned termIds, sort the statement
+         *       buffer, and do a batch insert on the statement index.
+         */
         public void addStatement(Resource s, URI p, Value o ) {
+
+//          System.err.println("("+s+":"+p+":"+o+")");
             
-//            System.err.println("("+s+":"+p+":"+o+")");
+            long _s = addTerm(s);
+            long _p = addTerm(p);
+            long _o = addTerm(o);
+
+            SPOIndex.SPO spo = new SPOIndex.SPO(_s,_p,_o);
+            
+            ndx_spo.insert(spo, spo);
             
         }
 
-        // FIXME flush indices.
+        /**
+         * Add a term into the appropriate term index.
+         * 
+         * @param t
+         *            The term.
+         * 
+         * @return The assigned term identifier.
+         * 
+         * @todo the practice of assigning one up identifiers to terms will
+         *       require a means to allocate those identifiers in a highly
+         *       concurrent fashion, e.g., by allocating a block of identifiers
+         *       at a time to a transaction. This is a bit distasteful, but it
+         *       could be handled by reconciling within a distinct transaction
+         *       for term inserts vs statement inserts (with appropriate
+         *       buffering or nested transactions, all of which seems very heavy
+         *       weight). Maybe a nicer solution is to give each journal a
+         *       unique identifier and to then assigned term ids within a
+         *       namespace formed by the journal identifier. This could be
+         *       highly concurrent since we can use a single global counter for
+         *       the journal but we still have to reconcile inserts across
+         *       concurrent transactions.
+         * 
+         * @todo The use of long[] identifiers for statements also means that
+         *       the SPO and other statement indices are only locally ordered so
+         *       they can not be used to perform a range scan without joining
+         *       against the various term indices.
+         */
+        public long addTerm(Value t) {
+            
+            if( t instanceof URI ) {
+                
+                String uri = ((URI)t).getURI();
+                
+                return ndx_uri.insert(uri);
+                
+            } else if( t instanceof Literal ) {
+                
+                Literal lit = (Literal) t;
+                
+                if( lit.getLanguage() != null ) {
+                    
+                    throw new UnsupportedOperationException("literal has language tag");
+                    
+                }
+
+                if( lit.getDatatype() != null ) {
+                    
+                    throw new UnsupportedOperationException("literal has data type");
+                    
+                }
+                
+                String label = lit.getLabel();
+                
+                return ndx_lit.insert(label);
+                
+            } else if( t instanceof BNode ) {
+                
+                throw new UnsupportedOperationException("bnode");
+                
+            } else {
+                
+                throw new AssertionError();
+                
+            }
+            
+        }
+        
+        /**
+         * @todo restart safety requires that the individual indices are flushed
+         *       to disk and their metadata records written and that we update
+         *       the corresponding root in the root block with the new metadata
+         *       record location and finally commit the journal.
+         * 
+         * @todo transactional isolation requires that we have isolation
+         *       semantics (nested index, validation, and merging down) built
+         *       into each index.
+         */
         public void commit() {
             
             System.err.println("incremental commit");
 
-//            ndx.uris.commit();
-//            ndx.lits.commit();
-//            ndx_stmts.commit();
+            ndx_uri.commit();
+            ndx_lit.commit();
+            ndx_spo.commit();
             
         }
 
+        /**
+         * @todo write tests for the individual indices, restart safety,
+         *       concurrent writers, and concurrent writes with concurrent
+         *       query.
+         */
         public void test_small() throws IOException {
-            
+
+//            // tiny
+//            int nclass = 3;
+//            int nproperty = 2;
+//            int nliteral = 2;
+//            int litsize = 100;
+
+            // small.
       int nclass = 30;
       int nproperty = 20;
       int nliteral = 20;
       int litsize = 100;
       
+            // moderate.
 //      int nclass = 5000;
 //      int nproperty = 20;
 //      int nliteral = 30;
@@ -787,4 +1290,39 @@ public class TestTripleStore extends AbstractBTreeTestCase {
     
         }
 
+        public void setUp() throws Exception {
+        
+            Properties properties = getProperties();
+
+            String file = properties.getProperty(Options.FILE);
+            
+            if( file != null ) {
+                
+                if(! new File(file).delete() ) {
+                    
+                    throw new RuntimeException("Could not delete file: "+file);
+                    
+                }
+                
+            }
+            
+            journal = new Journal(properties);
+
+            ndx_spo = new SPOIndex(journal);
+            ndx_uri = new StringIndex(journal);
+            ndx_lit = new StringIndex(journal);
+            
+        }
+        
+        Journal journal;
+        SPOIndex ndx_spo;
+        StringIndex ndx_uri;
+        StringIndex ndx_lit;
+
+        public void tearDown() {
+
+            journal.close();
+            
+        }
+        
 }

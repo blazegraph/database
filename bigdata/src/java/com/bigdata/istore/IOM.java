@@ -57,8 +57,8 @@ package com.bigdata.istore;
  *       behavior in a distributed database with other concurrent unisolated
  *       object managers and with concurrent transactions. There are also
  *       unresolved questions in concurrency control simply within the journal,
- *       which implements MVCC.  I need a better distinction here between what
- *       is possible and what is useful.
+ *       which implements MVCC. I need a better distinction here between what is
+ *       possible and what is useful.
  * 
  * @todo Support named objects with transactional isolation. The notional design
  *       uses a B+Tree behind the scenes. The root of the btree is stored in a
@@ -71,9 +71,10 @@ package com.bigdata.istore;
  *       can simply use a hash table to store the name : id mapping.
  * 
  * @todo Object caching, which is part of the OM contract (for reference testing
- *       for equality within a VM).
+ *       for equality within a VM). Try this with an inner hard reference queue
+ *       instead of an inner LRU hard reference hash table.
  * 
- * @todo Add operations for creating btree
+ * @todo Add operations for creating btrees.
  * 
  * @todo Add stream-based operations. Note that very large objects are going to
  *       scale out using an unisolated stream-based API. That API probably

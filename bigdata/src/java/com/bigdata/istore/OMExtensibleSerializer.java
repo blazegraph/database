@@ -85,8 +85,8 @@ import org.CognitiveWeb.extser.LongPacker;
  * allocation in bytes). The #of slots is computed from the size plus the offset
  * of the first slot.
  * 
- * FIXME For bigdata, extser needs to be a high concurrency service so that
- * binary data may be migrated among semantics without needing to deserialize
+ * FIXME For bigdata, extser needs to be a high concurrent service so that
+ * binary data may be migrated among segments without needing to deserialize
  * and re-serialize the data. Registration of new classes and versions MUST be
  * atomic. There is no means available to unregister a class (logically a write
  * once collection). The extser state can be cached locally by clients, with

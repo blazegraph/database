@@ -166,7 +166,7 @@ public class Node extends AbstractNode {
 
         this.nkeys = nkeys;
         
-        this.keys = keys;
+        this.keys = keys; // steal reference.
         
         this.childKeys = childKeys;
 
@@ -186,7 +186,7 @@ public class Node extends AbstractNode {
 
         super(btree, btree.branchingFactor);
 
-        keys = new int[branchingFactor];
+        keys = allocKeys(btree.keyType,branchingFactor);
 
         dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
@@ -218,7 +218,7 @@ public class Node extends AbstractNode {
         // The old root must be dirty when it is being split.
         assert oldRoot.isDirty();
 
-        keys = new int[branchingFactor];
+        keys = allocKeys(btree.keyType,branchingFactor);
 
         dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
@@ -284,7 +284,7 @@ public class Node extends AbstractNode {
         
 //        assert triggeredByChild != null;
 
-        keys = new int[branchingFactor];
+        keys = allocKeys(btree.keyType,branchingFactor);
 
         nkeys = src.nkeys;
 

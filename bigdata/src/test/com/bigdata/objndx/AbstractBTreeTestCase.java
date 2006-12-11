@@ -709,18 +709,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Return a new btree backed by a simple transient store but unwilling to
-     * write data onto the store.
-     * 
-     * The leaf cache will be large and cache evictions will cause exceptions if
-     * they occur. This provides an indication if cache evictions are occurring
-     * so that the tests of basic tree operations in this test suite are known
-     * to be conducted in an environment without incremental writes of leaves
-     * onto the store. This avoids copy-on-write scenarios and let's us test
-     * with the knowledge that there should always be a hard reference to a
-     * child or parent.
-     * 
-     * The {@link IValueSerializer} will throw an exception if invoked.
+     * Return a new btree backed by a simple transient store evict leaves or
+     * nodes onto the store. The leaf cache will be large and cache evictions
+     * will cause exceptions if they occur. This provides an indication if cache
+     * evictions are occurring so that the tests of basic tree operations in
+     * this test suite are known to be conducted in an environment without
+     * incremental writes of leaves onto the store. This avoids copy-on-write
+     * scenarios and let's us test with the knowledge that there should always
+     * be a hard reference to a child or parent.
      * 
      * The {@link SimpleLeafSplitPolicy} is used.
      * 
@@ -743,7 +739,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                         Integer.valueOf(0),
                         null, // no comparator for primitive key type.
                         Int32OIdKeySerializer.INSTANCE,
-                        new SimpleEntry.NoSerializer());
+                        new SimpleEntry.Serializer());
 
         return btree;
         

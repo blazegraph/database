@@ -56,7 +56,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class EntryIterator implements Iterator {
+class EntryIterator implements Iterator, IKeyVisitor {
 
     private final Leaf leaf;
 
@@ -88,6 +88,21 @@ class EntryIterator implements Iterator {
         
     }
 
+    public Object getKey() {
+        
+        if( index == 0 ) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return leaf.getKey(index-1);
+        
+    }
+    
+    /**
+     * @exception UnsupportedOperationException
+     */
     public void remove() {
 
         throw new UnsupportedOperationException();

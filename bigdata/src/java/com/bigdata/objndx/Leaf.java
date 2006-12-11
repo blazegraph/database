@@ -123,9 +123,9 @@ public class Leaf extends AbstractNode {
 
         this.nkeys = nkeys;
         
-        this.keys = keys;
+        this.keys = keys; // steal reference.
         
-        this.values = values;
+        this.values = values; // steal reference.
 
         // must clear the dirty since we just de-serialized this leaf.
         setDirty(false);
@@ -145,7 +145,7 @@ public class Leaf extends AbstractNode {
 
         super(btree, btree.getBrachingFactor());
 
-        keys = new int[branchingFactor+1];
+        keys = allocKeys(btree.keyType,branchingFactor+1);
 
         values = new Object[branchingFactor+1];
 
@@ -173,10 +173,10 @@ public class Leaf extends AbstractNode {
 
         nkeys = src.nkeys;
 
-        // nkeys == nvalues for a Leaf.
-        keys = new int[branchingFactor+1];
-
-        values = (Object[])new Object[branchingFactor+1];
+//        // nkeys == nvalues for a Leaf.
+//        keys = allocKeys(btree.keyType,branchingFactor+1);
+//
+//        values = (Object[])new Object[branchingFactor+1];
 
         /*
          * Note: Unless and until we have a means to recover leafs from a cache,

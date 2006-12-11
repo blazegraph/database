@@ -54,6 +54,9 @@ import java.nio.ByteBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo There should be a way to leverage the fact that one or more attributes
+ *       of the value may already be stored in the key.
  */
 public interface IValueSerializer {
 
