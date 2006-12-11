@@ -47,20 +47,20 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import org.apache.log4j.Level;
+
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Test suite for iterators.
+ * Test suite for iterators. The tests are presented from the least dependencies
+ * to the most dependencies ((traversal of the entries for a single leaf, then
+ * children of a node, then dirty child of a node, then post-order traversal,
+ * then post-order traversal of dirty nodes).
  * 
  * @see Leaf#entryIterator()
  * @see Node#childIterator(boolean)
  * @see AbstractNode#postOrderIterator(boolean)
- * 
- * @todo Develop tests from the least dependencies to the most dependencies
- *       ((traversal of the entries for a single leaf, then children of a node,
- *       then dirty child of a node, then post-order traversal, then post-order
- *       traversal of dirty nodes).
  * 
  * @todo test {@link IKeyVisitor} for each of the iterators.
  * 
@@ -241,6 +241,8 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         // verify visiting all children.
         assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
+                .childIterator(false));
+        assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(true));
 
         /*
@@ -265,6 +267,8 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify visiting all children.
         assertSameIterator(new AbstractNode[] { a, d, b }, ((Node) btree.root)
+                .childIterator(false));
+        assertSameIterator(new AbstractNode[] { a, d, b }, ((Node) btree.root)
                 .childIterator(true));
 
         /*
@@ -284,6 +288,8 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertTrue(b.isDirty());
 
         // verify visiting all children.
+        assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
+                .childIterator(false));
         assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(true));
 
@@ -472,6 +478,631 @@ public class TestIterators extends AbstractBTreeTestCase {
          * the root node will be replaced by a root leaf.
          */
 
+    }
+
+    /**
+     * Test ability to visit the nodes of the tree in a post-order traversal.
+     */
+    public void test_postOrderIterator01() {
+
+        BTree btree = getBTree(3);
+
+        final Leaf a = (Leaf) btree.root;
+        
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v9 = new SimpleEntry(9);
+
+        // empty tree visits the root leaf.
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator());
+        
+        // fill up the root leaf.
+        btree.insert(3, v3);
+        btree.insert(5, v5);
+        btree.insert(7, v7);
+
+        // split the root leaf.
+        btree.insert(9, v9);
+        final Node c = (Node) btree.root;
+        assertKeys(new int[]{7},c);
+        assertEquals(a,c.getChild(0));
+        final Leaf b = (Leaf)c.getChild(1);
+        assertKeys(new int[]{3,5},a);
+        assertValues(new Object[]{v3,v5}, a);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        
+        // verify iterator.
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator());
+
+        /*
+         * split another leaf so that there are now three children to visit. at
+         * this point the root is full.
+         */
+        btree.insert(1, v1);
+        btree.insert(2, v2);
+        assertKeys(new int[]{3,7},c);
+        assertEquals(a,c.getChild(0));
+        Leaf d = (Leaf)c.getChild(1);
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,5},d);
+        assertValues(new Object[]{v3,v5}, d);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { a, d, b, c }, btree.root
+                .postOrderIterator());
+        
+        /*
+         * cause another leaf (d) to split, forcing the split to propagate to and
+         * split the root and the tree to increase in height.
+         */
+        btree.insert(4, v4);
+        btree.insert(6, v6);
+//        btree.dump(Level.DEBUG,System.err);
+        assertNotSame(c,btree.root);
+        final Node g = (Node)btree.root;
+        assertKeys(new int[]{5},g);
+        assertEquals(c,g.getChild(0));
+        final Node f = (Node)g.getChild(1);
+        assertKeys(new int[]{3},c);
+        assertEquals(a,c.getChild(0));
+        assertEquals(d,c.getChild(1));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,4},d);
+        assertValues(new Object[]{v3,v4}, d);
+        assertKeys(new int[]{7},f);
+        Leaf e = (Leaf)f.getChild(0);
+        assertEquals(b,f.getChild(1));
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator());
+
+        /*
+         * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
+         * be deleted. this causes (c,f) to merge as well, which in turn forces
+         * the root to be replaced by (c).
+         */
+        assertEquals(v4,btree.remove(4));
+//        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5,7},c);
+        assertEquals(d,c.getChild(0));
+        assertEquals(e,c.getChild(1));
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        assertTrue(a.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, e, b, c }, btree.root
+                .postOrderIterator());
+
+        /*
+         * remove a key (7) from a leaf (b) forcing two leaves to join and
+         * verify the visitation order.
+         */
+        assertEquals(v7,btree.remove(7));
+        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5},c);
+        assertEquals(d,c.getChild(0));
+        assertEquals(b,c.getChild(1));
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6,9},b);
+        assertValues(new Object[]{v5,v6,v9}, b);
+        assertTrue(e.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator());
+
+        /*
+         * remove keys from a leaf forcing the remaining two leaves to join and
+         * verify the visitation order.
+         */
+        assertEquals(v3,btree.remove(3));
+        assertEquals(v5,btree.remove(5));
+        assertEquals(v6,btree.remove(6));
+        assertKeys(new int[]{1,2,9},b);
+        assertValues(new Object[]{v1,v2,v9}, b);
+        assertTrue(d.isDeleted());
+        assertTrue(c.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator());
+
+    }
+
+    /**
+     * Test ability to visit the dirty nodes of the tree in a post-order
+     * traversal. This version of the test verifies that the dirty post-order
+     * iterator will visit the same nodes as the normal post-order iterator
+     * since all nodes are dirty.
+     */
+    public void test_dirtyPostOrderIterator01() {
+
+        BTree btree = getBTree(3);
+
+        final Leaf a = (Leaf) btree.root;
+        
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v9 = new SimpleEntry(9);
+
+        // empty tree visits the root leaf.
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(true));
+        
+        // fill up the root leaf.
+        btree.insert(3, v3);
+        btree.insert(5, v5);
+        btree.insert(7, v7);
+
+        // split the root leaf.
+        btree.insert(9, v9);
+        final Node c = (Node) btree.root;
+        assertKeys(new int[]{7},c);
+        assertEquals(a,c.getChild(0));
+        final Leaf b = (Leaf)c.getChild(1);
+        assertKeys(new int[]{3,5},a);
+        assertValues(new Object[]{v3,v5}, a);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        
+        // verify iterator.
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * split another leaf so that there are now three children to visit. at
+         * this point the root is full.
+         */
+        btree.insert(1, v1);
+        btree.insert(2, v2);
+        assertKeys(new int[]{3,7},c);
+        assertEquals(a,c.getChild(0));
+        Leaf d = (Leaf)c.getChild(1);
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,5},d);
+        assertValues(new Object[]{v3,v5}, d);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { a, d, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, d, b, c }, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * cause another leaf (d) to split, forcing the split to propagate to and
+         * split the root and the tree to increase in height.
+         */
+        btree.insert(4, v4);
+        btree.insert(6, v6);
+//        btree.dump(Level.DEBUG,System.err);
+        assertNotSame(c,btree.root);
+        final Node g = (Node)btree.root;
+        assertKeys(new int[]{5},g);
+        assertEquals(c,g.getChild(0));
+        final Node f = (Node)g.getChild(1);
+        assertKeys(new int[]{3},c);
+        assertEquals(a,c.getChild(0));
+        assertEquals(d,c.getChild(1));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,4},d);
+        assertValues(new Object[]{v3,v4}, d);
+        assertKeys(new int[]{7},f);
+        Leaf e = (Leaf)f.getChild(0);
+        assertEquals(b,f.getChild(1));
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
+         * be deleted. this causes (c,f) to merge as well, which in turn forces
+         * the root to be replaced by (c).
+         */
+        assertEquals(v4,btree.remove(4));
+//        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5,7},c);
+        assertEquals(d,c.getChild(0));
+        assertEquals(e,c.getChild(1));
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        assertTrue(a.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, e, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { d, e, b, c }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove a key (7) from a leaf (b) forcing two leaves to join and
+         * verify the visitation order.
+         */
+        assertEquals(v7,btree.remove(7));
+        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5},c);
+        assertEquals(d,c.getChild(0));
+        assertEquals(b,c.getChild(1));
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6,9},b);
+        assertValues(new Object[]{v5,v6,v9}, b);
+        assertTrue(e.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove keys from a leaf forcing the remaining two leaves to join and
+         * verify the visitation order.
+         */
+        assertEquals(v3,btree.remove(3));
+        assertEquals(v5,btree.remove(5));
+        assertEquals(v6,btree.remove(6));
+        assertKeys(new int[]{1,2,9},b);
+        assertValues(new Object[]{v1,v2,v9}, b);
+        assertTrue(d.isDeleted());
+        assertTrue(c.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator(true));
+
+    }
+
+    /**
+     * Test ability to visit the dirty nodes of the tree in a post-order
+     * traversal. This version of the test writes out some nodes and/or leaves
+     * in order to verify that the post-order iterator will visit only those
+     * nodes and leaves that are currently dirty. Note that writing out a node
+     * or leaf makes it immutable. In order to make the node or leaf dirty again
+     * we have to modify it, which triggers copy-on-write. Copy on write
+     * propagates up from the leaf where we make the mutation and causes any
+     * immutable parents to be cloned as well. Nodes and leaves that have been
+     * cloned by copy-on-write are distinct objects from their immutable
+     * predecessors.
+     */
+    public void test_dirtyPostOrderIterator02() {
+
+        BTree btree = getBTree(3);
+
+        Leaf a = (Leaf) btree.root;
+        
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v9 = new SimpleEntry(9);
+
+        // empty tree visits the root leaf.
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(true));
+        /*
+         * write out the root leaf on the store and verify that the dirty
+         * iterator does not visit anything while the normal iterator visits the
+         * root.
+         */
+        btree.writeNodeRecursive(btree.root);
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] {}, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * Fill up the root leaf. Since it was immutable, this will trigger
+         * copy-on-write.  We verify that the root leaf reference is changed
+         * and verify that both iterators now visit the root.
+         */
+        assertEquals(a,btree.root);
+        btree.insert(3, v3);
+        assertNotSame(a,btree.root);
+        a = (Leaf)btree.root; // new reference for the root leaf.
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+                .postOrderIterator(true));
+        btree.insert(5, v5);
+        btree.insert(7, v7);
+
+        // split the root leaf.
+        btree.insert(9, v9);
+        Node c = (Node) btree.root;
+        assertKeys(new int[]{7},c);
+        assertEquals(a,c.getChild(0));
+        Leaf b = (Leaf)c.getChild(1);
+        assertKeys(new int[]{3,5},a);
+        assertValues(new Object[]{v3,v5}, a);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        
+        // verify iterator.
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * write out (a) and verify the iterator behaviors.
+         */
+        btree.writeNodeOrLeaf(a);
+        assertTrue(a.isPersistent());
+        assertFalse(b.isPersistent());
+        assertFalse(c.isPersistent());
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { b, c }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * write out (c) and verify the iterator behaviors.
+         */
+        btree.writeNodeRecursive(c);
+        assertTrue(a.isPersistent());
+        assertTrue(b.isPersistent());
+        assertTrue(c.isPersistent());
+        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * split another leaf (a) so that there are now three children to visit.
+         * at this point the root is full.
+         */
+        assertTrue(a.isPersistent());
+        assertTrue(b.isPersistent());
+        assertTrue(c.isPersistent());
+        btree.insert(1, v1); // triggers copy on write for (a) and (c).
+        assertNotSame(c,btree.root);
+        c = (Node)btree.root;
+        assertNotSame(a,c.getChild(0));
+        a = (Leaf)c.getChild(0);
+        assertEquals(b,c.getChild(1)); // b was not copied.
+        assertFalse(a.isPersistent());
+        assertTrue(b.isPersistent());
+        assertFalse(c.isPersistent());
+        btree.insert(2, v2);
+        assertKeys(new int[]{3,7},c);
+        assertEquals(a,c.getChild(0));
+        Leaf d = (Leaf)c.getChild(1);
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,5},d);
+        assertValues(new Object[]{v3,v5}, d);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertFalse(a.isPersistent());
+        assertTrue(b.isPersistent());
+        assertFalse(c.isPersistent());
+        assertSameIterator(new AbstractNode[] { a, d, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, d, c }, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * cause another leaf (d) to split, forcing the split to propagate to and
+         * split the root and the tree to increase in height.
+         */
+        btree.insert(4, v4);
+        btree.insert(6, v6);
+//        btree.dump(Level.DEBUG,System.err);
+        assertNotSame(c,btree.root);
+        final Node g = (Node)btree.root;
+        assertKeys(new int[]{5},g);
+        assertEquals(c,g.getChild(0));
+        final Node f = (Node)g.getChild(1);
+        assertKeys(new int[]{3},c);
+        assertEquals(a,c.getChild(0));
+        assertEquals(d,c.getChild(1));
+        assertKeys(new int[]{1,2},a);
+        assertValues(new Object[]{v1,v2}, a);
+        assertKeys(new int[]{3,4},d);
+        assertValues(new Object[]{v3,v4}, d);
+        assertKeys(new int[]{7},f);
+        Leaf e = (Leaf)f.getChild(0);
+        assertEquals(b,f.getChild(1));
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { a, d, c, e, f, g }, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * write out a subtree and revalidate the iterators.
+         */
+        btree.writeNodeRecursive(c);
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { e, f, g }, btree.root
+                .postOrderIterator(true));
+        
+        /*
+         * write out a leaf and revalidate the iterators.
+         */
+        btree.writeNodeRecursive(e);
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { f, g }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * write out the entire tree and revalidate the iterators.
+         */
+        btree.writeNodeRecursive(g);
+        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] {}, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
+         * be deleted. this causes (c,f) to merge as well, which in turn forces
+         * the root to be replaced by (c).
+         * 
+         * the following are cloned: d, c, g.
+         */
+        assertEquals(v4,btree.remove(4));
+        assertNotSame(g,btree.root);
+        assertNotSame(c,btree.root);
+        c = (Node) btree.root;
+        assertNotSame(d,c.getChild(0));
+        d = (Leaf) c.getChild(0);
+//        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5,7},c);
+        assertEquals(d,c.getChild(0));
+        assertEquals(e,c.getChild(1));
+        assertEquals(b,c.getChild(2));
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6},e);
+        assertValues(new Object[]{v5,v6}, e);
+        assertKeys(new int[]{7,9},b);
+        assertValues(new Object[]{v7,v9}, b);
+        assertTrue(a.isDeleted());
+        assertTrue(f.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, e, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { d, c }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove a key (7) from a leaf (b) forcing two leaves (b,e) into (b) to
+         * join and verify the visitation order.
+         */
+        assertEquals(v7,btree.remove(7));
+        btree.dump(Level.DEBUG,System.err);
+        assertKeys(new int[]{5},c);
+        assertEquals(d,c.getChild(0));
+        assertNotSame(b,c.getChild(1));
+        b = (Leaf) c.getChild(1);
+        assertKeys(new int[]{1,2,3},d);
+        assertValues(new Object[]{v1,v2,v3}, d);
+        assertKeys(new int[]{5,6,9},b);
+        assertValues(new Object[]{v5,v6,v9}, b);
+        assertTrue(e.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator(true));
+        /*
+         * write out the root and verify the visitation orders.
+         */
+        btree.writeNodeRecursive(c);
+        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] {}, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * remove keys from a leaf (b) forcing the remaining two leaves (b,d) to
+         * join into (b). Since there is only one leaf, that leaf now becomes
+         * the new root leaf of the tree.
+         */
+        assertEquals(c,btree.root);
+        assertEquals(d,c.getChild(0));
+        assertEquals(b,c.getChild(1));
+        assertEquals(v3, btree.remove(3)); // remove from (d)
+        assertNotSame(c,btree.root); // c was cloned.
+        c = (Node) btree.root;
+        assertNotSame(d,c.getChild(0));
+        d = (Leaf)c.getChild(0); // d was cloned.
+        assertEquals(b,c.getChild(1));
+        assertEquals(v5,btree.remove(5)); // remove from (b)
+        assertNotSame(b,c.getChild(1));
+        b = (Leaf)c.getChild(1); // b was cloned.
+        assertEquals(v6,btree.remove(6)); // remove from (b)
+        assertKeys(new int[]{1,2,9},b);
+        assertValues(new Object[]{v1,v2,v9}, b);
+        assertTrue(d.isDeleted());
+        assertTrue(c.isDeleted());
+
+        // verify iterator
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator(true));
+
+        /*
+         * write out the root and reverify the iterators.
+         */
+        btree.writeNodeRecursive(b);
+        assertSameIterator(new AbstractNode[] { b }, btree.root
+                .postOrderIterator(false));
+        assertSameIterator(new AbstractNode[] {}, btree.root
+                .postOrderIterator(true));
+        
     }
 
 //  assertSameIterator(new Integer[]{},new KeyIterator(root.entryIterator));
