@@ -529,10 +529,8 @@ public class Journal implements IRawStore, IStore {
     
     /**
      * The object index.
-     * 
-     * @todo Change to use the {@link IObjectIndex} interface.
      */
-    final SimpleObjectIndex objectIndex;
+    final IObjectIndex objectIndex;
     
     /**
      * The slot allocation index.

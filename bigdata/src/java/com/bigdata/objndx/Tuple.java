@@ -42,86 +42,21 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Dec 12, 2006
  */
+
 package com.bigdata.objndx;
 
-import java.util.NoSuchElementException;
-
 /**
- * Visits the direct children of a {@link Node} in the external key ordering.
+ * A key-value pair used to facilitate some iterator constructs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class ChildIterator implements KeyValueIterator {
+class Tuple {
 
-    private final Node node;
-
-    private int index = 0;
-
-    private int lastVisited = -1;
-
-    public ChildIterator(Node node) {
-
-        assert node != null;
-
-        this.node = node;
-
-    }
-
-    public boolean hasNext() {
-
-        // Note: nchildren == nkeys+1 for a Node.
-        return index <= node.nkeys;
-
-    }
-
-    public AbstractNode next() {
-
-        if (!hasNext()) {
-
-            throw new NoSuchElementException();
-
-        }
-
-        lastVisited = index++;
-        
-        return node.getChild(lastVisited);
-        
-    }
-
-    public Object getValue() {
+    public Object key;
     
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        return node.getChild(lastVisited);
-
-    }
-
-    public Object getKey() {
-
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        return node.getKey(lastVisited);
-        
-    }
+    public Object val;
     
-    /**
-     * @exception UnsupportedOperationException
-     */
-    public void remove() {
-
-        throw new UnsupportedOperationException();
-
-    }
-
 }

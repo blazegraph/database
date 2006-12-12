@@ -107,6 +107,11 @@ import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
  * from a fully connected matrix in the appropriate space.
  * <p>
  * 
+ * @todo compute the MB/sec rate at which this test runs and compare it with the
+ *       maximum transfer rate for the journal without the btree and the maximum
+ *       transfer rate to disk. this will tell us the overhead of the btree
+ *       implementation.
+ * 
  * @todo Try a variant in which we have metadata linking statements and terms
  *       together. In this case we would have to go back to the terms and update
  *       them to have metadata about the statement. it is a bit circular since

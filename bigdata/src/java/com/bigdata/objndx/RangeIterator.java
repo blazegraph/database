@@ -105,9 +105,12 @@ public class RangeIterator implements IRangeIterator {
         
     }
     
-    /**
-     * Return the key for the current value.
-     */
+    public Object getValue() {
+
+        throw new UnsupportedOperationException();
+
+    }
+
     public Object getKey() {
 
         throw new UnsupportedOperationException();

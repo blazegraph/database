@@ -42,29 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Dec 11, 2006
+ * Created on Dec 12, 2006
  */
 
 package com.bigdata.objndx;
 
-import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
- * Interface exposes the key associated with the object most recently visited an
- * {@link Iterator}.
+ * Empty iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyVisitor<T> extends Iterator<T> {
+public class EmptyKeyValueIterator implements KeyValueIterator {
+    
+    public static final KeyValueIterator INSTANCE = new EmptyKeyValueIterator();
+    
+    private EmptyKeyValueIterator() {}
 
-    /**
-     * The value of the key for the last entry visited by
-     * {@link Iterator#next()}.
-     * 
-     * @exception IllegalStateException
-     *                if no entries have been visited.
-     */
-    public Object getKey();
+    public boolean hasNext() {
+        return false;
+    }
+
+    public Object next() {
+        throw new NoSuchElementException();
+    }
+
+    public void remove() {
+        throw new UnsupportedOperationException();
+    }
+    
+    public Object getKey() {
+        throw new IllegalStateException();
+    }
+
+    public Object getValue() {
+        throw new IllegalStateException();
+    }
     
 }

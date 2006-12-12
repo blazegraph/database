@@ -54,7 +54,7 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-enum ArrayType {
+public enum ArrayType {
         
     BYTE(1), CHAR(2), SHORT(3), INT(4), LONG(5), FLOAT(6), DOUBLE(7),
     

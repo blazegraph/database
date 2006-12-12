@@ -46,7 +46,6 @@ Modifications:
  */
 package com.bigdata.objndx;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
@@ -56,17 +55,29 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class EntryIterator implements Iterator, IKeyVisitor {
+class EntryIterator implements KeyValueIterator {
 
     private final Leaf leaf;
 
+    private final Tuple tuple;
+    
     private int index = 0;
 
+    private int lastVisited = -1;
+    
     public EntryIterator(Leaf leaf) {
+
+        this( leaf, null );
+        
+    }
+
+    public EntryIterator(Leaf leaf, Tuple tuple ) {
 
         assert leaf != null;
 
         this.leaf = leaf;
+        
+        this.tuple = tuple; // MAY be null.
 
     }
 
@@ -84,19 +95,47 @@ class EntryIterator implements Iterator, IKeyVisitor {
 
         }
 
-        return leaf.values[index++];
+        lastVisited = index++;
+        
+        if( tuple != null ) {
+
+            /*
+             * eagerly set the key/value on the tuple for a side-effect style
+             * return.
+             */
+            tuple.key = leaf.getKey(lastVisited);
+            
+            tuple.val = leaf.values[lastVisited];            
+            
+            return tuple.val;
+            
+        }
+        
+        return leaf.values[lastVisited];
         
     }
 
-    public Object getKey() {
+    public Object getValue() {
         
-        if( index == 0 ) {
+        if( lastVisited == -1 ) {
             
             throw new IllegalStateException();
             
         }
         
-        return leaf.getKey(index-1);
+        return leaf.values[lastVisited];
+        
+    }
+    
+    public Object getKey() {
+        
+        if( lastVisited == -1 ) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return leaf.getKey(lastVisited);
         
     }
     

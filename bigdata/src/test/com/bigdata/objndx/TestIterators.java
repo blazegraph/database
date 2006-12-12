@@ -63,11 +63,19 @@ import org.apache.log4j.Level;
  *      NOT dirty and verifies that the iterators do NOT visit such nodes or
  *      leaves.
  * 
- * @todo test {@link IKeyVisitor} for each of the iterators.
+ * FIXME test {@link KeyValueIterator} for each of the iterators, including the
+ *       {@link AbstractNode#entryIterator()} which is not being tested in this
+ *       suite right now. There are some hoops used to get the
+ *       {@link KeyValueIterator} to work correct that definately need testing.
+ *       It would also be nice to be able to define a keyIterator(), but that
+ *       probably means changing entryIterator() to visit a {@link Tuple}.
  * 
  * @todo Define key range iterator visiting values with keys available for
  *       inspection. This will be used for key range scans. Ideally this will
  *       eventually allow concurrent modification of the btree during traversal.
+ * 
+ * @todo write a test suite for concurrent modification under traversal and
+ *       implement support for that feature in the various iterators.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

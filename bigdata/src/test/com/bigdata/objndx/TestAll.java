@@ -32,7 +32,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Object Index");
+        TestSuite suite = new TestSuite("BTree");
 
         // test key search routines (linear and binary and various key types).
         suite.addTest( TestSearch.suite() );

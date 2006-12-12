@@ -47,7 +47,6 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.lang.ref.WeakReference;
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
@@ -58,8 +57,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class DirtyChildIterator implements Iterator<AbstractNode>,
-        IKeyVisitor<AbstractNode> {
+class DirtyChildIterator implements KeyValueIterator {
 
     private final Node node;
     
@@ -67,6 +65,12 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
      * The index of the next child to return.
      */
     private int index = 0;
+    
+    /**
+     * The index of the last child that was returned to the caller via
+     * {@link #next()}.
+     */
+    private int lastVisited = -1;
 
     /**
      * The next child to return or null if we need to scan for the next child.
@@ -165,7 +169,7 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
         AbstractNode tmp = child;
 
         // advance the index where the scan will start next() time.
-        index++;
+        lastVisited = index++;
 
         // clear the reference to force another scan.
         child = null;
@@ -174,11 +178,28 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
 
     }
 
-    // FIXME either implement getKey() or do not implement that interface.
+    public Object getValue() {
+        
+        if( lastVisited == -1 ) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return node.getChild(lastVisited);
+
+    }
+
     public Object getKey() {
 
-        throw new UnsupportedOperationException();
-
+        if( lastVisited == -1 ) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return node.getKey(lastVisited);
+        
     }
 
     /**

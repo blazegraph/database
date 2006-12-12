@@ -753,8 +753,9 @@ abstract public class AbstractTestCase
      *                differs from the expected version counter.
      */
     protected void assertVersionCounter(Journal journal, int id, long expectedVersionCounter ) {
-        
-        IObjectIndexEntry entry = journal.objectIndex.objectIndex.get(id);
+
+        // FIXME hardwired to SimpleObjectIndex.
+        IObjectIndexEntry entry = ((SimpleObjectIndex)journal.objectIndex).objectIndex.get(id);
         
         if( entry == null ) fail("No entry in journal: id="+id);
         

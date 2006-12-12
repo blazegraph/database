@@ -56,8 +56,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 
-import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -522,39 +522,129 @@ public abstract class AbstractNode extends PO {
     /**
      * Traversal of index values in key order.
      */
-    public Iterator entryIterator() {
+    public KeyValueIterator entryIterator() {
 
-        /*
-         * Begin with a post-order iterator.
-         */
-        return new Striterator(postOrderIterator()).addFilter(new Expander() {
+//        /*
+//         * Begin with a post-order iterator.
+//         */
+//        return new Striterator(postOrderIterator()).addFilter(new Expander() {
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            /*
+//             * Expand the value objects for each leaf visited in the post-order
+//             * traversal.
+//             */
+//            protected Iterator expand(Object childObj) {
+//                /*
+//                 * A child of this node.
+//                 */
+//                AbstractNode child = (AbstractNode) childObj;
+//
+//                if (child instanceof Leaf) {
+//
+//                    return ((Leaf) child).entryIterator();
+//
+//                } else {
+//
+//                    return EmptyKeyValueIterator.INSTANCE;
+//
+//                }
+//            }
+//        });
 
-            private static final long serialVersionUID = 1L;
-
-            /*
-             * Expand the value objects for each leaf visited in the post-order
-             * traversal.
-             */
-            protected Iterator expand(Object childObj) {
-                /*
-                 * A child of this node.
-                 */
-                AbstractNode child = (AbstractNode) childObj;
-
-                if (child instanceof Leaf) {
-
-                    return ((Leaf) child).entryIterator();
-
-                } else {
-
-                    return EmptyIterator.DEFAULT;
-
-                }
-            }
-        });
-
+        return new PostOrderEntryIterator(postOrderIterator());
+        
     }
 
+    /**
+     * Helper class expands a post-order node and leaf traversal to visits
+     * the entries in the leaves.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class PostOrderEntryIterator extends Striterator implements KeyValueIterator {
+        
+        /**
+         * The key-value for each entry are set as a side-effect on a private
+         * {@link Tuple} field so that this class can implement
+         * {@link KeyValueIterator}.
+         * 
+         * @see EntryIterator#EntryIterator(Leaf, Tuple)
+         */
+        final Tuple tuple = new Tuple();
+        
+        public PostOrderEntryIterator(Iterator postOrderIterator) {
+            
+            super(postOrderIterator);
+            
+            addFilter(new Expander() {
+
+                private static final long serialVersionUID = 1L;
+
+                /*
+                 * Expand the value objects for each leaf visited in the
+                 * post-order traversal.
+                 */
+                protected Iterator expand(Object childObj) {
+                    /*
+                     * A child of this node.
+                     */
+                    AbstractNode child = (AbstractNode) childObj;
+
+                    if (child instanceof Leaf) {
+
+                        Leaf leaf = (Leaf) child;
+                        
+                        if (leaf.nkeys == 0) {
+
+                            return EmptyKeyValueIterator.INSTANCE;
+
+                        }
+
+                        return new EntryIterator(leaf,tuple);
+
+//                        return ((Leaf)child).entryIterator();
+
+                    } else {
+
+                        return EmptyKeyValueIterator.INSTANCE;
+
+                    }
+                }
+
+            });
+        
+        }
+
+        public Object getKey() {
+            return tuple.key;
+        }
+
+        public Object getValue() {
+            return tuple.val;
+        }
+        
+    }
+    
+//    /**
+//     * Traversal of index keys in key order.
+//     */
+//    public Iterator keyIterator() {
+//        
+//        return new Striterator(entryIterator()).addFilter(new Resolver() {
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            protected Object resolve(Object arg0) {
+//                return null;
+//            }
+//            
+//        });
+//        
+//    }
+    
     /**
      * <p>
      * Invariants:

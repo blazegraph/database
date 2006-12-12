@@ -912,11 +912,11 @@ public class Leaf extends AbstractNode {
      *       or we will scan all nodes and not just those covering the key
      *       range.
      */
-    public Iterator entryIterator() {
+    public KeyValueIterator entryIterator() {
 
         if (nkeys == 0) {
 
-            return EmptyIterator.DEFAULT;
+            return EmptyKeyValueIterator.INSTANCE;
 
         }
 

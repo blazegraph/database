@@ -91,13 +91,6 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
- * FIXME do incremental evictions of nodes as well as leaves and verify that the
- * heap does not grow unruly for extended inserts.
- * 
- * @todo Profile the heap and the code and determine if we are spending too much
- *       time autoboxing when using a primitive key type, notably int[] or
- *       long[].
- * 
  * @todo Implement an "extser" index that does not use extser itself, but which
  *       could provide the basis for a database that does use extser. The index
  *       needs to map class names to entries. Those entries are a classId and
@@ -120,17 +113,18 @@ import com.bigdata.journal.SlotMath;
  *       resident or in the direct buffer for the journal
  * 
  * @todo should this btree should intrinsically support isolation of inline
- *       objects by carrying the necessary metadata for each index entry. note
- *       that the original isolation scheme effectively carried references to
- *       the objects on the journal (slot allocations) rather than having them
- *       inline. we probably do not need to know where the historical versions
- *       is since we only need to release it on the journal if we are trying to
- *       keep a single file and reuse deallocated space. if we just discard
- *       entire journal extents once their data has been migrated into perfect
- *       segments then we never need to do that deallocation. this leaves us
- *       with a version counter (similar to a timestamp, and perhaps replaceable
- *       by a timestamp) and the object itself. if we make the timestamp part of
- *       the key, then all that we are left with is the object itself.
+ *       objects by carrying the necessary metadata for each index entry? maybe
+ *       what we need is an "isolation" constructor? note that the original
+ *       isolation scheme effectively carried references to the objects on the
+ *       journal (slot allocations) rather than having them inline. we probably
+ *       do not need to know where the historical versions is since we only need
+ *       to release it on the journal if we are trying to keep a single file and
+ *       reuse deallocated space. if we just discard entire journal extents once
+ *       their data has been migrated into perfect segments then we never need
+ *       to do that deallocation. this leaves us with a version counter (similar
+ *       to a timestamp, and perhaps replaceable by a timestamp) and the object
+ *       itself. if we make the timestamp part of the key, then all that we are
+ *       left with is the object itself.
  * 
  * @todo consider using extser an option for serialization so that we can
  *       continually evolve the node and leaf formats. we will also need a node
@@ -156,7 +150,8 @@ import com.bigdata.journal.SlotMath;
  *       managed by the host rather than showing up in the metadata index
  *       directly.
  * 
- * @todo drop the jdbm-based btree implementation in favor of this one.
+ * @todo drop the jdbm-based btree implementation in favor of this one (once we
+ *       have extser support in place).
  * 
  * @todo support column store style indices (key, column, timestamp), locality
  *       groups that partition the key space so that we can fully buffer parts
@@ -169,6 +164,12 @@ import com.bigdata.journal.SlotMath;
  *       When prior-next references are available, an iterator should be easily
  *       able to adjust for insertion and removal of keys.
  * 
+ * @todo maintain prior-next references among leaves (and nodes?) in memory even
+ *       if we are not able to write them onto the disk. when reading in a leaf,
+ *       always set the prior/next reference iff the corresponding leaf is in
+ *       memory - this is easily handled by checking the weak references on the
+ *       parent node.
+ * 
  * @todo support efficient insert of sorted data (batch or bulk insert).
  * 
  * @todo support efficient conditional inserts, e.g., if this key does not exist
@@ -177,24 +178,29 @@ import com.bigdata.journal.SlotMath;
  * @todo support key compression (prefix and suffix compression and split
  *       interval trickery).
  * 
- * @todo split cache for nodes and leaves.
- * 
  * @todo evict subranges by touching the node on the way up so that a node that
  *       is evicted from the hard reference cache will span a subrange that can
  *       be evicted together. this will help to preserve locality on disk. with
- *       this approach leaves might be evicted indepdently, but also as part of
- *       a node subrange eviction.
- * 
- * @todo maintain prior-next references among leaves (and nodes?) in memory even
- *       if we are not able to write them onto the disk. when reading in a leaf,
- *       always set the prior/next reference iff the corresponding leaf is in
- *       memory - this is easily handled by checking the weak references on the
- *       parent node.
+ *       this approach leaves might be evicted independently, but also as part
+ *       of a node subrange eviction.
  * 
  * @todo since forward scans are much more common, change the post-order
  *       iterator for commit processing to use a reverse traversal so that we
  *       can write the next leaf field whenever we evict a sequence of leaves as
- *       part of a sub-range commit.
+ *       part of a sub-range commit (probably not much of an issue since the
+ *       journal is normally fully buffered and the perfect index segments will
+ *       not have this problem).
+ * 
+ * @todo Actually, I could save both prior and next references using a
+ *       hand-over-hand chaining in which I pre-serialize the leaf and separate
+ *       the allocation step from the write on the store. With just a small
+ *       change to the leaf serialization format so that I can write in the
+ *       prior and next fields at a known location (which could even be the end
+ *       of the buffer), I would then be able to persistent the prior/next
+ *       references. <br>
+ *       The first step is to start maintaining those references. Also, consider
+ *       that it may be useful to maintain them at the node as well as the leaf
+ *       level.
  * 
  * @todo pre-fetch leaves for range scans? this really does require asynchronous
  *       IO, which is not available for many platforms (it is starting to show
@@ -594,15 +600,22 @@ public class BTree implements IBTree {
      *       restrictions are best imposed, by subclassing or application
      *       constraints, or be a more declarative interface.
      */
-//    static protected final int NEGINF = 0;
      protected final Object NEGINF;
 
      /**
-     * The root of the btree. This is initially a leaf until the leaf is
-     * split, at which point it is replaced by a node. The root is also
-     * replaced each time copy-on-write triggers a cascade of updates.
-     */
-    AbstractNode root;
+      * The metadataId that can be used to load the last state of the index
+      * that was written by {@link #commit()}.  When an index is loaded this
+      * is set to the metadataId specified to the constructor.  When a new
+      * index is created, this is initially 0L.
+      */
+     protected long metadataId = 0L;
+
+     /**
+      * The root of the btree. This is initially a leaf until the leaf is
+      * split, at which point it is replaced by a node. The root is also
+      * replaced each time copy-on-write triggers a cascade of updates.
+      */
+     AbstractNode root;
 
     /**
      * The height of the btree. The height is the #of leaves minus one. A
@@ -802,6 +815,8 @@ public class BTree implements IBTree {
         this.comparator = comparator;
         
         this.NEGINF = NEGINF;
+        
+        this.metadataId = metadataId;
         
         /*
          * read the btree metadata record. this tells us the branchingFactor and
@@ -1221,7 +1236,9 @@ public class BTree implements IBTree {
         
         buf.flip(); // prepare for writing.
 
-        return store.write(buf).toLong();
+        metadataId = store.write(buf).toLong();
+        
+        return metadataId;
 
     }
 
@@ -1348,13 +1365,41 @@ public class BTree implements IBTree {
     }
     
     /**
-     * FIXME We need an iterator that visits only the nodes since we do not need
-     * to fetch the leaves in order to delete them. The order does not matter if
-     * we delete all at once. However, this might introduce latency when the
-     * object index for a historical transaction is reclaimed.
+     * @todo Define the semantics for deleting the btree. If the delete occurs
+     *       during a transaction the isolation means that we have to delete all
+     *       of the keys, causing "delete" entries to spring into existance for
+     *       each key in the tree. When the transaction commits, those delete
+     *       markers will have to validate against the global state of the tree.
+     *       If the transaction validates, then the merge down onto the global
+     *       state will cause the corresponding entries to be removed from the
+     *       global tree.
+     * 
+     * Note that if there are persistent nodes in the tree, then copy-on-write
+     * is triggered during traversal. In order for us to write an iterator-based
+     * delete of the existing keys (causing them to become "delete" markers) we
+     * need the iterator to handle concurrent modification, at least to the
+     * extent that it can follow the change from the persistent reference for a
+     * node to the new mutable reference for that node.
+     * 
+     * Note that there is probably processing order that is more efficient for
+     * delete, e.g., left-to-right vs right-to-left.
+     * 
+     * @todo There should also be an unisolated DROP INDEX that simply removes
+     *       the index and its resources, including secondary index segment
+     *       files, in the metadata index, and in the various journals that were
+     *       absorbing writes for that index. That operation would require a
+     *       lock on the index, which could be achieved by taking the index
+     *       offline in the metadata index and invalidating all of the clients.
+     *       A similar "ADD INDEX" method would create a distributed index and
+     *       make it available to clients.
+     * 
+     * @todo GOM uses per-object indices. Once they span a single journal they
+     *       will have to be registered with the metadata index. However it
+     *       would be nice to avoid that overhead when the index is small and
+     *       can be kept "near" the generic object owing the index.
      */
     public void delete() {
-        
+
         throw new UnsupportedOperationException();
         
     }

@@ -86,7 +86,11 @@ import com.bigdata.journal.IRawStore;
  * appears to be less efficient on first glance.
  * 
  * FIXME Implement the post-order builder. Support each of the use cases,
- * including external sorting.
+ * including external sorting. Write a package to support lookups on the
+ * generated perfect indices, including buffering the nodes in memory and
+ * optionally buffering the leaves as well. To what extent can we reuse the
+ * btree package for these read-only indices and just swap out the
+ * {@link IRawStore} implementation?
  */
 public class PostOrderBuilder {
 

@@ -47,8 +47,6 @@
 
 package com.bigdata.objndx;
 
-import java.util.Iterator;
-
 /**
  * An iterator that visits key-value pairs in a half-open range defined by a
  * fromKey (inclusive) and a toKey (exclusive).
@@ -56,6 +54,6 @@ import java.util.Iterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRangeIterator extends Iterator, IKeyVisitor {
+public interface IRangeIterator extends KeyValueIterator {
 
 }

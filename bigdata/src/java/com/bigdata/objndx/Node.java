@@ -70,32 +70,6 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class Node extends AbstractNode {
 
-//    /**
-//     * <p>
-//     * Hard reference cache containing dirty child nodes (nodes or leaves).
-//     * </p>
-//     * <p>
-//     * This cache is pre-sized to its maximum capacity, which is
-//     * <code>branchingFactor+1</code>. While there are at most
-//     * <code>branchingFactor</code> children for a node, the cache is sized
-//     * one larger to allow for the child reference corresponding to the key that
-//     * causes overflow and forces the split may be inserted.
-//     * </p>
-//     * 
-//     * @todo this could be lazily created on mutation. i have not demonstrated
-//     *       that pre-sizing this cache is of benefit.
-//     * 
-//     * @todo rather than using a hash set this could be implemented as a linked
-//     *       list of the dirty children. that would reduce allocation futher and
-//     *       there is really no need to test set membership - this is just about
-//     *       holding a hard reference so that a weak reference to a dirty child
-//     *       is never cleared.
-//     * 
-//     * FIXME this is probably fully redundent with the hard reference queue and
-//     * could perhaps be dropped entirely.
-//     */
-//    transient protected Set<AbstractNode> dirtyChildren;
-
     /**
      * <p>
      * Weak references to child nodes (may be nodes or leaves). The capacity of

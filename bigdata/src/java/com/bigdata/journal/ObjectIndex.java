@@ -47,28 +47,76 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeMap;
+
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.objndx.ArrayType;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.DefaultEvictionListener;
+import com.bigdata.objndx.IndexEntrySerializer;
+import com.bigdata.objndx.Int32OIdKeySerializer;
+import com.bigdata.objndx.KeyValueIterator;
+import com.bigdata.objndx.PO;
 
 /**
- * This is a prototype implementation in order to proof out the concept for
- * transactional isolation. This implementation NOT persistence capable.
+ * A persistent object index supporting full transactional isolation.
  * 
- * FIXME Integrate the new persistence capable B+-Tree support to provide a
- * persistence capable object index. The btree support provides copy-on-write,
- * which means that we do not need to close the base object index when starting
- * a new transaction. Other changes that need to be explored are (a) making the
- * objects inline within the index (clustered object index) vs managing
- * allocated slots on the {@link IRawStore}. This would result in a change to
- * the {@link IObjectIndexEntry} API. Also, the solution should be general in
- * that any kind of btree can be used with transactional isolation and multiple
- * btrees can be used at the same time with transactional isolation; and (b)
- * exploring opportunities for further efficiencies by moving some of the update
- * logic into a callback or behavior extension for the btree insert/update
- * method.
+ * FIXME This needs to implement the object index semantics.
+ * 
+ * @todo convert from int32 to int64 so that we can multiplex object index
+ *       segments on the same journal or create one index per segment on the
+ *       journal?
+ * 
+ * @todo eventually refactor {@link IObjectIndexEntry} so that it does not
+ *       require us to store objects at random locations in the journal but
+ *       rather allows us to store them inline within the leaves of the object
+ *       index. This change might break a lot of the existing tests.
+ * 
+ * @todo We could just hide the btree as a field rather than extending it. The
+ *       easy way to get the object index semantics is using a one for one
+ *       substitution of the btree for a {@link TreeMap} in
+ *       {@link SimpleObjectIndex}. We also need to write and apply a test
+ *       suite and test the journal using the persistence capable object index
+ *       and not just the {@link SimpleObjectIndex}.
+ * 
+ * @todo Review the logic that isolations mutations on the object index. For
+ *       example, a delete of an object does not remove an entry from the base
+ *       object index but rather records that the object is marked as deleted in
+ *       that entry. When the isolated object index is merged down onto the
+ *       global object index entries for objects that are marked as deleted are
+ *       then deleted on the global index. When the transaction commits, the
+ *       state change in the global index is atomically committed.
+ * 
+ * @todo Verify that we cause the storage allocated to the object index to be
+ *       released when it is not longer accessible, e.g., the transaction
+ *       commits or objects have been deleted and are no longer visible so we
+ *       now remove their entries from the object index -- this can cause leaves
+ *       and nodes in the object index to become empty, at which point they are
+ *       deleted.
+ * 
+ * @todo Consider whether a call back "IValueSetter" would make it possible to
+ *       update the value on the leaf in a more sophisticated manner. E.g.,
+ *       rather than having to lookup to see if a value exists and then insert
+ *       the value, we could pass in a lamba expression that gets evaluated in
+ *       context and is able to distinguish between a value that did not exist
+ *       and one that does exist. Ideally we could offer three options at that
+ *       point : test, set, and delete, but just test/set is fine for most
+ *       purposes since remove(key) has the same effect.
+ * 
+ * @todo The btree support provides copy-on-write, which means that we do not
+ *       need to close the base object index when starting a new transaction.
+ * 
+ * @todo Make the objects inline within the index (clustered object index) vs
+ *       managing allocated slots on the {@link IRawStore}. This would result
+ *       in a change to the {@link IObjectIndexEntry} API.
+ * 
+ * @todo Any kind of btree can be used with transactional isolation and multiple
+ *       btrees can be used at the same time with transactional isolation
+ * 
+ * @todo exploring opportunities for further efficiencies by moving some of the
+ *       update logic into a callback or behavior extension for the btree
+ *       insert/update method.
  * 
  * FIXME Write lots of tests for this interface as well as for transactional
  * isolation at the {@link Journal} and {@link Tx} API level. We will reuse
@@ -118,8 +166,60 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleObjectIndex implements IObjectIndex {
+public class ObjectIndex implements IObjectIndex {
 
+    static class MyIndex extends BTree {
+        
+        /**
+         * Create a new index.
+         * 
+         * @param store
+         */
+        public MyIndex(IRawStore store) {
+
+            super(store,
+                    ArrayType.INT,
+                    DEFAULT_BRANCHING_FACTOR,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            DEFAULT_LEAF_QUEUE_CAPACITY,
+                            DEFAULT_LEAF_QUEUE_SCAN),
+                    Integer.valueOf(0),
+                    null, // no comparator for primitive key type.
+                    Int32OIdKeySerializer.INSTANCE,
+                    new IndexEntrySerializer(store.getSlotMath()));
+
+        }
+
+        /**
+         * Load an existing index.
+         *  
+         * @param store
+         * @param metadataId
+         */
+        public MyIndex(IRawStore store, long metadataId) {
+            
+            super(store,metadataId,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            DEFAULT_LEAF_QUEUE_CAPACITY,
+                            DEFAULT_LEAF_QUEUE_SCAN),
+                    Integer.valueOf(0),
+                    null, // no comparator for primitive key type.
+                    Int32OIdKeySerializer.INSTANCE,
+                    new IndexEntrySerializer(store.getSlotMath()));
+            
+        }
+
+        /**
+         * Makes {@link BTree#metadataId} visible.
+         */
+        public long getMetadataId() {
+            
+            return metadataId;
+            
+        }
+
+    }
+    
     /**
      * Interface for an entry (aka value) in the {@link IObjectIndex}. The
      * entry stores either the slots on which the data version for the
@@ -300,23 +400,25 @@ public class SimpleObjectIndex implements IObjectIndex {
      * 
      * @see IObjectIndexEntry
      */
-    final Map<Integer,IObjectIndexEntry> objectIndex;
+    final MyIndex objectIndex;
 
     /**
      * When non-null, this is the base (or inner) object index that represents
      * the committed object index state as of the time that a transaction began.
      */
-    final SimpleObjectIndex baseObjectIndex;
+    final MyIndex baseObjectIndex;
 
     /**
      * The slot allocation index.
+     * 
+     * @todo do we really need this?
      */
     final ISlotAllocationIndex allocationIndex;
     
     /**
      * Disallowed constructor.
      */
-    private SimpleObjectIndex() {
+    private ObjectIndex() {
         throw new UnsupportedOperationException();
     }
     
@@ -324,70 +426,51 @@ public class SimpleObjectIndex implements IObjectIndex {
      * Constructor used for the base object index (outside of any transactional
      * scope).
      * 
+     * @param store
+     *            The backing store.
      * @param allocationIndex
      *            The slot allocation index.
      */
-    public SimpleObjectIndex(ISlotAllocationIndex allocationIndex) {
+    public ObjectIndex(IRawStore store, ISlotAllocationIndex allocationIndex) {
 
         if( allocationIndex == null ) throw new IllegalArgumentException();
         
-        /*
-         * Assume that the journal object index will be relatively large.
-         * 
-         * @todo We could also use a btree for the base object index. That is
-         * what it will be when we are done in any case.  In fact, the TreeMap
-         * (a red-black tree implementation) does MUCH worse during the index
-         * merge.
-         */
-        final int initialCapacity = 100000;
+        this.objectIndex = new MyIndex(store);
 
-        this.objectIndex = new HashMap<Integer, IObjectIndexEntry>(
-                initialCapacity);
-
-//        this.objectIndex = new TreeMap<Integer, IObjectIndexEntry>();
-        
         this.baseObjectIndex = null;
         
         this.allocationIndex = allocationIndex;
 
     }
 
-    /**
-     * Private constructor creates a read-only (unmodifiable) deep-copy of the
-     * supplied object index state. This is used to provide a strong guarentee
-     * that object index modifications can not propagate through to the inner
-     * layer using this API.
-     * 
-     * @param objectIndex
-     * 
-     * FIXME The requirement to deep-copy the base object index arises because
-     * the transaction needs a view that is consistent with the start time for
-     * that transaction. When using a persistence capable object index based on
-     * a btree, we will use copy-on-write semantics to prevent the view with
-     * which the tx starts from being modified either by unisolated writes or by
-     * concurrent transactions that commit.
-     */
-    private SimpleObjectIndex(ISlotAllocationIndex allocationIndex, Map<Integer,IObjectIndexEntry> objectIndex ) {
-
-        if( allocationIndex == null ) throw new IllegalArgumentException();
-
-        Map<Integer, IObjectIndexEntry> copy = new HashMap<Integer, IObjectIndexEntry>(
-                objectIndex.size());
-        copy.putAll( objectIndex );
-        
-        /*
-         * Note: this does not prevent code from directly modifying the fields
-         * in an IObjectIndexEntry. However, the ISlotAllocation interface
-         * should prevent simply changing the record of the slots allocated to
-         * some version.
-         */
-        this.objectIndex = Collections.unmodifiableMap(copy);
-
-        this.baseObjectIndex = null;
-        
-        this.allocationIndex = allocationIndex; 
-
-    }
+//    /**
+//     * Private constructor creates a read-only (unmodifiable) deep-copy of the
+//     * supplied object index state. This is used to provide a strong guarentee
+//     * that object index modifications can not propagate through to the inner
+//     * layer using this API.
+//     * 
+//     * @param objectIndex
+//     * 
+//     * FIXME The requirement to deep-copy the base object index arises because
+//     * the transaction needs a view that is consistent with the start time for
+//     * that transaction. When using a persistence capable object index based on
+//     * a btree, we will use copy-on-write semantics to prevent the view with
+//     * which the tx starts from being modified either by unisolated writes or by
+//     * concurrent transactions that commit.
+//     */
+//    private ObjectIndex(ISlotAllocationIndex allocationIndex, long metadataId ) {
+//
+//        if( allocationIndex == null ) throw new IllegalArgumentException();
+//        
+//        if( objectIndex == null ) throw new IllegalArgumentException();
+//
+//        this.objectIndex = new MyIndex( store, metadataId );
+//
+//        this.baseObjectIndex = null;
+//        
+//        this.allocationIndex = allocationIndex; 
+//
+//    }
     
     /**
      * Constructor used to isolate a transaction by a read-only read-through
@@ -408,34 +491,32 @@ public class SimpleObjectIndex implements IObjectIndex {
      *       transactions that begin from the post-commit state of the isolated
      *       transaction.
      */
-    public SimpleObjectIndex(SimpleObjectIndex baseObjectIndex) {
+    public ObjectIndex(ObjectIndex baseObjectIndex) {
 
         assert baseObjectIndex != null;
 
         /*
-         * Presume modest initial capacity for a transaction. Only writes or
-         * deletes result in an entry in the isolated object index.
+         * FIXME There is concurrent modification under traversal during
+         * state-based validation. However, there is never more than a single
+         * thread accessing the index so the concurrency level is ONE (1).
+         * Either we need to support concurrent modification for the btree or we
+         * need to buffer the changes in a transient data structure.
          */
-        final int initialCapacity = 1000;
+        
+        final IRawStore store = baseObjectIndex.objectIndex.getStore();
         
         /*
-         * Default load factor.
+         * Create a new writable index that will isolate writes.
          */
-        final float loadFactor = 0.75f;
-        
-        /*
-         * Note: The concurrent hash map is used since we have traversal with
-         * concurrent modification during state-based validation. However, there
-         * is never more than a single thread accessing the map so the
-         * concurrency level is ONE (1).
-         */
-        final int concurrencyLevel = 1;
-        
-        this.objectIndex = new ConcurrentHashMap<Integer, IObjectIndexEntry>(
-                initialCapacity, loadFactor, concurrencyLevel);
+        this.objectIndex = new MyIndex(store);
 
-        this.baseObjectIndex = new SimpleObjectIndex(
-                baseObjectIndex.allocationIndex, baseObjectIndex.objectIndex);
+        /*
+         * A read-only view of the now current object index. This is loaded from
+         * the store so that modifications made to the global object index state
+         * are isolated from this transaction.
+         */
+        this.baseObjectIndex = new MyIndex(store,
+                baseObjectIndex.objectIndex.getMetadataId());
 
         this.allocationIndex = baseObjectIndex.allocationIndex;
         
@@ -455,7 +536,9 @@ public class SimpleObjectIndex implements IObjectIndex {
      */
     private IObjectIndexEntry getEntry(int id) {
         
-        IObjectIndexEntry entry = objectIndex.get(id );
+        Integer t = Integer.valueOf(id);
+        
+        IObjectIndexEntry entry = (IObjectIndexEntry) objectIndex.lookup( t );
         
         if( entry == null ) {
             
@@ -463,7 +546,7 @@ public class SimpleObjectIndex implements IObjectIndex {
 
             if( baseObjectIndex != null ) {
 
-                entry = baseObjectIndex.objectIndex.get(id);
+                entry = (IObjectIndexEntry) baseObjectIndex.lookup( t );
             
             }
 
@@ -519,7 +602,7 @@ public class SimpleObjectIndex implements IObjectIndex {
         if( allocationIndex == null ) throw new IllegalArgumentException();
 
         // Integer variant since we use it several times.
-        final Integer id2 = id;
+        final Integer id2 = Integer.valueOf( id );
         
         /* 
          * Get the object index entry.  This can read through into the base
@@ -546,7 +629,7 @@ public class SimpleObjectIndex implements IObjectIndex {
             
             newEntry.preExistingVersionSlots = null;
             
-            objectIndex.put( id2, newEntry );
+            objectIndex.insert( id2, newEntry );
             
             return;
             
@@ -601,7 +684,7 @@ public class SimpleObjectIndex implements IObjectIndex {
             newEntry.preExistingVersionSlots = entry.getCurrentVersionSlots(); 
             
             // add new entry into the outer index.
-            objectIndex.put(id2, newEntry);
+            objectIndex.insert(id2, newEntry);
             
         }
 
@@ -670,7 +753,7 @@ public class SimpleObjectIndex implements IObjectIndex {
             newEntry.preExistingVersionSlots = entry.getCurrentVersionSlots(); 
             
             // add new entry into the outer index.
-            objectIndex.put(id, newEntry);
+            objectIndex.insert(id, newEntry);
             
         }
         
@@ -750,18 +833,15 @@ public class SimpleObjectIndex implements IObjectIndex {
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;
         
-        final Iterator<Map.Entry<Integer, IObjectIndexEntry>> itr = objectIndex
-                .entrySet().iterator();
+        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
         
         while( itr.hasNext() ) {
             
-            Map.Entry<Integer, IObjectIndexEntry> mapEntry = itr.next();
+            // The value for that persistent identifier.
+            IObjectIndexEntry entry = (IObjectIndexEntry) itr.next();
             
             // The persistent identifier.
-            final Integer id = mapEntry.getKey();
-            
-            // The value for that persistent identifier.
-            final SimpleEntry entry = (SimpleEntry)mapEntry.getValue();
+            final Integer id = (Integer) itr.getKey();
             
             if( entry.isDeleted() ) {
 
@@ -785,7 +865,7 @@ public class SimpleObjectIndex implements IObjectIndex {
                      * capable implementation. It is also more "obvious" and
                      * safer since there is no reference sharing.
                      */
-                    ((SimpleObjectIndex)journal.objectIndex).objectIndex.put(id,entry);
+                    ((ObjectIndex)journal.objectIndex).objectIndex.insert(id,entry);
                     
                 } else {
                     
@@ -800,7 +880,7 @@ public class SimpleObjectIndex implements IObjectIndex {
                 /*
                  * Copy the entry down onto the global scope.
                  */
-                ((SimpleObjectIndex)journal.objectIndex).objectIndex.put(id, entry);
+                ((ObjectIndex)journal.objectIndex).objectIndex.insert(id, entry);
 
                 /*
                  * Mark the slots for the current version as committed.
@@ -896,7 +976,7 @@ public class SimpleObjectIndex implements IObjectIndex {
          * index for the transaction by mistake then interleaved transactions
          * will NOT be visible and write-write conflicts will NOT be detected.
          */
-        final SimpleObjectIndex globalScope = (SimpleObjectIndex) journal.objectIndex;
+        final ObjectIndex globalScope = (ObjectIndex)journal.objectIndex;
         
         /*
          * Note: Write-write conflicts can be validated iff a conflict resolver
@@ -919,22 +999,18 @@ public class SimpleObjectIndex implements IObjectIndex {
          */
         IStore readOnlyTx = null; // new ReadOnlyTx(journal);
         
-        // Scan entries in the outer map.
-        final Iterator<Map.Entry<Integer, IObjectIndexEntry>> itr = objectIndex
-                .entrySet().iterator();
+        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
         
         while( itr.hasNext() ) {
             
-            Map.Entry<Integer, IObjectIndexEntry> mapEntry = itr.next();
+            // The value for that persistent identifier in the transaction.
+            final SimpleEntry txEntry = (SimpleEntry) itr.next();
             
             // The persistent identifier.
-            final Integer id = mapEntry.getKey();
+            final Integer id = (Integer) itr.getKey();
             
-            // The value for that persistent identifier.
-            final SimpleEntry txEntry = (SimpleEntry)mapEntry.getValue();
-
             // Lookup the entry in the global scope.
-            IObjectIndexEntry baseEntry = globalScope.objectIndex.get(id);
+            IObjectIndexEntry baseEntry = (IObjectIndexEntry)globalScope.objectIndex.lookup(id);
             
             /*
              * If there is an entry in the global scope, then we MUST compare the
@@ -1078,18 +1154,12 @@ public class SimpleObjectIndex implements IObjectIndex {
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;
         
-        final Iterator<Map.Entry<Integer, IObjectIndexEntry>> itr = objectIndex
-                .entrySet().iterator();
+        final Iterator itr = objectIndex.getRoot().entryIterator();
         
         while( itr.hasNext() ) {
             
-            Map.Entry<Integer, IObjectIndexEntry> mapEntry = itr.next();
-            
-//            // The persistent identifier.
-//            final Integer id = mapEntry.getKey();
-            
             // The value for that persistent identifier.
-            final IObjectIndexEntry entry = mapEntry.getValue();
+            final IObjectIndexEntry entry = (IObjectIndexEntry)itr.next();
             
             // The slots on which the pre-existing version was written.
             ISlotAllocation preExistingVersionSlots = entry
