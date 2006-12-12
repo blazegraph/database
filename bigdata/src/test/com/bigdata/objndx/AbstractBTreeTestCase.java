@@ -691,7 +691,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("nChildKeys", nChildKeys, node.nkeys+1);
         
         // verify ordered values for the defined keys.
-        for( int i=0; i<=nChildKeys; i++ ) {
+        for( int i=0; i<nChildKeys; i++ ) {
 
             assertEquals("childKeys["+i+"]", childKeys[i], actualKeys[i]);
             

@@ -337,7 +337,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},c1);
         assertNotSame(a1,c1.getChild(0));
         Leaf a2 = (Leaf) c1.getChild(0);
-        assertEquals( b1, c.getChild(1));
+        assertEquals( b1, c1.getChild(1));
         assertKeys(new int[]{3,5},a2);
         assertValues(new Object[]{v3,v5}, a2);
         assertKeys(new int[]{7,8,9},b1);

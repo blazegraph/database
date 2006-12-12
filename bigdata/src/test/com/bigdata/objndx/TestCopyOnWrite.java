@@ -50,12 +50,10 @@ package com.bigdata.objndx;
 import org.apache.log4j.Level;
 
 /**
- * Test suite for copy-on-write semantics.
- * 
- * @todo the tests in this suite should verify {@link Node#childKeys}[].
- * 
- * @todo the tests in this suite should verify that the parent reference on a
- *       clean child was updated to point to the cloned parent.
+ * Test suite for copy-on-write semantics. Among other things the tests in this
+ * suite are responsible for verifying the contents of {@link Node#childKeys}[]
+ * and that the parent reference on a clean child was updated to point to
+ * the cloned parent when the child is "stolen" by the cloned parent.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -137,30 +135,36 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertTrue(b.isDirty());
 
         // write (a) onto the store and verify.
+        assertChildKeys(new long[]{0,0,0},c);
         btree.writeNodeOrLeaf(a);
         assertFalse(a.isDirty());
         assertTrue(a.isPersistent());
+        assertChildKeys(new long[]{a.getIdentity(),0,0},c);
         
         // write (b) onto the store and verify.
         btree.writeNodeOrLeaf(b);
         assertFalse(b.isDirty());
         assertTrue(b.isPersistent());
+        assertChildKeys(new long[]{a.getIdentity(),0,b.getIdentity()},c);
         
         // write (d) onto the store and verify.
         btree.writeNodeOrLeaf(d);
         assertFalse(d.isDirty());
         assertTrue(d.isPersistent());
+        assertChildKeys(new long[]{a.getIdentity(),d.getIdentity(),b.getIdentity()},c);
+//        c.dump(Level.DEBUG,System.err);
         
         /*
-         * remove a key from a leaf forcing two leaves to join and verify the
-         * visitation order.  this triggers copy-on-write for (a) and (a) is
-         * dirty as a post-condition.
+         * remove a key from a leaf (a) forcing two leaves (a,d) to join. this
+         * triggers copy-on-write for (a). (a1) is dirty as a post-condition.
+         * (d) is deleted as a post-condition.
          */
         assertEquals(v1,btree.remove(1));
         assertKeys(new int[]{7},c);
         assertNotSame(a,c.getChild(0));
-        Leaf a1 = (Leaf)c.getChild(0);
+        final Leaf a1 = (Leaf)c.getChild(0);
         assertEquals(b,c.getChild(1));
+        assertEquals(c,a1.getParent()); // parent is correct on a1.
         assertKeys(new int[]{2,3,5},a1);
         assertValues(new Object[]{v2,v3,v5}, a1);
         assertKeys(new int[]{7,9},b);
@@ -168,6 +172,7 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertTrue(d.isDeleted());
         assertTrue(a1.isDirty());
         assertFalse(b.isDirty());
+        assertChildKeys(new long[]{0,b.getIdentity()},c);
 
         /*
          * insert a key that will go into (b).  since (b) is immutable this
@@ -177,7 +182,8 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},c);
         assertEquals(a1,c.getChild(0));
         assertNotSame(b,c.getChild(1));
-        Leaf b1 = (Leaf)c.getChild(1);
+        final Leaf b1 = (Leaf)c.getChild(1);
+        assertEquals(c,b1.getParent()); // parent is correct on b1.
         assertKeys(new int[]{2,3,5},a1);
         assertValues(new Object[]{v2,v3,v5}, a1);
         assertKeys(new int[]{7,8,9},b1);
@@ -186,26 +192,34 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertTrue(d.isDeleted());
         assertTrue(a1.isDirty());
         assertTrue(b1.isDirty());
+        assertChildKeys(new long[]{0,0},c);
 
         /*
-         * write the root node of the tree onto the store.
+         * write the root node of the tree onto the store. this is the first
+         * time that we have written the root of this tree onto the store. it is
+         * now persistent. when we modify anything it will force the root to be
+         * cloned. any clean children will then be stolen by the new root node.
          */
         btree.writeNodeRecursive(c);
         assertFalse(c.isDirty());
         assertFalse(a1.isDirty());
         assertFalse(b1.isDirty());
+        assertChildKeys(new long[]{a1.getIdentity(),b1.getIdentity()},c);
 
         /*
          * remove a key from (a1). since (a1) is immutable this triggers
-         * copy-on-write. since the root is immtuable, it is also copied.
+         * copy-on-write. since the root is immutable, it is also copied.
+         * (b1) is clean, so it is stolen by setting its parent reference
+         * to the new (c1).
          */
         assertEquals(v2,btree.remove(2));
         assertNotSame(c,btree.root);
-        Node c1 = (Node)btree.root;
+        final Node c1 = (Node)btree.root;
         assertKeys(new int[]{7},c1);
         assertNotSame(a1,c1.getChild(0));
-        Leaf a2 = (Leaf) c1.getChild(0);
-        assertEquals( b1, c.getChild(1));
+        final Leaf a2 = (Leaf) c1.getChild(0);
+        assertEquals( b1, c1.getChild(1));
+        assertEquals( c1, b1.getParent() ); // verify clean child was stolen.
         assertKeys(new int[]{3,5},a2);
         assertValues(new Object[]{v3,v5}, a2);
         assertKeys(new int[]{7,8,9},b1);
@@ -213,6 +227,7 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertTrue(c1.isDirty());
         assertTrue(a2.isDirty());
         assertFalse(b1.isDirty());
+        assertChildKeys(new long[]{0,b1.getIdentity()},c1);
 
     }
 
@@ -245,8 +260,7 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         
         /*
          * Fill up the root leaf. Since it was immutable, this will trigger
-         * copy-on-write.  We verify that the root leaf reference is changed
-         * and verify.
+         * copy-on-write. We verify that the root leaf reference is changed.
          */
         assertEquals(a,btree.root);
         btree.insert(3, v3);
@@ -267,24 +281,28 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
         
         /*
-         * write out (a) and verify.
+         * write out leaf (a) and verify.
          */
         btree.writeNodeOrLeaf(a);
         assertTrue(a.isPersistent());
         assertFalse(b.isPersistent());
         assertFalse(c.isPersistent());
+        assertChildKeys(new long[]{a.getIdentity(),0},c);
 
         /*
-         * write out (c) and verify.
+         * write out the root (c) and verify.
          */
         btree.writeNodeRecursive(c);
         assertTrue(a.isPersistent());
         assertTrue(b.isPersistent());
         assertTrue(c.isPersistent());
+        assertChildKeys(new long[]{a.getIdentity(),b.getIdentity()},c);
 
         /*
          * split another leaf (a) so that there are now three children to visit.
-         * at this point the root is full.
+         * at this point the root is full. Since the root was immutable, this
+         * triggered copy on write for both (a) and (c).  Copy on write for (c)
+         * also stole the (b) from (c) for reuse on (c1).
          */
         assertTrue(a.isPersistent());
         assertTrue(b.isPersistent());
@@ -295,13 +313,15 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertNotSame(a,c.getChild(0));
         a = (Leaf)c.getChild(0);
         assertEquals(b,c.getChild(1)); // b was not copied.
+        assertEquals(c,b.getParent()); // b.parent was updated to the new (c).
         assertFalse(a.isPersistent());
         assertTrue(b.isPersistent());
         assertFalse(c.isPersistent());
+        // insert more until we split another leaf.
         btree.insert(2, v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
-        Leaf d = (Leaf)c.getChild(1);
+        Leaf d = (Leaf)c.getChild(1); // the new leaf (d).
         assertEquals(b,c.getChild(2));
         assertKeys(new int[]{1,2},a);
         assertValues(new Object[]{v1,v2}, a);
@@ -314,6 +334,8 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertFalse(a.isPersistent());
         assertTrue(b.isPersistent());
         assertFalse(c.isPersistent());
+        assertFalse(d.isPersistent());
+        assertChildKeys(new long[]{0,0,b.getIdentity()},c);
         
         /*
          * cause another leaf (d) to split, forcing the split to propagate to and
@@ -335,17 +357,23 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,4},d);
         assertValues(new Object[]{v3,v4}, d);
         assertKeys(new int[]{7},f);
-        Leaf e = (Leaf)f.getChild(0);
+        final Leaf e = (Leaf)f.getChild(0);
         assertEquals(b,f.getChild(1));
         assertKeys(new int[]{5,6},e);
         assertValues(new Object[]{v5,v6}, e);
         assertKeys(new int[]{7,9},b);
         assertValues(new Object[]{v7,v9}, b);
+        assertChildKeys(new long[]{0,0},c);
+        assertChildKeys(new long[]{0,b.getIdentity()},f);
+        assertChildKeys(new long[]{0,0},g);
         
         /*
          * write out the entire tree.
          */
         btree.writeNodeRecursive(g);
+        assertChildKeys(new long[]{a.getIdentity(),d.getIdentity()},c);
+        assertChildKeys(new long[]{e.getIdentity(),b.getIdentity()},f);
+        assertChildKeys(new long[]{c.getIdentity(),f.getIdentity()},g);
 
         /*
          * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
@@ -353,6 +381,7 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
          * the root to be replaced by (c).
          * 
          * the following are cloned: d, c, g.
+         * the following clean children are stolen: e, b (by the new root c).
          */
         assertEquals(v4,btree.remove(4));
         assertNotSame(g,btree.root);
@@ -365,6 +394,8 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertEquals(d,c.getChild(0));
         assertEquals(e,c.getChild(1));
         assertEquals(b,c.getChild(2));
+        assertEquals(c,e.getParent()); // stolen.
+        assertEquals(c,b.getParent()); // stolen.
         assertKeys(new int[]{1,2,3},d);
         assertValues(new Object[]{v1,v2,v3}, d);
         assertKeys(new int[]{5,6},e);
@@ -374,9 +405,11 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertTrue(a.isDeleted());
         assertTrue(f.isDeleted());
 
+        assertChildKeys(new long[]{0,e.getIdentity(),b.getIdentity()},c);
+
         /*
-         * remove a key (7) from a leaf (b) forcing two leaves (b,e) into (b) to
-         * join and verify the visitation order.
+         * remove a key (7) from a leaf (b) forcing two leaves (b,e) to join
+         * into (b)
          */
         assertEquals(v7,btree.remove(7));
         btree.dump(Level.DEBUG,System.err);
@@ -390,10 +423,13 @@ public class TestCopyOnWrite extends AbstractBTreeTestCase {
         assertValues(new Object[]{v5,v6,v9}, b);
         assertTrue(e.isDeleted());
 
+        assertChildKeys(new long[]{0,0},c);
+
         /*
          * write out the root.
          */
         btree.writeNodeRecursive(c);
+        assertChildKeys(new long[]{d.getIdentity(),b.getIdentity()},c);
 
         /*
          * remove keys from a leaf (b) forcing the remaining two leaves (b,d) to
