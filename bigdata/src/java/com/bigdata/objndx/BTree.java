@@ -49,9 +49,7 @@ package com.bigdata.objndx;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -99,6 +97,20 @@ import com.bigdata.journal.SlotMath;
  * @todo Profile the heap and the code and determine if we are spending too much
  *       time autoboxing when using a primitive key type, notably int[] or
  *       long[].
+ * 
+ * @todo Implement an "extser" index that does not use extser itself, but which
+ *       could provide the basis for a database that does use extser. The index
+ *       needs to map class names to entries. Those entries are a classId and
+ *       set of {version : Serializer} entries.
+ * 
+ * @todo test object index semantics (clustered index of int32 or int64
+ *       identifiers associate with inline objects and time/version stamps).
+ *       There is a global index, and then one persistence capable index per
+ *       transaction. The time/version stamps are used during validation to
+ *       determine if there is a possible write-write conflict. The same kind of
+ *       isolation should be provided for object and non-object indices. The
+ *       only real difference is that the object index is using an int32 or
+ *       int64 key.
  * 
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
@@ -410,37 +422,20 @@ public class BTree implements IBTree {
         
     }
     
-    /**
-     * A hard reference hash map for nodes in the btree is used to ensure that
-     * nodes remain wired into memory. Dirty nodes are written to disk during
-     * commit using a pre-order traversal that first writes any dirty leaves and
-     * then (recursively) their parent nodes.
-     * 
-     * @todo Make sure that nodes are eventually removed from this set. There
-     *       are two ways to make that happen. One is to just use a ring buffer
-     *       with a large capacity. This will serve a bit like an MRU. The other
-     *       is to remove nodes from this set explicitly on certain conditions.
-     *       For example, when a copy is made of an immutable node the immutable
-     *       node might be removed from this set. Also, if we support
-     *       incremental writes of nodes, then newly written nodes could be
-     *       removed from this set as well - they would remain accessible via
-     *       {@link Node#childRefs} for their parent as long as the node
-     *       remained on the hard reference queue. I.e., we could just use
-     *       another hard reference queue for nodes in addition to the one that
-     *       we have for leaves. The thing is that we may want to defer all node
-     *       writes until the commit.
-     * 
-     * @todo replace with the use of a hard reference queue and incremental
-     *       eviction of nodes.
-     * 
-     * @see AbstractNode#AbstractNode(AbstractNode)
-     */
-    final Set<Node> nodes = new HashSet<Node>();
+//    /**
+//     * A hard reference queue for nodes in the btree is used to ensure that
+//     * nodes remain wired into memory while they are being actively used. Dirty
+//     * nodes are written to disk during commit using a pre-order traversal that
+//     * first writes any dirty leaves and then (recursively) their parent nodes.
+//     * 
+//     * @see AbstractNode#AbstractNode(AbstractNode)
+//     */
+//    final HardReferenceQueue<PO> nodeQueue;
 
     /**
      * Leaves are added to a hard reference queue when they are created or read
-     * from the store. On eviction from the queue the leaf is serialized by
-     * {@link #listener} against the {@link #store}. Once the leaf is no longer
+     * from the store. On eviction from the queue the leaf is serialized by a
+     * listener against the {@link IRawStore}. Once the leaf is no longer
      * strongly reachable its weak references may be cleared by the VM. Note
      * that leaves are evicted as new leaves are added to the hard reference
      * queue. This occurs in two situations: (1) when a new leaf is created
@@ -451,49 +446,90 @@ public class BTree implements IBTree {
      * to get "too large" where too large is defined by the size of the hard
      * reference cache.
      * 
-     * @todo Only leaves are incrementally flushed, but it would be easy enough
-     *       to also incrementally flush nodes using
-     *       {@link #writeNodeRecursive(AbstractNode)}.
+     * Note: The code in {@link Node#postOrderIterator(boolean)} and
+     * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
+     * those iterators are used when persisting a node using a post-order
+     * traversal. If a hard reference queue eviction drives the serialization of
+     * a node and we touch the hard reference queue during the post-order
+     * traversal then we break down the semantics of
+     * {@link HardReferenceQueue#append(Object)} as the eviction does not
+     * necessarily cause the queue to reduce in length.
+     * 
+     * @todo This is all a bit fragile. Another way to handle this is to have
+     *       {@link HardReferenceQueue#append(Object)} begin to evict objects
+     *       before is is actually at capacity, but that is also a bit fragile.
+     * 
+     * @todo This queue is now used for both nodes and leaves. Update the
+     *       javadoc here, in the constants that provide minimums and defaults
+     *       for the queue, and in the other places where the queue is used or
+     *       configured. Also rename the field to nodeQueue or refQueue.
+     * 
+     * @todo Consider breaking this into one queue for nodes and another for
+     *       leaves. Would this make it possible to create a policy that targets
+     *       a fixed memory burden for the index? As it stands the #of nodes and
+     *       the #of leaves in memory can vary and leaves require much more
+     *       memory than nodes (for most trees).
      */
     final HardReferenceQueue<PO> leafQueue;
 
     /**
-     * Touch the node or leaf, causing its {@link AbstractNode#referenceCount}
-     * to be incremented and the node or leaf to be appended to the appropriate
-     * {@link HardReferenceQueue}. If the queue is full, then this will cause a
-     * reference to be evicted from the queue. If the reference counter for the
-     * evicted node or leaf is zero, then the node or leaf will be written onto
-     * the store and made immutable. A subsequent attempt to modify the node or
-     * leaf will force copy-on-write for that node or leaf.
+     * <p>
+     * Touch the node or leaf on the {@link #leafQueue}. If the node is not
+     * found on a scan of the tail of the queue, then it is appended to the
+     * queue and its {@link AbstractNode#referenceCount} is incremented. If the
+     * a node is being appended to the queue and the queue is at capacity, then
+     * this will cause a reference to be evicted from the queue. If the
+     * reference counter for the evicted node or leaf is zero, then the node or
+     * leaf will be written onto the store and made immutable. A subsequent
+     * attempt to modify the node or leaf will force copy-on-write for that node
+     * or leaf.
+     * </p>
+     * <p>
+     * This method guarentees that the specified node will NOT be synchronously
+     * persisted as a side effect and thereby made immutable. (Of course, the
+     * node may be already immutable.)
+     * </p>
+     * <p>
+     * In conjunction with {@link DefaultEvictionListener}, this method
+     * guarentees that the reference counter for the node will reflect the #of
+     * times that the node is actually present on the {@link #leafQueue}.
+     * </p>
      * 
      * @param node
      *            The node or leaf.
-     * 
-     * @todo Touch nodes on read and write as well and write tests for
-     *       incremental node eviction.
-     * 
-     * @todo Refactor to use a separate hard reference queue for nodes. This
-     *       will allow incremental writes of parts of the tree that are not
-     *       being accessed.
      */
     protected void touch(AbstractNode node) {
 
         assert node != null;
 
+        /*
+         * We need to guarentee that touching this node does not cause it to be
+         * made persistent. The condition of interest would arise if the queue
+         * is full and the referenceCount on the node is zero before this method
+         * was called. Under those circumstances, simply appending the node to
+         * the queue would cause it to be evicted and made persistent.
+         * 
+         * We avoid this by incrementing the reference counter before we touch
+         * the queue. Since the reference counter will therefore be positive if
+         * the node is selected for eviction, eviction will not cause the node
+         * to be made persistent.
+         */
         node.referenceCount++;
-  
-//        assert node.isLeaf();
-        
-        if (node.isLeaf()) {
 
-            leafQueue.append(node);
-
+        if( ! leafQueue.append(node) ) {
+            
+            /*
+             * A false return indicates that the node was found on a scan of the
+             * tail of the queue. In this case we do NOT want the reference
+             * counter to be incremented since we have not actually added
+             * another reference to this node onto the queue.  Therefore we 
+             * decrement the counter (since we incremented it above) for a net
+             * change of zero(0) across this method.
+             */
+            
+            node.referenceCount--;
+            
         }
-//        } else {
-//
-//            leafQueue.append(node);
-//            
-//        }
 
     }
     
@@ -989,8 +1025,8 @@ public class BTree implements IBTree {
             // Set the persistent identity of the child on the parent.
             parent.setChildKey(node);
 
-            // Remove from the dirty list on the parent.
-            parent.dirtyChildren.remove(node);
+//            // Remove from the dirty list on the parent.
+//            parent.dirtyChildren.remove(node);
 
         }
 

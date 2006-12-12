@@ -48,7 +48,7 @@ Modifications:
 package com.bigdata.objndx;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.HardReferenceQueue.HardReferenceCacheEvictionListener;
+import com.bigdata.cache.HardReferenceQueue.HardReferenceQueueEvictionListener;
 
 /**
  * Interface to handle evictions of nodes or leaves from the hard reference
@@ -60,7 +60,7 @@ import com.bigdata.cache.HardReferenceQueue.HardReferenceCacheEvictionListener;
  * @version $Id$
  */
 public interface IEvictionListener extends
-        HardReferenceCacheEvictionListener<PO> {
+        HardReferenceQueueEvictionListener<PO> {
 
     public void evicted(HardReferenceQueue<PO> cache, PO ref);
 

@@ -228,44 +228,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
 
-    /**
-     * Special purpose helper used to vet a key[] with a specific data type
-     * 
-     * @param keys
-     *            An array all of whose values will be tested against the
-     *            corresponding keys in the node.
-     * @param node
-     *            The node.
-     */
-    public void assertKeys(int[] keys, AbstractNode node ) {
-        
-        int nkeys = keys.length;
-        
-        int[] actualKeys = (int[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
-                    .intValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
     private void assertKeys(int nkeys,long[] keys, AbstractNode node ) {
         
         long[] actualKeys = (long[]) node.keys;
@@ -708,14 +670,89 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Return a new btree backed by a simple transient store evict leaves or
-     * nodes onto the store. The leaf cache will be large and cache evictions
-     * will cause exceptions if they occur. This provides an indication if cache
-     * evictions are occurring so that the tests of basic tree operations in
-     * this test suite are known to be conducted in an environment without
-     * incremental writes of leaves onto the store. This avoids copy-on-write
-     * scenarios and let's us test with the knowledge that there should always
-     * be a hard reference to a child or parent.
+     * Special purpose helper used to vet {@link Node#childKeys}.
+     * 
+     * @param childKeys
+     *            An array all of whose values will be tested against the
+     *            corresponding child identities in the node.
+     * @param node
+     *            The node.
+     */
+    public void assertChildKeys(long[] childKeys, Node node ) {
+        
+        int nChildKeys = childKeys.length;
+        
+        long[] actualKeys = node.childKeys;
+        
+        // verify the capacity of the childKeys[] on the node.
+        assertEquals("childKeys[] capacity", node.branchingFactor+1, actualKeys.length );
+        
+        // verify the #of defined keys.
+        assertEquals("nChildKeys", nChildKeys, node.nkeys+1);
+        
+        // verify ordered values for the defined keys.
+        for( int i=0; i<=nChildKeys; i++ ) {
+
+            assertEquals("childKeys["+i+"]", childKeys[i], actualKeys[i]);
+            
+        }
+        
+        // verify the undefined keys are all NULL.
+        for( int i=nChildKeys; i<actualKeys.length; i++ ) {
+            
+            assertEquals("childKeys[" + i + "]", IIdentityAccess.NULL, actualKeys[i]);
+            
+        }
+        
+    }
+
+    /**
+     * Special purpose helper used to vet a key[] with a specific data type
+     * 
+     * @param keys
+     *            An array all of whose values will be tested against the
+     *            corresponding keys in the node.
+     * @param node
+     *            The node.
+     */
+    public void assertKeys(int[] keys, AbstractNode node ) {
+        
+        int nkeys = keys.length;
+        
+        int[] actualKeys = (int[]) node.keys;
+        
+        // verify the capacity of the keys[] on the node.
+        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
+        
+        // verify the #of defined keys.
+        assertEquals("nkeys", nkeys, node.nkeys);
+        
+        // verify ordered values for the defined keys.
+        for( int i=0; i<nkeys; i++ ) {
+
+            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
+            
+        }
+        
+        // verify the undefined keys are all NEGINF.
+        for( int i=nkeys; i<actualKeys.length; i++ ) {
+            
+            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
+                    .intValue(), actualKeys[i]);
+            
+        }
+        
+    }
+
+    /**
+     * Return a new btree backed by a simple transient store that will NOT evict
+     * leaves or nodes onto the store. The leaf cache will be large and cache
+     * evictions will cause exceptions if they occur. This provides an
+     * indication if cache evictions are occurring so that the tests of basic
+     * tree operations in this test suite are known to be conducted in an
+     * environment without incremental writes of leaves onto the store. This
+     * avoids copy-on-write scenarios and let's us test with the knowledge that
+     * there should always be a hard reference to a child or parent.
      * 
      * The {@link SimpleLeafSplitPolicy} is used.
      * 

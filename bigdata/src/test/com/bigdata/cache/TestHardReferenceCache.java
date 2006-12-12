@@ -53,7 +53,7 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.HardReferenceQueue.HardReferenceCacheEvictionListener;
+import com.bigdata.cache.HardReferenceQueue.HardReferenceQueueEvictionListener;
 
 /**
  * Unit tests for {@link HardReferenceQueue}.
@@ -77,7 +77,7 @@ public class TestHardReferenceCache extends TestCase2 {
      */
     public void test_ctor() {
         
-        HardReferenceCacheEvictionListener<String> listener = new MyListener<String>();
+        HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
         
         HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 100, 20);
@@ -117,7 +117,7 @@ public class TestHardReferenceCache extends TestCase2 {
      */
     public void test_append_null() {
 
-        HardReferenceCacheEvictionListener<String> listener = new MyListener<String>();
+        HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
 
         HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 100, 2 );
@@ -433,7 +433,7 @@ public class TestHardReferenceCache extends TestCase2 {
      * @param <T>
      */
     public static class MyListener<T> implements
-            HardReferenceCacheEvictionListener<T> {
+            HardReferenceQueueEvictionListener<T> {
 
         /**
          * Constructor.

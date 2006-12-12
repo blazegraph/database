@@ -344,17 +344,17 @@ public class NodeSerializer {
 //        assert node.branchingFactor < Short.MAX_VALUE;
 //        assert node.nkeys >= node.minKeys && node.nkeys <= node.maxKeys;
 
-        if (node.dirtyChildren.size() > 0) {
-
-            /*
-             * Note: You can not serialize a node that has dirty children since
-             * the childKeys[] array will not contain the persistent identity
-             * for any child that has not already been serialized.
-             */
-            
-            throw new IllegalStateException("Dirty children exist.");
-            
-        }
+//        if (node.dirtyChildren.size() > 0) {
+//
+//            /*
+//             * Note: You can not serialize a node that has dirty children since
+//             * the childKeys[] array will not contain the persistent identity
+//             * for any child that has not already been serialized.
+//             */
+//            
+//            throw new IllegalStateException("Dirty children exist.");
+//            
+//        }
 
         final int nkeys = node.nkeys;
 
@@ -387,8 +387,13 @@ public class NodeSerializer {
         
             final long childKey = node.childKeys[i];
             
-            // children MUST have assigned persistent identity.
-            assert childKey != 0L;
+            /*
+             * Children MUST have assigned persistent identity.
+             */
+            if( childKey == 0L ) {
+                throw new AssertionError("Child is not persistent: this="
+                        + this + ", child index=" + i);
+            }
             
             putNodeRef(buf, childKey);
             

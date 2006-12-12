@@ -128,10 +128,19 @@ class DirtyChildIterator implements Iterator<AbstractNode>,
             if( ! child.isDirty() ) continue;
 
             /*
-             * Touch the child so that it will not be a candidate for eviction
-             * to the store.
-             */ 
-            node.btree.touch(node);
+             * Note: We do NOT touch the hard reference queue here since the
+             * DirtyChildrenIterator is used when persisting a node using a
+             * post-order traversal. If a hard reference queue eviction drives
+             * the serialization of a node and we touch the hard reference queue
+             * during the post-order traversal then we break down the semantics
+             * of HardReferenceQueue#append(...) as the eviction does not
+             * necessarily cause the queue to reduce in length.
+             */
+//            /*
+//             * Touch the child so that it will not be a candidate for eviction
+//             * to the store.
+//             */ 
+//            node.btree.touch(node);
             
             break;
             

@@ -107,6 +107,12 @@ import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
  * from a fully connected matrix in the appropriate space.
  * <p>
  * 
+ * @todo Try a variant in which we have metadata linking statements and terms
+ *       together. In this case we would have to go back to the terms and update
+ *       them to have metadata about the statement. it is a bit circular since
+ *       we can not create the statement until we have the terms and we can not
+ *       add the metadata to the terms until we have the statement.
+ * 
  * @todo Note that a very interesting solution for RDF places all data into a
  *       statement index and then use block compression techniques to remove
  *       frequent terms, e.g., the repeated parts of the value. Also note that
@@ -230,6 +236,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                     .toString());
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
+            properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
 
         }
 
@@ -706,11 +713,11 @@ public class TestTripleStore extends AbstractBTreeTestCase {
      */
     public static void main(String[] args) throws Exception {
 
-        // small
-        int nclass = 30;
-        int nproperty = 20;
-        int nliteral = 20;
-        int litsize = 100;
+//        // small
+//        int nclass = 30;
+//        int nproperty = 20;
+//        int nliteral = 20;
+//        int litsize = 100;
 
         // moderate
 //        int nclass = 300; // @todo at 300 this will force the journal to be extended on commit.
@@ -718,14 +725,14 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 //        int nliteral = 20;
 //        int litsize = 100;
 
-//      // large
-//      int nclass = 5000;
-//      int nproperty = 20;
-//      int nliteral = 30;
-////      int nliteral = 0;
-//      int litsize = 300;
+      // large
+      int nclass = 5000;
+      int nproperty = 20;
+      int nliteral = 30;
+//      int nliteral = 0;
+      int litsize = 300;
     
-        TestTripleStore test = new TestTripleStore();
+        TestTripleStore test = new TestTripleStore("TestTripleStore");
         test.setUp();
         test.doTest( nclass, nproperty, nliteral, litsize );
         test.tearDown();
@@ -1261,6 +1268,22 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                  * handle the s:p:o elements of the key as if they were a
                  * primitive data type. This would mean more copying of data
                  * during insert and remove on a leaf, but less allocation.
+                 * 
+                 * @todo 1. String is char[] + String object.  1/2 the allocations
+                 * if we use char[] and handle the comparison functions outselves.
+                 * 
+                 * @todo 2. key run length multiple for long[n] keys.  could also
+                 * be used for fixed length char[] keys.  allows us to treat the
+                 * key array as a single memory block with multiple complex items
+                 * comprised of repetitions of the same primitive type.
+                 * 
+                 * @todo 3. override value factory to cache very small sets of
+                 * URIs corresponding to rdf, rdfs, owl predicates to reduce the
+                 * heap churn from very common URIs.
+                 * 
+                 * @todo 4. override value factory to produce a URI that uses a
+                 * char[] and does more work when returning the localName or the
+                 * namespace rather than when returning the URI.
                  */
                 _term.setLength(0);
                 _term.append(uri.getNamespace());

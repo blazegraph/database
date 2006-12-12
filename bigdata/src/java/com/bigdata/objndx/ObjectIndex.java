@@ -54,7 +54,6 @@ import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SimpleObjectIndex;
-import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * FIXME This needs to implement the object index semantics and provide a

@@ -50,11 +50,11 @@ package com.bigdata.objndx;
 import java.util.Comparator;
 import java.util.Random;
 
-import com.bigdata.objndx.ndx.LongComparator;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.objndx.ndx.LongComparator;
 
 /**
  * Unit tests for {@link Search}.

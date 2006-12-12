@@ -53,7 +53,6 @@ import java.util.Vector;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
-import com.bigdata.objndx.ndx.IntegerComparator;
 
 /**
  * A test suite that will be evolved into a metadata index designed to locate

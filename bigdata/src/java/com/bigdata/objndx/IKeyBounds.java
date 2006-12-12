@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.util.Comparator;
 
 /**
  * Interface defining the legal bounds on the value of keys for an index, 

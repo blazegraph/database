@@ -70,21 +70,31 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class Node extends AbstractNode {
 
-    /**
-     * <p>
-     * Hard reference cache containing dirty child nodes (nodes or leaves).
-     * </p>
-     * <p>
-     * This cache is pre-sized to its maximum capacity, which is
-     * <code>branchingFactor+1</code>. While there are at most
-     * <code>branchingFactor</code> children for a node, the cache is sized
-     * one larger to allow for the child reference corresponding to the key that
-     * causes overflow and forces the split may be inserted. This greatly
-     * simplifies the logic for computing the split point and performing the
-     * split.
-     * </p>
-     */
-    transient protected Set<AbstractNode> dirtyChildren;
+//    /**
+//     * <p>
+//     * Hard reference cache containing dirty child nodes (nodes or leaves).
+//     * </p>
+//     * <p>
+//     * This cache is pre-sized to its maximum capacity, which is
+//     * <code>branchingFactor+1</code>. While there are at most
+//     * <code>branchingFactor</code> children for a node, the cache is sized
+//     * one larger to allow for the child reference corresponding to the key that
+//     * causes overflow and forces the split may be inserted.
+//     * </p>
+//     * 
+//     * @todo this could be lazily created on mutation. i have not demonstrated
+//     *       that pre-sizing this cache is of benefit.
+//     * 
+//     * @todo rather than using a hash set this could be implemented as a linked
+//     *       list of the dirty children. that would reduce allocation futher and
+//     *       there is really no need to test set membership - this is just about
+//     *       holding a hard reference so that a weak reference to a dirty child
+//     *       is never cleared.
+//     * 
+//     * FIXME this is probably fully redundent with the hard reference queue and
+//     * could perhaps be dropped entirely.
+//     */
+//    transient protected Set<AbstractNode> dirtyChildren;
 
     /**
      * <p>
@@ -170,7 +180,7 @@ public class Node extends AbstractNode {
         
         this.childKeys = childKeys;
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
+//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
@@ -188,7 +198,7 @@ public class Node extends AbstractNode {
 
         keys = allocKeys(btree.keyType,branchingFactor);
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
+//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
@@ -220,7 +230,7 @@ public class Node extends AbstractNode {
 
         keys = allocKeys(btree.keyType,branchingFactor);
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
+//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
@@ -237,7 +247,7 @@ public class Node extends AbstractNode {
 
         childRefs[0] = new WeakReference<AbstractNode>(oldRoot);
 
-        dirtyChildren.add(oldRoot);
+//        dirtyChildren.add(oldRoot);
 
         oldRoot.parent = new WeakReference<Node>(this);
 
@@ -262,7 +272,7 @@ public class Node extends AbstractNode {
      * Copy constructor.
      * 
      * @param src
-     *            The source node.
+     *            The source node (must be immutable).
      * 
      * @param triggeredByChild
      *            The child that triggered the copy constructor. This should be
@@ -282,13 +292,17 @@ public class Node extends AbstractNode {
 
         super(src);
         
+        assert !src.isDirty();
+        
+        assert src.isPersistent();
+        
 //        assert triggeredByChild != null;
 
         keys = allocKeys(btree.keyType,branchingFactor);
 
         nkeys = src.nkeys;
 
-        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
+//        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
@@ -344,17 +358,17 @@ public class Node extends AbstractNode {
             
         }
         
-        /*
-         * Remove the source node from the btree since it has been replaced by
-         * this node.
-         * 
-         * @todo mark the [src] as invalid if we develop a hash table based
-         * cache for nodes to ensure that we never access it by mistake using
-         * its persistent id. the current design only provides for access of
-         * nodes by navigation from the root, so we can never visit a node once
-         * it is no longer reachable from its parent.
-         */ 
-        btree.nodes.remove(src);
+//        /*
+//         * Remove the source node from the btree since it has been replaced by
+//         * this node.
+//         * 
+//         * @todo mark the [src] as invalid if we develop a hash table based
+//         * cache for nodes to ensure that we never access it by mistake using
+//         * its persistent id. the current design only provides for access of
+//         * nodes by navigation from the root, so we can never visit a node once
+//         * it is no longer reachable from its parent.
+//         */ 
+//        btree.nodes.remove(src);
 
     }
 
@@ -395,11 +409,11 @@ public class Node extends AbstractNode {
 
         childKeys[i] = child.getIdentity();
 
-        if (!dirtyChildren.remove(child)) {
-
-            throw new AssertionError("Child was not on dirty list.");
-
-        }
+//        if (!dirtyChildren.remove(child)) {
+//
+//            throw new AssertionError("Child was not on dirty list.");
+//
+//        }
         
     }
 
@@ -443,7 +457,7 @@ public class Node extends AbstractNode {
 
                         assert oldChild.isPersistent();
 
-                        assert !dirtyChildren.contains(oldChild);
+//                        assert !dirtyChildren.contains(oldChild);
 
                     }
 
@@ -455,8 +469,8 @@ public class Node extends AbstractNode {
                 // Stash reference to the new child.
                 childRefs[i] = new WeakReference<AbstractNode>(newChild);
 
-                // Add the new child to the dirty list.
-                dirtyChildren.add(newChild);
+//                // Add the new child to the dirty list.
+//                dirtyChildren.add(newChild);
 
                 // Set the parent on the new child.
                 newChild.parent = new WeakReference<Node>(this);
@@ -494,6 +508,8 @@ public class Node extends AbstractNode {
         
         assertInvariants();
 
+        btree.touch(this);
+
         int index = findChild(key);
 
         AbstractNode child = getChild(index);
@@ -505,6 +521,8 @@ public class Node extends AbstractNode {
     public Object lookup(Object key) {
 
         assert !isDeleted();
+
+        btree.touch(this);
 
         int index = findChild(key);
 
@@ -526,6 +544,8 @@ public class Node extends AbstractNode {
     public Object remove(Object key) {
 
         assert !isDeleted();
+
+        btree.touch(this);
 
         int index = findChild(key);
 
@@ -715,18 +735,18 @@ public class Node extends AbstractNode {
                 
                 tmp.parent = new WeakReference<Node>(rightSibling);
                 
-                if( tmp.isDirty()) {
-                
-                    /*
-                     * Iff the child is dirty, then move the hard reference for
-                     * dirty child to the rightSibling.
-                     */
-                    
-                    dirtyChildren.remove(tmp);
-                    
-                    rightSibling.dirtyChildren.add(tmp);
-                    
-                }
+//                if( tmp.isDirty()) {
+//                
+//                    /*
+//                     * Iff the child is dirty, then move the hard reference for
+//                     * dirty child to the rightSibling.
+//                     */
+//                    
+//                    dirtyChildren.remove(tmp);
+//                    
+//                    rightSibling.dirtyChildren.add(tmp);
+//                    
+//                }
                 
             }
 
@@ -863,10 +883,10 @@ public class Node extends AbstractNode {
             AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
             if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
-                if( child.isDirty() ) {
-                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-                    if(!dirtyChildren.add(child)) throw new AssertionError();
-                }
+//                if( child.isDirty() ) {
+//                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+//                    if(!dirtyChildren.add(child)) throw new AssertionError();
+//                }
             }
             
             // copy down the keys on the right sibling to cover up the hole.
@@ -910,10 +930,10 @@ public class Node extends AbstractNode {
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
             if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
-                if(child.isDirty()) {
-                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-                    if(!dirtyChildren.add(child)) throw new AssertionError();
-                }
+//                if(child.isDirty()) {
+//                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
+//                    if(!dirtyChildren.add(child)) throw new AssertionError();
+//                }
             }
             s.setKey(s.nkeys-1, btree.NEGINF);
             s.childRefs[s.nkeys] = null;
@@ -1009,10 +1029,10 @@ public class Node extends AbstractNode {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
                     child.parent = weakRef;
-                    if( child.isDirty() ) {
-                        // record hard references for dirty children.
-                        dirtyChildren.add(child);
-                    }
+//                    if( child.isDirty() ) {
+//                        // record hard references for dirty children.
+//                        dirtyChildren.add(child);
+//                    }
                 }
             }
             
@@ -1078,10 +1098,10 @@ public class Node extends AbstractNode {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
                     child.parent = weakRef;
-                    if( child.isDirty() ) {
-                        // record hard references for dirty children.
-                        dirtyChildren.add(child);
-                    }
+//                    if( child.isDirty() ) {
+//                        // record hard references for dirty children.
+//                        dirtyChildren.add(child);
+//                    }
                 }
             }
 
@@ -1168,7 +1188,7 @@ public class Node extends AbstractNode {
 
         childKeys[index + 1] = NULL;
 
-        dirtyChildren.add(child);
+//        dirtyChildren.add(child);
 
         child.parent = new WeakReference<Node>(this);
 
@@ -1470,8 +1490,8 @@ public class Node extends AbstractNode {
         childKeys[nkeys] = NULL;
         childRefs[nkeys] = null;
 
-        // Remove the child from the dirty list.
-        dirtyChildren.remove(child);
+//        // Remove the child from the dirty list.
+//        dirtyChildren.remove(child);
 
         // Clear the parent on the old child.
         child.parent = null;
@@ -1592,13 +1612,13 @@ public class Node extends AbstractNode {
 
         int i = getIndexOf( oldChild );
 
-        dirtyChildren.remove(oldChild);
-
-        if (newChild.isDirty()) {
-
-            dirtyChildren.add(newChild);
-
-        }
+//        dirtyChildren.remove(oldChild);
+//
+//        if (newChild.isDirty()) {
+//
+//            dirtyChildren.add(newChild);
+//
+//        }
 
         // set the persistent key for the new child.
         childKeys[i] = (newChild.isPersistent() ? newChild.getIdentity() : NULL);
@@ -1624,23 +1644,20 @@ public class Node extends AbstractNode {
 
         assert index >= 0 && index <= nkeys;
 
-        WeakReference<AbstractNode> childRef = childRefs[index];
+        final WeakReference<AbstractNode> childRef = childRefs[index];
 
-        AbstractNode child = null;
-
-        if (childRef != null) {
-
-            child = childRef.get();
-
-        }
+        AbstractNode child = childRef == null ? null : childRef.get();
 
         if (child == null) {
 
             long key = childKeys[index];
 
-            assert key != NULL;
-
-            assert btree != null;
+            if(key == NULL) {
+                dump(Level.DEBUG,System.err);
+                throw new AssertionError(
+                        "Child does not have persistent identity: this=" + this
+                                + ", index=" + index);
+            }
 
             child = btree.readNodeOrLeaf( key );
 
@@ -1863,16 +1880,16 @@ public class Node extends AbstractNode {
                     out.print(childRefs[i].get());
             }
             out.println("]");
-            out.print(indent(height) + "  #dirtyChildren="
-                    + dirtyChildren.size() + " : {");
-            int n = 0;
-            Iterator<AbstractNode> itr = dirtyChildren.iterator();
-            while (itr.hasNext()) {
-                if (n++ > 0)
-                    out.print(", ");
-                out.print(itr.next());
-            }
-            out.println("}");
+//            out.print(indent(height) + "  #dirtyChildren="
+//                    + dirtyChildren.size() + " : {");
+//            int n = 0;
+//            Iterator<AbstractNode> itr = dirtyChildren.iterator();
+//            while (itr.hasNext()) {
+//                if (n++ > 0)
+//                    out.print(", ");
+//                out.print(itr.next());
+//            }
+//            out.println("}");
         }
 
         /*
@@ -1975,15 +1992,15 @@ public class Node extends AbstractNode {
                                     + " since the child is dirty");
                             ok = false;
                         }
-                        if (!dirtyChildren.contains(child)) {
-                            out
-                                    .println(indent(height + 1)
-                                            + "  ERROR child at index="
-                                            + i
-                                            + " is dirty, but not on the dirty list: child="
-                                            + child);
-                            ok = false;
-                        }
+//                        if (!dirtyChildren.contains(child)) {
+//                            out
+//                                    .println(indent(height + 1)
+//                                            + "  ERROR child at index="
+//                                            + i
+//                                            + " is dirty, but not on the dirty list: child="
+//                                            + child);
+//                            ok = false;
+//                        }
                     } else {
                         /*
                          * Clean child (ie, persistent).  The parent of a clean
@@ -1995,15 +2012,15 @@ public class Node extends AbstractNode {
                                     + ", but child is not dirty");
                             ok = false;
                         }
-                        if (dirtyChildren.contains(child)) {
-                            out
-                                    .println(indent(height)
-                                            + "  ERROR child at index="
-                                            + i
-                                            + " is not dirty, but is on the dirty list: child="
-                                            + child);
-                            ok = false;
-                        }
+//                        if (dirtyChildren.contains(child)) {
+//                            out
+//                                    .println(indent(height)
+//                                            + "  ERROR child at index="
+//                                            + i
+//                                            + " is not dirty, but is on the dirty list: child="
+//                                            + child);
+//                            ok = false;
+//                        }
                     }
 
                 }
@@ -2088,27 +2105,27 @@ public class Node extends AbstractNode {
 
                 }
 
-                if (child.isDirty() && !dirtyChildren.contains(child)) {
-
-                    out
-                            .println(indent(height + 1)
-                                    + "ERROR dirty child not in node's dirty list at index="
-                                    + i);
-
-                    ok = false;
-
-                }
-
-                if (!child.isDirty() && dirtyChildren.contains(child)) {
-
-                    out
-                            .println(indent(height + 1)
-                                    + "ERROR clear child found in node's dirty list at index="
-                                    + i);
-
-                    ok = false;
-
-                }
+//                if (child.isDirty() && !dirtyChildren.contains(child)) {
+//
+//                    out
+//                            .println(indent(height + 1)
+//                                    + "ERROR dirty child not in node's dirty list at index="
+//                                    + i);
+//
+//                    ok = false;
+//
+//                }
+//
+//                if (!child.isDirty() && dirtyChildren.contains(child)) {
+//
+//                    out
+//                            .println(indent(height + 1)
+//                                    + "ERROR clear child found in node's dirty list at index="
+//                                    + i);
+//
+//                    ok = false;
+//
+//                }
 
                 if (child.isDirty()) {
 
@@ -2210,15 +2227,15 @@ public class Node extends AbstractNode {
 
             }
 
-            if (dirty.size() != dirtyChildren.size()) {
-
-                out.println(indent(height + 1) + "ERROR found " + dirty.size()
-                        + " dirty children, but " + dirtyChildren.size()
-                        + " in node's dirty list");
-
-                ok = false;
-
-            }
+//            if (dirty.size() != dirtyChildren.size()) {
+//
+//                out.println(indent(height + 1) + "ERROR found " + dirty.size()
+//                        + " dirty children, but " + dirtyChildren.size()
+//                        + " in node's dirty list");
+//
+//                ok = false;
+//
+//            }
 
         }
 

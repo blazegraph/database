@@ -50,6 +50,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestSplitJoinThreeLevels.class );
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
+        // test contract for BTree#touch(node) w/o IO.
+        suite.addTestSuite( TestTouch.class );
         // stress test basic tree operations w/o IO.
         suite.addTestSuite( TestBTree.class );
         // test checksum computations (used by serialization).
@@ -60,16 +62,18 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestNodeSerializer.class );
         // test iterator semantics for visiting only "dirty" nodes or leaves.
         suite.addTestSuite( TestDirtyIterators.class );
-        // test the commit protocol w/o incremental leaf eviction @todo expand tests.
+        // test incremental write of leaves and nodes.
+        suite.addTestSuite( TestIncrementalWrite.class );
+        // test copy-on-write scenarios.
+        suite.addTestSuite( TestCopyOnWrite.class );
+        // test the commit protocol. @todo expand tests.
         suite.addTestSuite( TestCommit.class );
-        // test incremental leaf eviction and copy-on-write scenarios.
-        suite.addTestSuite( TestEviction.class );
-        // @todo test copy-on-write semantics with post-commit or re-loaded tree.
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
         // test alternative key types (String and long[]) for simple RDF data model.
         suite.addTestSuite( TestTripleStore.class );
-        // @todo test tree operations for correct isolation and GC behaviors.
+        // test index is restart safe.
+        // @todo test tree operations for correct transaction isolation and GC.
         // @todo test journal commit semantics for index.
         // @todo test journal abort semantics for index.
         // @todo test journal restart semantics w/o shutdown.

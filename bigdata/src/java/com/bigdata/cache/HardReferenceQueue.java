@@ -83,7 +83,7 @@ public class HardReferenceQueue<T> {
     /**
      * The listener to which cache eviction notices are reported.
      */
-    private final HardReferenceCacheEvictionListener<T> listener;
+    private final HardReferenceQueueEvictionListener<T> listener;
     /**
      * The capacity of the cache.
      */
@@ -123,7 +123,7 @@ public class HardReferenceQueue<T> {
      *            The maximum #of references that can be stored on the cache.
      *            There is no guarentee that all stored references are distinct.
      */
-    public HardReferenceQueue(HardReferenceCacheEvictionListener<T> listener,
+    public HardReferenceQueue(HardReferenceQueueEvictionListener<T> listener,
             int capacity) {
         
         this( listener, capacity, 10);
@@ -144,7 +144,7 @@ public class HardReferenceQueue<T> {
      *            #of reference tests trads off against the latency of adding a
      *            reference to the cache.
      */
-    public HardReferenceQueue(HardReferenceCacheEvictionListener<T> listener,
+    public HardReferenceQueue(HardReferenceQueueEvictionListener<T> listener,
             int capacity, int nscan) {
         
         if( listener == null ) throw new IllegalArgumentException();
@@ -166,7 +166,7 @@ public class HardReferenceQueue<T> {
     /**
      * The  listener specified to the constructor.
      */
-    public HardReferenceCacheEvictionListener<T> getListener() {
+    public HardReferenceQueueEvictionListener<T> getListener() {
         
         return listener;
         
@@ -277,7 +277,7 @@ public class HardReferenceQueue<T> {
      * 
      * @return true iff a reference was evicted.
      * 
-     * @see HardReferenceCacheEvictionListener
+     * @see HardReferenceQueueEvictionListener
      */
     public boolean evict() {
         
@@ -503,7 +503,7 @@ public class HardReferenceQueue<T> {
      * @version $Id$
      * @param <T>
      */
-    public interface HardReferenceCacheEvictionListener<T> {
+    public interface HardReferenceQueueEvictionListener<T> {
         
         /**
          * Notice that a reference is being evicted from the cache. This notice

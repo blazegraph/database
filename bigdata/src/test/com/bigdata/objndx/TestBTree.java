@@ -86,7 +86,7 @@ public class TestBTree extends AbstractBTreeTestCase {
      */
     public void test_stress_removeStructure() {
        
-        int nkeys = 1000;
+        int nkeys = 500;
         
         doRemoveStructureStressTest(3,nkeys);
 

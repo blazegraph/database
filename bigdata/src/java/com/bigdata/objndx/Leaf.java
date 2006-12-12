@@ -130,8 +130,8 @@ public class Leaf extends AbstractNode {
         // must clear the dirty since we just de-serialized this leaf.
         setDirty(false);
 
-        // Add to the hard reference queue.
-        btree.touch(this);
+//        // Add to the hard reference queue.
+//        btree.touch(this);
         
     }
 
@@ -149,11 +149,11 @@ public class Leaf extends AbstractNode {
 
         values = new Object[branchingFactor+1];
 
-        /*
-         * Add to the hard reference queue. If the queue is full, then this will
-         * force the incremental write whatever gets evicted from the queue.
-         */
-        btree.touch(this);
+//        /*
+//         * Add to the hard reference queue. If the queue is full, then this will
+//         * force the incremental write whatever gets evicted from the queue.
+//         */
+//        btree.touch(this);
         
         btree.nleaves++;
 
@@ -163,7 +163,7 @@ public class Leaf extends AbstractNode {
      * Copy constructor.
      * 
      * @param src
-     *            The source node.
+     *            The source node (must be immutable).
      * 
      * @see AbstractNode#copyOnWrite()
      */
@@ -171,6 +171,9 @@ public class Leaf extends AbstractNode {
 
         super(src);
 
+        assert !src.isDirty();
+        assert src.isPersistent();
+        
         nkeys = src.nkeys;
 
 //        // nkeys == nvalues for a Leaf.
@@ -195,8 +198,8 @@ public class Leaf extends AbstractNode {
 //        // copy values
 //        btree.copyValues( src.values, this.values, nkeys );
         
-        // Add to the hard reference queue.
-        btree.touch(this);
+//        // Add to the hard reference queue.
+//        btree.touch(this);
 
     }
 

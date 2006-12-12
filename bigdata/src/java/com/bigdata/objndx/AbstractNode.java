@@ -286,9 +286,6 @@ public abstract class AbstractNode extends PO {
 
         this.branchingFactor = branchingFactor;
 
-//        // true iff the branching factor is odd (3,5,7,etc.)
-//        final boolean odd = (branchingFactor&1) == 1;
-        
         /*
          * Compute the minimum #of children/values. this is the same whether
          * this is a Node or a Leaf.
@@ -299,16 +296,19 @@ public abstract class AbstractNode extends PO {
         
         // The maximum #of keys is easy to compute.
         this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
-        
-        /*
-         * If this is a {@link Node} then ensures that the btree holds a hard
-         * reference to the node.
-         */
-        if( !isLeaf() ) {
-                
-            btree.nodes.add((Node)this);
 
-        }
+        // Add to the hard reference queue.
+        btree.touch(this);
+        
+//        /*
+//         * If this is a {@link Node} then ensures that the btree holds a hard
+//         * reference to the node.
+//         */
+//        if( !isLeaf() ) {
+//                
+//            btree.nodes.add((Node)this);
+//
+//        }
 
     }
 
@@ -483,7 +483,7 @@ public abstract class AbstractNode extends PO {
         } else {
 
             /*
-             * Since a clone was requested, we use this as an opportunity to
+             * Since a clone was not required, we use this as an opportunity to
              * touch the hard reference queue. This helps us to ensure that
              * nodes which have been touched recently will remain strongly
              * reachable.
