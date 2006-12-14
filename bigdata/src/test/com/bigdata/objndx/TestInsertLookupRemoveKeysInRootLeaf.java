@@ -86,9 +86,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int branchingFactor = 20;
         
-        IBTree btree = getBTree(branchingFactor);
+        BTree btree = getBTree(branchingFactor);
 
-        Leaf root = (Leaf) btree.getRoot();
+        Leaf root = (Leaf) btree.root;
         
         // array of inserted keys.
         int[] expectedKeys = new int[branchingFactor];
@@ -151,9 +151,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int branchingFactor = 20;
         
-        IBTree btree = getBTree(branchingFactor);
+        BTree btree = getBTree(branchingFactor);
 
-        Leaf root = (Leaf) btree.getRoot();
+        Leaf root = (Leaf) btree.root;
 
         // array of inserted keys.
         int[] expectedKeys = new int[branchingFactor];
@@ -292,9 +292,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int m = 4;
         
-        final IBTree btree = getBTree(m);
+        final BTree btree = getBTree(m);
 
-        final Leaf root = (Leaf) btree.getRoot();
+        final Leaf root = (Leaf) btree.root;
         
         Object e1 = new SimpleEntry();
         Object e2 = new SimpleEntry();
@@ -317,7 +317,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         assertEquals(e2,root.insert(2,e2));
         assertEquals(e1,root.insert(1,e1));
         assertEquals(e3,root.insert(3,e3));
-        assertEquals(root,btree.getRoot());
+        assertEquals(root,btree.root);
         
         // validate
         assertKeys(new int[]{1,2,3,4},root);

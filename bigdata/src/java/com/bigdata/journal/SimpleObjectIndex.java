@@ -677,22 +677,6 @@ public class SimpleObjectIndex implements IObjectIndex {
     }
 
     /**
-     * <p>
-     * Merge the transaction scope object index onto the global scope object
-     * index.
-     * </p>
-     * <p>
-     * Note: This method is invoked by a transaction during commit processing to
-     * merge the write set of its object index into the global scope. This
-     * operation does NOT check for conflicts. The pre-condition is that the
-     * transaction has already been validated (hence, there will be no
-     * conflicts). The method exists on the object index so that we can optimize
-     * the traversal of the object index in an implementation specific manner
-     * (vs exposing an iterator).  This method is also responsible for incrementing
-     * the {@link IObjectIndexEntry#getVersionCounter() version counter}s that are
-     * used to detect write-write conflicts during validation.
-     * </p>
-     * 
      * @todo For a persistence capable implementation of the object index we
      *       could clear currentVersionSlots during this operation since there
      *       should be no further access to that field. The only time that we
@@ -745,7 +729,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * FIXME Think up sneaky test cases for this method and verify its operation
      * in some detail.
      */
-    void mergeWithGlobalObjectIndex(Journal journal) {
+    public void mergeWithGlobalObjectIndex(Journal journal) {
         
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;
@@ -845,36 +829,6 @@ public class SimpleObjectIndex implements IObjectIndex {
     }
     
     /**
-     * <p>
-     * Validate changes made within the transaction against the last committed
-     * state of the journal. In general there are two kinds of conflicts:
-     * read-write conflicts and write-write conflicts. Read-write conflicts are
-     * handled by NEVER overwriting an existing version (an MVCC style
-     * strategy). Write-write conflicts are detected by backward validation
-     * against the last committed state of the journal. A write-write conflict
-     * exists IFF the version counter on the transaction index entry differs
-     * from the version counter in the global index scope. Once detected, a the
-     * resolution of a write-write conflict is delegated to a
-     * {@link IConflictResolver conflict resolver}. If a write-write
-     * conflict can not be validated, then validation will fail and the
-     * transaction will abort. The version counters are incremented during
-     * commit as part of the merge down of the transaction's object index onto
-     * the global object index.
-     * </p>
-     * <p>
-     * Validation occurs as part of the prepare/commit protocol. Concurrent
-     * transactions MAY continue to run without limitation. A concurrent commit
-     * (if permitted) would force re-validation since the transaction MUST now
-     * be validated against the new baseline. (It is possible that this
-     * validation could be optimized.)
-     * </p>
-     *
-     * @param journal The journal.
-     * 
-     * @param tx The transaction being validated.
-     * 
-     * @return True iff validation succeeds.
-     * 
      * FIXME As a trivial case, if no intervening commits have occurred on the
      * journal then this transaction MUST be valid regardless of its write (or
      * delete) set.  This test probably needs to examine the current root block
@@ -886,7 +840,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * that serves as the basis for this transaction (the committed state whose
      * object index this transaction uses as its inner read-only context).
      */
-    boolean validate(Journal journal,IStore tx) {
+    public boolean validate(Journal journal,IStore tx) {
         
         /*
          * This MUST be the journal's object index. The journals' object index
@@ -1072,8 +1026,7 @@ public class SimpleObjectIndex implements IObjectIndex {
      * incremental and atomic, but it needs a distinct commit point, it must be
      * restart safe, etc.).
      */
-
-    void gc(ISlotAllocationIndex allocationIndex) {
+    public void gc(ISlotAllocationIndex allocationIndex) {
         
         // Verify that this is a transaction scope object index.
         assert baseObjectIndex != null;

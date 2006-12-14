@@ -49,6 +49,7 @@ package com.bigdata.objndx;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 
@@ -143,7 +144,7 @@ public class Leaf extends AbstractNode {
      */
     protected Leaf(BTree btree) {
 
-        super(btree, btree.getBrachingFactor());
+        super(btree, btree.branchingFactor);
 
         keys = allocKeys(btree.keyType,branchingFactor+1);
 
@@ -890,6 +891,7 @@ public class Leaf extends AbstractNode {
 
         if (dirtyNodesOnly && ! isDirty() ) {
 
+//            return EmptyAbstractNodeIterator.INSTANCE;
             return EmptyIterator.DEFAULT;
 
         } else {
@@ -899,6 +901,64 @@ public class Leaf extends AbstractNode {
         }
 
     }
+
+//    /**
+//     * Strongly typed empty iterator with a public single instance.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private final static class EmptyAbstractNodeIterator implements Iterator<AbstractNode> {
+//
+//        public static final Iterator<AbstractNode> INSTANCE = new EmptyAbstractNodeIterator();
+//        
+//        private EmptyAbstractNodeIterator() {}
+//        
+//        public boolean hasNext() {
+//            return false;
+//        }
+//
+//        public AbstractNode next() {
+//            return null;
+//        }
+//
+//        public void remove() {
+//            throw new UnsupportedOperationException();
+//        }
+//        
+//    }
+//
+//    /**
+//     * Strongly typed iterator visits a single {@link AbstractNode}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private final static class SingletonAbstractNodeIterator implements Iterator<AbstractNode> {
+//
+//        private final AbstractNode node;
+//        private boolean exhausted = false;
+//        
+//        public SingletonAbstractNodeIterator(AbstractNode node) {
+//            assert node != null;
+//            this.node = node;
+//        }
+//        
+//        public boolean hasNext() {
+//            return ! exhausted;
+//        }
+//
+//        public AbstractNode next() {
+//            if( exhausted ) throw new NoSuchElementException();
+//            exhausted = true;
+//            return node;
+//        }
+//
+//        public void remove() {
+//            throw new UnsupportedOperationException();
+//        }
+//
+//    }
 
     /**
      * Iterator visits the values in key order.

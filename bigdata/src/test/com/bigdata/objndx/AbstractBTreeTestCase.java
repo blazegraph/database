@@ -1545,7 +1545,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     private void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {
         
-        log.info("m="+btree.getBrachingFactor()+", nkeys="+keys.length);
+        log.info("m="+btree.getBranchingFactor()+", nkeys="+keys.length);
         
         /*
          * Insert keys into the tree.

@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
+
 
 /**
  * <p>
@@ -135,6 +137,77 @@ public interface IObjectIndex {
      * 
      */
     public void delete( int id );
+ 
+    /**
+     * <p>
+     * Merge the transaction scope object index onto the global scope object
+     * index.
+     * </p>
+     * <p>
+     * Note: This method is invoked by a transaction during commit processing to
+     * merge the write set of its object index into the global scope. This
+     * operation does NOT check for conflicts. The pre-condition is that the
+     * transaction has already been validated (hence, there will be no
+     * conflicts). The method exists on the object index so that we can optimize
+     * the traversal of the object index in an implementation specific manner
+     * (vs exposing an iterator).  This method is also responsible for incrementing
+     * the {@link IObjectIndexEntry#getVersionCounter() version counter}s that are
+     * used to detect write-write conflicts during validation.
+     * </p>
+     */
+    public void mergeWithGlobalObjectIndex(Journal journal);
+
+    /**
+     * <p>
+     * Validate changes made within the transaction against the last committed
+     * state of the journal. In general there are two kinds of conflicts:
+     * read-write conflicts and write-write conflicts. Read-write conflicts are
+     * handled by NEVER overwriting an existing version (an MVCC style
+     * strategy). Write-write conflicts are detected by backward validation
+     * against the last committed state of the journal. A write-write conflict
+     * exists IFF the version counter on the transaction index entry differs
+     * from the version counter in the global index scope. Once detected, a the
+     * resolution of a write-write conflict is delegated to a
+     * {@link IConflictResolver conflict resolver}. If a write-write conflict
+     * can not be validated, then validation will fail and the transaction will
+     * abort. The version counters are incremented during commit as part of the
+     * merge down of the transaction's object index onto the global object
+     * index.
+     * </p>
+     * <p>
+     * Validation occurs as part of the prepare/commit protocol. Concurrent
+     * transactions MAY continue to run without limitation. A concurrent commit
+     * (if permitted) would force re-validation since the transaction MUST now
+     * be validated against the new baseline. (It is possible that this
+     * validation could be optimized.)
+     * </p>
+     * 
+     * @param journal
+     *            The journal.
+     * 
+     * @param tx
+     *            The transaction being validated.
+     * 
+     * @return True iff validation succeeds.
+     */
+    public boolean validate(Journal journal,IStore tx);
+
+    /**
+     * @todo document and reconcile with a clustered object index. also, if we
+     *       go with a scale out design an journal snapshots where index ranges
+     *       are evicted to index segments then we never need to both with GC
+     *       inside of the journal and we can use a WORM style allocator
+     *       (perfect fit allocation vs slots).
+     * 
+     * After a commit, the only entries that we expect to find in the
+     * transaction's object index are those where a pre-existing version was
+     * overwritten by the transaction. We just deallocate the slots for those
+     * pre-existing versions.
+     * 
+     * @param allocationIndex
+     *            The index on which slot allocations are maintained.
+     */
+    public void gc(ISlotAllocationIndex allocationIndex);
     
     /**
      * Indicates that the current data version for the persistent identifier was

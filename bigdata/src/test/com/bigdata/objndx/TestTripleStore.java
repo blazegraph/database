@@ -234,11 +234,36 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
             properties = super.getProperties();
 
+            /*
+             * Note: all buffer modes report in between 150 and 200k sustained
+             * triples per second insert rate out to 10M triples on my dell
+             * latitude 620 laptop. The transient mode is faster (~200k tps),
+             * but not as much faster as I would have expected seeing as it is
+             * not writing to disk while the other modes are. One thing worth
+             * exploring is the tradeoff in the branching factor of the btree.
+             * Since the disk and direct buffer modes currently write through to
+             * disk with each write, we might see better performance with a
+             * smaller branching factor in conjunction with deferring until a
+             * larger IO can be performed, e.g., 32-64k chunks. I have done some
+             * experimenting and there does seem to be better performance with a
+             * higher branching factor (not 64, but 128, 196, or 256). Since the
+             * btree data structure is slower for larger branching factors due
+             * to memory overhead, I suspect the increased in performance is due
+             * to larger IOs. A little more experimenting, and I see that
+             * performance with the transient store increases with the branching
+             * factor until at least 256 and possibly 384. I am now seeing ~
+             * 170k tps for the disk and direct buffer modes and close to 200k
+             * tps for the transient store with a branching factor of 256. The
+             * increase in performance may be due to lower memory allocation
+             * rates being less expense that increase moving around of data in
+             * the nodes and leaves of the tree.
+             */
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
 //                    .toString());
-
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
                     .toString());
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+//                    .toString());
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
             properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
@@ -1343,9 +1368,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             
             System.err.println("incremental commit");
 
-            ndx_uri.commit();
-            ndx_lit.commit();
-            ndx_spo.commit();
+            ndx_uri.write();
+            ndx_lit.write();
+            ndx_spo.write();
             
         }
 

@@ -785,7 +785,10 @@ abstract public class AbstractTestCase
      */
     protected void assertVersionCounter(Tx tx, int id, int expectedVersionCounter ) {
         
-        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
+        // FIXME hardwired to SimpleObjectIndex.
+        IObjectIndexEntry entry = ((SimpleObjectIndex)tx.getObjectIndex()).objectIndex.get(id);
+        
+//        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
         
         if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
         

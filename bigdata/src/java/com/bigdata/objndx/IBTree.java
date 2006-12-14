@@ -47,8 +47,6 @@
 
 package com.bigdata.objndx;
 
-import com.bigdata.journal.IRawStore;
-
 /**
  * Interface for a B-Tree mapping arbitrary non-null keys to arbitrary values.
  * 
@@ -56,52 +54,6 @@ import com.bigdata.journal.IRawStore;
  * @version $Id$
  */
 public interface IBTree {
-
-    /**
-     * The persistence store.
-     */
-    public IRawStore getStore();
-
-    /**
-     * The branching factor for the btree.
-     */
-    public int getBrachingFactor();
-
-    /**
-     * The height of the btree. The height is the #of leaves minus one. A
-     * btree with only a root leaf is said to have <code>height := 0</code>.
-     * Note that the height only changes when we split the root node.
-     */
-    public int getHeight();
-
-    /**
-     * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
-     */
-    public int getNodeCount();
-
-    /**
-     * The #of leaf nodes in the btree.  This is one (1) for a new btree.
-     */
-    public int getLeafCount();
-
-    /**
-     * The #of entries (aka values) in the btree. This is zero (0) for a new
-     * btree.
-     */
-    public int size();
-
-    /**
-     * The object responsible for (de-)serializing the nodes and leaves of the
-     * {@link BTree}.
-     */
-    public NodeSerializer getNodeSerializer();
-
-    /**
-     * The root of the btree. This is initially a leaf until the leaf is
-     * split, at which point it is replaced by a node. The root is also
-     * replaced each time copy-on-write triggers a cascade of updates.
-     */
-    public AbstractNode getRoot();
 
     /**
      * Insert an entry under the external key.
@@ -135,12 +87,6 @@ public interface IBTree {
     public Object remove(Object key);
     
     /**
-     * Deallocate all storage associated with this btree (nodes, leaves, and
-     * the metadata record for the btree itself).
-     */
-    public void delete();
-
-    /**
      * Return an iterator that visits key-value pairs in a half-open key range.
      * 
      * @param fromKey
@@ -150,29 +96,4 @@ public interface IBTree {
      */
     public IRangeIterator rangeIterator(Object fromKey, Object toKey);
     
-    /**
-     * Commit dirty nodes using a post-order traversal that first writes any
-     * dirty leaves and then (recursively) their parent nodes. The parent nodes
-     * are guarenteed to be dirty if there is a dirty child so the commit never
-     * triggers copy-on-write.
-     * 
-     * @return The persistent identity of the metadata record for the btree.
-     * 
-     * @todo update javadoc - this is basically a checkpoint. the commit
-     *       protocol is at the journal level and involves validating and
-     *       merging down onto the corresponding global index.
-     * 
-     * does the following javadoc belong on this class or in a journal api?
-     * 
-     * <pre>
-     *   The interface and its implementation provide specialized support for
-     *   transactional isolation object index from int32 within segment persistent
-     *   identifiers to the metadata required by the concurrency control policy to
-     *   track both the current state of the object, detect write-write conflicts, and
-     *   efficiently garbage collect historical versions that are no longer accessible
-     *   to any active transaction.
-     * </pre>
-     */
-    public long commit();
-
 }

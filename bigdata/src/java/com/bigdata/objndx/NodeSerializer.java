@@ -53,7 +53,6 @@ import java.util.zip.Adler32;
 import java.util.zip.Checksum;
 
 import com.bigdata.journal.Bytes;
-import com.bigdata.journal.ISlotAllocation;
 
 /**
  * <p>
@@ -395,7 +394,7 @@ public class NodeSerializer {
                         + this + ", child index=" + i);
             }
             
-            putNodeRef(buf, childKey);
+            buf.putLong(childKey);
             
         }
 
@@ -487,7 +486,7 @@ public class NodeSerializer {
 
         for (int i = 0; i <= nkeys; i++) {
 
-            children[i] = getNodeRef(buf);
+            children[i] = buf.getLong();
 
         }
 
@@ -637,94 +636,6 @@ public class NodeSerializer {
         // Done.
         return new Leaf( btree, id, branchingFactor, nkeys, keys, values);
 
-    }
-
-    /**
-     * When writing a reference to a node or leaf we only write the firstSlot
-     * value (int32). However, we write -(firstSlot) if the reference is to a
-     * leaf node (we can decide this based on the size of the allocation). When
-     * the reference is a "null", we just write zero(0). This helps us keep the
-     * size of the non-leaf nodes down and improves overall utilization of the
-     * store.
-     * 
-     * @param buf
-     *            The buffer on which we write an int32 value.
-     * @param longValue
-     *            The {@link ISlotAllocation} of the reference, encoded as a
-     *            long integer.
-     */
-    private void putNodeRef(ByteBuffer buf, long longValue) {
-
-        buf.putLong(longValue);
-        
-//        if( longValue == 0L ) {
-//
-//            // Special case for null ref.
-//            buf.putInt(0);
-//            
-//            return;
-//            
-//        }
-//        
-//        final int nbytes = SlotMath.getByteCount(longValue);
-//        
-//        final int firstSlot = SlotMath.getFirstSlot(longValue);
-//        
-//        if( nbytes == NODE_SIZE) {
-//        
-//            // Store as firstSlot (positive integer).
-//            buf.putInt(firstSlot);
-//            
-//        } else if( nbytes == LEAF_SIZE ) {
-//            
-//            // Store as -(firstSlot) (negative integer).
-//            buf.putInt(-firstSlot);
-//            
-//        } else {
-//            
-//            throw new AssertionError(
-//                    "Allocation size matches neither node nor leaf: firstSlot="
-//                            + firstSlot + ", nbytes=" + nbytes);
-//            
-//        }
-        
-    }
-
-    /**
-     * Reads an int32 value from the buffer and decodes it.
-     * 
-     * @param buf
-     *            The buffer from which to read the value.
-     * 
-     * @return The {@link ISlotAllocation} for the reference or zero(0L) iff
-     *         this was a null reference.
-     * 
-     * @see #putNodeRef(ByteBuffer, long)
-     */
-    private long getNodeRef(ByteBuffer buf) {
-
-        return buf.getLong();
-        
-//        final int firstSlot = buf.getInt();
-//        
-//        final long longValue;
-//        
-//        if (firstSlot == 0) {
-//            
-//            longValue = 0;
-//            
-//        } else if (firstSlot > 0) {
-//            
-//            longValue = SlotMath.toLong(NODE_SIZE, firstSlot);
-//            
-//        } else {
-//            
-//            longValue = SlotMath.toLong(LEAF_SIZE, -firstSlot);
-//            
-//        }
-//        
-//        return longValue;
-        
     }
 
 }

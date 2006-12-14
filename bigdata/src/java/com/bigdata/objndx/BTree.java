@@ -61,6 +61,9 @@ import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
 
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * <p>
  * This class implements a variant of a B+Tree in which all values are stored in
@@ -274,7 +277,7 @@ public class BTree implements IBTree {
     /**
      * The default branching factor.
      */
-    static public final int DEFAULT_BRANCHING_FACTOR = 64;
+    static public final int DEFAULT_BRANCHING_FACTOR = 256;
     
     /**
      * The minimum hard reference queue capacity is two(2) in order to avoid
@@ -386,42 +389,68 @@ public class BTree implements IBTree {
     
     protected final Counters counters = new Counters();
     
+    /**
+     * The persistence store.
+     */
     public IRawStore getStore() {
         
         return store;
         
     }
     
-    public int getBrachingFactor() {
+    /**
+     * The branching factor for the btree.
+     */
+    public int getBranchingFactor() {
         
         return branchingFactor;
         
     }
 
+    /**
+     * The height of the btree. The height is the #of leaves minus one. A
+     * btree with only a root leaf is said to have <code>height := 0</code>.
+     * Note that the height only changes when we split the root node.
+     */
     public int getHeight() {
         
         return height;
         
     }
 
+    /**
+     * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
+     */
     public int getNodeCount() {
         
         return nnodes;
         
     }
 
+    /**
+     * The #of leaf nodes in the btree.  This is one (1) for a new btree.
+     */
     public int getLeafCount() {
         
         return nleaves;
         
     }
 
+    /**
+     * The #of entries (aka values) in the btree. This is zero (0) for a new
+     * btree.  The returned value reflects only the #of entries in the btree
+     * and does not report the #of entries in a segmented index.
+     */
     public int size() {
         
         return nentries;
         
     }
 
+    /**
+     * The object responsible for (de-)serializing the nodes and leaves of the
+     * {@link BTree}.
+     */
     public NodeSerializer getNodeSerializer() {
         
         return nodeSer;
@@ -604,7 +633,7 @@ public class BTree implements IBTree {
 
      /**
       * The metadataId that can be used to load the last state of the index
-      * that was written by {@link #commit()}.  When an index is loaded this
+      * that was written by {@link #write()}.  When an index is loaded this
       * is set to the metadataId specified to the constructor.  When a new
       * index is created, this is initially 0L.
       */
@@ -639,6 +668,11 @@ public class BTree implements IBTree {
      */
     int nentries;
 
+    /**
+     * The root of the btree. This is initially a leaf until the leaf is
+     * split, at which point it is replaced by a node. The root is also
+     * replaced each time copy-on-write triggers a cascade of updates.
+     */
     public AbstractNode getRoot() {
 
         return root;
@@ -797,7 +831,8 @@ public class BTree implements IBTree {
             Object NEGINF,
             Comparator comparator,
             IKeySerializer keySer,
-            IValueSerializer valueSer)
+            IValueSerializer valueSer
+            )
     {
 
         assert store != null;
@@ -1341,18 +1376,19 @@ public class BTree implements IBTree {
             + Bytes.SIZEOF_INT * 6;
 
     /**
-     * @todo reconcile the notion of a commit with transactional isolation vs
-     *       simply flushing to the store. This could really be renamed "flush".
-     *       An atomic commit would validate all indices in the journal that are
-     *       touched within a given transaction and then merge down the indices
-     *       into the global scope on the transaction, flush each index in the
-     *       global scope, and then write a new root block in which were
-     *       recorded the location of the metadata block of each index defined
-     *       for the journal. Those indices that were modified by the
-     *       transaction will have new metadata blocks while those that were not
-     *       modified should reuse their old metadata block.
+     * Writes dirty nodes using a post-order traversal that first writes any
+     * dirty leaves and then (recursively) their parent nodes. The parent nodes
+     * are guarenteed to be dirty if there is a dirty child so the commit never
+     * triggers copy-on-write. This is basically a checkpoint -- it is NOT an
+     * atomic commit. The commit protocol is at the store level and involves
+     * validating and merging down onto the corresponding global index.
+     * 
+     * @return The persistent identity of the metadata record for the btree. The
+     *         btree can be reloaded from this metadata record. When used as
+     *         part of an atomic commit protocol, the metadata record address is
+     *         written into a slot on the root block or a named root object.
      */
-    public long commit() {
+    public long write() {
 
         if (root.isDirty()) {
 
@@ -1409,5 +1445,510 @@ public class BTree implements IBTree {
         return new RangeIterator(this,fromKey,toKey);
         
     }
+
+    /**
+     * Iterator visits the leaves of the tree.
+     * 
+     * @return Iterator visiting the {@link Leaf leaves} of the tree.
+     * 
+     * @todo optimize this if we add prior-next leaf references. 
+     */
+    protected Iterator leafIterator() {
+        
+        return new Striterator(root.postOrderIterator())
+                .addFilter(new Filter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    protected boolean isValid(Object arg0) {
+
+                        return arg0 instanceof Leaf;
+
+                    }
+                });
+        
+    }
+    
+//    /*
+//     * Interface for transactional isolation. 
+//     */
+//    
+//    /**
+//     * Returns a fully isolated btree suitable for use within a transaction.
+//     * Writes will be applied to the isolated btree. Reads will read first on
+//     * the isolated btree and then read through to the source btree iff no entry
+//     * is found for a key in the outer btree. In order to commit the changes on
+//     * the source btree, the changes must first be {@link #validate() validated},
+//     * {@link #mergeDown() merged down} onto the source btree, and dirty nodes
+//     * and leaves in the source btree must be written onto the store. Finally,
+//     * the store must record the new metadata record for the source btree in a
+//     * root block and commit. This protocol can be generalized to allow multiple
+//     * btrees to be isolated and atomically committed within the same
+//     * transaction. On abort, it is possible that nodes and leaves were written
+//     * on the store for the isolated btree. Those data are unreachable and MAY
+//     * be recovered depending on the nature of the store and its abort protocol.
+//     * 
+//     * @param src
+//     *            An unisolated btree that will serve as the ground state for
+//     *            the transactional view.
+//     * 
+//     * @todo There are a few problems with this approach <br>
+//     *       First, using a btree with MVCC requires that we record a timestamp
+//     *       or version counter with each object. This can be implemented using
+//     *       either a wrapper class (VersionedBTree) that delegates to BTree and
+//     *       encapsulates values as {value,timestamp} entries. Alternatively, we
+//     *       could maintain version counters either full time or optionally in
+//     *       all leaves as another int[] or long[], one per value. <br>
+//     *       Second, we need a means to have active transactions span instances
+//     *       of a journal (as each journal fills up it is eventually frozen, a
+//     *       new journal is opened, and the indices from the old journal are
+//     *       rebuilt in perfect read-only index segments on disk; those segments
+//     *       are periodically compacted and segments that grow too large are
+//     *       split). when we use a transient map to isolate writes then a
+//     *       journal contains only committed state.<br>
+//     *       Third, the isolated btree needs to start from the committed stable
+//     *       state of another btree (a possible exception is the first
+//     *       transaction to create a given btree). In order to verify that the
+//     *       source btree meets those requirements we need to know that it was
+//     *       loaded from a historical metadata record, e.g., as found in a root
+//     *       block or a read-only root names index found in a root block. Merely
+//     *       having a persistent root is NOT enough since just writing the tree
+//     *       onto the store does not make it restart safe.<br>
+//     *       Fourth, it would be very nice if we could reuse immutable nodes
+//     *       from the last committed state of a given btree. However, we can not
+//     *       simply use the BTree instance from the global state since
+//     *       intervening writes will show up inside of its node set and the view
+//     *       MUST be of a historical ground state.
+//     */
+//    public BTree(BTree src) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
+//    
+//    /**
+//     * <p>
+//     * Validate changes made to the index within a transaction against the last
+//     * committed state of the index in the global scope. In general there are
+//     * two kinds of conflicts: read-write conflicts and write-write conflicts.
+//     * Read-write conflicts are handled by NEVER overwriting an existing version
+//     * (an MVCC style strategy). Write-write conflicts are detected by backward
+//     * validation against the last committed state of the journal. A write-write
+//     * conflict exists IFF the version counter on the transaction index entry
+//     * differs from the version counter in the global index scope. Once
+//     * detected, the resolution of a write-write conflict is delegated to a
+//     * {@link IConflictResolver conflict resolver}. If a write-write conflict
+//     * can not be validated, then validation will fail and the transaction must
+//     * abort. The version counters are incremented during commit as part of the
+//     * {@link #mergeDown()} of the transaction scope index onto the global scope
+//     * index.
+//     * </p>
+//     * <p>
+//     * Validation occurs as part of the prepare/commit protocol. Concurrent
+//     * transactions MAY continue to run without limitation. A concurrent commit
+//     * (if permitted) would force re-validation since the transaction MUST now
+//     * be validated against the new baseline. (It is possible that this
+//     * validation could be optimized.)
+//     * </p>
+//     * 
+//     * @return True iff validation succeeds.
+//     * 
+//     * FIXME As a trivial case, if no intervening commits have occurred on the
+//     * journal then this transaction MUST be valid regardless of its write (or
+//     * delete) set. This test probably needs to examine the current root block
+//     * and the transaction to determine if there has been an intervening commit.
+//     * 
+//     * FIXME Make validation efficient by a streaming pass over the write set of
+//     * this transaction that detects when the transaction identifier for the
+//     * global object index has been modified since the transaction identifier
+//     * that serves as the basis for this transaction (the committed state whose
+//     * object index this transaction uses as its inner read-only context).
+//     */
+//    public boolean validate() {
+//        
+//        if(true) throw new UnsupportedOperationException();
+//
+//        /*
+//         * This MUST be the journal's object index. The journals' object index
+//         * is NOT always the same as the inner object index map used normally by
+//         * the transaction since other transactions MAY have committed on the
+//         * journal since the transaction started. If you use the inner object
+//         * index for the transaction by mistake then interleaved transactions
+//         * will NOT be visible and write-write conflicts will NOT be detected.
+//         */
+//        final ObjectIndex globalScope = (ObjectIndex)journal.objectIndex;
+//        
+//        /*
+//         * Note: Write-write conflicts can be validated iff a conflict resolver
+//         * was declared when the Journal object was instantiated.
+//         */
+//        final IConflictResolver conflictResolver = journal.getConflictResolver();
+//        
+//        // Verify that this is a transaction scope object index.
+//        assert baseObjectIndex != null;
+//        
+//        /*
+//         * A read-only transaction whose ground state is the current committed
+//         * state of the journal. This will be exposed to the conflict resolver
+//         * so that it can read the current state of objects committed on the
+//         * journal.
+//         * 
+//         * @todo Extract ITx and refactor Tx to write this class. What is the
+//         * timestamp concept for this transaction or does it simply fail to
+//         * register itself with the journal?
+//         */
+//        IStore readOnlyTx = null; // new ReadOnlyTx(journal);
+//        
+//        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
+//        
+//        while( itr.hasNext() ) {
+//            
+//            // The value for that persistent identifier in the transaction.
+//            final SimpleEntry txEntry = (SimpleEntry) itr.next();
+//            
+//            // The persistent identifier.
+//            final Integer id = (Integer) itr.getKey();
+//            
+//            // Lookup the entry in the global scope.
+//            IObjectIndexEntry baseEntry = (IObjectIndexEntry)globalScope.objectIndex.lookup(id);
+//            
+//            /*
+//             * If there is an entry in the global scope, then we MUST compare the
+//             * version counters.
+//             */
+//            if( baseEntry != null ) {
+//
+//                /*
+//                 * If the version counters do not agree then we need to perform
+//                 * write-write conflict resolution.
+//                 */
+//                if( baseEntry.getVersionCounter() != txEntry.getVersionCounter() ) {
+//
+//                    if( conflictResolver == null ) {
+//                        
+//                        System.err.println("Could not validate write-write conflict: id="+id);
+//                        
+//                        // validation failed.
+//                        
+//                        return false;
+//                        
+//                    } else {
+//                        
+//                        try {
+//                            
+//                            conflictResolver.resolveConflict(id,readOnlyTx,tx);
+//                            
+//                        } catch( Throwable t ) {
+//                            
+//                            System.err.println("Could not resolve write-write conflict: id="+id+" : "+t);
+//                            
+//                            return false;
+//                            
+//                        }
+//
+//                        /*
+//                         * FIXME We need to write the resolved version on the
+//                         * journal. However, we have to take care since this can
+//                         * result in a concurrent modification of the
+//                         * transaction's object index, which we are currently
+//                         * traversing.
+//                         * 
+//                         * The simple way to handle this is to accumulate
+//                         * updates from conflict resolution during validation
+//                         * and write them afterwards when we are no longer
+//                         * traversing the transaction's object index.
+//                         * 
+//                         * A better way would operate at a lower level and avoid
+//                         * the memory allocation and heap overhead for those
+//                         * temporary structures - this works well if we know
+//                         * that only the current entry will be updated by
+//                         * conflict resolution.
+//                         * 
+//                         * Finally, if more than one entry can be updated when
+//                         * we MUST use an object index data structure for the
+//                         * transaction that is safe for concurrent modification
+//                         * and we MUST track whether each entry has been
+//                         * resolved and scan until all entries resolve or a
+//                         * conflict is reported. Ideally cycles will be small
+//                         * and terminate quickly (ideally validation itself will
+//                         * terminate quickly), in which case we could use a
+//                         * transient data structure to buffer concurrent
+//                         * modifications to the object index. In that case, we
+//                         * only need to buffer records that are actually
+//                         * overwritten during validation - but that change would
+//                         * need to be manifest throughout the object index
+//                         * support since it is essentially stateful (or by
+//                         * further wrapping of the transaction's object index
+//                         * with a buffer!).
+//                         */
+//                        
+//                    }
+//                    
+//                }
+//                
+//                if( baseEntry.getVersionCounter() == Long.MAX_VALUE ) {
+//                    
+//                    /*
+//                     * @todo There may be ways to handle this, but that is
+//                     * really a LOT of overwrites. For example, we could just
+//                     * transparently promote the field to a BigInteger, which
+//                     * would require storing it as a Number rather than a
+//                     * [long]. Another approach is to only rely on "same or
+//                     * different". With that approach we could use a [short] for
+//                     * the version counter, wrap to zero on overflow, and there
+//                     * would not be a problem unless there were 32k new versions
+//                     * of this entry written while the transaction was running
+//                     * (pretty unlikely, and you can always use a packed int or
+//                     * long if you are worried :-) We could also just use a
+//                     * random number and accept rollback if the random values
+//                     * happened to collide.
+//                     */
+//                    
+//                    throw new RuntimeException("Too many overwrites: id="+id);
+//                    
+//                }
+//
+//                /*
+//                 * Increment the version counter. We add one to the current
+//                 * version counter in the _global_ scope since that was the
+//                 * current version at the time that the write-write conflict was
+//                 * detected.
+//                 * 
+//                 * Note: We MUST bump the version counter even if the "WRITE"
+//                 * was a "DELETE" otherwise we will fail to notice a write-write
+//                 * conflict where an intervening transaction deletes the version
+//                 * and commits before an overwrite of the version by a concurrent
+//                 * transaction.
+//                 */
+//                txEntry.versionCounter = (short) (baseEntry.getVersionCounter() + 1);
+//                                
+//            }
+//            
+//        }
+//
+//        // validation suceeded.
+//        
+//        return true;
+//
+//    }
+//
+//    /**
+//     * <p>
+//     * Merge the transaction scope index onto its global scope index.
+//     * </p>
+//     * <p>
+//     * Note: This method is invoked by a transaction during commit processing to
+//     * merge the write set of an index into the global scope. This operation
+//     * does NOT check for conflicts. The pre-condition is that the transaction
+//     * has already been validated (hence, there will be no conflicts). This
+//     * method is also responsible for incrementing the version counters that are
+//     * used to detect write-write conflicts during validation.
+//     * </p>
+//     * 
+//     * @todo For a persistence capable implementation of the object index we
+//     *       could clear currentVersionSlots during this operation since there
+//     *       should be no further access to that field. The only time that we
+//     *       will go re-visit the committed object index for the transaction is
+//     *       when we GC the pre-existing historical versions overwritten during
+//     *       that transaction. Given that, we do not even need to store the
+//     *       object index root for a committed transaction (unless we want to
+//     *       provide a feature for reading historical states, which is NOT part
+//     *       of the journal design). So another option is to just write a chain
+//     *       of {@link ISlotAllocation} objects. (Note, per the item below GC
+//     *       also needs to remove entries from the global object index so this
+//     *       optimization may not be practical). This could be a single long
+//     *       run-encoded slot allocation spit out onto a series of slots during
+//     *       PREPARE. When we GC the transaction, we just read the chain,
+//     *       deallocate the slots found on that chain, and then release the
+//     *       chain itself (it could have its own slots added to the end so that
+//     *       it is self-consuming). Just pay attention to ACID deallocation so
+//     *       that a partial operation does not have side-effects (at least, side
+//     *       effects that we do not want). This might require a 3-bit slot
+//     *       allocation index so that we can encode the conditional transition
+//     *       from (allocated + committed) to (deallocated + uncommitted) and
+//     *       know that on restart the state should be reset to (allocated +
+//     *       committed).
+//     * 
+//     * @todo GC should remove the 'deleted' entries from the global object index
+//     *       so that the index size does not grow without limit simply due to
+//     *       deleted versions. This makes it theoretically possible to reuse a
+//     *       persistent identifier once it has been deleted, is no longer
+//     *       visible to any active transaction, and has had the slots
+//     *       deallocated for its last valid version. However, in practice this
+//     *       would require that the logic minting new persistent identifiers
+//     *       received notice as old identifiers were expired and available for
+//     *       reuse. (Note that applications SHOULD use names to recover root
+//     *       objects from the store rather than their persistent identifiers.)
+//     * 
+//     * FIXME Validation of the object index MUST specifically treat the case
+//     * when no version for a persistent identifier exists in the ground state
+//     * for a tx, another tx begins and commits having written a version for that
+//     * identifier, and then this tx attempts to commit having written (or
+//     * written and deleted) a version for that identifier. Failure to treat this
+//     * case will cause problems during the merge since there will be an entry in
+//     * the global scope that was NOT visible to this transaction (which executed
+//     * against a distinct historical global scope). My take is the persistent
+//     * identifier assignment does not tend to have semantics (they are not
+//     * primary keys, but opaque identifiers) therefore we MUST NOT consider them
+//     * to be the same "object" and an unreconcilable write-write conflict MUST
+//     * be reported during validation. (Essentially, two transactions were handed
+//     * the same identifier for new objects.)
+//     * 
+//     * FIXME Think up sneaky test cases for this method and verify its operation
+//     * in some detail.
+//     */
+//    public void mergeDown() {
+//
+//        if(true) throw new UnsupportedOperationException();
+//        
+//        // Verify that this is a transaction scope object index.
+//        assert baseObjectIndex != null;
+//        
+//        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
+//        
+//        while( itr.hasNext() ) {
+//            
+//            // The value for that persistent identifier.
+//            IObjectIndexEntry entry = (IObjectIndexEntry) itr.next();
+//            
+//            // The persistent identifier.
+//            final Integer id = (Integer) itr.getKey();
+//            
+//            if( entry.isDeleted() ) {
+//
+//                /*
+//                 * IFF there was a pre-existing version in the global scope then
+//                 * we clear the 'currentVersionSlots' in the entry in the global
+//                 * scope and mark the index entry as dirty. The global scope
+//                 * will now recognized the persistent identifier as 'deleted'.
+//                 */
+//                
+//                if( entry.isPreExistingVersionOverwritten() ) {
+//
+//                    /*
+//                     * Update the entry in the global object index.
+//                     * 
+//                     * Note: the same post-conditions could be satisified by
+//                     * getting the entry in the global scope, clearing its
+//                     * [currentVersionSlots] field, settting its
+//                     * [preExistingVersionSlots] field and marking the entry as
+//                     * dirty -- that may be more effective with a persistence
+//                     * capable implementation. It is also more "obvious" and
+//                     * safer since there is no reference sharing.
+//                     */
+//                    ((ObjectIndex)journal.objectIndex).objectIndex.insert(id,entry);
+//                    
+//                } else {
+//                    
+//                    /*
+//                     * The deleted version never existed in the global scope.
+//                     */
+//                    
+//                }
+//
+//            } else {
+//
+//                /*
+//                 * Copy the entry down onto the global scope.
+//                 */
+//                ((ObjectIndex)journal.objectIndex).objectIndex.insert(id, entry);
+//
+//                /*
+//                 * Mark the slots for the current version as committed.
+//                 * 
+//                 * @todo This MUST be atomic. (It probably will be once it is
+//                 * modified for a persistence capable index since we do not
+//                 * record the new root of the object index on the journal until
+//                 * the moment of the commit, so while dirty index nodes may be
+//                 * evicted onto the journal, they are not accessible in case of
+//                 * a transaction restart. This does suggest a recursive twist
+//                 * with whether or not the slots for the index nodes themsevles
+//                 * are marked as committed on the journal -- all stuff that
+//                 * needs tests!)
+//                 */
+//                journal.allocationIndex.setCommitted(entry.getCurrentVersionSlots());
+//                
+//            }
+//            
+//            /*
+//             * The slots allocated to the pre-existing version are retained in
+//             * the index entry for this transaction until the garbage collection
+//             * is run for the transaction. This is true regardless of whether
+//             * new version(s) were written in this transaction, if the
+//             * pre-existing version was simply deleted, or if the most recent
+//             * versions written by this transaction was finally deleted. If the
+//             * entry is holding the slots for a pre-existing version that was
+//             * overwritten then we MUST NOT remove it from the transaction's
+//             * object index. That information is required later to GC the
+//             * pre-existing versions.
+//             */
+//            
+//            if( ! entry.isPreExistingVersionOverwritten() ) {
+//
+//                // Remove the index entry in the transaction scope.
+//                
+//                itr.remove();
+//
+//            }
+//
+//        }
+//
+//    }
+
+//    /**
+//     * Optional operation deletes @todo document and reconcile with a clustered object index. also, if we
+//     *       go with a scale out design an journal snapshots where index ranges
+//     *       are evicted to index segments then we never need to both with GC
+//     *       inside of the journal and we can use a WORM style allocator
+//     *       (perfect fit allocation vs slots).
+//     * 
+//     * After a commit, the only entries that we expect to find in the
+//     * transaction's object index are those where a pre-existing version was
+//     * overwritten by the transaction. We just deallocate the slots for those
+//     * pre-existing versions.
+//    
+//    * This implementation simply scans the object index. After a commit, the
+//    * only entries that we expect to find in the transaction's object index are
+//    * those where a pre-existing version was overwritten by the transaction. We
+//    * just deallocate the slots for those pre-existing versions.
+//    * 
+//    * @param allocationIndex
+//    *            The index on which slot allocations are maintained.
+//    * 
+//    * FIXME The transaction's object index SHOULD be deallocated on the journal
+//    * after garbage collection since it no longer holds any usable information.
+//    * 
+//    * FIXME Garbage collection probably MUST be atomic (it is Ok if it is both
+//    * incremental and atomic, but it needs a distinct commit point, it must be
+//    * restart safe, etc.).
+//     */
+//    public void gc() {
+//        throw new UnsupportedOperationException();        
+    // Verify that this is a transaction scope object index.
+//    assert baseObjectIndex != null;
+//    
+//    final Iterator itr = objectIndex.getRoot().entryIterator();
+//    
+//    while( itr.hasNext() ) {
+//        
+//        // The value for that persistent identifier.
+//        final IObjectIndexEntry entry = (IObjectIndexEntry)itr.next();
+//        
+//        // The slots on which the pre-existing version was written.
+//        ISlotAllocation preExistingVersionSlots = entry
+//                .getPreExistingVersionSlots();
+//
+//        // Deallocate those slots.
+//        allocationIndex.clear(preExistingVersionSlots);
+//        
+//        /*
+//         * Note: This removes the entry to avoid possible problems with
+//         * double-gc. However, this issue really needs to be resolved by an
+//         * ACID GC operation.
+//         */
+//        itr.remove();
+//            
+//    }
+//}
 
 }

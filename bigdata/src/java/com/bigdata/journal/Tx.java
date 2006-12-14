@@ -135,9 +135,9 @@ public class Tx implements IStore, ITx {
     
     final private Journal journal;
     final private long timestamp;
-    final private SimpleObjectIndex objectIndex;
+    final private IObjectIndex objectIndex;
     
-    SimpleObjectIndex getObjectIndex() {
+    IObjectIndex getObjectIndex() {
         
         return objectIndex;
         
@@ -171,8 +171,13 @@ public class Tx implements IStore, ITx {
          * resolve objects against the object index for the last committed
          * state at the time that the transaction was created.
          */
+        if(journal.objectIndex instanceof SimpleObjectIndex) {
         this.objectIndex = new SimpleObjectIndex(
                 (SimpleObjectIndex) journal.objectIndex);
+        } else {
+//            this.objectIndex = new ObjectIndex((ObjectIndex)journal.objectIndex);
+            throw new UnsupportedOperationException();
+        }
 
         journal.activateTx(this);
         

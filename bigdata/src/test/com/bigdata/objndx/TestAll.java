@@ -81,6 +81,17 @@ public class TestAll extends TestCase {
         // @todo test journal transaction isolation using the new object index.
         // @todo test journal restart semantics once persistent allocation index is implemented.
 
+        /*
+         * index rebuilding.
+         */
+        // test address encoding and decoding; @todo move to journal package to replace ISlotsAllocation
+        suite.addTestSuite( TestAddr.class );
+        suite.addTestSuite( TestPostOrderBuilder.class );
+        // @todo test compacting merge of two index segments.
+        // @todo test compacting merge of N index segments?
+        // @todo test SegmentedBTree (reads through to active index segments if miss on BTree in the journal).
+        // @todo test metadata management for index segments.
+       
         return suite;
         
     }

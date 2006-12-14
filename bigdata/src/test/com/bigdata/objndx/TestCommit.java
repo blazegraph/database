@@ -106,7 +106,7 @@ public class TestCommit extends TestCase2 {
             assertTrue(btree.root.isDirty());
 
             // Commit of tree with dirty root.
-            metadataId = btree.commit();
+            metadataId = btree.write();
 
             assertFalse(btree.root.isDirty());
 
@@ -145,7 +145,7 @@ public class TestCommit extends TestCase2 {
              * Commit of tree with clean root writes a new metadata record but
              * does not change the rootId.
              */
-            metadata2 = btree.commit();
+            metadata2 = btree.write();
             assertNotSame( metadataId, metadata2 );
 
         }

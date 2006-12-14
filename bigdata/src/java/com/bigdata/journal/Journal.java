@@ -473,6 +473,9 @@ import java.util.Properties;
  * 
  * @todo I need to revisit the assumptions for very large objects in the face of
  *       the recent / planned redesign.
+ *       
+ * @todo Can the backing file be opened in "append" mode?  Does that offer any
+ *       performance benefits?
  */
 public class Journal implements IRawStore, IStore {
 
@@ -1248,8 +1251,15 @@ public class Journal implements IRawStore, IStore {
                 _bufferStrategy.getSlotLimit());
 
         /*
-         * FIXME Change this to use the persistence capable object index.
+         * FIXME Change this to use the persistence capable object index, which
+         * currently lacks an entryIterator supporting remove().  This could be
+         * overcome either by using a transient (concurrent) hash map for the tx
+         * isolation level rather than a persistence capable btree or by adding
+         * support for traversal under concurrent modification to the BTree.  I
+         * am also considering a drastic refactor in which the existing concept
+         * of the IObjectIndex is discarded in favor of some new interfaces.
          */
+//        objectIndex = new ObjectIndex(this,allocationIndex);
         objectIndex = new SimpleObjectIndex(allocationIndex);
         
         /*

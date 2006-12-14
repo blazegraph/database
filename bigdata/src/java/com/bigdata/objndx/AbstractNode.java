@@ -57,7 +57,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;
-import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -346,7 +345,7 @@ public abstract class AbstractNode extends PO {
          * is only changed by the VM, not by the application).
          */
 
-        assert src == btree.getRoot()
+        assert src == btree.root
                 || (src.parent != null && src.parent.get() != null);
         
         this.parent = src.parent;
@@ -501,6 +500,8 @@ public abstract class AbstractNode extends PO {
      * node, its children are always visited before the node itself (hence
      * the node occurs in the post-order position in the traveral). The
      * iterator is NOT safe for concurrent modification.
+     * 
+     * @return Iterator visiting {@link AbstractNode}s.
      */
     public Iterator postOrderIterator() {
 
@@ -516,6 +517,8 @@ public abstract class AbstractNode extends PO {
      * 
      * @param dirtyNodesOnly
      *            When true, only dirty nodes and leaves will be visited
+     *            
+     * @return Iterator visiting {@link AbstractNode}s.
      */
     abstract public Iterator postOrderIterator(boolean dirtyNodesOnly);
 
