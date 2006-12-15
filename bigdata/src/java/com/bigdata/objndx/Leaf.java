@@ -69,7 +69,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Leaf extends AbstractNode {
+public class Leaf extends AbstractNode implements ILeaf {
 
     /**
      * <p>
@@ -146,7 +146,7 @@ public class Leaf extends AbstractNode {
 
         super(btree, btree.branchingFactor);
 
-        keys = allocKeys(btree.keyType,branchingFactor+1);
+        keys = ArrayType.alloc(btree.keyType,branchingFactor+1);
 
         values = new Object[branchingFactor+1];
 
@@ -213,6 +213,18 @@ public class Leaf extends AbstractNode {
 
     }
 
+    final public int getValueCount() {
+        
+        return nkeys;
+        
+    }
+    
+    final public Object[] getValues() {
+        
+        return values;
+        
+    }
+    
     /**
      * Inserts an entry under an external key. The caller MUST ensure by
      * appropriate navigation of parent nodes that the external key either
@@ -349,7 +361,7 @@ public class Leaf extends AbstractNode {
      * 
      * @return The new rightSibling leaf.
      */
-    protected AbstractNode split() {
+    protected IAbstractNode split() {
 
         // MUST be mutable.
         assert isDirty();

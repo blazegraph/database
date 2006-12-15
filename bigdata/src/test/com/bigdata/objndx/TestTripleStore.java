@@ -50,14 +50,10 @@ package com.bigdata.objndx;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.nio.BufferOverflowException;
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.Properties;
 
@@ -77,8 +73,6 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.IndexEntrySerializer.ByteBufferInputStream;
-import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a
@@ -377,91 +371,54 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
          * @version $Id$
+         * 
+         * @todo convert to {@link ArrayType#LONG} with a stride of 3.
          */
         public static class KeySerializer implements IKeySerializer {
 
             static final IKeySerializer INSTANCE = new KeySerializer();
             
+            public ArrayType getKeyType() {
+                
+                return ArrayType.OBJECT;
+                
+            }
+
             public int getSize(int n) {
                 
                 return (Bytes.SIZEOF_LONG * 3) * n;
                 
             }
 
-            public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
+            public void getKeys(DataInputStream is, Object keys, int nkeys)
+                    throws IOException {
 
-                Object[] a = (Object[])keys;
-                
-                DataInputStream is = new DataInputStream( new ByteBufferInputStream(buf) );
-                
-                try {
+                Object[] a = (Object[]) keys;
 
-                    for (int i = 0; i < nkeys; i++) {
+                for (int i = 0; i < nkeys; i++) {
 
-                        long s = LongPacker.unpackLong(is);
-                        long p = LongPacker.unpackLong(is);
-                        long o = LongPacker.unpackLong(is);
-                        
-                        a[i] = new SPO(s, p, o);
-                        
-                    }
+                    long s = LongPacker.unpackLong(is);
+                    long p = LongPacker.unpackLong(is);
+                    long o = LongPacker.unpackLong(is);
 
-                }
-
-                catch (EOFException ex) {
-
-                    RuntimeException ex2 = new BufferUnderflowException();
-
-                    ex2.initCause(ex);
-
-                    throw ex2;
-
-                }
-
-                catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
+                    a[i] = new SPO(s, p, o);
 
                 }
 
             }
 
-            public void putKeys(ByteBuffer buf, Object keys, int nkeys) {
+            public void putKeys(DataOutputStream os, Object keys, int nkeys)
+                    throws IOException {
 
-                Object[] a = (Object[])keys;
-                
-                DataOutputStream os = new DataOutputStream(
-                        new ByteBufferOutputStream(buf));
+                Object[] a = (Object[]) keys;
 
-                try {
+                for (int i = 0; i < nkeys; i++) {
 
-                    for (int i = 0; i < nkeys; i++) {
+                    SPO key = (SPO) a[i];
 
-                        SPO key = (SPO)a[i];
-
-                        LongPacker.packLong(os, key.s);
-                        LongPacker.packLong(os, key.p);
-                        LongPacker.packLong(os, key.o);
-
-                    }
-
-                    os.flush();
-
-                }
-
-                catch (EOFException ex) {
-
-                    RuntimeException ex2 = new BufferOverflowException();
-
-                    ex2.initCause(ex);
-
-                    throw ex2;
-
-                }
-
-                catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
+                    LongPacker.packLong(os, key.s);
+                    LongPacker.packLong(os, key.p);
+                    LongPacker.packLong(os, key.o);
 
                 }
 
@@ -491,11 +448,11 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 return 0;
             }
 
-            public void getValues(ByteBuffer buf, Object[] values, int n) {
+            public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
                 return;
             }
 
-            public void putValues(ByteBuffer buf, Object[] values, int n) {
+            public void putValues(DataOutputStream os, Object[] values, int n) throws IOException {
                 return;
             }
             
@@ -606,6 +563,12 @@ public class TestTripleStore extends AbstractBTreeTestCase {
 
             static final IKeySerializer INSTANCE = new KeySerializer();
             
+            public ArrayType getKeyType() {
+                
+                return ArrayType.OBJECT;
+                
+            }
+
             /**
              * FIXME There is no fixed upper limit for URLs or strings in general,
              * therefore the btree may have to occasionally resize its buffer to
@@ -617,74 +580,30 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 
             }
 
-            public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
+            public void getKeys(DataInputStream is, Object keys, int nkeys)
+                    throws IOException {
 
-                Object[] a = (Object[])keys;
-
-                DataInputStream is = new DataInputStream( new ByteBufferInputStream(buf) );
-                
-                try {
-
-                    for (int i = 0; i < nkeys; i++) {
-
-                        a[i] = is.readUTF();
-
-                    }
-
-                }
-
-                catch (EOFException ex) {
-
-                    RuntimeException ex2 = new BufferUnderflowException();
-
-                    ex2.initCause(ex);
-
-                    throw ex2;
-
-                }
-
-                catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-            }
-
-            public void putKeys(ByteBuffer buf, Object keys, int nkeys) {
-
-                if( nkeys == 0 ) return;
-                
                 Object[] a = (Object[]) keys;
 
-                DataOutputStream os = new DataOutputStream(
-                        new ByteBufferOutputStream(buf));
+                for (int i = 0; i < nkeys; i++) {
 
-                try {
-
-                    for (int i = 0; i < nkeys; i++) {
-
-                        os.writeUTF((String)a[i]);
-
-                    }
-
-                    os.flush();
+                    a[i] = is.readUTF();
 
                 }
+                
+            }
 
-                catch (EOFException ex) {
+            public void putKeys(DataOutputStream os, Object keys, int nkeys)
+                    throws IOException {
 
-                    RuntimeException ex2 = new BufferOverflowException();
+                if (nkeys == 0)
+                    return;
 
-                    ex2.initCause(ex);
+                Object[] a = (Object[]) keys;
 
-                    throw ex2;
+                for (int i = 0; i < nkeys; i++) {
 
-                }
-
-                catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
+                    os.writeUTF((String) a[i]);
 
                 }
 
@@ -708,12 +627,18 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 return 0;
             }
 
-            public void getValues(ByteBuffer buf, Object[] values, int n) {
-                return;
+            public void getValues(DataInputStream is, Object[] values, int n)
+                    throws IOException {
+
+                // NOP
+                
             }
 
-            public void putValues(ByteBuffer buf, Object[] values, int n) {
-                return;
+            public void putValues(DataOutputStream os, Object[] values, int n)
+                    throws IOException {
+                
+                // NOP
+                
             }
             
         }

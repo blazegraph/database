@@ -49,13 +49,9 @@ package com.bigdata.objndx;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
@@ -148,17 +144,16 @@ public class IndexEntrySerializer implements IValueSerializer {
      * <dd>As per currentVersionSlots.</dd>
      * </dl>
      */
-    public void putValues(ByteBuffer buf, Object[] values, int n) {
+    public void putValues(DataOutputStream os, Object[] values, int nvals)
+            throws IOException {
 
-        assert buf != null;
+        assert os != null;
         assert values != null;
-        assert n >= 0;
+        assert nvals >= 0;
 
-        if( n == 0 ) return;
+        if( nvals == 0 ) return;
         
-        DataOutputStream os = new DataOutputStream( new ByteBufferOutputStream(buf) );
-                
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < nvals; i++) {
 
             IndexEntry entry = (IndexEntry) values[i];
 
@@ -175,8 +170,6 @@ public class IndexEntrySerializer implements IValueSerializer {
             final long preExistingVersionSlots = entry.preExistingVersion;
             assert preExistingVersionSlots>=0;
 
-            try {
-            
                 /*
                  * versionCounter.
                  */
@@ -231,43 +224,23 @@ public class IndexEntrySerializer implements IValueSerializer {
                 }
 
                 os.flush();
-                
-            }
-            
-            catch(EOFException ex) {
-                
-                RuntimeException ex2 = new BufferOverflowException();
-                
-                ex2.initCause(ex);
-                
-                throw ex2;
-                
-            }
-            
-            catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
 
         }
         
     }
 
-    public void getValues(ByteBuffer buf, Object[] values, int n) {
+    public void getValues(DataInputStream is, Object[] values, int n)
+        throws IOException
+    {
 
-        assert buf != null;
+        assert is != null;
         assert values != null;
         assert n >= 0;
 
         if( n == 0 ) return;
         
-        DataInputStream is = new DataInputStream( new ByteBufferInputStream(buf) );
-        
         for (int i = 0; i < n; i++) {
 
-            try {
-                
                 final short versionCounter = ShortPacker.unpackShort(is);
 
                 final long currentVersion;
@@ -327,111 +300,8 @@ public class IndexEntrySerializer implements IValueSerializer {
                 values[i] = new IndexEntry(slotMath, versionCounter,
                         currentVersion, preExistingVersion);
             
-            }
-
-            catch(EOFException ex) {
-                
-                RuntimeException ex2 = new BufferUnderflowException();
-                
-                ex2.initCause(ex);
-                
-                throw ex2;
-                
-            }
-            
-            catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
         }
 
-    }
-
-    /**
-     * Reads bytes from a {@link ByteBuffer}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class ByteBufferInputStream extends InputStream {
-
-        final ByteBuffer buf;
-        
-        public ByteBufferInputStream( ByteBuffer buf ) {
-            
-            assert buf != null;
-            
-            this.buf = buf;
-            
-        }
-        
-        /**
-         * Read the next byte from the buffer.
-         * 
-         * @return The byte as a value in [0:255].
-         */
-        public int read() throws IOException {
-            
-            if( buf.remaining() == 0 ) {
-                
-                return -1;
-                
-            }
-            
-            // A byte whose value is in [-128:127].
-            byte b = buf.get();
-
-            return (0xff&b);
-//            return ((int) b) + 128;
-//            int v = ((int)b) + 128;
-//            assert v>=0 && v<=255;
-//            return v;
-//            return b;
-            
-        }
-        
-    }
-
-    /**
-     * Writes bytes onto a {@link ByteBuffer}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class ByteBufferOutputStream extends OutputStream {
-
-        final ByteBuffer buf;
-        
-        public ByteBufferOutputStream( ByteBuffer buf ) {
-            
-            assert buf != null;
-            
-            this.buf = buf;
-            
-        }
-
-        /**
-         * Write a byte on the buffer.
-         * 
-         * @param b
-         *            A byte whose value is in [-128:127].
-         */
-        public void write(int b) throws IOException {
-            
-            if( buf.remaining() == 0 ) {
-                
-                throw new EOFException();
-                
-            }
-            
-//            buf.put( (byte) (0x000000ff & b) );
-            
-            buf.put( (byte) b );
-                        
-        }
-        
     }
     
 }

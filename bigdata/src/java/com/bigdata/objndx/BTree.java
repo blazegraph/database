@@ -456,7 +456,7 @@ public class BTree implements IBTree {
         return nodeSer;
         
     }
-    
+
 //    /**
 //     * A hard reference queue for nodes in the btree is used to ensure that
 //     * nodes remain wired into memory while they are being actively used. Dirty
@@ -673,7 +673,7 @@ public class BTree implements IBTree {
      * split, at which point it is replaced by a node. The root is also
      * replaced each time copy-on-write triggers a cascade of updates.
      */
-    public AbstractNode getRoot() {
+    public IAbstractNode getRoot() {
 
         return root;
 
@@ -782,7 +782,7 @@ public class BTree implements IBTree {
         
         this.comparator = comparator;
 
-        this.nodeSer = new NodeSerializer(keySer,
+        this.nodeSer = new NodeSerializer(NodeFactory.INSTANCE, keySer,
                 valueSer);
 
          /*
@@ -864,7 +864,7 @@ public class BTree implements IBTree {
         
         keyType = md.keyType;
 
-        this.nodeSer = new NodeSerializer(Int32OIdKeySerializer.INSTANCE,
+        this.nodeSer = new NodeSerializer(NodeFactory.INSTANCE,keySer,
                 valueSer);
         
         /*
@@ -1032,6 +1032,8 @@ public class BTree implements IBTree {
          * Serialize the node or leaf onto a shared buffer.
          */
         
+        node.assertInvariants();
+        
         buf.clear();
         
         if( node.isLeaf() ) {
@@ -1112,7 +1114,7 @@ public class BTree implements IBTree {
         
         ByteBuffer tmp = store.read(slots,buf);
         
-        AbstractNode node = nodeSer.getNodeOrLeaf(this, id, tmp);
+        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, id, tmp);
         
         node.setDirty(false);
         
@@ -1446,27 +1448,60 @@ public class BTree implements IBTree {
         
     }
 
+    public KeyValueIterator entryIterator() {
+    
+        return root.entryIterator();
+        
+    }
+    
+//    /**
+//     * Iterator visits the leaves of the tree.
+//     * 
+//     * @return Iterator visiting the {@link Leaf leaves} of the tree.
+//     * 
+//     * @todo optimize this if we add prior-next leaf references. 
+//     */
+//    protected Iterator leafIterator() {
+//        
+//        return new Striterator(root.postOrderIterator())
+//                .addFilter(new Filter() {
+//
+//                    private static final long serialVersionUID = 1L;
+//
+//                    protected boolean isValid(Object arg0) {
+//
+//                        return arg0 instanceof Leaf;
+//
+//                    }
+//                });
+//        
+//    }
+    
     /**
-     * Iterator visits the leaves of the tree.
-     * 
-     * @return Iterator visiting the {@link Leaf leaves} of the tree.
-     * 
-     * @todo optimize this if we add prior-next leaf references. 
+     * Factory for nodes and leaves used by the {@link NodeSerializer}.
      */
-    protected Iterator leafIterator() {
+    protected static class NodeFactory implements INodeFactory {
+
+        public static final INodeFactory INSTANCE = new NodeFactory();
         
-        return new Striterator(root.postOrderIterator())
-                .addFilter(new Filter() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    protected boolean isValid(Object arg0) {
-
-                        return arg0 instanceof Leaf;
-
-                    }
-                });
+        private NodeFactory() {}
         
+        public ILeaf allocLeaf(IBTree btree, long id, int branchingFactor,
+                ArrayType keyType, int nkeys, Object keys, Object[] values) {
+
+            return new Leaf((BTree) btree, id, branchingFactor, nkeys, keys,
+                    values);
+            
+        }
+
+        public INode allocNode(IBTree btree, long id, int branchingFactor,
+                ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
+            
+            return new Node((BTree) btree, id, branchingFactor, nkeys, keys,
+                    childAddr);
+            
+        }
+
     }
     
 //    /*

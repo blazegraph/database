@@ -42,86 +42,37 @@ Modifications:
 
 */
 /*
- * Created on Nov 15, 2006
+ * Created on Dec 15, 2006
  */
+
 package com.bigdata.objndx;
 
-import java.util.NoSuchElementException;
-
 /**
- * Visits the direct children of a {@link Node} in the external key ordering.
+ * Interface for leaves of a B+-Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class ChildIterator implements KeyValueIterator {
+public interface ILeaf extends IAbstractNode {
 
-    private final Node node;
-
-    private int index = 0;
-
-    private int lastVisited = -1;
-
-    public ChildIterator(Node node) {
-
-        assert node != null;
-
-        this.node = node;
-
-    }
-
-    public boolean hasNext() {
-
-        // Note: nchildren == nkeys+1 for a Node.
-        return index <= node.nkeys;
-
-    }
-
-    public IAbstractNode next() {
-
-        if (!hasNext()) {
-
-            throw new NoSuchElementException();
-
-        }
-
-        lastVisited = index++;
-        
-        return node.getChild(lastVisited);
-        
-    }
-
-    public Object getValue() {
-    
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        return node.getChild(lastVisited);
-
-    }
-
-    public Object getKey() {
-
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        return node.getKey(lastVisited);
-        
-    }
-    
     /**
-     * @exception UnsupportedOperationException
+     * The #of values in the leaf (this MUST be equal to
+     * {@link IAbstractNode#getKeyCount()}.
+     * 
+     * @return The #of values in the leaf.
      */
-    public void remove() {
+    public int getValueCount();
 
-        throw new UnsupportedOperationException();
-
-    }
-
+    /**
+     * The backing array in which the values are stored. Only the first
+     * {@link #getValueCount()} entries in the array are defined - and those
+     * values MUST be non-<code>null</code>. The use of this array is
+     * dangerous since mutations are directly reflected in the leaf, but it may
+     * be highly efficient. Callers MUST excercise are to perform only read-only
+     * operations against the returned array.
+     * 
+     * @return The backing array in which the values are stored.
+     */
+    public Object[] getValues();
+    
 }

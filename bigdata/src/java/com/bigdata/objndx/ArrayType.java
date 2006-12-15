@@ -180,4 +180,38 @@ public enum ArrayType {
         }
     }
 
+    /**
+     * Allocate an array of the indicated key type and capacity.
+     * 
+     * @param keyType
+     *            The key type.
+     * @param capacity
+     *            The array capacity.
+     * @return The array.
+     * 
+     * @todo consider the use of an allocation pool for this, leaves, and nodes.
+     */
+    static public final Object alloc(ArrayType keyType, int capacity) {
+        switch (keyType) {
+        case BYTE:
+            return new byte[capacity];
+        case SHORT:
+            return new short[capacity];
+        case CHAR:
+            return new char[capacity];
+        case INT:
+            return new int[capacity];
+        case LONG:
+            return new long[capacity];
+        case FLOAT:
+            return new float[capacity];
+        case DOUBLE:
+            return new double[capacity];
+        case OBJECT:
+            return new Object[capacity];
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+
 }

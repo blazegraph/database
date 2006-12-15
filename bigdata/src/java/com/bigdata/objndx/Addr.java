@@ -17,6 +17,11 @@ package com.bigdata.objndx;
 final public class Addr {
 
     /**
+     * A null reference (0L).
+     */
+    public static final long NULL = 0L;
+    
+    /**
      * Converts a length and offset into a long integer.
      * 
      * @param nbytes

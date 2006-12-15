@@ -51,7 +51,7 @@ import org.apache.log4j.Level;
 
 /**
  * Test suite for copy-on-write semantics. Among other things the tests in this
- * suite are responsible for verifying the contents of {@link Node#childKeys}[]
+ * suite are responsible for verifying the contents of {@link Node#childAddr}[]
  * and that the parent reference on a clean child was updated to point to
  * the cloned parent when the child is "stolen" by the cloned parent.
  * 

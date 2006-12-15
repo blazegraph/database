@@ -47,18 +47,32 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.nio.ByteBuffer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.journal.Bytes;
 
 /**
  * Key (de-)serializer suitable for use with int32 object identifier keys. keys
  * are non-negative integers in the half-open range [1:{@link Integer#MAX_VALUE}).
+ * The keys are packed. When the keys tend to be found in the lower part of the
+ * positive {@link Integer} range this results in smaller serialization. Even if
+ * the keys are evenly distributed through the positive {@link Integer} range
+ * packing is more compact than staight serialization. However, it is possible
+ * to serialize keys such that the result is less compact.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo keys can be packed since they are non-negative.
+ * FIXME Handle prefix packing, which will be more efficient than
+ * {@link LongPacker}, which is currently disabled since it is interacting with
+ * the key distributions used by the {@link TestNodeSerializer} test suite.
+ * doing. Note that things like prefix / suffix compression will break
+ * serialization and suggests that they should be version changes for the
+ * {@link NodeSerializer}.
  */
 public class Int32OIdKeySerializer implements IKeySerializer {
 
@@ -70,13 +84,19 @@ public class Int32OIdKeySerializer implements IKeySerializer {
      */
     static final int NEGINF = 0;
     
+    public ArrayType getKeyType() {
+        
+        return ArrayType.INT;
+        
+    }
+    
     public int getSize(int n) {
         
         return n*Bytes.SIZEOF_INT;
         
     }
 
-    public void putKeys(ByteBuffer buf, Object keys, int nkeys) {
+    public void putKeys(DataOutputStream os, Object keys, int nkeys) throws IOException {
 
         final int[] a = (int[]) keys;
         
@@ -90,7 +110,9 @@ public class Int32OIdKeySerializer implements IKeySerializer {
             
 //            assert key < BTree.POSINF; // verify maximum.
 
-            buf.putInt(key);
+//            LongPacker.packLong(os, key);
+            
+            os.writeInt(key);
             
             lastKey = key;
             
@@ -98,7 +120,9 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
     }
 
-    public void getKeys(ByteBuffer buf, Object keys, int nkeys) {
+    public void getKeys(DataInputStream is, Object keys, int nkeys)
+        throws IOException
+    {
         
         final int[] a = (int[])keys;
 
@@ -106,7 +130,9 @@ public class Int32OIdKeySerializer implements IKeySerializer {
 
         for (int i = 0; i < nkeys; i++) {
 
-            int key = buf.getInt();
+            final int key = is.readInt();
+            
+//            final int key = (int)LongPacker.unpackLong(is);
 
             assert key > lastKey; // verify keys are in ascending order.
 

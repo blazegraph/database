@@ -47,7 +47,9 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.nio.ByteBuffer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * (De-)serialize the values in a {@link Leaf}.
@@ -69,32 +71,34 @@ public interface IValueSerializer {
      *            The #of values in the sequence.
      */
     public int getSize(int n);
-    
+
     /**
-     * De-serialize the {@link Leaf}s values from the buffer.
+     * De-serialize the values.
      * 
-     * @param buf
-     *            The buffer.
+     * @param is
+     *            The input stream.
      * @param values
      *            The array into which the values must be written.
-     * @param n
+     * @param nvals
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be read from the buffer and
      *            written on the array.
      */
-    public void getValues(ByteBuffer buf, Object[] values, int n);
+    public void getValues(DataInputStream is, Object[] values, int nvals)
+            throws IOException;
 
     /**
-     * Serialize the {@link Leaf}'s values onto the buffer.
+     * Serialize the values.
      * 
-     * @param buf
-     *            The buffer.
+     * @param os
+     *            The output stream.
      * @param values
      *            The array of values from the {@link Leaf}.
-     * @param n The
-     *            #of valid values in the array. The values in indices [0:n-1]
-     *            are defined and must be written.
+     * @param nvals
+     *            The #of valid values in the array. The values in indices
+     *            [0:n-1] are defined and must be written.
      */
-    public void putValues(ByteBuffer buf, Object[] values,int n);
+    public void putValues(DataOutputStream os, Object[] values, int nvals)
+            throws IOException;
 
 }

@@ -154,7 +154,7 @@ class DirtyChildIterator implements KeyValueIterator {
 
     }
 
-    public AbstractNode next() {
+    public IAbstractNode next() {
 
         if (!hasNext()) {
 
@@ -166,7 +166,7 @@ class DirtyChildIterator implements KeyValueIterator {
 
         assert child.isDirty();
 
-        AbstractNode tmp = child;
+        IAbstractNode tmp = child;
 
         // advance the index where the scan will start next() time.
         lastVisited = index++;

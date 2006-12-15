@@ -60,19 +60,12 @@ import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * <p>
- * Abstract node.
- * </p>
- * <p>
- * Note: For nodes in the index, the attributes dirty and persistent are 100%
- * correlated. Since only transient nodes may be dirty and only persistent nodes
- * are clean any time one is true the other is false.
- * </p>
+ * Abstract node supporting incremental persistence and copy-on-write semantics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractNode extends PO {
+public abstract class AbstractNode extends PO implements IAbstractNode {
 
     /**
      * Log for node and leaf operations.
@@ -373,7 +366,7 @@ public abstract class AbstractNode extends PO {
      * 
      * @return Either this leaf or a copy of this leaf.
      */
-    protected AbstractNode copyOnWrite() {
+    protected IAbstractNode copyOnWrite() {
         
         // Always invoked first for a leaf and thereafter in its other form.
         assert isLeaf();
@@ -495,14 +488,6 @@ public abstract class AbstractNode extends PO {
 
     }
 
-    /**
-     * Post-order traveral of nodes and leaves in the tree. For any given
-     * node, its children are always visited before the node itself (hence
-     * the node occurs in the post-order position in the traveral). The
-     * iterator is NOT safe for concurrent modification.
-     * 
-     * @return Iterator visiting {@link AbstractNode}s.
-     */
     public Iterator postOrderIterator() {
 
         return postOrderIterator(false);
@@ -522,9 +507,6 @@ public abstract class AbstractNode extends PO {
      */
     abstract public Iterator postOrderIterator(boolean dirtyNodesOnly);
 
-    /**
-     * Traversal of index values in key order.
-     */
     public KeyValueIterator entryIterator() {
 
 //        /*
@@ -853,40 +835,6 @@ public abstract class AbstractNode extends PO {
     }
 
     /**
-     * Allocate an array of the indicated key type and capacity.
-     * 
-     * @param keyType
-     *            The key type.
-     * @param capacity
-     *            The array capacity.
-     * @return The array.
-     * 
-     * @todo consider the use of an allocation pool for this, leaves, and nodes.
-     */
-    static public final Object allocKeys(ArrayType keyType, int capacity) {
-        switch (keyType) {
-        case BYTE:
-            return new byte[capacity];
-        case SHORT:
-            return new short[capacity];
-        case CHAR:
-            return new char[capacity];
-        case INT:
-            return new int[capacity];
-        case LONG:
-            return new long[capacity];
-        case FLOAT:
-            return new float[capacity];
-        case DOUBLE:
-            return new double[capacity];
-        case OBJECT:
-            return new Object[capacity];
-        default:
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
      * Update the value of the key at the specified index.
      * 
      * @param index
@@ -960,11 +908,32 @@ public abstract class AbstractNode extends PO {
         }
     }
     
-    /**
-     * True iff this is a leaf node.
-     */
     abstract public boolean isLeaf();
 
+    public int getBranchingFactor() {
+        
+        return branchingFactor;
+        
+    }
+    
+    public ArrayType getKeyType() {
+        
+        return btree.keyType;
+        
+    }
+    
+    public int getKeyCount() {
+        
+        return nkeys;
+        
+    }
+    
+    public Object getKeys() {
+        
+        return keys;
+        
+    }
+    
     /**
      * <p>
      * Split a node or leaf that is over capacity (by one).
@@ -972,7 +941,7 @@ public abstract class AbstractNode extends PO {
      * 
      * @return The high node (or leaf) created by the split.
      */
-    abstract protected AbstractNode split();
+    abstract protected IAbstractNode split();
     
     /**
      * <p>
@@ -1180,42 +1149,10 @@ public abstract class AbstractNode extends PO {
      */
     abstract protected void merge(AbstractNode sibling, boolean isRightSibling);
 
-    /**
-     * Recursive search locates the approprate leaf and inserts the entry under
-     * the key. The leaf is split iff necessary. Splitting the leaf can cause
-     * splits to cascade up towards the root. If the root is split then the
-     * total depth of the tree is inceased by one.
-     * 
-     * @param key
-     *            The external key.
-     * @param entry
-     *            The value.
-     * 
-     * @return The previous value or <code>null</code> if the key was not
-     *         found.
-     */
     abstract public Object insert(Object key, Object entry);
 
-    /**
-     * Recursive search locates the appropriate leaf and removes and returns
-     * the pre-existing value stored under the key (if any).
-     * 
-     * @param key
-     *            The external key.
-     *            
-     * @return The value or null if there was no entry for that key.
-     */
     abstract public Object remove(Object key);
 
-    /**
-     * Recursive search locates the entry for the probe key.
-     * 
-     * @param key
-     *            The external key.
-     * 
-     * @return The entry or <code>null</code> iff there is no entry for
-     *         that key.
-     */
     abstract public Object lookup(Object key);
 
     /**

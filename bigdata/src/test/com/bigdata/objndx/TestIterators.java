@@ -160,7 +160,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
         
         // verify visiting all children.
-        assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
+        assertSameIterator(new IAbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(false));
 
         /*
@@ -181,7 +181,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
 
         // verify visiting all children.
-        assertSameIterator(new AbstractNode[] { a, d, b }, ((Node) btree.root)
+        assertSameIterator(new IAbstractNode[] { a, d, b }, ((Node) btree.root)
                 .childIterator(false));
 
         /*
@@ -199,7 +199,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertTrue(d.isDeleted());
 
         // verify visiting all children.
-        assertSameIterator(new AbstractNode[] { a, b }, ((Node) btree.root)
+        assertSameIterator(new IAbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(false));
 
         /*
@@ -229,7 +229,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         SimpleEntry v9 = new SimpleEntry(9);
 
         // empty tree visits the root leaf.
-        assertSameIterator(new AbstractNode[] { btree.root }, btree.root
+        assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
                 .postOrderIterator());
         
         // fill up the root leaf.
@@ -249,7 +249,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
         
         // verify iterator.
-        assertSameIterator(new AbstractNode[] { a, b, c }, btree.root
+        assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
                 .postOrderIterator());
 
         /*
@@ -270,7 +270,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
 
         // verify iterator
-        assertSameIterator(new AbstractNode[] { a, d, b, c }, btree.root
+        assertSameIterator(new IAbstractNode[] { a, d, b, c }, btree.root
                 .postOrderIterator());
         
         /*
@@ -301,7 +301,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertValues(new Object[]{v7,v9}, b);
 
         // verify iterator
-        assertSameIterator(new AbstractNode[] { a, d, c, e, b, f, g }, btree.root
+        assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
                 .postOrderIterator());
 
         /*
@@ -324,7 +324,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertTrue(a.isDeleted());
 
         // verify iterator
-        assertSameIterator(new AbstractNode[] { d, e, b, c }, btree.root
+        assertSameIterator(new IAbstractNode[] { d, e, b, c }, btree.root
                 .postOrderIterator());
 
         /*
@@ -343,7 +343,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertTrue(e.isDeleted());
 
         // verify iterator
-        assertSameIterator(new AbstractNode[] { d, b, c }, btree.root
+        assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
                 .postOrderIterator());
 
         /*
@@ -359,7 +359,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertTrue(c.isDeleted());
 
         // verify iterator
-        assertSameIterator(new AbstractNode[] { b }, btree.root
+        assertSameIterator(new IAbstractNode[] { b }, btree.root
                 .postOrderIterator());
 
     }

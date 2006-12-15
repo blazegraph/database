@@ -42,50 +42,38 @@ Modifications:
 
 */
 /*
- * Created on Dec 9, 2006
+ * Created on Dec 15, 2006
  */
 
 package com.bigdata.objndx;
 
-
 /**
- * Interface defining the legal bounds on the value of keys for an index, 
+ * Interface for the non-leaf nodes of a B+-Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyBounds {
+public interface INode extends IAbstractNode {
 
     /**
-     * Assert that a key is within the legal bounds.
-     */
-    public void assertBounds();
-
-    /**
-     * The key that is used as negative infinity. When the key type is a
-     * primitive data type such as <code>long</code> this MUST return
-     * non-null. For non-primitive key types this MUST return <code>null</code>.
+     * The #of children of this node. Either all children will be {@link INode}s
+     * or all children will be {@link ILeaf leaves}. The #of children of a node
+     * MUST be <code>{@link #getKeyCount()}+1</code>
      * 
-     * @todo consider renaming this to getInvalidKey() or getNullKey().  the
-     * concept of the key bounds is captured by a different methods on this
-     * api.
+     * @return The #of children of this node.
      */
-    public Object getNegInf();
+    public int getChildCount();
 
     /**
-     * The enumeration value indicating the data type used to store keys in
-     * the nodes and leaves of the tree.  When a key corresponds to a primitive
-     * data type, then you generally want to use an array of that primitive data
-     * type.  The only exception would be an application which needed to use the
-     * full value range for the primitive data type and which was therefore forced
-     * to use an Object to store each key value.
+     * The backing array of the persistent addresses of the children. Only the
+     * first {@link #getChildCount()} entries in the returned array are defined.
+     * If an entry is zero(0L), then the corresponding child is not persistent.
+     * The use of this array is dangerous since mutations are directly reflected
+     * in the node, but it may be highly efficient. Callers MUST excercise are
+     * to perform only read-only operations against the returned array.
+     * 
+     * @return The backing array of persistent child addresses.
      */
-    public ArrayType getArrayType();
-
-//    /**
-//     * The comparator that will be used to compare keys iff the keys are NOT
-//     * primitive data types.
-//     */
-//    public Comparator getComparator();
-    
+    public long[] getChildAddr();
+        
 }

@@ -81,22 +81,16 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     }
 
     /**
-     * Return a random reference to a child node or leaf. References are an
-     * {@link ISlotAllocation} encoded as a long integer.
-     * 
-     * @param isLeaf
-     *            When true, the reference will be to a leaf node. Otherwise the
-     *            reference will be to a non-leaf node. (This effects the #of
-     *            bytes encoded into the reference - the reference is only
-     *            syntactically valid and MUST NOT be dereferenced).
+     * Return a random reference to a child node or leaf.  The reference is
+     * only syntactically valid and MUST NOT be dereferenced.
      */
-    private long nextNodeRef(boolean isLeaf) {
+    private long nextNodeRef() {
 
         // random slot on the journal in [1:n-1].
         int firstSlot = r.nextInt(Integer.MAX_VALUE - 1) + 1;
 
         // #of bytes in the serialized record.
-        int nbytes = r.nextInt(256)+NodeSerializer.OFFSET_KEYS;
+        int nbytes = r.nextInt(256)+26;
 
         // convert to an encoded slot allocation.
         return SlotMath.toLong(nbytes, firstSlot);
@@ -169,6 +163,8 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         
         assert positionsRemaining >= 0;
         
+        // choose smaller ranges so that the keys tend to bunch up closer to zero.
+//        range = Math.max((range / positionsRemaining)/100, 1);
         range = range / positionsRemaining;
         
         assert range < Integer.MAX_VALUE;
@@ -217,13 +213,16 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         // #of keys per node.
         final int branchingFactor = btree.branchingFactor;
         
-        final long id = nextNodeRef(false); // ref. for this node.
+        final long id = nextNodeRef(); // ref. for this node.
 
         int nchildren = r.nextInt((branchingFactor+1)/2)+(branchingFactor+1)/2;
         assert nchildren>=(branchingFactor+1)/2;
         assert nchildren<=branchingFactor;
         int nkeys = nchildren-1;
-        
+
+//        // children are either all leaves or all nodes.
+//        boolean isLeaf = r.nextBoolean();
+
         final int[] keys = new int[branchingFactor];
         
         final long[] children = new long[branchingFactor+1];
@@ -234,20 +233,15 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         for (int i = 0; i < nkeys ; i++) {
 
-            // reference is to either a leaf or a non-leaf node.
-            boolean isLeaf = r.nextBoolean();
-
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            children[i] = nextNodeRef(isLeaf);
+            children[i] = nextNodeRef();
 
         }
 
         // children[nkeys] is always defined.
 
-        boolean isLeaf = r.nextBoolean();
-        
-        children[nkeys] = nextNodeRef(isLeaf);
+        children[nkeys] = nextNodeRef();
 
         /*
          * create the node and set it as the root to fake out the btree.
@@ -269,7 +263,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         // #of keys per node.
         final int branchingFactor = btree.branchingFactor;
 
-        long id = nextNodeRef(true); // ref. for this leaf.
+        long id = nextNodeRef(); // ref. for this leaf.
 
         int nkeys = r.nextInt((branchingFactor+1)/2)+(branchingFactor+1)/2;
         assert nkeys>=(branchingFactor+1)/2;

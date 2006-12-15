@@ -539,6 +539,12 @@ public class PostOrderBuilder {
          * relatively high since each entry is relatively large.
          */
         final HardReferenceQueue<AbstractSegNode> queue = new HardReferenceQueue<AbstractSegNode>(listener,100,20);
+
+        /**
+         * Text of a message used in exceptions for mutation operations on the
+         * index segment.
+         */
+        final protected static String MSG_READ_ONLY = "Read-only index";
         
         public IndexSegment(File file) throws IOException {
         
@@ -789,15 +795,39 @@ public class PostOrderBuilder {
             final public int branchingFactor;
             final public int height;
             final public ArrayType keyType; // serialized as int.
+            /**
+             * The #of leaves serialized in the file.
+             */
             final public int nleaves;
+            /**
+             * The #of nodes serialized in the file. If zero, then
+             * {@link #nleaves} MUST be ONE (1) and the index consists solely of
+             * a root leaf.
+             */
             final public int nnodes;
+            /**
+             * The #of index entries serialized in the file. This must be a
+             * positive integer as an empty index is not permitted (this forces
+             * the application to check the btree and NOT build the index
+             * segment when it is empty).
+             */
             final public int nentries;
             /**
              * The maximum #of bytes in any node or leaf stored on the index
              * segment.
              */
             final public int maxNodeOrLeafLength;
+            /**
+             * The offset to the start of the serialized leaves in the file.
+             * 
+             * Note: This should be equal to {@link #SIZE} since the leaves are
+             * written immediately after the {@link Metadata} record.
+             */
             final public long offsetLeaves;
+            /**
+             * The offset to the start of the serialized nodes in the file or
+             * <code>-1L</code> iff there are no nodes in the file.
+             */
             final public long offsetNodes;
             final public long addrRoot; // address of the root node/leaf.
             final public long length; // of the file in bytes.
@@ -866,7 +896,7 @@ public class PostOrderBuilder {
             public Metadata(int branchingFactor, int height, ArrayType keyType,
                     int nleaves, int nnodes, int nentries,
                     int maxNodeOrLeafLength, long offsetLeaves,
-                    long offsetNodes, long offsetRoot, long length,
+                    long offsetNodes, long addrRoot, long length,
                     long timestamp, String name) {
                 
                 assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
@@ -875,21 +905,32 @@ public class PostOrderBuilder {
                 
                 assert keyType != null;
                 
-                assert nleaves > 0;
+                assert nleaves > 0; // always at least one leaf.
                 
-                assert nnodes >= 0;
+                assert nnodes >= 0; // may be just a root leaf.
                 
-                assert nentries <= Math.pow(branchingFactor,height);
+                // index may not be empty.
+                assert nentries > 0;
+                // #entries must fit within the tree height.
+                assert nentries <= Math.pow(branchingFactor,height+1);
                 
                 assert maxNodeOrLeafLength > 0;
                 
                 assert offsetLeaves > 0;
 
-                assert offsetNodes > offsetLeaves;
-                
-                assert offsetRoot > offsetNodes;
-                
-                assert length > offsetRoot;
+                if(nnodes == 0) {
+                    // the root is a leaf.
+                    assert offsetNodes == -1L;
+                    assert offsetLeaves < length;
+                    assert Addr.getOffset(addrRoot) > offsetLeaves;
+                    assert Addr.getOffset(addrRoot) < length;
+                } else {
+                    // the root is a node.
+                    assert offsetNodes > offsetLeaves;
+                    assert offsetNodes < length;
+                    assert Addr.getOffset(addrRoot) >= offsetNodes;
+                    assert Addr.getOffset(addrRoot) < length;
+                }
                 
                 assert timestamp != 0L;
                 
@@ -915,7 +956,7 @@ public class PostOrderBuilder {
                 
                 this.offsetNodes = offsetNodes;
                 
-                this.addrRoot = offsetRoot;
+                this.addrRoot = addrRoot;
 
                 this.length = length;
                 
@@ -973,22 +1014,40 @@ public class PostOrderBuilder {
             
         }
 
+        public ArrayType getKeyType() {
+            
+            return metadata.keyType;
+            
+        }
+        
         public Object insert(Object key, Object entry) {
-            throw new UnsupportedOperationException("Read-only index");
+            
+            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            
         }
 
         public Object remove(Object key) {
-            throw new UnsupportedOperationException("Read-only index");
+            
+            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            
         }
 
         public Object lookup(Object key) {
-            // TODO Auto-generated method stub
-            return null;
+
+            throw new UnsupportedOperationException();
+
         }
 
         public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
-            // TODO Auto-generated method stub
-            return null;
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        public KeyValueIterator entryIterator() {
+            
+            throw new UnsupportedOperationException();
+            
         }
 
     }

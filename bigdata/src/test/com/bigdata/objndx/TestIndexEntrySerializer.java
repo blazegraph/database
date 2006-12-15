@@ -50,13 +50,10 @@ package com.bigdata.objndx;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.IndexEntrySerializer.ByteBufferInputStream;
-import com.bigdata.objndx.IndexEntrySerializer.ByteBufferOutputStream;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -87,173 +84,10 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
 //        
 //    }
     
-    public void testByteBufferStreams00() throws IOException {
-        
-        doRoundTripTest( (byte)0 );
-        doRoundTripTest( (byte)127 );
-        doRoundTripTest( (byte)128 );
-        doRoundTripTest( (byte)129 );
-        doRoundTripTest( (byte)255 );
-        doRoundTripTest( (byte)256 );
-        
-    }
-
-    public void doRoundTripTest(byte expected) throws IOException {
-
-        final ByteBuffer buf = ByteBuffer.allocate(1);
-        
-        {
-            
-            ByteBufferOutputStream os = new ByteBufferOutputStream(buf);
-
-            os.write(expected);
-
-        }
-        
-        buf.flip();
-        
-        {
-            
-            ByteBufferInputStream is = new ByteBufferInputStream(buf);
-            
-            int b = is.read();
-            
-            if( b == -1 ) fail("EOF");
-            
-            byte actual = (byte)b;
-            
-            assertEquals( expected, actual );
-            
-        }
-
-    }
-    
-    public void testByteBufferStreams02() throws IOException {
-        
-        byte[] expected = new byte[1024*8];
-        
-        r.nextBytes(expected);
-        
-        final ByteBuffer buf = ByteBuffer.allocate(expected.length);
-        
-        {
-            
-            DataOutputStream dos = new DataOutputStream(
-                    new ByteBufferOutputStream(buf));
-
-            dos.write(expected);
-
-            dos.flush();
-
-            dos.close();
-
-        }
-        
-        buf.flip();
-        
-        {
-            
-            DataInputStream dis = new DataInputStream( new ByteBufferInputStream(buf));
-            
-            byte[] actual = new byte[expected.length];
-            
-            dis.read(actual);
-            
-            assertEquals(expected,actual);
-            
-        }
-        
-    }
-    
-    public void testByteBufferStreams03() throws IOException {
-        
-        byte[] expected = new byte[256];
-
-        int b = Byte.MIN_VALUE;
-        
-        for (int i = 0; i < 256; i++) {
-
-            expected[i] = (byte) b++;
-//            expected[i] = (byte)i;
-
-        }
-        
-        final ByteBuffer buf = ByteBuffer.allocate(expected.length);
-        
-        {
-            
-            DataOutputStream dos = new DataOutputStream(
-                    new ByteBufferOutputStream(buf));
-
-            dos.write(expected);
-
-            dos.flush();
-
-            dos.close();
-
-        }
-        
-        buf.flip();
-        
-        {
-            
-            DataInputStream dis = new DataInputStream( new ByteBufferInputStream(buf));
-            
-            byte[] actual = new byte[expected.length];
-            
-            dis.read(actual);
-            
-            assertEquals(expected,actual);
-            
-        }
-        
-    }
-
-    public void testByteBufferStreams04() throws IOException {
-        
-        for (int i = 0; i < 1000; i++) {
-
-            final String expected = getRandomString(256, 0);
-
-            // Note: presuming that this is sufficient capacity.
-            final int capacity = expected.length() * 3;
-
-            final ByteBuffer buf = ByteBuffer.allocate(capacity);
-
-            {
-
-                DataOutputStream dos = new DataOutputStream(
-                        new ByteBufferOutputStream(buf));
-
-                dos.writeUTF(expected);
-
-                dos.flush();
-
-                dos.close();
-
-            }
-
-            buf.flip();
-
-            {
-
-                DataInputStream dis = new DataInputStream(
-                        new ByteBufferInputStream(buf));
-
-                String actual = dis.readUTF();
-
-                assertEquals(expected, actual);
-
-            }
-
-        }
-        
-    }
-    
     /**
      * Test with entry whose fields are all zeros.
      */
-    public void test01() {
+    public void test01() throws IOException {
         
         IndexEntry e1 = new IndexEntry(store.getSlotMath(),(short)0,0L,0L);
         
@@ -266,7 +100,7 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
     /**
      * Test with entry having known field values.
      */
-    public void test02() {
+    public void test02() throws IOException {
         
         IndexEntry e1 = new IndexEntry(store.getSlotMath(),(short)1,SlotMath.toLong(12, 90),0L);
         
@@ -279,7 +113,7 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
     /**
      * Test with entry having known field values.
      */
-    public void test03() {
+    public void test03() throws IOException {
         
         IndexEntry e1 = new IndexEntry(store.getSlotMath(),(short)2,0L,SlotMath.toLong(22, 80));
         
@@ -292,7 +126,7 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
     /**
      * Test with entry having known field values.
      */
-    public void test04() {
+    public void test04() throws IOException {
         
         IndexEntry e1 = new IndexEntry(store.getSlotMath(),(short)3,SlotMath.toLong(32, 92),SlotMath.toLong(2, 10));
         
@@ -306,7 +140,7 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
      * Test with entry having known field values corresponding to an observed
      * test failure.
      */
-    public void test05() {
+    public void test05() throws IOException {
         
         IndexEntry e1 = new IndexEntry(store.getSlotMath(),(short)28942,6851360340572110870L,2927585090617737519L);
         
@@ -319,7 +153,7 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
     /**
      * Stress test with entry whose fields are random.
      */
-    public void testStress() {
+    public void testStress() throws IOException {
         
         final int LIMIT = 1000;
 
@@ -351,12 +185,20 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
         
     }
     
-    public void doRoundTripTest( ByteBuffer buf, IndexEntry[] expected, int n ) {
+    public void doRoundTripTest( ByteBuffer buf, IndexEntry[] expected, int n )
+        throws IOException
+    {
         
         // clear before writing.
         buf.clear();
         
-        valueSer.putValues(buf, expected, n);
+        /*
+         * Setup output stream over the buffer.
+         */
+        DataOutputStream os = new DataOutputStream(new ByteBufferOutputStream(
+                buf));
+
+        valueSer.putValues(os, expected, n);
         
         IndexEntry[] actual = new IndexEntry[expected.length];
         
@@ -365,9 +207,15 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
         
         try {
 
-            valueSer.getValues(buf, actual, n);
+            /*
+             * Setup input stream reading from the buffer.
+             */
+            final DataInputStream is = new DataInputStream(
+                    new ByteBufferInputStream(buf));
+
+            valueSer.getValues(is, actual, n);
             
-        } catch(BufferUnderflowException ex) {
+        } catch(IOException ex) {
             
             for( int i=0; i<n; i++ ) {
                 

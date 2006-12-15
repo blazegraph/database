@@ -47,6 +47,9 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Vector;
@@ -278,12 +281,12 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 return 0;
             }
 
-            public void getValues(ByteBuffer buf, Object[] values, int n) {
+            public void getValues(DataInputStream is, Object[] values, int nvals) throws IOException {
                 // TODO Auto-generated method stub
                 
             }
 
-            public void putValues(ByteBuffer buf, Object[] values, int n) {
+            public void putValues(DataOutputStream os, Object[] values, int nvals) throws IOException {
                 // TODO Auto-generated method stub
                 
             }

@@ -68,7 +68,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Node extends AbstractNode {
+public class Node extends AbstractNode implements INode {
 
     /**
      * <p>
@@ -87,7 +87,7 @@ public class Node extends AbstractNode {
 
     /**
      * <p>
-     * The persistent keys of the childKeys nodes (may be nodes or leaves). The
+     * The persistent keys of the childAddr nodes (may be nodes or leaves). The
      * capacity of this array is m, where m is the {@link #branchingFactor}.
      * Valid indices are in [0:nkeys+1] since nchildren := nkeys+1 for a
      * {@link Node}. The key is {@link #NULL} until the child has been
@@ -107,7 +107,7 @@ public class Node extends AbstractNode {
      * computing the split point and performing the split.
      * </p>
      */
-    long[] childKeys;
+    long[] childAddr;
 
     /**
      * De-serialization constructor.
@@ -127,7 +127,7 @@ public class Node extends AbstractNode {
      *            <code>branchingFactor</code> to allow room for the insert
      *            key that places the node temporarily over capacity during a
      *            split.
-     * @param childKeys
+     * @param childAddr
      *            The persistent identity for the direct children (the array
      *            reference is copied NOT the array contents). The array MUST be
      *            dimensioned to <code>branchingFactor+1</code> to allow room
@@ -152,7 +152,7 @@ public class Node extends AbstractNode {
         
         this.keys = keys; // steal reference.
         
-        this.childKeys = childKeys;
+        this.childAddr = childKeys;
 
 //        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
@@ -170,13 +170,13 @@ public class Node extends AbstractNode {
 
         super(btree, btree.branchingFactor);
 
-        keys = allocKeys(btree.keyType,branchingFactor);
+        keys = ArrayType.alloc(btree.keyType,branchingFactor);
 
 //        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor+1];
+        childAddr = new long[branchingFactor+1];
 
     }
 
@@ -202,13 +202,13 @@ public class Node extends AbstractNode {
         // The old root must be dirty when it is being split.
         assert oldRoot.isDirty();
 
-        keys = allocKeys(btree.keyType,branchingFactor);
+        keys = ArrayType.alloc(btree.keyType,branchingFactor);
 
 //        dirtyChildren = new HashSet<AbstractNode>(branchingFactor+1);
 
         childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor+1];
+        childAddr = new long[branchingFactor+1];
 
         /*
          * Replace the root node on the tree.
@@ -262,7 +262,7 @@ public class Node extends AbstractNode {
      * parent reference and then skip it? If so, then that would remove a
      * toublesome parameter from the API.
      */
-    protected Node(Node src, AbstractNode triggeredByChild) {
+    protected Node(Node src, IAbstractNode triggeredByChild) {
 
         super(src);
         
@@ -272,7 +272,7 @@ public class Node extends AbstractNode {
         
 //        assert triggeredByChild != null;
 
-        keys = allocKeys(btree.keyType,branchingFactor);
+        keys = ArrayType.alloc(btree.keyType,branchingFactor);
 
         nkeys = src.nkeys;
 
@@ -280,7 +280,7 @@ public class Node extends AbstractNode {
 
         childRefs = new WeakReference[branchingFactor+1];
 
-        childKeys = new long[branchingFactor+1];
+        childAddr = new long[branchingFactor+1];
 
         /*
          * @todo Unless and until we have a means to recover leafs from a cache,
@@ -294,7 +294,7 @@ public class Node extends AbstractNode {
         System.arraycopy(src.keys, 0, keys, 0, nkeys);
 
         // Note: There is always one more child than keys for a Node.
-        System.arraycopy(src.childKeys, 0, childKeys, 0, nkeys+1);
+        System.arraycopy(src.childAddr, 0, childAddr, 0, nkeys+1);
 
         /*
          * Steal strongly reachable unmodified children by setting their parent
@@ -355,6 +355,18 @@ public class Node extends AbstractNode {
 
     }
 
+    final public int getChildCount() {
+        
+        return nkeys+1;
+        
+    }
+    
+    final public long[] getChildAddr() {
+        
+        return childAddr;
+        
+    }
+    
     /**
      * This method must be invoked on a parent to notify the parent that the
      * child has become persistent. The method scans the weak references for
@@ -381,7 +393,7 @@ public class Node extends AbstractNode {
 
         int i = getIndexOf( child );
 
-        childKeys[i] = child.getIdentity();
+        childAddr[i] = child.getIdentity();
 
 //        if (!dirtyChildren.remove(child)) {
 //
@@ -416,7 +428,7 @@ public class Node extends AbstractNode {
         // Scan for location in weak references.
         for (int i = 0; i <= nkeys; i++) {
 
-            if (childKeys[i] == oldChildKey) {
+            if (childAddr[i] == oldChildKey) {
 
                 if (true) {
 
@@ -438,7 +450,7 @@ public class Node extends AbstractNode {
                 }
 
                 // Clear the old key.
-                childKeys[i] = NULL;
+                childAddr[i] = NULL;
 
                 // Stash reference to the new child.
                 childRefs[i] = new WeakReference<AbstractNode>(newChild);
@@ -486,7 +498,7 @@ public class Node extends AbstractNode {
 
         int index = findChild(key);
 
-        AbstractNode child = getChild(index);
+        IAbstractNode child = getChild(index);
 
         return child.insert(key, entry);
 
@@ -500,7 +512,7 @@ public class Node extends AbstractNode {
 
         int index = findChild(key);
 
-        AbstractNode child = getChild(index);
+        IAbstractNode child = getChild(index);
 
         return child.lookup(key);
 
@@ -523,7 +535,7 @@ public class Node extends AbstractNode {
 
         int index = findChild(key);
 
-        AbstractNode child = getChild(index);
+        IAbstractNode child = getChild(index);
 
         Object val = child.remove(key);
         
@@ -642,7 +654,7 @@ public class Node extends AbstractNode {
      * node, which may cause the parent node itself to split.
      * </p>
      */
-    protected AbstractNode split() {
+    protected IAbstractNode split() {
 
         assert isDirty(); // MUST be mutable.
         assert nkeys == maxKeys+1; // MUST be over capacity by one.
@@ -694,7 +706,7 @@ public class Node extends AbstractNode {
             
             rightSibling.childRefs[j] = childRefs[i];
             
-            rightSibling.childKeys[j] = childKeys[i];
+            rightSibling.childAddr[j] = childAddr[i];
             
             AbstractNode tmp = (childRefs[i] == null ? null : childRefs[i]
                     .get());
@@ -741,7 +753,7 @@ public class Node extends AbstractNode {
             
             childRefs[i] = null;
             
-            childKeys[i] = NULL;
+            childAddr[i] = NULL;
 
         }
 
@@ -853,7 +865,7 @@ public class Node extends AbstractNode {
 //            p.setKey(index, s.getKey(0)); // update the separatorKey from the rightSibling.
             p.copyKey(index, s, 0); // update the separatorKey from the rightSibling.
             childRefs[nkeys+1] = s.childRefs[0]; // copy the child from the rightSibling.
-            childKeys[nkeys+1] = s.childKeys[0];
+            childAddr[nkeys+1] = s.childAddr[0];
             AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
             if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
@@ -866,12 +878,12 @@ public class Node extends AbstractNode {
             // copy down the keys on the right sibling to cover up the hole.
             System.arraycopy(s.keys, 1, s.keys, 0, s.nkeys-1);
             System.arraycopy(s.childRefs, 1, s.childRefs, 0, s.nkeys);
-            System.arraycopy(s.childKeys, 1, s.childKeys, 0, s.nkeys);
+            System.arraycopy(s.childAddr, 1, s.childAddr, 0, s.nkeys);
 
             // erase exposed key/value on rightSibling that is no longer defined.
             s.setKey(s.nkeys-1, btree.NEGINF);
             s.childRefs[s.nkeys] = null;
-            s.childKeys[s.nkeys] = NULL;
+            s.childAddr[s.nkeys] = NULL;
 
             s.nkeys--;
             this.nkeys++;
@@ -892,7 +904,7 @@ public class Node extends AbstractNode {
             // copy down by one.
             System.arraycopy(keys, 0, keys, 1, nkeys);
             System.arraycopy(childRefs, 0, childRefs, 1, nkeys+1);
-            System.arraycopy(childKeys, 0, childKeys, 1, nkeys+1);
+            System.arraycopy(childAddr, 0, childAddr, 1, nkeys+1);
             
             // move the last key/child from the leftSibling to this node.
 //            setKey(0, p.getKey(index-1)); // copy the separatorKey from the parent.
@@ -900,7 +912,7 @@ public class Node extends AbstractNode {
 //            p.setKey(index-1, s.getKey(s.nkeys-1)); // update the separatorKey
             p.copyKey(index-1, s, s.nkeys-1); // update the separatorKey
             childRefs[0] = s.childRefs[s.nkeys];
-            childKeys[0] = s.childKeys[s.nkeys];
+            childAddr[0] = s.childAddr[s.nkeys];
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
             if( child!=null ) {
                 child.parent = new WeakReference<Node>(this);
@@ -911,7 +923,7 @@ public class Node extends AbstractNode {
             }
             s.setKey(s.nkeys-1, btree.NEGINF);
             s.childRefs[s.nkeys] = null;
-            s.childKeys[s.nkeys] = NULL;
+            s.childAddr[s.nkeys] = NULL;
             s.nkeys--;
             this.nkeys++;
 
@@ -995,7 +1007,7 @@ public class Node extends AbstractNode {
              */
             System.arraycopy(s.keys, 0, this.keys, nkeys, s.nkeys);
             System.arraycopy(s.childRefs, 0, this.childRefs, nkeys, s.nkeys+1);
-            System.arraycopy(s.childKeys, 0, this.childKeys, nkeys, s.nkeys+1);
+            System.arraycopy(s.childAddr, 0, this.childAddr, nkeys, s.nkeys+1);
             
             // update parent on children
             WeakReference<Node> weakRef = new WeakReference<Node>(this);
@@ -1055,12 +1067,12 @@ public class Node extends AbstractNode {
             // move keys and children down by sibling.nkeys+1 positions.
             System.arraycopy(this.keys, 0, this.keys, s.nkeys+1, this.nkeys);
             System.arraycopy(this.childRefs, 0, this.childRefs, s.nkeys+1, this.nkeys+1);
-            System.arraycopy(this.childKeys, 0, this.childKeys, s.nkeys+1, this.nkeys+1);
+            System.arraycopy(this.childAddr, 0, this.childAddr, s.nkeys+1, this.nkeys+1);
             
             // copy keys and values from the sibling to index 0 of this leaf.
             System.arraycopy(s.keys, 0, this.keys, 0, s.nkeys);
             System.arraycopy(s.childRefs, 0, this.childRefs, 0, s.nkeys+1);
-            System.arraycopy(s.childKeys, 0, this.childKeys, 0, s.nkeys+1);
+            System.arraycopy(s.childAddr, 0, this.childAddr, 0, s.nkeys+1);
 
             // copy the separatorKey from the parent.
             //this.setKey(s.nkeys, p.getKey(index - 1));
@@ -1147,7 +1159,7 @@ public class Node extends AbstractNode {
          * copy down per-child data. #children == nkeys+1. child[0] is
          * always defined.
          */
-        System.arraycopy(childKeys, index + 1, childKeys, index + 2, length);
+        System.arraycopy(childAddr, index + 1, childAddr, index + 2, length);
         System.arraycopy(childRefs, index + 1, childRefs, index + 2, length);
 
         /*
@@ -1160,7 +1172,7 @@ public class Node extends AbstractNode {
          */
         childRefs[index + 1] = new WeakReference<AbstractNode>(child);
 
-        childKeys[index + 1] = NULL;
+        childAddr[index + 1] = NULL;
 
 //        dirtyChildren.add(child);
 
@@ -1440,7 +1452,7 @@ public class Node extends AbstractNode {
 
         if (lengthChildCopy > 0) {
 
-            System.arraycopy(childKeys, index + 1, childKeys, index,
+            System.arraycopy(childAddr, index + 1, childAddr, index,
                     lengthChildCopy);
 
             System.arraycopy(childRefs, index + 1, childRefs, index,
@@ -1461,7 +1473,7 @@ public class Node extends AbstractNode {
         }
 
         // erase the last child position.
-        childKeys[nkeys] = NULL;
+        childAddr[nkeys] = NULL;
         childRefs[nkeys] = null;
 
 //        // Remove the child from the dirty list.
@@ -1595,7 +1607,7 @@ public class Node extends AbstractNode {
 //        }
 
         // set the persistent key for the new child.
-        childKeys[i] = (newChild.isPersistent() ? newChild.getIdentity() : NULL);
+        childAddr[i] = (newChild.isPersistent() ? newChild.getIdentity() : NULL);
 
         // set the reference to the new child.
         childRefs[i] = new WeakReference<AbstractNode>(newChild);
@@ -1624,7 +1636,7 @@ public class Node extends AbstractNode {
 
         if (child == null) {
 
-            long key = childKeys[index];
+            long key = childAddr[index];
 
             if(key == NULL) {
                 dump(Level.DEBUG,System.err);
@@ -1842,8 +1854,8 @@ public class Node extends AbstractNode {
             ok = false;
         }
         if (debug) {
-            out.println(indent(height) + "  childKeys="
-                    + Arrays.toString(childKeys));
+            out.println(indent(height) + "  childAddr="
+                    + Arrays.toString(childAddr));
             out.print(indent(height) + "  childRefs=[");
             for (int i = 0; i < branchingFactor; i++) {
                 if (i > 0)
@@ -1868,9 +1880,9 @@ public class Node extends AbstractNode {
 
         /*
          * Look for inconsistencies for children. A dirty child MUST NOT
-         * have an entry in childKeys[] since it is not persistent and MUST
+         * have an entry in childAddr[] since it is not persistent and MUST
          * show up in dirtyChildren. Likewise if a child is NOT dirty, then
-         * it MUST have an entry in childKeys and MUST NOT show up in
+         * it MUST have an entry in childAddr and MUST NOT show up in
          * dirtyChildren.
          * 
          * This also verifies that all entries beyond nchildren (nkeys+1)
@@ -1884,10 +1896,10 @@ public class Node extends AbstractNode {
                  * Scanning past the last valid child index. 
                  */
 
-                if (childKeys[i] != NULL) {
+                if (childAddr[i] != NULL) {
 
-                    out.println(indent(height) + "  ERROR childKeys[" + i
-                            + "] should be " + NULL + ", not " + childKeys[i]);
+                    out.println(indent(height) + "  ERROR childAddr[" + i
+                            + "] should be " + NULL + ", not " + childAddr[i]);
 
                     ok = false;
 
@@ -1959,9 +1971,9 @@ public class Node extends AbstractNode {
                                     + i + "] is null, but the child is dirty");
                             ok = false;
                         }
-                        if (childKeys[i] != NULL) {
-                            out.println(indent(height) + "  ERROR childKeys["
-                                    + i + "]=" + childKeys[i]
+                        if (childAddr[i] != NULL) {
+                            out.println(indent(height) + "  ERROR childAddr["
+                                    + i + "]=" + childAddr[i]
                                     + ", but MUST be " + NULL
                                     + " since the child is dirty");
                             ok = false;
@@ -1980,7 +1992,7 @@ public class Node extends AbstractNode {
                          * Clean child (ie, persistent).  The parent of a clean
                          * child may be either clear or dirty.
                          */
-                        if (childKeys[i] == NULL) {
+                        if (childAddr[i] == NULL) {
                             out.println(indent(height) + "  ERROR childKey["
                                     + i + "] is " + NULL
                                     + ", but child is not dirty");
@@ -2020,7 +2032,7 @@ public class Node extends AbstractNode {
 
             for (int i = 0; i <= /*nkeys*/branchingFactor; i++) {
 
-                if (childRefs[i] == null && childKeys[i] == 0) {
+                if (childRefs[i] == null && childAddr[i] == 0) {
 
                     if (i <= nkeys) {
 

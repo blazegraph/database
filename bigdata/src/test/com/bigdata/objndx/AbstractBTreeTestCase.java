@@ -387,7 +387,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
     
-    public void assertSameNodeOrLeaf(AbstractNode n1, AbstractNode n2 ) {
+    public void assertSameNodeOrLeaf(IAbstractNode n1, IAbstractNode n2 ) {
         
         if( n1 == n2 ) return;
         
@@ -441,7 +441,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assertKeys(n1,n2);
         
-        assertEquals("children",n1.childKeys,n2.childKeys);
+        assertEquals("children",n1.childAddr,n2.childAddr);
         
     }
 
@@ -670,9 +670,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Special purpose helper used to vet {@link Node#childKeys}.
+     * Special purpose helper used to vet {@link Node#childAddr}.
      * 
-     * @param childKeys
+     * @param childAddr
      *            An array all of whose values will be tested against the
      *            corresponding child identities in the node.
      * @param node
@@ -682,10 +682,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         int nChildKeys = childKeys.length;
         
-        long[] actualKeys = node.childKeys;
+        long[] actualKeys = node.childAddr;
         
-        // verify the capacity of the childKeys[] on the node.
-        assertEquals("childKeys[] capacity", node.branchingFactor+1, actualKeys.length );
+        // verify the capacity of the childAddr[] on the node.
+        assertEquals("childAddr[] capacity", node.branchingFactor+1, actualKeys.length );
         
         // verify the #of defined keys.
         assertEquals("nChildKeys", nChildKeys, node.nkeys+1);
@@ -693,14 +693,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify ordered values for the defined keys.
         for( int i=0; i<nChildKeys; i++ ) {
 
-            assertEquals("childKeys["+i+"]", childKeys[i], actualKeys[i]);
+            assertEquals("childAddr["+i+"]", childKeys[i], actualKeys[i]);
             
         }
         
         // verify the undefined keys are all NULL.
         for( int i=nChildKeys; i<actualKeys.length; i++ ) {
             
-            assertEquals("childKeys[" + i + "]", IIdentityAccess.NULL, actualKeys[i]);
+            assertEquals("childAddr[" + i + "]", IIdentityAccess.NULL, actualKeys[i]);
             
         }
         

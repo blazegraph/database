@@ -50,6 +50,8 @@ package com.bigdata.objndx;
 import java.io.File;
 import java.io.IOException;
 
+import com.bigdata.objndx.PostOrderBuilder.IndexSegment;
+
 /**
  * Test suite for efficient post-order rebuild of an index in an external index
  * segment.
@@ -79,12 +81,15 @@ import java.io.IOException;
  *       journal. We expunge the isolated index into a segment and do a merge
  *       when the transaction finally commits. We wind up doing the same
  *       validation and merge steps as when the isolation occurs within a more
- *       limited buffer, but in more of a batch fashion.  This might work nicely
+ *       limited buffer, but in more of a batch fashion. This might work nicely
  *       if we buffer the isolatation index out to a certain size in memory and
- *       then start to spill it onto the journal.  If fact, the hard reference
+ *       then start to spill it onto the journal. If fact, the hard reference
  *       queue already does this so we can just test to see if (a) anything has
  *       been written out from the isolation index; and (b) whether or not the
  *       journal was frozen since the isolation index was created.
+ * 
+ * Should the merge down should impose the transaction commit timestamp on the
+ * items in the index?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -120,54 +125,190 @@ public class TestPostOrderBuilder extends AbstractBTreeTestCase {
     }
 
     /**
-     * Test ability to build an index segment from a {@link BTree}.
+     * Test suite based on a small btree with known keys and values.
+     * 
+     * @see src/architecture/btree.xls, which has the detailed examples.
+     *  
+     * @todo test it all again with other interesting output branching
+     * factors.
+     * 
+     * @todo write another test that builds a tree of at least height 3
+     * (four levels).
+     * 
+     * @todo write a stress test that builds a tree with at least 1M
+     * entries, exports it as an index segment, and then validates the index
+     * segment.
      */
-    public void test_build01() throws IOException {
+    public static class TestSmallTree extends AbstractBTreeTestCase {
+
+        BTree btree;
+        File outFile;
+
+        public TestSmallTree() {}
         
-        BTree btree = getBTree(3);
+        public TestSmallTree(String name) {super(name);}
         
-//        int[] keys = new int[]{1,2,3,4,5,6,7,8,9,10};
-//        
-//        SimpleEntry[] vals = new SimpleEntry[]{
-//                new SimpleEntry(1),
-//                new SimpleEntry(2),
-//                new SimpleEntry(3),
-//                new SimpleEntry(4),
-//                new SimpleEntry(5),
-//                new SimpleEntry(6),
-//                new SimpleEntry(7),
-//                new SimpleEntry(8),
-//                new SimpleEntry(9),
-//                new SimpleEntry(10)
-//        };
-        
-        for( int i=1; i<=10; i++ ) {
-            
-            btree.insert(i, new SimpleEntry(i) );
-            
+        /**
+         * Sets up the {@link #btree} and ensures that the {@link #outFile} on
+         * which the {@link IndexSegment} will be written does not exist.
+         */
+        public void setUp() {
+
+            btree = getBTree(3);
+
+            for (int i = 1; i <= 10; i++) {
+
+                btree.insert(i, new SimpleEntry(i));
+
+            }
+
+            outFile = new File(getName() + ".seg");
+
+            if (outFile.exists() && !outFile.delete()) {
+
+                throw new RuntimeException("Could not delete file: " + outFile);
+
+            }
+
         }
 
-        final File outFile = new File( getName()+".seg" );
-        
-        if( outFile.exists() && ! outFile.delete() ) {
+        public void tearDown() {
 
-            throw new RuntimeException("Could not delete file: "+outFile);
-            
+            if (outFile != null && outFile.exists() && !outFile.delete()) {
+
+                System.err
+                        .println("Warning: Could not delete file: " + outFile);
+
+            }
+
         }
         
-        new PostOrderBuilder(outFile,null,btree,3);
-        
-        /*
+        /**
+         * Test ability to build an index segment from a {@link BTree}.
+         * 
          * @todo verify interals in builder.
          * @todo verify post-conditions for files.
-         * @todo verify can load the index file.
-         * @todo verify correct #of leaves and nodes.
-         * @todo verify the right keys in the right leaves.
-         * @todo verify same keys and values in the correct order.
-         * 
-         * @todo test it all again with other interesting output branching
-         * factors.
          */
+        public void test_buildOrder3() throws IOException {
+            
+            new PostOrderBuilder(outFile,null,btree,3);
+
+             /*
+              * Verify can load the index file and that the metadata
+              * associated with the index file is correct (we are only
+              * checking those aspects that are easily defined by the test
+              * case and not, for example, those aspects that depend on the
+              * specifics of the length of serialized nodes or leaves).
+              */
+            final IndexSegment seg = new IndexSegment(outFile);
+            assertEquals(3,seg.metadata.branchingFactor);
+            assertEquals(2,seg.metadata.height);
+            assertEquals(ArrayType.INT,seg.metadata.keyType);
+            assertEquals(4,seg.metadata.nleaves);
+            assertEquals(3,seg.metadata.nnodes);
+            assertEquals(10,seg.metadata.nentries);
+            
+            /*
+             * @todo verify the right keys in the right leaves.
+             */
+            
+            /*
+             * Verify the total index order.
+             */
+            assertSameBTree(btree, seg);
+            
+        }
+        
+        public void test_buildOrder10() throws IOException {
+            
+            new PostOrderBuilder(outFile,null,btree,10);
+
+             /*
+              * Verify can load the index file and that the metadata
+              * associated with the index file is correct (we are only
+              * checking those aspects that are easily defined by the test
+              * case and not, for example, those aspects that depend on the
+              * specifics of the length of serialized nodes or leaves).
+              */
+            final IndexSegment seg = new IndexSegment(outFile);
+            assertEquals(10,seg.metadata.branchingFactor);
+            assertEquals(0,seg.metadata.height);
+            assertEquals(ArrayType.INT,seg.metadata.keyType);
+            assertEquals(1,seg.metadata.nleaves);
+            assertEquals(0,seg.metadata.nnodes);
+            assertEquals(10,seg.metadata.nentries);
+            
+            /*
+             * @todo verify the right keys in the right leaves.
+             */
+            
+            /*
+             * Verify the total index order.
+             */
+            assertSameBTree(btree, seg);
+            
+        }
+        
+        /**
+         * Assert #of entries, key type, and the same keys and values. The
+         * height, branching factor, #of nodes and #of leaves will differ if the
+         * {@link IndexSegment} was built with a different branching factor from
+         * the original {@link BTree}.
+         * 
+         * @param expected
+         *            The ground truth btree.
+         * @param actual
+         *            The index segment that is being validated.
+         */
+        public void assertSameBTree(BTree expected, IndexSegment actual) {
+
+            assert expected != null;
+            
+            assert actual != null;
+            
+            // The #of entries must agree.
+            assertEquals(expected.nentries, actual.metadata.nentries);
+            
+            // The key type must agree.
+            assertEquals(expected.keyType, actual.metadata.keyType);
+            
+            KeyValueIterator expectedItr = btree.entryIterator();
+            
+            KeyValueIterator actualItr = actual.entryIterator();
+            
+            int index = 0;
+            
+            while( expectedItr.hasNext() ) {
+                
+                if( ! actualItr.hasNext() ) {
+                    
+                    fail("The iterator is not willing to visit enough entries");
+                    
+                }
+                
+                Object expectedVal = expectedItr.next();
+                
+                Object actualVal = actualItr.next();
+
+                Object expectedKey = expectedItr.getKey();
+                
+                Object actualKey = expectedItr.getKey();
+
+                assertEquals("index="+index, expectedKey,actualKey);
+
+                assertEquals("index="+index+", key="+expectedKey, expectedVal,actualVal);
+                
+                index++;
+                
+            }
+            
+            if( actualItr.hasNext() ) {
+                
+                fail("The iterator is willing to visit too many entries");
+                
+            }
+            
+        }
         
     }
     

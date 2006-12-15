@@ -46,6 +46,10 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.Bytes;
@@ -114,21 +118,23 @@ class SimpleEntry {
             
         }
         
-        public void putValues(ByteBuffer buf, Object[] values, int n) {
+        public void putValues(DataOutputStream os, Object[] values, int n)
+                throws IOException {
 
             for (int i = 0; i < n; i++) {
 
-                buf.putInt(((SimpleEntry) values[i]).id);
+                os.writeInt(((SimpleEntry) values[i]).id);
 
             }
 
         }
 
-        public void getValues(ByteBuffer buf, Object[] values, int n) {
+        public void getValues(DataInputStream is, Object[] values, int n)
+                throws IOException {
 
             for (int i = 0; i < n; i++) {
 
-                values[i] = new SimpleEntry(buf.getInt());
+                values[i] = new SimpleEntry(is.readInt());
 
             }
 
@@ -152,13 +158,13 @@ class SimpleEntry {
             
         }
         
-        public void getValues(ByteBuffer buf, Object[] values, int n) {
+        public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
 
             throw new UnsupportedOperationException();
  
         }
 
-        public void putValues(ByteBuffer buf, Object[] values, int n) {
+        public void putValues(DataOutputStream os, Object[] values, int n) throws IOException {
 
             throw new UnsupportedOperationException();
 

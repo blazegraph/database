@@ -47,7 +47,9 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.nio.ByteBuffer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * (De-)serialize the keys in a {@link Leaf} or {@link Node}.
@@ -57,6 +59,16 @@ import java.nio.ByteBuffer;
  */
 public interface IKeySerializer {
 
+    /**
+     * The data type used to store the keys.
+     * 
+     * @return The data type for the keys. This will either correspond to one of
+     *         the primitive data types or to an {@link Object}.
+     *         {@link #getKeys()} will return an object that may be cast to an
+     *         array of the corresponding type.
+     */
+    public ArrayType getKeyType();
+    
     /**
      * The maximum size of a sequence of serialized keys in bytes. This is
      * used to compute the maximum required size of a buffer to (de-)serialize
@@ -68,10 +80,10 @@ public interface IKeySerializer {
     public int getSize(int n);
     
     /**
-     * De-serialize the keys from the buffer.
+     * De-serialize the keys.
      * 
-     * @param buf
-     *            The buffer.
+     * @param is
+     *            The input stream.
      * @param nkeys
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be read from the buffer and
@@ -83,13 +95,15 @@ public interface IKeySerializer {
      *         type declaration makes it possible to return either an array of
      *         primitives or an array of objects.
      */
-    public void getKeys(ByteBuffer buf, Object keys, int nkeys);
+    public void getKeys(DataInputStream is, Object keys, int nkeys)
+        throws IOException;
 
     /**
      * Serialize the keys onto the buffer.
      * 
-     * @param buf
-     *            The buffer.
+     * @param os
+     *            The output stream (the caller is responsible for flushing
+     *            the stream).
      * @param keys
      *            The array of keys from a {@link Leaf} or {@link Node}. Note
      *            that this parameter type declaration makes it possible to
@@ -98,6 +112,7 @@ public interface IKeySerializer {
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be written.
      */
-    public void putKeys(ByteBuffer buf, Object keys,int nkeys);
+    public void putKeys(DataOutputStream os, Object keys,int nkeys)
+        throws IOException;
 
 }

@@ -91,16 +91,20 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      *            factor).
      * 
      * @todo this test helper is rather specific to the concept of an object
-     *       index and therefore somewhat dated.
+     *       index and therefore somewhat dated.  Also, it presumes that much
+     *       of the serialized format is fixed, but we actually pack everything
+     *       except the header.
      */
     public void showInfo(int slotSize,int branchingFactor) {
 
+        // @todo drop use of the slotMath and the computation of #of slots used.
         final SlotMath slotMath = new SlotMath(slotSize);
         
         final IndexEntrySerializer valueSer = new IndexEntrySerializer(slotMath);
         
         final NodeSerializer nodeSer = new NodeSerializer(
-                Int32OIdKeySerializer.INSTANCE, valueSer);
+                BTree.NodeFactory.INSTANCE, Int32OIdKeySerializer.INSTANCE,
+                valueSer);
 
         System.err.println("Shared record format:");
 
@@ -111,19 +115,33 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         
         System.err.println(" checksum: offset="
                 + NodeSerializer.OFFSET_CHECKSUM + ", size="
-                + NodeSerializer.SIZEOF_ADLER32);
+                + NodeSerializer.SIZEOF_CHECKSUM);
         
         System.err.println(" nbytes  : offset=" + NodeSerializer.OFFSET_NBYTES
                 + ", size=" + NodeSerializer.SIZEOF_NBYTES);
 
-        System.err.println(" isLeaf  : offset=" + NodeSerializer.OFFSET_IS_LEAF
-                + ", size=" + NodeSerializer.SIZEOF_IS_LEAF);
+        System.err.println(" nodeType: offset=" + NodeSerializer.OFFSET_NODE_TYPE
+                + ", size=" + NodeSerializer.SIZEOF_NODE_TYPE);
         
-        System.err.println(" order   : offset=" + NodeSerializer.OFFSET_ORDER
-                + ", size=" + NodeSerializer.SIZEOF_ORDER);
+        System.err.println(" version : offset=" + NodeSerializer.OFFSET_VERSION
+                + ", size=" + NodeSerializer.SIZEOF_VERSION);
 
-        System.err.println(" nkeys   : offset=" + NodeSerializer.OFFSET_NKEYS
-                + ", size=" + NodeSerializer.SIZEOF_NKEYS);
+        /*
+         * iff a linked leaf (not used for node or unlinked leaf).
+         */
+        System.err.println(" prior   : offset=" + NodeSerializer.OFFSET_PRIOR
+                + ", size=" + NodeSerializer.SIZEOF_REF);
+
+        System.err.println(" next    : offset=" + NodeSerializer.OFFSET_NEXT
+                + ", size=" + NodeSerializer.SIZEOF_REF);
+
+        /*
+         * the different fixed length header sizes.
+         */
+        System.err.println(" node header    : size=" + NodeSerializer.SIZEOF_NODE_HEADER);
+        System.err.println(" leaf header    : size=" + NodeSerializer.SIZEOF_LEAF_HEADER);
+        System.err.println(" linked leaf hdr: size=" + NodeSerializer.SIZEOF_LINKED_LEAF_HEADER);
+
 
         /*
          * a node
@@ -133,28 +151,28 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             int nkeys = branchingFactor - 1;
             int nchildren = branchingFactor;
             int keysSize = nodeSer.keySerializer.getSize(nkeys);
-            int valuesSize = (nchildren * NodeSerializer.SIZEOF_NODE_VALUE);
-            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
+            int valuesSize = (nchildren * NodeSerializer.SIZEOF_REF);
+//            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
             
             System.err.println("Node specific record format:");
             
-            System.err.println(" key[]   : offset="
-                    + NodeSerializer.OFFSET_KEYS +
+            System.err.println(" key[]" +
+//                    ": offset="+ NodeSerializer.OFFSET_KEYS +
 //                    ", size="+ NodeSerializer.SIZEOF_KEY +
-                    ", #keys=" + nkeys
+                    ": #keys=" + nkeys
                     + ", #bytes=" + keysSize);
             
             System.err.println(" value   : child node ref         ("
                     + NodeSerializer.SIZEOF_REF + ")");
             
             System.err.println(" value   : total node value       ("
-                    + NodeSerializer.SIZEOF_NODE_VALUE + ")");
+                    + NodeSerializer.SIZEOF_REF + ")");
             
-            System.err.println(" value[] : offset="
-                    + offsetValues + ", size="
-                    + NodeSerializer.SIZEOF_NODE_VALUE + ", #values="
-                    + nchildren + ", #bytes="
-                    + valuesSize );
+            System.err.println(" value[]"+
+//                    + " : offset="+offsetValues +
+                    ": size="+NodeSerializer.SIZEOF_REF +
+                    ", #values="+nchildren +
+                    ", #bytes="+ valuesSize );
 
             final int nodeSize = nodeSer.getSize(false, branchingFactor);
 
@@ -175,14 +193,14 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             int nkeys = branchingFactor;
             int keysSize = nodeSer.keySerializer.getSize(nkeys);
             int valuesSize = valueSer.getSize(nkeys);
-            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
+//            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
 
             System.err.println("Leaf specific record format:");
             
-            System.err.println(" key[]   : offset="
-                    + NodeSerializer.OFFSET_KEYS +
+            System.err.println(" key[]"+
+//                    ": offset="+ NodeSerializer.OFFSET_KEYS +
 //                    ", size="+ NodeSerializer.SIZEOF_KEY +
-                    ", #keys=" + branchingFactor
+                    ": #keys=" + branchingFactor
                     + ", #bytes=" + keysSize);
             
             System.err.println(" value   : versionCounter         ("
@@ -197,9 +215,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
             System.err.println(" value   : total leaf value       ("
                     + IndexEntrySerializer.SIZEOF_LEAF_VALUE + ")");
 
-            System.err.println(" value[] : offset=" + offsetValues + ", size="
-                    + IndexEntrySerializer.SIZEOF_LEAF_VALUE + ", #values=" + nkeys
-                    + ", #bytes=" + valuesSize);
+            System.err.println(" value[] : #values=" + nkeys + ", #bytes="
+                    + valuesSize);
 
             final int leafSize = nodeSer.getSize(true, branchingFactor - 1);
 
@@ -294,7 +311,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         /*
          * Serialize onto a buffer.
          */
-        ByteBuffer buf = ByteBuffer.allocate(nodeSer.getSize(expected));
+        ByteBuffer buf = ByteBuffer.allocate(getSize(nodeSer,expected));
         
         nodeSer.putLeaf(buf, expected);
         
@@ -335,7 +352,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         /*
          * Serialize onto a buffer.
          */
-        ByteBuffer buf = ByteBuffer.allocate(nodeSer.getSize(expected));
+        ByteBuffer buf = ByteBuffer.allocate(getSize(nodeSer,expected));
         
         nodeSer.putNode(buf, expected);
         
@@ -389,14 +406,14 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      *            
      * @return The de-serialized node or leaf.
      */
-    public AbstractNode doRoundTripTest(boolean verbose, BTree ndx,
+    public IAbstractNode doRoundTripTest(boolean verbose, BTree ndx,
             AbstractNode expected) {
 
         final boolean isLeaf = expected.isLeaf();
         
         NodeSerializer nodeSer = ndx.getNodeSerializer();
         
-        final int BUF_SIZE = nodeSer.getSize(expected);
+        final int BUF_SIZE = getSize(nodeSer,expected);
         
         ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
         
@@ -415,7 +432,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         
         buf.flip(); // prepare for reading.
         
-        AbstractNode actual = nodeSer.getNodeOrLeaf(ndx,
+        AbstractNode actual = (AbstractNode) nodeSer.getNodeOrLeaf(ndx,
                 expected.getIdentity(), buf);
 
         if (verbose)
@@ -473,21 +490,21 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         }
 
         /*
-         * Override the index of the first valid key in the node to test for a
-         * checksum error.
+         * Override the a byte in the serialized record to test for a correctly
+         * reported checksum error.
          */
 
-        final int nkeys = buf2.getShort(NodeSerializer.OFFSET_NKEYS);
+        final byte b = buf2.get(NodeSerializer.OFFSET_NODE_TYPE);
         
-        int randomNKeys;
+        byte randomByte;
         
         do {
             
-            randomNKeys = r.nextInt(ndx.branchingFactor-1);
+            randomByte= (byte) r.nextInt(255);
             
-        } while( randomNKeys == nkeys );
+        } while( randomByte == b );
         
-        buf2.putShort(NodeSerializer.OFFSET_NKEYS,  (short) randomNKeys );
+        buf2.put(NodeSerializer.OFFSET_NODE_TYPE, randomByte );
         
         buf2.flip(); // prepare for re-reading.
         
@@ -563,83 +580,19 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         
     }
 
-//    /**
-//     * A mostly non-functional implementation of the {@link IBTree} interface
-//     * designed to make it possible to test the {@link NodeSerializer} without
-//     * having to meet the structural requirements of a real B-Tree.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private static class MyBTree implements IBTree {
-//
-//        private final IRawStore store;
-//        private final int branchingFactor;
-//        
-//        public MyBTree(int branchingFactor) {
-//         
-//            this.store = new SimpleStore();
-//            
-//            this.branchingFactor = branchingFactor;
-//            
-//        }
-//        
-//        public long commit() {
-//            return 0;
-//        }
-//
-//        public int getBrachingFactor() {
-//            return branchingFactor;
-//        }
-//
-//        public int getEntryCount() {
-//            return 0;
-//        }
-//
-//        public int getHeight() {
-//            return 0;
-//        }
-//
-//        public int getLeafCount() {
-//            return 0;
-//        }
-//
-//        public ILeafSplitPolicy getLeafSplitPolicy() {
-//            return null;
-//        }
-//
-//        public int getNodeCount() {
-//            return 0;
-//        }
-//
-//        public NodeSerializer getNodeSerializer() {
-//            return null;
-//        }
-//
-//        public INodeSplitPolicy getNodeSplitPolicy() {
-//            return null;
-//        }
-//
-//        public AbstractNode getRoot() {
-//            return null;
-//        }
-//
-//        public IRawStore getStore() {
-//            return store;
-//        }
-//
-//        public void insert(int key, Object entry) {
-//        }
-//
-//        public Object lookup(int key) {
-//            return null;
-//        }
-//
-//        public Object remove(int key) {
-//            return null;
-//        }
-//        
-//    }
+    /**
+     * The #of bytes requires to serialize this node or leaf.
+     * 
+     * @param node
+     *            The node or leaf.
+     * 
+     * @return The #of bytes required to serialize that node or leaf.
+     */
+    protected int getSize(NodeSerializer nodeSer,AbstractNode node) {
+
+        return nodeSer.getSize( node.isLeaf(), node.nkeys );
+        
+    }
     
     /**
      * Run a large stress test.

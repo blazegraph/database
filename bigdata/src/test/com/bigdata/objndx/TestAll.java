@@ -34,6 +34,11 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("BTree");
 
+        // test address encoding and decoding; @todo move to journal package to replace ISlotsAllocation
+        suite.addTestSuite( TestAddr.class );
+        // test classes that let us treat a ByteBuffer as an input/output stream.
+        suite.addTestSuite( TestByteBufferStreams.class );
+
         // test key search routines (linear and binary and various key types).
         suite.addTest( TestSearch.suite() );
         // test assertions that test for node/leaf invariants.
@@ -84,8 +89,6 @@ public class TestAll extends TestCase {
         /*
          * index rebuilding.
          */
-        // test address encoding and decoding; @todo move to journal package to replace ISlotsAllocation
-        suite.addTestSuite( TestAddr.class );
         suite.addTestSuite( TestPostOrderBuilder.class );
         // @todo test compacting merge of two index segments.
         // @todo test compacting merge of N index segments?
