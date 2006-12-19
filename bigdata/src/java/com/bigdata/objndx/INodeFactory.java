@@ -30,7 +30,7 @@ public interface INodeFactory {
      *            
      * @return A node initialized from those data.
      */
-    public INode allocNode( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, long[] childAddr);
+    public INodeData allocNode( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, long[] childAddr);
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
@@ -53,6 +53,6 @@ public interface INodeFactory {
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeaf allocLeaf( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, Object[] values);
+    public ILeafData allocLeaf( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, Object[] values);
 
 }

@@ -125,7 +125,7 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
                             Integer.valueOf(0),
                             null, // no comparator for primitive key type.
                             Int32OIdKeySerializer.INSTANCE,
-                    new SimpleEntry.Serializer());
+                    SimpleEntry.Serializer.INSTANCE);
 
             return btree;
 

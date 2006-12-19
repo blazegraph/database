@@ -48,31 +48,32 @@ Modifications:
 package com.bigdata.objndx;
 
 /**
- * Interface for leaves of a B+-Tree.
+ * Interface for low-level data access for the non-leaf nodes of a B+-Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeaf extends IAbstractNode {
+public interface INodeData extends IAbstractNodeData {
 
     /**
-     * The #of values in the leaf (this MUST be equal to
-     * {@link IAbstractNode#getKeyCount()}.
+     * The #of children of this node. Either all children will be nodes or all
+     * children will be leaves. The #of children of a node MUST be
+     * <code>{@link IAbstractNodeData#getKeyCount()}+1</code>
      * 
-     * @return The #of values in the leaf.
+     * @return The #of children of this node.
      */
-    public int getValueCount();
+    public int getChildCount();
 
     /**
-     * The backing array in which the values are stored. Only the first
-     * {@link #getValueCount()} entries in the array are defined - and those
-     * values MUST be non-<code>null</code>. The use of this array is
-     * dangerous since mutations are directly reflected in the leaf, but it may
-     * be highly efficient. Callers MUST excercise are to perform only read-only
-     * operations against the returned array.
+     * The backing array of the persistent addresses of the children. Only the
+     * first {@link #getChildCount()} entries in the returned array are defined.
+     * If an entry is zero(0L), then the corresponding child is not persistent.
+     * The use of this array is dangerous since mutations are directly reflected
+     * in the node, but it may be highly efficient. Callers MUST excercise are
+     * to perform only read-only operations against the returned array.
      * 
-     * @return The backing array in which the values are stored.
+     * @return The backing array of persistent child addresses.
      */
-    public Object[] getValues();
-    
+    public long[] getChildAddr();
+        
 }

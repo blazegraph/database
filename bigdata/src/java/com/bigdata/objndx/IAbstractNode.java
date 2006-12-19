@@ -58,67 +58,6 @@ import java.util.Iterator;
 public interface IAbstractNode {
 
     /**
-     * The branching factor is maximum the #of children for a node or maximum
-     * the #of values for a leaf.
-     * 
-     * @return The branching factor.
-     */
-    public int getBranchingFactor();
-    
-    /**
-     * The #of keys defined keys for the node or leaf. The maximum #of keys for
-     * a node is one less than the {@link #getBranchingFactor()}. The maximum
-     * #of keys for a leaf is the {@link #getBranchingFactor()}.
-     * 
-     * @return The #of defined keys.
-     */
-    public int getKeyCount();
-
-    /**
-     * The data type used to store the keys.
-     * 
-     * @return The data type for the keys. This will either correspond to one of
-     *         the primitive data types or to an {@link Object}.
-     *         {@link #getKeys()} will return an object that may be cast to an
-     *         array of the corresponding type.
-     */
-    public ArrayType getKeyType();
-    
-    /**
-     * The backing array in which the keys are stored. Only the first
-     * {@link #getKeyCount()} entries in the array are defined. The use of this
-     * array is dangerous since mutations are directly reflected in the node or
-     * leaf, but it may be highly efficient. In particular, operations that are
-     * concerned about forcing object creation when accessing primitive keys
-     * should make read-only use of the returned array to access the keys
-     * directly.
-     * 
-     * @return The backing array containing the keys. The return value will be
-     *         an array whose data type is indicated by {@link #getKeyType()}.
-     */
-    public Object getKeys();
-    
-    /**
-     * Post-order traveral of nodes and leaves in the tree. For any given
-     * node, its children are always visited before the node itself (hence
-     * the node occurs in the post-order position in the traveral). The
-     * iterator is NOT safe for concurrent modification.
-     * 
-     * @return Iterator visiting {@link IAbstractNode}s.
-     */
-    public Iterator postOrderIterator();
-
-    /**
-     * Traversal of index values in key order.
-     */
-    public KeyValueIterator entryIterator();
-
-    /**
-     * True iff this is a leaf node.
-     */
-    public boolean isLeaf();
-
-    /**
      * Recursive search locates the approprate leaf and inserts the entry under
      * the key. The leaf is split iff necessary. Splitting the leaf can cause
      * splits to cascade up towards the root. If the root is split then the
@@ -135,6 +74,17 @@ public interface IAbstractNode {
     public Object insert(Object key, Object entry);
 
     /**
+     * Recursive search locates the entry for the probe key.
+     * 
+     * @param key
+     *            The external key.
+     * 
+     * @return The entry or <code>null</code> iff there is no entry for
+     *         that key.
+     */
+    public Object lookup(Object key);
+
+    /**
      * Recursive search locates the appropriate leaf and removes and returns
      * the pre-existing value stored under the key (if any).
      * 
@@ -146,14 +96,18 @@ public interface IAbstractNode {
     public Object remove(Object key);
 
     /**
-     * Recursive search locates the entry for the probe key.
-     * 
-     * @param key
-     *            The external key.
-     * 
-     * @return The entry or <code>null</code> iff there is no entry for
-     *         that key.
+     * Traversal of index values in key order.
      */
-    public Object lookup(Object key);
+    public KeyValueIterator entryIterator();
+
+    /**
+     * Post-order traveral of nodes and leaves in the tree. For any given
+     * node, its children are always visited before the node itself (hence
+     * the node occurs in the post-order position in the traveral). The
+     * iterator is NOT safe for concurrent modification.
+     * 
+     * @return Iterator visiting {@link IAbstractNode}s.
+     */
+    public Iterator postOrderIterator();
 
 }

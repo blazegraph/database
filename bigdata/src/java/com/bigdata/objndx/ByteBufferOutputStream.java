@@ -13,7 +13,13 @@ import java.nio.ByteBuffer;
  */
 class ByteBufferOutputStream extends OutputStream {
 
-    final ByteBuffer buf;
+    final protected ByteBuffer buf;
+    
+    final public ByteBuffer getByteBuffer() {
+        
+        return buf;
+        
+    }
 
     public ByteBufferOutputStream(ByteBuffer buf) {
 
@@ -24,10 +30,14 @@ class ByteBufferOutputStream extends OutputStream {
     }
 
     /**
-     * Write a byte on the buffer.
+     * Write a byte on the buffer. The {@link ByteBuffer#position()} is advanced
+     * as a side effect.
      * 
      * @param b
      *            A byte whose value is in [-128:127].
+     * 
+     * @exception EOFException
+     *                if the buffer would overflow.
      */
     public void write(int b) throws IOException {
 

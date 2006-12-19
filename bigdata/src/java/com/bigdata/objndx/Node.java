@@ -68,7 +68,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Node extends AbstractNode implements INode {
+public class Node extends AbstractNode implements INodeData {
 
     /**
      * <p>
@@ -134,7 +134,7 @@ public class Node extends AbstractNode implements INode {
      *            for the insert key that places the node temporarily over
      *            capacity during a split.
      */
-    protected Node(BTree btree, long id, int branchingFactor, int nkeys, Object keys, long[] childKeys) {
+    protected Node(AbstractBTree btree, long id, int branchingFactor, int nkeys, Object keys, long[] childKeys) {
 
         super( btree, branchingFactor );
 
@@ -186,8 +186,7 @@ public class Node extends AbstractNode implements INode {
      * and NO keys.
      * 
      * @param btree
-     *            Required solely to differentiate the method signature from the
-     *            copy constructor.
+     *            A mutable btree.
      * @param oldRoot
      *            The node that was previously the root of the tree (either a
      *            node or a leaf).
@@ -269,6 +268,9 @@ public class Node extends AbstractNode implements INode {
         assert !src.isDirty();
         
         assert src.isPersistent();
+        
+        // cast to mutable implementation class.
+        BTree btree = (BTree)this.btree;
         
 //        assert triggeredByChild != null;
 
@@ -658,6 +660,9 @@ public class Node extends AbstractNode implements INode {
 
         assert isDirty(); // MUST be mutable.
         assert nkeys == maxKeys+1; // MUST be over capacity by one.
+
+        // cast to mutable implementation class.
+        BTree btree = (BTree)this.btree;
 
         btree.counters.nodesSplit++;
         
@@ -1382,6 +1387,9 @@ public class Node extends AbstractNode implements INode {
         assert !isDeleted();
         assert !isPersistent();
 
+        // cast to mutable implementation class.
+        BTree btree = (BTree)this.btree;
+        
         assertInvariants();
 
         if (INFO) {
@@ -1811,7 +1819,7 @@ public class Node extends AbstractNode implements INode {
             ok = false;
         }
 
-        if (this == btree.root) {
+        if (this == btree.getRoot()) {
             if (parent != null) {
                 out
                         .println(indent(height)

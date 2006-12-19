@@ -98,34 +98,6 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     }
 
     /**
-     * Return a random version counter.
-     * 
-     * @todo Shape the distribution to make version0 and other low-numbered
-     *       versions much more likely.
-     */
-    private short nextVersionCounter() {
-
-        return (short)r.nextInt((int)Short.MAX_VALUE);
-
-    }
-
-    /**
-     * Reference to a random data object.
-     * 
-     * @return A reference to a random data object. The reference is only
-     *         syntactically valid and MUST NOT be dereferenced
-     */
-    private long nextVersionRef() {
-
-        int nbytes = r.nextInt(512)+1;
-        
-        int firstSlot = r.nextInt(Integer.MAX_VALUE - 1) + 1;
-
-        return SlotMath.toLong(nbytes, firstSlot);
-
-    }
-    
-    /**
      * Return a random key value. Keys are always generated in a progressive
      * (sorted) order. A key is an int32 within segment persistent identifier
      * that is mapped by the object index onto an {@link ISlotAllocation}. The
@@ -184,24 +156,11 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
     }
     
     /**
-     * Generate a random entry for an {@link IObjectIndex}.
+     * Generate a random entry.
      */
-    public IndexEntry getRandomEntry(SlotMath slotMath) {
-        
-        // when true, the entry marks a deleted version.
-        boolean isDeleted = r.nextInt(100) < 10;
+    public Object getRandomEntry() {
 
-        // when true, a preExisting version is defined on the journal.
-        boolean isPreExisting = r.nextInt(100) < 50;
-
-        short versionCounter = nextVersionCounter();
-
-        long currentVersion = isDeleted ? 0L : nextVersionRef();
-
-        long preExistingVersion = isPreExisting ? nextVersionRef() : 0L;
-
-        return new IndexEntry(slotMath, versionCounter, currentVersion,
-                preExistingVersion);
+        return new SimpleEntry(r.nextInt());
 
     }
 
@@ -271,7 +230,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
 
         final int[] keys = new int[branchingFactor+1];
 
-        final IObjectIndexEntry[] values = new IObjectIndexEntry[branchingFactor+1];
+        final Object[] values = new Object[branchingFactor+1];
 
         // node with some valid keys and corresponding child refs.
 
@@ -286,7 +245,7 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
             // the key.
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
-            values[i] = getRandomEntry(btree.store.getSlotMath());
+            values[i] = getRandomEntry();
 
         }
 

@@ -51,11 +51,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.util.Vector;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.objndx.BTree.BTreeMetadata;
 
 /**
  * A test suite that will be evolved into a metadata index designed to locate
@@ -110,8 +110,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                     branchingFactor,
                     new HardReferenceQueue<PO>(
                     new DefaultEvictionListener(),
-                    BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
-                    BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
                     Integer.valueOf(0),
                     null, // no comparator for primitive key type.
                     Int32OIdKeySerializer.INSTANCE,
@@ -125,10 +125,12 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * @param metadataId
          */
         public MetadataIndex(IRawStore store, long metadataId) {
-            super(store, metadataId, new HardReferenceQueue<PO>(
+            super(store, new BTreeMetadata(BTree
+                    .getTransitionalRawStore(store), metadataId),
+                    new HardReferenceQueue<PO>(
                     new DefaultEvictionListener(),
-                    BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
-                    BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
                     Integer.valueOf(0),
                     null, // no comparator for primitive key type.
                     Int32OIdKeySerializer.INSTANCE,

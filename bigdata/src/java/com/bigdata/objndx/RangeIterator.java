@@ -53,7 +53,8 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Implement the key range iterator.
+ * FIXME Implement the key range iterator. Optimize when using a read-only
+ * {@link IndexSegment}.  Support pre-fetch, next/prior traversal, etc.
  * 
  * @todo Support iteration with concurrent structural modification. The iterator
  *       will have to listen for structural modifications and perhaps for insert /
@@ -61,7 +62,7 @@ package com.bigdata.objndx;
  */
 public class RangeIterator implements IRangeIterator {
 
-    private final BTree btree;
+    private final IBTree btree;
     private final Object fromKey;
     private final Object toKey;
     
@@ -74,7 +75,7 @@ public class RangeIterator implements IRangeIterator {
      * @param toKey
      *            The first key that will not be visited by the iterator.
      */
-    public RangeIterator(BTree btree, Object fromKey, Object toKey ) {
+    public RangeIterator(IBTree btree, Object fromKey, Object toKey ) {
         
         this.btree = btree;
         

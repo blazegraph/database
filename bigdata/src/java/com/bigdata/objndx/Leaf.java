@@ -49,7 +49,6 @@ package com.bigdata.objndx;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 
@@ -69,7 +68,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Leaf extends AbstractNode implements ILeaf {
+public class Leaf extends AbstractNode implements ILeafData {
 
     /**
      * <p>
@@ -107,8 +106,8 @@ public class Leaf extends AbstractNode implements ILeaf {
      *            <code>branchingFactor+1</code> to allow room for the value
      *            corresponding to the insert key that forces a split.
      */
-    protected Leaf(BTree btree, long id, int branchingFactor, int nkeys,
-            Object keys, Object[] values) {
+    protected Leaf(AbstractBTree btree, long id, int branchingFactor,
+            int nkeys, Object keys, Object[] values) {
         
         super(btree, branchingFactor );
 
@@ -140,7 +139,7 @@ public class Leaf extends AbstractNode implements ILeaf {
      * Creates a new leaf, increments the #of leaves that belong to the btree,
      * and adds the new leaf to the hard reference queue for the btree.
      * 
-     * @param btree
+     * @param btree A mutable btree.
      */
     protected Leaf(BTree btree) {
 
@@ -297,7 +296,7 @@ public class Leaf extends AbstractNode implements ILeaf {
         insert(key, index, entry);
 
         // one more entry in the btree.
-        btree.nentries++;
+        ((BTree)btree).nentries++;
 
         if (INFO) {
             log.info("this="+this+", key="+key+", value="+entry);
@@ -381,9 +380,9 @@ public class Leaf extends AbstractNode implements ILeaf {
          * insert( separatorKey, rightSibling ) into the parent.
          */
         final Object separatorKey = getKey(splitIndex);
-
+        
         // the new rightSibling of this leaf.
-        final Leaf rightSibling = new Leaf(btree);
+        final Leaf rightSibling = new Leaf((BTree)btree);
 
         if (INFO) {
             log.info("this=" + this + ", nkeys=" + nkeys + ", splitIndex="
@@ -418,7 +417,7 @@ public class Leaf extends AbstractNode implements ILeaf {
              * new node with zero keys and one child (this leaf).
              */
 
-            p = new Node(btree, this);
+            p = new Node((BTree)btree, this);
 
         }
 
@@ -509,13 +508,13 @@ public class Leaf extends AbstractNode implements ILeaf {
             s.setKey(s.nkeys-1, btree.NEGINF);
             s.values[s.nkeys-1] = null;
 
+            s.nkeys--;
+            this.nkeys++;
+            
             // update the separator key for the rightSibling.
 //            p.setKey(index, s.getKey(0));
             p.copyKey(index,s,0);
 
-            s.nkeys--;
-            this.nkeys++;
-            
             assertInvariants();
             s.assertInvariants();
 
@@ -847,13 +846,13 @@ public class Leaf extends AbstractNode implements ILeaf {
         values[ nkeys-1 ] = null;
 
         // One less entry in the tree.
-        btree.nentries--;
-        assert btree.nentries >= 0;
+        ((BTree)btree).nentries--;
+        assert ((BTree)btree).nentries >= 0;
 
         // One less key in the leaf.
         nkeys--;
         
-        if( btree.root != this ) {
+        if( btree.getRoot() != this ) {
 
             /*
              * this is not the root leaf.
@@ -1003,7 +1002,7 @@ public class Leaf extends AbstractNode implements ILeaf {
         // Set to false iff an inconsistency is detected.
         boolean ok = true;
 
-        if ((btree.root != this) && (nkeys < minKeys)) {
+        if ((btree.getRoot() != this) && (nkeys < minKeys)) {
             // min keys failure (the root may have fewer keys).
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
@@ -1019,10 +1018,10 @@ public class Leaf extends AbstractNode implements ILeaf {
             ok = false;
         }
 
-        if (height != -1 && height != btree.height) {
+        if (height != -1 && height != btree.getHeight()) {
 
             out.println(indent(height) + "WARN: height=" + height
-                    + ", but btree height=" + btree.height);
+                    + ", but btree height=" + btree.getHeight());
             ok = false;
             
         }
@@ -1042,7 +1041,7 @@ public class Leaf extends AbstractNode implements ILeaf {
             out.println(indent(height) + "  parent="
                     + (parent == null ? null : parent.get()));
             
-            out.println(indent(height) + "  isRoot=" + (btree.root == this)
+            out.println(indent(height) + "  isRoot=" + (btree.getRoot() == this)
                     + ", dirty=" + isDirty() + ", nkeys=" + nkeys
                     + ", minKeys=" + minKeys + ", maxKeys=" + maxKeys
                     + ", branchingFactor=" + branchingFactor);

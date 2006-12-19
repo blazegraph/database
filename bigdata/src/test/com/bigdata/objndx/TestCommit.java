@@ -51,6 +51,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.objndx.BTree.BTreeMetadata;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.
@@ -88,7 +89,7 @@ public class TestCommit extends TestCase2 {
 
         final int branchingFactor = 4;
         
-        final long metadataId;
+        final long addrMetadata;
         final long rootId;
         {
 
@@ -96,17 +97,17 @@ public class TestCommit extends TestCase2 {
                     ArrayType.INT,
                     branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
                             Integer.valueOf(0),
                             null, // no comparator for primitive key type.
                             Int32OIdKeySerializer.INSTANCE,
-                    new SimpleEntry.Serializer());
+                            SimpleEntry.Serializer.INSTANCE);
 
             assertTrue(btree.root.isDirty());
 
             // Commit of tree with dirty root.
-            metadataId = btree.write();
+            addrMetadata = btree.write();
 
             assertFalse(btree.root.isDirty());
 
@@ -123,16 +124,17 @@ public class TestCommit extends TestCase2 {
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, metadataId,
+            BTree btree = new BTree(store, new BTreeMetadata(BTree
+                    .getTransitionalRawStore(store), addrMetadata),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
                             Integer.valueOf(0),
                             null, // no comparator for primitive key type.
                             Int32OIdKeySerializer.INSTANCE,
-                    new SimpleEntry.Serializer());
+                            SimpleEntry.Serializer.INSTANCE);
 
-            // verify rootId.
+            // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());
             assertFalse(btree.root.isDirty());
 
@@ -143,26 +145,27 @@ public class TestCommit extends TestCase2 {
 
             /*
              * Commit of tree with clean root writes a new metadata record but
-             * does not change the rootId.
+             * does not change the addrRoot.
              */
             metadata2 = btree.write();
-            assertNotSame( metadataId, metadata2 );
+            assertNotSame( addrMetadata, metadata2 );
 
         }
 
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = new BTree(store, metadataId,
+            BTree btree = new BTree(store, new BTreeMetadata(BTree
+                    .getTransitionalRawStore(store), addrMetadata),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_LEAF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_LEAF_QUEUE_SCAN),
+                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
                             Integer.valueOf(0),
                             null, // no comparator for primitive key type.
                             Int32OIdKeySerializer.INSTANCE,
-                    new SimpleEntry.Serializer());
+                    SimpleEntry.Serializer.INSTANCE);
 
-            // verify rootId.
+            // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());
 
             assertEquals("height", 0, btree.height);

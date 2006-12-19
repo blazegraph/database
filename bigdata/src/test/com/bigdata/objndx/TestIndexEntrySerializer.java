@@ -52,10 +52,16 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.journal.ContiguousSlotAllocation;
+import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
+import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
+ * @deprecated along with {@link IndexEntry} and {@link IndexEntrySerializer}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -83,6 +89,56 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
 //        assertEquals((byte)0xff,(byte)-1);
 //        
 //    }
+    
+    /**
+     * Generate a random entry for an {@link IObjectIndex}.
+     */
+    public IndexEntry getRandomEntry(SlotMath slotMath) {
+        
+        // when true, the entry marks a deleted version.
+        boolean isDeleted = r.nextInt(100) < 10;
+
+        // when true, a preExisting version is defined on the journal.
+        boolean isPreExisting = r.nextInt(100) < 50;
+
+        short versionCounter = nextVersionCounter();
+
+        long currentVersion = isDeleted ? 0L : nextVersionRef();
+
+        long preExistingVersion = isPreExisting ? nextVersionRef() : 0L;
+
+        return new IndexEntry(slotMath, versionCounter, currentVersion,
+                preExistingVersion);
+
+    }
+
+    /**
+     * Return a random version counter.
+     * 
+     * @todo Shape the distribution to make version0 and other low-numbered
+     *       versions much more likely.
+     */
+    private short nextVersionCounter() {
+
+        return (short)r.nextInt((int)Short.MAX_VALUE);
+
+    }
+
+    /**
+     * Reference to a random data object.
+     * 
+     * @return A reference to a random data object. The reference is only
+     *         syntactically valid and MUST NOT be dereferenced
+     */
+    private long nextVersionRef() {
+
+        int nbytes = r.nextInt(512)+1;
+        
+        int firstSlot = r.nextInt(Integer.MAX_VALUE - 1) + 1;
+
+        return SlotMath.toLong(nbytes, firstSlot);
+
+    }
     
     /**
      * Test with entry whose fields are all zeros.
@@ -234,5 +290,183 @@ public class TestIndexEntrySerializer extends AbstractObjectIndexTestCase {
         }
         
     }
+ 
+    /**
+     * Compare an array of {@link IObjectIndexEntry}s for consistent data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals( IObjectIndexEntry[] expected, IObjectIndexEntry[] actual )
+    {
+        assertEquals( null, expected, actual );
+    }
+
+    /**
+     * Compare an array of {@link IObjectIndexEntry}s for consistent data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals( String msg, IObjectIndexEntry[] expected, IObjectIndexEntry[] actual )
+    {
+
+        if( msg == null ) {
+            msg = "";
+        } else {
+            msg = msg + " : ";
+        }
+        
+        if( expected == null && actual == null ) {
+            
+            return;
+            
+        }
+        
+        if( expected == null && actual != null ) {
+            
+            fail( msg+"Expected a null array." );
+            
+        }
+        
+        if( expected != null && actual == null ) {
+            
+            fail( msg+"Not expecting a null array." );
+            
+        }
+        
+        assertEquals
+            ( msg+"length differs.",
+              expected.length,
+              actual.length
+              );
+        
+        for( int i=0; i<expected.length; i++ ) {
+            
+            assertEquals
+                ( msg+"values differ: index="+i,
+                  expected[ i ],
+                  actual[ i ]
+                  );
+            
+        }
+        
+    }
     
+    /**
+     * Test two {@link IObjectIndexEntry entries} for consistent data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals(IObjectIndexEntry expected,
+            IObjectIndexEntry actual) {
+        
+        assertEquals(null,expected,actual);
+        
+    }
+    
+    /**
+     * Test two {@link IObjectIndexEntry entries} for consistent data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals(String msg, IObjectIndexEntry expected,
+            IObjectIndexEntry actual) {
+        
+        if( msg == null ) {
+            msg = "";
+        } else {
+            msg = msg + " : ";
+        }
+
+        if( expected == null) {
+            
+            assertNull(actual);
+            
+        } else {
+        
+            assertNotNull("actual",actual);
+            
+            assertEquals(msg+"versionCounter", expected.getVersionCounter(), actual
+                    .getVersionCounter());
+
+            assertEquals(msg+"isDeleted", expected.isDeleted(), actual.isDeleted());
+
+            assertEquals(msg+"currentVersion", expected.getCurrentVersionSlots(),
+                    actual.getCurrentVersionSlots());
+
+            assertEquals(msg+"isPreExistingVersionOverwritten", expected
+                    .isPreExistingVersionOverwritten(), actual
+                    .isPreExistingVersionOverwritten());
+
+            assertEquals(msg+"preExistingVersion", expected
+                    .getPreExistingVersionSlots(), actual
+                    .getPreExistingVersionSlots());
+            
+        }
+        
+    }
+    
+    /**
+     * <p>
+     * Verify that the {@link ISlotAllocation}s are consistent.
+     * </p>
+     * 
+     * @param expected
+     *            The expected slot allocation.
+     * @param actual
+     *            The actual slot allocation.
+     */
+    public void assertEquals(ISlotAllocation expected, ISlotAllocation actual) {
+
+        assertEquals(null,expected,actual);
+
+    }
+
+    /**
+     * <p>
+     * Verify that the {@link ISlotAllocation}s are consistent.
+     * </p>
+     * <p>
+     * Note: This test presumes that contiguous allocations are being used.
+     * </p>
+     * 
+     * @param expected
+     *            The expected slot allocation.
+     * @param actual
+     *            The actual slot allocation.
+     */
+    public void assertEquals(String msg, ISlotAllocation expected, ISlotAllocation actual) {
+
+        if( msg == null ) {
+            msg = "";
+        } else {
+            msg = msg + " : ";
+        }
+
+        if( expected == null ) {
+            
+            assertNull(actual);
+            
+        } else {
+
+            if (!(expected instanceof ContiguousSlotAllocation)) {
+                fail("Not expecting: " + expected.getClass());
+            }
+
+            if (!(actual instanceof ContiguousSlotAllocation)) {
+                fail("Not expecting: " + actual.getClass());
+            }
+
+            assertEquals(msg + "firstSlot", expected.firstSlot(), actual
+                    .firstSlot());
+
+            assertEquals(msg + "byteCount", expected.getByteCount(), actual
+                    .getByteCount());
+        }
+
+    }
+
 }

@@ -56,6 +56,14 @@ import java.io.IOException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Support implementations that factor out the longest common prefix for
+ *       the keys in a node or leaf. The prefix is stored once per node/leaf and
+ *       only the remainder is stored once per key. It requires data-type
+ *       specific handling to do this efficiently. (There is a variant in which
+ *       the full prefix is stored on the leaves but only the increment from the
+ *       parent node is stored on a node and the full prefix is then dynamically
+ *       reconstructed from the traversal path through the tree.)
  */
 public interface IKeySerializer {
 
@@ -70,9 +78,9 @@ public interface IKeySerializer {
     public ArrayType getKeyType();
     
     /**
-     * The maximum size of a sequence of serialized keys in bytes. This is
-     * used to compute the maximum required size of a buffer to (de-)serialize
-     * nodes and values.
+     * The maximum size of a sequence of serialized keys in bytes. This is used
+     * to compute the maximum required size of a buffer to (de-)serialize nodes
+     * and values.
      * 
      * @param n
      *            The #of values in the sequence.

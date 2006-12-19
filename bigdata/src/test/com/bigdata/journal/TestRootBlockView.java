@@ -118,7 +118,7 @@ public class TestRootBlockView extends TestCase2 {
                     .getObjectIndexRoot());
             assertEquals("rootIds", rootIds, rootBlock.getRootIds());
             for( int j=0; j<rootIds.length; j++ ) {
-                assertEquals("rootId[" + j + "]", rootIds[j], rootBlock
+                assertEquals("addrRoot[" + j + "]", rootIds[j], rootBlock
                         .getRootId(j));
             }
             assertEquals("commitCounter", commitCounter, rootBlock

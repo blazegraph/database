@@ -73,6 +73,7 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.objndx.BTree.BTreeMetadata;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a
@@ -100,6 +101,15 @@ import com.bigdata.journal.Options;
  * by inserting or removing rdfs:subClassOf (or rdfs:subPropertyOf) assertions
  * from a fully connected matrix in the appropriate space.
  * <p>
+ * 
+ * @todo The term indices need to use a distinct suffix code so that the
+ *       identifiers assigned by each index are unique.
+ * 
+ * @todo Develop an {@link IValueSerializer} for use on leaves of a statement
+ *       index. This can use an efficient data structure for immutable strings,
+ *       e.g., some kind of persistent string table, trie, etc., to store the
+ *       lexical components of each value in each statement and a compact
+ *       representation of each statement in terms of those components.
  * 
  * @todo compute the MB/sec rate at which this test runs and compare it with the
  *       maximum transfer rate for the journal without the btree and the maximum
@@ -289,8 +299,8 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                     ArrayType.OBJECT, // generic keys
                     DEFAULT_BRANCHING_FACTOR,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            DEFAULT_LEAF_QUEUE_CAPACITY,
-                            DEFAULT_LEAF_QUEUE_SCAN),
+                            DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            DEFAULT_HARD_REF_QUEUE_SCAN),
                     null, // NEGINF
                     SPOComparator.INSTANCE,
                     KeySerializer.INSTANCE,
@@ -308,8 +318,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          */
         public SPOIndex(IRawStore store, long metadataId) {
             super(  store,
-                    metadataId,
-                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_LEAF_QUEUE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN),
+                    new BTreeMetadata(BTree
+                            .getTransitionalRawStore(store), metadataId),
+                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY, DEFAULT_HARD_REF_QUEUE_SCAN),
                     null, // NEGINF
                     SPOComparator.INSTANCE,
                     KeySerializer.INSTANCE,
@@ -491,8 +502,8 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                     ArrayType.OBJECT, // generic keys
                     DEFAULT_BRANCHING_FACTOR,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            DEFAULT_LEAF_QUEUE_CAPACITY,
-                            DEFAULT_LEAF_QUEUE_SCAN),
+                            DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            DEFAULT_HARD_REF_QUEUE_SCAN),
                     null, // NEGINF
                     StringComparator.INSTANCE,
                     KeySerializer.INSTANCE,
@@ -510,8 +521,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          */
         public StringIndex(IRawStore store, long metadataId) {
             super(  store,
-                    metadataId,
-                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_LEAF_QUEUE_CAPACITY, DEFAULT_LEAF_QUEUE_SCAN),
+                    new BTreeMetadata(BTree
+                            .getTransitionalRawStore(store), metadataId),
+                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY, DEFAULT_HARD_REF_QUEUE_SCAN),
                     null, // NEGINF
                     StringComparator.INSTANCE,
                     KeySerializer.INSTANCE,
@@ -665,6 +677,8 @@ public class TestTripleStore extends AbstractBTreeTestCase {
      * existing data would be time consuming as well. There are probably a lot
      * of ways to cheat, including if we are using context we can insist that
      * bulk loads do not overlap with existing contexts.
+     * 
+     * @todo test with {@link RecordCompression} enabled for the {@link BTree}s.
      */
     public static void main(String[] args) throws Exception {
 

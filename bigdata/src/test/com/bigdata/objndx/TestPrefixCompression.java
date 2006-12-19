@@ -42,38 +42,32 @@ Modifications:
 
 */
 /*
- * Created on Dec 15, 2006
+ * Created on Dec 18, 2006
  */
 
 package com.bigdata.objndx;
 
 /**
- * Interface for the non-leaf nodes of a B+-Tree.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated Drop this test suite?
  */
-public interface INode extends IAbstractNode {
+public class TestPrefixCompression extends AbstractBTreeTestCase {
 
     /**
-     * The #of children of this node. Either all children will be {@link INode}s
-     * or all children will be {@link ILeaf leaves}. The #of children of a node
-     * MUST be <code>{@link #getKeyCount()}+1</code>
      * 
-     * @return The #of children of this node.
      */
-    public int getChildCount();
+    public TestPrefixCompression() {
+        // TODO Auto-generated constructor stub
+    }
 
     /**
-     * The backing array of the persistent addresses of the children. Only the
-     * first {@link #getChildCount()} entries in the returned array are defined.
-     * If an entry is zero(0L), then the corresponding child is not persistent.
-     * The use of this array is dangerous since mutations are directly reflected
-     * in the node, but it may be highly efficient. Callers MUST excercise are
-     * to perform only read-only operations against the returned array.
-     * 
-     * @return The backing array of persistent child addresses.
+     * @param name
      */
-    public long[] getChildAddr();
-        
+    public TestPrefixCompression(String name) {
+        super(name);
+        // TODO Auto-generated constructor stub
+    }
+
 }

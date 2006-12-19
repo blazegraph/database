@@ -267,8 +267,7 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
                         Integer.valueOf(0),
                         null, // no comparator for primitive key type.
                         Int32OIdKeySerializer.INSTANCE,
-                        new IndexEntrySerializer(store
-                        .getSlotMath()));
+                        SimpleEntry.Serializer.INSTANCE);
 
         return btree;
         

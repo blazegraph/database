@@ -50,8 +50,6 @@ package com.bigdata.objndx;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.BufferOverflowException;
-import java.nio.BufferUnderflowException;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
@@ -66,6 +64,9 @@ import com.bigdata.journal.SlotMath;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This is based on the old object index approach.
+ * @see IndexEntry
  * 
  * @todo Since we are packing the versionCounter we could get away with using an
  *       int32 or even int64 field.

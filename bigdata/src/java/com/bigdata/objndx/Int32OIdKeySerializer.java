@@ -52,31 +52,18 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.journal.Bytes;
 
 /**
  * Key (de-)serializer suitable for use with int32 object identifier keys. keys
  * are non-negative integers in the half-open range [1:{@link Integer#MAX_VALUE}).
- * The keys are packed. When the keys tend to be found in the lower part of the
- * positive {@link Integer} range this results in smaller serialization. Even if
- * the keys are evenly distributed through the positive {@link Integer} range
- * packing is more compact than staight serialization. However, it is possible
- * to serialize keys such that the result is less compact.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Handle prefix packing, which will be more efficient than
- * {@link LongPacker}, which is currently disabled since it is interacting with
- * the key distributions used by the {@link TestNodeSerializer} test suite.
- * doing. Note that things like prefix / suffix compression will break
- * serialization and suggests that they should be version changes for the
- * {@link NodeSerializer}.
  */
 public class Int32OIdKeySerializer implements IKeySerializer {
-
-    public static final IKeySerializer INSTANCE = new Int32OIdKeySerializer();
 
     /**
      * The value of the key that represents a null reference. This is the
@@ -84,64 +71,270 @@ public class Int32OIdKeySerializer implements IKeySerializer {
      */
     static final int NEGINF = 0;
     
+    /**
+     * The keys are written as unpacked integer values.
+     */
+    static final public byte VERSION0 = (byte)0;
+    
+    /**
+     * The keys are written as packed non-negative integer values. This often,
+     * but not always, produces a more compact serialization that just writing
+     * out the integer values.
+     * 
+     * @todo review why it is possible for this to take more space than 
+     */
+    static final public byte VERSION1 = (byte)1;
+    
+    /**
+     * Prefix compression with packed integer values.
+     * 
+     * The value of the largest key is choosen as a prefix and written out once
+     * as a packed integer. For each key, the difference between the prefix and
+     * that key is computed and written out as a packed integer. This is always
+     * a non-negative integer and it will be zero for the largest key.
+     * 
+     * @todo compare this with a strategy that computes the #of leading bytes
+     *       (or bits) in common between the first and last keys, writes that
+     *       out, and then masks off those bytes when writing out the keys. Once
+     *       masked off, the keys will again be of a fixed length. Explore
+     *       whether packing the masked off values is worth while and, if the
+     *       #of remaining bits is 15 or less, then explore the
+     *       {@link ShortPacker}. Finally, if the #of bits remaining is 8 or
+     *       less than just write out one byte per key since we can not improve
+     *       on that without bit packing all of the keys together (which is an
+     *       option I guess).
+     */
+    static final public byte VERSION2 = (byte)2;
+    
+    /**
+     * The version that will be used to write keys.
+     */
+    private final byte version;
+    
+    public byte getVersion() {
+        
+        return version;
+        
+    }
+
+    /**
+     * A public instance.
+     * 
+     * @todo compare various strategies, choose the best one, and make it the
+     *       default here, i.e., write a performance test comparing their
+     *       behavior on some realistic data.
+     * 
+     * @todo {@link #VERSION1} and {@link #VERSION2} can under-estimate the
+     *       required space.
+     */
+    public static final IKeySerializer INSTANCE = new Int32OIdKeySerializer(
+            VERSION0);
+    
+    /**
+     * Create a key serializer that will use the specified serialization
+     * version.
+     * 
+     * @param version
+     *            The key serialization version. Note that the class always
+     *            deserializes keys based on how the keys were actuall
+     *            serialized but it serializes keys based on the choice declared
+     *            to the constructor.
+     * 
+     * @see #VERSION0
+     * @see #VERSION1
+     * @see #VERSION2
+     */
+    public Int32OIdKeySerializer(byte version) {
+        
+        switch(version) {
+        case VERSION0:
+        case VERSION1:
+        case VERSION2:
+            break;
+        default:
+            throw new IllegalArgumentException();
+        }
+        this.version = version;
+        
+    }
+
     public ArrayType getKeyType() {
         
         return ArrayType.INT;
         
     }
-    
+
+    /**
+     * Estimates for packed keys may err high on average but may actually be low
+     * for some key patterns.
+     */
     public int getSize(int n) {
+
+        switch (version) {
+
+        case VERSION0:
+            // version code and N unpacked keys
+            return 1 + n * Bytes.SIZEOF_INT;
         
-        return n*Bytes.SIZEOF_INT;
+        case VERSION1:
+            // version code and N packed keys.
+            return 1 + n * Bytes.SIZEOF_INT;
+        
+        case VERSION2:
+            // version code, prefix, and N packed keys.
+            return 1 + Bytes.SIZEOF_INT + n * Bytes.SIZEOF_INT;
+        
+        default:
+            throw new AssertionError();
+        
+        }
         
     }
 
     public void putKeys(DataOutputStream os, Object keys, int nkeys) throws IOException {
 
-        final int[] a = (int[]) keys;
+        os.write(version);
         
-        int lastKey = NEGINF;
-        
-        for (int i = 0; i < nkeys; i++) {
+        switch (version) {
+        case VERSION0: {
+            final int[] a = (int[]) keys;
 
-            final int key = a[i];
-            
-            assert key > lastKey; // verify increasing and minimum.
-            
-//            assert key < BTree.POSINF; // verify maximum.
+            int lastKey = NEGINF;
 
-//            LongPacker.packLong(os, key);
+            for (int i = 0; i < nkeys; i++) {
+
+                final int key = a[i];
+
+                assert key > lastKey; // verify increasing and minimum.
+
+                os.writeInt(key);
+
+                lastKey = key;
+
+            }
+            break;
+        }
+        case VERSION1: {
+            final int[] a = (int[]) keys;
+
+            int lastKey = NEGINF;
+
+            for (int i = 0; i < nkeys; i++) {
+
+                final int key = a[i];
+
+                assert key > lastKey; // verify increasing and minimum.
+
+                LongPacker.packLong(os, key);
+
+                lastKey = key;
+
+            }
+            break;
+        }
+        case VERSION2: {
+
+            final int[] a = (int[]) keys;
+
+            // the largest key.
+            final int prefix = a[nkeys-1];
+
+            LongPacker.packLong(os, prefix);
             
-            os.writeInt(key);
-            
-            lastKey = key;
-            
+            int lastKey = NEGINF;
+
+            for (int i = 0; i < nkeys; i++) {
+
+                final int key = a[i];
+
+                assert key > lastKey; // verify increasing and minimum.
+
+                // write out only the difference.
+                LongPacker.packLong(os, prefix - key);
+
+                lastKey = key;
+
+            }
+            break;
+        }
+        default:
+            throw new AssertionError();
         }
 
     }
-
+    
     public void getKeys(DataInputStream is, Object keys, int nkeys)
         throws IOException
     {
+
+        final byte version = is.readByte();
         
-        final int[] a = (int[])keys;
+        switch (version) {
+        case VERSION0: {
 
-        int lastKey = NEGINF;
+            final int[] a = (int[]) keys;
 
-        for (int i = 0; i < nkeys; i++) {
+            int lastKey = NEGINF;
 
-            final int key = is.readInt();
+            for (int i = 0; i < nkeys; i++) {
+
+                final int key = is.readInt();
+
+                assert key > lastKey; // verify keys are in ascending order.
+
+                a[i] = lastKey = key;
+
+            }
+
+            break;
+        }
+        case VERSION1: {
+
+            final int[] a = (int[]) keys;
+
+            int lastKey = NEGINF;
+
+            for (int i = 0; i < nkeys; i++) {
+
+                final int key = (int) LongPacker.unpackLong(is);
+                
+                assert key > lastKey; // verify keys are in ascending order.
+
+                a[i] = lastKey = key;
+
+            }
+
+            break;
+        }
+        case VERSION2: {
+
+            final int[] a = (int[]) keys;
+
+            // the prefixed should be equal to the largest key.
+            final int prefix = (int) LongPacker.unpackLong(is);
+            assert prefix > 0;
             
-//            final int key = (int)LongPacker.unpackLong(is);
+            int lastKey = NEGINF;
 
-            assert key > lastKey; // verify keys are in ascending order.
+            for (int i = 0; i < nkeys; i++) {
 
-//            assert key < BTree.POSINF; // verify keys in legal range.
+                final int key = prefix - (int)LongPacker.unpackLong(is);
 
-            a[i] = lastKey = key;
+                assert key > lastKey; // verify keys are in ascending order.
+
+                a[i] = lastKey = key;
+
+            }
+            
+            assert a[nkeys-1] == prefix;
+            
+            break;
+        }
+        default:
+            throw new IOException("Unknown version: " + version);
 
         }
-        
+
     }
 
 }

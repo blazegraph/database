@@ -65,7 +65,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractNode extends PO implements IAbstractNode {
+public abstract class AbstractNode extends PO implements IAbstractNode,
+        IAbstractNodeData {
 
     /**
      * Log for node and leaf operations.
@@ -104,7 +105,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
      * This requires a custom method to read the node with the btree reference
      * on hand so that we can set this field.
      */
-    final transient protected BTree btree;
+    final transient protected AbstractBTree btree;
 
     /**
      * The branching factor (#of slots for keys or values).
@@ -205,7 +206,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
              * Deallocate the object on the store.
              */
 
-            btree.store.delete(btree.asSlots(identity));
+            btree.store.delete(identity);
             
         }
         
@@ -236,7 +237,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
          * The parent is allowed to be null iff this is the root of the
          * btree.
          */
-        assert (this == btree.root && p == null) || p != null;
+        assert (this == btree.getRoot() && p == null) || p != null;
 
         return p;
 
@@ -268,7 +269,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
      *            btree we are able to support different branching factors at
      *            different levels of the tree.
      */
-    protected AbstractNode(BTree btree, int branchingFactor) {
+    protected AbstractNode(AbstractBTree btree, int branchingFactor) {
 
         assert btree != null;
 
@@ -338,7 +339,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
          * is only changed by the VM, not by the application).
          */
 
-        assert src == btree.root
+        assert src == btree.getRoot()
                 || (src.parent != null && src.parent.get() != null);
         
         this.parent = src.parent;
@@ -413,6 +414,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
                     }
                 }
             }
+
+            // cast to mutable implementation class.
+            final BTree btree = (BTree) this.btree;
             
             AbstractNode newNode;
 
@@ -657,10 +661,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
             /*
              * either the root or the parent is reachable.
              */
-            assert btree.root == this
+            IAbstractNode root = btree.getRoot();
+            
+            assert root == this
                     || (this.parent != null && this.parent.get() != null);
 
-            if (btree.root != this) {
+            if (root != this) {
 
                 // not the root, so the min #of keys must be observed.
                 assert nkeys >= minKeys;
@@ -683,13 +689,25 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
 
     }
 
-    static protected final void assertKeyTypeAndLength(BTree btree, Object keys,int length) {
+    /**
+     * Test that the keys are suitable for this tree.
+     * 
+     * @param btree
+     *            The owing btree.
+     * @param keys
+     *            The keys[].
+     * @param length
+     *            The required length of the keys[].
+     */
+    static protected final void assertKeyTypeAndLength(AbstractBTree btree,
+            Object keys, int length) {
         
         assert btree != null;
         assert keys != null;
         ArrayType keyType = ArrayType.getArrayType(keys);
         assert btree.keyType == keyType;
         assert getLength(keys) == length;
+        
     }
     
     /**
@@ -1002,7 +1020,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode {
         assert isDirty();
         assert !isPersistent();
         // verify that the leaf is not the root.
-        assert btree.root != this;
+        assert ((BTree)btree).root != this;
         
         final Node parent = getParent();
 

@@ -104,7 +104,7 @@ public class TestTouch extends AbstractBTreeTestCase {
                 Integer.valueOf(0),
                 null, // no comparator for primitive key type.
                 Int32OIdKeySerializer.INSTANCE,
-                new SimpleEntry.Serializer());
+                SimpleEntry.Serializer.INSTANCE);
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -177,7 +177,8 @@ public class TestTouch extends AbstractBTreeTestCase {
                 Integer.valueOf(0),
                 null, // no comparator for primitive key type.
                 Int32OIdKeySerializer.INSTANCE,
-                new SimpleEntry.Serializer());
+                SimpleEntry.Serializer.INSTANCE
+                );
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -241,7 +242,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         assertEquals(queueScan,leafQueue.nscan());
         assertEquals(listener,leafQueue.getListener());
         
-        IValueSerializer valSer = new SimpleEntry.Serializer();
+        IValueSerializer valSer = SimpleEntry.Serializer.INSTANCE;
 
         // The btree.
         final BTree btree = new BTree(

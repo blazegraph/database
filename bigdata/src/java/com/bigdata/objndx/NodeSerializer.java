@@ -63,7 +63,7 @@ import com.bigdata.journal.Bytes;
 /**
  * <p>
  * An instance of this class is used to serialize and de-serialize the
- * {@link INode}s and {@link ILeaf}s of an {@link IBTree}. Leaf and non-leaf
+ * {@link INodeData}s and {@link ILeafData}s of an {@link IBTree}. Leaf and non-leaf
  * records have different serialization formats, but their leading bytes use the
  * same format so that you can tell by inspection whether a buffer contains a
  * leaf or a non-leaf node. The header of the record uses a fixed length format
@@ -96,10 +96,7 @@ import com.bigdata.journal.Bytes;
  * 
  * @todo Compute the #of shared bytes (common prefix) for the low and high key,
  *       write that prefix once, and then mask off that prefix for each key
- *       written. This should substantially reduce the space required to write
- *       the keys. Review the rest of the serialized form and see if there are
- *       other opportunities to pack things down (e.g., node references can be
- *       packed just like we are doing in {@link IndexEntrySerializer}).
+ *       written.
  * 
  * @todo use allocation pools for node, leaf, key[], and value[] objects?
  * 
@@ -110,8 +107,8 @@ import com.bigdata.journal.Bytes;
  * bit tricky.
  * 
  * @see IBTree
- * @see INode
- * @see ILeaf
+ * @see INodeData
+ * @see ILeafData
  * @see IKeySerializer
  * @see IValueSerializer
  * @see LongPacker
@@ -268,16 +265,16 @@ public class NodeSerializer {
      * Designated constructor.
      * 
      * @param nodeFactory
-     *            An object that knows how to construct {@link INode}s and
-     *            {@link ILeaf leaves}.
+     *            An object that knows how to construct {@link INodeData}s and
+     *            {@link ILeafData leaves}.
      * 
      * @param keySerializer
      *            An object that knows how to (de-)serialize the keys on
-     *            {@link INode}s and {@link ILeaf leaves} of a btree.
+     *            {@link INodeData}s and {@link ILeafData leaves} of a btree.
      * 
      * @param valueSerializer
      *            An object that knows how to (de-)serialize the values on
-     *            {@link ILeaf leaves}.
+     *            {@link ILeafData leaves}.
      */
     public NodeSerializer(INodeFactory nodeFactory, IKeySerializer keySerializer, IValueSerializer valueSerializer) {
 
@@ -338,10 +335,10 @@ public class NodeSerializer {
     }
 
     /**
-     * De-serialize a node or leaf. This method is used when the caller does not
-     * know a-priori whether the reference is to a node or leaf. The decision is
-     * made based on inspection of the {@link #OFFSET_NODE_TYPE} byte in the
-     * buffer.
+     * De-serialize a node or leaf using absolute offsets into the buffer. This
+     * method is used when the caller does not know a-priori whether the
+     * reference is to a node or leaf. The decision is made based on inspection
+     * of the {@link #OFFSET_NODE_TYPE} byte in the buffer.
      * 
      * @param btree
      *            The btree.
@@ -353,7 +350,7 @@ public class NodeSerializer {
      * 
      * @return The de-serialized node.
      */
-    public IAbstractNode getNodeOrLeaf( IBTree btree, long id, ByteBuffer buf) {
+    public IAbstractNodeData getNodeOrLeaf( IBTree btree, long id, ByteBuffer buf) {
 
         assert btree != null;
         assert id != 0L;
@@ -384,7 +381,7 @@ public class NodeSerializer {
      * @exception BufferOverflowException
      *                if there is not enough space remaining in the buffer.
      */
-    public void putNode(ByteBuffer buf, INode node) {
+    public void putNode(ByteBuffer buf, INodeData node) {
 
         assert buf != null;
         assert node != null;
@@ -498,7 +495,7 @@ public class NodeSerializer {
 
     }
 
-    public INode getNode(IBTree btree,long id,ByteBuffer buf) {
+    public INodeData getNode(IBTree btree,long id,ByteBuffer buf) {
 
         assert btree != null;
         assert id != 0L;
@@ -644,7 +641,7 @@ public class NodeSerializer {
      * @param leaf
      *            The leaf node.
      */
-    public void putLeaf(ByteBuffer buf, ILeaf leaf) {
+    public void putLeaf(ByteBuffer buf, ILeafData leaf) {
 
         assert buf != null;
         assert leaf != null;
@@ -740,7 +737,7 @@ public class NodeSerializer {
 
     }
 
-    public ILeaf getLeaf(IBTree btree,long id,ByteBuffer buf) {
+    public ILeafData getLeaf(IBTree btree,long id,ByteBuffer buf) {
         
         assert btree != null;
         assert id != 0L;

@@ -94,6 +94,25 @@ import cutthecrap.utils.striterators.Striterator;
  * nodes in the tree.
  * </p>
  * 
+ * @todo track the #of nodes and leaves on the hard reference queue in touch and
+ *       {@link DefaultEvictionListener}. Also track the number that are clean
+ *       vs dirty.
+ * 
+ * @todo Modify to support "stealing" of immutable nodes by wrapping them with a
+ *       thin class encapsulating the {parent, btree} references and refactor
+ *       the design until it permits an isolated btree to reuse the in memory
+ *       nodes and leaves of the base btree in order to minimize the resource
+ *       and IO costs of having multiple concurrent transactions running on the
+ *       same journal.
+ * 
+ * @todo support the concept of a "stride" for fixed length arrays of primitive
+ *       data keys, e.g., long[4]. This would treat each run of N values in
+ *       {@link AbstractNode#keys} as a single key. The advantage is to minimize
+ *       object creation for some kinds of keys, e.g., a triple or quad store or
+ *       a fixed length byte[] or char[] such as char[64]. Note that long fixed
+ *       length arrays are better off doing reference copying as they will be
+ *       moving less data (how large is a Java reference anyway, 4 bytes?).
+ * 
  * @todo Implement an "extser" index that does not use extser itself, but which
  *       could provide the basis for a database that does use extser. The index
  *       needs to map class names to entries. Those entries are a classId and
@@ -247,32 +266,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree implements IBTree {
-    
-    /**
-     * Log for btree opeations.
-     */
-    protected static final Logger log = Logger.getLogger(BTree.class);
-    
-    /**
-     * Log for {@link BTree#dump(PrintStream)} and friends. 
-     */
-    protected static final Logger dumpLog = Logger.getLogger(BTree.class.getName()+"#dump");
-    
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
-
-    /**
-     * The minimum allowed branching factor (3).
-     */
-    static public final int MIN_BRANCHING_FACTOR = 3;
+public class BTree extends AbstractBTree implements IBTree {
     
     /**
      * The default branching factor.
@@ -303,7 +297,7 @@ public class BTree implements IBTree {
      * @todo testing with a large leaf cache and a large branching factor means
      *       that you nearly never evict leaves
      */
-    static public final int DEFAULT_LEAF_QUEUE_CAPACITY = 500;
+    static public final int DEFAULT_HARD_REF_QUEUE_CAPACITY = 500;
 
     /**
      * The #of entries on the hard reference queue that will be scanned for a
@@ -314,365 +308,87 @@ public class BTree implements IBTree {
      * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
      * is dirty.
      */
-    static public final int DEFAULT_LEAF_QUEUE_SCAN = 10;
+    static public final int DEFAULT_HARD_REF_QUEUE_SCAN = 10;
     
-    /**
-     * The persistence store.
-     */
-    final protected IRawStore store;
-
-    /**
-     * The branching factor for the btree.
-     */
-    protected int branchingFactor;
-
-    /**
-     * A helper class that collects statistics on the btree.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo add nano timers and track storage used by the index. The goal is to
-     *       know how much of the time of the server is consumed by the index,
-     *       what percentage of the store is dedicated to the index, how
-     *       expensive it is to do some scan-based operations (merged down,
-     *       delete of transactional isolated persistent index), and evaluate
-     *       the buffer strategy by comparing accesses with IOs.
-     */
-    public class Counters {
-
-        int nfinds = 0;
-        int ninserts = 0;
-        int nremoves = 0;
-        int rootsSplit = 0;
-        int rootsJoined = 0;
-        int nodesSplit = 0;
-        int nodesJoined = 0;
-        int leavesSplit = 0;
-        int leavesJoined = 0; // @todo also merge vs redistribution of keys on remove (and insert if b*-tree)
-        int nodesCopyOnWrite = 0;
-        int leavesCopyOnWrite = 0;
-        int nodesRead = 0;
-        int leavesRead = 0;
-        int nodesWritten = 0;
-        int leavesWritten = 0;
-        long bytesRead = 0L;
-        long bytesWritten = 0L;
-
-        // @todo consider changing to logging so that the format will be nicer
-        // or just improve the formatting.
-        public String toString() {
-            
-            return 
-            "height="+height+
-            ", #nodes="+nnodes+
-            ", #leaves="+nleaves+
-            ", #entries="+nentries+
-            ", #find="+nfinds+
-            ", #insert="+ninserts+
-            ", #remove="+nremoves+
-            ", #roots split="+rootsSplit+
-            ", #roots joined="+rootsJoined+
-            ", #nodes split="+nodesSplit+
-            ", #nodes joined="+nodesJoined+
-            ", #leaves split="+leavesSplit+
-            ", #leaves joined="+leavesJoined+
-            ", #nodes copyOnWrite="+nodesCopyOnWrite+
-            ", #leaves copyOnWrite="+leavesCopyOnWrite+
-            ", read ("+nodesRead+" nodes, "+leavesRead+" leaves, "+bytesRead+" bytes)"+
-            ", wrote ("+nodesWritten+" nodes, "+leavesWritten+" leaves, "+bytesWritten+" bytes)"
-            ;
-            
-        }
-
-    }
-    
-    protected final Counters counters = new Counters();
-    
-    /**
-     * The persistence store.
-     */
-    public IRawStore getStore() {
-        
-        return store;
-        
-    }
-    
-    /**
-     * The branching factor for the btree.
-     */
     public int getBranchingFactor() {
         
         return branchingFactor;
         
     }
 
-    /**
-     * The height of the btree. The height is the #of leaves minus one. A
-     * btree with only a root leaf is said to have <code>height := 0</code>.
-     * Note that the height only changes when we split the root node.
-     */
+    public ArrayType getKeyType() {
+        
+        return keyType;
+        
+    }
+    
     public int getHeight() {
         
         return height;
         
     }
 
-    /**
-     * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
-     */
     public int getNodeCount() {
         
         return nnodes;
         
     }
 
-    /**
-     * The #of leaf nodes in the btree.  This is one (1) for a new btree.
-     */
     public int getLeafCount() {
         
         return nleaves;
         
     }
 
-    /**
-     * The #of entries (aka values) in the btree. This is zero (0) for a new
-     * btree.  The returned value reflects only the #of entries in the btree
-     * and does not report the #of entries in a segmented index.
-     */
     public int size() {
         
         return nentries;
         
     }
 
-    /**
-     * The object responsible for (de-)serializing the nodes and leaves of the
-     * {@link BTree}.
-     */
     public NodeSerializer getNodeSerializer() {
-        
+
         return nodeSer;
-        
-    }
-
-//    /**
-//     * A hard reference queue for nodes in the btree is used to ensure that
-//     * nodes remain wired into memory while they are being actively used. Dirty
-//     * nodes are written to disk during commit using a pre-order traversal that
-//     * first writes any dirty leaves and then (recursively) their parent nodes.
-//     * 
-//     * @see AbstractNode#AbstractNode(AbstractNode)
-//     */
-//    final HardReferenceQueue<PO> nodeQueue;
-
-    /**
-     * Leaves are added to a hard reference queue when they are created or read
-     * from the store. On eviction from the queue the leaf is serialized by a
-     * listener against the {@link IRawStore}. Once the leaf is no longer
-     * strongly reachable its weak references may be cleared by the VM. Note
-     * that leaves are evicted as new leaves are added to the hard reference
-     * queue. This occurs in two situations: (1) when a new leaf is created
-     * during a split of an existing leaf; and (2) when a leaf is read in from
-     * the store. The minimum capacity for the hard reference queue is two (2)
-     * so that a split may occur without forcing eviction of either leaf in the
-     * split. Incremental writes basically make it impossible for the commit IO
-     * to get "too large" where too large is defined by the size of the hard
-     * reference cache.
-     * 
-     * Note: The code in {@link Node#postOrderIterator(boolean)} and
-     * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
-     * those iterators are used when persisting a node using a post-order
-     * traversal. If a hard reference queue eviction drives the serialization of
-     * a node and we touch the hard reference queue during the post-order
-     * traversal then we break down the semantics of
-     * {@link HardReferenceQueue#append(Object)} as the eviction does not
-     * necessarily cause the queue to reduce in length.
-     * 
-     * @todo This is all a bit fragile. Another way to handle this is to have
-     *       {@link HardReferenceQueue#append(Object)} begin to evict objects
-     *       before is is actually at capacity, but that is also a bit fragile.
-     * 
-     * @todo This queue is now used for both nodes and leaves. Update the
-     *       javadoc here, in the constants that provide minimums and defaults
-     *       for the queue, and in the other places where the queue is used or
-     *       configured. Also rename the field to nodeQueue or refQueue.
-     * 
-     * @todo Consider breaking this into one queue for nodes and another for
-     *       leaves. Would this make it possible to create a policy that targets
-     *       a fixed memory burden for the index? As it stands the #of nodes and
-     *       the #of leaves in memory can vary and leaves require much more
-     *       memory than nodes (for most trees).
-     */
-    final HardReferenceQueue<PO> leafQueue;
-
-    /**
-     * <p>
-     * Touch the node or leaf on the {@link #leafQueue}. If the node is not
-     * found on a scan of the tail of the queue, then it is appended to the
-     * queue and its {@link AbstractNode#referenceCount} is incremented. If the
-     * a node is being appended to the queue and the queue is at capacity, then
-     * this will cause a reference to be evicted from the queue. If the
-     * reference counter for the evicted node or leaf is zero, then the node or
-     * leaf will be written onto the store and made immutable. A subsequent
-     * attempt to modify the node or leaf will force copy-on-write for that node
-     * or leaf.
-     * </p>
-     * <p>
-     * This method guarentees that the specified node will NOT be synchronously
-     * persisted as a side effect and thereby made immutable. (Of course, the
-     * node may be already immutable.)
-     * </p>
-     * <p>
-     * In conjunction with {@link DefaultEvictionListener}, this method
-     * guarentees that the reference counter for the node will reflect the #of
-     * times that the node is actually present on the {@link #leafQueue}.
-     * </p>
-     * 
-     * @param node
-     *            The node or leaf.
-     */
-    protected void touch(AbstractNode node) {
-
-        assert node != null;
-
-        /*
-         * We need to guarentee that touching this node does not cause it to be
-         * made persistent. The condition of interest would arise if the queue
-         * is full and the referenceCount on the node is zero before this method
-         * was called. Under those circumstances, simply appending the node to
-         * the queue would cause it to be evicted and made persistent.
-         * 
-         * We avoid this by incrementing the reference counter before we touch
-         * the queue. Since the reference counter will therefore be positive if
-         * the node is selected for eviction, eviction will not cause the node
-         * to be made persistent.
-         */
-        node.referenceCount++;
-
-        if( ! leafQueue.append(node) ) {
-            
-            /*
-             * A false return indicates that the node was found on a scan of the
-             * tail of the queue. In this case we do NOT want the reference
-             * counter to be incremented since we have not actually added
-             * another reference to this node onto the queue.  Therefore we 
-             * decrement the counter (since we incremented it above) for a net
-             * change of zero(0) across this method.
-             */
-            
-            node.referenceCount--;
-            
-        }
 
     }
-    
-    /**
-     * Used to serialize and de-serialize the nodes and leaves of the tree.
-     */
-    final NodeSerializer nodeSer;
 
     /**
-     * Used to serialize and de-serialize the nodes and leaves of the tree. This
-     * is pre-allocated to the maximum size of any node or leaf and the single
-     * buffer is then reused every time we read or write a node or a leaf.
+     * The metadata record used to load the last state of the index that was
+     * written by {@link #write()}. When an index is loaded this is set to the
+     * metadata specified to the constructor. When a new index is created, this
+     * is initially <code>null</code>.
      */
-    final ByteBuffer buf;
-    
-    /**
-     * The type for keys for this btree.  The key type may be a primitive data
-     * type or {@link Object}.
-     * 
-     * @see ArrayType
-     */
-    final ArrayType keyType;
+    protected BTreeMetadata metadata = null;
 
     /**
-     * The comparator used iff the key type is not a primitive data type. When
-     * the key type is a primitive data type then comparison is performed using
-     * the operations for EQ, GT, LT, etc. rather than a {@link Comparator}.
-     * 
-     * @todo extend to permit comparison of the value as well as the key so that
-     *       a total order can be established that permits key duplicates with
-     *       distinct value attributes -or- support duplicates by put(k,v) vs
-     *       add(k,v) and set(k,v) semantics and provision a given tree either
-     *       to permit duplicates or not.
+     * The root of the btree. This is initially a leaf until the leaf is split,
+     * at which point it is replaced by a node. The root is also replaced each
+     * time copy-on-write triggers a cascade of updates.
      */
-    final Comparator comparator;
-    
-    /**
-     * An invalid key. This is used primarily as the value of keys that are not
-     * defined within a node or a leaf of the tree. The value choosen for a
-     * primitive data type is arbitrary, but common choices are zero (0), -1,
-     * and the largest negative value in the value space for the data type. When
-     * the btree is serving as an object identifier index, then the value
-     * choosen is always zero(0) since it also carries the semantics of a null
-     * reference. When the keys are Objects then the value choosen MUST be
-     * <code>null</code>. The need to have an illegal value for keys of a
-     * primitive data necessarily imposes a restriction of a value that may not
-     * appear as a legal key.
-     * 
-     * @todo rename as "NULL" since it means a null reference and hence an
-     *       invalid key more than it means anything else.
-     *       
-     * @todo do we actually need an illegal value for primitive keys or is this
-     *       just paranoia that insists on unused keys being NEGINF vs whatever
-     *       the last key value was (essentially garbage). As long as the code
-     *       never looks at an unused key I think that things should be ok. As
-     *       far as I can tell there is not any requirement for a key less than
-     *       any valid key in the btree implementation. We do use NEGINF in
-     *       several assertions and test suites in both the sense of the value
-     *       that an unused key must have an in the sense of a value less than
-     *       any legal key. There used to be a concept of POSINF but it proved
-     *       useless except as part of range checking the keys and key range
-     *       restrictions are best imposed, by subclassing or application
-     *       constraints, or be a more declarative interface.
-     */
-     protected final Object NEGINF;
-
-     /**
-      * The metadataId that can be used to load the last state of the index
-      * that was written by {@link #write()}.  When an index is loaded this
-      * is set to the metadataId specified to the constructor.  When a new
-      * index is created, this is initially 0L.
-      */
-     protected long metadataId = 0L;
-
-     /**
-      * The root of the btree. This is initially a leaf until the leaf is
-      * split, at which point it is replaced by a node. The root is also
-      * replaced each time copy-on-write triggers a cascade of updates.
-      */
-     AbstractNode root;
+    protected AbstractNode root;
 
     /**
-     * The height of the btree. The height is the #of leaves minus one. A
-     * btree with only a root leaf is said to have <code>height := 0</code>.
-     * Note that the height only changes when we split the root node.
+     * The height of the btree. The height is the #of leaves minus one. A btree
+     * with only a root leaf is said to have <code>height := 0</code>. Note
+     * that the height only changes when we split the root node.
      */
-    int height;
+    protected int height;
 
     /**
      * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
      */
-    int nnodes;
+    protected int nnodes;
 
     /**
-     * The #of leaf nodes in the btree.  This is one (1) for a new btree.
+     * The #of leaf nodes in the btree. This is one (1) for a new btree.
      */
-    int nleaves;
+    protected int nleaves;
 
     /**
-     * The #of entries in the btree.  This is zero (0) for a new btree.
+     * The #of entries in the btree. This is zero (0) for a new btree.
      */
-    int nentries;
+    protected int nentries;
 
-    /**
-     * The root of the btree. This is initially a leaf until the leaf is
-     * split, at which point it is replaced by a node. The root is also
-     * replaced each time copy-on-write triggers a cascade of updates.
-     */
     public IAbstractNode getRoot() {
 
         return root;
@@ -690,7 +406,7 @@ public class BTree implements IBTree {
      *            The hard reference queue. The minimum capacity is 2 to avoid
      *            cache evictions of the leaves participating in a split. A
      *            reasonable capacity is specified by
-     *            {@link #DEFAULT_LEAF_QUEUE_CAPACITY}.
+     *            {@link #DEFAULT_HARD_REF_QUEUE_CAPACITY}.
      * @param keyType
      *            The btree can store keys in an array of the specified
      *            primitive data type or in an {@link Object} array. The latter
@@ -725,66 +441,16 @@ public class BTree implements IBTree {
             IValueSerializer valueSer)
     {
 
-        assert store != null;
+        super(getTransitionalRawStore(store), keyType, branchingFactor,
+                hardReferenceQueue, NEGINF, comparator, keySer, valueSer,
+                NodeFactory.INSTANCE);
 
-        assert branchingFactor >= MIN_BRANCHING_FACTOR;
-
+        /*
+         * Note: the mutable BTree has a limit here so that split() will always
+         * succeed. That limit does not apply for an immutable btree.
+         */
         assert hardReferenceQueue.capacity() >= MINIMUM_LEAF_QUEUE_CAPACITY;
         
-        assert keyType != null;
-        
-        assert keySer != null;
-        
-        assert valueSer != null;
-        
-        if( keyType == ArrayType.OBJECT ) {
-            
-            if (NEGINF != null) {
-
-                throw new IllegalArgumentException(
-                        "NEGINF must be null when not using a primitive key type.");
-
-            }
-
-            if( comparator == null ) {
-                
-                throw new IllegalArgumentException(
-                        "A comparator must be specified unless using a primitive key type.");
-                
-            }
-            
-        } else {
-            
-            if( NEGINF == null ) {
-                
-                throw new IllegalArgumentException(
-                        "NEGINF must be non-null when using a primtive key type.");
-                
-            }
-            
-            if( comparator != null ) {
-                
-                throw new IllegalArgumentException("The comparator must be null when using a primitive key type");
-                
-            }
-            
-        }
-        
-        this.store = store;
-
-        this.branchingFactor = branchingFactor;
-
-        this.leafQueue = hardReferenceQueue;
-
-        this.keyType = keyType;
-        
-        this.NEGINF = NEGINF;
-        
-        this.comparator = comparator;
-
-        this.nodeSer = new NodeSerializer(NodeFactory.INSTANCE, keySer,
-                valueSer);
-
          /*
           * FIXME There is no fixed upper limit for URIs (or strings in
           * general), therefore the btree may have to occasionally resize its
@@ -815,19 +481,19 @@ public class BTree implements IBTree {
      *            The persistence store.
      * @param metadataId
      *            The persistent identifier of btree metadata.
-     * @param leafQueue
+     * @param hardReferenceQueue
      *            The hard reference queue for {@link Leaf}s.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
      * 
      * @todo deserialize the keySer, valueSer, comparator, and NEGINF from the
-     *       metadata record.
+     *       metadata record?  Use default java serialization? extSer?
      */
     public BTree(
             IRawStore store,
-            long metadataId,
-            HardReferenceQueue<PO> leafQueue,
+            BTreeMetadata metadata,
+            HardReferenceQueue<PO> hardReferenceQueue,
             Object NEGINF,
             Comparator comparator,
             IKeySerializer keySer,
@@ -835,37 +501,16 @@ public class BTree implements IBTree {
             )
     {
 
-        assert store != null;
-
-        assert leafQueue != null;
+        super(getTransitionalRawStore(store), metadata.keyType,
+                metadata.branchingFactor, hardReferenceQueue, NEGINF,
+                comparator, keySer, valueSer, NodeFactory.INSTANCE);
         
-        assert keySer != null;
+        this.metadata = metadata;
         
-        assert valueSer != null;
-        
-        this.store = store;
-
-        this.leafQueue = leafQueue;
-
-        this.comparator = comparator;
-        
-        this.NEGINF = NEGINF;
-        
-        this.metadataId = metadataId;
-        
-        /*
-         * read the btree metadata record. this tells us the branchingFactor and
-         * the root node identifier, both of which we need below to initialize
-         * the btree.
-         */
-        final Metadata md = readMetadata(metadataId);
-        
-        final long rootId = md.rootId;
-        
-        keyType = md.keyType;
-
-        this.nodeSer = new NodeSerializer(NodeFactory.INSTANCE,keySer,
-                valueSer);
+        this.height = metadata.height;
+        this.nnodes = metadata.nnodes;
+        this.nleaves = metadata.nleaves;
+        this.nentries = metadata.nentries;
         
         /*
          * FIXME There is no fixed upper limit for URIs (or strings in
@@ -884,258 +529,11 @@ public class BTree implements IBTree {
 
         /*
          * Read the root node of the btree.
-         * 
-         * Note: We could optionally run a variant of the post-order
-         * iterator to suck in the entire node structure of the btree. If we
-         * do nothing, then the nodes will be read in incrementally on
-         * demand. Since we always place non-leaf nodes into a hard
-         * reference cache, tree operations will speed up over time until
-         * the entire non-leaf node structure is loaded.
          */
-        this.root = readNodeOrLeaf( rootId );
+        this.root = readNodeOrLeaf( metadata.addrRoot );
 
     }
 
-    /**
-     * Write a dirty node and its children using a post-order traversal that
-     * first writes any dirty leaves and then (recursively) their parent nodes.
-     * The parent nodes are guarenteed to be dirty if there is a dirty child so
-     * this never triggers copy-on-write. This is used as part of the commit
-     * protocol where it is invoked with the root of the tree, but it may also
-     * be used to incrementally flush dirty non-root {@link Node}s.
-     * 
-     * @param node
-     *            The root of the hierarchy of nodes to be written. The node
-     *            MUST be dirty. The node this does NOT have to be the root of
-     *            the tree and it does NOT have to be a {@link Node}.
-     */
-    protected void writeNodeRecursive( AbstractNode node ) {
-
-        assert node != null;
-        
-        assert node.isDirty();
-        
-        assert ! node.isDeleted();
-
-        assert ! node.isPersistent();
-        
-        /*
-         * Note we have to permit the reference counter to be positive and not
-         * just zero here since during a commit there will typically still be
-         * references on the hard reference queue but we need to write out the
-         * nodes and leaves anyway.  If we were to evict everything from the
-         * hard reference queue before a commit then the counters would be zero
-         * but the queue would no longer be holding our nodes and leaves and
-         * they would be GC'd soon as since they would no longer be strongly
-         * reachable.
-         */
-        assert node.referenceCount >= 0;
-        
-        // #of dirty nodes written (nodes or leaves)
-        int ndirty = 0;
-
-        // #of dirty leaves written.
-        int nleaves = 0;
-
-        /*
-         * Post-order traversal of children and this node itself.  Dirty
-         * nodes get written onto the store.
-         * 
-         * Note: This iterator only visits dirty nodes.
-         */
-        Iterator itr = node.postOrderIterator(true);
-
-        while (itr.hasNext()) {
-
-            AbstractNode t = (AbstractNode) itr.next();
-
-            assert t.isDirty();
-
-            if (t != this.root) {
-
-                /*
-                 * The parent MUST be defined unless this is the root node.
-                 */
-
-                assert t.parent != null;
-                assert t.parent.get() != null;
-
-            }
-
-            // write the dirty node on the store.
-            writeNodeOrLeaf(t);
-
-            ndirty++;
-
-            if (t instanceof Leaf)
-                nleaves++;
-
-        }
-
-        log.info("write: " + ndirty + " dirty nodes (" + nleaves
-                + " leaves), rootId=" + node.getIdentity());
-        
-    }
-    
-    /**
-     * Writes the node on the store (non-recursive). The node MUST be dirty. If
-     * the node has a parent, then the parent is notified of the persistent
-     * identity assigned to the node by the store.  This method is NOT recursive
-     * and dirty children of a node will NOT be visited.
-     * 
-     * @return The persistent identity assigned by the store.
-     */
-    protected long writeNodeOrLeaf( AbstractNode node ) {
-
-        assert node != null;
-        assert node.btree == this;
-        assert node.isDirty();
-        assert !node.isDeleted();
-        assert !node.isPersistent();
-
-        /*
-         * Note we have to permit the reference counter to be positive and not
-         * just zero here since during a commit there will typically still be
-         * references on the hard reference queue but we need to write out the
-         * nodes and leaves anyway.  If we were to evict everything from the
-         * hard reference queue before a commit then the counters would be zero
-         * but the queue would no longer be holding our nodes and leaves and
-         * they would be GC'd soon as since they would no longer be strongly
-         * reachable.
-         */
-        assert node.referenceCount >= 0;
-
-        /*
-         * Note: The parent should be defined unless this is the root node.
-         * 
-         * Note: A parent CAN NOT be serialized before all of its children have
-         * persistent identity since it needs to write the identity of each
-         * child in its serialization record.
-         */
-        Node parent = node.getParent();
-
-        if (parent == null) {
-            
-            assert node == root;
-
-        } else {
-
-            // parent must be dirty if child is dirty.
-            assert parent.isDirty();
-
-            // parent must not be persistent if it is dirty.
-            assert !parent.isPersistent();
-            
-        }
-        
-        /*
-         * Serialize the node or leaf onto a shared buffer.
-         */
-        
-        node.assertInvariants();
-        
-        buf.clear();
-        
-        if( node.isLeaf() ) {
-        
-            nodeSer.putLeaf(buf, (Leaf)node);
-
-            counters.leavesWritten++;
-            
-        } else {
-
-            nodeSer.putNode(buf, (Node) node);
-
-            counters.nodesWritten++;
-
-        }
-        
-        /*
-         * Flip the buffer and write the serialized node or leaf onto the store.
-         */
-        
-        buf.flip();
-        
-        ISlotAllocation slots = store.write(buf);
-        
-        final long id = slots.toLong();
-
-        counters.bytesWritten += slots.getByteCount();
-        
-        /*
-         * The node or leaf now has a persistent identity and is marked as
-         * clean. At this point is MUST be treated as being immutable. Any
-         * changes directed to this node or leaf MUST trigger copy-on-write.
-         */
-
-        node.setIdentity(id);
-        
-        node.setDirty(false);
-
-        if( parent != null ) {
-            
-            // Set the persistent identity of the child on the parent.
-            parent.setChildKey(node);
-
-//            // Remove from the dirty list on the parent.
-//            parent.dirtyChildren.remove(node);
-
-        }
-
-        return id;
-
-    }
-
-    /**
-     * Convert the persistent identifier into an {@link ISlotAllocation}.
-     * 
-     * @param id
-     *            The persistent identifier.
-     * 
-     * @return The {@link ISlotAllocation}
-     */
-    protected ISlotAllocation asSlots(long id) {
-        
-        final int firstSlot = SlotMath.getFirstSlot(id);
-        
-        final int byteCount = SlotMath.getByteCount(id);
-
-        final int slotCount = store.getSlotMath().getSlotCount(byteCount);
-        
-        return new ContiguousSlotAllocation(byteCount, slotCount, firstSlot);
-
-    }
-    
-    protected AbstractNode readNodeOrLeaf( long id ) {
-        
-        buf.clear();
-        
-        ISlotAllocation slots = asSlots(id);
-        
-        ByteBuffer tmp = store.read(slots,buf);
-        
-        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, id, tmp);
-        
-        node.setDirty(false);
-        
-        if (node instanceof Leaf) {
-            
-            counters.leavesRead++;
-
-        } else {
-            
-            counters.nodesRead++;
-            
-        }
-
-        counters.bytesRead += slots.getByteCount();
-        
-        touch(node);
-
-        return node;
-        
-    }
-    
     public Object insert(Object key, Object entry) {
 
         if( key == null ) throw new IllegalArgumentException();
@@ -1178,205 +576,142 @@ public class BTree implements IBTree {
     }
 
     /**
-     * Recursive dump of the tree.
-     * 
-     * @param out
-     *            The dump is written on this stream.
-     * 
-     * @return true unless an inconsistency is detected.
-     * 
-     * @todo modify to write on log vs PrintStream.
-     */
-    boolean dump(PrintStream out) {
-
-        return dump(BTree.dumpLog.getEffectiveLevel(), out );
-
-    }
-        
-    public boolean dump(Level level, PrintStream out) {
-            
-        // True iff we will write out the node structure.
-        final boolean info = level.toInt() <= Level.INFO.toInt();
-
-        int[] utils = getUtilization();
-        
-        if (info) {
-            log.info("height=" + height + ", branchingFactor="
-                    + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
-                    + nleaves + ", #entries=" + nentries + ", nodeUtil="
-                    + utils[0] + "%, leafUtil=" + utils[1] + "%, utilization="
-                    + utils[2] + "%");
-        }
-
-        boolean ok = root.dump(level, out, 0, true);
-
-        return ok;
-
-    }
-
-    /**
-     * Computes and returns the utilization of the tree. The utilization figures
-     * do not factor in the space requirements of nodes and leaves.
-     * 
-     * @return An array whose elements are:
-     *         <ul>
-     *         <li>0 - the leaf utilization percentage [0:100]. The leaf
-     *         utilization is computed as the #of values stored in the tree
-     *         divided by the #of values that could be stored in the #of
-     *         allocated leaves.</li>
-     *         <li>1 - the node utilization percentage [0:100]. The node
-     *         utilization is computed as the #of non-root nodes divided by the
-     *         #of non-root nodes that could be addressed by the tree.</li>
-     *         <li>2 - the total utilization percentage [0:100]. This is the
-     *         average of the leaf utilization and the node utilization.</li>
-     *         </ul>
-     */
-    public int[] getUtilization() {
-        
-        int numNonRootNodes = nnodes + nleaves - 1;
-        
-        int nodeUtilization = nnodes == 0 ? 100 : (100 * numNonRootNodes )
-                / (nnodes * branchingFactor);
-        
-        int leafUtilization = ( 100 * nentries ) / (nleaves * branchingFactor);
-        
-        int utilization = (nodeUtilization + leafUtilization) / 2;
-
-        return new int[]{nodeUtilization,leafUtilization,utilization};
-        
-    }
-
-    /**
-     * Write out the persistent metadata for the btree on the store and
-     * return the persistent identifier for that metadata. The metadata
-     * include the persistent identifier of the root of the btree and the
-     * height, #of nodes, #of leaves, and #of entries in the btree.
-     * 
-     * @param rootId
-     *            The persistent identifier of the root of the btree.
-     * 
-     * @return The persistent identifier for the metadata.
-     */
-    long writeMetadata() {
-
-        long rootId = root.getIdentity();
-
-        ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
-
-        buf.putLong(rootId);
-        buf.putInt(branchingFactor);
-        buf.putInt(height);
-        buf.putInt(nnodes);
-        buf.putInt(nleaves);
-        buf.putInt(nentries);
-        buf.putInt(keyType.intValue());
-        
-        buf.flip(); // prepare for writing.
-
-        metadataId = store.write(buf).toLong();
-        
-        return metadataId;
-
-    }
-
-    /**
-     * Read the persistent metadata record for the btree.  Sets the height,
-     * #of nodes, #of leavs, and #of entries from the metadata record as a
-     * side effect.
-     * 
-     * @param metadataId
-     *            The persistent identifier of the btree metadata record.
-     *            
-     * @return The persistent identifier of the root of the btree.
-     */
-    Metadata readMetadata(long metadataId) {
-
-        ByteBuffer buf = store.read(asSlots(metadataId),null);
-
-        final long rootId = buf.getLong();
-        
-        branchingFactor = buf.getInt();
-        assert branchingFactor >= MIN_BRANCHING_FACTOR;
-        
-        height = buf.getInt();
-        assert height >= 0;
-        
-        nnodes = buf.getInt();
-        assert nnodes >= 0;
-        
-        nleaves = buf.getInt();
-        assert nleaves >= 0;
-        
-        nentries = buf.getInt();
-        assert nentries >= 0;
-        
-        ArrayType keyType = ArrayType.parseInt( buf.getInt() );
-
-        if( keyType == ArrayType.OBJECT ) {
-            
-            if (NEGINF != null) {
-
-                throw new IllegalArgumentException(
-                        "NEGINF must be null when not using a primitive key type.");
-
-            }
-
-            if( comparator == null ) {
-                
-                throw new IllegalArgumentException(
-                        "A comparator must be specified unless using a primitive key type.");
-                
-            }
-            
-        } else {
-            
-            if( NEGINF == null ) {
-                
-                throw new IllegalArgumentException(
-                        "NEGINF must be non-null when using a primtive key type.");
-                
-            }
-            
-            if( comparator != null ) {
-                
-                throw new IllegalArgumentException("The comparator must be null when using a primitive key type");
-                
-            }
-            
-        }
-        
-        log.info("rootId=" + rootId + ", branchingFactor=" + branchingFactor
-                + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
-                + nleaves + ", nentries=" + nentries + ", keyType=" + keyType);
-
-        Metadata md = new Metadata();
-        md.rootId = rootId;
-        md.keyType = keyType;
-        return md;
-
-    }
-
-    /**
      * Used to pass multiple values out of {@link BTree#readMetadata} so that
      * various final fields can be set in the constructor form that loads an
      * existing tree from a store.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo refactor to make the metadata record extensible.
      */
-    protected static class Metadata {
-       
-        public long rootId;
-        public ArrayType keyType;
+    public static class BTreeMetadata {
+
+        /**
+         * The address of the root node or leaf.
+         */
+        public final long addrRoot;
         
+        public final int branchingFactor;
+
+        public final int height;
+        
+        public final int nnodes;
+        
+        public final int nleaves;
+        
+        public final int nentries;
+        
+        public final ArrayType keyType;
+
+        /**
+         * Address that can be used to read this metadata record from the store.
+         */
+        public final long addrMetadata;
+        
+        /**
+         * The #of bytes in the metadata record written by {@link #writeMetadata()}.
+         */
+        public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
+                + Bytes.SIZEOF_INT * 6;
+
+        /**
+         * Constructor used to write out a metadata record.
+         * 
+         * @param btree
+         *            The btree.
+         */
+        protected BTreeMetadata(BTree btree) {
+            
+            this.addrRoot = btree.root.getIdentity();
+            
+            this.branchingFactor = btree.branchingFactor;
+            
+            this.height = btree.height;
+            
+            this.nnodes = btree.nnodes;
+            
+            this.nleaves = btree.nleaves;
+
+            this.nentries = btree.nentries;
+            
+            this.keyType = btree.keyType;
+        
+            this.addrMetadata = write(btree.store);
+            
+        }
+        
+        /**
+         * Write out the persistent metadata for the btree on the store and
+         * return the persistent identifier for that metadata. The metadata
+         * include the persistent identifier of the root of the btree and the
+         * height, #of nodes, #of leaves, and #of entries in the btree.
+         * 
+         * @return The persistent identifier for the metadata.
+         */
+        protected long write(IRawStore2 store) {
+
+            ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
+
+            buf.putLong(addrRoot);
+            buf.putInt(branchingFactor);
+            buf.putInt(height);
+            buf.putInt(nnodes);
+            buf.putInt(nleaves);
+            buf.putInt(nentries);
+            buf.putInt(keyType.intValue());
+            
+            buf.flip(); // prepare for writing.
+
+            return store.write(buf);
+
+        }
+
+        /**
+         * Read the persistent metadata record for the btree.
+         * 
+         * @param addrMetadta
+         *            The address from which the metadata record will be read.
+         *            
+         * @return The persistent identifier of the root of the btree.
+         */
+        public BTreeMetadata(IRawStore2 store,long addrMetadata) {
+
+            assert store != null;
+            
+            assert addrMetadata != 0L;
+            
+            this.addrMetadata = addrMetadata;
+            
+            ByteBuffer buf = store.read(addrMetadata,null);
+
+            addrRoot = buf.getLong();
+            
+            branchingFactor = buf.getInt();
+            assert branchingFactor >= MIN_BRANCHING_FACTOR;
+            
+            height = buf.getInt();
+            assert height >= 0;
+            
+            nnodes = buf.getInt();
+            assert nnodes >= 0;
+            
+            nleaves = buf.getInt();
+            assert nleaves >= 0;
+            
+            nentries = buf.getInt();
+            assert nentries >= 0;
+            
+            keyType = ArrayType.parseInt( buf.getInt() );
+            
+            log.info("addrRoot=" + addrRoot + ", branchingFactor=" + branchingFactor
+                    + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
+                    + nleaves + ", nentries=" + nentries + ", keyType=" + keyType);
+
+        }
+
     }
     
-    /**
-     * The #of bytes in the metadata record written by {@link #writeMetadata()}.
-     */
-    public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
-            + Bytes.SIZEOF_INT * 6;
-
     /**
      * Writes dirty nodes using a post-order traversal that first writes any
      * dirty leaves and then (recursively) their parent nodes. The parent nodes
@@ -1389,6 +724,10 @@ public class BTree implements IBTree {
      *         btree can be reloaded from this metadata record. When used as
      *         part of an atomic commit protocol, the metadata record address is
      *         written into a slot on the root block or a named root object.
+     * 
+     * @todo consider returning a new {@link IBTree} view with the metadata
+     *       field set as a means to support isolation rather than just updating
+     *       this field.
      */
     public long write() {
 
@@ -1398,7 +737,13 @@ public class BTree implements IBTree {
             
         }
 
-        return writeMetadata();
+        BTreeMetadata metadata = new BTreeMetadata(this);
+        
+        metadata.write(store);
+        
+        this.metadata = metadata;
+        
+        return metadata.addrMetadata;
 
     }
     
@@ -1454,31 +799,8 @@ public class BTree implements IBTree {
         
     }
     
-//    /**
-//     * Iterator visits the leaves of the tree.
-//     * 
-//     * @return Iterator visiting the {@link Leaf leaves} of the tree.
-//     * 
-//     * @todo optimize this if we add prior-next leaf references. 
-//     */
-//    protected Iterator leafIterator() {
-//        
-//        return new Striterator(root.postOrderIterator())
-//                .addFilter(new Filter() {
-//
-//                    private static final long serialVersionUID = 1L;
-//
-//                    protected boolean isValid(Object arg0) {
-//
-//                        return arg0 instanceof Leaf;
-//
-//                    }
-//                });
-//        
-//    }
-    
     /**
-     * Factory for nodes and leaves used by the {@link NodeSerializer}.
+     * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
      */
     protected static class NodeFactory implements INodeFactory {
 
@@ -1486,7 +808,7 @@ public class BTree implements IBTree {
         
         private NodeFactory() {}
         
-        public ILeaf allocLeaf(IBTree btree, long id, int branchingFactor,
+        public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
                 ArrayType keyType, int nkeys, Object keys, Object[] values) {
 
             return new Leaf((BTree) btree, id, branchingFactor, nkeys, keys,
@@ -1494,7 +816,7 @@ public class BTree implements IBTree {
             
         }
 
-        public INode allocNode(IBTree btree, long id, int branchingFactor,
+        public INodeData allocNode(IBTree btree, long id, int branchingFactor,
                 ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
             
             return new Node((BTree) btree, id, branchingFactor, nkeys, keys,
@@ -1986,4 +1308,81 @@ public class BTree implements IBTree {
 //    }
 //}
 
+    static protected IRawStore2 getTransitionalRawStore(IRawStore store) {
+     
+        if( store instanceof IRawStore2 ) {
+            
+            return (IRawStore2) store;
+            
+        } else {
+            
+            return new TransitionalRawStore( store );
+            
+        }
+        
+    }
+    
+    /**
+     * Transition class allows the {@link BTree} to be used with the
+     * {@link Journal} while I defer refactoring of the {@link Journal} to use
+     * {@link Addr} vs {@link ISlotAllocation}.
+     */
+    protected static class TransitionalRawStore implements IRawStore2 {
+        
+        private final IRawStore delegate;
+        
+        public TransitionalRawStore(IRawStore delegate) {
+            
+            assert delegate != null;
+            
+            this.delegate = delegate;
+            
+        }
+        
+        /**
+         * Convert the persistent identifier into an {@link ISlotAllocation}.
+         * 
+         * @param id
+         *            The persistent identifier.
+         * 
+         * @return The {@link ISlotAllocation}
+         */
+        protected ISlotAllocation asSlots(long id) {
+            
+            final int firstSlot = SlotMath.getFirstSlot(id);
+            
+            final int byteCount = SlotMath.getByteCount(id);
+
+            final int slotCount = delegate.getSlotMath().getSlotCount(byteCount);
+            
+            return new ContiguousSlotAllocation(byteCount, slotCount, firstSlot);
+
+        }
+
+        /**
+         * Note: This is the target method for reading data on the new
+         * interface. The method signatures with {@link ISlotAllocation} are all
+         * deprecated and will be refactor out soon.
+         */
+        public ByteBuffer read(long addr, ByteBuffer dst) {
+
+            ISlotAllocation slots = asSlots(addr);
+
+            return delegate.read(slots,dst);
+        }
+
+        public void delete(long addr) {
+            
+            delegate.delete(asSlots(addr));
+            
+        }
+
+        public long write(ByteBuffer data) {
+            
+            return delegate.write(data).toLong();
+            
+        }
+        
+    }
+    
 }

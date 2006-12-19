@@ -48,9 +48,7 @@ package com.bigdata.objndx;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import com.bigdata.journal.Bytes;
 
@@ -112,6 +110,10 @@ class SimpleEntry {
      */
     static class Serializer implements IValueSerializer {
 
+        public static final Serializer INSTANCE = new Serializer();
+        
+        private Serializer() {}
+
         public int getSize(int n ) {
             
             return n * Bytes.SIZEOF_INT;
@@ -152,6 +154,10 @@ class SimpleEntry {
      */
     static class NoSerializer implements IValueSerializer {
 
+        public static final NoSerializer INSTANCE = new NoSerializer();
+        
+        private NoSerializer() {}
+        
         public int getSize(int n ) {
             
             return n * Bytes.SIZEOF_INT;

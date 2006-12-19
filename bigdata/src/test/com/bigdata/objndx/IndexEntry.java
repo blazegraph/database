@@ -55,6 +55,9 @@ import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This is based on an old approach to the object index and also
+ * assumes a slot-based allocator.
  */
 class IndexEntry implements IObjectIndexEntry {
 

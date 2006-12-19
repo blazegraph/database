@@ -50,7 +50,11 @@ package com.bigdata.objndx;
 import java.io.File;
 import java.io.IOException;
 
-import com.bigdata.objndx.PostOrderBuilder.IndexSegment;
+import junit.framework.AssertionFailedError;
+
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.objndx.IndexSegment.FileStore;
+
 
 /**
  * Test suite for efficient post-order rebuild of an index in an external index
@@ -200,13 +204,19 @@ public class TestPostOrderBuilder extends AbstractBTreeTestCase {
               * case and not, for example, those aspects that depend on the
               * specifics of the length of serialized nodes or leaves).
               */
-            final IndexSegment seg = new IndexSegment(outFile);
-            assertEquals(3,seg.metadata.branchingFactor);
-            assertEquals(2,seg.metadata.height);
-            assertEquals(ArrayType.INT,seg.metadata.keyType);
-            assertEquals(4,seg.metadata.nleaves);
-            assertEquals(3,seg.metadata.nnodes);
-            assertEquals(10,seg.metadata.nentries);
+            final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+                    // setup reference queue to hold all leaves and nodes.
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            7, 7),
+                    // take the other parameters from the btree.
+                    btree.NEGINF, btree.comparator,
+                    btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
+            assertEquals(3,seg.getBranchingFactor());
+            assertEquals(2,seg.getHeight());
+            assertEquals(ArrayType.INT,seg.getKeyType());
+            assertEquals(4,seg.getLeafCount());
+            assertEquals(3,seg.getNodeCount());
+            assertEquals(10,seg.size());
             
             /*
              * @todo verify the right keys in the right leaves.
@@ -230,13 +240,20 @@ public class TestPostOrderBuilder extends AbstractBTreeTestCase {
               * case and not, for example, those aspects that depend on the
               * specifics of the length of serialized nodes or leaves).
               */
-            final IndexSegment seg = new IndexSegment(outFile);
-            assertEquals(10,seg.metadata.branchingFactor);
-            assertEquals(0,seg.metadata.height);
-            assertEquals(ArrayType.INT,seg.metadata.keyType);
-            assertEquals(1,seg.metadata.nleaves);
-            assertEquals(0,seg.metadata.nnodes);
-            assertEquals(10,seg.metadata.nentries);
+            final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+                    // setup reference queue to hold all leaves and nodes.
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            1, 1),
+                    // take the other parameters from the btree.
+                    btree.NEGINF, btree.comparator,
+                    btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                    );
+            assertEquals(10,seg.getBranchingFactor());
+            assertEquals(0,seg.getHeight());
+            assertEquals(ArrayType.INT,seg.getKeyType());
+            assertEquals(1,seg.getLeafCount());
+            assertEquals(0,seg.getNodeCount());
+            assertEquals(10,seg.size());
             
             /*
              * @todo verify the right keys in the right leaves.
@@ -267,10 +284,10 @@ public class TestPostOrderBuilder extends AbstractBTreeTestCase {
             assert actual != null;
             
             // The #of entries must agree.
-            assertEquals(expected.nentries, actual.metadata.nentries);
+            assertEquals(expected.size(), actual.size());
             
             // The key type must agree.
-            assertEquals(expected.keyType, actual.metadata.keyType);
+            assertEquals(expected.getKeyType(), actual.getKeyType());
             
             KeyValueIterator expectedItr = btree.entryIterator();
             
@@ -294,9 +311,32 @@ public class TestPostOrderBuilder extends AbstractBTreeTestCase {
                 
                 Object actualKey = expectedItr.getKey();
 
-                assertEquals("index="+index, expectedKey,actualKey);
+//                System.err.println("index="+index+", key="+actualKey+", val="+actualVal);
+                
+                try {
+                    
+                    assertEquals(expectedKey, actualKey);
+                    
+                } catch (AssertionFailedError ex) {
+                    
+                    /*
+                     * Lazily generate message.
+                     */
+                    fail("index=" + index, ex);
+                    
+                }
 
-                assertEquals("index="+index+", key="+expectedKey, expectedVal,actualVal);
+                try {
+
+                    assertEquals(expectedVal, actualVal);
+                    
+                } catch (AssertionFailedError ex) {
+                    /*
+                     * Lazily generate message.
+                     */
+                    fail("index=" + index + ", key=" + expectedKey, ex);
+                    
+                }
                 
                 index++;
                 
