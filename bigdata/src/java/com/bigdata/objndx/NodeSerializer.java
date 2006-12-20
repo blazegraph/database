@@ -63,15 +63,16 @@ import com.bigdata.journal.Bytes;
 /**
  * <p>
  * An instance of this class is used to serialize and de-serialize the
- * {@link INodeData}s and {@link ILeafData}s of an {@link IBTree}. Leaf and non-leaf
- * records have different serialization formats, but their leading bytes use the
- * same format so that you can tell by inspection whether a buffer contains a
- * leaf or a non-leaf node. The header of the record uses a fixed length format
- * so that some fields can be tested without full de-serialization, e.g., the
- * checksum, whether the record contains a leaf vs a node, etc. This fixed
- * record also makes it possible to update some fields in the header once the
- * entire record has been serialized, including the checksum, the #of bytes in
- * the serialized record, and the prior/next addresses for leaves.
+ * {@link INodeData}s and {@link ILeafData}s of an {@link IBTree}. Leaf and
+ * non-leaf records have different serialization formats, but their leading
+ * bytes use the same format so that you can tell by inspection whether a buffer
+ * contains a leaf or a non-leaf node. The header of the record uses a fixed
+ * length format so that some fields can be tested without full
+ * de-serialization, e.g., the checksum, whether the record contains a leaf vs a
+ * node, etc. This fixed record also makes it possible to update some fields in
+ * the header once the entire record has been serialized, including the
+ * checksum, the #of bytes in the serialized record, and the prior/next
+ * addresses for leaves.
  * </p>
  * <p>
  * The methods defined by this class all work with {@link ByteBuffer}s. On
@@ -96,7 +97,10 @@ import com.bigdata.journal.Bytes;
  * 
  * @todo Compute the #of shared bytes (common prefix) for the low and high key,
  *       write that prefix once, and then mask off that prefix for each key
- *       written.
+ *       written. Modify search to only search that part of the key that is
+ *       recorded in each Node and only the new part of the key in the Leaf.
+ *       This is both less storage and less time searching. The full key can
+ *       then be reconstructed as required.
  * 
  * @todo use allocation pools for node, leaf, key[], and value[] objects?
  * 
@@ -366,6 +370,33 @@ public class NodeSerializer {
 
         }
 
+    }
+    
+    /**
+     * Serialize a node or leaf onto a buffer.
+     * 
+     * @param buf
+     *            The buffer. The node or leaf will be serialized starting at
+     *            the current position. The position will be advanced as a side
+     *            effect.
+     * @param node
+     *            The node or leaf.
+     * 
+     * @exception BufferOverflowException
+     *                if there is not enough space remaining in the buffer.
+     */
+    public void putNodeOrLeaf(ByteBuffer buf, IAbstractNodeData node) {
+        
+        if(node instanceof INodeData) {
+            
+            putNode(buf,(INodeData)node);
+            
+        } else {
+        
+            putLeaf(buf,(ILeafData)node);
+            
+        }
+        
     }
     
     /**

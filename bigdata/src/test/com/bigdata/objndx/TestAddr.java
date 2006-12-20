@@ -66,9 +66,9 @@ public class TestAddr extends TestCase {
         
         final long lval = Addr.toLong(nbytes,offset);
 
-        TestPostOrderBuilder.assertEquals("nbytes(lval="+Long.toHexString(lval)+")", nbytes, Addr.getByteCount(lval));
+        TestIndexSegmentBuilderStatics.assertEquals("nbytes(lval="+Long.toHexString(lval)+")", nbytes, Addr.getByteCount(lval));
 
-        TestPostOrderBuilder.assertEquals("offset(lval="+Long.toHexString(lval)+")", offset, Addr.getOffset(lval));
+        TestIndexSegmentBuilderStatics.assertEquals("offset(lval="+Long.toHexString(lval)+")", offset, Addr.getOffset(lval));
 
     }
 
@@ -84,7 +84,7 @@ public class TestAddr extends TestCase {
     }
 
     /**
-     * Test of {@link Addr#toLong(int, int)}.
+     * Test of {@link Addr#toLong(int nbytes, int offset)}.
      */
     public void test_toLong02() {
         

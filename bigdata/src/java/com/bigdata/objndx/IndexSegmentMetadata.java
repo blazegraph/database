@@ -83,7 +83,7 @@ public class IndexSegmentMetadata {
     
     /**
      * The offset to the start of the serialized nodes in the file or
-     * <code>-1L</code> iff there are no nodes in the file.
+     * <code>0L</code> iff there are no nodes in the file.
      */
     final public long offsetNodes;
     
@@ -224,7 +224,7 @@ public class IndexSegmentMetadata {
 
         if(nnodes == 0) {
             // the root is a leaf.
-            assert offsetNodes == -1L;
+            assert offsetNodes == 0L;
             assert offsetLeaves < length;
             assert Addr.getOffset(addrRoot) >= offsetLeaves;
             assert Addr.getOffset(addrRoot) < length;

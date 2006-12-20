@@ -93,8 +93,10 @@ public class TestAll extends TestCase {
         /*
          * index rebuilding.
          */
-        suite.addTestSuite( TestPostOrderBuilder.class );
-        suite.addTestSuite( TestPostOrderBuilder.TestSmallTree.class );
+        // test static methods for the index builder.
+        suite.addTestSuite( TestIndexSegmentBuilderStatics.class );
+        // test with small known examples in detail.
+        suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // @todo test compacting merge of two index segments.
         // @todo test compacting merge of N index segments?
         // @todo test SegmentedBTree (reads through to active index segments if miss on BTree in the journal).

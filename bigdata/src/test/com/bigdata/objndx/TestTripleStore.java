@@ -73,7 +73,6 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.BTree.BTreeMetadata;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a

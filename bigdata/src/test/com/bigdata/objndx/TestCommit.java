@@ -51,7 +51,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
-import com.bigdata.objndx.BTree.BTreeMetadata;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.

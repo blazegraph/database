@@ -1620,4 +1620,88 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     }
     
+    /**
+     * Compare two {@link IBTree}s for the same #of entries, key type, and the same keys and values. The
+     * height, branching factor, #of nodes and #of leaves may differ (the test does
+     * not presume that the btrees were built with the same branching factor, but merely with the same
+     * data and key type).
+     * 
+     * @param expected
+     *            The ground truth btree.
+     * @param actual
+     *            The btree that is being validated.
+     */
+    public void assertSameBTree(AbstractBTree expected, AbstractBTree actual) {
+
+        assert expected != null;
+        
+        assert actual != null;
+        
+        // The #of entries must agree.
+        assertEquals(expected.size(), actual.size());
+        
+        // The key type must agree.
+        assertEquals(expected.getKeyType(), actual.getKeyType());
+        
+        KeyValueIterator expectedItr = expected.entryIterator();
+        
+        KeyValueIterator actualItr = actual.entryIterator();
+        
+        int index = 0;
+        
+        while( expectedItr.hasNext() ) {
+            
+            if( ! actualItr.hasNext() ) {
+                
+                fail("The iterator is not willing to visit enough entries");
+                
+            }
+            
+            Object expectedVal = expectedItr.next();
+            
+            Object actualVal = actualItr.next();
+
+            Object expectedKey = expectedItr.getKey();
+            
+            Object actualKey = expectedItr.getKey();
+
+//            System.err.println("index="+index+", key="+actualKey+", val="+actualVal);
+            
+            try {
+                
+                assertEquals(expectedKey, actualKey);
+                
+            } catch (AssertionFailedError ex) {
+                
+                /*
+                 * Lazily generate message.
+                 */
+                fail("index=" + index, ex);
+                
+            }
+
+            try {
+
+                assertEquals(expectedVal, actualVal);
+                
+            } catch (AssertionFailedError ex) {
+                /*
+                 * Lazily generate message.
+                 */
+                fail("index=" + index + ", key=" + expectedKey, ex);
+                
+            }
+            
+            index++;
+            
+        }
+        
+        if( actualItr.hasNext() ) {
+            
+            fail("The iterator is willing to visit too many entries");
+            
+        }
+        
+    }
+    
 }

@@ -42,6 +42,27 @@ final public class Addr {
     }
     
     /**
+     * A human readable representation showing the offset and length components
+     * of the address.
+     * 
+     * @param addr
+     *            An address.
+     * 
+     * @return The representation.
+     */
+    public static String toString(long addr) {
+        
+        if(addr==0L) return "NULL";
+        
+        int offset = getOffset(addr);
+        
+        int nbytes = getByteCount(addr);
+        
+        return "{nbytes="+nbytes+",offset="+offset+"}";
+        
+    }
+    
+    /**
      * Extracts the byte count from a long integer formed by
      * {@link #toLong(int, int)}.
      * 

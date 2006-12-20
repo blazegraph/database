@@ -7,11 +7,6 @@ import java.nio.ByteBuffer;
 import java.util.Comparator;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.HardReferenceQueue.HardReferenceQueueEvictionListener;
-import com.bigdata.journal.IRawStore;
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.BTree.NodeFactory;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -21,10 +16,11 @@ import com.bigdata.objndx.BTree.NodeFactory;
  * buffer the part of the file containing the index nodes or the entire file
  * depending on application requirements.
  * 
+ * Note: iterators returned by this class do not support removal (the nodes and
+ * leaves will all refuse mutation operations).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo To what extent can I reuse the test suites for BTree and IndexSegment?
  */
 public class IndexSegment extends AbstractBTree implements IBTree {
 
@@ -139,6 +135,62 @@ public class IndexSegment extends AbstractBTree implements IBTree {
     }
 
     /**
+     * The internal addresses for child nodes found in a node of the index
+     * segment are relative to the start of the index nodes block in the file.
+     * To differentiate them from addresses for leaves, which are correct, the
+     * sign is flipped so that a node address is always a negative integer. This
+     * method looks for the negative address, flips the sign, and adds in the
+     * offset of the node block in the file so that the resulting address
+     * correctly addresses an absolute offset in the file.
+     * 
+     * @param addr
+     *            An {@link Addr}. When negative, the address is for a node and
+     *            must be decoded per the commentary above.
+     * 
+     * @return The node or leaf at that address in the file.
+     * 
+     * @see IndexSegmentBuilder.SimpleNodeData
+     */
+    protected AbstractNode readNodeOrLeaf(long addr) {
+
+        if (addr < 0) {
+    
+            /*
+             * Always a reference to a node as represented in childAddr[] of
+             * some node.
+             */
+            
+            // flip the sign
+            addr = -(addr);
+            
+            // compute the absolute offset into the file.
+            int offset = (int) fileStore.metadata.offsetNodes
+                    + Addr.getOffset(addr);
+            
+            // the size of the record in bytes.
+            int nbytes = Addr.getByteCount(addr);
+            
+            // form an absolute Addr.
+            addr = Addr.toLong(nbytes, offset);
+            
+            // read the node from the file.
+            return (Node) super.readNodeOrLeaf(addr);
+
+        } else {
+            
+            /*
+             * Either a leaf -or- the root node (which does not use an encoded
+             * address!)
+             */
+            
+            // read the node or leaf from the file.
+            return super.readNodeOrLeaf(addr);
+
+        }
+    
+    }
+    
+    /**
      * Operation is disallowed.
      */
     public Object insert(Object key, Object entry) {
@@ -154,28 +206,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
-    }
-
-    public Object lookup(Object key) {
-
-        if( key == null ) throw new IllegalArgumentException();
-
-        counters.nfinds++;
-        
-        return root.lookup(key);
-
-    }
-
-    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
-
-        return new RangeIterator(this,fromKey,toKey);
-        
-    }
-
-    public KeyValueIterator entryIterator() {
-    
-        return root.entryIterator();
-        
     }
 
     /**
@@ -298,10 +328,8 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo adapt IRawStore to use {@link Addr} vs {@link ISlotAllocation}.
-     * 
      * @todo make it optional to fully buffer the index nodes?
-     * @todo make it optional to fully buffer the entire file?
+     * @todo make it optional to fully buffer the entire file.
      */
     public static class FileStore implements IRawStore2 {
         
@@ -312,11 +340,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
          * of the queue does not require any IOs.
          */
         protected final ByteBuffer buf_nodes;
-
-//        /**
-//         * A buffer used to read a leaf or an index node.
-//         */
-//        protected final ByteBuffer buf;
 
         /**
          * The file containing the index segment.
@@ -368,7 +391,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
              * be a deserialized object and the file will not be buffered in
              * memory.
              */
-            this.buf_nodes = (metadata.nnodes > 0 ? readIndexNodes(raf) : null);
+            this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf) : null);
 
         }
         
@@ -412,15 +435,24 @@ public class IndexSegment extends AbstractBTree implements IBTree {
             if (offset >= metadata.offsetNodes && buf_nodes != null) {
 
                 /*
-                 * the data are buffered.
+                 * the data are buffered. create a slice onto the read-only
+                 * buffer that reveals only those bytes that contain the desired
+                 * node. the position() of the slice will be zero(0) and the
+                 * limit() will be the #of bytes in the compressed record.
                  */
 
+                // correct the offset so that it is relative to the buffer.
+                int off = (int)metadata.offsetNodes - offset;
+                
+                // set the limit on the buffer to the end of the record.
+                buf_nodes.limit(off + length);
+
+                // set the position on the buffer to the start of the record.
+                buf_nodes.position(off);
+                
+                // create a slice of that view.
                 dst = buf_nodes.slice();
-
-                dst.limit(offset + length);
-
-                dst.position(offset);
-
+                
             } else {
 
                 /*
@@ -433,9 +465,11 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
                 try {
 
-                    // read into [dst] - does not modify position().
+                    // read into [dst] - does not modify the channel's position().
                     raf.getChannel().read(dst, offset);
 
+                    dst.flip(); // Flip buffer for reading.
+                    
                 } catch (IOException ex) {
 
                     throw new RuntimeException(ex);
@@ -457,8 +491,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
              * buffer held internally by the RecordCompressor.
              */
 
-            dst.flip(); // Flip for reading.
-
             return compressor.decompress(dst); // Decompress.
 
         }
@@ -468,7 +500,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
          * 
          * @return A read-only view of a buffer containing the index nodes.
          */
-        protected ByteBuffer readIndexNodes(RandomAccessFile raf)
+        protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
                 throws IOException {
 
             long start = metadata.offsetNodes;

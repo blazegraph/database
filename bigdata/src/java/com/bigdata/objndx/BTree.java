@@ -46,23 +46,15 @@ Modifications:
  */
 package com.bigdata.objndx;
 
-import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
-import java.util.Iterator;
-
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.Bytes;
 import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.SlotMath;
-
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
@@ -112,6 +104,10 @@ import cutthecrap.utils.striterators.Striterator;
  *       a fixed length byte[] or char[] such as char[64]. Note that long fixed
  *       length arrays are better off doing reference copying as they will be
  *       moving less data (how large is a Java reference anyway, 4 bytes?).
+ * 
+ * @todo drop the jdbm-based btree implementation in favor of this one and test
+ *       out a GOM integration. this will also require an extser service /
+ *       index.
  * 
  * @todo Implement an "extser" index that does not use extser itself, but which
  *       could provide the basis for a database that does use extser. The index
@@ -171,9 +167,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       the historical journal snapshots and index key range files can be
  *       managed by the host rather than showing up in the metadata index
  *       directly.
- * 
- * @todo drop the jdbm-based btree implementation in favor of this one (once we
- *       have extser support in place).
  * 
  * @todo support column store style indices (key, column, timestamp), locality
  *       groups that partition the key space so that we can fully buffer parts
@@ -505,8 +498,10 @@ public class BTree extends AbstractBTree implements IBTree {
                 metadata.branchingFactor, hardReferenceQueue, NEGINF,
                 comparator, keySer, valueSer, NodeFactory.INSTANCE);
         
+        // save a reference to the immutable metadata record.
         this.metadata = metadata;
         
+        // initialize mutable fields from the immutable metadata record.
         this.height = metadata.height;
         this.nnodes = metadata.nnodes;
         this.nleaves = metadata.nleaves;
@@ -534,184 +529,6 @@ public class BTree extends AbstractBTree implements IBTree {
 
     }
 
-    public Object insert(Object key, Object entry) {
-
-        if( key == null ) throw new IllegalArgumentException();
-        if( entry == null ) throw new IllegalArgumentException();
-        
-        counters.ninserts++;
-        
-        assert entry != null;
-
-        if(INFO) {
-            log.info("key="+key+", entry="+entry);
-        }
-
-        return root.insert(key, entry);
-
-    }
-
-    public Object lookup(Object key) {
-
-        if( key == null ) throw new IllegalArgumentException();
-
-        counters.nfinds++;
-        
-        return root.lookup(key);
-
-    }
-
-    public Object remove(Object key) {
-
-        if( key == null ) throw new IllegalArgumentException();
-
-        counters.nremoves++;
-
-        if(INFO) {
-            log.info("key="+key);
-        }
-
-        return root.remove(key);
-
-    }
-
-    /**
-     * Used to pass multiple values out of {@link BTree#readMetadata} so that
-     * various final fields can be set in the constructor form that loads an
-     * existing tree from a store.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo refactor to make the metadata record extensible.
-     */
-    public static class BTreeMetadata {
-
-        /**
-         * The address of the root node or leaf.
-         */
-        public final long addrRoot;
-        
-        public final int branchingFactor;
-
-        public final int height;
-        
-        public final int nnodes;
-        
-        public final int nleaves;
-        
-        public final int nentries;
-        
-        public final ArrayType keyType;
-
-        /**
-         * Address that can be used to read this metadata record from the store.
-         */
-        public final long addrMetadata;
-        
-        /**
-         * The #of bytes in the metadata record written by {@link #writeMetadata()}.
-         */
-        public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
-                + Bytes.SIZEOF_INT * 6;
-
-        /**
-         * Constructor used to write out a metadata record.
-         * 
-         * @param btree
-         *            The btree.
-         */
-        protected BTreeMetadata(BTree btree) {
-            
-            this.addrRoot = btree.root.getIdentity();
-            
-            this.branchingFactor = btree.branchingFactor;
-            
-            this.height = btree.height;
-            
-            this.nnodes = btree.nnodes;
-            
-            this.nleaves = btree.nleaves;
-
-            this.nentries = btree.nentries;
-            
-            this.keyType = btree.keyType;
-        
-            this.addrMetadata = write(btree.store);
-            
-        }
-        
-        /**
-         * Write out the persistent metadata for the btree on the store and
-         * return the persistent identifier for that metadata. The metadata
-         * include the persistent identifier of the root of the btree and the
-         * height, #of nodes, #of leaves, and #of entries in the btree.
-         * 
-         * @return The persistent identifier for the metadata.
-         */
-        protected long write(IRawStore2 store) {
-
-            ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
-
-            buf.putLong(addrRoot);
-            buf.putInt(branchingFactor);
-            buf.putInt(height);
-            buf.putInt(nnodes);
-            buf.putInt(nleaves);
-            buf.putInt(nentries);
-            buf.putInt(keyType.intValue());
-            
-            buf.flip(); // prepare for writing.
-
-            return store.write(buf);
-
-        }
-
-        /**
-         * Read the persistent metadata record for the btree.
-         * 
-         * @param addrMetadta
-         *            The address from which the metadata record will be read.
-         *            
-         * @return The persistent identifier of the root of the btree.
-         */
-        public BTreeMetadata(IRawStore2 store,long addrMetadata) {
-
-            assert store != null;
-            
-            assert addrMetadata != 0L;
-            
-            this.addrMetadata = addrMetadata;
-            
-            ByteBuffer buf = store.read(addrMetadata,null);
-
-            addrRoot = buf.getLong();
-            
-            branchingFactor = buf.getInt();
-            assert branchingFactor >= MIN_BRANCHING_FACTOR;
-            
-            height = buf.getInt();
-            assert height >= 0;
-            
-            nnodes = buf.getInt();
-            assert nnodes >= 0;
-            
-            nleaves = buf.getInt();
-            assert nleaves >= 0;
-            
-            nentries = buf.getInt();
-            assert nentries >= 0;
-            
-            keyType = ArrayType.parseInt( buf.getInt() );
-            
-            log.info("addrRoot=" + addrRoot + ", branchingFactor=" + branchingFactor
-                    + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
-                    + nleaves + ", nentries=" + nentries + ", keyType=" + keyType);
-
-        }
-
-    }
-    
     /**
      * Writes dirty nodes using a post-order traversal that first writes any
      * dirty leaves and then (recursively) their parent nodes. The parent nodes
@@ -787,18 +604,6 @@ public class BTree extends AbstractBTree implements IBTree {
         
     }
 
-    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
-
-        return new RangeIterator(this,fromKey,toKey);
-        
-    }
-
-    public KeyValueIterator entryIterator() {
-    
-        return root.entryIterator();
-        
-    }
-    
     /**
      * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
      */

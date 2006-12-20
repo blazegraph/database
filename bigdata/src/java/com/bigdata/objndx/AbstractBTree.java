@@ -387,6 +387,59 @@ abstract public class AbstractBTree implements IBTree {
      */
     abstract public IAbstractNode getRoot();
     
+    public Object insert(Object key, Object entry) {
+
+        if( key == null ) throw new IllegalArgumentException();
+        if( entry == null ) throw new IllegalArgumentException();
+        
+        counters.ninserts++;
+        
+        assert entry != null;
+
+        if(INFO) {
+            log.info("key="+key+", entry="+entry);
+        }
+
+        return getRoot().insert(key, entry);
+
+    }
+
+    public Object lookup(Object key) {
+
+        if( key == null ) throw new IllegalArgumentException();
+
+        counters.nfinds++;
+        
+        return getRoot().lookup(key);
+
+    }
+
+    public Object remove(Object key) {
+
+        if( key == null ) throw new IllegalArgumentException();
+
+        counters.nremoves++;
+
+        if(INFO) {
+            log.info("key="+key);
+        }
+
+        return getRoot().remove(key);
+
+    }
+
+    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
+
+        return new RangeIterator(this,fromKey,toKey);
+        
+    }
+
+    public KeyValueIterator entryIterator() {
+    
+        return getRoot().entryIterator();
+        
+    }
+    
     /**
      * Iterator visits the leaves of the tree.
      * 
@@ -569,17 +622,17 @@ abstract public class AbstractBTree implements IBTree {
      *            
      * @return The node or leaf.
      */
-    protected AbstractNode readNodeOrLeaf( long id ) {
+    protected AbstractNode readNodeOrLeaf( long addr ) {
         
         buf.clear();
         
-        ByteBuffer tmp = store.read(id,buf);
+        ByteBuffer tmp = store.read(addr,buf);
         
         final int bytesRead = tmp.position();
         
         counters.bytesRead += bytesRead;
         
-        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, id, tmp);
+        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
         
         node.setDirty(false);
         
