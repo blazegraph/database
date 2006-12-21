@@ -282,6 +282,8 @@ public class IndexSegmentBuilder {
         assert btree != null;
         assert m >= AbstractBTree.MIN_BRANCHING_FACTOR;
         
+        final long begin = System.currentTimeMillis();
+        
         // The data type used for the keys in the btree.
         keyType = btree.keyType;
         
@@ -301,6 +303,8 @@ public class IndexSegmentBuilder {
         // The height of the output tree.
         height = getMinimumHeight(m,nleaves);
 
+        log.info("branchingFactor="+m+", nentries="+nentries+", nleaves="+nleaves+", height="+height);
+        
         // The #of entries to place into each leaf.
         final int[] n = distributeKeys(m,m2,nleaves,nentries);
         
@@ -505,6 +509,16 @@ public class IndexSegmentBuilder {
                     // write the address of the child on the parent node.
                     SimpleNodeData node = nodes[height-1];
                     
+                    /*
+                     * Prepare to receive the next node's data on this
+                     * level.
+                     */
+                    if(node.written) {
+                   
+                        node.reset();
+                        
+                    }
+                    
                     node.childAddr[node.nkeys] = addr;
                     
                     node.nchildren++;
@@ -525,12 +539,6 @@ public class IndexSegmentBuilder {
 
                         long addrParent = writeNode(tmpChannel,node);
                         
-                        /*
-                         * Prepare to receive the next node's data on this
-                         * level.
-                         */
-                        node.reset();
-                        
                     }
                     
                 }
@@ -540,18 +548,29 @@ public class IndexSegmentBuilder {
             // Verify that all leaves were written out.
             assert nleaves == nleavesWritten;
             
-            /* 
+            /*
              * Flush out any unwritten nodes.
+             * 
+             * Note: this tests nchildren>0 to make sure that at least one child
+             * has been attached to the node, otherwise it is clean and does not
+             * need to be written. if there is a child, then the requirements
+             * are a minimum of two children and one separatorKey (this catches
+             * an edge case where we might try to write more than one root
+             * node). if this is not a root node, then the requirements are m2 <=
+             * nkeys <= m
              */
             
-            for (int i = height-1; i >= 0; i--) {
+            for (int h = height-1; h >= 0; h--) {
                 
-                SimpleNodeData node = nodes[i];
+                SimpleNodeData node = nodes[h];
                 
-                if (!node.written) {
+                if (!node.written && node.nchildren>0 ) {
 
+                    assert node.nchildren>=2;
+                    assert node.nkeys == node.nchildren - 1;
+                    
                     // verify not under capacity (root is exempt).
-                    if(i>0) {
+                    if(h>0) {
                         assert node.nkeys >= m2;
                     }
 
@@ -660,10 +679,14 @@ public class IndexSegmentBuilder {
                 
                 outChannel.position(0);
                 
-                new IndexSegmentMetadata(m, height, keyType, nleaves,
+                IndexSegmentMetadata md = new IndexSegmentMetadata(m, height, keyType, nleaves,
                         nnodesWritten, nentries, maxNodeOrLeafLength,
                         offsetLeaves, offsetNodes, addrRoot, out.length(), now,
-                        name).write(out);
+                        name);
+                
+                md.write(out);
+                
+                log.info(md.toString());
                 
             }
                         
@@ -675,6 +698,19 @@ public class IndexSegmentBuilder {
             outChannel.force(true);
             out.close(); // also releases the lock.
             out = null;
+
+            /*
+             * log run time.
+             * 
+             * @todo track runtime as an instance variable for inspection by the
+             * calling process.
+             */
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            log.info("finished: elapsed=" + elapsed + "ms, nentries=" + nentries
+                    + ", branchingFactor=" + m + ", nnodes=" + nnodesWritten
+                    + ", nleaves=" + nleavesWritten);
 
         } catch (Throwable ex) {
 
@@ -708,7 +744,7 @@ public class IndexSegmentBuilder {
                             + tmpFile.getAbsoluteFile());
                 }
             }
-
+            
         }
         
     }
@@ -1160,6 +1196,25 @@ public class IndexSegmentBuilder {
      */
     public static int[] distributeKeys(int m, int m2, int nleaves, int nentries) {
 
+        assert m>=BTree.MIN_BRANCHING_FACTOR;
+        assert m2>=(m+1)/2;
+        assert m2 <= m;
+        assert nleaves>0;
+        assert nentries>0;
+        
+        if( nleaves == 1) {
+            
+            /*
+             * If there is just a root leaf then any number (up to the leafs
+             * capacity) will fit into that root leaf.
+             */
+            
+            assert nentries <= m;
+            
+            return new int[]{nentries};
+            
+        }
+            
         final int[] n = new int[nleaves];
 
         /*

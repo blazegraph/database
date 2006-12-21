@@ -101,8 +101,26 @@ import com.bigdata.journal.Options;
  * from a fully connected matrix in the appropriate space.
  * <p>
  * 
+ * @todo The more that we pack things down the slower we can expect this to run
+ *       since IOs will be smaller ... until we begin buffering writes to larger
+ *       IOs for the store. The way that we compensate for this is by increasing
+ *       the branching factor for the indices, but that begins to run into
+ *       overhead for moving keys during inserts on a node. Deferring writes
+ *       from the direct buffer on the journal onto the backing file should
+ *       provide a nice performance boost. The writes could even be async since
+ *       we only need to sync at a commit when the writer must assert that all
+ *       bytes up to a given {@link Addr} have been written onto the store.
+ * 
  * @todo The term indices need to use a distinct suffix code so that the
- *       identifiers assigned by each index are unique.
+ *       identifiers assigned by each index are unique. Or just use one
+ *       heterogenous reverse index to reverse any term identifier to a term and
+ *       make sure that the term indices use distinct suffix codes so that there
+ *       is never a cross-index collision.
+ * 
+ * @todo Develop both an all-way index variant and a variant that builds
+ *       distributed linked lists for the off-axis access paths. The latter can
+ *       be batched using a scatter query while the former is clearly optimial
+ *       for key scans.
  * 
  * @todo Develop an {@link IValueSerializer} for use on leaves of a statement
  *       index. This can use an efficient data structure for immutable strings,
@@ -483,20 +501,39 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          * index.
          * 
          * @todo this needs to be (a) shared across all transactional instances
-         *       of this index; (b) restart safe; and (c) set into a namespace
-         *       that is unique to the journal so that multiple writers on
-         *       multiple journals for a single distributed database can not
-         *       collide.
+         *       of this index; (b) restart safe; (c) set into a namespace that
+         *       is unique to the journal so that multiple writers on multiple
+         *       journals for a single distributed database can not collide;
+         *       and (d) set into a namespace that is unique to the index and
+         *       that is persistent as part of the index metadata (which should
+         *       be extensible for at least {@link BTree}).
          */
         protected long nextId = 1;
+        
+        /**
+         * An int16 value that may be used to multiplex identifier assignments
+         * for one or more distributed indices. When non-zero the next
+         * identifier that would be assigned by this index is first shifted 16
+         * bits to the left and then ORed with the indexId. This limits the #of
+         * distinct terms that can be stored in the index to 2^48.
+         */
+        protected final short indexId;
         
         /**
          * Create a new index.
          * 
          * @param store
          *            The backing store.
+         * 
+         * @param indexId
+         *            An int16 value that may be used to multiplex identifier
+         *            assignments for one or more distributed indices. When
+         *            non-zero the next identifier that would be assigned by
+         *            this index is first shifted 16 bits to the left and then
+         *            ORed with the indexId. This limits the #of distinct terms
+         *            that can be stored in the index to 2^48.
          */
-        public StringIndex(IRawStore store) {
+        public StringIndex(IRawStore store, short indexId) {
             super(store,
                     ArrayType.OBJECT, // generic keys
                     DEFAULT_BRANCHING_FACTOR,
@@ -508,6 +545,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                     KeySerializer.INSTANCE,
                     ValueSerializer.INSTANCE
                     );
+            
+            this.indexId = indexId;
+            
         }
         
         /**
@@ -519,6 +559,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          *            The metadata record identifier for the index.
          */
         public StringIndex(IRawStore store, long metadataId) {
+        
             super(  store,
                     new BTreeMetadata(BTree
                             .getTransitionalRawStore(store), metadataId),
@@ -528,6 +569,10 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                     KeySerializer.INSTANCE,
                     ValueSerializer.INSTANCE
                     );
+            
+            // @todo store and recover the indexId from the metadata record.
+            this.indexId = 0;
+
         }
 
         public long insert(String s) {
@@ -537,6 +582,14 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             if( id == null ) {
                 
                 id = nextId++;
+                
+                if( indexId != 0 ) {
+                    
+                    id <<= 16;
+                    
+                    id |= indexId;
+                    
+                }
                 
                 insert(s,id);
                 
@@ -650,6 +703,221 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 
                 // NOP
                 
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * A persistent index for reversing long integer term identifiers to
+     * {@link String}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo This should be able to reverse kind of RDF {@link Value} for a
+     *       full-featured implementation.
+     */
+    public static class ReverseIndex extends BTree {
+
+        /**
+         * The next identifier to be assigned to a string inserted into this
+         * index.
+         * 
+         * @todo this needs to be (a) shared across all transactional instances
+         *       of this index; (b) restart safe; (c) set into a namespace that
+         *       is unique to the journal so that multiple writers on multiple
+         *       journals for a single distributed database can not collide;
+         *       and (d) set into a namespace that is unique to the 
+         */
+        protected long nextId = 1;
+        
+        /**
+         * Used as the value for an illegal key (0L).
+         */
+        private static transient final Long NULL = 0L;
+        
+        /**
+         * Create a new index.
+         * 
+         * @param store
+         *            The backing store.
+         */
+        public ReverseIndex(IRawStore store) {
+            super(store,
+                    ArrayType.LONG, // termId keys
+                    DEFAULT_BRANCHING_FACTOR,
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            DEFAULT_HARD_REF_QUEUE_SCAN),
+                    NULL, // NEGINF
+                    null, // comparator uses native comparison of long keys.
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
+        
+        /**
+         * Load an index from the store.
+         * 
+         * @param store
+         *            The backing store.
+         * @param metadataId
+         *            The metadata record identifier for the index.
+         */
+        public ReverseIndex(IRawStore store, long metadataId) {
+            super(  store,
+                    new BTreeMetadata(BTree
+                            .getTransitionalRawStore(store), metadataId),
+                    new HardReferenceQueue<PO>( new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY, DEFAULT_HARD_REF_QUEUE_SCAN),
+                    NULL, // NEGINF
+                    null, // comparator uses native comparison for long keys.
+                    KeySerializer.INSTANCE,
+                    ValueSerializer.INSTANCE
+                    );
+        }
+
+        public void add(Long id, String s) {
+            
+            String t = (String)lookup(id);
+            
+            if( t == null ) {
+                
+                super.insert(id,s);
+                
+            } else {
+
+                /*
+                 * Paranoia test will fail if the id has already been assigned
+                 * to another term. The most likley cause is a failure to keep
+                 * the various term indices (URIs, literals, typed literals, XML
+                 * literals, etc.) or segments of those indices in distinct
+                 * namespaces resulting in an identifier assignment collision.
+                 */
+                if( ! t.equals(s)) {
+                    
+                    throw new RuntimeException("insert(id=" + id + ", term="
+                            + s + "), but id already assigned to term=" + t);
+                    
+                }
+                
+            }
+            
+        }
+                
+        /**
+         * Key serializer.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class KeySerializer implements IKeySerializer {
+
+            static final IKeySerializer INSTANCE = new KeySerializer();
+
+            public ArrayType getKeyType() {
+                
+                return ArrayType.LONG;
+                
+            }
+
+            public void getKeys(DataInputStream is, Object keys, int nkeys) throws IOException {
+
+                long[] a = (long[])keys;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    a[i] = LongPacker.unpackLong(is);
+                    
+                }
+                
+            }
+
+            /**
+             * May overestimate since we pack values.
+             */
+            public int getSize(int n) {
+
+                return Bytes.SIZEOF_LONG * n;
+                
+            }
+
+            public void putKeys(DataOutputStream os, Object keys, int nkeys) throws IOException {
+
+                long[] a = (long[])keys;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    LongPacker.packLong(os,a[i]);
+                    
+                }
+
+            }
+            
+        }
+
+        /**
+         * Serializes the string value.
+         * 
+         * @todo handle all variations of an RDF {@link Value}. Certain types
+         *       should be kept in their own term:id indices, e.g., xml
+         *       literals, uris, plain literals, and anything else that either
+         *       does not form part of a total ordering over values or is very
+         *       large.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        public static class ValueSerializer implements IValueSerializer {
+
+            static final IValueSerializer INSTANCE = new ValueSerializer();
+            
+            public ArrayType getKeyType() {
+                
+                return ArrayType.OBJECT;
+                
+            }
+
+            /**
+             * FIXME There is no fixed upper limit for URLs or strings in general,
+             * therefore the btree may have to occasionally resize its buffer to
+             * accomodate very long variable length terms.
+             */
+            public int getSize(int n) {
+                
+                return 4096*n;
+                
+            }
+
+            public void getValues(DataInputStream is, Object[] vals, int n)
+                    throws IOException {
+
+                Object[] a = (Object[]) vals;
+
+                for (int i = 0; i < n; i++) {
+
+                    a[i] = is.readUTF();
+
+                }
+                
+            }
+
+            public void putValues(DataOutputStream os, Object[] vals, int n)
+                    throws IOException {
+
+                if (n == 0)
+                    return;
+
+                Object[] a = (Object[]) vals;
+
+                for (int i = 0; i < n; i++) {
+
+                    os.writeUTF((String) a[i]);
+
+                }
+
             }
             
         }
@@ -1171,6 +1439,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
          *       insert on terms, then create buffer of long[] for each
          *       statement based on the assigned termIds, sort the statement
          *       buffer, and do a batch insert on the statement index.
+         * 
+         * @todo optimize using long[] keys with stride of 3 (triple store) or 4
+         *       (quad store).
          */
         public void addStatement(Resource s, URI p, Value o ) {
 
@@ -1238,7 +1509,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                  * during insert and remove on a leaf, but less allocation.
                  * 
                  * @todo 1. String is char[] + String object.  1/2 the allocations
-                 * if we use char[] and handle the comparison functions outselves.
+                 * if we use char[] and handle the comparison functions ourselves.
                  * 
                  * @todo 2. key run length multiple for long[n] keys.  could also
                  * be used for fixed length char[] keys.  allows us to treat the
@@ -1257,7 +1528,15 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 _term.append(uri.getNamespace());
                 _term.append(uri.getLocalName());
                 
-                return ndx_uri.insert(_term.toString());
+                String term = _term.toString();
+                
+                // forward mapping assigns identifier.
+                long id = ndx_uri.insert(term);
+
+                // reverse mapping from identifier to term.
+                ndx_inv.add(id, term );
+
+                return id;
                 
             } else if( t instanceof Literal ) {
                 
@@ -1276,8 +1555,14 @@ public class TestTripleStore extends AbstractBTreeTestCase {
                 }
                 
                 String label = lit.getLabel();
+
+                // forward mapping assigns identifier.
+                long id = ndx_lit.insert(label);
                 
-                return ndx_lit.insert(label);
+                // reverse mapping from identifier to term.
+                ndx_inv.add(id, label);
+                
+                return id;
                 
             } else if( t instanceof BNode ) {
                 
@@ -1386,8 +1671,9 @@ public class TestTripleStore extends AbstractBTreeTestCase {
             journal = new Journal(properties);
 
             ndx_spo = new SPOIndex(journal);
-            ndx_uri = new StringIndex(journal);
-            ndx_lit = new StringIndex(journal);
+            ndx_uri = new StringIndex(journal,(short)1);
+            ndx_lit = new StringIndex(journal,(short)2);
+            ndx_inv = new ReverseIndex(journal);
             
         }
         
@@ -1395,6 +1681,7 @@ public class TestTripleStore extends AbstractBTreeTestCase {
         SPOIndex ndx_spo;
         StringIndex ndx_uri;
         StringIndex ndx_lit;
+        ReverseIndex ndx_inv;
 
         public void tearDown() {
 

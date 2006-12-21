@@ -1299,9 +1299,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
 
     /**
-     * Creates a sequence of distinct keys in random order and inserts them into
+     * Creates a sequence of dense keys in random order and inserts them into
      * the tree. Note that the split decision points are path dependent and can
      * not be predicated given random inserts.
+     * 
+     * Note: This test helper does NOT remove the keys afterways and is used by
+     * some tests that depend on that behavior.
      * 
      * @param m
      *            The branching factor.
@@ -1309,7 +1312,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param ninserts
      *            The #of keys to insert.
      */
-    public void doSplitWithRandomKeySequence(BTree btree,int m, int ninserts) {
+    public BTree doSplitWithRandomKeySequence(BTree btree,int m, int ninserts) {
 
         log.info("m="+m+", ninserts="+ninserts);
 
@@ -1363,6 +1366,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         log.info(btree.counters.toString());
 
+        return btree;
+        
     }
 
     private void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {

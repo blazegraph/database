@@ -198,5 +198,17 @@ public class TestIndexSegmentBuilderStatics extends AbstractBTreeTestCase {
                 (10 + 1) / 2, 1, 10));
         
     }
+
+    /**
+     * Test where the root leaf has fewer than (m+1)/2 entries.  The root is
+     * never under capacity, so this tests that the function to distribute the
+     * keys accepts a root leaf under these circumstances.
+     */
+    public void test_distributeKeys_rootUnderCapacity() {
+        
+        assertEquals(new int[] { 3 }, IndexSegmentBuilder.distributeKeys(10,
+                (10 + 1) / 2, 1, 3));
+        
+    }
     
 }

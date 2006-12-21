@@ -534,8 +534,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public void testStress() {
      
-        int ntrials = 10;
-        int nnodes = 100;
+        int ntrials = 20;
+        int nnodes = 1000;
         
         doStressTest( ntrials,nnodes);
         
@@ -601,8 +601,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
      */
     public static void main(String[] args) {
 
-        final int NTRIALS = 100;
-        final int NNODES = 1000;
+        final int NTRIALS = 1000;
+        final int NNODES = 10000;
 
         new TestNodeSerializer().doStressTest(NTRIALS, NNODES);
         

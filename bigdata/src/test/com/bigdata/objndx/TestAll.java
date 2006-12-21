@@ -97,6 +97,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentBuilderStatics.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
+        // stress test with larger random input trees and a variety of branching factors.
+        suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
         // @todo test compacting merge of two index segments.
         // @todo test compacting merge of N index segments?
         // @todo test SegmentedBTree (reads through to active index segments if miss on BTree in the journal).

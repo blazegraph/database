@@ -101,7 +101,8 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      * @param valSer
      * @throws IOException
      * 
-     * @todo explore good defaults for the hard reference queue.
+     * @todo explore good defaults for the hard reference queue. consider
+     *       splitting into a leafQueue and a nodeQueue.
      */
     public IndexSegment(FileStore fileStore,
             HardReferenceQueue<PO> hardReferenceQueue, Object NEGINF,
@@ -134,6 +135,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
     }
 
+    /**
+     * @todo move to parent class and have various methods test to validate that
+     *       the index is open (lookup, insert, remove, scan).
+     */
+    public void close() {
+        
+        fileStore.close();
+        
+    }
+    
     /**
      * The internal addresses for child nodes found in a node of the index
      * segment are relative to the start of the index nodes block in the file.
@@ -327,9 +338,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo make it optional to fully buffer the index nodes?
-     * @todo make it optional to fully buffer the entire file.
      */
     public static class FileStore implements IRawStore2 {
         
@@ -344,17 +352,17 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         /**
          * The file containing the index segment.
          */
-        final File file;
+        protected final File file;
 
         /**
          * The random access file used to read the index segment.
          */
-        final RandomAccessFile raf;
+        protected final RandomAccessFile raf;
 
         /**
          * A read-only view of the metadata record for the index segment.
          */
-        final IndexSegmentMetadata metadata;
+        protected final IndexSegmentMetadata metadata;
         
         /**
          * Used to decompress nodes and leaves as they are read.
@@ -364,6 +372,17 @@ public class IndexSegment extends AbstractBTree implements IBTree {
          */
         protected final RecordCompressor compressor = new RecordCompressor();
 
+        /**
+         * Open the read-only store.
+         * 
+         * @param file
+         * 
+         * @throws IOException
+         * 
+         * @todo make it optional to fully buffer the index nodes?
+         * @todo make it optional to fully buffer the entire file.
+         * @todo hide IOException?
+         */
         public FileStore(File file) throws IOException {
             
             if (file == null)
@@ -383,7 +402,9 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
             // read the metadata record from the file.
             this.metadata = new IndexSegmentMetadata(raf);
-            
+
+            log.info(metadata.toString());
+
             /*
              * Read the index nodes from the file into a buffer. If there are no
              * index nodes then we skip this step. Note that we always read in
@@ -393,7 +414,32 @@ public class IndexSegment extends AbstractBTree implements IBTree {
              */
             this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf) : null);
 
+            this.open = true;
+            
         }
+
+        /**
+         * Close the read-only store.
+         */
+        public void close() {
+            
+            if( !open ) throw new IllegalStateException();
+
+            try {
+
+                raf.close();
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
+            open = false;
+            
+        }
+        
+        private boolean open = false;
         
         public void delete(long addr) {
             throw new UnsupportedOperationException();
@@ -422,6 +468,8 @@ public class IndexSegment extends AbstractBTree implements IBTree {
          */
         public ByteBuffer read(long addr, ByteBuffer dst) {
 
+            if(!open) throw new IllegalStateException();
+            
 //          /*
 //          * The caller should always pass in [buf], but this is in keeping
 //          * with our API contract.
@@ -442,9 +490,10 @@ public class IndexSegment extends AbstractBTree implements IBTree {
                  */
 
                 // correct the offset so that it is relative to the buffer.
-                int off = (int)metadata.offsetNodes - offset;
+                int off = offset - (int)metadata.offsetNodes;
                 
                 // set the limit on the buffer to the end of the record.
+                System.err.println("offset="+offset+", length="+length);
                 buf_nodes.limit(off + length);
 
                 // set the position on the buffer to the start of the record.

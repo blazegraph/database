@@ -1134,7 +1134,7 @@ public class BTree extends AbstractBTree implements IBTree {
      */
     protected static class TransitionalRawStore implements IRawStore2 {
         
-        private final IRawStore delegate;
+        protected final IRawStore delegate;
         
         public TransitionalRawStore(IRawStore delegate) {
             

@@ -1,5 +1,11 @@
 package com.bigdata.objndx;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import org.CognitiveWeb.extser.LongPacker;
+
 /**
  * An address encodes both an int32 length and an int32 offset into a
  * single long integer. This limits the addressable size of a file to
@@ -94,5 +100,56 @@ final public class Addr {
 
     private static final transient long NBYTES_MASK = 0x00000000ffffffffL;
     private static final transient long OFFSET_MASK = 0xffffffff00000000L;
+ 
+    /**
+     * Breaks an {@link Addr} into its offset and size and packs each component
+     * separately. This provides much better packing then packing the entire
+     * {@link Addr} as a long integer since each component tends to be a small
+     * positive integer value.
+     * 
+     * @param os The output stream.
+     * 
+     * @param addr The {@link Addr}.
+     * 
+     * @throws IOException
+     */
+    public static void pack(DataOutputStream os,long addr) throws IOException {
+        
+        final int offset = Addr.getOffset(addr);
+        
+        final int nbytes = Addr.getByteCount(addr);
+        
+        LongPacker.packLong(os, offset);
+        
+        LongPacker.packLong(os, nbytes);
+        
+    }
     
+    /**
+     * Unpacks an {@link Addr}.
+     * 
+     * @param is The input stream.
+     * 
+     * @return The addr.
+     * 
+     * @throws IOException
+     */
+    public static long unpack(DataInputStream is) throws IOException {
+    
+        long v = LongPacker.unpackLong(is);
+        
+        assert v <= Integer.MAX_VALUE;
+        
+        final int offset = (int) v;
+
+        v = LongPacker.unpackLong(is);
+        
+        assert v <= Integer.MAX_VALUE;
+        
+        final int nbytes = (int) v;
+        
+        return Addr.toLong(nbytes, offset);
+        
+    }
+
 }

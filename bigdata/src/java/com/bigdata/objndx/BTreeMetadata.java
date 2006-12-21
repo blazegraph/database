@@ -133,10 +133,28 @@ public class BTreeMetadata {
         
         keyType = ArrayType.parseInt( buf.getInt() );
         
-        BTree.log.info("addrRoot=" + addrRoot + ", branchingFactor=" + branchingFactor
-                + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
-                + nleaves + ", nentries=" + nentries + ", keyType=" + keyType);
+        BTree.log.info(toString());
 
     }
 
+    /**
+     * A human readable representation of the metadata record.
+     */
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("addrRoot=" + Addr.toString(addrRoot));
+        sb.append(", branchingFactor=" + branchingFactor);
+        sb.append(", height=" + height);
+        sb.append(", nnodes=" + nnodes);
+        sb.append(", nleaves=" + nleaves);
+        sb.append(", nentries=" + nentries);
+        sb.append(", keyType=" + keyType);
+        sb.append(", addrMetadata=" + Addr.toString(addrMetadata));
+        
+        return sb.toString();
+        
+    }
+    
 }

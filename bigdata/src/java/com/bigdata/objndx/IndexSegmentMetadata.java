@@ -2,6 +2,7 @@ package com.bigdata.objndx;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Date;
 
 import com.bigdata.journal.Bytes;
 
@@ -310,6 +311,31 @@ public class IndexSegmentMetadata {
         
         raf.writeUTF(name);
         
+    }
+    
+    /**
+     * A human readable representation of the metadata record.
+     */
+    public String toString() {
+ 
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("magic="+Integer.toHexString(MAGIC));
+        sb.append(", branchingFactor="+branchingFactor);
+        sb.append(", height=" + height);
+        sb.append(", keyType=" + keyType);
+        sb.append(", nleaves=" + nleaves);
+        sb.append(", nnodes=" + nnodes);
+        sb.append(", nentries=" + nentries);
+        sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
+        sb.append(", offsetLeaves=" + offsetLeaves);
+        sb.append(", offsetNodes=" + offsetNodes);
+        sb.append(", addrRoot=" + Addr.toString(addrRoot));
+        sb.append(", length=" + length);
+        sb.append(", timestamp=" + new Date(timestamp));
+        sb.append(", name="+name);
+
+        return sb.toString();
     }
 
 }

@@ -473,7 +473,8 @@ public class NodeSerializer {
 
                 }
 
-                LongPacker.packLong(os, addr);
+                Addr.pack(os,addr);
+//                LongPacker.packLong(os, addr);
 //                os.writeLong(addr);
 
             }
@@ -613,7 +614,8 @@ public class NodeSerializer {
             for (int i = 0; i <= nkeys; i++) {
 
 //                final long addr = is.readLong();
-                final long addr = LongPacker.unpackLong(is);
+//                final long addr = LongPacker.unpackLong(is);
+                final long addr = Addr.unpack(is);
 
                 if (addr == 0L) {
 
@@ -889,5 +891,5 @@ public class NodeSerializer {
         }
 
     }
-
+    
 }
