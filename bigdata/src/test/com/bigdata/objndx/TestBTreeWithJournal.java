@@ -201,11 +201,11 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithRandomKeySequence( getBTree(m), m, m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m );
             
-            doSplitWithRandomKeySequence( getBTree(m), m, m*m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m );
 
             // This case overflows the default journal extent.
 //            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m );

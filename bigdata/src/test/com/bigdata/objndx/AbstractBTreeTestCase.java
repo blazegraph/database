@@ -1091,8 +1091,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The #of distinct key-value pairs to insert.
      * @param trace
      *            The trace level (zero disables most tracing).
+     * 
+     * @return The populated {@link BTree}.
      */
-    public void doInsertRandomSparseKeySequenceTest(int m, int ninserts, int trace) {
+    public BTree doInsertRandomSparseKeySequenceTest(int m, int ninserts, int trace) {
         
         /*
          * generate random keys.  the keys are a sparse monotonic sequence.
@@ -1115,13 +1117,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        doInsertRandomKeySequenceTest(m, keys, entries, trace);
+        return doInsertRandomKeySequenceTest(m, keys, entries, trace);
         
     }
 
     /**
-     * Insert key value pairs into the tree in a random order and verify
-     * the expected entry traversal afterwards.
+     * Insert key value pairs into the tree in a random order and verify the
+     * expected entry traversal afterwards.
      * 
      * @param m
      *            The branching factor. The tree.
@@ -1131,12 +1133,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The entries.
      * @param trace
      *            The trace level (zero disables most tracing).
+     * 
+     * @return The populated {@link BTree}.
      */
-    public void doInsertRandomKeySequenceTest(int m, int[] keys,
+    public BTree doInsertRandomKeySequenceTest(int m, int[] keys,
             SimpleEntry[] entries, int trace) {
 
-        doInsertKeySequenceTest(m, keys, entries, getRandomOrder(keys.length),
-                trace);
+        return doInsertKeySequenceTest(m, keys, entries,
+                getRandomOrder(keys.length), trace);
 
     }
 
@@ -1172,9 +1176,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     
     /**
      * Insert key value pairs into the tree in the specified order and verify
-     * the expected entry traversal afterwards.  If the test fails, then the
-     * details necessary to recreate the test (m, ninserts, and the order[])
-     * are printed out.
+     * the expected entry traversal afterwards. If the test fails, then the
+     * details necessary to recreate the test (m, ninserts, and the order[]) are
+     * printed out.
      * 
      * @param m
      *            The branching factor. The tree.
@@ -1186,8 +1190,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The order in which the key-entry pairs will be inserted.
      * @param trace
      *            The trace level (zero disables most tracing).
+     * 
+     * @return The populated {@link BTree}.
      */
-    public void doInsertKeySequenceTest(int m, int[] keys, SimpleEntry[] entries, int[] order, int trace){
+    protected BTree doInsertKeySequenceTest(int m, int[] keys, SimpleEntry[] entries, int[] order, int trace){
 
         try {
             
@@ -1268,6 +1274,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
              */
             assertSameIterator(entries, btree.getRoot().entryIterator());
 
+            return btree;
+            
         } catch (AssertionFailedError ex) {
             System.err.println("int m=" + m+";");
             System.err.println("int ninserts="+keys.length+";");
@@ -1303,16 +1311,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * the tree. Note that the split decision points are path dependent and can
      * not be predicated given random inserts.
      * 
-     * Note: This test helper does NOT remove the keys afterways and is used by
-     * some tests that depend on that behavior.
-     * 
      * @param m
      *            The branching factor.
      * 
      * @param ninserts
      *            The #of keys to insert.
      */
-    public BTree doSplitWithRandomKeySequence(BTree btree,int m, int ninserts) {
+    public BTree doSplitWithRandomDenseKeySequence(BTree btree,int m, int ninserts) {
 
         log.info("m="+m+", ninserts="+ninserts);
 
@@ -1370,7 +1375,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
 
-    private void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {
+    protected void doRandomKeyInsertTest(BTree btree, int[] keys, SimpleEntry[] entries, int[] order ) {
         
         log.info("m="+btree.getBranchingFactor()+", nkeys="+keys.length);
         

@@ -210,13 +210,13 @@ public class TestBTree extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doSplitWithRandomKeySequence( getBTree(m), m, m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m );
             
-            doSplitWithRandomKeySequence( getBTree(m), m, m*m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m );
 
-            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m );
+            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m*m );
 
         }
         

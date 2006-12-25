@@ -78,7 +78,7 @@ public class IndexSegmentMetadata {
      * The offset to the start of the serialized leaves in the file.
      * 
      * Note: This should be equal to {@link #SIZE} since the leaves are
-     * written immediately after the {@link IndexSegmentMetadata} record.
+     * written immediately after the {@link PartitionMetadata} record.
      */
     final public long offsetLeaves;
     

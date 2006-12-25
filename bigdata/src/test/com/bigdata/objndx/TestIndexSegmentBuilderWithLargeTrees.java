@@ -207,12 +207,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 //                // take the other parameters from the btree.
 //                btree.NEGINF, btree.comparator,
 //                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
-//        TestIndexSegmentBuilderStatics.assertEquals(10,seg.getBranchingFactor());
-//        TestIndexSegmentBuilderStatics.assertEquals(0,seg.getHeight());
-//        TestIndexSegmentBuilderStatics.assertEquals(ArrayType.INT,seg.getKeyType());
-//        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getLeafCount());
-//        TestIndexSegmentBuilderStatics.assertEquals(0,seg.getNodeCount());
-//        TestIndexSegmentBuilderStatics.assertEquals(3,seg.size());
+//        TestIndexSegmentPlan.assertEquals(10,seg.getBranchingFactor());
+//        TestIndexSegmentPlan.assertEquals(0,seg.getHeight());
+//        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+//        TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
+//        TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
+//        TestIndexSegmentPlan.assertEquals(3,seg.size());
 //        
 //        /*
 //         * Verify the total index order.
@@ -221,40 +221,71 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 //        
 //    }
 
-    /*
-     * @todo try large branching factors, but limit the total #of keys inserted
-     * or the running time will be too long (I am using an expontential #of keys
-     * by default).
+    /**
+     * Branching factors for the source btree that is then used to build an
+     * {@link IndexSegment}. This parameter indirectly determines both the #of
+     * leaves and the #of entries in the source btree.
      * 
-     * Note: For sequential keys, m=128 causes the journal to exceed its initial
-     * extent.
+     * Note: Regardless of the branching factor in the source btree, the same
+     * {@link IndexSegment} should be build for a given set of entries
+     * (key-value pairs) and a given output branching factor for the
+     * {@link IndexSegment}. However, input trees of different heights also
+     * stress different parts of the algorithm.
      */
-    final int[] branchingFactors = new int[]{3,4,5,10,20};//,64};//,128};//,512};
+    final int[] branchingFactors = new int[]{3,4,5,10,20,64,128};//,512};
     
     /**
-     * A stress test for random key insertion using a that runs with a variety
-     * of branching factors and #of keys to insert. This test does NOT remove
-     * the keys afterwards. Once a {@link BTree} has been built we use it to
-     * build an {@link IndexSegment} and then compare the two trees for the same
-     * total ordering.
+     * A stress test for building {@link IndexSegment}s. A variety of
+     * {@link BTree}s are built from dense random keys in [1:n] using a variety
+     * of branching factors. For each {@link BTree}, a variety of
+     * {@link IndexSegment}s are built using a variety of output branching
+     * factors. For each {@link IndexSegment}, we then compare it against its
+     * source {@link BTree} for the same total ordering.
      */
-    public void test_splitRootLeaf_randomKeySequence() throws IOException {
+    public void test_randomDenseKeys() throws IOException {
 
         for(int i=0; i<branchingFactors.length; i++) {
             
             int m = branchingFactors[i];
             
-            doBuildIndexSegmentAndCompare( doSplitWithRandomKeySequence( getBTree(m), m, m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m ) );
             
-            doBuildIndexSegmentAndCompare( doSplitWithRandomKeySequence( getBTree(m), m, m*m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m ) );
 
-            doBuildIndexSegmentAndCompare( doSplitWithRandomKeySequence( getBTree(m), m, m*m*m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m ) );
 
-            // @todo This case overflows the default journal extent so we need to increase the initial extent.
-            doBuildIndexSegmentAndCompare( doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m*m ) );
 
         }
         
+    }
+    
+    /**
+     * A stress test for building {@link IndexSegment}s. A variety of
+     * {@link BTree}s are built from spase random keys using a variety of
+     * branching factors. For each {@link BTree}, a variety of
+     * {@link IndexSegment}s are built using a variety of output branching
+     * factors. For each {@link IndexSegment}, we then compare it against its
+     * source {@link BTree} for the same total ordering.
+     */
+    public void test_randomSparseKeys() throws IOException {
+
+        int trace = 0;
+        
+        for(int i=0; i<branchingFactors.length; i++) {
+            
+            int m = branchingFactors[i];
+            
+            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m,trace));
+            
+            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m,trace) );
+
+            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m,trace) );
+
+            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m*m,trace) );
+
+        }
+    
     }
 
     /**

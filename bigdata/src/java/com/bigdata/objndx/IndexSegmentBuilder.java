@@ -62,12 +62,12 @@ import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 
 /**
- * Class supports a post-order construction of a "perfect" b+tree given sorted
- * records. There are two main use cases:
+ * Builds an {@link IndexSegment} given a source btree and a target branching
+ * factor. There are two main use cases:
  * <ol>
  * <li>Evicting a key range of an index into an optimized on-disk index. In
- * this case, the input is a btree that is ideally backed by a fully buffered
- * {@link IRawStore} so that no random reads are required.</li>
+ * this case, the input is a {@link BTree} that is ideally backed by a fully
+ * buffered {@link IRawStore} so that no random reads are required.</li>
  * <li>Merging index segments. In this case, the input is typically records
  * emerging from a merge-sort. There are two distinct cases here. In one, we
  * simply have raw records that are being merged into an index. This might occur
@@ -81,6 +81,13 @@ import com.bigdata.journal.Journal;
  * whose retention is no longer required by that policy to be dropped.</li>
  * </ol>
  * 
+ * Note: In order for the nodes to be written in a contiguous block we either
+ * have to buffer them in memory or have to write them onto a temporary file and
+ * then copy them into place after the last leaf has been processed. The code
+ * currently uses a temporary file for this purpose. This space demand was not
+ * present in West's algorithm because it did not attempt to place the leaves
+ * contiguously onto the store.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -93,14 +100,19 @@ import com.bigdata.journal.Journal;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
- * @todo Support each of the use cases, including external sorting.
+ * @todo Support merging index segments. This will probably be a merge sort
+ *       using two leaf scans in parallel followed by a scan over the merged
+ *       result that builds the index segment. The latter leaf scan will be
+ *       somewhat special but is required since we need to known the actual #of
+ *       entries before we can build the tree. Alternatively, we could just
+ *       compute the #of entries and then run two leaf scans merging as we build
+ *       the index segment itself.
  * 
- * FIXME Consider using {@link FileOutputStream#FileOutputStream(File, boolean)}
- * to open the temporary file in an append only mode and then get the
- * {@link FileChannel} from {@link FileOutputStream#getChannel()}. Does this
- * improve performance? Can we still read from the channel? Try this on the
- * {@link Journal} as well, at least for cases where we will never read from the
- * journal (i.e., fully buffered).
+ * @todo Support external sorting? This is tricky since the key and value data
+ *       type and comparator must have exactly the same semantics as in the
+ *       {@link IBTree} which is a bit much to expect from an external sort
+ *       routine. Also, since the data are pre-ordered a merging scan seems
+ *       likely to be far more efficient.
  */
 public class IndexSegmentBuilder {
 
@@ -111,29 +123,43 @@ public class IndexSegmentBuilder {
             .getLogger(IndexSegmentBuilder.class);
 
     /**
+     * The file mode used to open the file on which the {@link IndexSegment} is
+     * written.
+     * 
      * @todo consider the file mode and buffering. We should at least buffer
      *       several pages of data per write and can experiment with writing
      *       through (vs caching writes in the OS layer). The file does not need
      *       to be "live" until it is completely written, so there is no need to
      *       update file metadata until the end of the build process.
+     * 
+     * @todo Consider using
+     *       {@link FileOutputStream#FileOutputStream(File, boolean)} to open
+     *       the temporary file in an append only mode and then get the
+     *       {@link FileChannel} from {@link FileOutputStream#getChannel()}.
+     *       Does this improve performance? Can we still read from the channel?
+     *       Try this on the {@link Journal} as well, at least for cases where
+     *       we will never read from the journal (i.e., fully buffered).
      */
     final String mode = "rw"; // also rws or rwd
     
     /**
-     * The buffer used to serialize individual nodes and leaves before they
-     * are written onto the file.
+     * The buffer used to serialize individual nodes and leaves before they are
+     * written onto the file.
      * 
      * @todo The capacity of this buffer is a SWAG. It is too large for most
-     * purposes but it is unlikely to be too small for most purposes. If you
-     * see a buffer overflow exception then you may have extremely long keys
-     * and/or very large values. The BTree class has the same problem with
-     * the buffer that it uses to serialize nodes and leaves, but its nodes
-     * and leaves are smaller since it uses a smaller branching factor.
+     *       purposes but it is unlikely to be too small for most purposes. If
+     *       you see a buffer overflow exception then you may have extremely
+     *       long keys and/or very large values. The BTree class has the same
+     *       problem with the buffer that it uses to serialize nodes and leaves,
+     *       but its nodes and leaves are smaller since it uses a smaller
+     *       branching factor.
      */
     final ByteBuffer buf = ByteBuffer.allocateDirect(1*Bytes.megabyte32);
 
     /**
-     * Buffer for compressed records.  The capacity is a SWAG.
+     * Buffer for compressed records.
+     * 
+     * @todo The capacity of this buffer is a SWAG.
      */
     final ByteBuffer cbuf = ByteBuffer.allocateDirect(Bytes.megabyte32/2);
     
@@ -150,6 +176,33 @@ public class IndexSegmentBuilder {
      *       by subclassing or instance data.
      */
     final RecordCompressor compressor = new RecordCompressor();
+
+    /**
+     * The file specified by the caller on which the {@link IndexSegment} is
+     * written.
+     */
+    protected final File outFile;
+    
+    /**
+     * The temporary created to hold nodes unless the index segment will consist
+     * of just a root leaf. When created, this file is deleted regardless of the
+     * outcome of the operation.
+     */
+    protected final File tmpFile;
+    
+    /**
+     * The file on which the {@link IndexSegment} is written. The file is closed
+     * regardless of the outcome of the operation.
+     */
+    protected RandomAccessFile out = null;
+
+    /**
+     * The temporary file on which the nodes destined for {@link IndexSegment}
+     * will be written. The file is opened iff there are non-leaf nodes in the
+     * index segment. The file is closed regardless of the outcome of the
+     * operation.
+     */
+    protected RandomAccessFile tmp = null;
     
     /**
      * The data type used for the keys in the btree.
@@ -161,40 +214,6 @@ public class IndexSegmentBuilder {
      */
     final NodeSerializer nodeSer;
     
-    /**
-     * The minimum #of values that may be placed into non-root leaf (and
-     * also the minimum #of children that may be placed into a non-root
-     * node). (the minimum capacity).
-     */
-    final int m2; 
-    
-    /**
-     * The #of entries in the btree.
-     */
-    final int nentries;
-    
-    /**
-     * The #of leaves that will exist in the output tree. When nleaves == 1
-     * the output tree will consist of a root leaf. In this case we do not
-     * open a temporary file for the nodes since there will not be any.
-     */
-    final int nleaves; 
-    
-    /**
-     * The height of the output tree. This is used to maintain a stack of
-     * the nodes that we are creating as we build the leaves under those
-     * nodes. The space requirement is only height nodes and one leaf.
-     * 
-     * Note: In order for the nodes to be written in a contiguous block we
-     * either have to buffer them in memory or have to write them onto a
-     * temporary file and then copy them into place after the last leaf has
-     * been processed. The code currently uses a temporary file for this
-     * purpose. This space demand was not present in West's algorithm
-     * because it did not attempt to place the leafs contiguously onto the
-     * store.
-     */
-    final int height;
-
     /**
      * The offset in the output file of the last leaf written onto that file.
      * Together with {@link #lastLeafSize} this is used to compute the
@@ -213,7 +232,7 @@ public class IndexSegmentBuilder {
 
     /**
      * Tracks the maximum length of any serialized node or leaf.  This is used
-     * to fill in one of the {@link IndexSegmentMetadata} fields.
+     * to fill in one of the {@link PartitionMetadata} fields.
      */
     int maxNodeOrLeafLength = 0;
 
@@ -227,6 +246,26 @@ public class IndexSegmentBuilder {
      * The #of leaves written for the output tree.
      */
     int nleavesWritten = 0;
+
+    /**
+     * The stack of nodes that are currently being populated. This array is
+     * allocated iff height>0. The nodes in this array are reused rather than
+     * being reallocated.
+     */
+    final SimpleNodeData[] nodes;
+    
+    /**
+     * The current leaf that is being populated from the source btree. This leaf
+     * is reused for each output leaf rather than being reallocated.  In the
+     * degenerate case when the output btree is a single root leaf then this
+     * will be that leaf and {@link #nodes} will be [null].
+     */
+    final SimpleLeafData leaf;
+
+    /**
+     * The plan for building the B+-Tree.
+     */
+    final IndexSegmentPlan plan;
     
     /**
      * <p>
@@ -255,7 +294,7 @@ public class IndexSegmentBuilder {
      * index nodes. While the size of a serialized node can be estimated easily,
      * the size of a serialized leaf depends on the kinds of values stored in
      * that index. The actual sizes are recorded in the
-     * {@link IndexSegmentMetadata} record in the header of the
+     * {@link PartitionMetadata} record in the header of the
      * {@link IndexSegment}.
      * </p>
      * 
@@ -289,41 +328,58 @@ public class IndexSegmentBuilder {
         
         // Used to serialize the nodes and leaves for the output tree.
         nodeSer = btree.nodeSer;
-        
-        // The minimum capacity of a leaf (or a node).
-        m2 = (m+1)/2; 
-        
-        // The #of entries in the btree.
-        nentries = btree.size();
-        assert nentries>0;
-        
-        // The #of leaves in the output tree.
-        nleaves = (int)Math.ceil((double)nentries / (double)m); 
-        
-        // The height of the output tree.
-        height = getMinimumHeight(m,nleaves);
 
-        log.info("branchingFactor="+m+", nentries="+nentries+", nleaves="+nleaves+", height="+height);
+        /*
+         * Create a plan for generating the output tree.
+         */
+        plan = new IndexSegmentPlan(m,btree.size());
+
+        /*
+         * Setup a stack of nodes (one per non-leaf level) and one leaf. These
+         * are filled based on the plan and the entries visited in the source
+         * btree.
+         */
+        if(plan.height == 0 ) {
+
+            nodes = null;
+            
+        } else {
+            
+            nodes = new SimpleNodeData[plan.height];
+
+            for (int i = plan.height - 1; i >= 0; i--) {
+
+                /*
+                 * Allocate a single node that we will reuse for each node
+                 * populated at this level of the output tree.
+                 */
+
+                nodes[i] = new SimpleNodeData(m, keyType);
+                
+            }
+            
+        }
         
-        // The #of entries to place into each leaf.
-        final int[] n = distributeKeys(m,m2,nleaves,nentries);
-        
+        // the output leaf (reused for each leaf we populate).
+        leaf = new SimpleLeafData(m,keyType);
+
         /*
          * setup for IO.
          */
 
+        this.outFile = outFile;
+        
         if (outFile.exists()) {
             throw new IllegalArgumentException("File exists: "
                     + outFile.getAbsoluteFile());
         }
 
         // the temporary file is used iff there are nodes to write.
-        final File tmpFile = (nleaves > 1 ? File.createTempFile("index",
-                ".seg", tmpDir) : null);
+        tmpFile = (plan.nleaves > 1 ? File.createTempFile("index", ".seg",
+                tmpDir) : null);
 
-        RandomAccessFile out = null;
-
-        RandomAccessFile tmp = null;
+        final FileChannel outChannel;
+        final FileChannel tmpChannel;
         
         try {
 
@@ -333,7 +389,7 @@ public class IndexSegmentBuilder {
             
             out = new RandomAccessFile(outFile, mode);
             
-            final FileChannel outChannel = out.getChannel();
+            outChannel = out.getChannel();
             
             if (outChannel.tryLock() == null) {
                 
@@ -348,8 +404,6 @@ public class IndexSegmentBuilder {
              * tree will consist of more than just a root leaf.
              */
 
-            final FileChannel tmpChannel;
-            
             if (tmpFile != null) {
 
                 tmp = new RandomAccessFile(tmpFile, mode);
@@ -419,17 +473,6 @@ public class IndexSegmentBuilder {
              * Note that the root may be a leaf as a degenerate case.
              */
 
-            // stack of current output nodes.
-            final SimpleNodeData[] nodes = (height == 0 ? null
-                    : new SimpleNodeData[height]);
-            
-            for( int i=0; i<height; i++ ) {
-                nodes[i] = new SimpleNodeData(m,keyType);
-            }
-            
-            // current output leaf.
-            final SimpleLeafData leaf = new SimpleLeafData(m,keyType);
-
             // visit leaves in order in the source tree.
             Iterator sourceLeaves = btree.leafIterator();
 
@@ -444,7 +487,7 @@ public class IndexSegmentBuilder {
             
             int nsourceKeys = sourceLeaf.getKeyCount();
             
-            for (int i = 0; i < nleaves; i++) {
+            for (int i = 0; i < plan.nleaves; i++) {
 
                 /*
                  * Fill in defined keys and values for this leaf.
@@ -458,7 +501,7 @@ public class IndexSegmentBuilder {
 
                 leaf.nkeys = 0;
 
-                final int limit = n[i]; // #of keys to fill in this leaf.
+                final int limit = plan.numInLeaf[i]; // #of keys to fill in this leaf.
                 
                 for (int j = 0; j < limit; j++) {
 
@@ -480,7 +523,7 @@ public class IndexSegmentBuilder {
                     
                     nconsumed++;
 
-                    if( j == 0 && height>0 ) {
+                    if( j == 0 && plan.height>0 ) {
 
                         /*
                          * This is a new leaf. The first child on the parent
@@ -489,7 +532,7 @@ public class IndexSegmentBuilder {
                          * the first key on the new leaf as the separatorKey on
                          * the parent node.
                          */
-                        SimpleNodeData node = nodes[height-1];
+                        SimpleNodeData node = nodes[plan.height-1];
                         
                         if(node.nchildren>0) {
 
@@ -502,12 +545,12 @@ public class IndexSegmentBuilder {
                 }
                 
                 // write the leaf onto the output channel.
-                long addr = writeLeaf(outChannel,leaf);
+                long addr = writeLeaf(leaf);
                 
-                if( height>0 ) {
+                if( plan.height>0 ) {
 
                     // write the address of the child on the parent node.
-                    SimpleNodeData node = nodes[height-1];
+                    SimpleNodeData node = nodes[plan.height-1];
                     
                     /*
                      * Prepare to receive the next node's data on this
@@ -527,9 +570,9 @@ public class IndexSegmentBuilder {
                         
                         // verify not under capacity (root is exempt).
                         
-                        boolean isRoot = height == 1;
+                        boolean isRoot = plan.height == 1;
                         
-                        assert isRoot || node.nkeys >= m2;
+                        assert isRoot || node.nkeys >= plan.m2;
                         
                         /*
                          * @todo this needs to get written onto the node's
@@ -537,7 +580,7 @@ public class IndexSegmentBuilder {
                          * (from the next leaf).
                          */
 
-                        long addrParent = writeNode(tmpChannel,node);
+                        long addrParent = writeNode(node);
                         
                     }
                     
@@ -546,7 +589,7 @@ public class IndexSegmentBuilder {
             }
 
             // Verify that all leaves were written out.
-            assert nleaves == nleavesWritten;
+            assert plan.nleaves == nleavesWritten;
             
             /*
              * Flush out any unwritten nodes.
@@ -560,7 +603,7 @@ public class IndexSegmentBuilder {
              * nkeys <= m
              */
             
-            for (int h = height-1; h >= 0; h--) {
+            for (int h = plan.height-1; h >= 0; h--) {
                 
                 SimpleNodeData node = nodes[h];
                 
@@ -571,14 +614,14 @@ public class IndexSegmentBuilder {
                     
                     // verify not under capacity (root is exempt).
                     if(h>0) {
-                        assert node.nkeys >= m2;
+                        assert node.nkeys >= plan.m2;
                     }
 
                     /*
                      * @todo this needs to get written into the parent (if any)
                      * of this node.
                      */
-                    long addrNode = writeNode(tmpChannel, node);
+                    long addrNode = writeNode(node);
                     
                 }
                 
@@ -635,7 +678,7 @@ public class IndexSegmentBuilder {
                 // Close the temporary file - also releases the lock.
                 tmp.close();
                 
-                tmp = null;
+//                tmp = null;
 
                 /*
                  * The addrRoot is computed from the offset on the tmp channel
@@ -679,9 +722,10 @@ public class IndexSegmentBuilder {
                 
                 outChannel.position(0);
                 
-                IndexSegmentMetadata md = new IndexSegmentMetadata(m, height, keyType, nleaves,
-                        nnodesWritten, nentries, maxNodeOrLeafLength,
-                        offsetLeaves, offsetNodes, addrRoot, out.length(), now,
+                IndexSegmentMetadata md = new IndexSegmentMetadata(m,
+                        plan.height, keyType, plan.nleaves, nnodesWritten,
+                        plan.nentries, maxNodeOrLeafLength, offsetLeaves,
+                        offsetNodes, addrRoot, out.length(), now,
                         name);
                 
                 md.write(out);
@@ -691,13 +735,13 @@ public class IndexSegmentBuilder {
             }
                         
             /*
-             * Flush this channel to disk, close the channel, and clear the
-             * reference. This also releases our lock. We are done and the index
-             * segment is ready for use.
+             * Flush this channel to disk and close the channel. This also
+             * releases our lock. We are done and the index segment is ready for
+             * use.
              */
             outChannel.force(true);
             out.close(); // also releases the lock.
-            out = null;
+//            out = null;
 
             /*
              * log run time.
@@ -708,9 +752,9 @@ public class IndexSegmentBuilder {
             
             final long elapsed = System.currentTimeMillis() - begin;
             
-            log.info("finished: elapsed=" + elapsed + "ms, nentries=" + nentries
-                    + ", branchingFactor=" + m + ", nnodes=" + nnodesWritten
-                    + ", nleaves=" + nleavesWritten);
+            log.info("finished: elapsed=" + elapsed + "ms, nentries="
+                    + plan.nentries + ", branchingFactor=" + m + ", nnodes="
+                    + nnodesWritten + ", nleaves=" + nleavesWritten);
 
         } catch (Throwable ex) {
 
@@ -718,7 +762,7 @@ public class IndexSegmentBuilder {
              * make sure that the output file is deleted unless it was
              * successfully processed.
              */
-            if (out != null) {
+            if (out != null && out.getChannel().isOpen()) {
                 try {
                     out.close();
                 } catch (Throwable t) {
@@ -734,9 +778,11 @@ public class IndexSegmentBuilder {
             /*
              * make sure that the temporary file gets deleted regardless.
              */
-            if (tmp != null) {
-                try {tmp.close();}
-                catch (Throwable t) {}
+            if (tmp != null && tmp.getChannel().isOpen()) {
+                try {
+                    tmp.close();
+                } catch (Throwable t) {
+                }
             }
             if (tmpFile != null) {
                 if(!tmpFile.delete()) {
@@ -792,9 +838,70 @@ public class IndexSegmentBuilder {
         return cbuf;
 
     }
+
+    /**
+     * Close out a node or leaf. When a node or leaf is closed we write it out
+     * to obtain its {@link Addr} and set its address on its direct parent using
+     * {@link #addChild(com.bigdata.objndx.IndexSegmentBuilder.SimpleNodeData, long)}.
+     * 
+     */
+    protected void close(AbstractSimpleNodeData node) throws IOException {
+
+//        FileChannel outChannel, tmpChannel;
+//        SimpleNodeData parent;
+
+        long addr = writeNodeOrLeaf(node);
+
+        //FIXME get the parent of the node from the stack.
+        SimpleNodeData parent = null;
+        
+        addChild(parent, addr);
+
+    }
+
+    /**
+     * Record the persistent {@link Addr address} of a child on its parent.
+     * 
+     * @param parent
+     *            The parent.
+     * @param childAddr
+     *            The address of the child (node or leaf).
+     *            
+     * @throws IOException
+     */
+    protected void addChild(SimpleNodeData parent,long childAddr) throws IOException {
+
+        assert parent.nchildren < parent.maxChildren;
+
+        parent.childAddr[parent.nchildren++] = childAddr;
+        
+        if( parent.nchildren == parent.maxChildren ) {
+            
+            close(parent);
+            
+        }
+        
+    }
     
     /**
-     * Serialize, compress, and write the leaf onto the output channel.
+     * Serialize, compress, and write the node or leaf onto the appropriate
+     * output channel.
+     * 
+     * @return The {@link Addr} that may be used to read the compressed node or
+     *         leaf from the file. Note that the address of a node is relative
+     *         to the start of the node channel and therefore must be adjusted
+     *         before reading the node from the final index segment file.
+     */
+    protected long writeNodeOrLeaf(AbstractSimpleNodeData node)
+            throws IOException {
+
+        return node.isLeaf() ? writeLeaf((SimpleLeafData) node)
+                : writeNode((SimpleNodeData) node);
+        
+    }
+
+    /**
+     * Serialize, compress, and write the leaf onto the leaf output channel.
      * 
      * @return The {@link Addr} that may be used to read the compressed leaf
      *         from the file.
@@ -809,10 +916,12 @@ public class IndexSegmentBuilder {
      *       the leaf after it has been compressed. Review
      *       {@link NodeSerializer} with regard to this issue again.
      */
-    protected long writeLeaf(FileChannel outChannel,final SimpleLeafData leaf)
+    protected long writeLeaf(final SimpleLeafData leaf)
         throws IOException
     {
 
+        FileChannel outChannel = out.getChannel();
+        
         // serialize and compress onto [cbuf].
         serializeAndCompress( leaf );
 
@@ -857,7 +966,7 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Serialize, compress, and write the node onto the output channel.
+     * Serialize, compress, and write the node onto the node output channel.
      * 
      * @return An <em>relative</em> {@link Addr} that must be correctly
      *         decoded before you can read the compressed node from the file.
@@ -865,9 +974,11 @@ public class IndexSegmentBuilder {
      * 
      * @see SimpleNodeData, which describes the decoding required.
      */
-    protected long writeNode(FileChannel tmpChannel,final SimpleNodeData node)
+    protected long writeNode(final SimpleNodeData node)
         throws IOException
     {
+
+        FileChannel tmpChannel = tmp.getChannel();
 
         // serialize and compress onto [cbuf].
         serializeAndCompress( node );
@@ -1081,6 +1192,16 @@ public class IndexSegmentBuilder {
          */
         int nchildren = 0;
         
+        /**
+         * We precompute the #of children to be assigned to each node and store
+         * that value in this field for convenience. While the field name is
+         * "max", this is the exact #of children that will be assigned to the
+         * node.
+         * 
+         * FIXME Compute maxChildren for non-leaf nodes.
+         */
+        int maxChildren = -1;
+        
         boolean written = false;
         
         public SimpleNodeData(int m,ArrayType keyType) {
@@ -1120,284 +1241,4 @@ public class IndexSegmentBuilder {
         
     }
     
-    /**
-     * Chooses the minimum height for a tree having a specified branching factor
-     * and a specified #of leaves.
-     * 
-     * @param m
-     *            The branching factor.
-     * @param nleaves
-     *            The #of leaves that must be addressable by the tree.
-     */
-    public static int getMinimumHeight(int m, int nleaves) {
-        
-        final int maxHeight = 10;
-        
-        for (int h = 0; h <= maxHeight; h++) {
-        
-            /*
-             * The maximum #of leaves addressable by a tree of height h and the
-             * given branching factor.
-             * 
-             * Note: Java guarentees that Math.pow(int,int) produces the exact
-             * result iff that result can be represented as an integer. This
-             * useful feature lets us avoid having to deal with precision issues
-             * or write our own integer version of pow (computing m*m h times).
-             */
-            final double d = (double)Math.pow(m,h);
-            
-            if( d >= nleaves ) {
-            
-                /*
-                 * h is the smallest height tree of the specified branching
-                 * factor m capable of addressing the specified #of leaves.
-                 */
-                return h;
-                
-            }
-            
-        }
-        
-        throw new UnsupportedOperationException(
-                "Can not build a tree for that many leaves: m=" + m
-                        + ", nleaves=" + nleaves + ", maxHeight=" + maxHeight);
-    }
-
-    /**
-     * We want to fill up every leaf, but we have to make sure that the last
-     * leaf is not under capacity. To that end, we calculate the #of entries
-     * that would remain if we filled up n-1 leaves completely. If the #of
-     * remaining entries is less than or equal to the minimum capacity of a
-     * leaf, then we have to adjust the allocation of entries such that the last
-     * leaf is at its minimum capacity. This is done by computing the shortage
-     * and then distributing that shortage among the leaves. Once we have
-     * deferred enough entries we are guarenteed that the final leaf will not be
-     * under capacity.
-     * 
-     * @param m
-     *            The branching factor in the output tree.
-     * @param m2
-     *            The minimum capacity for a leaf in the output tree, which is
-     *            computed as (m+1)/2.
-     * @param nleaves
-     *            The #of leaves in the output tree.
-     * @param nentries
-     *            The #of entries to be inserted into the output tree.
-     * 
-     * @return An array indicating how many entries should be inserted into each
-     *         leaf of the output tree. The array index is the leaf order
-     *         (origin zero). The value is the capacity to which that leaf
-     *         should be filled.
-     * 
-     * @todo is it possible to have a shortage in an ancestor node if no leaf
-     *       underflows? do we need to perform a similar calculation for nodes
-     *       or does that work out naturally from the dynamics of evicting
-     *       leaves that have reached the capacity decided on by this routine?
-     */
-    public static int[] distributeKeys(int m, int m2, int nleaves, int nentries) {
-
-        assert m>=BTree.MIN_BRANCHING_FACTOR;
-        assert m2>=(m+1)/2;
-        assert m2 <= m;
-        assert nleaves>0;
-        assert nentries>0;
-        
-        if( nleaves == 1) {
-            
-            /*
-             * If there is just a root leaf then any number (up to the leafs
-             * capacity) will fit into that root leaf.
-             */
-            
-            assert nentries <= m;
-            
-            return new int[]{nentries};
-            
-        }
-            
-        final int[] n = new int[nleaves];
-
-        /*
-         * Default each leaf to m entries.
-         */
-        for (int i = 0; i < nleaves; i++) {
-            
-            n[i] = m;
-            
-        }
-
-        /*
-         * The #of entries that would be allocated to the last leaf if we filled
-         * each proceeding leaf to capacity.
-         */
-        int remaining = nentries - ((nleaves - 1) * m);
-
-        /*
-         * If the #of entries remainin would put the leaf under capacity then we
-         * compute the shortage. We need to defer this many entries from the
-         * previous leaves in order to have the last leaf reach its minimum
-         * capacity.
-         */
-        int shortage = remaining < m2 ? m2 - remaining : 0;
-
-        if( remaining < m2 ) {
-
-            // the last leaf will be at minimum capacity.
-            n[nleaves - 1] = m2;
-            
-        } else {
-
-            // the remainder will go into the last leaf without underflow.
-            n[nleaves - 1] = remaining;
-            
-        }
-
-        /*
-         * If the shortage is greater than the #of previous leaves, then we need
-         * to short some leaves by more than one entry. This scenario can be
-         * observed when building a tree with m := 9 and 10 entries. In that
-         * case there are only two leaves and we wind up shorting the previous
-         * leaf by 4 bringing both leaves down to their minimum capacity of 5.
-         */
-        if (shortage > 0) {
-            
-            while (shortage > 0) {
-
-                for (int i = nleaves - 2; i >= 0 && shortage > 0; i--) {
-
-                    n[i]--;
-
-                    shortage--;
-
-                }
-                
-            }
-            
-        }
-
-        return n;
-        
-    }
-    
-// /**
-// * Choose the height and branching factor (aka order) of the generated tree.
-// * This choice is made by choosing a height and order for the tree such
-//     * that:
-//     * 
-//     * <pre>
-//     *   2(d + 1)&circ;(h-l) - 1 &lt;= N &lt;= (2d + 1)&circ;h - l
-//     * </pre>
-//     * 
-//     * where
-//     * <ul>
-//     * <li>d := the minimum #of keys in a node of the generated tree (m/2).</li>
-//     * <li>h := the height of the generated tree (origin one (1)).</li>
-//     * <li>N := the #of entries (rows of data)</li>
-//     * </ul>
-//     * 
-//     * This can be restated as:
-//     * 
-//     * <pre>
-//     *  
-//     *   2(m/2 + 1)&circ;h - 1 &lt;= N &lt;= (m + 1)&circ;(h+1) - l
-//     * </pre>
-//     * 
-//     * where
-//     * <ul>
-//     * <li>m := the branching factor of the generated tree.</li>
-//     * <li>h := the height of the generated tree (origin zero(0)).</li>
-//     * <li>N := the #of entries (rows of data)</li>
-//     * </ul>
-//     * 
-//     * @todo The #of entries to be placed into the generated perfect index must
-//     *       be unchanging during this process. This suggests that it is best to
-//     *       freeze the journal, opening a new journal for continued writes, and
-//     *       then evict all index ranges in the frozen journal into perfect
-//     *       indices.
-//     * 
-//     * @todo Note that this routine is limited to an index subrange with no more
-//     *       entries than can be represented in an int32 signed value.
-//     */
-//    protected void phase1(int nentries) {
-//
-//        /*
-//         * @todo solve for the desired height, where h is the #of non-leaf nodes
-//         * and is zero (0) if the tree consists of only a root leaf.  We want to
-//         * minimize the height as long as the node/leaf size is not too great.
-//         */
-//        int h = 0;
-//        
-//        /*
-//         * @todo solve for the desired branching factor (#of children for a node
-//         * or the #of values for a leaf. The #of keys for a node is m-1. The
-//         * branching factor has to be bounded since there is some branching
-//         * factor at which any btree fits into the root leaf. Therefore an
-//         * allowable upper range for m should be an input, e.g., m = 4096. This
-//         * can be choosen with an eye to the size of a leaf on the disk since we
-//         * plan to have the index nodes in memory but to read the leaves from
-//         * disk. Since the size of a leaf varies by the key and value types this
-//         * can either be a SWAG, e.g., 1024 or 4096, or it can be computed based
-//         * on the actual average size of the leaves as written onto the store.
-//         * 
-//         * Note that leaves in the journal index ranges will typically be much
-//         * smaller since the journal uses smaller branching factors to minimize
-//         * the cost of insert and delete operations on an index.
-//         * 
-//         * In order to minimize IO we probably want to write the leaves onto the
-//         * output file as we go (blocking them in a page buffer of at least 32K)
-//         * and generate the index nodes in a big old buffer (since we do not
-//         * know their serialized size in advance) and then write them out all at
-//         * once.
-//         */
-//        int m = 4;
-//        
-//        /*
-//         * The minimum #of entries that will fit in a btree given (m,h).
-//         */
-//        int min = (int) Math.pow(m+1, h)-1;
-//        
-//        /*
-//         * The maximum #of entries that will fit in a btree given (m,h).
-//         */
-//        int max = (int) Math.pow(m, h+1);
-//        
-//        if( min <= nentries && nentries<= max ) {
-//            
-//            /*
-//             * A btree may be constructed for this many entries with height := h
-//             * and branching factor := m. There will be many such solutions and
-//             * one needs to be choosen before building the tree.
-//             * 
-//             * To build the tree with the fewest possible nodes, select the
-//             * combination of (m,h) with the smallest value of h. This is what
-//             * we are looking for since there will be no further inserted into
-//             * the generated index (it is read-only for our purposes). Other
-//             * applications might want to "dial-in" some sparseness to the index
-//             * by choosing a larger value of h so that more inserts could be
-//             * absorbed without causing nodes split.  This is not an issue for
-//             * us since we never insert into the generated index file.
-//             */
-//            
-//        }
-//
-//        /*
-//         * compute per-level values given (h,m).
-//         * 
-//         * Note: our h is h-1 for West (we count the root as h == 0 and West
-//         * counts it as h == 1).  While West defines the height in terms of
-//         * the #of nodes in a path to a leaf from the root, West is working
-//         * with a b-tree and there is no distinction between nodes and leaves.
-//         */
-//        int r[] = new int[h-1];
-//        int n[] = new int[h-1];
-//        
-//    }
-//
-//    /**
-//     *
-//     */
-//    protected void phase2() {
-//
-//    }
-
 }

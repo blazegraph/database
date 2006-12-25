@@ -56,11 +56,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SlotMath;
-import com.bigdata.objndx.BTree.NodeFactory;
+import com.bigdata.objndx.IndexSegment.FileStore;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -347,9 +344,13 @@ abstract public class AbstractBTree implements IBTree {
     }
 
     /**
-     * The height of the btree. The height is the #of leaves minus one. A
-     * btree with only a root leaf is said to have <code>height := 0</code>.
-     * Note that the height only changes when we split the root node.
+     * The height of the btree. The height is the #of levels minus one. A btree
+     * with only a root leaf has <code>height := 0</code>. A btree with a
+     * root node and one level of leaves under it has <code>height := 1</code>.
+     * Note that all leaves of a btree are at the same height (this is what is
+     * means for the btree to be "balanced"). Also note that the height only
+     * changes when we split or join the root node (a btree maintains balance by
+     * growing and shrinking in levels from the top rather than the leaves).
      */
     abstract public int getHeight();
     

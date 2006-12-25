@@ -109,12 +109,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 // take the other parameters from the btree.
                 btree.NEGINF, btree.comparator,
                 btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
-        TestIndexSegmentBuilderStatics.assertEquals(3,seg.getBranchingFactor());
-        TestIndexSegmentBuilderStatics.assertEquals(2,seg.getHeight());
-        TestIndexSegmentBuilderStatics.assertEquals(ArrayType.INT,seg.getKeyType());
-        TestIndexSegmentBuilderStatics.assertEquals(4,seg.getLeafCount());
-        TestIndexSegmentBuilderStatics.assertEquals(3,seg.getNodeCount());
-        TestIndexSegmentBuilderStatics.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
+        TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
+        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+        TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
+        TestIndexSegmentPlan.assertEquals(3,seg.getNodeCount());
+        TestIndexSegmentPlan.assertEquals(10,seg.size());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -156,12 +156,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 btree.NEGINF, btree.comparator,
                 btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
                 );
-        TestIndexSegmentBuilderStatics.assertEquals(9,seg.getBranchingFactor());
-        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getHeight());
-        TestIndexSegmentBuilderStatics.assertEquals(ArrayType.INT,seg.getKeyType());
-        TestIndexSegmentBuilderStatics.assertEquals(2,seg.getLeafCount());
-        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentBuilderStatics.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(9,seg.getBranchingFactor());
+        TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
+        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+        TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
+        TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
+        TestIndexSegmentPlan.assertEquals(10,seg.size());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -200,12 +200,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 btree.NEGINF, btree.comparator,
                 btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
                 );
-        TestIndexSegmentBuilderStatics.assertEquals(10,seg.getBranchingFactor());
-        TestIndexSegmentBuilderStatics.assertEquals(0,seg.getHeight());
-        TestIndexSegmentBuilderStatics.assertEquals(ArrayType.INT,seg.getKeyType());
-        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getLeafCount());
-        TestIndexSegmentBuilderStatics.assertEquals(0,seg.getNodeCount());
-        TestIndexSegmentBuilderStatics.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(10,seg.getBranchingFactor());
+        TestIndexSegmentPlan.assertEquals(0,seg.getHeight());
+        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+        TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
+        TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
+        TestIndexSegmentPlan.assertEquals(10,seg.size());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -274,12 +274,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 btree.NEGINF, btree.comparator,
                 btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
                 );
-        TestIndexSegmentBuilderStatics.assertEquals(3,seg.getBranchingFactor());
-        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getHeight());
-        TestIndexSegmentBuilderStatics.assertEquals(ArrayType.INT,seg.getKeyType());
-        TestIndexSegmentBuilderStatics.assertEquals(3,seg.getLeafCount());
-        TestIndexSegmentBuilderStatics.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentBuilderStatics.assertEquals(9,seg.size());
+        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
+        TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
+        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+        TestIndexSegmentPlan.assertEquals(3,seg.getLeafCount());
+        TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
+        TestIndexSegmentPlan.assertEquals(9,seg.size());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -292,4 +292,80 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
     }
 
+    /*
+     * problem3
+     */
+
+    /**
+     * Create, populate, and return a btree with a branching factor of (3) and
+     * 20 sequential keys [1:20]. The resulting tree has a height of (3). The
+     * values are {@link SimpleEntry} objects whose state is the same as the
+     * corresponding key.
+     * 
+     * @return The btree.
+     * 
+     * @see src/architecture/btree.xls, which details this input tree and a
+     *      series of output trees with various branching factors.
+     */
+    public BTree getProblem3() {
+
+        BTree btree = getBTree(3);
+
+        for (int i = 1; i <= 20; i++) {
+
+            btree.insert(i, new SimpleEntry(i));
+
+        }
+        
+        return btree;
+
+    }
+
+    /**
+     * Note: This problem requires us to short a node in the level above the
+     * leaves so that the last node in that level does not underflow.
+     * 
+     * @throws IOException
+     */
+    public void test_problem3_buildOrder3() throws IOException {
+
+        BTree btree = getProblem3();
+
+        btree.dump(Level.DEBUG,System.err);
+        
+        new IndexSegmentBuilder(outFile,tmpDir,btree,3);
+
+         /*
+          * Verify can load the index file and that the metadata
+          * associated with the index file is correct (we are only
+          * checking those aspects that are easily defined by the test
+          * case and not, for example, those aspects that depend on the
+          * specifics of the length of serialized nodes or leaves).
+          */
+        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+                // setup reference queue to hold all leaves and nodes.
+                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                        11, 11),
+                // take the other parameters from the btree.
+                btree.NEGINF, btree.comparator,
+                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                );
+        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
+        TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
+        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
+        TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());
+        TestIndexSegmentPlan.assertEquals(4,seg.getNodeCount());
+        TestIndexSegmentPlan.assertEquals(20,seg.size());
+        
+        /*
+         * @todo verify the right keys in the right leaves.
+         */
+        
+        /*
+         * Verify the total index order.
+         */
+        assertSameBTree(btree, seg);
+        
+    }
+    
 }

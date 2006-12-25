@@ -66,9 +66,11 @@ public class TestAddr extends TestCase {
         
         final long lval = Addr.toLong(nbytes,offset);
 
-        TestIndexSegmentBuilderStatics.assertEquals("nbytes(lval="+Long.toHexString(lval)+")", nbytes, Addr.getByteCount(lval));
+        assertEquals("nbytes(lval=" + Long.toHexString(lval) + ")", nbytes,
+                Addr.getByteCount(lval));
 
-        TestIndexSegmentBuilderStatics.assertEquals("offset(lval="+Long.toHexString(lval)+")", offset, Addr.getOffset(lval));
+        assertEquals("offset(lval=" + Long.toHexString(lval) + ")", offset,
+                Addr.getOffset(lval));
 
     }
 

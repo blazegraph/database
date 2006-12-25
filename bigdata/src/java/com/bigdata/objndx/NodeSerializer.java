@@ -102,7 +102,22 @@ import com.bigdata.journal.Bytes;
  *       This is both less storage and less time searching. The full key can
  *       then be reconstructed as required.
  * 
- * @todo use allocation pools for node, leaf, key[], and value[] objects?
+ * @todo try using an allocation pools for node and leaf objects together with
+ *       keys[] and vals[]. We can know when the references are cleared, but at
+ *       that point we no longer have the reference so we can not reuse the
+ *       large arrays (keys[] and vals[]). It may not make much sense to reuse
+ *       vals[] since it always holds Objects. Unless those objects are mutable
+ *       we have to clear the array contents so that the values can be GCd. The
+ *       same is true when the keys[] contains Objects. The case where reuse
+ *       makes the most sense is when it is a primitive data type [] with a
+ *       modestly large capacity.<br>
+ *       The only way that I can see to manage this is to explicitly deallocate
+ *       the leaf/node. This can either be done immediately when it falls off of
+ *       the hard reference queue and is written onto the store or we could move
+ *       the reference to a secondary hard reference queue for retention of
+ *       immutable nodes and leaves. This shoulds be examined in conjunction
+ *       with the examination of breaking the hard reference queue into one
+ *       queue for nodes and one for leaves.
  * 
  * FIXME add support for serializing the prior/next references when known. we do
  * checksums which makes it trickier to touch up those references after the fact
@@ -594,7 +609,7 @@ public class NodeSerializer {
             // nkeys
             final int nkeys = (int) LongPacker.unpackLong(is);
 
-            // @todo minimum is (m+1/2) unless this is the root node.
+            // Note: minimum is (m+1/2) unless this is the root node.
             assert nkeys >= 0 && nkeys < branchingFactor;
 
             final long[] childAddr = new long[branchingFactor + 1];
@@ -838,7 +853,7 @@ public class NodeSerializer {
             // nkeys
             final int nkeys = (int) LongPacker.unpackLong(is);
 
-            // @todo limit is (m+1)/2 unless root leaf.
+            // Note: minimum is (m+1)/2 unless root leaf.
             assert nkeys >= 0 && nkeys <= branchingFactor;
 
             /*

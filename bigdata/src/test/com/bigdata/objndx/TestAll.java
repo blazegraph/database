@@ -94,7 +94,7 @@ public class TestAll extends TestCase {
          * index rebuilding.
          */
         // test static methods for the index builder.
-        suite.addTestSuite( TestIndexSegmentBuilderStatics.class );
+        suite.addTestSuite( TestIndexSegmentPlan.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // stress test with larger random input trees and a variety of branching factors.
