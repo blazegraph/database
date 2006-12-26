@@ -47,10 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import com.bigdata.journal.IObjectIndex;
 import com.bigdata.journal.ISlotAllocation;
 import com.bigdata.journal.SlotMath;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
  * Abstract test case defines utility methods for testing the object index and

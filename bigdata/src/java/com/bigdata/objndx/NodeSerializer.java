@@ -135,6 +135,18 @@ import com.bigdata.journal.Bytes;
 public class NodeSerializer {
 
     /**
+     * FIXME Packing child addresses for the {@link IndexSegment} is currently
+     * broken since we are flipping the sign when the child is a node in order
+     * to indicate that the offset is relative to the node base rather than the
+     * file base. This flag has been placed here temporarily in order to disable
+     * the packing feature for child addresses. The correct fix is perhaps to
+     * bit shift left by one bit and set a flag indicating whether the address
+     * is of a node or a leaf and then decode the address appropriately either
+     * when it is read from the store or when it is used.
+     */
+    private final boolean packChildAddress = false;
+
+    /**
      * An object that knows how to constructor nodes and leaves.
      */
     protected final INodeFactory nodeFactory;
@@ -488,7 +500,16 @@ public class NodeSerializer {
 
                 }
 
-                Addr.pack(os,addr);
+                if(packChildAddress) {
+                    
+                    Addr.pack(os,addr);
+                    
+                } else {
+                    
+                    os.writeLong(addr);
+                    
+                }
+                
 //                LongPacker.packLong(os, addr);
 //                os.writeLong(addr);
 
@@ -630,7 +651,17 @@ public class NodeSerializer {
 
 //                final long addr = is.readLong();
 //                final long addr = LongPacker.unpackLong(is);
-                final long addr = Addr.unpack(is);
+                final long addr;
+                
+                if( packChildAddress ) {
+                
+                    addr = Addr.unpack(is);
+                    
+                } else {
+                    
+                    addr = is.readLong();
+                    
+                }
 
                 if (addr == 0L) {
 

@@ -5,6 +5,7 @@ import java.io.RandomAccessFile;
 import java.util.Date;
 
 import com.bigdata.journal.Bytes;
+import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
 
 /**
  * The metadata record for an {@link IndexSegment}.

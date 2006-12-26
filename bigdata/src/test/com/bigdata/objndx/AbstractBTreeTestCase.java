@@ -59,10 +59,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.ContiguousSlotAllocation;
 import com.bigdata.journal.IRawStore;
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
 
 /**
  * Abstract test case for {@link BTree} tests.

@@ -47,14 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Vector;
-
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.IRawStore;
 
 /**
  * A test suite that will be evolved into a metadata index designed to locate

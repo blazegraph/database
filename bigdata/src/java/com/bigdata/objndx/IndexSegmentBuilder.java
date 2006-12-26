@@ -55,11 +55,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
+import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -81,7 +83,7 @@ import com.bigdata.journal.Journal;
  * whose retention is no longer required by that policy to be dropped.</li>
  * </ol>
  * 
- * Note: In order for the nodes to be written in a contiguous block we either
+ * Note: In order for the stack to be written in a contiguous block we either
  * have to buffer them in memory or have to write them onto a temporary file and
  * then copy them into place after the last leaf has been processed. The code
  * currently uses a temporary file for this purpose. This space demand was not
@@ -92,7 +94,7 @@ import com.bigdata.journal.Journal;
  * @version $Id$
  * 
  * @see "Post-order B-Tree Construction" by Lawerence West, ACM 1992. Note that
- *      West's algorithm is for a b-tree (values are stored on internal nodes as
+ *      West's algorithm is for a b-tree (values are stored on internal stack as
  *      well as leaves), not a b+-tree (values are stored only on the leaves).
  *      Our implementation is therefore an adaptation.
  * 
@@ -113,6 +115,9 @@ import com.bigdata.journal.Journal;
  *       {@link IBTree} which is a bit much to expect from an external sort
  *       routine. Also, since the data are pre-ordered a merging scan seems
  *       likely to be far more efficient.
+ * 
+ * FIXME change the way in which child addresses are serialized so that we can
+ * continue to pack them and re-enable packing in the {@link NodeSerializer}.
  */
 public class IndexSegmentBuilder {
 
@@ -121,6 +126,18 @@ public class IndexSegmentBuilder {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentBuilder.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
@@ -132,8 +149,7 @@ public class IndexSegmentBuilder {
      *       to be "live" until it is completely written, so there is no need to
      *       update file metadata until the end of the build process.
      * 
-     * @todo Consider using
-     *       {@link FileOutputStream#FileOutputStream(File, boolean)} to open
+     * @todo Consider using {@link FileOutputStream#FileOutputStream(File, boolean)} to open
      *       the temporary file in an append only mode and then get the
      *       {@link FileChannel} from {@link FileOutputStream#getChannel()}.
      *       Does this improve performance? Can we still read from the channel?
@@ -143,15 +159,15 @@ public class IndexSegmentBuilder {
     final String mode = "rw"; // also rws or rwd
     
     /**
-     * The buffer used to serialize individual nodes and leaves before they are
+     * The buffer used to serialize individual stack and leaves before they are
      * written onto the file.
      * 
      * @todo The capacity of this buffer is a SWAG. It is too large for most
      *       purposes but it is unlikely to be too small for most purposes. If
      *       you see a buffer overflow exception then you may have extremely
      *       long keys and/or very large values. The BTree class has the same
-     *       problem with the buffer that it uses to serialize nodes and leaves,
-     *       but its nodes and leaves are smaller since it uses a smaller
+     *       problem with the buffer that it uses to serialize stack and leaves,
+     *       but its stack and leaves are smaller since it uses a smaller
      *       branching factor.
      */
     final ByteBuffer buf = ByteBuffer.allocateDirect(1*Bytes.megabyte32);
@@ -164,7 +180,7 @@ public class IndexSegmentBuilder {
     final ByteBuffer cbuf = ByteBuffer.allocateDirect(Bytes.megabyte32/2);
     
     /**
-     * Compressor used for nodes and leaves.
+     * Compressor used for stack and leaves.
      * 
      * @todo review choice of best speed vs best compression and possibly
      *       elevate to a constuctor parameter.
@@ -184,7 +200,7 @@ public class IndexSegmentBuilder {
     protected final File outFile;
     
     /**
-     * The temporary created to hold nodes unless the index segment will consist
+     * The temporary created to hold stack unless the index segment will consist
      * of just a root leaf. When created, this file is deleted regardless of the
      * outcome of the operation.
      */
@@ -197,8 +213,8 @@ public class IndexSegmentBuilder {
     protected RandomAccessFile out = null;
 
     /**
-     * The temporary file on which the nodes destined for {@link IndexSegment}
-     * will be written. The file is opened iff there are non-leaf nodes in the
+     * The temporary file on which the stack destined for {@link IndexSegment}
+     * will be written. The file is opened iff there are non-leaf stack in the
      * index segment. The file is closed regardless of the outcome of the
      * operation.
      */
@@ -210,7 +226,7 @@ public class IndexSegmentBuilder {
     final ArrayType keyType;
 
     /**
-     * Used to serialize the nodes and leaves of the output tree.
+     * Used to serialize the stack and leaves of the output tree.
      */
     final NodeSerializer nodeSer;
     
@@ -237,7 +253,7 @@ public class IndexSegmentBuilder {
     int maxNodeOrLeafLength = 0;
 
     /**
-     * The #of nodes written for the output tree. This will be zero if all
+     * The #of stack written for the output tree. This will be zero if all
      * entries fit into a root leaf.
      */
     int nnodesWritten = 0;
@@ -246,19 +262,30 @@ public class IndexSegmentBuilder {
      * The #of leaves written for the output tree.
      */
     int nleavesWritten = 0;
+    
+    /**
+     * The #of nodes or leaves that have been written out in each level of the
+     * tree.
+     * 
+     * @see IndexSegmentPlan#numInLevel
+     */
+    final int writtenInLevel[];
 
     /**
-     * The stack of nodes that are currently being populated. This array is
-     * allocated iff height>0. The nodes in this array are reused rather than
-     * being reallocated.
+     * The stack of stack that are currently being populated. The first N-1
+     * elements in this array are always stack while the last element is always
+     * a leaf ({@link #leaf} is the same reference as the last element in this
+     * array). The stack and the leaf in this array are reused rather than being
+     * reallocated.
      */
-    final SimpleNodeData[] nodes;
+    final AbstractSimpleNodeData[] stack;
     
     /**
      * The current leaf that is being populated from the source btree. This leaf
-     * is reused for each output leaf rather than being reallocated.  In the
+     * is reused for each output leaf rather than being reallocated. In the
      * degenerate case when the output btree is a single root leaf then this
-     * will be that leaf and {@link #nodes} will be [null].
+     * will be that leaf. This reference is always the same as the last
+     * reference in {@link #stack}.
      */
     final SimpleLeafData leaf;
 
@@ -266,6 +293,11 @@ public class IndexSegmentBuilder {
      * The plan for building the B+-Tree.
      */
     final IndexSegmentPlan plan;
+    
+    /**
+     * The process runtime in milliseconds.
+     */
+    final long elapsed;
     
     /**
      * <p>
@@ -289,9 +321,9 @@ public class IndexSegmentBuilder {
      * address 68,719,476,736 entries - well beyond what we want in a given
      * index segment! Well before that the index segment should be split into
      * multiple files. The split point should be determined by the size of the
-     * serialized leaves and nodes, e.g., the amount of data on disk required by
+     * serialized leaves and stack, e.g., the amount of data on disk required by
      * the index segment and the amount of memory required to fully buffer the
-     * index nodes. While the size of a serialized node can be estimated easily,
+     * index stack. While the size of a serialized node can be estimated easily,
      * the size of a serialized leaf depends on the kinds of values stored in
      * that index. The actual sizes are recorded in the
      * {@link PartitionMetadata} record in the header of the
@@ -301,7 +333,7 @@ public class IndexSegmentBuilder {
      * @param outFile
      *            The file on which the index segment is written.
      * @param tmpDir
-     *            The temporary directory in which the index nodes are buffered
+     *            The temporary directory in which the index stack are buffered
      *            during the build (optional - the default temporary directory
      *            is used if this is <code>null</code>).
      * @param btree
@@ -326,45 +358,45 @@ public class IndexSegmentBuilder {
         // The data type used for the keys in the btree.
         keyType = btree.keyType;
         
-        // Used to serialize the nodes and leaves for the output tree.
+        // Used to serialize the stack and leaves for the output tree.
         nodeSer = btree.nodeSer;
 
-        /*
-         * Create a plan for generating the output tree.
-         */
+        // Create a plan for generating the output tree.
         plan = new IndexSegmentPlan(m,btree.size());
 
         /*
-         * Setup a stack of nodes (one per non-leaf level) and one leaf. These
-         * are filled based on the plan and the entries visited in the source
-         * btree.
+         * Setup a stack of stack (one per non-leaf level) and one leaf. These
+         * are filled in based on the plan and the entries visited in the source
+         * btree. Nodes and leaves are written out to their respective channel
+         * each time they are complete as defined (by the plan) by the #of
+         * children assigned to a node or values assigned to a leaf.
          */
-        if(plan.height == 0 ) {
 
-            nodes = null;
+        stack = new AbstractSimpleNodeData[plan.height + 1];
+
+        // Note: assumes defaults to all zeros.
+        writtenInLevel = new int[plan.height + 1];
+        
+        for (int h = 0; h < plan.height; h++) {
+
+            SimpleNodeData node = new SimpleNodeData(h, m, keyType);
+
+            node.max = plan.numInNode[h][0];
             
-        } else {
-            
-            nodes = new SimpleNodeData[plan.height];
-
-            for (int i = plan.height - 1; i >= 0; i--) {
-
-                /*
-                 * Allocate a single node that we will reuse for each node
-                 * populated at this level of the output tree.
-                 */
-
-                nodes[i] = new SimpleNodeData(m, keyType);
-                
-            }
+            stack[h] = node;
             
         }
         
         // the output leaf (reused for each leaf we populate).
-        leaf = new SimpleLeafData(m,keyType);
+        
+        leaf = new SimpleLeafData(plan.height,m,keyType);
+
+        leaf.max = plan.numInNode[plan.height][0];
+
+        stack[plan.height] = leaf;
 
         /*
-         * setup for IO.
+         * Setup for IO.
          */
 
         this.outFile = outFile;
@@ -374,7 +406,7 @@ public class IndexSegmentBuilder {
                     + outFile.getAbsoluteFile());
         }
 
-        // the temporary file is used iff there are nodes to write.
+        // the temporary file is used iff there are stack to write.
         tmpFile = (plan.nleaves > 1 ? File.createTempFile("index", ".seg",
                 tmpDir) : null);
 
@@ -421,7 +453,7 @@ public class IndexSegmentBuilder {
                 
                 /*
                  * Set to null iff temp file not opened because there are no
-                 * nodes to write.
+                 * stack to write.
                  */
 
                 tmpChannel = null;
@@ -430,7 +462,7 @@ public class IndexSegmentBuilder {
 
             /*
              * Skip over the metadata record, which we have to write once we
-             * know how the leaves and nodes fit onto the file once they have
+             * know how the leaves and stack fit onto the file once they have
              * been serialized and compressed.
              * 
              * @todo we could serialize the record with zeros for values that we
@@ -446,29 +478,18 @@ public class IndexSegmentBuilder {
              * Scan the source btree leaves in key order writing output leaves
              * onto the index segment file with the new branching factor. We
              * also track a stack of nodes that are being written out
-             * concurrently on the temporary channel. Each time we write out a
-             * leaf (for a tree of height>0) we record the address of that leaf
-             * at childAddr[nkeys] in the immediate parent node. When we start a
-             * leaf we record the first key in the new leaf at keys[0] in the
-             * immediate parent node and increment the #of keys in the parent.
+             * concurrently on a temporary channel.
              * 
-             * If the parent becomes full then we write out the node to the
-             * tmpChannel and insert the appropriate separatorKey into its
-             * parent.
+             * The plan tells us the #of values to insert into each leaf and the
+             * #of children to insert into each node. Each time a leaf becomes
+             * full (according to the plan), we "close" the leaf, writing it out
+             * onto the store and obtaining its "address". The "close" logic
+             * also takes care of setting the address on the leaf's parent node
+             * (if any). If the parent node becomes filled (according to the
+             * plan) then it is also "closed".
              * 
-             * It is an error if the root becomes full.
-             * 
-             * The separator key for the parent is always a key in a leaf. In
-             * fact it is the first key that goes into the next leaf. This means
-             * that either we need to read the keys ahead or that we need to
-             * fill in the separator key and evict the node behind. Note that we
-             * need to evict the last node after we finish the last leaf. Note
-             * that we could enter the next leaf address before we actually
-             * write the leaf since it is simply the current position of the
-             * outChannel. However, this does not generalize to nodes trivially
-             * since we have potentially a stack of N nodes that are being
-             * written out. This implies that we defer adding the child to the
-             * parent until the child has been written out.
+             * Each time (except the first) that we start a new leaf we record
+             * its first key as a separatorKey in the appropriate parent node.
              * 
              * Note that the root may be a leaf as a degenerate case.
              */
@@ -486,7 +507,7 @@ public class IndexSegmentBuilder {
             int nconsumed = 0;
             
             int nsourceKeys = sourceLeaf.getKeyCount();
-            
+
             for (int i = 0; i < plan.nleaves; i++) {
 
                 /*
@@ -499,9 +520,7 @@ public class IndexSegmentBuilder {
                  * that many key/val entries will actually be serialized.
                  */
 
-                leaf.nkeys = 0;
-
-                final int limit = plan.numInLeaf[i]; // #of keys to fill in this leaf.
+                final int limit = leaf.max; // #of keys to fill in this leaf.
                 
                 for (int j = 0; j < limit; j++) {
 
@@ -523,113 +542,37 @@ public class IndexSegmentBuilder {
                     
                     nconsumed++;
 
-                    if( j == 0 && plan.height>0 ) {
+                    if( i > 0 && j == 0 ) {
 
                         /*
-                         * This is a new leaf. The first child on the parent
-                         * does not get a separatorKey. Therefore, if this is
-                         * the 2nd or better child on the parent then we copy
-                         * the first key on the new leaf as the separatorKey on
-                         * the parent node.
+                         * Every time (after the first) that we enter a new leaf
+                         * we need to record its first key as a separatorKey in
+                         * the appropriate parent.
                          */
-                        SimpleNodeData node = nodes[plan.height-1];
-                        
-                        if(node.nchildren>0) {
+                        addSeparatorKey(leaf);
 
-                            node.copyKey(node.nkeys++, leaf, 0 );
-                            
-                        }
-                        
-                    }
-                    
-                }
-                
-                // write the leaf onto the output channel.
-                long addr = writeLeaf(leaf);
-                
-                if( plan.height>0 ) {
-
-                    // write the address of the child on the parent node.
-                    SimpleNodeData node = nodes[plan.height-1];
-                    
-                    /*
-                     * Prepare to receive the next node's data on this
-                     * level.
-                     */
-                    if(node.written) {
-                   
-                        node.reset();
-                        
-                    }
-                    
-                    node.childAddr[node.nkeys] = addr;
-                    
-                    node.nchildren++;
-                    
-                    if(node.nchildren==m) {
-                        
-                        // verify not under capacity (root is exempt).
-                        
-                        boolean isRoot = plan.height == 1;
-                        
-                        assert isRoot || node.nkeys >= plan.m2;
-                        
-                        /*
-                         * @todo this needs to get written onto the node's
-                         * parent together with the appropriate separatorKey
-                         * (from the next leaf).
-                         */
-
-                        long addrParent = writeNode(node);
-                        
                     }
                     
                 }
 
+                /*
+                 * Close the current leaf. This will write the address of the
+                 * leaf on the parent (if any). If the parent becomes full then
+                 * the parent will be closed as well.
+                 */
+                close(leaf);
+                
             }
 
             // Verify that all leaves were written out.
             assert plan.nleaves == nleavesWritten;
             
-            /*
-             * Flush out any unwritten nodes.
-             * 
-             * Note: this tests nchildren>0 to make sure that at least one child
-             * has been attached to the node, otherwise it is clean and does not
-             * need to be written. if there is a child, then the requirements
-             * are a minimum of two children and one separatorKey (this catches
-             * an edge case where we might try to write more than one root
-             * node). if this is not a root node, then the requirements are m2 <=
-             * nkeys <= m
-             */
-            
-            for (int h = plan.height-1; h >= 0; h--) {
-                
-                SimpleNodeData node = nodes[h];
-                
-                if (!node.written && node.nchildren>0 ) {
-
-                    assert node.nchildren>=2;
-                    assert node.nkeys == node.nchildren - 1;
-                    
-                    // verify not under capacity (root is exempt).
-                    if(h>0) {
-                        assert node.nkeys >= plan.m2;
-                    }
-
-                    /*
-                     * @todo this needs to get written into the parent (if any)
-                     * of this node.
-                     */
-                    long addrNode = writeNode(node);
-                    
-                }
-                
-            }
+            // Verify that all nodes were written out.
+            assert plan.nnodes == nnodesWritten;
             
             /*
-             * All nodes and leaves have been written. Now we prepare the final
-             * metadata record. If we wrote any nodes onto the temporary channel
+             * All stack and leaves have been written. Now we prepare the final
+             * metadata record. If we wrote any stack onto the temporary channel
              * then we also have to bulk copy them into the output channel.
              */
             final long offsetLeaves = IndexSegmentMetadata.SIZE;
@@ -677,8 +620,6 @@ public class IndexSegmentBuilder {
                 
                 // Close the temporary file - also releases the lock.
                 tmp.close();
-                
-//                tmp = null;
 
                 /*
                  * The addrRoot is computed from the offset on the tmp channel
@@ -689,10 +630,15 @@ public class IndexSegmentBuilder {
                  * that is correct for the output file. All internal node
                  * references require some translation.)
                  */
-                long addr = - ( nodes[0].addr ); // flip sign
+                
+                long addr = - ( ((SimpleNodeData)stack[0]).addr ); // flip sign
+                
                 int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
+                
                 int nbytes = Addr.getByteCount(addr); // #of bytes in root node.
+                
                 addrRoot = Addr.toLong(nbytes, offset); // form correct addr.
+                
                 log.info("addrRoot(Node): "+addrRoot+", "+Addr.toString(addrRoot));
                 
             } else {
@@ -745,12 +691,9 @@ public class IndexSegmentBuilder {
 
             /*
              * log run time.
-             * 
-             * @todo track runtime as an instance variable for inspection by the
-             * calling process.
              */
             
-            final long elapsed = System.currentTimeMillis() - begin;
+            elapsed = System.currentTimeMillis() - begin;
             
             log.info("finished: elapsed=" + elapsed + "ms, nentries="
                     + plan.nentries + ", branchingFactor=" + m + ", nnodes="
@@ -796,6 +739,174 @@ public class IndexSegmentBuilder {
     }
 
     /**
+     * Close out a node or leaf. When a node or leaf is closed we write it out
+     * to obtain its {@link Addr} and set its address on its direct parent using
+     * {@link #addChild(com.bigdata.objndx.IndexSegmentBuilder.SimpleNodeData, long)}.
+     * 
+     */
+    protected void close(AbstractSimpleNodeData node) throws IOException {
+
+        final int h = node.level;
+
+        // the index into the level for this node or leaf.
+        final int col = writtenInLevel[h];
+
+        assert col < plan.numInLevel[h];
+
+        if (DEBUG)
+            log.debug("closing " + (node.isLeaf() ? "leaf" : "node") + "; h="
+                    + h + ", col=" + col + ", max=" + node.max + ", nkeys="
+                    + node.nkeys);
+        
+        // Note: This uses shared buffers!
+        final long addr = writeNodeOrLeaf(node);
+
+        SimpleNodeData parent = getParent(node);
+        
+        if(parent != null) {
+            
+            addChild(parent, addr);
+            
+        }
+        
+        /*
+         * If there are more nodes to be filled at this level then prepare
+         * this node to receive its next values/children. 
+         */
+        if( col+1 < plan.numInLevel[h] ) {
+            
+            int max = plan.numInNode[h][col+1];
+            
+            node.reset( max );
+            
+        }
+
+        writtenInLevel[h]++;        
+
+    }
+
+    /**
+     * Record the persistent {@link Addr address} of a child on its parent. If
+     * all children on the parent become assigned then the parent is closed.
+     * 
+     * @param parent
+     *            The parent.
+     * @param childAddr
+     *            The address of the child (node or leaf).
+     * 
+     * @throws IOException
+     */
+    protected void addChild(SimpleNodeData parent,long childAddr) throws IOException {
+
+        assert parent.nchildren < parent.max;
+
+        if(DEBUG)
+            log.debug("setting child at index=" + parent.nchildren
+                + " on node at level=" + parent.level + ", col="
+                + writtenInLevel[parent.level] + ", addr="
+                + Addr.toString(childAddr));
+        
+        parent.childAddr[parent.nchildren++] = childAddr;
+
+        if( parent.nchildren == parent.max ) {
+            
+            close(parent);
+            
+        }
+        
+    }
+    
+    /**
+     * Copies the first key of a new leaf as a separatorKey for the appropriate
+     * parent (if any) of that leaf. This must be invoked when the first key is
+     * set on that leaf. However, it must not be invoked on the first leaf.
+     * 
+     * @param leaf
+     *            The current leaf. The first key on that leaf must be defined.
+     */
+    protected void addSeparatorKey(SimpleLeafData leaf) {
+        
+        SimpleNodeData parent = getParent(leaf);
+        
+        if( parent != null ) {
+
+            addSeparatorKey(parent,leaf);
+            
+        }
+        
+    }
+
+    /**
+     * Copies the first key of a new leaf as a separatorKey for the appropriate
+     * parent (if any) of that leaf.
+     * 
+     * @param parent
+     *            A parent of that leaf (non-null).
+     * @param leaf
+     *            The current leaf. The first key on the leaf must be defined.
+     */
+    private void addSeparatorKey(SimpleNodeData parent, SimpleLeafData leaf) {
+
+        if(parent==null) {
+            
+            throw new AssertionError();
+            
+        }
+        
+        /*
+         * The maximum #of keys for a node is one less key than the maximum #of
+         * children for that node.
+         */ 
+        final int maxKeys = parent.max - 1;
+        
+        if( parent.nkeys < maxKeys ) {
+            
+            /*
+             * Copy the first key from the leaf into this parent, incrementing
+             * the #of keys in the parent.
+             */
+
+            if (DEBUG)
+                log.debug("setting separatorKey on node at level "
+                        + parent.level + ", col="
+                        + writtenInLevel[parent.level]);
+
+            parent.copyKey(parent.nkeys++, leaf, 0 );
+
+        } else {
+
+            /*
+             * Delegate to the parent recursively until we find the first parent
+             * into which the separatorKey can be inserted.
+             */
+
+            addSeparatorKey(getParent(parent),leaf);
+            
+        }
+        
+    }
+    
+    /**
+     * Return the parent of a node or leaf in the {@link #stack} stack.
+     * 
+     * @param node
+     *            The node or leaf.
+     * 
+     * @return The parent or null iff <i>node</i> is the root node or leaf.
+     */
+    protected SimpleNodeData getParent(AbstractSimpleNodeData node) {
+        
+        if(node.level==0) {
+        
+            return null;
+            
+        }
+        
+        return (SimpleNodeData)stack[node.level-1];
+        
+    }
+    
+    /**
      * Serialize and compress a node or leaf.
      * 
      * @return {@link #cbuf}, which contains the serialized and compressed
@@ -839,50 +950,6 @@ public class IndexSegmentBuilder {
 
     }
 
-    /**
-     * Close out a node or leaf. When a node or leaf is closed we write it out
-     * to obtain its {@link Addr} and set its address on its direct parent using
-     * {@link #addChild(com.bigdata.objndx.IndexSegmentBuilder.SimpleNodeData, long)}.
-     * 
-     */
-    protected void close(AbstractSimpleNodeData node) throws IOException {
-
-//        FileChannel outChannel, tmpChannel;
-//        SimpleNodeData parent;
-
-        long addr = writeNodeOrLeaf(node);
-
-        //FIXME get the parent of the node from the stack.
-        SimpleNodeData parent = null;
-        
-        addChild(parent, addr);
-
-    }
-
-    /**
-     * Record the persistent {@link Addr address} of a child on its parent.
-     * 
-     * @param parent
-     *            The parent.
-     * @param childAddr
-     *            The address of the child (node or leaf).
-     *            
-     * @throws IOException
-     */
-    protected void addChild(SimpleNodeData parent,long childAddr) throws IOException {
-
-        assert parent.nchildren < parent.maxChildren;
-
-        parent.childAddr[parent.nchildren++] = childAddr;
-        
-        if( parent.nchildren == parent.maxChildren ) {
-            
-            close(parent);
-            
-        }
-        
-    }
-    
     /**
      * Serialize, compress, and write the node or leaf onto the appropriate
      * output channel.
@@ -959,7 +1026,7 @@ public class IndexSegmentBuilder {
         // the #of leaves written so far.
         nleavesWritten++;
         
-        System.err.print("x"); // wrote a leaf.
+        System.err.print("."); // wrote a leaf.
 
         return Addr.toLong(nbytes, (int)offset);
         
@@ -1008,7 +1075,7 @@ public class IndexSegmentBuilder {
             
         }
 
-        node.written = true;
+//        node.written = true;
 
 //        // the offset where we just wrote the last node.
 //        lastNodeOffset = offset;
@@ -1016,10 +1083,10 @@ public class IndexSegmentBuilder {
 //        // the size of the compressed node that we just wrote out.
 //        lastNodeSize = nbytes;
 
-        // the #of nodes written so far.
+        // the #of stack written so far.
         nnodesWritten++;
         
-        System.err.print("."); // wrote a node.
+        System.err.print("x"); // wrote a node.
 
         // flip the sign to indicate a relative reference to a node.
         long addr = - ( Addr.toLong(nbytes, (int)offset) );
@@ -1031,7 +1098,7 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Abstract base class for classes used to construct and serialize nodes and
+     * Abstract base class for classes used to construct and serialize stack and
      * leaves written onto the index segment.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -1039,17 +1106,40 @@ public class IndexSegmentBuilder {
      */
     abstract protected static class AbstractSimpleNodeData implements IAbstractNodeData {
 
+        /**
+         * The level in the output tree for this node or leaf (origin zero). The
+         * root is always at level zero (0).
+         */
+        final int level;
         final int m;
         final ArrayType keyType;
         // mutable.
         final Object keys;
         int nkeys;
+        
+        /**
+         * We precompute the #of children to be assigned to each node and the
+         * #of values to be assigned to each leaf and store that value in this
+         * field. While the field name is "max", this is the exact that must be
+         * assigned to the node.
+         */
+        int max = -1;
+        
 
-        protected AbstractSimpleNodeData(int m,ArrayType keyType,Object keys) {
+        protected AbstractSimpleNodeData(int level,int m,ArrayType keyType,Object keys) {
+            this.level = level;
             this.m = m;
             this.keyType = keyType;
             this.nkeys = 0;
             this.keys = keys;
+        }
+
+        protected void reset(int max) {
+            
+            nkeys = 0;
+            
+            this.max = max;
+            
         }
         
         public int getBranchingFactor() {
@@ -1111,12 +1201,20 @@ public class IndexSegmentBuilder {
         // mutable.
         final Object[] vals;
         
-        public SimpleLeafData(int m,ArrayType keyType) {
+        public SimpleLeafData(int level,int m,ArrayType keyType) {
 
-            super(m,keyType,ArrayType.alloc(keyType, m));
+            super(level,m,keyType,ArrayType.alloc(keyType, m));
             
             this.vals = new Object[m];
             
+        }
+        
+        /**
+         * 
+         * @param max The #of values that must be assigned to this leaf.
+         */
+        public void reset(int max) {
+            super.reset(max);
         }
         
         public int getValueCount() {
@@ -1139,7 +1237,7 @@ public class IndexSegmentBuilder {
      * 
      * Note: All node addresses that are internal to a node and reference a
      * child node (vs a leaf) are correct relative to the start of the node
-     * block. This is an unavoidable consequence of serializing the nodes before
+     * block. This is an unavoidable consequence of serializing the stack before
      * we have the total offset to the start of the node block. In order to flag
      * this we flip the sign on the node addresses so that the are serialized as
      * negative numbers. Flipping the sign serves to distinguish leaf addresses,
@@ -1169,7 +1267,7 @@ public class IndexSegmentBuilder {
         long addr = 0L;
         
         /**
-         * The address at which the child nodes were written. This is a negative
+         * The address at which the child stack were written. This is a negative
          * integer iff the child is a node and a positive integer iff the child
          * is a leaf. When it is a negative integer, you must flip the sign to
          * obtain a relative offset to the start of the index node block and the
@@ -1187,26 +1285,12 @@ public class IndexSegmentBuilder {
          * awareness of the intermediate state - when we have filled in the
          * childAddr for the last leaf but not yet filled in the separatorKey
          * for the next leaf.
-         * 
-         * @todo update javadoc once generalized to height>1.
          */
         int nchildren = 0;
         
-        /**
-         * We precompute the #of children to be assigned to each node and store
-         * that value in this field for convenience. While the field name is
-         * "max", this is the exact #of children that will be assigned to the
-         * node.
-         * 
-         * FIXME Compute maxChildren for non-leaf nodes.
-         */
-        int maxChildren = -1;
-        
-        boolean written = false;
-        
-        public SimpleNodeData(int m,ArrayType keyType) {
+        public SimpleNodeData(int level,int m,ArrayType keyType) {
 
-            super(m,keyType,ArrayType.alloc(keyType, m-1));
+            super(level,m,keyType,ArrayType.alloc(keyType, m-1));
             
             this.childAddr = new long[m];
             
@@ -1214,16 +1298,17 @@ public class IndexSegmentBuilder {
         
         /**
          * Reset counters and flags so that the node may be reused.
+         * 
+         * @param max
+         *            The new limit on the #of children to fill on this node.
          */
-        public void reset() {
+        public void reset(int max) {
+
+            super.reset(max);
             
             addr = 0;
             
-            nkeys = 0;
-            
             nchildren = 0;
-            
-            written = false;
             
         }
 

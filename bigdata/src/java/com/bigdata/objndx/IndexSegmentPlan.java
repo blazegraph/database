@@ -32,6 +32,11 @@ public class IndexSegmentPlan {
      * open a temporary file for the nodes since there will not be any.
      */
     final int nleaves; 
+
+    /**
+     * The #of non-leaf nodes in the output tree.
+     */
+    final int nnodes;
     
     /**
      * The height of the output tree (#of levels in the output tree).
@@ -39,28 +44,30 @@ public class IndexSegmentPlan {
     final int height;
 
     /**
-     * The #of entries to place into each leaf.  The array is dimensioned to
-     * {@link #nleaves}.
+     * The #of entries to place into each leaf. The array is dimensioned to
+     * {@link #nleaves}. This is a convenience reference to the last array in
+     * {@link #numInNode}.
      */
     final int[] numInLeaf;
     
     /**
-     * The #of nodes at each level of the tree above the leaves and [null]
-     * iff there are no nodes in the output tree.
+     * The #of nodes at each level of the tree, including the level containing
+     * the leaves.
      * 
      * @see #nleaves, which is the #of leaves in the output tree.
      */
     final int[] numInLevel;
     
     /**
-     * The #of children to place into each node in each level of the output
-     * tree or [null] iff there are no nodes in the output tree. The first
-     * index is the level in the tree, start from level zero which is the
-     * root and increasing through level [height], which is the level above
-     * the leaves.
+     * The #of children / values to place into each node in each level of the
+     * output tree. The first index is the level in the tree, start from level
+     * zero which is the root and increasing through level [height+1], which is
+     * the level containing the leaves of the output tree.
+     * 
+     * @see numInLeaf, which is a reference to the last element of this array.
      */
     final int[][] numInNode;
-    
+
     /**
      * Create a plan for building a B+-Tree. The plan has only these two
      * inputs. Everything else about the plan is deterministic based on
@@ -96,59 +103,55 @@ public class IndexSegmentPlan {
         
         // #of entries in each leaf.
         numInLeaf = distributeKeys(m,m2,nleaves,nentries);
+
+        /*
+         * Figure out how many nodes are in each level of the output tree. We
+         * start from the leaves and compute the #of nodes required to hold that
+         * many child references.
+         */
+
+        numInNode = new int[height+1][];
+
+        numInLevel = new int[height+1];
+
+        /*
+         * The first time through this loop the #of children is initialized to
+         * the #of leaves. Thereafter is is [numThisLevel] for the previous
+         * level.
+         */
+        int nchildren = nleaves;
+
+        int nnodes = 0;
         
-        if (height == 0) {
-            
-            /*
-             * There are no nodes in the output tree.
-             */
-            
-            numInNode = null;
-            
-            numInLevel = null;
-            
-        } else {
-            
-            /*
-             * Figure out how many nodes are in each level of the output tree.
-             * We start from the leaves and compute the #of nodes required to
-             * hold that many child references.
-             */
-            
-            numInNode = new int[height][];
-            
-            numInLevel = new int[height];
+        for (int h = height - 1; h >= 0; h--) {
 
             /*
-             * The first time through this loop the #of children is initialized
-             * to the #of leaves. Thereafter is is [numThisLevel] for the
-             * previous level.
+             * Compute the minimum #of nodes required to hold the references for
+             * the children of the level in the tree beneath this one.
              */
-            int nchildren = nleaves;
-            
-            for (int h = height - 1; h >= 0; h--) {
+            int numThisLevel = (int) Math.ceil((double) nchildren / (double) m);
 
-                /*
-                 * Compute the minimum #of nodes required to hold the references
-                 * for the children of the level in the tree beneath this one.
-                 */
-                int numThisLevel = (int)Math.ceil((double)nchildren / (double)m); 
-                
-                numInLevel[h] = numThisLevel;
-                
-                /*
-                 * Distribute the children among the nodes allocated for this level.
-                 */
-                numInNode[h] = distributeChildren(m, m2, numThisLevel, nchildren);
-                
-                nchildren = numThisLevel;
-                
-            }
-            
+            numInLevel[h] = numThisLevel;
+
+            /*
+             * Distribute the children among the nodes allocated for this level.
+             */
+            numInNode[h] = distributeChildren(m, m2, numThisLevel, nchildren);
+
+            nchildren = numThisLevel;
+
+            nnodes += numThisLevel;
+
         }
+        
+        numInNode[height] = numInLeaf;
+        
+        numInLevel[height] = nleaves;
+
+        this.nnodes = nnodes;
 
     }
-    
+
     /**
      * Chooses the minimum height for a tree having a specified branching factor
      * and a specified #of leaves.
