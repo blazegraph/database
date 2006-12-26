@@ -135,21 +135,14 @@ import com.bigdata.journal.Bytes;
 public class NodeSerializer {
 
     /**
-     * FIXME Packing child addresses for the {@link IndexSegment} is currently
-     * broken since we are flipping the sign when the child is a node in order
-     * to indicate that the offset is relative to the node base rather than the
-     * file base. This flag has been placed here temporarily in order to disable
-     * the packing feature for child addresses. The correct fix is perhaps to
-     * bit shift left by one bit and set a flag indicating whether the address
-     * is of a node or a leaf and then decode the address appropriately either
-     * when it is read from the store or when it is used.
-     */
-    private final boolean packChildAddress = false;
-
-    /**
      * An object that knows how to constructor nodes and leaves.
      */
     protected final INodeFactory nodeFactory;
+    
+    /**
+     * An object that knows how to (de-)serialize child addresses.
+     */
+    protected final IAddressSerializer addrSerializer;
     
     /**
      * An object that knows how to (de-)serialize keys.
@@ -299,6 +292,10 @@ public class NodeSerializer {
      *            An object that knows how to construct {@link INodeData}s and
      *            {@link ILeafData leaves}.
      * 
+     * @param addrSerializer
+     *            An object that knows how to (de-)serialize the child addresses
+     *            on an {@link INodeData}.
+     * 
      * @param keySerializer
      *            An object that knows how to (de-)serialize the keys on
      *            {@link INodeData}s and {@link ILeafData leaves} of a btree.
@@ -307,15 +304,19 @@ public class NodeSerializer {
      *            An object that knows how to (de-)serialize the values on
      *            {@link ILeafData leaves}.
      */
-    public NodeSerializer(INodeFactory nodeFactory, IKeySerializer keySerializer, IValueSerializer valueSerializer) {
+    public NodeSerializer(INodeFactory nodeFactory, IAddressSerializer addrSerializer, IKeySerializer keySerializer, IValueSerializer valueSerializer) {
 
         assert nodeFactory != null;
 
+        assert addrSerializer != null;
+        
         assert keySerializer != null;
 
         assert valueSerializer != null;
 
         this.nodeFactory = nodeFactory;
+
+        this.addrSerializer = addrSerializer;
         
         this.keySerializer = keySerializer;
         
@@ -473,7 +474,6 @@ public class NodeSerializer {
         DataOutputStream os = new DataOutputStream(new ByteBufferOutputStream(
                 buf));
         
-        int i = 0;
         try {
 
             // branching factor.
@@ -485,35 +485,8 @@ public class NodeSerializer {
             // keys.
             keySerializer.putKeys(os, keys, nkeys);
 
-            // values.
-            for (i = 0; i <= nkeys; i++) {
-
-                final long addr = childAddr[i];
-
-                /*
-                 * Children MUST have assigned persistent identity.
-                 */
-                if (addr == 0L) {
-
-                    throw new RuntimeException("Child is not persistent: node="
-                            + node + ", child index=" + i);
-
-                }
-
-                if(packChildAddress) {
-                    
-                    Addr.pack(os,addr);
-                    
-                } else {
-                    
-                    os.writeLong(addr);
-                    
-                }
-                
-//                LongPacker.packLong(os, addr);
-//                os.writeLong(addr);
-
-            }
+            // addresses.
+            addrSerializer.putChildAddresses(os, childAddr, nkeys+1);
 
             // Done using the DataOutputStream so flush to the ByteBuffer.
             os.flush();
@@ -644,36 +617,10 @@ public class NodeSerializer {
             keySerializer.getKeys(is, keys, nkeys);
 
             /*
-             * Child references (nchildren == nkeys+1).
+             * Child addresses (nchildren == nkeys+1).
              */
 
-            for (int i = 0; i <= nkeys; i++) {
-
-//                final long addr = is.readLong();
-//                final long addr = LongPacker.unpackLong(is);
-                final long addr;
-                
-                if( packChildAddress ) {
-                
-                    addr = Addr.unpack(is);
-                    
-                } else {
-                    
-                    addr = is.readLong();
-                    
-                }
-
-                if (addr == 0L) {
-
-                    throw new RuntimeException(
-                            "Child does not have persistent address: index="
-                                    + i);
-
-                }
-
-                childAddr[i] = addr;
-
-            }
+            addrSerializer.getChildAddresses(is, childAddr, nkeys+1);
 
             // verify #of bytes actually read.
             assert buf.position() - pos0 == nbytes;

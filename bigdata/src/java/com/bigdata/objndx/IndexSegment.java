@@ -111,7 +111,8 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
         super(fileStore, fileStore.metadata.keyType,
                 fileStore.metadata.branchingFactor, hardReferenceQueue, NEGINF,
-                comparator, keySer, valSer, ImmutableNodeFactory.INSTANCE);
+                comparator, AddressSerializer.INSTANCE, keySer, valSer,
+                ImmutableNodeFactory.INSTANCE);
 
         // Type-safe reference to the backing store.
         this.fileStore = (FileStore) fileStore;

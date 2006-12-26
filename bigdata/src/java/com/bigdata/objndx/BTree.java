@@ -435,7 +435,8 @@ public class BTree extends AbstractBTree implements IBTree {
     {
 
         super(getTransitionalRawStore(store), keyType, branchingFactor,
-                hardReferenceQueue, NEGINF, comparator, keySer, valueSer,
+                hardReferenceQueue, NEGINF, comparator,
+                PackedAddressSerializer.INSTANCE, keySer, valueSer,
                 NodeFactory.INSTANCE);
 
         /*
@@ -496,7 +497,8 @@ public class BTree extends AbstractBTree implements IBTree {
 
         super(getTransitionalRawStore(store), metadata.keyType,
                 metadata.branchingFactor, hardReferenceQueue, NEGINF,
-                comparator, keySer, valueSer, NodeFactory.INSTANCE);
+                comparator, PackedAddressSerializer.INSTANCE, keySer, valueSer,
+                NodeFactory.INSTANCE);
         
         // save a reference to the immutable metadata record.
         this.metadata = metadata;

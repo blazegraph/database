@@ -116,8 +116,14 @@ import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
  *       routine. Also, since the data are pre-ordered a merging scan seems
  *       likely to be far more efficient.
  * 
- * FIXME change the way in which child addresses are serialized so that we can
- * continue to pack them and re-enable packing in the {@link NodeSerializer}.
+ * FIXME Packing child addresses for the {@link IndexSegment} is currently
+ * broken since we are flipping the sign when the child is a node in order to
+ * indicate that the offset is relative to the node base rather than the file
+ * base. At the moment the child addresses are simply not packed for an
+ * {@link IndexSegment}. However, the correct fix is to bit shift left by one
+ * bit and set a flag indicating whether the address is of a node or a leaf and
+ * then decode the address appropriately either when it is read from the store.
+ * This will let us simplify
  */
 public class IndexSegmentBuilder {
 
@@ -359,7 +365,9 @@ public class IndexSegmentBuilder {
         keyType = btree.keyType;
         
         // Used to serialize the stack and leaves for the output tree.
-        nodeSer = btree.nodeSer;
+        nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
+                AddressSerializer.INSTANCE, btree.nodeSer.keySerializer,
+                btree.nodeSer.valueSerializer);
 
         // Create a plan for generating the output tree.
         plan = new IndexSegmentPlan(m,btree.size());
@@ -1326,4 +1334,29 @@ public class IndexSegmentBuilder {
         
     }
     
+    /**
+     * Factory does not support node or leaf creation.
+     */
+    protected static class NOPNodeFactory implements INodeFactory {
+
+        public static final INodeFactory INSTANCE = new NOPNodeFactory();
+        
+        private NOPNodeFactory() {}
+        
+        public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
+                ArrayType keyType, int nkeys, Object keys, Object[] values) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        public INodeData allocNode(IBTree btree, long id, int branchingFactor,
+                ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+    }
+
 }

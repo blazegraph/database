@@ -103,8 +103,8 @@ public class TestNodeSerializer extends AbstractObjectIndexTestCase {
         final IndexEntrySerializer valueSer = new IndexEntrySerializer(slotMath);
         
         final NodeSerializer nodeSer = new NodeSerializer(
-                BTree.NodeFactory.INSTANCE, Int32OIdKeySerializer.INSTANCE,
-                valueSer);
+                BTree.NodeFactory.INSTANCE, PackedAddressSerializer.INSTANCE,
+                Int32OIdKeySerializer.INSTANCE, valueSer);
 
         System.err.println("Shared record format:");
 

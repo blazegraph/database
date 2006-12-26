@@ -239,19 +239,23 @@ abstract public class AbstractBTree implements IBTree {
      *            When keyType is {@link ArrayType#OBJECT} this is the
      *            comparator used to place the keys into a total ordering. It
      *            must be null for otherwise.
+     * @param addrSer
+     *            Object that knows how to (de-)serialize the child addresses in
+     *            an {@link INodeData}.
      * @param keySer
-     *            Object that knows how to (de-)serialize the keys in a
-     *            {@link Node} or a {@link Leaf} of the tree.
+     *            Object that knows how to (de-)serialize the keys in an
+     *            {@link INodeData} or an {@link ILeafData} of the tree.
      * @param valueSer
-     *            Object that knows how to (de-)serialize the values in a
-     *            {@link Leaf}.
+     *            Object that knows how to (de-)serialize the values in an
+     *            {@link ILeafData}.
+     * @param nodeFactory
+     *            Object that provides a factory for node and leaf objects.
      */
-    protected AbstractBTree(IRawStore2 store,
-            ArrayType keyType,
-            int branchingFactor,
-            HardReferenceQueue<PO> hardReferenceQueue, Object NEGINF,
-            Comparator comparator, IKeySerializer keySer,
-            IValueSerializer valueSer, INodeFactory nodeFactory ) {
+    protected AbstractBTree(IRawStore2 store, ArrayType keyType,
+            int branchingFactor, HardReferenceQueue<PO> hardReferenceQueue,
+            Object NEGINF, Comparator comparator, IAddressSerializer addrSer,
+            IKeySerializer keySer, IValueSerializer valueSer,
+            INodeFactory nodeFactory) {
         
         assert store != null;
         
@@ -260,6 +264,8 @@ abstract public class AbstractBTree implements IBTree {
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
         assert hardReferenceQueue != null;
+        
+        assert addrSer != null;
         
         assert keySer != null;
         
@@ -312,7 +318,7 @@ abstract public class AbstractBTree implements IBTree {
         
         this.NEGINF = NEGINF;
 
-        this.nodeSer = new NodeSerializer(nodeFactory, keySer, valueSer);
+        this.nodeSer = new NodeSerializer(nodeFactory, addrSer, keySer, valueSer);
 
     }
     
