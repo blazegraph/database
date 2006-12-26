@@ -1,12 +1,17 @@
 package com.bigdata.objndx;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
+import org.CognitiveWeb.extser.LongPacker;
+
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.journal.Bytes;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -111,7 +116,8 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
         super(fileStore, fileStore.metadata.keyType,
                 fileStore.metadata.branchingFactor, hardReferenceQueue, NEGINF,
-                comparator, AddressSerializer.INSTANCE, keySer, valSer,
+                comparator, new CustomAddressSerializer(
+                        fileStore.metadata.offsetNodes), keySer, valSer,
                 ImmutableNodeFactory.INSTANCE);
 
         // Type-safe reference to the backing store.
@@ -146,61 +152,61 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
     }
     
-    /**
-     * The internal addresses for child nodes found in a node of the index
-     * segment are relative to the start of the index nodes block in the file.
-     * To differentiate them from addresses for leaves, which are correct, the
-     * sign is flipped so that a node address is always a negative integer. This
-     * method looks for the negative address, flips the sign, and adds in the
-     * offset of the node block in the file so that the resulting address
-     * correctly addresses an absolute offset in the file.
-     * 
-     * @param addr
-     *            An {@link Addr}. When negative, the address is for a node and
-     *            must be decoded per the commentary above.
-     * 
-     * @return The node or leaf at that address in the file.
-     * 
-     * @see IndexSegmentBuilder.SimpleNodeData
-     */
-    protected AbstractNode readNodeOrLeaf(long addr) {
-
-        if (addr < 0) {
-    
-            /*
-             * Always a reference to a node as represented in childAddr[] of
-             * some node.
-             */
-            
-            // flip the sign
-            addr = -(addr);
-            
-            // compute the absolute offset into the file.
-            int offset = (int) fileStore.metadata.offsetNodes
-                    + Addr.getOffset(addr);
-            
-            // the size of the record in bytes.
-            int nbytes = Addr.getByteCount(addr);
-            
-            // form an absolute Addr.
-            addr = Addr.toLong(nbytes, offset);
-            
-            // read the node from the file.
-            return (Node) super.readNodeOrLeaf(addr);
-
-        } else {
-            
-            /*
-             * Either a leaf -or- the root node (which does not use an encoded
-             * address!)
-             */
-            
-            // read the node or leaf from the file.
-            return super.readNodeOrLeaf(addr);
-
-        }
-    
-    }
+//    /**
+//     * The internal addresses for child nodes found in a node of the index
+//     * segment are relative to the start of the index nodes block in the file.
+//     * To differentiate them from addresses for leaves, which are correct, the
+//     * sign is flipped so that a node address is always a negative integer. This
+//     * method looks for the negative address, flips the sign, and adds in the
+//     * offset of the node block in the file so that the resulting address
+//     * correctly addresses an absolute offset in the file.
+//     * 
+//     * @param addr
+//     *            An {@link Addr}. When negative, the address is for a node and
+//     *            must be decoded per the commentary above.
+//     * 
+//     * @return The node or leaf at that address in the file.
+//     * 
+//     * @see IndexSegmentBuilder.SimpleNodeData
+//     */
+//    protected AbstractNode readNodeOrLeaf(long addr) {
+//
+//        if (addr < 0) {
+//    
+//            /*
+//             * Always a reference to a node as represented in childAddr[] of
+//             * some node.
+//             */
+//            
+//            // flip the sign
+//            addr = -(addr);
+//            
+//            // compute the absolute offset into the file.
+//            int offset = (int) fileStore.metadata.offsetNodes
+//                    + Addr.getOffset(addr);
+//            
+//            // the size of the record in bytes.
+//            int nbytes = Addr.getByteCount(addr);
+//            
+//            // form an absolute Addr.
+//            addr = Addr.toLong(nbytes, offset);
+//            
+//            // read the node from the file.
+//            return (Node) super.readNodeOrLeaf(addr);
+//
+//        } else {
+//            
+//            /*
+//             * Either a leaf -or- the root node (which does not use an encoded
+//             * address!)
+//             */
+//            
+//            // read the node or leaf from the file.
+//            return super.readNodeOrLeaf(addr);
+//
+//        }
+//    
+//    }
     
     /**
      * Operation is disallowed.
@@ -443,11 +449,15 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         private boolean open = false;
         
         public void delete(long addr) {
+
             throw new UnsupportedOperationException();
+            
         }
 
         public long write(ByteBuffer data) {
+            
             throw new UnsupportedOperationException();
+            
         }
         
         /**
@@ -572,4 +582,222 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
     }
 
+    /**
+     * <p>
+     * A custom serializer class provides a workaround for node offsets (which
+     * are relative to the start of the nodes in the file) in contract to leaf
+     * offsets (which are relative to the start of the file). This condition
+     * arises as a side effect of serializing nodes onto a temporary channel at
+     * the same time that the {@link IndexSegmentBuilder} is serializing leaves
+     * onto the primary channel.
+     * </p>
+     * <p>
+     * Addresses are required to be left-shifted by one bit on the
+     * {@link INodeData} interface during serialization and the low bit must be
+     * a one (1) iff the address is of a child node and a zero (0) iff the
+     * address is of a child leaf. During de-serialization, the low bit is
+     * examined so that the address may be appropriately decoded and the addr is
+     * then right shifted one bit. A leaf address does not require further
+     * decodiing. Decoding for a node address requires that we add in the offset
+     * of the start of the nodes in the file, which is recorded in
+     * {@link IndexSegmentMetadata#offsetNodes} and is specified as a parameter
+     * to the {@link CustomAddressSerializer} constructor.
+     * </p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class CustomAddressSerializer implements IAddressSerializer {
+
+        /**
+         * The offset within the file of the first node. All nodes are written
+         * densely on the file beginning at this offset. The child addresses for
+         * a node are relative to this offset and must be corrected during
+         * decoding (this is handled automatically by this class).
+         */
+        protected final int offsetNodes;
+
+        /**
+         * Constructor variant used when the offset of the nodes is not known.
+         * This is used by the {@link IndexSegmentBuilder}. When using this
+         * constructor de-serialization of addresses is disabled.
+         */
+        public CustomAddressSerializer() {
+            
+            this.offsetNodes = 0;
+            
+        }
+
+        /**
+         * 
+         * @param nodesOffset
+         *            The offset within the file of the first node. All nodes
+         *            are written densely on the file beginning at this offset.
+         *            The child addresses for a node are relative to this offset
+         *            and must be corrected during decoding (this is handled
+         *            automatically by this class). When zero(0) node
+         *            deserialization is not permitted (the nodesOffset will be
+         *            zero in the metadata record iff no nodes were generated by
+         *            the index segment builder).
+         * 
+         * @see IndexSegmentMetadata#offsetNodes
+         */
+        public CustomAddressSerializer(long offsetNodes) {
+            
+            /*
+             * Note: trim to int (we restrict the maximum size of the segment).
+             */
+            this.offsetNodes = (int) offsetNodes;
+            
+            System.err.println("offsetNodes="+offsetNodes);
+            
+        }
+        
+        /**
+         * This over-estimates the space requirements. 
+         */
+        public int getSize(int n) {
+            
+            return Bytes.SIZEOF_LONG * n;
+            
+        }
+
+        /**
+         * Packs the addresses, which MUST already have been encoded according
+         * to the conventions of this class.
+         */
+        public void putChildAddresses(DataOutputStream os, long[] childAddr, int nchildren) throws IOException {
+            
+            for (int i = 0; i < nchildren; i++) {
+
+                long addr = childAddr[i];
+
+                /*
+                 * Children MUST have assigned persistent identity.
+                 */
+                if (addr == 0L) {
+
+                    throw new RuntimeException("Child is not persistent: index="
+                            + i);
+
+                }
+
+                // test the low bit.  when set this is a node; otherwise a leaf.
+                final boolean isLeaf = (addr & 1) == 0;
+                
+                // strip off the low bit.
+                addr >>= 1;
+                
+                final int offset = Addr.getOffset(addr);
+                
+                final int nbytes = Addr.getByteCount(addr);
+                
+                final int adjustedOffset = (isLeaf ? (offset << 1)
+                        : ((offset << 1) | 1));
+                
+                // write the adjusted offset (requires decoding).
+                LongPacker.packLong(os, adjustedOffset);
+                
+                // write the #of bytes (does not require decoding).
+                LongPacker.packLong(os, nbytes);
+
+            }
+
+        }
+
+        /**
+         * Unpacks and decodes the addresses.
+         */
+        public void getChildAddresses(DataInputStream is, long[] childAddr,
+                int nchildren) throws IOException {
+
+            // check that we know the offset for deserialization.
+            assert offsetNodes > 0;
+            
+            for (int i = 0; i < nchildren; i++) {
+
+                /*
+                 * Note: the Address is packed as two long integers. The first
+                 * is the offset. The way the packed values are written, the
+                 * offset is left-shifted by one and its low bit indicates
+                 * whether the referent is a node (1) or a leaf (0).
+                 */
+                
+                /*
+                 * offset (this field must be decoded).
+                 */
+                long v = LongPacker.unpackLong(is);
+                
+                assert v <= Integer.MAX_VALUE;
+                
+                // test the low bit.  when set this is a node; otherwise a leaf.
+                final boolean isLeaf = (v & 1) == 0;
+
+                // right shift by one to remove the low bit.
+                v >>= 1;
+
+                // compute the real offset into the file.
+                final int offset = isLeaf? (int)v : (int)v + offsetNodes;
+                
+                /*
+                 * nbytes (this field does not need any further interpretation).
+                 */
+                
+                v = LongPacker.unpackLong(is);
+                
+                assert v <= Integer.MAX_VALUE;
+                
+                final int nbytes = (int) v;
+
+                /*
+                 * combine into the correct address.
+                 */
+                final long addr = Addr.toLong(nbytes, offset);
+                
+                if (addr == 0L) {
+
+                    throw new RuntimeException(
+                            "Child does not have persistent address: index=" + i);
+
+                }
+
+                childAddr[i] = addr;
+
+            }
+
+        }
+
+        /**
+         * Encode an address. The address is left shifted by one bit. If the
+         * address is of a node then the low bit is set to one (1) otherwise it
+         * will be zero(0).
+         * 
+         * @param nbytes
+         *            The #of bytes in the allocation.
+         * @param offset
+         *            The offset of the allocation.
+         * @param isLeaf
+         *            true iff this is the address of a leaf and false iff this
+         *            is the address of a node.
+         * 
+         * @return The encoded address.
+         */
+        static public long encode(int nbytes,int offset,boolean isLeaf) {
+            
+            long addr = Addr.toLong(nbytes, (int) offset);
+            
+            addr <<= 1; // (addr << 1)
+            
+            if (!isLeaf) {
+                
+                addr |= 1; // addr++;
+            
+            }
+            
+            return addr;
+            
+        }
+
+    }
+    
 }

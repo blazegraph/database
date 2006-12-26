@@ -95,6 +95,8 @@ public class TestAll extends TestCase {
          */
         // test static methods for the index builder.
         suite.addTestSuite( TestIndexSegmentPlan.class );
+        // test encoding and decoding of child node/leaf addresses.
+        suite.addTestSuite( TestIndexSegmentAddressSerializer.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // stress test with larger random input trees and a variety of branching factors.

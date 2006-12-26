@@ -358,9 +358,9 @@ public class NodeSerializer {
 
         } else {
 
-            int valuesSize = (SIZEOF_REF * (nkeys + 1));
+            int addrSize = addrSerializer.getSize(nkeys+1);
 
-            return SIZEOF_NODE_HEADER + flexHeader + keysSize + valuesSize;
+            return SIZEOF_NODE_HEADER + flexHeader + keysSize + addrSize;
 
         }
         

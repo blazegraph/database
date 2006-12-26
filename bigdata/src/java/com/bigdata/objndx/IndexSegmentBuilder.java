@@ -62,6 +62,7 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
+import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -115,15 +116,6 @@ import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
  *       {@link IBTree} which is a bit much to expect from an external sort
  *       routine. Also, since the data are pre-ordered a merging scan seems
  *       likely to be far more efficient.
- * 
- * FIXME Packing child addresses for the {@link IndexSegment} is currently
- * broken since we are flipping the sign when the child is a node in order to
- * indicate that the offset is relative to the node base rather than the file
- * base. At the moment the child addresses are simply not packed for an
- * {@link IndexSegment}. However, the correct fix is to bit shift left by one
- * bit and set a flag indicating whether the address is of a node or a leaf and
- * then decode the address appropriately either when it is read from the store.
- * This will let us simplify
  */
 public class IndexSegmentBuilder {
 
@@ -366,8 +358,10 @@ public class IndexSegmentBuilder {
         
         // Used to serialize the stack and leaves for the output tree.
         nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
-                AddressSerializer.INSTANCE, btree.nodeSer.keySerializer,
-                btree.nodeSer.valueSerializer);
+                new IndexSegment.CustomAddressSerializer(),
+                btree.nodeSer.keySerializer,
+                btree.nodeSer.valueSerializer
+                );
 
         // Create a plan for generating the output tree.
         plan = new IndexSegmentPlan(m,btree.size());
@@ -639,7 +633,9 @@ public class IndexSegmentBuilder {
                  * references require some translation.)
                  */
                 
-                long addr = - ( ((SimpleNodeData)stack[0]).addr ); // flip sign
+//                long addr = - ( ((SimpleNodeData)stack[0]).addr ); // flip sign
+                
+                long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
                 
                 int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
                 
@@ -1036,7 +1032,13 @@ public class IndexSegmentBuilder {
         
         System.err.print("."); // wrote a leaf.
 
-        return Addr.toLong(nbytes, (int)offset);
+//        return Addr.toLong(nbytes, (int)offset);
+        
+        // Encode the address.
+        final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
+                true);
+        
+        return addr;
         
     }
 
@@ -1096,8 +1098,12 @@ public class IndexSegmentBuilder {
         
         System.err.print("x"); // wrote a node.
 
-        // flip the sign to indicate a relative reference to a node.
-        long addr = - ( Addr.toLong(nbytes, (int)offset) );
+//        // flip the sign to indicate a relative reference to a node.
+//        long addr = - ( Addr.toLong(nbytes, (int)offset) );
+
+        // Encode the address.
+        final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
+                false);
         
         node.addr = addr;
         
