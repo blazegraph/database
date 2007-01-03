@@ -69,6 +69,13 @@ public interface IAbstractNodeData {
     public int getBranchingFactor();
     
     /**
+     * The #of entries (aka keys or values) spanned by this node or leaf.
+     * 
+     * @see INodeData#getChildEntryCounts()
+     */
+    public int getEntryCount();
+
+    /**
      * The #of keys defined keys for the node or leaf. The maximum #of keys for
      * a node is one less than the {@link #getBranchingFactor()}. The maximum
      * #of keys for a leaf is the {@link #getBranchingFactor()}.

@@ -86,7 +86,7 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
- * @todo track the #of nodes and leaves on the hard reference queue in touch and
+ * @todo Track the #of nodes and leaves on the hard reference queue in touch and
  *       {@link DefaultEvictionListener}. Also track the number that are clean
  *       vs dirty.
  * 
@@ -107,7 +107,12 @@ import com.bigdata.journal.SlotMath;
  * 
  * @todo drop the jdbm-based btree implementation in favor of this one and test
  *       out a GOM integration. this will also require an extser service /
- *       index.
+ *       index. extser support could be handled using an extensible metadata
+ *       record for the {@link BTree} or {@link IndexSegment}, at least for an
+ *       embedded database scenario. http://xstream.codehaus.org/ is also an
+ *       interesting serialization package with somewhat different goals (you do
+ *       not have to write serializers, but it is doubtless less compact and
+ *       does not have extensible versioning).
  * 
  * @todo Implement an "extser" index that does not use extser itself, but which
  *       could provide the basis for a database that does use extser. The index
@@ -253,9 +258,6 @@ import com.bigdata.journal.SlotMath;
  *       and use a separate implementation for bulk generating and reading
  *       "perfect" read-only key range segments.
  * 
- * @todo Support bloom filters. Figure out whether they go in front of an index
- *       or just an index range segment.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -333,7 +335,7 @@ public class BTree extends AbstractBTree implements IBTree {
         
     }
 
-    public int size() {
+    public int getEntryCount() {
         
         return nentries;
         
@@ -369,6 +371,10 @@ public class BTree extends AbstractBTree implements IBTree {
 
     /**
      * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
+     * 
+     * @todo this field as well as nleaves and nentries could be taken from the
+     *       root node rather than being maintained directly. when the root is a
+     *       leaf, then nnodes=0, nleaves=1, and nentries=root.nkeys
      */
     protected int nnodes;
 
@@ -462,10 +468,13 @@ public class BTree extends AbstractBTree implements IBTree {
 
         this.height = 0;
 
-        this.nnodes = nleaves = nentries = 0;
+        this.nnodes = 0;
+        
+        this.nentries = 0;
         
         this.root = new Leaf(this);
         
+        this.nleaves = 1; 
     }
 
     /**
@@ -624,10 +633,11 @@ public class BTree extends AbstractBTree implements IBTree {
         }
 
         public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
+                ArrayType keyType, /*int nnodes, int nleaves,*/ int nentries,
+                int nkeys, Object keys, long[] childAddr, int[] childEntryCounts) {
             
-            return new Node((BTree) btree, id, branchingFactor, nkeys, keys,
-                    childAddr);
+            return new Node((BTree) btree, id, branchingFactor,/* nnodes,
+                    nleaves, */ nentries, nkeys, keys, childAddr, childEntryCounts);
             
         }
 

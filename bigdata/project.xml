@@ -30,13 +30,8 @@
 
   <p>
 
-	  A distributed store based on a replicated segment architecture using
-	  a Read One Write All Available (ROWAA) strategy.  This project is
-	  designed to layer over the <code>dbCache</code> module and provide
-	  the foundation for a distributed database.  This module provides the
-	  peer discover, lock server, client/server partition, and replication
-	  features of a distributed database.  An integration with jdbm(2.x) is
-	  planned to support a Data2.0 GOM distributed high availabilty platform.
+	  bigdata is a distributed storage platform designed for high performance
+	  and scale out on commodity hardware.
 
   </p>
 
@@ -150,6 +145,13 @@
       <id>junit</id> 
       <version>3.8.1</version> 
       <url>http://www.junit.org/</url>
+    </dependency>
+
+    <!-- LGPL utility classes. -->
+    <dependency> 
+      <id>lgpl-util</id> 
+      <!--<version>3.8.1</version>-->
+      <url>http://cweb.cvs.sourceforge.net/cweb/lgpl-utils/</url>
     </dependency>
 
   </dependencies>

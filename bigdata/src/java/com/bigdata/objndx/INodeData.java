@@ -75,5 +75,29 @@ public interface INodeData extends IAbstractNodeData {
      * @return The backing array of persistent child addresses.
      */
     public long[] getChildAddr();
-        
+
+//    /**
+//     * The #of non-leaf nodes that would be spanned by a post-order traversal of
+//     * the tree starting with this node (the count includes this node and all
+//     * spanned descendent nodes but excludes any spanned leaves).  For example,
+//     * for the root of a btree that has been split for the first time this will
+//     * be one(1) since there is one root node and two child leaves and we only
+//     * report the nodes.
+//     */
+//    public int getNodeCount();
+
+//    /**
+//     * The #of leaf nodes spanned by this node.
+//     */
+//    public int getLeafCount();
+
+    /**
+     * The #of entries (aka keys or values) spanned by each child of this node.
+     * The sum of the defined values in this array should always be equal to the
+     * value returned by {@link #getEntryCount()}. These data are used to
+     * support fast computation of the index at which a key occurs and the #of
+     * entries in a given key range.
+     */
+    public int[] getChildEntryCounts();
+
 }

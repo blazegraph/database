@@ -51,27 +51,69 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.ISlotAllocation;
+import com.bigdata.journal.Journal;
 
 /**
- * Transitional interface bridging {@link IRawStore} based on fixed size slot
- * allocations to a new interface drops the concept of {@link ISlotAllocation}
- * and encodes the #of bytes (vs #of slots) directly into the long {@link Addr}.
+ * <p>
+ * A low-level interface for reading and writing data. This interface is not
+ * isolated and operations do not possess ACID semantics. Implementations may or
+ * may not be durable. All operations are expressed in terms of long integers,
+ * constructed and examined using {@link Addr}, that encode both the offset on
+ * the store at which the data exists and the length of the data in bytes.
+ * </p>
+ * <p>
+ * The {@link Journal} is the principle implementation of this interface and
+ * provides both transient and durable options and the facilities for atomic
+ * commit. {@link BTree} provides a higher level interface for operations on a
+ * {@link Journal}. The {@link BTree} uses a copy-on-write policy designed to
+ * support transactional semantics by making it possible to read from a
+ * consistent historical state.
+ * </p>
+ * 
+ * FIXME This is a transitional interface bridging {@link IRawStore} based on
+ * fixed size slot allocations to a new interface drops the concept of
+ * {@link ISlotAllocation} and encodes the #of bytes (vs #of slots) directly
+ * into the long {@link Addr}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @see Addr
  * @see IRawStore
+ * @see Journal
+ * @see BTree
  */
 public interface IRawStore2 {
 
     /**
-     * Reads data, assembling the result in a buffer. This method is not
-     * isolated.
+     * Write the data (unisolated).
      * 
-     * @param off
-     *            The offset from which the data will be read.
-     * @param len
-     *            The #of bytes to be read.
+     * @param data
+     *            The data.
+     * 
+     * @return A long integer formed using {@link Addr} that encodes both the
+     *         offset from which the data may be read and the #of bytes to be
+     *         read.
+     */
+    public long write(ByteBuffer data);
+    
+    /**
+     * Delete the data (unisolated).
+     * 
+     * @param addr
+     *            A long integer formed using {@link Addr} that encodes both the
+     *            offset at which the data was written and the #of bytes that
+     *            were written.
+     */
+    public void delete(long addr);
+    
+    /**
+     * Read the data (unisolated).
+     * 
+     * @param addr
+     *            A long integer formed using {@link Addr} that encodes both the
+     *            offset from which the data will be read and the #of bytes to
+     *            be read.
      * @param dst
      *            The destination buffer (optional). When specified, the data
      *            will be appended starting at the current position. If there is
@@ -86,16 +128,4 @@ public interface IRawStore2 {
      */
     public ByteBuffer read(long addr, ByteBuffer dst);
 
-    public void delete(long addr);
-    
-    /**
-     * Writes the data, returns the {@link Addr} as a long integer.
-     * 
-     * @param data
-     *            The data.
-     *            
-     * @return The address that can be used to recover the data.
-     */
-    public long write(ByteBuffer data);
-    
 }

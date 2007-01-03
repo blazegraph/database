@@ -418,7 +418,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
                  * Validate the keys and entries.
                  */
                 
-                assertEquals("#entries", expected.size(), btree.size());
+                assertEquals("#entries", expected.size(), btree.getEntryCount());
                 
                 Iterator<Map.Entry<Integer,SimpleEntry>> itr = expected.entrySet().iterator();
                 

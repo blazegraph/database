@@ -47,6 +47,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestInvariants.class );
         // test finding a child of a node by its key.
         suite.addTestSuite( TestFindChild.class );
+        // @todo test successor(key), including for application defined key types.
         // test insert, lookup, and remove for root leaf w/o splitting it.
         suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
         // test splitting the root leaf.
@@ -55,6 +56,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestSplitJoinRootLeaf.class );
         // test splitting and joining with more than two levels.
         suite.addTestSuite( TestSplitJoinThreeLevels.class );
+        // test indexOf, keyAt, valueAt.
+        suite.addTestSuite( TestLinearListMethods.class );
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
         // test contract for BTree#touch(node) w/o IO.

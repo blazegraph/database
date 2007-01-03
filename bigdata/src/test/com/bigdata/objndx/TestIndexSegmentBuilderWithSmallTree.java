@@ -114,7 +114,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(3,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -124,6 +124,11 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
          * Verify the total index order.
          */
         assertSameBTree(btree, seg);
+        
+        /*
+         * @todo verify per-node counters (#of nodes, leaves, entries, and bytes
+         * spanned by the node).
+         */
         
     }
 
@@ -161,7 +166,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -205,7 +210,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.size());
+        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -279,7 +284,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(3,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(9,seg.size());
+        TestIndexSegmentPlan.assertEquals(9,seg.getEntryCount());
         
         /*
          * @todo verify the right keys in the right leaves.
@@ -355,7 +360,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(4,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(20,seg.size());
+        TestIndexSegmentPlan.assertEquals(20,seg.getEntryCount());
         
         /*
          * @todo verify the right keys in the right leaves.

@@ -1,7 +1,7 @@
 package com.bigdata.objndx;
 
 /**
- * A helper class that collects statistics on the btree.
+ * A helper class that collects statistics on an {@link AbstractBTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -28,6 +28,9 @@ public class Counters {
     int nfinds = 0;
     int ninserts = 0;
     int nremoves = 0;
+    int nindexOf = 0;
+    int ngetKey = 0;
+    int ngetValue = 0;
     int rootsSplit = 0;
     int rootsJoined = 0;
     int nodesSplit = 0;
@@ -51,10 +54,13 @@ public class Counters {
         "height="+btree.getHeight()+
         ", #nodes="+btree.getNodeCount()+
         ", #leaves="+btree.getLeafCount()+
-        ", #entries="+btree.size()+
+        ", #entries="+btree.getEntryCount()+
         ", #find="+nfinds+
         ", #insert="+ninserts+
         ", #remove="+nremoves+
+        ", #indexOf="+nindexOf+
+        ", #getKey="+ngetKey+
+        ", #getValue="+ngetValue+
         ", #roots split="+rootsSplit+
         ", #roots joined="+rootsJoined+
         ", #nodes split="+nodesSplit+

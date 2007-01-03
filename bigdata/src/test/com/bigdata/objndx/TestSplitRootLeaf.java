@@ -106,6 +106,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -148,6 +149,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,4},a);
         assertValues(new Object[]{v3,v4},a);
@@ -190,6 +192,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{6},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,5},a);
         assertValues(new Object[]{v3,v5},a);
@@ -232,6 +235,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,5},a);
         assertValues(new Object[]{v3,v5},a);
@@ -276,6 +280,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -320,6 +325,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,4},a);
         assertValues(new Object[]{v3,v4},a);
@@ -364,6 +370,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{6},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
         assertValues(new Object[]{v3,v5},a);
@@ -408,6 +415,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
         assertValues(new Object[]{v3,v5},a);
@@ -452,6 +460,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
         assertValues(new Object[]{v3,v5},a);

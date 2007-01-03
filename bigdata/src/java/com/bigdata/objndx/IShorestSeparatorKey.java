@@ -60,14 +60,14 @@ package com.bigdata.objndx;
  * you have an index with variable length character data as keys:
  * 
  * <pre>
- *      leaf:    [ motivate, movie, moving, mower ]
+ *       leaf:    [ motivate, movie, moving, mower ]
  * </pre>
  * 
  * This leaf will be split at index 2 as follows:
  * 
  * <pre>
- *      leaf:    [ motivate, movie, -, - ]
- *      sibling: [ moving, mower, -, - ]
+ *       leaf:    [ motivate, movie, -, - ]
+ *       sibling: [ moving, mower, -, - ]
  * </pre>
  * 
  * The separator key MUST be less than or equal to "moving" and strictly greater
@@ -87,7 +87,10 @@ package com.bigdata.objndx;
  *             data into a page and for the index nodes. We are achieving
  *             similar means through other devices, notably allowing the page
  *             size to vary while fixing the branching factor and using large
- *             branching factors and compression in {@link IndexSegments}.
+ *             branching factors and compression in {@link IndexSegments}. If
+ *             implemented, the effect would be to reduce the size on disk of a
+ *             node in an index segment. However, those nodes are already
+ *             compressed so it is uncertain if there would be any real savings.
  */
 public interface IShorestSeparatorKey {
 

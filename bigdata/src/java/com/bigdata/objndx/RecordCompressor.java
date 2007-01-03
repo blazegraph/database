@@ -62,8 +62,14 @@ import java.util.zip.InflaterInputStream;
  * compression and decompression operations of a given {@link RecordCompressor}
  * reuse a shared instance buffer. Any decompression result is valid only until
  * the next compression or decompression operation performed by that
- * {@link RecordCompressor}. When used in a single-threaded context this reduces
- * allocation while maximizing the opportunity for bulk transfers.
+ * {@link RecordCompressor}. When used in a single-threaded context this
+ * reduces allocation while maximizing the opportunity for bulk transfers.
+ * 
+ * @todo define an interface for a record compressor and write the class of the
+ *       compressor used into the {@link IndexSegmentMetadata} so that we can
+ *       experiment with other compression schemes in a backward compatible
+ *       manner. If the compressor has parameters then those can be capture by
+ *       subclassing or instance data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

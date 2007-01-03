@@ -316,7 +316,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
              * Build the index segment.
              */
             System.err.println("Building index segment: in(m="
-                    + btree.getBranchingFactor() + ", nentries=" + btree.size()
+                    + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                     + "), out(m=" + m + ")");
             
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,tmpDir,btree,m);

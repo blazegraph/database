@@ -24,6 +24,9 @@ import com.bigdata.journal.Bytes;
  * Note: iterators returned by this class do not support removal (the nodes and
  * leaves will all refuse mutation operations).
  * 
+ * @todo Support efficient leaf scans in forward order (could also do reverse
+ *       order by serializing the priorId into the leaf).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -82,7 +85,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
     }
     
-    public int size() {
+    public int getEntryCount() {
 
         return fileStore.metadata.nentries;
         
@@ -238,16 +241,24 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
                 ArrayType keyType, int nkeys, Object keys, Object[] values) {
 
-            return new ImmutableLeaf((AbstractBTree) btree, id, branchingFactor, nkeys,
-                    keys, values);
-            
+            return new ImmutableLeaf((AbstractBTree) btree, id,
+                    branchingFactor, nkeys, keys, values);
+
         }
 
         public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
-            
-            return new ImmutableNode((AbstractBTree) btree, id, branchingFactor, nkeys,
-                    keys, childAddr);
+                ArrayType keyType,
+//                int nnodes, int nleaves,
+                int nentries,
+                int nkeys, Object keys, long[] childAddr, int[] childEntryCount) {
+
+            return new ImmutableNode((AbstractBTree) btree, id,
+                    branchingFactor,
+//                    nnodes, nleaves, 
+                    nentries, nkeys, keys,
+                    childAddr,
+                    childEntryCount
+                    );
             
         }
 
@@ -266,12 +277,22 @@ public class IndexSegment extends AbstractBTree implements IBTree {
              * @param btree
              * @param id
              * @param branchingFactor
+             * @param nentries
              * @param nkeys
              * @param keys
              * @param childKeys
              */
-            protected ImmutableNode(AbstractBTree btree, long id, int branchingFactor, int nkeys, Object keys, long[] childKeys) {
-                super(btree, id, branchingFactor, nkeys, keys, childKeys);
+            protected ImmutableNode(AbstractBTree btree, long id,
+                    int branchingFactor,
+//                    int nnodes, int nleaves,
+                    int nentries,
+                    int nkeys, Object keys, long[] childKeys, int[] childEntryCount) {
+
+                super(btree, id, branchingFactor,
+//                        nnodes, nleaves,
+                        nentries,
+                        nkeys, keys, childKeys, childEntryCount);
+                
             }
 
             public void delete() {

@@ -126,6 +126,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -187,6 +188,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -248,6 +250,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -309,6 +312,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -381,6 +385,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -405,6 +410,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
         assertEquals(b,root.getChild(1));
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,5},a);
         assertValues(new Object[]{v2,v5},a);
@@ -425,7 +431,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * Continue by removing another key and forcing merge. This removes (7)
          * from (b), making (b) deficient and forcing b.merge(a). The
          * postcondition is that (b) has all the remaining keys and has become
-         * the root leaf and the (a) and the root node are deleted.
+         * the root leaf and that (a) and the root node are deleted.
          */
 
         assertEquals(v7,btree.remove(7));
@@ -477,6 +483,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);
@@ -497,6 +504,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         assertEquals(b,root.getChild(1));
+        assertEntryCounts(new int[]{3,3},root);
         
         assertKeys(new int[]{2,3,4},a);
         assertValues(new Object[]{v2,v3,v4},a);
@@ -518,6 +526,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertEquals(v5,btree.remove(5));
         assertKeys(new int[]{7,9},b);
         assertValues(new Object[]{v7,v9},b);
+        assertEntryCounts(new int[]{3,2},root);
 
         assertEquals(v9,btree.remove(9));
         assertTrue("after redistribute a->b",btree.dump(Level.DEBUG,System.err));
@@ -525,6 +534,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{4},root);
         assertEquals(a,root.getChild(0));
         assertEquals(b,root.getChild(1));
+        assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{2,3},a);
         assertValues(new Object[]{v2,v3},a);

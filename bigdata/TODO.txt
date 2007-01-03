@@ -1,4 +1,4 @@
-Some big data design and implementation questions.
+Some bigdata design and implementation questions.
 
 1. How far does jini scale?  We will have 1000s of hosts, but up to
    32-bits of distinct segments.  Does each host or each segment
@@ -44,15 +44,7 @@ Some big data design and implementation questions.
    reduce installation reads.
 
 
-Application layer.
-
-
-1. Support b-link trees (concurrent traversal and modification) in
-   jdbm.
-
-2. Support containers (many objects in the same record).
-
-3. Support clustering.
+GOM layer.
 
 4. Support distributed link sets so that we can efficiently parallize
    link set scans across multiple segments and leverage bigtable row
@@ -74,4 +66,3 @@ Application layer.
    client that requested the iterator.
 
 5. Support schema constraints on link sets and generic objects in GOM.
-   

@@ -182,12 +182,6 @@ public class IndexSegmentBuilder {
      * 
      * @todo review choice of best speed vs best compression and possibly
      *       elevate to a constuctor parameter.
-     * 
-     * @todo define an interface for a record compressor and write the class of
-     *       the compressor used into the metadata record so that we can
-     *       experiment with other compression schemes in a backward compatible
-     *       manner. If the compressor has parameters then those can be capture
-     *       by subclassing or instance data.
      */
     final RecordCompressor compressor = new RecordCompressor();
 
@@ -364,7 +358,7 @@ public class IndexSegmentBuilder {
                 );
 
         // Create a plan for generating the output tree.
-        plan = new IndexSegmentPlan(m,btree.size());
+        plan = new IndexSegmentPlan(m,btree.getEntryCount());
 
         /*
          * Setup a stack of stack (one per non-leaf level) and one leaf. These
@@ -746,7 +740,7 @@ public class IndexSegmentBuilder {
      * Close out a node or leaf. When a node or leaf is closed we write it out
      * to obtain its {@link Addr} and set its address on its direct parent using
      * {@link #addChild(com.bigdata.objndx.IndexSegmentBuilder.SimpleNodeData, long)}.
-     * 
+     * This also updates the per-child counters of the #of entries spanned by a node. 
      */
     protected void close(AbstractSimpleNodeData node) throws IOException {
 
@@ -768,8 +762,11 @@ public class IndexSegmentBuilder {
         SimpleNodeData parent = getParent(node);
         
         if(parent != null) {
+
+            // #of entries spanned by this node.
+            final int nentries = node.getEntryCount();
             
-            addChild(parent, addr);
+            addChild(parent, addr, nentries);
             
         }
         
@@ -790,17 +787,21 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Record the persistent {@link Addr address} of a child on its parent. If
-     * all children on the parent become assigned then the parent is closed.
+     * Record the persistent {@link Addr address} of a child on its parent and
+     * the #of entries spanned by that child. If all children on the parent
+     * become assigned then the parent is closed.
      * 
      * @param parent
      *            The parent.
      * @param childAddr
      *            The address of the child (node or leaf).
+     * @param nentries
+     *            The #of entries spanned by the child (node or leaf).
      * 
      * @throws IOException
      */
-    protected void addChild(SimpleNodeData parent,long childAddr) throws IOException {
+    protected void addChild(SimpleNodeData parent, long childAddr, int nentries)
+            throws IOException {
 
         assert parent.nchildren < parent.max;
 
@@ -810,7 +811,15 @@ public class IndexSegmentBuilder {
                 + writtenInLevel[parent.level] + ", addr="
                 + Addr.toString(childAddr));
         
-        parent.childAddr[parent.nchildren++] = childAddr;
+        int nchildren = parent.nchildren;
+        
+        parent.childAddr[nchildren] = childAddr;
+        
+        parent.childEntryCount[nchildren] = nentries;
+
+        parent.nentries += nentries;
+        
+        parent.nchildren++;
 
         if( parent.nchildren == parent.max ) {
             
@@ -1242,6 +1251,12 @@ public class IndexSegmentBuilder {
         public boolean isLeaf() {
             return true;
         }
+
+        public int getEntryCount() {
+            
+            return nkeys;
+            
+        }
     
     }
 
@@ -1302,11 +1317,65 @@ public class IndexSegmentBuilder {
          */
         int nchildren = 0;
         
+        /**
+         * #of entries spanned by this node.
+         */
+        int nentries;
+        
+        /**
+         * The #of entries spanned by each child of this node.
+         */
+        int[] childEntryCount;
+        
+//        /**
+//         * #of leaves spanned by this node.
+//         */
+//        int nleaves;
+//        /**
+//         * #of nodes spanned by this node.
+//         */
+//        int nnodes;
+//        /**
+//         * #of bytes in leaves spanned by this node.
+//         * 
+//         * @todo de-serialize and expose in {@link IndexSegment}.
+//         */
+//        int nbytes;
+
+        public int getEntryCount() {
+            
+            return nentries;
+            
+        }
+
+        public int[] getChildEntryCounts() {
+            
+            return childEntryCount;
+            
+        }
+        
+//        public int getLeafCount() {
+//            return nleaves;
+//        }
+//
+//        public int getNodeCount() {
+//            return nnodes;
+//        }
+//
+//        /**
+//         * Cumulative #of bytes in leaves spanned by this node.
+//         */
+//        public int getByteCount() {
+//            return nbytes;
+//        }
+        
         public SimpleNodeData(int level,int m,ArrayType keyType) {
 
             super(level,m,keyType,ArrayType.alloc(keyType, m-1));
             
             this.childAddr = new long[m];
+            
+            this.childEntryCount = new int[m];
             
         }
         
@@ -1323,6 +1392,14 @@ public class IndexSegmentBuilder {
             addr = 0;
             
             nchildren = 0;
+
+//            nnodes = 0;
+//            
+//            nleaves = 0;
+            
+            nentries = 0;
+
+//            nbytes = 0;
             
         }
 
@@ -1357,7 +1434,10 @@ public class IndexSegmentBuilder {
         }
 
         public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, long[] childAddr) {
+                ArrayType keyType,
+//                int nnodes, int nleaves,
+                int nentries,
+                int nkeys, Object keys, long[] childAddr, int[] childEntryCounts) {
             
             throw new UnsupportedOperationException();
             

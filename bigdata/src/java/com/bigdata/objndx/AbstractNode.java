@@ -676,6 +676,24 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             // max #of keys.
             assert nkeys <= maxKeys;
 
+//            if( ! isLeaf() ) {
+//
+//                int nentries = 0;
+//            
+//                for( int i=0; i<=nkeys; i++) {
+//                
+//                    int n = ((Node)this).childEntryCounts[i];
+//                    
+//                    assert n > 0;
+//                    
+//                    nentries += n;
+//                    
+//                }
+//                
+//                assert nentries == ((Node)this).nentries;
+//                
+//            }
+            
         } catch (AssertionError ex) {
 
             log.fatal("Invariants failed\n"
@@ -1173,6 +1191,56 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
     abstract public Object lookup(Object key);
 
+    /**
+     * Recursive search locates the appropriate leaf and returns the index
+     * position of the entry.
+     * 
+     * @param key
+     *            The search key.
+     * 
+     * @return the index of the search key, if found; otherwise,
+     *         <code>(-(insertion point) - 1)</code>. The insertion point is
+     *         defined as the point at which the key would be found it it were
+     *         inserted into the btree without intervening mutations. Note that
+     *         this guarantees that the return value will be >= 0 if and only if
+     *         the key is found.
+     */
+    abstract public int indexOf(Object key);
+    
+    /**
+     * Recursive search locates the entry at the specified index position in the
+     * btree and returns the key for that entry.
+     * 
+     * @param index
+     *            The index position of the entry (origin zero and relative to
+     *            this node or leaf).
+     * 
+     * @return The key at that index position.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if index is less than zero.
+     * @exception IndexOutOfBoundsException
+     *                if index is greater than the #of entries.
+     */
+    abstract public Object keyAt(int index);
+    
+    /**
+     * Recursive search locates the entry at the specified index position in the
+     * btree and returns the value for that entry.
+     * 
+     * @param index
+     *            The index position of the entry (origin zero and relative to
+     *            this node or leaf).
+     * 
+     * @return The value at that index position.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if index is less than zero.
+     * @exception IndexOutOfBoundsException
+     *                if index is greater than the #of entries.
+     */
+    abstract public Object valueAt(int index);
+    
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).
      * 

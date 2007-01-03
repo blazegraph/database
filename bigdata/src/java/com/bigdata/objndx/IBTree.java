@@ -47,6 +47,8 @@
 
 package com.bigdata.objndx;
 
+import com.bigdata.objndx.ndx.NoSuccessorException;
+
 /**
  * Interface for a B-Tree mapping arbitrary non-null keys to arbitrary values.
  * 
@@ -85,15 +87,5 @@ public interface IBTree {
      *         entry for that key.
      */
     public Object remove(Object key);
-    
-    /**
-     * Return an iterator that visits key-value pairs in a half-open key range.
-     * 
-     * @param fromKey
-     *            The lowest key that will be visited (inclusive).
-     * @param toKey
-     *            The first key that will not be visited (exclusive).
-     */
-    public IRangeIterator rangeIterator(Object fromKey, Object toKey);
     
 }

@@ -222,11 +222,6 @@ public class DistributedIndex implements IBTree {
         return null;
     }
 
-    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
     public Object remove(Object key) {
         // TODO Auto-generated method stub
         return null;

@@ -20,17 +20,28 @@ public interface INodeFactory {
      *            The branching factor for the node.
      * @param keyType
      *            The data type used to store the keys.
+     * @param nentries
+     *            The #of entries spanned by this node.
      * @param nkeys
      *            The #of keys defined in the node.
      * @param keys
      *            An array containing the keys found in the node.
      * @param childAddr
-     *            An array of the persistent addresses for the children of
-     *            this node.
-     *            
+     *            An array of the persistent addresses for the children of this
+     *            node.
+     * @param childEntryCount
+     *            An of the #of entries spanned by each direct child.
+     * 
      * @return A node initialized from those data.
      */
-    public INodeData allocNode( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, long[] childAddr);
+    public INodeData allocNode(IBTree btree, long id, int branchingFactor,
+            ArrayType keyType,
+            int nentries,
+            int nkeys,
+            Object keys,
+            long[] childAddr,
+            int[] childEntryCount
+            );
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>

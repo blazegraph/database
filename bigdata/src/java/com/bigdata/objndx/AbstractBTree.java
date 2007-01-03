@@ -57,7 +57,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
+import com.bigdata.journal.Journal;
 import com.bigdata.objndx.IndexSegment.FileStore;
+import com.bigdata.objndx.ndx.NoSuccessorException;
+import com.bigdata.objndx.ndx.SuccessorUtil;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -361,21 +364,22 @@ abstract public class AbstractBTree implements IBTree {
     abstract public int getHeight();
     
     /**
-     * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
+     * The #of non-leaf nodes in the {@link AbstractBTree}. This is zero (0)
+     * for a new btree.
      */
     abstract public int getNodeCount();
 
     /**
-     * The #of leaf nodes in the btree.  This is one (1) for a new btree.
+     * The #of leaf nodes in the {@link AbstractBTree}. This is one (1) for a
+     * new btree.
      */
     abstract public int getLeafCount();
 
     /**
-     * The #of entries (aka values) in the btree. This is zero (0) for a new
-     * btree.  The returned value reflects only the #of entries in the btree
-     * and does not report the #of entries in a segmented index.
+     * The #of entries (aka values) in the {@link AbstractBTree}. This is zero
+     * (0) for a new btree.
      */
-    abstract public int size();
+    abstract public int getEntryCount();
     
     /**
      * The object responsible for (de-)serializing the nodes and leaves of the
@@ -396,8 +400,11 @@ abstract public class AbstractBTree implements IBTree {
     
     public Object insert(Object key, Object entry) {
 
-        if( key == null ) throw new IllegalArgumentException();
-        if( entry == null ) throw new IllegalArgumentException();
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        if (entry == null)
+            throw new IllegalArgumentException();
         
         counters.ninserts++;
         
@@ -413,7 +420,8 @@ abstract public class AbstractBTree implements IBTree {
 
     public Object lookup(Object key) {
 
-        if( key == null ) throw new IllegalArgumentException();
+        if (key == null)
+            throw new IllegalArgumentException();
 
         counters.nfinds++;
         
@@ -435,15 +443,282 @@ abstract public class AbstractBTree implements IBTree {
 
     }
 
+    /**
+     * Lookup the index position of the key.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return The index of the search key, if found; otherwise,
+     *         <code>(-(insertion point) - 1)</code>. The insertion point is
+     *         defined as the point at which the key would be found it it were
+     *         inserted into the btree without intervening mutations. Note that
+     *         this guarantees that the return value will be >= 0 if and only if
+     *         the key is found. When found the index will be in [0:nentries).
+     *         Adding or removing entries in the tree may invalidate the index.
+     * 
+     * @todo promote to {@link IBTree}?
+     * 
+     * @see #getKey(int)
+     * @see #getValue(int)
+     */
+    public int indexOf(Object key) {
+        
+        if( key == null ) throw new IllegalArgumentException();
+
+        counters.nindexOf++;
+        
+        int index = ((AbstractNode)getRoot()).indexOf(key);
+        
+//        if( index < 0 ) {
+//            
+//            // not found.
+//            
+//            return -1;
+//            
+//        }
+        
+        return index;
+        
+    }
+
+    /**
+     * Return the key for the identified entry. This performs an efficient
+     * search whose cost is essentially the same as {@link #lookup(Object)}.
+     * 
+     * @param index
+     *            The index position of the entry (origin zero).
+     * 
+     * @return The key at that index position.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if index is less than zero.
+     * @exception IndexOutOfBoundsException
+     *                if index is greater than the #of entries.
+     * 
+     * @see #indexOf(Object)
+     * @see #getValue(int)
+     */
+    public Object keyAt(int index) {
+
+        if (index < 0)
+            throw new IndexOutOfBoundsException("less than zero");
+
+        if (index >= getEntryCount())
+            throw new IndexOutOfBoundsException("too large");
+
+        counters.ngetKey++;
+        
+        return ((AbstractNode)getRoot()).keyAt(index);
+
+    }
+    
+    /**
+     * Return the value for the identified entry. This performs an efficient 
+     * search whose cost is essentially the same as {@link #lookup(Object)}.
+     * 
+     * @param index
+     *            The index position of the entry (origin zero).
+     * 
+     * @return The value at that index position.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if index is less than zero.
+     * @exception IndexOutOfBoundsException
+     *                if index is greater than the #of entries.
+     *                
+     * @see #indexOf(Object)
+     * @see #getKey(int)
+     */
+    public Object valueAt(int index) {
+
+        if (index < 0)
+            throw new IndexOutOfBoundsException("less than zero");
+
+        if (index >= getEntryCount())
+            throw new IndexOutOfBoundsException("too large");
+
+        counters.ngetKey++;
+        
+        return ((AbstractNode)getRoot()).valueAt(index);
+
+    }
+    
+    /**
+     * Return an iterator that visits the entries in a half-open key range.
+     * 
+     * @param fromKey
+     *            The lowest key that will be visited (inclusive).
+     * @param toKey
+     *            The first key that will not be visited (exclusive).
+     */
     public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
 
         return new RangeIterator(this,fromKey,toKey);
         
     }
 
+    /**
+     * Return the #of entries in a half-open key range. The fromKey and toKey
+     * need not be defined in the btree. This method computes the #of entries in
+     * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
+     * The cost is equal to the cost of lookup of the both keys.
+     * 
+     * @param fromKey
+     *            The lowest key that will be counted (inclusive).
+     * @param toKey
+     *            The first key that will not be counted (exclusive).
+     * 
+     * @return The #of entries in the half-open key range. This will be zero if
+     *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
+     *         total ordering.
+     * 
+     * @todo perhaps place the count of entries or entries remaining on the
+     *       {@link IRangeIterator}?
+     * 
+     * @see #successor(Object), which may be used to produce a closed range for
+     *      any given <i>toKey</i>.
+     */
+    public int rangeCount(Object fromKey, Object toKey)
+            throws NoSuccessorException {
+
+        if (fromKey == null)
+            throw new IllegalArgumentException();
+
+        if (toKey == null)
+            throw new IllegalArgumentException();
+        
+        final AbstractNode root = (AbstractNode)getRoot();
+        
+        int fromIndex = root.indexOf(fromKey);
+        
+        int toIndex = root.indexOf(toKey);
+        
+        // Handle case when fromKey is not found.
+        if( fromIndex < 0 ) fromIndex = -fromIndex - 1;
+        
+        // Handle case when toKey is not found.
+        if( toIndex < 0 ) toIndex = -toIndex - 1;
+        
+        if( toIndex <= fromIndex ) {
+            
+            return 0;
+            
+        }
+        
+        int ret = toIndex - fromIndex;
+        
+        return ret;
+        
+    }
+
+    /**
+     * Return the successor of a key.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return The successor of the key.
+     * 
+     * @exception IllegalArgumentException
+     *                if the key is null.
+     * 
+     * @exception NoSuccessorException
+     *                if there is no successor for that key.
+     * 
+     * @todo add a successor parameter to the constructor for use when the
+     *       keyType is an Object.
+     */
+    protected Object successor(Object key) throws NoSuccessorException {
+       
+        if (key == null)
+            throw new IllegalArgumentException();
+        
+        switch(keyType) {
+        case BYTE: return Byte.valueOf(SuccessorUtil.successor((Byte)key));
+        case SHORT: return Short.valueOf(SuccessorUtil.successor((Short)key));
+        case CHAR: return Character.valueOf(SuccessorUtil.successor((Character)key));
+        case INT: return Integer.valueOf(SuccessorUtil.successor((Integer)key));
+        case LONG: return Long.valueOf(SuccessorUtil.successor((Long)key));
+        case FLOAT: return Float.valueOf(SuccessorUtil.successor((Float)key));
+        case DOUBLE: return Double.valueOf(SuccessorUtil.successor((Double)key));
+        case OBJECT: throw new UnsupportedOperationException();
+        default: throw new UnsupportedOperationException();
+        }
+        
+    }
+    
+    /**
+     * Visits all entries in key order.
+     * 
+     * @return An iterator that will visit all entries in key order.
+     */
     public KeyValueIterator entryIterator() {
     
         return getRoot().entryIterator();
+        
+    }
+
+    /**
+     * <p>
+     * An instance of this class may be used to obtain an estimate of various
+     * counters for a key range. Such estimates may be useful when planning
+     * joins.
+     * </p>
+     * <p>
+     * The cost and quality of the estimate depends on the {@link AbstractBTree}
+     * implementation. Some implementations have better or worse information
+     * available at low cost. For example, exact information is available at low
+     * cost (zero IOs and no scans) for an {@link IndexSegment} whose nodes are
+     * fully buffered. Likewise, a {@link BTree} backed by a fully buffered
+     * {@link Journal} can provide the estimates without any IOs, but it has
+     * less information available and would therefore have to de-serialize the
+     * leaves in to create that estimate.
+     * </p>
+     * <p>
+     * When creating estimates for a paritioned index there are multiple
+     * {@link IndexSegment}s in addition to a {@link BTree} for a given index
+     * partition and cheapest estimate may simply be the #of partitions spanned
+     * by the key range.
+     * </p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see AbstractBTree#keyRangeEstimate(com.bigdata.objndx.AbstractBTree.KeyRangeEstimate)
+     * 
+     * @todo the size of a node or leaf is available from its {@link Addr}.
+     * 
+     * @todo create estimates for {@link BTree} and {@link IndexSegment}.
+     * 
+     * @todo provide a means to create easily consumed order of magnitude
+     *       estimates for join planning for a partitioned index.
+     */
+    public static class KeyRangeEstimate {
+    
+        public int nentries;
+        public int nleaves;
+        public int nbytes;
+        
+    }
+    
+    /**
+     * Estimate the count, #of IOs, and #of bytes in a half-open key range.
+     * 
+     * @param fromKey
+     *            The lowest key that will be included in the estimate
+     *            (inclusive).
+     * @param toKey
+     *            The first key that will not be included in the estimate
+     *            (exclusive).
+     * 
+     * @return The estimate.
+     */
+    public KeyRangeEstimate keyRangeEstimate(KeyRangeEstimate est) {
+
+        // @todo implement keyRangeEstimate(est)
+        
+        return est;
         
     }
     
@@ -494,7 +769,7 @@ abstract public class AbstractBTree implements IBTree {
 
         final int nleaves = getLeafCount();
 
-        final int nentries = size();
+        final int nentries = getEntryCount();
 
         final int numNonRootNodes = nnodes + nleaves - 1;
 
@@ -543,7 +818,7 @@ abstract public class AbstractBTree implements IBTree {
 
             final int nleaves = getLeafCount();
 
-            final int nentries = size();
+            final int nentries = getEntryCount();
 
             final int branchingFactor = getBranchingFactor();
             

@@ -183,28 +183,41 @@ abstract public class AbstractObjectIndexTestCase extends AbstractBTreeTestCase 
         final int[] keys = new int[branchingFactor];
         
         final long[] children = new long[branchingFactor+1];
+
+        final int[] childEntryCounts = new int[branchingFactor+1];
         
         // node with some valid keys and corresponding child refs.
 
         int lastKey = NEGINF;
 
+        int nentries = 0;
+        
         for (int i = 0; i < nkeys ; i++) {
 
             lastKey = keys[i] = nextKey(branchingFactor, i, lastKey);
 
             children[i] = nextNodeRef();
 
+            childEntryCounts[i] = r.nextInt(10)+1; // some non-zero count.  
+            
+            nentries += childEntryCounts[i];
+            
         }
 
         // children[nkeys] is always defined.
 
         children[nkeys] = nextNodeRef();
 
+        childEntryCounts[nkeys] = r.nextInt(10)+1; // some non-zero count. 
+        
+        nentries += childEntryCounts[nkeys];
+                
         /*
          * create the node and set it as the root to fake out the btree.
          */
         
-        Node node = new Node(btree, id, branchingFactor, nkeys, keys, children);
+        Node node = new Node(btree, id, branchingFactor, nentries, nkeys, keys,
+                children, childEntryCounts);
         
         btree.root = node;
 

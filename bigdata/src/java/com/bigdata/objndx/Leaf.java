@@ -84,6 +84,15 @@ public class Leaf extends AbstractNode implements ILeafData {
     protected Object[] values;
 
     /**
+     * The #of entries is always the #of keys.
+     */
+    public int getEntryCount() {
+        
+        return nkeys;
+        
+    }
+
+    /**
      * De-serialization constructor.
      * 
      * @param btree
@@ -155,8 +164,6 @@ public class Leaf extends AbstractNode implements ILeafData {
 //         */
 //        btree.touch(this);
         
-        btree.nleaves++;
-
     }
 
     /**
@@ -298,6 +305,12 @@ public class Leaf extends AbstractNode implements ILeafData {
         // one more entry in the btree.
         ((BTree)btree).nentries++;
 
+        if( parent != null ) {
+            
+            parent.get().updateEntryCount(this,1);
+            
+        }
+
         if (INFO) {
             log.info("this="+this+", key="+key+", value="+entry);
             if(DEBUG) {
@@ -345,6 +358,50 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     }
 
+    public int indexOf(Object key) {
+
+        btree.touch(this);
+        
+        int index = search(key);
+
+        if (index < 0) {
+
+            // Not found, return the "insert position".
+            //
+            // @todo simplify logic here to "return search(key);"
+
+            return index;
+
+        }
+
+        return index;
+
+    }
+    
+    public Object keyAt(int index) {
+        
+        if (index < 0)
+            throw new IndexOutOfBoundsException("negative: "+index);
+
+        if (index >= nkeys)
+            throw new IndexOutOfBoundsException("too large: "+index);
+        
+        return getKey(index);
+        
+    }
+
+    public Object valueAt(int index) {
+        
+        if (index < 0)
+            throw new IndexOutOfBoundsException("negative: "+index);
+
+        if (index >= nkeys)
+            throw new IndexOutOfBoundsException("too large: "+index);
+        
+        return values[index];
+        
+    }
+
     /**
      * <p>
      * Split an over capacity leaf (a leaf with maxKeys+1 keys), creating a new
@@ -367,8 +424,13 @@ public class Leaf extends AbstractNode implements ILeafData {
         // MUST be an overflow.
         assert nkeys == maxKeys+1;
 
+        final BTree btree = (BTree)this.btree;
+        
         btree.counters.leavesSplit++;
 
+        // #of entries in the leaf before it is split.
+        final int nentriesBeforeSplit = nkeys;
+        
         /*
          * The splitIndex is the index of the first key/value to move to the new
          * rightSibling.
@@ -382,7 +444,10 @@ public class Leaf extends AbstractNode implements ILeafData {
         final Object separatorKey = getKey(splitIndex);
         
         // the new rightSibling of this leaf.
-        final Leaf rightSibling = new Leaf((BTree)btree);
+        final Leaf rightSibling = new Leaf(btree);
+
+        // increment #of leaves in the tree.
+        btree.nleaves++;
 
         if (INFO) {
             log.info("this=" + this + ", nkeys=" + nkeys + ", splitIndex="
@@ -414,11 +479,18 @@ public class Leaf extends AbstractNode implements ILeafData {
 
             /*
              * Use a special constructor to split the root leaf. The result is a
-             * new node with zero keys and one child (this leaf).
+             * new node with zero keys and one child (this leaf).  The #of entries
+             * spanned by the new root node is the same as the #of entries found
+             * on this leaf _before_ the split.
              */
 
-            p = new Node((BTree)btree, this);
+            p = new Node((BTree)btree, this, nentriesBeforeSplit);
 
+        } else {
+            
+            // this leaf now has fewer entries
+            p.childEntryCounts[p.getIndexOf(this)] -= rightSibling.nkeys;
+            
         }
 
         /* 
@@ -435,7 +507,10 @@ public class Leaf extends AbstractNode implements ILeafData {
     /**
      * Redistributes a key from the specified sibling into this leaf in order to
      * bring this leaf up to the minimum #of keys. This also updates the
-     * separator key in the parent for the right most of (this, sibling).
+     * separator key in the parent for the right most of (this, sibling). While
+     * the #of entries spanned by the children of the common parent is changed
+     * by this method note that there is no net change in the #of entries
+     * spanned by that parent node.
      * 
      * @param sibling
      *            A direct sibling of this leaf (either the left or right
@@ -515,6 +590,11 @@ public class Leaf extends AbstractNode implements ILeafData {
 //            p.setKey(index, s.getKey(0));
             p.copyKey(index,s,0);
 
+            // update parent : one more key on this child.
+            p.childEntryCounts[index]++;
+            // update parent : one less key on our right sibling.
+            p.childEntryCounts[index+1]--;
+
             assertInvariants();
             s.assertInvariants();
 
@@ -545,6 +625,11 @@ public class Leaf extends AbstractNode implements ILeafData {
 //            p.setKey(index-1,getKey(0));
             p.copyKey(index-1, this, 0);
 
+            // update parent : one more key on this child.
+            p.childEntryCounts[index]++;
+            // update parent : one less key on our left sibling.
+            p.childEntryCounts[index-1]--;
+
             assertInvariants();
             s.assertInvariants();
 
@@ -556,7 +641,8 @@ public class Leaf extends AbstractNode implements ILeafData {
      * Merge the keys and values from the sibling into this leaf, delete the
      * sibling from the store and remove the sibling from the parent. This will
      * trigger recursive {@link AbstractNode#join()} if the parent node is now
-     * deficient.
+     * deficient. While this changes the #of entries spanned by the current node
+     * it does NOT effect the #of entries spanned by the parent.
      * 
      * @param sibling
      *            A direct sibling of this leaf (does NOT need to be mutable).
@@ -591,6 +677,12 @@ public class Leaf extends AbstractNode implements ILeafData {
         }
 
         /*
+         * The index of this leaf in its parent. we note this before we
+         * start mucking with the keys.
+         */
+        final int index = p.getIndexOf(this);
+        
+        /*
          * determine which leaf is earlier in the key ordering so that we know
          * whether the sibling's keys will be inserted at the front of this
          * leaf's keys or appended to this leaf's keys.
@@ -604,12 +696,6 @@ public class Leaf extends AbstractNode implements ILeafData {
              * in this leaf.
              */
 
-            /*
-             * The index of this leaf in its parent. we note this before we
-             * start mucking with the keys.
-             */
-            final int index = p.getIndexOf(this);
-            
             /*
              * Copy in the keys and values from the sibling.
              */
@@ -632,6 +718,9 @@ public class Leaf extends AbstractNode implements ILeafData {
              */
 //            p.setKey(index, p.getKey(index+1));
             p.copyKey(index, p, index+1 );
+
+            // reallocate spanned entries from the sibling to this node.
+            p.childEntryCounts[index] += s.getEntryCount();
             
             assertInvariants();
             
@@ -658,6 +747,9 @@ public class Leaf extends AbstractNode implements ILeafData {
             System.arraycopy(s.values, 0, this.values, 0, s.nkeys);
             
             this.nkeys += s.nkeys;
+
+            // reallocate spanned entries from the sibling to this node.
+            p.childEntryCounts[index] += s.getEntryCount();
 
             assertInvariants();
             
@@ -851,12 +943,16 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         // One less key in the leaf.
         nkeys--;
-        
+                
         if( btree.getRoot() != this ) {
 
             /*
              * this is not the root leaf.
              */
+        
+            // update entry count on ancestors.
+            
+            parent.get().updateEntryCount(this,-1);
             
             if( nkeys < minKeys ) {
                 

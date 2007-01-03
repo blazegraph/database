@@ -433,13 +433,21 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("maxKeys",n1.maxKeys,n2.maxKeys);
         
         assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
+
+//        assertEquals("nnodes",n1.nnodes,n2.nnodes);
+//        
+//        assertEquals("nleaves",n1.nleaves,n2.nleaves);
         
+        assertEquals("nentries",n1.nentries,n2.nentries);
+
         assertEquals("nkeys",n1.nkeys,n2.nkeys);
 
         assertKeys(n1,n2);
         
-        assertEquals("children",n1.childAddr,n2.childAddr);
-        
+        assertEquals("childAddr",n1.childAddr,n2.childAddr);
+
+        assertEquals("childEntryCounts",n1.childEntryCounts,n2.childEntryCounts);
+
     }
 
     /**
@@ -558,6 +566,53 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
                     .intValue(), actualKeys[i]);
+            
+        }
+        
+    }
+
+    /**
+     * Special purpose helper used to vet the per-child entry counts for an
+     * {@link INodeData}.
+     * 
+     * @param expected
+     *            An array all of whose values will be tested against the
+     *            corresponding elements in the node as returned by
+     *            {@link INodeData#getChildEntryCounts()}. The sum of the
+     *            expected array is also tested against the value returned by
+     *            {@link IAbstractNodeData#getEntryCount()}.
+     * @param node
+     *            The node.
+     */
+    public void assertEntryCounts(int[] expected, INodeData node ) {
+        
+        int len = expected.length;
+        
+        int[] actual = (int[]) node.getChildEntryCounts();
+        
+        // verify the capacity of the keys[] on the node.
+        assertEquals("childEntryCounts[] capacity", node.getBranchingFactor()+1, actual.length );
+        
+        // verify the #of defined elements.
+        assertEquals("nchildren", len, node.getChildCount());
+        
+        // verify defined elements.
+        int nentries = 0;
+        for( int i=0; i<len; i++ ) {
+
+            assertEquals("childEntryCounts["+i+"]", expected[i], actual[i]);
+            
+            nentries += expected[i];
+            
+        }
+        
+        // verify total #of spanned entries.
+        assertEquals("nentries",nentries,node.getEntryCount());
+        
+        // verify the undefined keys are all ZERO(0).
+        for( int i=len; i<actual.length; i++ ) {
+            
+            assertEquals("keys[" + i + "]", 0, actual[i]);
             
         }
         
@@ -1509,7 +1564,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                  * Validate the keys and entries.
                  */
                 
-                assertEquals("#entries", expected.size(), btree.size());
+                assertEquals("#entries", expected.size(), btree.getEntryCount());
                 
                 Iterator<Map.Entry<Integer,SimpleEntry>> itr = expected.entrySet().iterator();
                 
@@ -1573,7 +1628,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             // reinsert finds key and returns existing value.
             assertEquals(vals[i],btree.insert(keys[i], vals[i]));
 
-            assertEquals("size", i + 1, btree.size());
+            assertEquals("size", i + 1, btree.getEntryCount());
             
         }
         
@@ -1645,7 +1700,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assert actual != null;
         
         // The #of entries must agree.
-        assertEquals(expected.size(), actual.size());
+        assertEquals(expected.getEntryCount(), actual.getEntryCount());
         
         // The key type must agree.
         assertEquals(expected.getKeyType(), actual.getKeyType());

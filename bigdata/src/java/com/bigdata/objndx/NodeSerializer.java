@@ -346,7 +346,7 @@ public class NodeSerializer {
          * The branching factor and #of keys are packed values, but this is
          * their maximum size.
          */
-        final int flexHeader = (Bytes.SIZEOF_INT*2) ;
+        final int flexHeader = (Bytes.SIZEOF_INT*3);
         
         int keysSize = keySerializer.getSize(nkeys);
 
@@ -360,7 +360,10 @@ public class NodeSerializer {
 
             int addrSize = addrSerializer.getSize(nkeys+1);
 
-            return SIZEOF_NODE_HEADER + flexHeader + keysSize + addrSize;
+            int childEntryCountSize = (nkeys+1) * Bytes.SIZEOF_INT; 
+            
+            return SIZEOF_NODE_HEADER + flexHeader + keysSize + addrSize
+                    + childEntryCountSize;
 
         }
         
@@ -445,8 +448,12 @@ public class NodeSerializer {
         assert buf != null;
         assert node != null;
 
-        final int nkeys = node.getKeyCount();
         final int branchingFactor = node.getBranchingFactor();
+//        final int nnodes = node.getNodeCount();
+//        final int nleaves = node.getLeafCount();
+        final int nentries = node.getEntryCount();
+        final int[] childEntryCounts = node.getChildEntryCounts();
+        final int nkeys = node.getKeyCount();
         final Object keys = node.getKeys();
         final long[] childAddr = node.getChildAddr();
 
@@ -479,6 +486,15 @@ public class NodeSerializer {
             // branching factor.
             LongPacker.packLong(os, branchingFactor);
 
+//            // #of spanned nodes.
+//            LongPacker.packLong(os, nnodes);
+//            
+//            // #of spanned leaves.
+//            LongPacker.packLong(os, nleaves);
+            
+            // #of spanned entries.
+            LongPacker.packLong(os, nentries);
+            
             // #of keys
             LongPacker.packLong(os, nkeys);
 
@@ -488,6 +504,9 @@ public class NodeSerializer {
             // addresses.
             addrSerializer.putChildAddresses(os, childAddr, nkeys+1);
 
+            // #of entries spanned per child.
+            putChildEntryCounts(os,childEntryCounts,nkeys+1);
+            
             // Done using the DataOutputStream so flush to the ByteBuffer.
             os.flush();
 
@@ -600,6 +619,15 @@ public class NodeSerializer {
 
             assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
 
+//            // nspanned nodes
+//            final int nnodes = (int)LongPacker.unpackLong(is);
+//            
+//            // nspanned leaves
+//            final int nleaves = (int)LongPacker.unpackLong(is);
+            
+            // nentries
+            final int nentries = (int)LongPacker.unpackLong(is);
+            
             // nkeys
             final int nkeys = (int) LongPacker.unpackLong(is);
 
@@ -608,26 +636,29 @@ public class NodeSerializer {
 
             final long[] childAddr = new long[branchingFactor + 1];
 
-            /*
-             * Keys.
-             */
+            final int[] childEntryCounts = new int[branchingFactor + 1];
+            
+            // Keys.
 
             final Object keys = ArrayType.alloc(keyType, branchingFactor);
 
             keySerializer.getKeys(is, keys, nkeys);
 
-            /*
-             * Child addresses (nchildren == nkeys+1).
-             */
+            // Child addresses (nchildren == nkeys+1).
 
             addrSerializer.getChildAddresses(is, childAddr, nkeys+1);
 
+            // #of entries spanned by each child.
+            
+            getChildEntryCounts(is,childEntryCounts,nkeys+1);
+            
             // verify #of bytes actually read.
             assert buf.position() - pos0 == nbytes;
 
             // Done.
             return nodeFactory.allocNode(btree, id, branchingFactor, keyType,
-                    nkeys, keys, childAddr);
+//                    nnodes, nleaves,
+                    nentries, nkeys, keys, childAddr, childEntryCounts );
 
         }
 
@@ -885,4 +916,69 @@ public class NodeSerializer {
 
     }
     
+    /**
+     * Write out a packed array of the #of entries spanned by each child of some
+     * node.
+     * 
+     * @param os
+     * @param childEntryCounts
+     *            The #of entries spanned by each direct child.
+     * @param nchildren
+     *            The #of elements of that array that are defined.
+     * @throws IOException
+     */
+    protected void putChildEntryCounts(DataOutputStream os,
+            int[] childEntryCounts, int nchildren) throws IOException {
+
+        for (int i = 0; i < nchildren; i++) {
+
+            final long nentries = childEntryCounts[i];
+
+            /*
+             * Children MUST span some entries.
+             */
+            if (nentries == 0L) {
+
+                throw new RuntimeException(
+                        "Child does not span entries: index=" + i);
+
+            }
+
+            LongPacker.packLong(os, nentries);
+
+        }
+
+    }
+
+    /**
+     * Read in a packed array of the #of entries spanned by each child of some
+     * node.
+     * 
+     * @param is
+     * @param childEntryCounts
+     *            The #of entries spanned by each direct child.
+     * @param nchildren
+     *            The #of elements of that array that are defined.
+     * @throws IOException
+     */
+    protected void getChildEntryCounts(DataInputStream is,
+            int[] childEntryCounts, int nchildren) throws IOException {
+
+        for (int i = 0; i < nchildren; i++) {
+
+            final int nentries = (int) LongPacker.unpackLong(is);
+
+            if (nentries == 0L) {
+
+                throw new RuntimeException(
+                        "Child does not span entries: index=" + i);
+
+            }
+
+            childEntryCounts[i] = nentries;
+
+        }
+
+    }
+
 }
