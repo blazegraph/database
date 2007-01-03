@@ -1763,6 +1763,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             fail("The iterator is willing to visit too many entries");
             
         }
+
+        System.err.println("Examining expected tree for inconsistencies");
+        assert expected.dump(System.err);
+        System.err.println("Examining actual tree for inconsistencies");
+        assert actual.dump(System.err);
         
     }
     

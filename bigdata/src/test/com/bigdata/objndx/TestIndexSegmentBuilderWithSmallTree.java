@@ -93,7 +93,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         BTree btree = getProblem1();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3);
+        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -144,7 +144,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         BTree btree = getProblem1();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,9);
+        new IndexSegmentBuilder(outFile,tmpDir,btree,9,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -188,7 +188,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         BTree btree = getProblem1();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,10);
+        new IndexSegmentBuilder(outFile,tmpDir,btree,10,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -262,7 +262,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         btree.dump(Level.DEBUG,System.err);
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3);
+        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -338,7 +338,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         btree.dump(Level.DEBUG,System.err);
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3);
+        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
          /*
           * Verify can load the index file and that the metadata

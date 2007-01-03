@@ -47,9 +47,11 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -221,6 +223,18 @@ public class IndexSegmentBuilder {
      * Used to serialize the stack and leaves of the output tree.
      */
     final NodeSerializer nodeSer;
+
+    /**
+     * The errorRate parameter from the constructor which determines whether or
+     * not we build a bloom filter and what the target false positive error rate
+     * will be for that filter if we do build one.
+     */
+    final double errorRate;
+    
+    /**
+     * The bloom filter iff we build one (errorRate != 0.0).
+     */
+    final it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
     
     /**
      * The offset in the output file of the last leaf written onto that file.
@@ -336,9 +350,20 @@ public class IndexSegmentBuilder {
      *            tree. (Small branching factors are permitted for testing, but
      *            generally you want something relatively large.)
      * 
+     * @param errorRate
+     *            A value in [0:1] that is interpreted as an allowable false
+     *            positive error rate for a bloom filter. When zero, the bloom
+     *            filter is not constructed. The bloom filter provides efficient
+     *            fast rejection of keys that are not in the index. If the bloom
+     *            filter reports that a key is in the index then the index MUST
+     *            be tested to verify that the result is not a false positive.
+     *            Bloom filters are great if you have a lot of point tests to
+     *            perform but they are not used if you are doing range scans.
+     * 
      * @throws IOException
      */
-    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree, int m)
+    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
+            int m, double errorRate)
             throws IOException {
 
         assert outFile != null;
@@ -391,6 +416,30 @@ public class IndexSegmentBuilder {
 
         stack[plan.height] = leaf;
 
+        /*
+         * Setup optional bloom filter.
+         */
+        if( errorRate < 0.0 || errorRate > 1.0 ) {
+            
+            throw new IllegalArgumentException(
+                    "errorRate must be in [0:1], not " + errorRate);
+            
+        }
+        
+        this.errorRate = errorRate;
+        
+        if(errorRate == 0.0) {
+
+            bloomFilter = null;
+            
+        } else {
+            
+            // FIXME compute [d] based on the error rate.
+            bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(btree
+                    .getEntryCount());
+            
+        }
+        
         /*
          * Setup for IO.
          */
@@ -532,9 +581,17 @@ public class IndexSegmentBuilder {
                                                 
                     }
                     
-                    leaf.copyKey(leaf.nkeys++, sourceLeaf, nconsumed);
+                    leaf.copyKey(leaf.nkeys, sourceLeaf, nconsumed);
                     
                     leaf.vals[j] = sourceLeaf.values[nconsumed];
+
+                    if( bloomFilter != null ) {
+                        
+                        leaf.addKey(bloomFilter,leaf.nkeys);
+                        
+                    }
+                    
+                    leaf.nkeys++;
                     
                     nconsumed++;
 
@@ -654,6 +711,58 @@ public class IndexSegmentBuilder {
             }
 
             /*
+             * If the bloom filter was constructed then serialize it on the end of
+             * the file.
+             */
+            final long addrBloom;
+            
+            if( bloomFilter == null ) {
+        
+                addrBloom = 0L;
+                
+            } else {
+
+                /*
+                 * Serialize the bloom filter.
+                 * 
+                 * Note: This is standard java serialization onto a buffer. We
+                 * then write the buffer on the file and note the offset and #of
+                 * bytes in the representation so that it can be de-serialized
+                 * later.
+                 * 
+                 * @todo support alternative serialization that is more
+                 * flexible?
+                 * 
+                 * @todo compress the bloom filter?
+                 */
+                assert out.length() < Integer.MAX_VALUE;
+                
+                final int offset = (int)out.length(); 
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                
+                ObjectOutputStream oos = new ObjectOutputStream(baos);
+                
+                oos.writeObject(bloomFilter);
+                
+                oos.flush();
+                
+                oos.close();
+                
+                final byte[] bloomBytes = baos.toByteArray();
+
+                // seek to the end of the file.
+                out.seek(offset);
+                
+                // write the serialized bloom filter.
+                out.write(bloomBytes, 0, bloomBytes.length);
+                
+                // note its address.
+                addrBloom = Addr.toLong(bloomBytes.length,offset);
+                
+            }
+            
+            /*
              * Seek to the start of the file and write out the metadata record.
              */
             {
@@ -669,8 +778,8 @@ public class IndexSegmentBuilder {
                 IndexSegmentMetadata md = new IndexSegmentMetadata(m,
                         plan.height, keyType, plan.nleaves, nnodesWritten,
                         plan.nentries, maxNodeOrLeafLength, offsetLeaves,
-                        offsetNodes, addrRoot, out.length(), now,
-                        name);
+                        offsetNodes, addrRoot, errorRate, addrBloom, out
+                                .length(), now, name);
                 
                 md.write(out);
                 
@@ -1209,7 +1318,7 @@ public class IndexSegmentBuilder {
             default: throw new UnsupportedOperationException();
             }
         }
-       
+
     }
     
     /**
@@ -1258,6 +1367,39 @@ public class IndexSegmentBuilder {
             
         }
     
+        /**
+         * Adds the key at the specified index to the bloom filter.
+         * 
+         * @param bloomFilter
+         *            the bloom filter.
+         * 
+         * @param index
+         *            The key index in [0:maxKeys-1].
+         * 
+         * @todo handle all key types.
+         */
+        final protected void addKey(it.unimi.dsi.mg4j.util.BloomFilter bloomFilter,int index) {
+            switch(keyType) {
+//            case BYTE: bloomFilter.add(((byte[])keys)[index]); break;
+//            case SHORT: bloomFilter.add(((short[])keys)[index]); break;
+//            case CHAR: bloomFilter.add(((char[])keys)[index]); break;
+//            case INT: bloomFilter.add((int[])keys,index,1); break;
+            case INT: {
+                _bloomKeys_int[0] = ((int[])keys)[index];
+                bloomFilter.add(_bloomKeys_int);
+                break;
+            }
+//            case LONG: bloomFilter.add(((long[])keys)[index]); break;
+//            case FLOAT: bloomFilter.add(((float[])keys)[index]); break;
+//            case DOUBLE: bloomFilter.add(((double[])keys)[index]); break;
+//            case OBJECT: bloomFilter.add(((Object[])keys)[index]); break;
+            default: throw new UnsupportedOperationException();
+            }        
+        }
+
+        final private int stride = 1;
+        final private int[] _bloomKeys_int = new int[stride];
+
     }
 
     /**

@@ -82,8 +82,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestCommit.class );
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
-        // test alternative key types (String and long[]) for simple RDF data model.
-        suite.addTestSuite( TestTripleStore.class );
         // test index is restart safe.
         // @todo test tree operations for correct transaction isolation and GC.
         // @todo test journal commit semantics for index.
@@ -104,8 +102,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // stress test with larger random input trees and a variety of branching factors.
         suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
+        // test of the bloom filter integration.
+        suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
         // @todo test compacting merge of two index segments.
         // @todo test compacting merge of N index segments?
+        
+        /*
+         * partitioned indices.
+         */
         // @todo test SegmentedBTree (reads through to active index segments if miss on BTree in the journal).
         // @todo test metadata management for index segments.
        

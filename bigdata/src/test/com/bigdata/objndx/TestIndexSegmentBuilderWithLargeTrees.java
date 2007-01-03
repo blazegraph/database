@@ -319,7 +319,8 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
                     + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                     + "), out(m=" + m + ")");
             
-            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,tmpDir,btree,m);
+            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+                    tmpDir, btree, m, 0.);
 
             // @todo verify post-condition for the temporary file.
 //            assertFalse(builder.tmp)

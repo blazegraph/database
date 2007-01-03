@@ -19,7 +19,8 @@ import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
  *       the metadata for a distributed index.
  * 
  * @todo add a uuid for each index segment and a uuid for the index to which the
- *       segments belong?
+ *       segments belong?  examine the format of the uuid.  can we use part of
+ *       it as the unique basis for one up identifiers within a parition?
  * 
  * @todo We need a general mechanism for persisting metadata including NEGINF,
  *       Comparator, keySer, and valSer for indices.  This can probably be done
@@ -95,6 +96,20 @@ public class IndexSegmentMetadata {
      * @see Addr
      */
     final public long addrRoot;
+
+    /**
+     * The target error rate for the optional bloom filter and 0.0 iff
+     * the bloom filter was not constructed.
+     */
+    final public double errorRate;
+    
+    /**
+     * Address of the optional bloom filter and 0L iff no bloom filter
+     * was constructed.
+     * 
+     * @see Addr
+     */
+    final public long addrBloom;
     
     /**
      * Length of the file in bytes.
@@ -165,6 +180,10 @@ public class IndexSegmentMetadata {
         
         addrRoot = raf.readLong();
 
+        errorRate = raf.readDouble();
+        
+        addrBloom = raf.readLong();
+        
         length = raf.readLong();
         
         if (length != raf.length()) {
@@ -194,6 +213,8 @@ public class IndexSegmentMetadata {
      * @param offsetLeaves
      * @param offsetNodes
      * @param addrRoot
+     * @param errorRate
+     * @param addrBloom
      * @param length
      * @param timestamp
      * @param name
@@ -203,7 +224,8 @@ public class IndexSegmentMetadata {
     public IndexSegmentMetadata(int branchingFactor, int height,
             ArrayType keyType, int nleaves, int nnodes, int nentries,
             int maxNodeOrLeafLength, long offsetLeaves, long offsetNodes,
-            long addrRoot, long length, long timestamp, String name) {
+            long addrRoot, double errorRate, long addrBloom, long length,
+            long timestamp, String name) {
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -237,6 +259,10 @@ public class IndexSegmentMetadata {
             assert Addr.getOffset(addrRoot) >= offsetNodes;
             assert Addr.getOffset(addrRoot) < length;
         }
+
+        if( addrBloom == 0L ) assert errorRate == 0.;
+        
+        if( errorRate != 0.) assert addrBloom != 0L;
         
         assert timestamp != 0L;
         
@@ -264,6 +290,10 @@ public class IndexSegmentMetadata {
         
         this.addrRoot = addrRoot;
 
+        this.errorRate = errorRate;
+        
+        this.addrBloom = addrBloom;
+        
         this.length = length;
         
         this.timestamp = timestamp;
@@ -306,6 +336,10 @@ public class IndexSegmentMetadata {
 
         raf.writeLong(addrRoot);
 
+        raf.writeDouble(errorRate);
+        
+        raf.writeLong(addrBloom);
+        
         raf.writeLong(length);
         
         raf.writeLong(timestamp);
@@ -332,6 +366,8 @@ public class IndexSegmentMetadata {
         sb.append(", offsetLeaves=" + offsetLeaves);
         sb.append(", offsetNodes=" + offsetNodes);
         sb.append(", addrRoot=" + Addr.toString(addrRoot));
+        sb.append(", errorRate=" + errorRate);
+        sb.append(", addrBloom=" + Addr.toString(addrBloom));
         sb.append(", length=" + length);
         sb.append(", timestamp=" + new Date(timestamp));
         sb.append(", name="+name);

@@ -1,11 +1,16 @@
 package com.bigdata.objndx;
 
+import it.unimi.dsi.mg4j.util.BloomFilter;
+
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Comparator;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -41,8 +46,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      * The root of the btree. Since this is a read-only index the root can never
      * be replaced.
      */
-    final AbstractNode root;
+    final protected AbstractNode root;
 
+    /**
+     * An optional bloom filter that will be used to filter point tests. Since
+     * bloom filters do not support removal of keys the option to use a filter
+     * is restricted to {@link IndexSegment}s since they are read-only data
+     * structures.
+     */
+    final it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
+    
     /**
      * Text of a message used in exceptions for mutation operations on the
      * index segment.
@@ -143,8 +156,91 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.metadata.addrRoot);
 
+        // read in the optional bloom filter from its addr.
+        if( fileStore.metadata.addrBloom == 0L ) {
+        
+            this.bloomFilter = null;
+            
+        } else {
+
+            this.bloomFilter = readBloomFilter(fileStore.metadata.addrBloom);
+            
+        }
+        
     }
 
+    /**
+     * Reads the bloom filter from the file.
+     * 
+     * Note: this goes around the {@link FileStore} API since the bloom filter
+     * is not (currently) written as a compressed record and since the size of
+     * the largest compressed record does not pay attention to the serialized
+     * size of the optional bloom filter.
+     */
+    protected BloomFilter readBloomFilter(long addr) throws IOException {
+
+        assert addr != 0L;
+        
+        System.err.println("reading bloom filter: "+Addr.toString(addr));
+        
+        final int off = Addr.getOffset(addr);
+        
+        final int len = Addr.getByteCount(addr);
+        
+        ByteBuffer buf = ByteBuffer.allocate(len);
+
+        buf.limit(len);
+
+        buf.position(0);
+
+        try {
+
+            // read into [dst] - does not modify the channel's position().
+            final int nread = fileStore.raf.getChannel().read(buf, off);
+            
+            assert nread == len;
+            
+            buf.flip(); // Flip buffer for reading.
+            
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        assert buf.position() == 0;
+        assert buf.limit() == len;
+
+        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
+        
+//        ByteArrayInputStream bais = new ByteArrayInputStream(buf.array());
+        
+        ObjectInputStream ois = new ObjectInputStream(bais);
+        
+        try {
+
+            BloomFilter bloomFilter = (BloomFilter) ois.readObject();
+            
+            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
+                    + ", entryCount=" + getEntryCount() + ", bytesOnDisk="
+                    + len + ", errorRate=" + fileStore.metadata.errorRate);
+            
+            return bloomFilter;
+            
+        }
+        
+        catch(Exception ex) {
+            
+            IOException ex2 = new IOException("Could not read bloom filter: "+ex);
+            
+            ex2.initCause(ex);
+            
+            throw ex2;
+            
+        }
+
+    }
+    
     /**
      * @todo move to parent class and have various methods test to validate that
      *       the index is open (lookup, insert, remove, scan).
@@ -210,7 +306,82 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 //        }
 //    
 //    }
-    
+
+    /**
+     * Overrides the base class to use the optional bloom filter when present.
+     */
+    public Object lookup(Object key) {
+
+        if (key == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+
+        if( bloomFilter != null && ! containsKey(key)) {
+
+            /*
+             * If the bloom filter reports that the key does not exist then we
+             * always believe it.
+             */
+
+            counters.nbloomRejects++;
+            
+            return null;
+        
+        }
+        
+        /*
+         * Either there is no bloom filter or the bloom filter believes that the
+         * key exists. Either way we now lookup the entry in the btree.
+         */
+        counters.nfinds++;
+        
+        return getRoot().lookup(key);
+
+    }
+
+    /**
+     * Returns true if the optional bloom filter reports that the key exists.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return True if the bloom filter believes that the key is present in the
+     *         index. When true, you must still test the key to verify that it
+     *         is, in fact, present in the index. When false, you do NOT need to
+     *         test the index.
+     * 
+     * @todo This reuses a type-specific private instance array to test the
+     *       bloom filter and is therefore not safe for concurrent callers as
+     *       they will overwrite one anothers data. This could be fixed simply
+     *       by adding an appropriate synchronized keyword on the method, but
+     *       that is not necessary in a single threaded environment.
+     * 
+     * @todo handle all key types.
+     * 
+     * @todo examine the #of weights in use by the filter.
+     */
+    final protected boolean containsKey(Object key) {
+        assert bloomFilter != null;
+        switch(keyType) {
+//        case BYTE: bloomFilter.add(((byte[])keys)[index]); break;
+//        case SHORT: bloomFilter.add(((short[])keys)[index]); break;
+//        case CHAR: bloomFilter.add(((char[])keys)[index]); break;
+        case INT: {
+            _bloomKeys_int[0] = ((Integer)key).intValue(); 
+            return bloomFilter.contains(_bloomKeys_int);
+        }
+//        case LONG: bloomFilter.add(((long[])keys)[index]); break;
+//        case FLOAT: bloomFilter.add(((float[])keys)[index]); break;
+//        case DOUBLE: bloomFilter.add(((double[])keys)[index]); break;
+//        case OBJECT: bloomFilter.add(((Object[])keys)[index]); break;
+        default: throw new UnsupportedOperationException();
+        }
+    }
+    final private int stride = 1;
+    final private int[] _bloomKeys_int = new int[stride];
+
     /**
      * Operation is disallowed.
      */
@@ -228,7 +399,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
     }
-
+    
     /**
      * Factory for immutable nodes and leaves used by the {@link NodeSerializer}.
      */
@@ -432,7 +603,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
             this.metadata = new IndexSegmentMetadata(raf);
 
             log.info(metadata.toString());
-
+            
             /*
              * Read the index nodes from the file into a buffer. If there are no
              * index nodes then we skip this step. Note that we always read in
@@ -502,11 +673,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
             if(!open) throw new IllegalStateException();
             
-//          /*
-//          * The caller should always pass in [buf], but this is in keeping
-//          * with our API contract.
-//          */
-//         if( dst == null ) dst = buf;
+            /*
+             * The caller generally passes in [buf], but this is in keeping with
+             * our API contract. (One exception is when we read the bloom filter
+             * from the store).
+             */
+            if (dst == null) {
+                
+                dst = ByteBuffer.allocate(Addr.getByteCount(addr));
+
+            }
          
             final int offset = Addr.getOffset(addr);
 

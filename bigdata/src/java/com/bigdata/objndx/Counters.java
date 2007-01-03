@@ -25,7 +25,8 @@ public class Counters {
         
     }
     
-    int nfinds = 0;
+    int nfinds = 0; // #of keys looked up in the tree by lookup(key).
+    int nbloomRejects = 0; // #of keys rejected by the bloom filter in lookup(key).
     int ninserts = 0;
     int nremoves = 0;
     int nindexOf = 0;
@@ -56,6 +57,7 @@ public class Counters {
         ", #leaves="+btree.getLeafCount()+
         ", #entries="+btree.getEntryCount()+
         ", #find="+nfinds+
+        ", #bloomRejects="+nbloomRejects+
         ", #insert="+ninserts+
         ", #remove="+nremoves+
         ", #indexOf="+nindexOf+
