@@ -2,6 +2,7 @@ package com.bigdata.objndx;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
@@ -14,11 +15,6 @@ import com.bigdata.objndx.IndexSegment.FileStore;
  * @see src/architecture/btree.xls, which has the detailed examples.
  * 
  * @todo test post-condition for the temporary file.
- * 
- * @todo test it all again with other interesting output branching factors.
- * 
- * @todo write another test that builds a tree of at least height 3 (four
- *       levels).
  */
 public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase {
 
@@ -58,6 +54,32 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
     }
 
+    /**
+     * apply dump() as a structural validation of the tree.  note that we
+     * have to materialize the leaves in the generated index segment since
+     * dump does not materialize a child from its Addr if it is not already
+     * resident.
+     */
+    protected void dumpIndexSegment(IndexSegment seg) {
+
+        // materialize the leaves.
+        
+        Iterator itr = seg.leafIterator();
+        
+        while (itr.hasNext()) {
+            
+            itr.next();
+            
+        }
+
+        // dump the tree to validate it.
+
+        System.err.println("dumping index segment");
+
+        assert seg.dump(Level.DEBUG, System.err);
+
+    }
+    
     /*
      * problem1
      */
@@ -115,20 +137,60 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(3,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
+
+        // test index segment structure.
+        dumpIndexSegment(seg);
         
         /*
-         * @todo verify the right keys in the right leaves.
+         * Test the tree in detail.
+         * 
+         * FIXME The build algorithm is currently getting the separatorKeys
+         * wrong for C (the root) and B (the 2nd node on the level 1). As a
+         * result the entryIterator() succeeds since it only depends on the
+         * childAddr[], but lookup by key fails for at least some keys.
          */
+        {
+        
+            final Node D = (Node)seg.getRoot();
+            final Node A = (Node)D.getChild(0); 
+            final Node B = (Node)D.getChild(1);
+            final Node C = (Node)D.getChild(2);
+            final Leaf a = (Leaf)A.getChild(0);
+            final Leaf b = (Leaf)A.getChild(1);
+            final Leaf c = (Leaf)A.getChild(2);
+            final Leaf d = (Leaf)B.getChild(0);
+            final Leaf e = (Leaf)B.getChild(1);
+            final Leaf f = (Leaf)C.getChild(0);
+            final Leaf g = (Leaf)C.getChild(1);
+           
+            assertKeys(new int[]{10,16},D);
+            assertEntryCounts(new int[]{9,6,5},D);
+            
+            assertKeys(new int[]{4,7},A);
+            assertEntryCounts(new int[]{3,3,3},A);
+            
+            assertKeys(new int[]{13},B);
+            assertEntryCounts(new int[]{3,3},B);
+            
+            assertKeys(new int[]{19},C);
+            assertEntryCounts(new int[]{3,2},C);
+            
+            assertKeys(new int[]{1,2,3},a);
+            assertKeys(new int[]{4,5,6},b);
+            assertKeys(new int[]{7,8,9},c);
+            assertKeys(new int[]{10,11,12},d);
+            assertKeys(new int[]{13,14,15},e);
+            assertKeys(new int[]{16,17,18},f);
+            assertKeys(new int[]{19,20},g);
+
+            // Note: values are verified by testing the total order.
+
+        }
         
         /*
          * Verify the total index order.
          */
         assertSameBTree(btree, seg);
-        
-        /*
-         * @todo verify per-node counters (#of nodes, leaves, entries, and bytes
-         * spanned by the node).
-         */
         
     }
 
@@ -167,10 +229,28 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
-        
+
+        // test index segment structure.
+        dumpIndexSegment(seg);
+
         /*
-         * @todo verify the right keys in the right leaves.
+         * Test the tree in detail.
          */
+        {
+        
+            final Node A = (Node)seg.getRoot(); 
+            final Leaf a = (Leaf)A.getChild(0);
+            final Leaf b = (Leaf)A.getChild(1);
+           
+            assertKeys(new int[]{6},A);
+            assertEntryCounts(new int[]{5,5},A);
+            
+            assertKeys(new int[]{1,2,3,4,5},a);
+            assertKeys(new int[]{6,7,8,9,10},b);
+
+            // Note: values are verified by testing the total order.
+
+        }
         
         /*
          * Verify the total index order.
@@ -212,9 +292,18 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
         
+        // test index segment structure.
+        dumpIndexSegment(seg);
+
         /*
-         * @todo verify the right keys in the right leaves.
+         * verify the right keys in the right leaves.
          */
+        {
+            
+            Leaf root = (Leaf)seg.getRoot();
+            assertKeys(new int[]{1,2,3,4,5,6,7,8,9,10},root);
+            
+        }
         
         /*
          * Verify the total index order.
@@ -286,9 +375,29 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(9,seg.getEntryCount());
         
+        // test index segment structure.
+        dumpIndexSegment(seg);
+
         /*
-         * @todo verify the right keys in the right leaves.
+         * Test the tree in detail.
          */
+        {
+        
+            final Node A = (Node)seg.getRoot();
+            final Leaf a = (Leaf)A.getChild(0);
+            final Leaf b = (Leaf)A.getChild(1);
+            final Leaf c = (Leaf)A.getChild(2);
+           
+            assertKeys(new int[]{4,7},A);
+            assertEntryCounts(new int[]{3,3,3},A);
+            
+            assertKeys(new int[]{1,2,3},a);
+            assertKeys(new int[]{4,5,6},b);
+            assertKeys(new int[]{7,8,9},c);
+
+            // Note: values are verified by testing the total order.
+
+        }
         
         /*
          * Verify the total index order.
@@ -361,10 +470,30 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(4,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(20,seg.getEntryCount());
-        
+
+        // test index segment structure.
+        dumpIndexSegment(seg);
+
         /*
-         * @todo verify the right keys in the right leaves.
+         * Test the tree in detail.
          */
+        {
+        
+            final Node A = (Node)seg.getRoot();
+            final Leaf a = (Leaf)A.getChild(0);
+            final Leaf b = (Leaf)A.getChild(1);
+            final Leaf c = (Leaf)A.getChild(2);
+           
+            assertKeys(new int[]{4,7},A);
+            assertEntryCounts(new int[]{3,3,3},A);
+            
+            assertKeys(new int[]{1,2,3},a);
+            assertKeys(new int[]{4,5,6},b);
+            assertKeys(new int[]{7,8,9},c);
+
+            // Note: values are verified by testing the total order.
+
+        }
         
         /*
          * Verify the total index order.

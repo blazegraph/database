@@ -53,8 +53,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.apache.log4j.Level;
-
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Bytes;
@@ -69,6 +67,8 @@ import com.bigdata.objndx.IndexSegment.FileStore;
  * and without the use of the bloom filter.
  * 
  * @todo compare performance with and without the bloom filter.
+ * 
+ * @todo test points that will not be in the index as well as those that are.
  * 
  * @todo report on the cost to construct the filter and its serialized size and
  *       runtime space.
@@ -330,8 +330,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         getKeysAndValues(btree,keys,vals);
 
-        doPointTest("btree", btree, keys, vals);
-        doPointTest("w/ bloom", seg2, keys, vals);
+        doRandomLookupTest("btree", btree, keys, vals);
+        doRandomLookupTest("w/ bloom", seg2, keys, vals);
         
         System.err.println("Closing index segments.");
         seg2.close();
@@ -423,13 +423,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                     btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
 
             /*
-             * Verify the total index order.
+             * Explicitly test the bloom filter against ground truth. 
              */
-            System.err.println("Verifying index segments.");
-            assertSameBTree(btree, seg);
-            assertSameBTree(btree, seg2);
-            assertSameBTree(seg, seg);
-
+            
             Object[] keys = new Object[btree.getEntryCount()];
             Object[] vals = new Object[btree.getEntryCount()];
 
@@ -447,10 +443,15 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              */
             doBloomFilterTest("pre-serialization", seg2.bloomFilter, keys);
 
-            doPointTest("btree", btree, keys, vals);
-            doPointTest("no bloom", seg, keys, vals);
-            doPointTest("w/ bloom", seg2, keys, vals);
-            
+            /*
+             * Verify index segments against the source btree and against one
+             * another.
+             */
+            System.err.println("Verifying index segments.");
+            assertSameBTree(btree, seg);
+            assertSameBTree(btree, seg2);
+            assertSameBTree(seg, seg2);
+
             System.err.println("Closing index segments.");
             seg.close();
             seg2.close();
@@ -475,111 +476,6 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         System.err.println("Closing journal.");
         ((Journal)((TransitionalRawStore)btree.getStore()).delegate).close();
         
-    }
-
-    /**
-     * Extract all keys and values from the btree in key order.  The caller must
-     * correctly dimension the arrays before calling this method.
-     * 
-     * @param btree
-     *            The btree.
-     * @param keys
-     *            The keys in key order (out).
-     * @param vals
-     *            The values in key order (out).
-     */
-    protected void getKeysAndValues(AbstractBTree btree, Object[] keys,
-            Object[] vals) {
-        
-        KeyValueIterator itr = btree.entryIterator();
-
-        int i = 0;
-        
-        while( itr.hasNext() ) {
-            
-            Object val = itr.next();
-            
-            Object key = itr.getKey();
-
-            assert val != null;
-            
-            assert key != null;
-            
-            keys[i] = key;
-            
-            vals[i] = val;
-            
-            i++;
-            
-        }
-        
-    }
-    
-    /**
-     * Tests the performance of random point tests on the btree.
-     * 
-     * @param label
-     * 
-     * @param btree
-     * 
-     * @param keys
-     *            the keys in key order.
-     * 
-     * @param vals
-     *            the values in key order.
-     * 
-     * @todo test points that will not be in the index as well as those that
-     *       are.
-     */
-    protected void doPointTest(String label, AbstractBTree btree, Object[] keys, Object[] vals) {
-        
-        int nentries = btree.getEntryCount();
-        
-        System.err.println("\ncondition: "+label+", nentries="+nentries);
-        
-        int[] order = getRandomOrder(nentries);
-
-        long begin = System.currentTimeMillis();
-
-        boolean randomOrder = false;
-        
-        for(int i=0; i<nentries; i++) {
-            
-            Object key = (randomOrder ? keys[order[i]] : keys[i]);
-        
-            Object val = btree.lookup(key);
-            
-            if( val == null ) {
-
-                // FIXME This is looking for a build error.
-                System.err.println("i="+i+", key="+key);
-
-                assert btree.dump(Level.DEBUG, System.err);
-                
-            }
-            
-            
-            /*
-             * test for a false negative. the bloom filter was given a key that
-             * is in the btree. if it reports that the key was not in the bloom
-             * filter then that is a false negative. bloom filters are not
-             * supposed to have false negative.
-             */
-            assertNotNull("false negative: i="+i+", key="+key, val);
-
-            Object expectedVal = (randomOrder ? vals[order[i]] : vals[i]);
-
-            assertEquals(expectedVal,val);
-            
-        }
- 
-        long elapsed = System.currentTimeMillis() - begin;
-        
-        System.err.println(label + " : tested " + nentries
-                + " keys in random order in " + elapsed + "ms");
-        
-        System.err.println(label + " : " + btree.counters);
-         
     }
 
     /**

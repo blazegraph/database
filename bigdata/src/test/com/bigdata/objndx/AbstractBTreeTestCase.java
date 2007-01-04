@@ -1683,10 +1683,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
     
     /**
-     * Compare two {@link IBTree}s for the same #of entries, key type, and the same keys and values. The
-     * height, branching factor, #of nodes and #of leaves may differ (the test does
-     * not presume that the btrees were built with the same branching factor, but merely with the same
-     * data and key type).
+     * A suite of tests designed to verify that one btree correctly represents
+     * the information present in a ground truth btree. The test verifies the
+     * #of entries, key type, the {@link AbstractBTree#entryIterator()}, and
+     * also both lookup by key and lookup by entry index. The height, branching
+     * factor, #of nodes and #of leaves may differ (the test does not presume
+     * that the btrees were built with the same branching factor, but merely
+     * with the same data and key type).
      * 
      * @param expected
      *            The ground truth btree.
@@ -1704,7 +1707,69 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         // The key type must agree.
         assertEquals(expected.getKeyType(), actual.getKeyType());
+
+        // verify the entry iterator.
+        doEntryIteratorTest(actual,expected);
         
+        /*
+         * Extract the ground truth mapping from the input btree.
+         */
+        Object[] keys = new Object[expected.getEntryCount()];
+        
+        Object[] vals = new Object[expected.getEntryCount()];
+        
+        getKeysAndValues(expected, keys, vals);
+        
+        /*
+         * Verify lookup against the segment with random keys choosen from
+         * the input btree. This vets the separatorKeys. If the separator
+         * keys are incorrect then lookup against the index segment will
+         * fail in various interesting ways.
+         */
+        doRandomLookupTest("actual", actual, keys, vals);
+
+        /*
+         * Verify lookup by entry index with random keys. This vets the
+         * childEntryCounts[] on the nodes of the generated index segment.
+         * If the are wrong then this test will fail in various interesting
+         * ways.
+         */
+        doRandomIndexOfTest("actual", actual, keys, vals);
+
+        /*
+         * Examine the btree for inconsistencies (we also examine the ground
+         * truth btree for inconsistencies to be paranoid).
+         */
+
+        System.err.println("Examining expected tree for inconsistencies");
+        assert expected.dump(System.err);
+
+        System.err.println("Examining actual tree for inconsistencies");
+        assert actual.dump(System.err);
+
+    }
+    
+    /**
+     * Compares the total ordering of a btree against the total ordering of a
+     * ground truth btree.
+     * 
+     * Note: This uses the {@link AbstractBTree#entryIterator()} method. Due to
+     * the manner in which that iterator is implemented, the iterator does NOT
+     * rely on the separator keys. Therefore while this validates the total
+     * order it does NOT validate that the index may be searched by key (or by
+     * entry index).
+     * 
+     * @param expected
+     *            The ground truth btree.
+     * 
+     * @param actual
+     *            The btree to be tested.
+     * 
+     * @see #doRandomLookupTest(String, AbstractBTree, Object[], Object[])
+     * @see #doRandomIndexOfTest(String, AbstractBTree, Object[], Object[])
+     */
+    protected void doEntryIteratorTest(AbstractBTree expected, AbstractBTree actual ) {
+
         KeyValueIterator expectedItr = expected.entryIterator();
         
         KeyValueIterator actualItr = actual.entryIterator();
@@ -1764,11 +1829,153 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        System.err.println("Examining expected tree for inconsistencies");
-        assert expected.dump(System.err);
-        System.err.println("Examining actual tree for inconsistencies");
-        assert actual.dump(System.err);
+
+    }
+
+    /**
+     * Extract all keys and values from the btree in key order.  The caller must
+     * correctly dimension the arrays before calling this method.
+     * 
+     * @param btree
+     *            The btree.
+     * @param keys
+     *            The keys in key order (out).
+     * @param vals
+     *            The values in key order (out).
+     */
+    protected void getKeysAndValues(AbstractBTree btree, Object[] keys,
+            Object[] vals) {
+        
+        KeyValueIterator itr = btree.entryIterator();
+
+        int i = 0;
+        
+        while( itr.hasNext() ) {
+            
+            Object val = itr.next();
+            
+            Object key = itr.getKey();
+
+            assert val != null;
+            
+            assert key != null;
+            
+            keys[i] = key;
+            
+            vals[i] = val;
+            
+            i++;
+            
+        }
         
     }
     
+    /**
+     * Tests the performance of random {@link IBTree#lookup(Object)}s on the
+     * btree. This vets the separator keys and the childAddr and/or childRef
+     * arrays since those are responsible for lookup.
+     * 
+     * @param label
+     *            A descriptive label for error messages.
+     * 
+     * @param btree
+     *            The btree.
+     * 
+     * @param keys
+     *            the keys in key order.
+     * 
+     * @param vals
+     *            the values in key order.
+     */
+    protected void doRandomLookupTest(String label, AbstractBTree btree, Object[] keys, Object[] vals) {
+        
+        int nentries = btree.getEntryCount();
+        
+        System.err.println("\ncondition: "+label+", nentries="+nentries);
+        
+        int[] order = getRandomOrder(nentries);
+
+        long begin = System.currentTimeMillis();
+
+        boolean randomOrder = true;
+        
+        for(int i=0; i<nentries; i++) {
+
+            int entryIndex = randomOrder ? order[i] : i;
+            
+            Object key = keys[entryIndex];
+        
+            Object val = btree.lookup(key);
+            
+            Object expectedVal = vals[entryIndex];
+
+            assertEquals(expectedVal,val);
+            
+        }
+ 
+        long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println(label + " : tested " + nentries
+                + " keys order in " + elapsed + "ms");
+        
+        System.err.println(label + " : " + btree.counters);
+         
+    }
+
+    /**
+     * Tests the performance of random lookups of keys and values by entry
+     * index. This vets the separator keys and childRef/childAddr arrays, which
+     * are used to lookup the entry index for a key, and also vets the
+     * childEntryCount[] array, since that is responsible for lookup by entry
+     * index.
+     * 
+     * @param label
+     *            A descriptive label for error messages.
+     * 
+     * @param btree
+     *            The btree.
+     * 
+     * @param keys
+     *            the keys in key order.
+     * 
+     * @param vals
+     *            the values in key order.
+     */
+    protected void doRandomIndexOfTest(String label, AbstractBTree btree, Object[] keys, Object[] vals) {
+        
+        int nentries = btree.getEntryCount();
+        
+        System.err.println("\ncondition: "+label+", nentries="+nentries);
+        
+        int[] order = getRandomOrder(nentries);
+
+        long begin = System.currentTimeMillis();
+
+        boolean randomOrder = true;
+        
+        for(int i=0; i<nentries; i++) {
+            
+            int entryIndex = randomOrder ? order[i] : i;
+            
+            Object key = keys[entryIndex];
+        
+            assertEquals("indexOf",entryIndex,btree.indexOf(key));
+            
+            Object expectedVal = vals[entryIndex];
+
+            assertEquals("keyAt",key,btree.keyAt(entryIndex));
+
+            assertEquals("valueAt",expectedVal,btree.valueAt(entryIndex));
+            
+        }
+ 
+        long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println(label + " : tested " + nentries
+                + " keys in " + elapsed + "ms");
+        
+        System.err.println(label + " : " + btree.counters);
+         
+    }
+
 }

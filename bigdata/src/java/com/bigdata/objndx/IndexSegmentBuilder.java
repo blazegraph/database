@@ -510,12 +510,12 @@ public class IndexSegmentBuilder {
              * know how the leaves and stack fit onto the file once they have
              * been serialized and compressed.
              * 
-             * @todo we could serialize the record with zeros for values that we
-             * do not know until after the index has been generated and then
-             * patch them up afterwards. This would let us compute the final
-             * record size while also permitting the use of Java default
-             * serialization to store things like NEGINF, comparator, keySer,
-             * valSer, and the record compressor.
+             * @todo we could serialize the metadata record with zeros for
+             * values that we do not know until after the index has been
+             * generated and then patch them up afterwards. This would let us
+             * compute the final record size while also permitting the use of
+             * Java default serialization to store things like NEGINF,
+             * comparator, keySer, valSer, and the record compressor.
              */
             outChannel.position(IndexSegmentMetadata.SIZE);
             
@@ -849,7 +849,8 @@ public class IndexSegmentBuilder {
      * Close out a node or leaf. When a node or leaf is closed we write it out
      * to obtain its {@link Addr} and set its address on its direct parent using
      * {@link #addChild(com.bigdata.objndx.IndexSegmentBuilder.SimpleNodeData, long)}.
-     * This also updates the per-child counters of the #of entries spanned by a node. 
+     * This also updates the per-child counters of the #of entries spanned by a
+     * node.
      */
     protected void close(AbstractSimpleNodeData node) throws IOException {
 
@@ -1376,7 +1377,7 @@ public class IndexSegmentBuilder {
          * @param index
          *            The key index in [0:maxKeys-1].
          * 
-         * @todo handle all key types.
+         * FIXME handle all key types.
          */
         final protected void addKey(it.unimi.dsi.mg4j.util.BloomFilter bloomFilter,int index) {
             switch(keyType) {
