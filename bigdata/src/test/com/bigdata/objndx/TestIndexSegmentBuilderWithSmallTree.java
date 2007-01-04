@@ -143,45 +143,30 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         /*
          * Test the tree in detail.
-         * 
-         * FIXME The build algorithm is currently getting the separatorKeys
-         * wrong for C (the root) and B (the 2nd node on the level 1). As a
-         * result the entryIterator() succeeds since it only depends on the
-         * childAddr[], but lookup by key fails for at least some keys.
          */
         {
         
-            final Node D = (Node)seg.getRoot();
-            final Node A = (Node)D.getChild(0); 
-            final Node B = (Node)D.getChild(1);
-            final Node C = (Node)D.getChild(2);
+            final Node C = (Node)seg.getRoot();
+            final Node A = (Node)C.getChild(0);
+            final Node B = (Node)C.getChild(1);
             final Leaf a = (Leaf)A.getChild(0);
             final Leaf b = (Leaf)A.getChild(1);
-            final Leaf c = (Leaf)A.getChild(2);
-            final Leaf d = (Leaf)B.getChild(0);
-            final Leaf e = (Leaf)B.getChild(1);
-            final Leaf f = (Leaf)C.getChild(0);
-            final Leaf g = (Leaf)C.getChild(1);
+            final Leaf c = (Leaf)B.getChild(0);
+            final Leaf d = (Leaf)B.getChild(1);
            
-            assertKeys(new int[]{10,16},D);
-            assertEntryCounts(new int[]{9,6,5},D);
+            assertKeys(new int[]{7},C);
+            assertEntryCounts(new int[]{6,4},C);
+
+            assertKeys(new int[]{4},A);
+            assertEntryCounts(new int[]{3,3},A);
             
-            assertKeys(new int[]{4,7},A);
-            assertEntryCounts(new int[]{3,3,3},A);
-            
-            assertKeys(new int[]{13},B);
-            assertEntryCounts(new int[]{3,3},B);
-            
-            assertKeys(new int[]{19},C);
-            assertEntryCounts(new int[]{3,2},C);
+            assertKeys(new int[]{9},B);
+            assertEntryCounts(new int[]{2,2},B);
             
             assertKeys(new int[]{1,2,3},a);
             assertKeys(new int[]{4,5,6},b);
-            assertKeys(new int[]{7,8,9},c);
-            assertKeys(new int[]{10,11,12},d);
-            assertKeys(new int[]{13,14,15},e);
-            assertKeys(new int[]{16,17,18},f);
-            assertKeys(new int[]{19,20},g);
+            assertKeys(new int[]{7,8},c);
+            assertKeys(new int[]{9,10},d);
 
             // Note: values are verified by testing the total order.
 
@@ -479,20 +464,39 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
          */
         {
         
-            final Node A = (Node)seg.getRoot();
+            final Node D = (Node)seg.getRoot();
+            final Node A = (Node)D.getChild(0); 
+            final Node B = (Node)D.getChild(1);
+            final Node C = (Node)D.getChild(2);
             final Leaf a = (Leaf)A.getChild(0);
             final Leaf b = (Leaf)A.getChild(1);
             final Leaf c = (Leaf)A.getChild(2);
+            final Leaf d = (Leaf)B.getChild(0);
+            final Leaf e = (Leaf)B.getChild(1);
+            final Leaf f = (Leaf)C.getChild(0);
+            final Leaf g = (Leaf)C.getChild(1);
            
+            assertKeys(new int[]{10,16},D);
+            assertEntryCounts(new int[]{9,6,5},D);
+            
             assertKeys(new int[]{4,7},A);
             assertEntryCounts(new int[]{3,3,3},A);
+            
+            assertKeys(new int[]{13},B);
+            assertEntryCounts(new int[]{3,3},B);
+            
+            assertKeys(new int[]{19},C);
+            assertEntryCounts(new int[]{3,2},C);
             
             assertKeys(new int[]{1,2,3},a);
             assertKeys(new int[]{4,5,6},b);
             assertKeys(new int[]{7,8,9},c);
+            assertKeys(new int[]{10,11,12},d);
+            assertKeys(new int[]{13,14,15},e);
+            assertKeys(new int[]{16,17,18},f);
+            assertKeys(new int[]{19,20},g);
 
             // Note: values are verified by testing the total order.
-
         }
         
         /*

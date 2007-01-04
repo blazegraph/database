@@ -555,6 +555,8 @@ public class IndexSegmentBuilder {
 
             for (int i = 0; i < plan.nleaves; i++) {
 
+                leaf.reset(plan.numInNode[leaf.level][i]);
+
                 /*
                  * Fill in defined keys and values for this leaf.
                  * 
@@ -879,25 +881,14 @@ public class IndexSegmentBuilder {
             addChild(parent, addr, nentries);
             
         }
-        
-        /*
-         * If there are more nodes to be filled at this level then prepare this
-         * node to receive its next values/children.
-         * 
-         * FIXME This is resetting the node before the call to addSeparatorKey
-         * with the result that the next separatorKey will go into this node
-         * rather than its parent. I need to review the control logic here to
-         * get this twist ironed out. The various test suites have been enhanced
-         * to now correctly report this bug as well as a variety of other
-         * possible errors in index segment generation.
-         */
-        if( col+1 < plan.numInLevel[h] ) {
-            
-            int max = plan.numInNode[h][col+1];
-            
-            node.reset( max );
-            
-        }
+
+//        if (col + 1 < plan.numInLevel[h]) {
+//
+//            int max = plan.numInNode[h][col + 1];
+//
+//            parent.reset(max);
+//
+//        }
 
         writtenInLevel[h]++;        
 
@@ -920,7 +911,43 @@ public class IndexSegmentBuilder {
     protected void addChild(SimpleNodeData parent, long childAddr, int nentries)
             throws IOException {
 
-        assert parent.nchildren < parent.max;
+        if (parent.nchildren == parent.max) {
+            /*
+             * If there are more nodes to be filled at this level then prepare
+             * this node to receive its next values/children.
+             */
+            final int h = parent.level;
+
+            /*
+             * the index into the level for this node. note that we subtract one
+             * since the node is full and was already "closed". what we are
+             * trying to figure out here is whether the node may be reset so as
+             * to allow more children into what is effectively a new node or
+             * whether there are no more nodes allowed at this level of the
+             * output tree.
+             */
+            final int col = writtenInLevel[h] - 1;
+
+            if (col + 1 < plan.numInLevel[h]) {
+
+                int max = plan.numInNode[h][col + 1];
+
+                parent.reset(max);
+
+            } else {
+
+                /*
+                 * the data is driving us to populate more nodes in this level
+                 * than the plan allows for the output tree. this is either an
+                 * error in the control logic or an error in the plan.
+                 */
+                throw new AssertionError();
+
+            }
+
+        }
+
+// assert parent.nchildren < parent.max;
 
         if(DEBUG)
             log.debug("setting child at index=" + parent.nchildren
