@@ -881,8 +881,15 @@ public class IndexSegmentBuilder {
         }
         
         /*
-         * If there are more nodes to be filled at this level then prepare
-         * this node to receive its next values/children. 
+         * If there are more nodes to be filled at this level then prepare this
+         * node to receive its next values/children.
+         * 
+         * FIXME This is resetting the node before the call to addSeparatorKey
+         * with the result that the next separatorKey will go into this node
+         * rather than its parent. I need to review the control logic here to
+         * get this twist ironed out. The various test suites have been enhanced
+         * to now correctly report this bug as well as a variety of other
+         * possible errors in index segment generation.
          */
         if( col+1 < plan.numInLevel[h] ) {
             
