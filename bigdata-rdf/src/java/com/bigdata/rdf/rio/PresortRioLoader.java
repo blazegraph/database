@@ -58,12 +58,13 @@ import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.rdf.TripleStore;
-import com.bigdata.rdf.rio.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.rio.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.rio.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.rio.OptimizedValueFactory._Statement;
-import com.bigdata.rdf.rio.OptimizedValueFactory._URI;
-import com.bigdata.rdf.rio.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
+import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
+import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Statement handled for the RIO RDF Parser that collects values and statements

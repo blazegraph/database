@@ -45,7 +45,7 @@ Modifications:
  * Created on Jan 26, 2007
  */
 
-package com.bigdata.rdf.rio;
+package com.bigdata.rdf.model;
 
 import java.util.Comparator;
 import java.util.UUID;
