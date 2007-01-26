@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+  <id>bigdata-rdf</id>
+  <name>bigdata-rdf</name>
+  <package>com.bigdata</package>
+  <extends>../cweb/project.xml</extends>
+  <groupId>com.bigdata</groupId>
+  <currentVersion>0.1-b1-dev</currentVersion>
+
+  <organization>
+    <name>SYSTAP, LLC</name>
+    <url>http://www.systap.com/</url>
+  </organization>
+
+  <!-- required per-POM metadata. -->
+  <inceptionYear>2006</inceptionYear>
+  <url>http://www.systap.com/</url>
+
+  <!-- The short description is used in the JAR manifest.  For -->
+  <!-- compatibility reasons, no leading/trailing newlines and -->
+  <!-- 72 character length limit.                              -->
+
+  <shortDescription>bigdata-rdf</shortDescription>
+
+  <description>
+
+<![CDATA[
+
+  <p>
+
+	  rdf database build on the bigdata architecture.
+
+  </p>
+
+]]>
+
+  </description>
+
+  <versions>
+  </versions>
+
+  <!-- copy down inheritance applies. -->
+  <developers>
+
+    <developer>
+      <name>Bryan Thompson</name>
+      <id>bryan</id>
+      <email>bryan@systap.com</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+    <developer>
+      <name>Mike Personick</name>
+      <id>mike</id>
+      <email>mike@systap.com</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+  </developers>
+
+  <!-- project-specific data. -->
+  <dependencies>
+
+    <!-- log4j integration. -->
+    <dependency> 
+      <id>log4j</id> 
+      <version>1.2.8</version> 
+      <url>http://logging.apache.org</url>
+    </dependency>
+
+    <!-- junit extensions. -->
+    <dependency> 
+      <id>junit</id> 
+      <version>3.8.1</version> 
+      <url>http://www.junit.org/</url>
+    </dependency>
+
+    <!-- LGPL utility classes. -->
+    <dependency> 
+      <id>lgpl-util</id> 
+      <!--<version>3.8.1</version>-->
+      <url>http://cweb.cvs.sourceforge.net/cweb/lgpl-utils/</url>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <nagEmailAddress>
+      thompsonbry@users.sourceforge.net
+    </nagEmailAddress>
+
+    <sourceDirectory>${basedir}/src/java</sourceDirectory>
+
+    <unitTestSourceDirectory>${basedir}/src/test</unitTestSourceDirectory>
+
+    <aspectSourceDirectory/>
+
+    <!-- Unit test cases -->
+
+    <unitTest>
+
+      <includes>
+        <include>org/CognitiveWeb/dbcache/TestAll.java</include>
+      </includes>
+
+      <!-- Resources for test cases are declared here. -->
+
+      <resources>
+      </resources>
+
+    </unitTest>
+              
+    <!-- J A R  R E S O U R C E S -->
+    <resources>
+      <resource>
+        <directory>${basedir}/src/resources/logging</directory>
+        <includes>
+          <include>log4j.properties</include>
+        </includes>
+      </resource>
+
+    </resources>
+
+    <jars>
+    </jars>
+
+  </build>
+
+</project>

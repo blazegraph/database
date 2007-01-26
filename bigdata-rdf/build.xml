@@ -1,0 +1,61 @@
+<project name="bigdata-rdf" default="jar" basedir=".">
+
+    <property file="build.properties"/>
+
+    <path id="build.classpath">
+        <fileset dir="${bigdata.rdf.dir}/lib">
+            <include name="*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/lib">
+            <include name="*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="runtime.classpath">
+        <pathelement location="${build.dir}"/>
+        <path refid="build.classpath"/>
+    </path>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="prepare">
+        <mkdir dir="${build.dir}"/>
+    </target>
+
+    <target name="compile" depends="prepare">
+        <mkdir dir="${build.dir}"/>
+        <javac destdir="${build.dir}" 
+               classpathref="build.classpath"
+               debug="on">
+            <src path="${cweb.dir}/commons/src/java"/>
+            <src path="${cweb.dir}/concurrent/src/java"/>
+            <src path="${cweb.dir}/dbcache/src/java"/>
+            <src path="${cweb.dir}/extser/src/java"/>
+            <src path="${cweb.dir}/junit-ext/src/java"/>
+            <src path="${cweb.dir}/lgpl-utils/src/java"/>
+            <src path="${bigdata.dir}/src/java"/>
+            <src path="${bigdata.dir}/src/test"/>
+            <src path="${bigdata.rdf.dir}/src/java"/>
+            <src path="${bigdata.rdf.dir}/src/test"/>
+        </javac>
+<!--
+        <copy toDir="${build.dir}/classes">
+            <fileset dir="${src.dir}">
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+-->        
+    </target>
+
+    <target name="jar" depends="compile">
+        <jar destfile="${jar.name}">
+            <fileset dir="${build.dir}"/>
+            <manifest>
+                <attribute name="Main-Class" value="com/bigdata/rdf/TestRioIntegration"/>
+            </manifest>
+        </jar>
+    </target>
+
+</project>
