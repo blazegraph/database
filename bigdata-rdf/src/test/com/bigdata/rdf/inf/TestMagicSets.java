@@ -49,7 +49,12 @@ package com.bigdata.rdf.inf;
 
 import java.io.IOException;
 
-import junit.framework.TestCase2;
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.vocabulary.RDF;
+import org.openrdf.vocabulary.RDFS;
+
+import com.bigdata.rdf.TripleStore;
 
 /**
  * Test suite for inference engine and the magic sets implementation.
@@ -92,7 +97,7 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMagicSets extends TestCase2 {
+public class TestMagicSets extends AbstractInferenceEngineTestCase {
 
     /**
      * 
@@ -107,18 +112,127 @@ public class TestMagicSets extends TestCase2 {
         super(name);
     }
 
+    public static class MagicRule extends Rule {
+
+        /**
+         * The original rule. Execution is delegated to this object if the magic
+         * matches.
+         */
+        public final Rule rule;
+        
+        /**
+         * @param store
+         * @param head
+         * @param body
+         */
+        public MagicRule(InferenceEngine store, Rule rule) {
+            
+            super(store, rule.head, magicRewrite(rule));
+            
+            this.rule = rule;
+            
+        }
+        
+        static Pred[] magicRewrite(Rule rule) {
+            
+            Pred[] ret = new Pred[rule.body.length+1];
+            
+            ret[0] = new Magic(rule.head.s,rule.head.p,rule.head.o);
+
+            System.arraycopy(rule.body, 0, ret, 1, rule.body.length);
+            
+            return ret;
+            
+        }
+
+        /**
+         * Return true iff the {@link Magic} is matched in the kb.
+         */
+        public boolean match() {
+
+            // FIXME implement magic match.
+            return true;
+            
+        }
+
+        /**
+         * Applies the base rule iff the {@link Magic} is matched.
+         */
+        public int apply() {
+
+            if(match()) { 
+            
+                return rule.apply();
+            
+            }
+            
+            return 0;
+            
+        }
+        
+        
+    }
+    
     /**
      * Test of query answering using magic sets.
-     *
-     * @todo define micro kb based on mike's example and work through the
-     * magic sets implementation.
+     * 
+     * @todo work through the magic sets implementation.
      * 
      * @throws IOException
      */
     public void testQueryAnswering01() throws IOException {
 
-        fail("implement test");
+        /*
+         * setup the database.
+         */
+        URI x = new URIImpl("http://www.foo.org/x");
+        URI y = new URIImpl("http://www.foo.org/y");
+        URI z = new URIImpl("http://www.foo.org/z");
+
+        URI A = new URIImpl("http://www.foo.org/A");
+        URI B = new URIImpl("http://www.foo.org/B");
+        URI C = new URIImpl("http://www.foo.org/C");
+
+        URI rdfType = new URIImpl(RDF.TYPE);
+
+        URI rdfsSubClassOf = new URIImpl(RDFS.SUBCLASSOF);
+
+        store.addStatement(x, rdfType, C);
+        store.addStatement(y, rdfType, B);
+        store.addStatement(z, rdfType, A);
+
+        store.addStatement(B, rdfsSubClassOf, A);
+        store.addStatement(C, rdfsSubClassOf, B);
+
+        store.commit();
+
+        assertEquals("statementCount", 5, store.ndx_spo.getEntryCount());
+        assertTrue(store.containsStatement(x, rdfType, C));
+        assertTrue(store.containsStatement(y, rdfType, B));
+        assertTrue(store.containsStatement(z, rdfType, A));
+        assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
+        assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
         
+        /*
+         * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
+         */
+
+        // query :- triple(?s,rdf:type,A).
+        Triple query = new Triple(store.nextVar(), store.rdfType, new Id(store
+                .addTerm(new URIImpl("http://www.foo.org/A"))));
+
+        // Run the queryy.
+        TripleStore answerSet = store.query(query, new Rule[] { store.rdfs9,
+                store.rdfs11 });
+
+        /*
+         * @todo verify the answer set: ?s := {x,y,z}.
+         */
+        assertEquals("statementCount", 3, answerSet.getStatementCount());
+        assertTrue(answerSet.containsStatement(x, rdfType, A));
+        assertTrue(answerSet.containsStatement(y, rdfType, A));
+        assertTrue(answerSet.containsStatement(z, rdfType, A));
+
     }
     
 }

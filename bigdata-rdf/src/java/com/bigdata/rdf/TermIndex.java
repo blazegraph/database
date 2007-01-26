@@ -61,6 +61,8 @@ import com.bigdata.objndx.PO;
  * A persistent index mapping variable length byte[] keys formed from an RDF
  * {@link Value} to {@link Long} integer term identifiers.
  * 
+ * FIXME review use of indexId.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -143,15 +145,15 @@ public class TermIndex extends BTree {
     }
 
     /**
-     * Lookup the term in the term:id index. if it is there then take its
-     * termId. Otherwise, insert the term into the term:id index which gives us
-     * its termId.
+     * Lookup the term in the term:id index (non-batch api). if it is there then
+     * take its termId. Otherwise, insert the term into the term:id index which
+     * gives us its termId.
      * 
-     * @param key The sort key for the term.
+     * @param key
+     *            The sort key for the term.
      * 
      * @return The termId, which was either assigned or resolved by the index.
      */
-    // @todo review use of indexId.
     public long add(byte[] key) {
         
         Long id = (Long)lookup(key);
@@ -175,86 +177,24 @@ public class TermIndex extends BTree {
         return id;
         
     }
-    
-//    /**
-//     * Places URIs into a total ordering.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class StringComparator implements Comparator<String> {
-//
-//        static final Comparator INSTANCE = new StringComparator();
-//        
-//        public int compare(String o1, String o2) {
-//            
-//            return o1.compareTo(o2);
-//            
-//        }
-//        
-//    }
-    
-//    /**
-//     * Key serializer.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class KeySerializer implements IKeySerializer {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = -3384846308020761038L;
-//        static final IKeySerializer INSTANCE = new KeySerializer();
-//        
-//        public ArrayType getKeyType() {
-//            
-//            return ArrayType.OBJECT;
-//            
-//        }
-//
-//        /**
-//         * Note: There is no fixed upper limit for URLs or strings in general,
-//         * therefore the btree may have to occasionally resize its buffer to
-//         * accomodate very long variable length keys.
-//         */
-//        public int getSize(int n) {
-//            
-//            return 4096*n;
-//            
-//        }
-//
-//        public void getKeys(DataInputStream is, Object keys, int nkeys)
-//                throws IOException {
-//
-//            Object[] a = (Object[]) keys;
-//
-//            for (int i = 0; i < nkeys; i++) {
-//
-//                a[i] = is.readUTF();
-//
-//            }
-//            
-//        }
-//
-//        public void putKeys(DataOutputStream os, Object keys, int nkeys)
-//                throws IOException {
-//
-//            if (nkeys == 0)
-//                return;
-//
-//            Object[] a = (Object[]) keys;
-//
-//            for (int i = 0; i < nkeys; i++) {
-//
-//                os.writeUTF((String) a[i]);
-//
-//            }
-//
-//        }
-//
-//    }
+
+    /**
+     * Get the existing term identifier.
+     * 
+     * @param key
+     *            The term key.
+     * 
+     * @return The term identifier -or- 0L if the term was not found.
+     */
+    public long get(byte[] key) {
+        
+        Long id = (Long)lookup(key);
+        
+        if( id == null ) return 0;
+            
+        return id;
+        
+    }
 
     /**
      * Note: There is no additional data serialized with a String. All the

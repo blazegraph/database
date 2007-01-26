@@ -299,9 +299,9 @@ public class TripleStore {
         keyBuilder = new RdfKeyBuilder(_keyBuilder);
 
         // perfect statement indices.
-        ndx_spo = new StatementIndex(journal);
-        ndx_pos = new StatementIndex(journal);
-        ndx_osp = new StatementIndex(journal);
+        ndx_spo = new StatementIndex(journal,KeyOrder.SPO);
+        ndx_pos = new StatementIndex(journal,KeyOrder.POS);
+        ndx_osp = new StatementIndex(journal,KeyOrder.OSP);
 
         ndx_termId = new TermIndex(journal, (short) 1);
         
@@ -316,6 +316,15 @@ public class TripleStore {
     }
 
     /**
+     * The #of triples in the store.
+     */
+    public int getStatementCount() {
+        
+        return ndx_spo.getEntryCount();
+        
+    }
+    
+    /**
      * Add a single statement by lookup and/or insert into the various indices
      * (non-batch api).
      */
@@ -328,6 +337,21 @@ public class TripleStore {
         ndx_spo.insert(keyBuilder.statement2Key(_s, _p, _o),null);
         ndx_pos.insert(keyBuilder.statement2Key(_p, _o, _s),null);
         ndx_osp.insert(keyBuilder.statement2Key(_p, _s, _p),null);
+        
+    }
+
+    /**
+     * Return true if the statement exists in the store (non-batch API).
+     */
+    public boolean containsStatement(Resource s, URI p, Value o) {
+
+        long _s, _p, _o;
+        
+        if( (_s = getTerm(s)) == 0L ) return false;
+        if( (_p = getTerm(p)) == 0L ) return false;
+        if( (_o = getTerm(o)) == 0L ) return false;
+        
+        return ndx_spo.contains(keyBuilder.statement2Key(_s, _p, _o));
         
     }
 
@@ -610,7 +634,7 @@ public class TripleStore {
     
     /**
      * Add a term into the term:id index and the id:term index, returning the
-     * assigned term identifier.
+     * assigned term identifier (non-batch API).
      * 
      * @param value
      *            The term.
@@ -631,6 +655,21 @@ public class TripleStore {
 
     }
 
+    /**
+     * Return the pre-assigned termId for the value (non-batch API).
+     * 
+     * @param value
+     *            The value.
+     * 
+     * @return The pre-assigned termId -or- 0L iff the term is not known to the
+     *         database.
+     */
+    public long getTerm(Value value) {
+
+        return ndx_termId.get(keyBuilder.value2Key(value));
+
+    }
+    
     /**
      * @todo restart safety requires that the individual indices are flushed
      *       to disk and their metadata records written and that we update

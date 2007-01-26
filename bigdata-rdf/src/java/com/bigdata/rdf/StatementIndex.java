@@ -62,16 +62,21 @@ import com.bigdata.objndx.PO;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo make the keyOrder property persistent.
  */
 public class StatementIndex extends BTree {
 
+    public final KeyOrder keyOrder;
+    
     /**
      * Create a new statement index.
      * 
      * @param store
      *            The backing store.
      */
-    public StatementIndex(IRawStore store) {
+    public StatementIndex(IRawStore store,KeyOrder keyOrder) {
+        
         super(store,
                 DEFAULT_BRANCHING_FACTOR,
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
@@ -80,6 +85,11 @@ public class StatementIndex extends BTree {
                 ValueSerializer.INSTANCE,
                 null // new RecordCompressor() // record compressor
                 );
+        
+        assert keyOrder != null;
+        
+        this.keyOrder = keyOrder;
+        
     }
     
     /**
@@ -90,11 +100,15 @@ public class StatementIndex extends BTree {
      * @param metadataId
      *            The metadata record identifier for the index.
      */
-    public StatementIndex(IRawStore store, long metadataId) {
+    public StatementIndex(IRawStore store, long metadataId,KeyOrder keyOrder) {
+
         super(store, BTreeMetadata.read(BTree.getTransitionalRawStore(store),
                 metadataId), new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
                 DEFAULT_HARD_REF_QUEUE_SCAN));
+        
+        this.keyOrder = keyOrder;
+        
     }
 
     /**

@@ -43,6 +43,9 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.RdfKeyBuilder;
+
 /**
  * Represents a triple.
  * 
@@ -51,20 +54,78 @@ package com.bigdata.rdf.inf;
  */
 public class SPO {
     
+    /**
+     * @see RdfKeyBuilder#CODE_STMT
+     * @see RdfKeyBuilder#CODE_PRED
+     * @see RdfKeyBuilder#CODE_RULE
+     */
+    public final byte code;
     public final long s;
     public final long p;
     public final long o;
     
+    /**
+     * Construct a triple from term identifiers.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     */
     public SPO(long s, long p, long o) {
+        this.code = RdfKeyBuilder.CODE_STMT;
         this.s = s;
         this.p = p;
         this.o = o;
     }
     
-    public SPO(byte[] key) {
+    /**
+     * Construct a triple from the sort key.
+     * 
+     * @param keyOrder
+     *            Indicates the permutation of the subject, predicate and object
+     *            used by the key.
+     * 
+     * @param keyBuilder
+     *            Used to decode the key.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @see RdfKeyBuilder#key2Statement(byte[], long[])
+     */
+    public SPO(KeyOrder keyOrder, RdfKeyBuilder keyBuilder, byte[] key) {
         
-        throw new UnsupportedOperationException();
+        long[] ids = new long[3];
         
+        code = keyBuilder.key2Statement(key, ids); 
+        
+        switch (keyOrder) {
+
+        case SPO:
+            s = ids[0];
+            p = ids[1];
+            o = ids[2];
+
+            break;
+        case POS:
+            p = ids[0];
+            o = ids[1];
+            s = ids[2];
+
+            break;
+        case OSP:
+            o = ids[0];
+            s = ids[1];
+            p = ids[2];
+
+            break;
+
+        default:
+
+            throw new UnsupportedOperationException();
+
+        }
+
     }
 
 }

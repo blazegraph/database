@@ -57,10 +57,10 @@ public class RuleRdfs9 extends Rule {
 
     public RuleRdfs9(InferenceEngine store,Var u, Var v, Var x) {
         super(store,
-                new Pred(v, store.rdfType, x), //
+                new Triple(v, store.rdfType, x), //
                 new Pred[] { //
-                        new Pred(u, store.rdfsSubClassOf, x),//
-                        new Pred(v, store.rdfType, u) //
+                        new Triple(u, store.rdfsSubClassOf, x),//
+                        new Triple(v, store.rdfType, u) //
                 });
     }
 

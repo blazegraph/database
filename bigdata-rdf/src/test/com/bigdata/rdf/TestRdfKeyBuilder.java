@@ -63,7 +63,6 @@ import com.bigdata.objndx.KeyBuilder;
  * @todo write test for sort key generated for each well-known datatype uri.
  * @todo write test that sort keys for various value types are assigned to
  *       non-overlapping regions of the key space.
- * @todo write test for generate of statement keys.
  * @todo write code to generate permutations of statement keys and tests of that
  *       code.
  * 
@@ -216,6 +215,9 @@ public class TestRdfKeyBuilder extends TestCase2 {
         
     }
     
+    /**
+     * @todo test rule and pred encoding and decoding as well.
+     */
     public void test_statement() {
         
         byte[] k1 = fixture.statement2Key(1, 2, 3);
@@ -229,6 +231,19 @@ public class TestRdfKeyBuilder extends TestCase2 {
         assertTrue(BytesUtil.compareBytes(k1, k2)<0);
         assertTrue(BytesUtil.compareBytes(k2, k3)<0);
 
+        // verify decoding.
+
+        long[] ids = new long[3];
+        
+        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k1, ids));
+        assertEquals(new long[]{1,2,3},ids);
+        
+        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k2, ids));
+        assertEquals(new long[]{2,2,3},ids);
+
+        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k3, ids));
+        assertEquals(new long[]{2,2,4},ids);
+        
     }
     
 }

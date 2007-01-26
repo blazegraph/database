@@ -76,6 +76,22 @@ public class RdfKeyBuilder {
     }
     
     /*
+     * Define bytes indicating whether a key in a statement index is a
+     * statement, predicate (rule without a body), or a rule with a body. This
+     * distinction makes it possible to mix together rules and data in the
+     * statement indices.
+     */
+    
+    /** indicates a statement. */
+    final public static byte CODE_STMT = 0x01;
+    /** indicates a predicate (value is null). */
+    final public static byte CODE_PRED = 0x02;
+    /** indicates a rule (value is the rule body). */
+    final public static byte CODE_RULE = 0x03;
+    
+    /*
+     * Define bytes indicating the type of a term in the term index.
+     * 
      * Note: when these signed bytes get encoded as unsigned bytes in a key
      * their values change. For example, 2 becomes 130.
      */
@@ -311,9 +327,58 @@ public class RdfKeyBuilder {
      * 
      * @return The sort key for the statement with those values.
      */
-    public byte[] statement2Key(long id1, long id2, long id3 ) {
+    public byte[] statement2Key(long id1, long id2, long id3) {
         
-        return keyBuilder.reset().append(id1).append(id2).append(id3).getKey();
+        return keyBuilder.reset().append(CODE_STMT).append(id1).append(id2)
+                .append(id3).getKey();
+        
+    }
+
+    public byte[] pred2Key(long id1, long id2, long id3) {
+        
+        return keyBuilder.reset().append(CODE_PRED).append(id1).append(id2)
+                .append(id3).getKey();
+        
+    }
+    
+    public byte[] rule2Key(long id1, long id2, long id3) {
+        
+        return keyBuilder.reset().append(CODE_RULE).append(id1).append(id2)
+                .append(id3).getKey();
+        
+    }
+    
+    /**
+     * Decodes a statement key.
+     * 
+     * @param key
+     *            A key as encoded by {@link #statement2Key(long, long, long)}
+     *            and friends or from one of the
+     *            {@link StatementIndex statement indices}.
+     * @param ids
+     *            The ids. You have to know the {@link KeyOrder} in order to
+     *            figure out which is the subject, predicate, or object.
+     * 
+     * @return The byte code indicating whether the key was a
+     *         {@link #CODE_STMT statement}, {@link #CODE_PRED predicate}, or
+     *         {@link #CODE_RULE} rule.
+     */
+    public byte key2Statement(byte[] key, long[] ids) {
+        
+        assert key != null;
+        assert ids != null;
+        assert key.length == 8 * 3 + 1;
+        assert ids.length == 3;
+        
+        byte code = keyBuilder.decodeByte(key[0]);
+
+        ids[0] = keyBuilder.decodeLong(key, 1);
+        
+        ids[1] = keyBuilder.decodeLong(key, 1+8);
+        
+        ids[2] = keyBuilder.decodeLong(key, 1+8+8);
+        
+        return code;
         
     }
     

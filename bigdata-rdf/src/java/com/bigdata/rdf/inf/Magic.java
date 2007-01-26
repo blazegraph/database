@@ -41,55 +41,43 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Jan 26, 2007
+ */
+
 package com.bigdata.rdf.inf;
 
 /**
- * A predicate is a triple with one or more variables. While the general
- * case allows a predicate to have an arbitrary name, for RDFS reasoning we
- * are only concerned with predicates of the form <code>triple(s,p,o)</code>
- * or <code>magic(triple(s,p,o))</code>. Since this is a boolean
- * distinction, we capture it with a boolean flag rather than allowing a
- * predicate name and arity.
+ * A magic/1 predicate whose argument is a triple pattern.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class Pred {
-
-    public final boolean magic;
-
-    public final VarOrId s;
-
-    public final VarOrId p;
-
-    public final VarOrId o;
+public final class Magic extends Pred {
 
     /**
-     * Return true iff all arguments of the predicate are bound (vs
-     * variables).
-     */
-    public boolean isFact() {
-
-        return !s.isVar() && !p.isVar() && !o.isVar();
-
-    }
-
-    /**
-     * Create either a magic/1 or a triple/3 predicate.
+     * Create a magic predicate of the form
+     * <code>magic(triple(s,p,o))</code>
      * 
-     * @param magic
      * @param s
      * @param p
      * @param o
      */
-    protected Pred(boolean magic, VarOrId s, VarOrId p, VarOrId o) {
-        assert s != null;
-        assert p != null;
-        assert o != null;
-        this.magic = magic;
-        this.s = s;
-        this.p = p;
-        this.o = o;
+    public Magic(VarOrId s, VarOrId p, VarOrId o) {
+
+        super(true,s,p,o);
+        
     }
 
+    /**
+     * Create the magic predicate for the given triple pattern.
+     * 
+     * @param triple The triple pattern.
+     */
+    public Magic(Triple triple) {
+        
+        this(triple.s,triple.p,triple.o);
+        
+    }
+    
 }

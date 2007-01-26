@@ -50,10 +50,13 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Options;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.rdf.StatementIndex;
 import com.bigdata.rdf.TermIndex;
 import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 
 /**
  * Adds support for RDFS inference.
@@ -279,7 +282,7 @@ public class InferenceEngine extends TripleStore {
 
         while (itr1.hasNext()) {
 
-            ids[i++] = new SPO(itr1.getKey());
+            ids[i++] = new SPO(ndx.keyOrder,keyBuilder,itr1.getKey());
 
         }
 
@@ -287,6 +290,113 @@ public class InferenceEngine extends TripleStore {
 
         return ids;
 
+    }
+
+    /**
+     * Accepts a triple pattern and returns the closure over that triple pattern
+     * using a magic transform of the RDFS entailment rules.
+     * 
+     * @param query
+     *            The triple pattern.
+     * 
+     * @param rules
+     *            The rules to be applied.
+     * 
+     * @return The answer set.
+     * 
+     * @exception IllegalArgumentException
+     *                if query is null.
+     * @exception IllegalArgumentException
+     *                if query is a fact (no variables).
+     */
+    public TripleStore query(Triple query, Rule[] rules) throws IOException {
+
+        if (query == null)
+            throw new IllegalArgumentException("query is null");
+
+        if (query.isFact())
+            throw new IllegalArgumentException("no variables");
+
+        if (rules == null)
+            throw new IllegalArgumentException("rules is null");
+
+        if (rules.length == 0)
+            throw new IllegalArgumentException("no rules");
+        
+        final int nrules = rules.length;
+
+        /*
+         * prepare the magic transform of the provided rules.
+         */
+        
+        Rule[] rules2 = new Rule[nrules];
+        
+        for( int i=0; i<nrules; i++ ) {
+
+            rules2[i] = new MagicRule(this,rules[i]);
+
+        }
+        
+        /*
+         * @todo create the magic seed and insert it into the answer set.
+         */
+        Magic magicSeed = new Magic(query);
+
+        /*
+         * Run the magic transform.
+         */
+
+        Properties answerSetProperties = new Properties();
+        
+        /*
+         * @todo support buffer extension for the transient mode or set the
+         * default capacity to something larger.  if things get too large
+         * then we need to spill over to disk.
+         */
+        answerSetProperties.setProperty(Options.BUFFER_MODE,
+                BufferMode.Transient.toString());
+        
+        TripleStore answerSet = new TripleStore(answerSetProperties);
+        
+        int lastStatementCount = ndx_spo.getEntryCount();
+
+        final long begin = System.currentTimeMillis();
+
+        System.err.println("Running query: "+query);
+
+        int nadded = 0;
+
+        while (true) {
+
+            for (int i = 0; i < nrules; i++) {
+
+                Rule rule = rules[i];
+
+                nadded += rule.apply();
+
+            }
+
+            int statementCount = ndx_spo.getEntryCount();
+
+            // testing the #of statement is less prone to error.
+            if (lastStatementCount == statementCount) {
+
+                //                if( nadded == 0 ) { // should also work.
+
+                // This is the fixed point.
+                break;
+
+            }
+
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        System.err.println("Ran query in " + elapsed + "ms; "
+                + lastStatementCount + " statements in answer set.");
+
+        return answerSet;
+        
     }
 
 }
