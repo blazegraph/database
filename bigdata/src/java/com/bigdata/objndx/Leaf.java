@@ -511,6 +511,41 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     }
 
+    /**
+     * Looks up one or more tuples and reports whether or not they exist.
+     * 
+     * @return The #of tuples processed.
+     * 
+     * @todo optimize batch lookup here (also when bloom filter is available on
+     *       an IndexSegment).
+     */
+    public int contains(int ntuples, int tupleIndex, byte[][] searchKeys,
+            boolean[] contains) {
+
+        assert tupleIndex < ntuples;
+        
+        btree.touch(this);
+        
+        final int entryIndex = this.keys.search(searchKeys[tupleIndex]);
+
+        if (entryIndex < 0) {
+
+            // Not found.
+
+            contains[tupleIndex] = false;
+            
+            return 1;
+
+        }
+
+        // Found.
+        
+        contains[tupleIndex] = true;
+        
+        return 1;
+
+    }
+
     public int indexOf(byte[] key) {
 
         btree.touch(this);

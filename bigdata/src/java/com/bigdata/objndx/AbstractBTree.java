@@ -433,11 +433,7 @@ abstract public class AbstractBTree implements IBTree {
      * @param values
      *            An array of values, one per tuple (out). The array element
      *            corresponding to a tuple will be null if the key does not
-     *            exist -or- if the key exists with a null value (null values
-     *            are used to mark deleted keys in an isolated btree).
-     * 
-     * @todo timestamps do not belong in the network api since they are only
-     *       used for transactional isolation.
+     *            exist -or- if the key exists with a null value.
      */
     public void lookup(int ntuples, byte[][] keys, Object[] values) {
      
@@ -463,6 +459,63 @@ abstract public class AbstractBTree implements IBTree {
              */
             int nused = ((AbstractNode) getRoot()).lookup(ntuples, tupleIndex,
                     keys, values);
+            
+            assert nused > 0;
+            
+            counters.ninserts += nused;
+            
+            tupleIndex += nused;
+
+        }
+        
+    }
+
+    /**
+     * Batch lookup operation for N tuples returns the most recent timestamp and
+     * value for each key. This operation can be very efficient if the keys are
+     * presented in sorted order.
+     * 
+     * @param ntuples
+     *            The #of tuples in the operation (in).
+     * 
+     * @param keys
+     *            A series of keys paired to values (in). Each key is an
+     *            variable length unsigned byte[]. The keys must be presented in
+     *            sorted order in order to obtain maximum efficiency for the
+     *            batch operation.
+     * 
+     * @param contains
+     *            An array of boolean flags, one per tuple (out). The array
+     *            element corresponding to a tuple will be true iff the key
+     *            exists.
+     * 
+     * @todo write tests for this - the code was cloned from lookup so it should
+     *       work but there it no test suite for contains() at this time.
+     */
+    public void contains(int ntuples, byte[][] keys, boolean[] contains) {
+     
+        if (ntuples <= 0)
+            throw new IllegalArgumentException("ntuples is non-positive");
+            
+        if (keys == null)
+            throw new IllegalArgumentException("keys is null");
+
+        if( keys.length < ntuples )
+            throw new IllegalArgumentException("not enough keys");
+
+        if (contains == null)
+            throw new IllegalArgumentException("contains is null");
+        
+        if( contains.length < ntuples )
+            throw new IllegalArgumentException("not enough values");
+
+        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+
+            /*
+             * Each call MAY process more than one tuple.
+             */
+            int nused = ((AbstractNode) getRoot()).contains(ntuples, tupleIndex,
+                    keys, contains);
             
             assert nused > 0;
             
@@ -548,6 +601,8 @@ abstract public class AbstractBTree implements IBTree {
     /** @deprecated */
     private final Object[] _values = new Object[1];
     /** @deprecated */
+    private final boolean[] _contains = new boolean[1];
+    /** @deprecated */
     private final KeyBuilder keyBuilder = new KeyBuilder();
     
     /**
@@ -620,6 +675,17 @@ abstract public class AbstractBTree implements IBTree {
 
     }
 
+    public boolean contains(byte[] key) {
+
+        if( key == null )
+            throw new IllegalArgumentException();
+
+        contains(1,unbox(key),_contains);
+        
+        return _contains[0];
+        
+    }
+    
     public Object remove(Object key) {
 
         if (key == null)

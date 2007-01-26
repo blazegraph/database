@@ -651,6 +651,32 @@ public class Node extends AbstractNode implements INodeData {
     }
     
     /**
+     * Existence test for up one or more tuples. For each tuple processed, this
+     * finds the index of the first key in the node whose value is greater than
+     * or equal to the key associated with that tuple. The lookup operation is
+     * then delegated to the child node or leaf at position
+     * <code>index - 1</code>.
+     * 
+     * @return The #of tuples processed.
+     */
+    public int contains(int ntuples, int tupleIndex, byte[][] searchKeys,
+            boolean[] contains) {
+
+        assert !deleted;
+        
+        if(btree.debug) assertInvariants();
+
+        btree.touch(this);
+
+        final int childIndex = findChild(searchKeys[tupleIndex]);
+
+        AbstractNode child = (AbstractNode)getChild(childIndex);
+
+        return child.contains(ntuples, tupleIndex, searchKeys, contains);
+        
+    }
+    
+    /**
      * Remove zero or more tuples. For each tuple processed, this finds the
      * index of the first key in the node whose value is greater than or equal
      * to the key associated with that tuple. The remove operation is then

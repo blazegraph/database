@@ -545,7 +545,7 @@ public class KeyBuilder {
 
         } else {
             
-            v = 0x8000000000000000L + v;
+            v = v + 0x8000000000000000L;
             
         }
 
@@ -563,6 +563,44 @@ public class KeyBuilder {
         
     }
 
+    /**
+     * Decodes a signed long value as encoded by {@link #append(long)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The signed long value.
+     */
+    static public long decodeLong(byte[] buf,int off) {
+
+        long v = 0L;
+        
+        // big-endian.
+        v += (0xffL & buf[off++]) << 56;
+        v += (0xffL & buf[off++]) << 48;
+        v += (0xffL & buf[off++]) << 40;
+        v += (0xffL & buf[off++]) << 32;
+        v += (0xffL & buf[off++]) << 24;
+        v += (0xffL & buf[off++]) << 16;
+        v += (0xffL & buf[off++]) <<  8;
+        v += (0xffL & buf[off++]) <<  0;
+
+        if (v < 0) {
+            
+            v = v + 0x8000000000000000L;
+
+        } else {
+            
+            v = v - 0x8000000000000000L;
+            
+        }
+
+        return v;
+        
+    }
+    
     /**
      * Appends a signed integer to the key by first converting it to a
      * lexiographic ordering as an unsigned integer and then appending it into
@@ -657,13 +695,31 @@ public class KeyBuilder {
 
         } else {
             
-            i = 0x80 + i;
+            i = i + 0x80;
             
         }
         
         buf[len++] = (byte)(i & 0xff);
         
         return this;
+        
+    }
+    
+    static public byte decodeByte(byte v) {
+
+        int i = v;
+        
+        if (i < 0) {
+
+            i = i - 0x80;
+
+        } else {
+            
+            i = i + 0x80;
+            
+        }
+
+        return (byte)(i & 0xff);
         
     }
 

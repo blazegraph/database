@@ -1087,6 +1087,24 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             byte[][] searchKeys, Object[] values);
 
     /**
+     * Batch existence testing for one or more keys.
+     * 
+     * @param ntuples
+     *            The #of tuples that are being looked up (in).
+     * @param tupleIndex
+     *            The index of the tuple to be looked up (in)
+     * @param searchKeys
+     *            The array of keys (one key per tuple) (in).
+     * @param contains
+     *            Flags (one element per key) (out). On output, each element is
+     *            true iff the corresponding search key was found.
+     * 
+     * @return The #of tuples processed.
+     */
+    abstract public int contains(int ntuples, int tupleIndex,
+            byte[][] searchKeys, boolean[] contains);
+
+    /**
      * Batch removal of one or more tuples, returning their existing values and
      * timestamps.
      * 

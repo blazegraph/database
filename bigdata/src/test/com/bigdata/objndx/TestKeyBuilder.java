@@ -409,6 +409,15 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("k0<kp1",BytesUtil.compareBytes(k0, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
 
+        /*
+         * verify decoding.
+         */
+        assertEquals("kmin",bmin,KeyBuilder.decodeByte(kmin[0]));
+        assertEquals("km1" ,bm1 ,KeyBuilder.decodeByte(km1[0]));
+        assertEquals("k0"  ,b0  ,KeyBuilder.decodeByte(k0[0]));
+        assertEquals("kp1" ,bp1 ,KeyBuilder.decodeByte(kp1[0]));
+        assertEquals("kmax",bmax,KeyBuilder.decodeByte(kmax[0]));
+
     }
     
     public void test_keyBuilder_short_key() {
@@ -514,6 +523,17 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("k0<kp1",BytesUtil.compareBytes(k0, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
 
+        /*
+         * verify decoding.
+         * 
+         * @todo test decoding at offsets != 0.
+         */
+        assertEquals("kmin",lmin,KeyBuilder.decodeLong(kmin, 0));
+        assertEquals("km1" ,lm1 ,KeyBuilder.decodeLong(km1 , 0));
+        assertEquals("k0"  ,l0  ,KeyBuilder.decodeLong(k0  , 0));
+        assertEquals("kp1" ,lp1 ,KeyBuilder.decodeLong(kp1 , 0));
+        assertEquals("kmax",lmax,KeyBuilder.decodeLong(kmax, 0));
+        
     }
 
     /**

@@ -50,6 +50,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -94,6 +96,17 @@ import com.bigdata.journal.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME test out the use of a buffered output stream in the (de-)serializer
+ * methods and make sure that the buffered output stream is reading or writing
+ * on the underlying ByteBuffer, which is typically direct, using a block byte[]
+ * transfer. See {@link ByteBufferOutputStream} and
+ * {@link ByteBufferInputStream} which do not currently perform bulk transfers
+ * since they do not override {@link OutputStream#write(byte[], int, int)} and
+ * {@link InputStream#read(byte[], int, int)}.  Basically, the hypothesis is that
+ * the operations on the direct buffer might be slower than operations on a Java
+ * byte[] so buffering and doing bulk transfers to/from the direct buffer might
+ * be faster.
  * 
  * @todo automatically resize the decompression buffers as required and start
  *       with a smaller buffer.
