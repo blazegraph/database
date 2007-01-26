@@ -80,14 +80,12 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         IRawStore store = new SimpleStore();
         
         BTree btree = new BTree(store,
-                ArrayType.INT,
                 branchingFactor,
                 new MyHardReferenceQueue<PO>(new DefaultEvictionListener(),
                         queueCapacity, queueScan),
-                        Integer.valueOf(0),
-                        null, // no comparator for primitive key type.
-                        Int32OIdKeySerializer.INSTANCE,
-                        SimpleEntry.Serializer.INSTANCE);
+                        SimpleEntry.Serializer.INSTANCE,
+                        null // no record compressor
+                        );
 
         return btree;
         

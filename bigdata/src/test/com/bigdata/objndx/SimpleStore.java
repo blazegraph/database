@@ -95,12 +95,14 @@ public class SimpleStore implements IRawStore {
         if( buf != null && buf.remaining() > bytes.length ) {
             
             buf.put(bytes);
-         
+            
             return buf;
             
         } else {
         
-            return ByteBuffer.wrap(bytes);
+            buf = ByteBuffer.wrap(bytes);
+            
+            return buf;
             
         }
         

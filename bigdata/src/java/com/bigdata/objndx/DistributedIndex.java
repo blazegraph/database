@@ -201,12 +201,9 @@ public class DistributedIndex implements IBTree {
      *       #of partitions as two (2) or to handle one partition as a special
      *       case by explicitly storing its reference.
      */
-    public DistributedIndex(IRawStore store, int branchingFactor,
-            Object NEGINF, Comparator comparator,
-            IKeySerializer keySerializer) {
+    public DistributedIndex(IRawStore store, int branchingFactor) {
         
-        ndx_md = new MetadataIndex(store, branchingFactor, NEGINF, comparator,
-                keySerializer);
+        ndx_md = new MetadataIndex(store, branchingFactor);
 
 //        ndx_md.insert(NEGINF, entry) = new MetadataIndex(store, branchingFactor, NEGINF, comparator,
 //                keySerializer);
@@ -266,20 +263,13 @@ public class DistributedIndex implements IBTree {
          * @param store
          * @param branchingFactor
          */
-        public MetadataIndex(IRawStore store, int branchingFactor,
-                Object NEGINF, Comparator comparator,
-                IKeySerializer keySerializer) {
-            super(store,
-                    ArrayType.OBJECT,
-                    branchingFactor,
-                    new HardReferenceQueue<PO>(
+        public MetadataIndex(IRawStore store, int branchingFactor) {
+            super(store, branchingFactor, new HardReferenceQueue<PO>(
                     new DefaultEvictionListener(),
                     BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                     BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                    NEGINF,
-                    comparator,
-                    keySerializer,
-                    PartitionMetadata.Serializer.INSTANCE);
+                    PartitionMetadata.Serializer.INSTANCE,
+                    new RecordCompressor());
         }
 
         /**
@@ -288,17 +278,13 @@ public class DistributedIndex implements IBTree {
          * @param store
          * @param metadataId
          */
-        public MetadataIndex(IRawStore store, long metadataId,Object NEGINF, Comparator comparator, IKeySerializer keySerializer ) {
-            super(store, new BTreeMetadata(BTree
+        public MetadataIndex(IRawStore store, long metadataId, Object NEGINF,
+                Comparator comparator, IKeySerializer keySerializer) {
+            super(store, BTreeMetadata.read(BTree
                     .getTransitionalRawStore(store), metadataId),
-                    new HardReferenceQueue<PO>(
-                    new DefaultEvictionListener(),
-                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                    NEGINF,
-                    comparator,
-                    keySerializer,
-                    PartitionMetadata.Serializer.INSTANCE);
+                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
         }
 
         /**
@@ -450,15 +436,15 @@ public class DistributedIndex implements IBTree {
          */
         public static class Serializer implements IValueSerializer {
 
-            public static final Serializer INSTANCE = new Serializer();
+            /**
+             * 
+             */
+            private static final long serialVersionUID = 4307076612127034103L;
             
-            private Serializer() {}
+            public transient static final Serializer INSTANCE = new Serializer();
             
-            public int getSize(int n) {
-                // TODO Auto-generated method stub
-                return 0;
-            }
-
+            public Serializer() {}
+            
             public void getValues(DataInputStream is, Object[] values, int nvals) throws IOException {
                 // TODO Auto-generated method stub
                 

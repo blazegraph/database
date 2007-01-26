@@ -78,23 +78,23 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
     public TestLinearListMethods(String name) {
         super(name);
     }
-
+    
     /**
      * Tests on the root leaf.
      */
-    public void test_linearListHeight0() throws NoSuccessorException {
+    public void test_linearListHeight0() {
         
         BTree btree = getBTree(3);
-        
+
         Leaf a = (Leaf)btree.getRoot();
 
         SimpleEntry v3 = new SimpleEntry(3);
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(i2k(3), v3);
+        btree.insert(i2k(5), v5);
+        btree.insert(i2k(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -104,42 +104,42 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          * not found and the encoded insertion point is returned.  The "not
          * found" indices are a computed as (-(insert position)-1).
          */
-        assertEquals(-1,btree.indexOf(1));
-        assertEquals(-1,btree.indexOf(2));
-        assertEquals(0,btree.indexOf(3));
-        assertEquals(-2,btree.indexOf(4));
-        assertEquals(1,btree.indexOf(5));
-        assertEquals(-3,btree.indexOf(6));
-        assertEquals(2,btree.indexOf(7));
-        assertEquals(-4,btree.indexOf(8));
-        assertEquals(-4,btree.indexOf(9));
+        assertEquals(-1,btree.indexOf(i2k(1)));
+        assertEquals(-1,btree.indexOf(i2k(2)));
+        assertEquals(0,btree.indexOf(i2k(3)));
+        assertEquals(-2,btree.indexOf(i2k(4)));
+        assertEquals(1,btree.indexOf(i2k(5)));
+        assertEquals(-3,btree.indexOf(i2k(6)));
+        assertEquals(2,btree.indexOf(i2k(7)));
+        assertEquals(-4,btree.indexOf(i2k(8)));
+        assertEquals(-4,btree.indexOf(i2k(9)));
 
         /*
          * test of rangeCount [3,5,7]
          */
-        assertEquals(0,btree.rangeCount(2, 1));
-        assertEquals(0,btree.rangeCount(3, 2));
-        assertEquals(0,btree.rangeCount(5, 2));
-        assertEquals(0,btree.rangeCount(9, 3));
+        assertEquals(0,btree.rangeCount(i2k(2), i2k(1)));
+        assertEquals(0,btree.rangeCount(i2k(3), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(5), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(9), i2k(3)));
 
-        assertEquals(0,btree.rangeCount(2, 2));
-        assertEquals(0,btree.rangeCount(2, 3));
-        assertEquals(1,btree.rangeCount(2, 4));
+        assertEquals(0,btree.rangeCount(i2k(2), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(2), i2k(3)));
+        assertEquals(1,btree.rangeCount(i2k(2), i2k(4)));
 
-        assertEquals(0,btree.rangeCount(3, 3));
-        assertEquals(1,btree.rangeCount(3, 4));
-        assertEquals(1,btree.rangeCount(3, 5));
-        assertEquals(2,btree.rangeCount(3, 6));
-        assertEquals(2,btree.rangeCount(3, 7));
+        assertEquals(0,btree.rangeCount(i2k(3), i2k(3)));
+        assertEquals(1,btree.rangeCount(i2k(3), i2k(4)));
+        assertEquals(1,btree.rangeCount(i2k(3), i2k(5)));
+        assertEquals(2,btree.rangeCount(i2k(3), i2k(6)));
+        assertEquals(2,btree.rangeCount(i2k(3), i2k(7)));
 
-        assertEquals(3,btree.rangeCount(2, 8));
-        assertEquals(3,btree.rangeCount(3, 8));
-        assertEquals(2,btree.rangeCount(4, 8));
-        assertEquals(2,btree.rangeCount(5, 8));
-        assertEquals(1,btree.rangeCount(6, 8));
-        assertEquals(1,btree.rangeCount(7, 8));
-        assertEquals(0,btree.rangeCount(8, 8));
-        assertEquals(0,btree.rangeCount(9, 8));
+        assertEquals(3,btree.rangeCount(i2k(2), i2k(8)));
+        assertEquals(3,btree.rangeCount(i2k(3), i2k(8)));
+        assertEquals(2,btree.rangeCount(i2k(4), i2k(8)));
+        assertEquals(2,btree.rangeCount(i2k(5), i2k(8)));
+        assertEquals(1,btree.rangeCount(i2k(6), i2k(8)));
+        assertEquals(1,btree.rangeCount(i2k(7), i2k(8)));
+        assertEquals(0,btree.rangeCount(i2k(8), i2k(8)));
+        assertEquals(0,btree.rangeCount(i2k(9), i2k(8)));
 
         /*
          * test of keyAt [3,5,7]
@@ -150,9 +150,9 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         } catch (IndexOutOfBoundsException ex) {
             log.info("Ignoring expected exception: " + ex);
         }
-        assertEquals(3,btree.keyAt(0));
-        assertEquals(5,btree.keyAt(1));
-        assertEquals(7,btree.keyAt(2));
+        assertEquals(i2k(3),btree.keyAt(0));
+        assertEquals(i2k(5),btree.keyAt(1));
+        assertEquals(i2k(7),btree.keyAt(2));
         try {
             btree.keyAt(3);
             fail("Expecting: " + IndexOutOfBoundsException.class);
@@ -228,45 +228,45 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         /*
          * test indexOf at height=1 [2,3,5,7]
          */
-        assertEquals(-1,btree.indexOf(1));
-        assertEquals(0,btree.indexOf(2));
-        assertEquals(1,btree.indexOf(3));
-        assertEquals(-3,btree.indexOf(4));
-        assertEquals(2,btree.indexOf(5));
-        assertEquals(-4,btree.indexOf(6));
-        assertEquals(3,btree.indexOf(7));
-        assertEquals(-5,btree.indexOf(8));
+        assertEquals(-1,btree.indexOf(i2k(1)));
+        assertEquals(0,btree.indexOf(i2k(2)));
+        assertEquals(1,btree.indexOf(i2k(3)));
+        assertEquals(-3,btree.indexOf(i2k(4)));
+        assertEquals(2,btree.indexOf(i2k(5)));
+        assertEquals(-4,btree.indexOf(i2k(6)));
+        assertEquals(3,btree.indexOf(i2k(7)));
+        assertEquals(-5,btree.indexOf(i2k(8)));
         
         /*
          * test rangeCount at height=1 [2,3,5,7]
          */
 
-        assertEquals(0,btree.rangeCount(2, 1));
-        assertEquals(0,btree.rangeCount(3, 2));
-        assertEquals(0,btree.rangeCount(5, 2));
-        assertEquals(0,btree.rangeCount(9, 3));
+        assertEquals(0,btree.rangeCount(i2k(2), i2k(1)));
+        assertEquals(0,btree.rangeCount(i2k(3), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(5), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(9), i2k(3)));
         
-        assertEquals(0,btree.rangeCount(1, 1));
-        assertEquals(0,btree.rangeCount(1, 2));
-        assertEquals(0,btree.rangeCount(2, 2));
-        assertEquals(1,btree.rangeCount(2, 3));
-        assertEquals(2,btree.rangeCount(2, 4));
+        assertEquals(0,btree.rangeCount(i2k(1), i2k(1)));
+        assertEquals(0,btree.rangeCount(i2k(1), i2k(2)));
+        assertEquals(0,btree.rangeCount(i2k(2), i2k(2)));
+        assertEquals(1,btree.rangeCount(i2k(2), i2k(3)));
+        assertEquals(2,btree.rangeCount(i2k(2), i2k(4)));
 
-        assertEquals(0,btree.rangeCount(3, 3));
-        assertEquals(1,btree.rangeCount(3, 4));
-        assertEquals(1,btree.rangeCount(3, 5));
-        assertEquals(2,btree.rangeCount(3, 6));
-        assertEquals(2,btree.rangeCount(3, 7));
+        assertEquals(0,btree.rangeCount(i2k(3), i2k(3)));
+        assertEquals(1,btree.rangeCount(i2k(3), i2k(4)));
+        assertEquals(1,btree.rangeCount(i2k(3), i2k(5)));
+        assertEquals(2,btree.rangeCount(i2k(3), i2k(6)));
+        assertEquals(2,btree.rangeCount(i2k(3), i2k(7)));
 
-        assertEquals(4,btree.rangeCount(1, 8));
-        assertEquals(4,btree.rangeCount(2, 8));
-        assertEquals(3,btree.rangeCount(3, 8));
-        assertEquals(2,btree.rangeCount(4, 8));
-        assertEquals(2,btree.rangeCount(5, 8));
-        assertEquals(1,btree.rangeCount(6, 8));
-        assertEquals(1,btree.rangeCount(7, 8));
-        assertEquals(0,btree.rangeCount(8, 8));
-        assertEquals(0,btree.rangeCount(9, 8));
+        assertEquals(4,btree.rangeCount(i2k(1), i2k(8)));
+        assertEquals(4,btree.rangeCount(i2k(2), i2k(8)));
+        assertEquals(3,btree.rangeCount(i2k(3), i2k(8)));
+        assertEquals(2,btree.rangeCount(i2k(4), i2k(8)));
+        assertEquals(2,btree.rangeCount(i2k(5), i2k(8)));
+        assertEquals(1,btree.rangeCount(i2k(6), i2k(8)));
+        assertEquals(1,btree.rangeCount(i2k(7), i2k(8)));
+        assertEquals(0,btree.rangeCount(i2k(8), i2k(8)));
+        assertEquals(0,btree.rangeCount(i2k(9), i2k(8)));
 
         /*
          * test of keyAt [2,3,5,7]
@@ -277,10 +277,10 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         } catch (IndexOutOfBoundsException ex) {
             log.info("Ignoring expected exception: " + ex);
         }
-        assertEquals(2,btree.keyAt(0));
-        assertEquals(3,btree.keyAt(1));
-        assertEquals(5,btree.keyAt(2));
-        assertEquals(7,btree.keyAt(3));
+        assertEquals(i2k(2),btree.keyAt(0));
+        assertEquals(i2k(3),btree.keyAt(1));
+        assertEquals(i2k(5),btree.keyAt(2));
+        assertEquals(i2k(7),btree.keyAt(3));
         try {
             btree.keyAt(4);
             fail("Expecting: " + IndexOutOfBoundsException.class);
@@ -321,7 +321,15 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          * Generate keys, values, and visitation order.
          */
         // keys
-        final int[] keys = new int[]{5,6,7,8,3,4,2,1};
+        final byte[] k1 = i2k(1);
+        final byte[] k2 = i2k(2);
+        final byte[] k3 = i2k(3);
+        final byte[] k4 = i2k(4);
+        final byte[] k5 = i2k(5);
+        final byte[] k6 = i2k(6);
+        final byte[] k7 = i2k(7);
+        final byte[] k8 = i2k(8);
+        final byte[][] keys = new byte[][] { k5, k6, k7, k8, k3, k4, k2, k1 };
         // values
         final SimpleEntry v1 = new SimpleEntry(1);
         final SimpleEntry v2 = new SimpleEntry(2);
@@ -333,11 +341,11 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         final SimpleEntry v8 = new SimpleEntry(8);
         final SimpleEntry[] vals = new SimpleEntry[]{v5,v6,v7,v8,v3,v4,v2,v1};
         // permutation vector for visiting values in key order.
-        final int[] order = new int[keys.length];
+        final int[] order = new int[] {1,2,3,4,5,6,7,8};
         // generate visitation order.
         {
-            System.arraycopy(keys, 0, order, 0, keys.length);
-            Arrays.sort(order);
+//            System.arraycopy(keys, 0, order, 0, keys.length);
+//            Arrays.sort(order);
             System.err.println("keys="+Arrays.toString(keys));
             System.err.println("vals="+Arrays.toString(vals));
             System.err.println("order="+Arrays.toString(order));
@@ -360,29 +368,27 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         int n = 0;
         
         { // insert(5,5)
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 5 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertKeys(new int[]{5},a);
+            assertKeys(new byte[][]{k5},a);
             assertValues(new Object[]{v5},a);
             assertTrue(btree.dump(System.err));
         }
 
         { // insert(6,6)
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 6 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertKeys(new int[]{5,6},a);
+            assertKeys(new byte[][]{k5,k6},a);
             assertValues(new Object[]{v5,v6},a);
             assertTrue(btree.dump(System.err));
         }
@@ -395,15 +401,14 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          * keys: [ 5 6 7 ]
          */
         { // insert(7,7)
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 7 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             // validate root leaf.
-            assertKeys(new int[]{5,6,7},a);
+            assertKeys(new byte[][]{k5,k6,k7},a);
             assertValues(new Object[]{v5,v6,v7},a);
             assertTrue(btree.dump(System.err));
         }
@@ -424,9 +429,8 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         final Node c;
         final Leaf b;
         { // insert(8,8)
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 8 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -435,7 +439,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             
             // validate new root (c).
             c = (Node)btree.getRoot();
-            assertKeys(new int[]{7},c);
+            assertKeys(new byte[][]{k7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
             assertNull(c.childRefs[2]);
@@ -443,11 +447,11 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate original leaf (a).
-            assertKeys(new int[]{5,6},a);
+            assertKeys(new byte[][]{k5,k6},a);
             assertValues(new Object[]{v5,v6},a);
             
             // validate new leaf (b).
-            assertKeys(new int[]{7,8},b);
+            assertKeys(new byte[][]{k7,k8},b);
             assertValues(new Object[]{v7,v8},b);
             
             assertTrue(btree.dump(System.err));
@@ -465,16 +469,15 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          * b.keys[ 7 8 - ]
          */
         {
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 3 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
             assertEquals(val,btree.lookup(key)); // found.
             assertTrue(btree.dump(Level.DEBUG,System.err));
             // validate original leaf (a).
-            assertKeys(new int[]{3,5,6},a);
+            assertKeys(new byte[][]{k3,k5,k6},a);
             assertValues(new Object[]{v3,v5,v6},a);
             // validate root.
             assertEntryCounts(new int[]{3,2}, c);
@@ -495,9 +498,8 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          */
         final Leaf d;
         {
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 4 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -505,7 +507,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertTrue(btree.dump(Level.DEBUG,System.err));
             
             // validate root (c).
-            assertKeys(new int[]{5,7},c);
+            assertKeys(new byte[][]{k5,k7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.childRefs[1]);
             d = (Leaf) c.getChild(1);
@@ -513,15 +515,15 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertEntryCounts(new int[]{2,2,2}, c);
             
             // validate original leaf (a).
-            assertKeys(new int[]{3,4},a);
+            assertKeys(new byte[][]{k3,k4},a);
             assertValues(new Object[]{v3,v4},a);
             
             // validate new leaf (d).
-            assertKeys(new int[]{5,6},d);
+            assertKeys(new byte[][]{k5,k6},d);
             assertValues(new Object[]{v5,v6},d);
             
             // validate leaf (b).
-            assertKeys(new int[]{7,8},b);
+            assertKeys(new byte[][]{k7,k8},b);
             assertValues(new Object[]{v7,v8},b);
             
         }
@@ -530,9 +532,8 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
          * insert(2,2), bringing (a) to capacity again.
          */
         {
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 2 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -540,7 +541,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertTrue(btree.dump(Level.DEBUG,System.err));
             
             // validate original leaf (a).
-            assertKeys(new int[]{2,3,4},a);
+            assertKeys(new byte[][]{k2,k3,k4},a);
             assertValues(new Object[]{v2,v3,v4},a);
             
             // validate root.
@@ -573,9 +574,8 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         final Node f, g;
         {
             
-            int key = keys[n];
+            byte[] key = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 1 && val.id() == key;
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -585,7 +585,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             // validate the new root(g).
             assertNotSame(c,btree.getRoot());
             g = (Node)btree.getRoot();
-            assertKeys(new int[]{5},g);
+            assertKeys(new byte[][]{k5},g);
             assertEquals(c,g.getChild(0));
             assertNotNull(g.childRefs[1]);
             f = (Node) g.getChild(1);
@@ -593,7 +593,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertEntryCounts(new int[]{4,4}, g);
             
             // validate old root (c).
-            assertKeys(new int[]{3},c);
+            assertKeys(new byte[][]{k3},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.childRefs[1]);
             e = (Leaf) c.getChild(1);
@@ -601,26 +601,26 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f) split from the old root split(c)->(c,f).
-            assertKeys(new int[]{7},f);
+            assertKeys(new byte[][]{k7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
             assertNull(f.childRefs[2]);
             assertEntryCounts(new int[]{2,2}, f);
             
             // validate original leaf (a), which was re-split into (a,e).
-            assertKeys(new int[]{1,2},a);
+            assertKeys(new byte[][]{k1,k2},a);
             assertValues(new Object[]{v1,v2},a);
             
             // validate new leaf (e).
-            assertKeys(new int[]{3,4},e);
+            assertKeys(new byte[][]{k3,k4},e);
             assertValues(new Object[]{v3,v4},e);
             
             // validate new leaf (d).
-            assertKeys(new int[]{5,6},d);
+            assertKeys(new byte[][]{k5,k6},d);
             assertValues(new Object[]{v5,v6},d);
             
             // validate leaf (b).
-            assertKeys(new int[]{7,8},b);
+            assertKeys(new byte[][]{k7,k8},b);
             assertValues(new Object[]{v7,v8},b);
 
         }
@@ -628,42 +628,44 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         /*
          * test indexOf: [1,2,3,4,5,6,7,8]
          */
-        assertEquals(-1,btree.indexOf(0));
-        assertEquals(0,btree.indexOf(1));
-        assertEquals(1,btree.indexOf(2));
-        assertEquals(2,btree.indexOf(3));
-        assertEquals(3,btree.indexOf(4));
-        assertEquals(4,btree.indexOf(5));
-        assertEquals(5,btree.indexOf(6));
-        assertEquals(6,btree.indexOf(7));
-        assertEquals(7,btree.indexOf(8));
-        assertEquals(((-8)-1),btree.indexOf(9));
+        final byte[] k0 = i2k(0);
+        final byte[] k9 = i2k(9);
+        assertEquals(-1,btree.indexOf(k0));
+        assertEquals(0,btree.indexOf(k1));
+        assertEquals(1,btree.indexOf(k2));
+        assertEquals(2,btree.indexOf(k3));
+        assertEquals(3,btree.indexOf(k4));
+        assertEquals(4,btree.indexOf(k5));
+        assertEquals(5,btree.indexOf(k6));
+        assertEquals(6,btree.indexOf(k7));
+        assertEquals(7,btree.indexOf(k8));
+        assertEquals(((-8)-1),btree.indexOf(k9));
         
         /*
          * test rangeCount: [1,2,3,4,5,6,7,8]
          */
-        assertEquals(0,btree.rangeCount(0, 1));
-        assertEquals(1,btree.rangeCount(0, 2));
-        assertEquals(2,btree.rangeCount(0, 3));
-        assertEquals(3,btree.rangeCount(0, 4));
-        assertEquals(4,btree.rangeCount(0, 5));
-        assertEquals(5,btree.rangeCount(0, 6));
-        assertEquals(6,btree.rangeCount(0, 7));
-        assertEquals(7,btree.rangeCount(0, 8));
-        assertEquals(8,btree.rangeCount(0, 9));
+        assertEquals(0,btree.rangeCount(k0, k1));
+        assertEquals(1,btree.rangeCount(k0, k2));
+        assertEquals(2,btree.rangeCount(k0, k3));
+        assertEquals(3,btree.rangeCount(k0, k4));
+        assertEquals(4,btree.rangeCount(k0, k5));
+        assertEquals(5,btree.rangeCount(k0, k6));
+        assertEquals(6,btree.rangeCount(k0, k7));
+        assertEquals(7,btree.rangeCount(k0, k8));
+        assertEquals(8,btree.rangeCount(k0, k9));
 
-        assertEquals(5,btree.rangeCount(4, 9));
-        assertEquals(4,btree.rangeCount(4, 8));
-        assertEquals(3,btree.rangeCount(4, 7));
-        assertEquals(2,btree.rangeCount(4, 6));
-        assertEquals(1,btree.rangeCount(4, 5));
-        assertEquals(0,btree.rangeCount(4, 4));
-        assertEquals(0,btree.rangeCount(4, 3));
+        assertEquals(5,btree.rangeCount(k4, k9));
+        assertEquals(4,btree.rangeCount(k4, k8));
+        assertEquals(3,btree.rangeCount(k4, k7));
+        assertEquals(2,btree.rangeCount(k4, k6));
+        assertEquals(1,btree.rangeCount(k4, k5));
+        assertEquals(0,btree.rangeCount(k4, k4));
+        assertEquals(0,btree.rangeCount(k4, k3));
 
-        assertEquals(1,btree.rangeCount(3, 4));
-        assertEquals(2,btree.rangeCount(3, 5));
-        assertEquals(3,btree.rangeCount(3, 6));
-        assertEquals(4,btree.rangeCount(3, 7));
+        assertEquals(1,btree.rangeCount(k3, k4));
+        assertEquals(2,btree.rangeCount(k3, k5));
+        assertEquals(3,btree.rangeCount(k3, k6));
+        assertEquals(4,btree.rangeCount(k3, k7));
 
         /*
          * test keyAt: [1,2,3,4,5,6,7,8]
@@ -674,14 +676,14 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         } catch (IndexOutOfBoundsException ex) {
             log.info("Ignoring expected exception: " + ex);
         }
-        assertEquals(1,btree.keyAt(0));
-        assertEquals(2,btree.keyAt(1));
-        assertEquals(3,btree.keyAt(2));
-        assertEquals(4,btree.keyAt(3));
-        assertEquals(5,btree.keyAt(4));
-        assertEquals(6,btree.keyAt(5));
-        assertEquals(7,btree.keyAt(6));
-        assertEquals(8,btree.keyAt(7));
+        assertEquals(k1,btree.keyAt(0));
+        assertEquals(k2,btree.keyAt(1));
+        assertEquals(k3,btree.keyAt(2));
+        assertEquals(k4,btree.keyAt(3));
+        assertEquals(k5,btree.keyAt(4));
+        assertEquals(k6,btree.keyAt(5));
+        assertEquals(k7,btree.keyAt(6));
+        assertEquals(k8,btree.keyAt(7));
         try {
             btree.keyAt(8);
             fail("Expecting: " + IndexOutOfBoundsException.class);

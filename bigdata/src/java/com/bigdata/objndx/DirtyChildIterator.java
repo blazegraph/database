@@ -57,7 +57,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class DirtyChildIterator implements KeyValueIterator {
+class DirtyChildIterator implements INodeIterator {
 
     private final Node node;
     
@@ -178,7 +178,7 @@ class DirtyChildIterator implements KeyValueIterator {
 
     }
 
-    public Object getValue() {
+    public IAbstractNode getNode() {
         
         if( lastVisited == -1 ) {
             
@@ -198,7 +198,7 @@ class DirtyChildIterator implements KeyValueIterator {
             
         }
         
-        return node.getKey(lastVisited);
+        return node.keys.getKey(lastVisited);
         
     }
 

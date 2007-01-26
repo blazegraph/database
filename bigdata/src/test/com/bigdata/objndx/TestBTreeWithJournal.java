@@ -118,14 +118,12 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
             final int nscan = 10;
 
             BTree btree = new BTree(journal,
-                    ArrayType.INT,
                     branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             leafQueueCapacity, nscan),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                    SimpleEntry.Serializer.INSTANCE);
+                    SimpleEntry.Serializer.INSTANCE,
+                    null // no record compressor
+                    );
 
             return btree;
 

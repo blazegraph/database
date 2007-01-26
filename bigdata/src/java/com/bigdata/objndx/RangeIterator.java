@@ -54,11 +54,16 @@ package com.bigdata.objndx;
  * @version $Id$
  * 
  * FIXME Implement the key range iterator. Optimize when using a read-only
- * {@link IndexSegment}.  Support pre-fetch, next/prior traversal, etc.
+ * {@link IndexSegment}. Support pre-fetch, next/prior traversal, etc.
+ * 
+ * @todo consider batch api that uses the range count to allocate arrays for the
+ *       keys and values and then streams them back to the client en mass.
  * 
  * @todo Support iteration with concurrent structural modification. The iterator
  *       will have to listen for structural modifications and perhaps for insert /
  *       delete key operations on the current leaf.
+ * 
+ * @deprecated not in use at this time.
  */
 public class RangeIterator implements IRangeIterator {
 
@@ -75,7 +80,7 @@ public class RangeIterator implements IRangeIterator {
      * @param toKey
      *            The first key that will not be visited by the iterator.
      */
-    public RangeIterator(IBTree btree, Object fromKey, Object toKey ) {
+    public RangeIterator(IBTree btree, byte[] fromKey, byte[] toKey ) {
         
         this.btree = btree;
         
@@ -112,7 +117,7 @@ public class RangeIterator implements IRangeIterator {
 
     }
 
-    public Object getKey() {
+    public byte[] getKey() {
 
         throw new UnsupportedOperationException();
 

@@ -86,21 +86,21 @@ import com.bigdata.journal.Bytes;
  * will be thrown.
  * </p>
  * <p>
- * The (de-)serialization interfaces for the keys {@link IKeySerializer} and the
- * values {@link IValueSerializer} both hide the use of {@link ByteBuffer}s
- * from the application. The use of compression or packing techniques within the
- * implementations of those interfaces is encouraged.
+ * The (de-)serialization interfaces for the values {@link IValueSerializer}
+ * hides the use of {@link ByteBuffer}s from the application. The use of
+ * compression or packing techniques within the implementations of this
+ * interfaces is encouraged.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Compute the #of shared bytes (common prefix) for the low and high key,
- *       write that prefix once, and then mask off that prefix for each key
- *       written. Modify search to only search that part of the key that is
- *       recorded in each Node and only the new part of the key in the Leaf.
- *       This is both less storage and less time searching. The full key can
- *       then be reconstructed as required.
+ * @todo automatically resize the decompression buffers as required and start
+ *       with a smaller buffer.
+ * 
+ * @todo consider the use of thread-local variables for the read buffers so that
+ *       the buffers may be used by multiple concurrent readers (the bloom
+ *       filter is another place where concurrency is limited for readers)
  * 
  * @todo try using an allocation pools for node and leaf objects together with
  *       keys[] and vals[]. We can know when the references are cleared, but at
@@ -124,6 +124,9 @@ import com.bigdata.journal.Bytes;
  * and the next reference is not knowable for the index segments until we have
  * determined the serialized size of the current leaf, which makes that all a
  * bit tricky.
+ * 
+ * @todo make the checksum optional or do not use when using the record
+ *       compressor?
  * 
  * @see IBTree
  * @see INodeData
@@ -153,6 +156,30 @@ public class NodeSerializer {
      * An object that knows how to (de-)serialize the values on leaves.
      */
     protected final IValueSerializer valueSerializer;
+    
+    /**
+     * Used to serialize and de-serialize the nodes and leaves of the tree. This
+     * is pre-allocated based on the estimated maximum size of a node or leaf.
+     * If the buffer overflows it is re-allocated and the operation will be
+     * retried.
+     */
+    protected ByteBuffer _buf;
+    
+    /**
+     * Used to (de-)compress serialized records (optional).
+     */
+    protected final RecordCompressor recordCompressor;
+    
+    /**
+     * When true, checksums are computed, stored, and verified on read. This
+     * option is not recommended in conjunction with a fully buffered store.
+     */
+    protected final boolean useChecksum;
+
+    /**
+     * The default initial capacity for the (de-)serialization buffer.
+     */
+    public static final transient int DEFAULT_BUFFER_CAPACITY = Bytes.kilobyte32 * 100;
     
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
@@ -292,22 +319,55 @@ public class NodeSerializer {
      *            An object that knows how to construct {@link INodeData}s and
      *            {@link ILeafData leaves}.
      * 
+     * @param branchingFactor
+     *            The maximum branching factor for nodes or leaves serialized
+     *            using this object. This is informative and is used only to
+     *            estimate the initialBufferCapacity when that value is not
+     *            given.
+     * 
+     * @param initialBufferCapacity
+     *            The initial capacity for {@link #buf} (optional). This will be
+     *            resized as necessary if the buffer overflows during a write.
+     *            When zero (0), the initial capacity is defaulted to
+     *            {@link #DEFAULT_BUFFER_CAPACITY}.
+     * 
      * @param addrSerializer
      *            An object that knows how to (de-)serialize the child addresses
      *            on an {@link INodeData}.
      * 
-     * @param keySerializer
-     *            An object that knows how to (de-)serialize the keys on
-     *            {@link INodeData}s and {@link ILeafData leaves} of a btree.
-     * 
      * @param valueSerializer
      *            An object that knows how to (de-)serialize the values on
      *            {@link ILeafData leaves}.
+     * 
+     * @param recordCompressor
+     *            An object that knows how to (de-)compress a serialized record
+     *            (optional).
+     * 
+     * @param useChecksum
+     *            When true the checksum of the serialized record will be
+     *            computed and stored in the record. When the record is
+     *            de-serialized the checksum will be validated. Note that
+     *            computing the checksum is ~ 40% of the cost of
+     *            (de-)serialization. Further, when the backing store is a fully
+     *            buffered journal the checksum is validating memory (already
+     *            parity checked) not disk so the use of the checksum in this
+     *            situation is not recommended. The checksum makes the most
+     *            sense for an {@link IndexSegment} since the data are being
+     *            read from disk.
+     * 
+     * @todo change recordCompressor to an interface.
      */
-    public NodeSerializer(INodeFactory nodeFactory, IAddressSerializer addrSerializer, IKeySerializer keySerializer, IValueSerializer valueSerializer) {
+    public NodeSerializer(INodeFactory nodeFactory, int branchingFactor,
+            int initialBufferCapacity, IAddressSerializer addrSerializer,
+            IKeySerializer keySerializer, IValueSerializer valueSerializer,
+            RecordCompressor recordCompressor, boolean useChecksum) {
 
         assert nodeFactory != null;
 
+        assert branchingFactor >= AbstractBTree.MIN_BRANCHING_FACTOR;
+        
+        assert initialBufferCapacity >= 0;
+        
         assert addrSerializer != null;
         
         assert keySerializer != null;
@@ -315,152 +375,227 @@ public class NodeSerializer {
         assert valueSerializer != null;
 
         this.nodeFactory = nodeFactory;
-
+        
         this.addrSerializer = addrSerializer;
         
         this.keySerializer = keySerializer;
         
         this.valueSerializer = valueSerializer;
+
+        this.recordCompressor = recordCompressor;
+
+        this.useChecksum = useChecksum;
         
-    }
+        if (initialBufferCapacity == 0) {
 
-    /**
-     * Return the maximum serialized size (in bytes) of a node or leaf.
-     * 
-     * @param isLeaf
-     *            True iff the maximum size will be reported for a leaf.
-     * @param nkeys
-     *            The #of keys for the node or leaf. Note that the maximum #of
-     *            keys for a node is one less than the maximum #of keys for a
-     *            leaf.
-     *            
-     * @return The maximum size of the serialized record in bytes.
-     * 
-     * FIXME There is no fixed upper limit for URIs (or strings in general),
-     * therefore the btree may have to occasionally resize its buffer to
-     * accomodate very long variable length keys.
-     */
-    protected int getSize( boolean isLeaf, int nkeys ) {
-        
-        /*
-         * The branching factor and #of keys are packed values, but this is
-         * their maximum size.
-         */
-        final int flexHeader = (Bytes.SIZEOF_INT*3);
-        
-        int keysSize = keySerializer.getSize(nkeys);
-
-        if (isLeaf) {
-
-            int valuesSize = valueSerializer.getSize(nkeys);
-
-            return SIZEOF_LINKED_LEAF_HEADER + flexHeader + keysSize + valuesSize;
-
-        } else {
-
-            int addrSize = addrSerializer.getSize(nkeys+1);
-
-            int childEntryCountSize = (nkeys+1) * Bytes.SIZEOF_INT; 
-            
-            return SIZEOF_NODE_HEADER + flexHeader + keysSize + addrSize
-                    + childEntryCountSize;
+            initialBufferCapacity = DEFAULT_BUFFER_CAPACITY;
 
         }
         
+        this._buf = alloc(initialBufferCapacity);
+        
     }
 
     /**
-     * De-serialize a node or leaf using absolute offsets into the buffer. This
-     * method is used when the caller does not know a-priori whether the
-     * reference is to a node or leaf. The decision is made based on inspection
-     * of the {@link #OFFSET_NODE_TYPE} byte in the buffer.
+     * Allocate a buffer of the stated capacity.  When the capacity is larger
+     * than 8k a direct buffer will be used automatically.
+     * 
+     * @param capacity The buffer capacity.
+     * 
+     * @return The buffer.
+     * 
+     * @todo review use of direct buffers here.  do we always want to use a
+     * direct buffer for better IO or only when the data size is large?
+     */
+    static protected ByteBuffer alloc(int capacity) {
+        
+        return capacity < Bytes.kilobyte32 * 8 ? ByteBuffer
+                .allocate(capacity) : ByteBuffer
+                .allocateDirect(capacity);
+                
+    }
+
+    /**
+     * Extends the internal buffer used to serialize nodes and leaves.
+     */
+    protected void extendBuffer() {
+
+        int capacity = _buf.capacity();
+        
+        capacity += Math.max(Bytes.kilobyte32 * 4, capacity / 2);
+
+        System.err.println("Extending buffer to capacity=" + capacity
+                + " bytes.");
+
+        _buf = alloc(capacity);
+
+    }
+
+    /**
+     * De-serialize a node or leaf. This method is used when the caller does not
+     * know a-priori whether the reference is to a node or leaf. The decision is
+     * made based on inspection of the {@link #OFFSET_NODE_TYPE} byte in the
+     * supplied buffer.
      * 
      * @param btree
      *            The btree.
-     * @param id
-     *            The persistent identitifer of the node or leaf being
-     *            de-serialized.
+     * @param addr
+     *            The address of the node or leaf being de-serialized - see
+     *            {@link Addr}.
      * @param buf
-     *            The buffer.
+     *            The buffer containing the serialized data.
+     * 
+     * @todo document and verify effects on buf position and limit w/ and w/o
+     *       decompression.
      * 
      * @return The de-serialized node.
      */
-    public IAbstractNodeData getNodeOrLeaf( IBTree btree, long id, ByteBuffer buf) {
+    public IAbstractNodeData getNodeOrLeaf( IBTree btree, long addr, ByteBuffer buf) {
 
-        assert btree != null;
-        assert id != 0L;
+//        assert btree != null;
+//        assert addr != 0L;
         assert buf != null;
         
-        if( buf.get(OFFSET_NODE_TYPE) == TYPE_NODE ) {
+        /*
+         * optionally decompresses the record. note that we must decompress the
+         * buffer before we can test the byte that will determine if it is a
+         * node or a leaf.
+         */
+        
+        ByteBuffer tmp = buf;
+        
+        assert tmp.position() == 0;
+        
+        buf = decompress( buf );
 
-            return getNode(btree,id,buf);
+        assert tmp.position() == 0;
+
+        final IAbstractNodeData ret;
+        
+        final byte nodeType = buf.get(OFFSET_NODE_TYPE);
+        
+        switch(nodeType) {
+        
+        case TYPE_NODE: {
+
+            assert tmp.position() == 0;
+
+            // deserialize (already decompressed)
+            ret = getNode(btree, addr, buf, true);
+
+            /*
+             * @todo it is extremely weird, but this assertion (and the parallel
+             * one below) trips during the TestBTreeWithJournal stress tests.
+             * this is odd because the code explicitly resets the position of
+             * the buffer that it is manipulating as its last step in getNode()
+             * and getLeaf().  there must be some odd interaction with _buf but
+             * I can not figure it out.
+             */
+//            assert tmp.position() == 0;
             
-        } else {
+            break;
             
-            return getLeaf(btree,id,buf);
+        }
+        
+        case TYPE_LEAF:
+        case TYPE_LINKED_LEAF: {
+
+            assert tmp.position() == 0;
+
+            // deserialize (already decompressed)
+            ret = getLeaf(btree, addr, buf, true);
+
+            // @todo see the note above.
+//            assert tmp.position() == 0;
+            
+            break;
 
         }
+
+        default: {
+        
+            throw new RuntimeException("unknown node type="+nodeType);
+            
+        }
+        
+        }
+     
+        return ret;
 
     }
     
     /**
-     * Serialize a node or leaf onto a buffer.
+     * Serialize a node or leaf.
      * 
-     * @param buf
-     *            The buffer. The node or leaf will be serialized starting at
-     *            the current position. The position will be advanced as a side
-     *            effect.
      * @param node
      *            The node or leaf.
      * 
+     * @return The serialized record.
+     * 
      * @exception BufferOverflowException
      *                if there is not enough space remaining in the buffer.
      */
-    public void putNodeOrLeaf(ByteBuffer buf, IAbstractNodeData node) {
+    public ByteBuffer putNodeOrLeaf(IAbstractNodeData node) {
         
         if(node instanceof INodeData) {
             
-            putNode(buf,(INodeData)node);
+            return putNode((INodeData)node);
             
         } else {
         
-            putLeaf(buf,(ILeafData)node);
+            return putLeaf((ILeafData)node);
             
         }
         
     }
     
     /**
-     * Serialize a non-leaf node onto a buffer.
+     * Serialize a node onto an internal buffer and returns that buffer. If the
+     * operation would overflow then the buffer is extended and the operation is
+     * retried.
      * 
-     * @param buf
-     *            The buffer. The node will be serialized starting at the
-     *            current position. The position will be advanced as a side
-     *            effect.
      * @param node
      *            The node.
      * 
-     * @exception BufferOverflowException
-     *                if there is not enough space remaining in the buffer.
+     * @return the buffer containing the serialized node. the position will be
+     *         zero and the limit will be the #of bytes in the serialized node.
      */
-    public void putNode(ByteBuffer buf, INodeData node) {
+    public ByteBuffer putNode(INodeData node) {
 
+        while (true) {
+
+            try {
+
+                return putNode(_buf, node);
+
+            } catch (BufferOverflowException ex) {
+
+                extendBuffer();
+
+            }
+
+        }
+
+    }
+    
+    private ByteBuffer putNode(ByteBuffer buf, INodeData node) {
+        
         assert buf != null;
         assert node != null;
 
         final int branchingFactor = node.getBranchingFactor();
-//        final int nnodes = node.getNodeCount();
-//        final int nleaves = node.getLeafCount();
         final int nentries = node.getEntryCount();
         final int[] childEntryCounts = node.getChildEntryCounts();
         final int nkeys = node.getKeyCount();
-        final Object keys = node.getKeys();
+        final IKeyBuffer keys = node.getKeys();
         final long[] childAddr = node.getChildAddr();
 
         /*
          * fixed length node header.
          */
 
+        buf.clear();
+        
         final int pos0 = buf.position();
 
         // checksum
@@ -486,20 +621,14 @@ public class NodeSerializer {
             // branching factor.
             LongPacker.packLong(os, branchingFactor);
 
-//            // #of spanned nodes.
-//            LongPacker.packLong(os, nnodes);
-//            
-//            // #of spanned leaves.
-//            LongPacker.packLong(os, nleaves);
-            
             // #of spanned entries.
             LongPacker.packLong(os, nentries);
             
-            // #of keys
-            LongPacker.packLong(os, nkeys);
+//            // #of keys
+//            LongPacker.packLong(os, nkeys);
 
             // keys.
-            keySerializer.putKeys(os, keys, nkeys);
+            keySerializer.putKeys(os, keys);
 
             // addresses.
             addrSerializer.putChildAddresses(os, childAddr, nkeys+1);
@@ -545,29 +674,63 @@ public class NodeSerializer {
         buf.putInt(pos0 + OFFSET_NBYTES, nbytes);
 
         // compute checksum for data written.
-        final int checksum = chk.checksum(buf, pos0 + SIZEOF_CHECKSUM, pos0
-                + nbytes);
+        final int checksum = useChecksum ? chk.checksum(buf, pos0
+                + SIZEOF_CHECKSUM, pos0 + nbytes) : 0;
 
         // System.err.println("computed node checksum: "+checksum);
 
         // write the checksum into the buffer.
         buf.putInt(pos0, checksum);
 
+        // flip the buffer to prepare for reading.
+        buf.flip();
+
+        // optionally compresses the record.
+        return compress( buf );
+                
     }
 
-    public INodeData getNode(IBTree btree,long id,ByteBuffer buf) {
+    public INodeData getNode(IBTree btree,long addr,ByteBuffer buf) {
+        
+        return getNode(btree,addr,buf,false);
+        
+    }
 
-        assert btree != null;
-        assert id != 0L;
+    /**
+     * De-serialize the node.
+     * 
+     * @param btree
+     *            The btree to which the node belongs.
+     * @param addr
+     *            The address of the node - see {@link Addr}.
+     * @param buf
+     *            The buffer containing the serialized node.
+     * @param decompressed
+     *            true iff the buffer has already been decompressed using
+     *            {@link #decompress(ByteBuffer)}.
+     * 
+     * @return The deserialized node.
+     */
+    protected INodeData getNode(IBTree btree,long addr,ByteBuffer buf, boolean decompressed ) {
+
+//        assert btree != null;
+//        assert addr != 0L;
         assert buf != null;
 
-        final ArrayType keyType = keySerializer.getKeyType();
+        // optionally decompresses the record.
+        assert buf.position() == 0;
+        if( ! decompressed) {
+            buf = decompress( buf );
+            assert buf.position() == 0;
+        }
 
         /*
          * Read fixed length node header.
          */
 
         final int pos0 = buf.position();
+
+        assert pos0 == 0;
 
         // checksum
         final int readChecksum = buf.getInt(); // read checksum.
@@ -581,21 +744,25 @@ public class NodeSerializer {
          * verify checksum now that we know how many bytes of data we expect to
          * read.
          */
-        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_CHECKSUM,
-                pos0 + nbytes);
+        if( useChecksum ) {
+        
+            final int computedChecksum = chk.checksum(buf, pos0
+                    + SIZEOF_CHECKSUM, pos0 + nbytes);
 
-        if (computedChecksum != readChecksum) {
+            if (computedChecksum != readChecksum) {
 
-            throw new ChecksumError("Invalid checksum: read " + readChecksum
-                    + ", but computed " + computedChecksum);
+                throw new ChecksumError("Invalid checksum: read "
+                        + readChecksum + ", but computed " + computedChecksum);
+
+            }
 
         }
-
+        
         // nodeType
         if (buf.get() != TYPE_NODE) {
 
             // expecting a non-leaf node.
-            throw new RuntimeException("Not a Node: id=" + id);
+            throw new RuntimeException("Not a Node: id=" + addr);
 
         }
 
@@ -619,20 +786,14 @@ public class NodeSerializer {
 
             assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
 
-//            // nspanned nodes
-//            final int nnodes = (int)LongPacker.unpackLong(is);
-//            
-//            // nspanned leaves
-//            final int nleaves = (int)LongPacker.unpackLong(is);
-            
             // nentries
             final int nentries = (int)LongPacker.unpackLong(is);
             
-            // nkeys
-            final int nkeys = (int) LongPacker.unpackLong(is);
+//            // nkeys
+//            final int nkeys = (int) LongPacker.unpackLong(is);
 
-            // Note: minimum is (m+1/2) unless this is the root node.
-            assert nkeys >= 0 && nkeys < branchingFactor;
+//            // Note: minimum is (m+1/2) unless this is the root node.
+//            assert nkeys >= 0 && nkeys < branchingFactor;
 
             final long[] childAddr = new long[branchingFactor + 1];
 
@@ -640,10 +801,12 @@ public class NodeSerializer {
             
             // Keys.
 
-            final Object keys = ArrayType.alloc(keyType, branchingFactor);
+//            final Object keys = ArrayType.alloc(keyType, branchingFactor, stride);
 
-            keySerializer.getKeys(is, keys, nkeys);
+            final IKeyBuffer keys = keySerializer.getKeys(is);
 
+            final int nkeys = keys.getKeyCount();
+            
             // Child addresses (nchildren == nkeys+1).
 
             addrSerializer.getChildAddresses(is, childAddr, nkeys+1);
@@ -651,14 +814,17 @@ public class NodeSerializer {
             // #of entries spanned by each child.
             
             getChildEntryCounts(is,childEntryCounts,nkeys+1);
-            
+
             // verify #of bytes actually read.
             assert buf.position() - pos0 == nbytes;
 
+            // reset the buffer position.
+            buf.position(pos0);
+            assert buf.position() == 0;
+            
             // Done.
-            return nodeFactory.allocNode(btree, id, branchingFactor, keyType,
-//                    nnodes, nleaves,
-                    nentries, nkeys, keys, childAddr, childEntryCounts );
+            return nodeFactory.allocNode(btree, addr, branchingFactor,
+                    nentries, keys, childAddr, childEntryCounts);
 
         }
 
@@ -689,24 +855,44 @@ public class NodeSerializer {
     }
     
     /**
-     * Serialize a leaf node onto a buffer.
+     * Serialize a leaf node onto a buffer. If the operation would overflow then
+     * the buffer is extended and the operation is retried.
      * 
-     * @param buf
-     *            The buffer. The node will be serialized starting at the
-     *            current position. The position will be advanced as a side
-     *            effect.
      * @param leaf
      *            The leaf node.
+     * 
+     * @return the buffer containing the serialized leaf. the position will be
+     *         zero and the limit will be the #of bytes in the serialized leaf.
      */
-    public void putLeaf(ByteBuffer buf, ILeafData leaf) {
+    public ByteBuffer putLeaf(ILeafData leaf) {
+
+        while (true) {
+
+            try {
+
+                return putLeaf(_buf,leaf);
+
+            } catch (BufferOverflowException ex) {
+
+                extendBuffer();
+
+            }
+
+        }
+        
+    }
+     
+    private ByteBuffer putLeaf(ByteBuffer buf, ILeafData leaf) {
 
         assert buf != null;
         assert leaf != null;
         
         final int nkeys = leaf.getKeyCount();
         final int branchingFactor = leaf.getBranchingFactor();
-        final Object keys = leaf.getKeys();
+        final IKeyBuffer keys = leaf.getKeys();
         final Object[] vals = leaf.getValues();
+        
+        buf.clear();
         
         /*
          * common data.
@@ -736,15 +922,13 @@ public class NodeSerializer {
             // branching factor.
             LongPacker.packLong(os, branchingFactor);
 
-            // #of keys
-            LongPacker.packLong(os, nkeys);
+//            // #of keys
+//            LongPacker.packLong(os, nkeys);
 
             // keys.
-            keySerializer.putKeys(os, keys, nkeys);
+            keySerializer.putKeys(os, keys);
 
-            /*
-             * values.
-             */
+            // values.
             valueSerializer.putValues(os, vals, nkeys);
 
             // Done using the DataOutputStream so flush to the ByteBuffer.
@@ -785,22 +969,53 @@ public class NodeSerializer {
         buf.putInt(pos0 + OFFSET_NBYTES, nbytes);
 
         // compute checksum
-        final int checksum = chk.checksum(buf, pos0 + SIZEOF_CHECKSUM, pos0
-                + nbytes);
+        final int checksum = (useChecksum ? chk.checksum(buf, pos0
+                + SIZEOF_CHECKSUM, pos0 + nbytes) : 0);
         // System.err.println("computed leaf checksum: "+checksum);
 
         // write checksum on buffer.
         buf.putInt(pos0, checksum);
 
+        /*
+         * Flip the buffer to prepare it for reading. The position will be zero
+         * and the limit will be the #of bytes in the serialized record.
+         */
+        buf.flip();
+        
+        // optionally compresses the record.
+        return compress( buf );
+                
     }
 
-    public ILeafData getLeaf(IBTree btree,long id,ByteBuffer buf) {
+    protected ILeafData getLeaf(IBTree btree,long addr,ByteBuffer buf) {
         
-        assert btree != null;
-        assert id != 0L;
+        return getLeaf(btree,addr,buf,false);
+        
+    }
+    
+    /**
+     * De-serialize a leaf.
+     * 
+     * @param btree
+     *            The owning btree.
+     * @param addr
+     *            The address of the leaf - see {@link Addr}.
+     * @param buf
+     *            The buffer containing the serialized leaf.
+     * @param decompressed
+     *            true iff the buffer contains a record that has already been
+     *            decompressed using {@link #decompress(ByteBuffer)}.
+     * 
+     * @return The deserialized leaf.
+     */
+    protected ILeafData getLeaf(IBTree btree,long addr,ByteBuffer buf,boolean decompressed) {
+        
+//        assert btree != null;
+//        assert addr != 0L;
         assert buf != null;
 
-        final ArrayType keyType = keySerializer.getKeyType();
+        // optionally decompresses the record.
+        if( ! decompressed) buf = decompress( buf );
 
         /*
          * common data.
@@ -808,6 +1023,8 @@ public class NodeSerializer {
 
         final int pos0 = buf.position();
 
+        assert pos0 == 0;
+        
         // checksum
         final int readChecksum = buf.getInt(); // read checksum.
         // System.err.println("read checksum="+readChecksum);
@@ -818,13 +1035,17 @@ public class NodeSerializer {
         /*
          * verify checksum.
          */
-        final int computedChecksum = chk.checksum(buf, pos0 + SIZEOF_CHECKSUM,
-                pos0 + nbytes);
+        if (useChecksum) {
+        
+            final int computedChecksum = chk.checksum(buf, pos0
+                    + SIZEOF_CHECKSUM, pos0 + nbytes);
 
-        if (computedChecksum != readChecksum) {
+            if (computedChecksum != readChecksum) {
 
-            throw new ChecksumError("Invalid checksum: read " + readChecksum
-                    + ", but computed " + computedChecksum);
+                throw new ChecksumError("Invalid checksum: read "
+                        + readChecksum + ", but computed " + computedChecksum);
+
+            }
 
         }
 
@@ -834,7 +1055,7 @@ public class NodeSerializer {
         if (nodeType != TYPE_LEAF && nodeType != TYPE_LINKED_LEAF) {
 
             // expecting a leaf.
-            throw new RuntimeException("Not a leaf: id=" + id + ", nodeType="
+            throw new RuntimeException("Not a leaf: id=" + addr + ", nodeType="
                     + nodeType);
 
         }
@@ -859,23 +1080,19 @@ public class NodeSerializer {
 
             assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
 
-            // nkeys
-            final int nkeys = (int) LongPacker.unpackLong(is);
+//            // nkeys
+//            final int nkeys = (int) LongPacker.unpackLong(is);
+//
+//            // Note: minimum is (m+1)/2 unless root leaf.
+//            assert nkeys >= 0 && nkeys <= branchingFactor;
 
-            // Note: minimum is (m+1)/2 unless root leaf.
-            assert nkeys >= 0 && nkeys <= branchingFactor;
+            // keys.
 
-            /*
-             * Keys.
-             */
+            final IKeyBuffer keys = keySerializer.getKeys(is);
 
-            final Object keys = ArrayType.alloc(keyType, branchingFactor + 1);
-
-            keySerializer.getKeys(is, keys, nkeys);
-
-            /*
-             * Values.
-             */
+            final int nkeys = keys.getKeyCount();
+            
+            // values.
 
             final Object[] values = new Object[branchingFactor + 1];
 
@@ -884,9 +1101,13 @@ public class NodeSerializer {
             // verify #of bytes actually read.
             assert buf.position() - pos0 == nbytes;
 
+            // reset the buffer position.
+            buf.position(0);
+            assert buf.position() == 0;
+            
             // Done.
-            return nodeFactory.allocLeaf(btree, id, branchingFactor, keyType,
-                    nkeys, keys, values);
+            return nodeFactory.allocLeaf(btree, addr, branchingFactor, keys,
+                    values);
 
         }
 
@@ -978,6 +1199,146 @@ public class NodeSerializer {
             childEntryCounts[i] = nentries;
 
         }
+
+    }
+
+    protected void putTimestamps(DataOutputStream os, long[] timestamps,
+            int nentries) throws IOException {
+
+        for (int i = 0; i < nentries; i++) {
+
+            final long timestamp = timestamps[i];
+
+            LongPacker.packLong(os, timestamp);
+
+        }
+
+    }
+
+    protected void getTimestamps(DataInputStream is, long[] timestamps,
+            int nentries) throws IOException {
+
+        for (int i = 0; i < nentries; i++) {
+
+            final long timestamp = LongPacker.unpackLong(is);
+
+            timestamps[i] = timestamp;
+
+        }
+
+    }
+
+    /**
+     * Compress a record in the buffer.
+     * 
+     * @param buf
+     *            The record. The data from the position to the limit will be
+     *            compressed.
+     * 
+     * @return The record unless compression is enabled in which case the
+     *         compressed record is returned.  the position will be zero and
+     *         the limit will be the #of bytes in the compressed record.
+     */
+    protected ByteBuffer compress(ByteBuffer buf) {
+
+        assert buf.position() == 0;
+        
+        if( recordCompressor == null ) return buf;
+        
+        // clear compression buffer.
+        cbuf.clear();
+        
+        // setup writer onto compression buffer.
+        ByteBufferOutputStream bbos = new ByteBufferOutputStream(cbuf);
+        
+        // compress the serialized leaf.
+        recordCompressor.compress(buf, bbos);
+ 
+        /*
+         * reset the position to zero(0) to avoid the side effect on [buf] of
+         * compressing the buffer (which advances to position to the limit).
+         */
+        buf.position(0);
+        
+        // Note: flush/close are not required.
+//        try {
+//            
+//            // flush the compression buffer.
+//            bbos.flush();
+//
+//            // and close it.
+//            bbos.close();
+//
+//        } catch (IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+        
+        // flip the compressed buffer to prepare for writing or reading.
+        cbuf.flip();
+
+        assert cbuf.position() == 0;
+
+//        cbuf.position(0);
+        
+        return cbuf;
+        
+    }
+
+    /**
+     * Buffer for compressed records.
+     * 
+     * @todo The capacity of this buffer is a SWAG. it needs to begin life as a
+     *       smaller buffer and grow as required.
+     */
+    final private ByteBuffer cbuf = ByteBuffer
+            .allocateDirect(Bytes.megabyte32 / 2);
+        
+    /**
+     * If compression is enabled, then decompress the data.
+     * 
+     * Note: the checksum mechanism works well when we are not using a
+     * compression technique. depending on the compression technique, a change
+     * in the compressed data may trigger a failure of the decompression
+     * algorithm. in such cases we never get the decompressed record and there
+     * for the checksum is not even computed.  For this reason, you may see a
+     * decompression error thrown out of this method when the root cause is a
+     * problem with the compressed data record, perhaps as read from the disk
+     * or the network.
+     * 
+     * @param buf
+     *            The record. The data from the position to the limit will be
+     *            decompressed.
+     * 
+     * @return When compression is enabled the returned buffer will be a
+     *         read-only view onto a shared instance buffer held internally by
+     *         the {@link RecordCompressor}. The position will be zero. The
+     *         limit will be the #of decompressed bytes. When compression is not
+     *         enabled <i>buf</i> is returned unchanged.
+     */
+    protected ByteBuffer decompress(ByteBuffer buf) {
+        
+        assert buf.position() == 0;
+        
+        if( recordCompressor == null ) return buf;
+        
+        ByteBuffer tmp = buf;
+        
+        assert tmp.position() == 0;
+
+        ByteBuffer ret = recordCompressor.decompress(buf); // Decompress.
+
+        /*
+         * note: this restores the position for [buf] to remove the side
+         * effect of decompressing the buffer which causes the position to
+         * be advanced to the limit.
+         */
+        buf.position(0);
+
+        assert buf.position() == 0;
+        
+        return ret;
 
     }
 

@@ -47,7 +47,6 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.nio.ByteBuffer;
-import java.util.Comparator;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ContiguousSlotAllocation;
@@ -86,6 +85,43 @@ import com.bigdata.journal.SlotMath;
  * nodes in the tree.
  * </p>
  * 
+ * @todo try changing the default branching factor in spo index to divide by 3
+ *       or 6; try routing all arraycopy calls through a final method that
+ *       handles small N or strongly typed moderate N locally. run through the
+ *       call graph knocking out IO and see what is sucking down the cpu.
+ * 
+ * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
+ *       findChild, search, and autobox logic).
+ * 
+ * @todo keep the non-batch as well as the batch api or simplify to just the
+ *       batch api?
+ * 
+ * @todo modify ibtree api to accept int[], etc. and do both single and batch
+ *       operations with the same methods. require that the keys are in sorted
+ *       order when nkeys in array is greater than one. add wrapper methods to
+ *       allow operations with single Integer (for compatibility with the test
+ *       cases) and possibly Long, etc. Modify the internals to use int[1] and
+ *       not Integer for stride == 1?
+ * 
+ * @todo Multiple versions will not work unless the timestamp is _part_ of the
+ *       key. The reason is that the ordering is defined by { key, timestamp }
+ *       or for a column store { key, column, timestamp}. The separator keys
+ *       MUST be able to guide search to the correct leaf, so the timestamp (or
+ *       timestamp and column name) MUST be part of the separator keys, and
+ *       hence they must be part of the full key as observed by the btree. This
+ *       suggests using a general purpose key constructed from an application
+ *       key, a column name, and a timestamp for a column store.<br>
+ *       This means that timestamps may not be required for all leaves and could
+ *       be elided when using the btree for a column store (vs for full
+ *       transactional isolation). Another way to approach isolation is to make
+ *       the timestamp part of the object when used for isolation. that results
+ *       in more object creation, less data movement, and requires the wrapper
+ *       to be imposed by the user of the btree so that they insert, lookup, and
+ *       remove a time-marked application value. Handled this way, the btree is
+ *       completely ignorant about timestamps for both column stores and
+ *       transactional isolation. If I go this route this I will wind up
+ *       dropping the timestamp from the batch API.
+ * 
  * @todo Track the #of nodes and leaves on the hard reference queue in touch and
  *       {@link DefaultEvictionListener}. Also track the number that are clean
  *       vs dirty.
@@ -119,6 +155,11 @@ import com.bigdata.journal.SlotMath;
  *       needs to map class names to entries. Those entries are a classId and
  *       set of {version : Serializer} entries.
  * 
+ * @todo support dictionary order and alternative unicode collation sequences
+ *       for char[n], char[*], and String data types. Note that a variable
+ *       length char[] requires less space to represent the same data as a
+ *       {@link String}.
+ * 
  * @todo test object index semantics (clustered index of int32 or int64
  *       identifiers associate with inline objects and time/version stamps).
  *       There is a global index, and then one persistence capable index per
@@ -134,20 +175,6 @@ import com.bigdata.journal.SlotMath;
  *       the index segments are read-only but it would reduce memory by reducing
  *       the #of nodes -- and we can expect that the siblings will be either
  *       resident or in the direct buffer for the journal
- * 
- * @todo should this btree should intrinsically support isolation of inline
- *       objects by carrying the necessary metadata for each index entry? maybe
- *       what we need is an "isolation" constructor? note that the original
- *       isolation scheme effectively carried references to the objects on the
- *       journal (slot allocations) rather than having them inline. we probably
- *       do not need to know where the historical versions is since we only need
- *       to release it on the journal if we are trying to keep a single file and
- *       reuse deallocated space. if we just discard entire journal extents once
- *       their data has been migrated into perfect segments then we never need
- *       to do that deallocation. this leaves us with a version counter (similar
- *       to a timestamp, and perhaps replaceable by a timestamp) and the object
- *       itself. if we make the timestamp part of the key, then all that we are
- *       left with is the object itself.
  * 
  * @todo consider using extser an option for serialization so that we can
  *       continually evolve the node and leaf formats. we will also need a node
@@ -226,37 +253,19 @@ import com.bigdata.journal.SlotMath;
  *       IO, which is not available for many platforms (it is starting to show
  *       up in linux 2.6 kernals).
  * 
- * @todo refactor object index implementation into two variants providing
- *       isolation. In one the objects are referenced but exist outside of the
- *       index. This is the current design. In the other, then objects are
- *       stored as part of the values in the index. This is a clustered object
- *       index design and is identicaly to the design where non-int64 keys are
- *       used for the index. The latter design requires that we replace the
- *       currentSlots reference with the current version data. The advantage of
- *       this design is two fold. First, the index may be split into multiple
- *       segments and therefore scales out. Second, objects with key locality
- *       have retrieval locality as well. The former design has an advantage iff
- *       the objects are migrated to a read-optimized segment in which the int64
- *       identifier directly addresses the object in a slot on a page. Making
- *       clustering work effectively with the int64 object index by reference
- *       design probably requires mechanisms for assigning persistent
- *       identifiers based on expected locality of reference, e.g., late
- *       assignment of identifiers to persistence capable transient objects or
- *       an explicit notion of clustering rules or "local" objects.
- * 
- * @todo Support periodic rebuilding (for locality rather than packing purposes
- *       since we have packed index nodes in any case). A goal would be to have
- *       both contiguous leaves with prior/next references intack and to have
- *       the index nodes in a known block on disk for efficient loading. Writes
- *       on a rebuilt index would naturally cause locality to degrade until the
- *       index was rebuilt.
- * 
  * @todo Note that efficient support for large branching factors requires a more
  *       sophisticated approach to maintaining the key order within a node or
  *       leaf. E.g., using a red-black tree or adaptive packed memory array.
  *       However, we can use smaller branching factors for btrees in the journal
  *       and use a separate implementation for bulk generating and reading
  *       "perfect" read-only key range segments.
+ * 
+ * @todo derive a string index that uses patricia trees in the leaves per
+ *       several published papers.
+ * 
+ * @todo one way to increase performance while maintaining the separation of the
+ *       control logic and the keyType is to use template classes, but I am not
+ *       sure that this is worth it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -303,7 +312,7 @@ public class BTree extends AbstractBTree implements IBTree {
      * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
      * is dirty.
      */
-    static public final int DEFAULT_HARD_REF_QUEUE_SCAN = 10;
+    static public final int DEFAULT_HARD_REF_QUEUE_SCAN = 20;
     
     public int getBranchingFactor() {
         
@@ -311,12 +320,6 @@ public class BTree extends AbstractBTree implements IBTree {
         
     }
 
-    public ArrayType getKeyType() {
-        
-        return keyType;
-        
-    }
-    
     public int getHeight() {
         
         return height;
@@ -406,44 +409,29 @@ public class BTree extends AbstractBTree implements IBTree {
      *            cache evictions of the leaves participating in a split. A
      *            reasonable capacity is specified by
      *            {@link #DEFAULT_HARD_REF_QUEUE_CAPACITY}.
-     * @param keyType
-     *            The btree can store keys in an array of the specified
-     *            primitive data type or in an {@link Object} array. The latter
-     *            is required for general purpose keys, but int, long, float, or
-     *            double keys may use a primitive data type for better memory
-     *            efficiency and less heap churn.
-     * @param NEGINF
-     *            When keyType is {@link ArrayType#OBJECT} then this MUST be
-     *            <code>null</code>. Otherwise this MUST be an instance of
-     *            the Class corresponding to the primitive data type for the
-     *            key, e.g., {@link Integer} for <code>int</code> keys, and
-     *            the value of that instance is generally choosen to be zero(0).
-     * @param comparator
-     *            When keyType is {@link ArrayType#OBJECT} this is the
-     *            comparator used to place the keys into a total ordering. It
-     *            must be null for otherwise.
-     * @param keySer
-     *            Object that knows how to (de-)serialize the keys in a
-     *            {@link Node} or a {@link Leaf} of the tree.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
+     * @param recordCompressor
+     *            Object that knows how to (de-)compress a serialized node or
+     *            leaf (optional).
+     * 
+     * @todo change record compressor to an interface.
      */
     public BTree(
             IRawStore store,
-            ArrayType keyType,
             int branchingFactor,
             HardReferenceQueue<PO> hardReferenceQueue,
-            Object NEGINF,
-            Comparator comparator,
-            IKeySerializer keySer,
-            IValueSerializer valueSer)
+            IValueSerializer valueSer,
+            RecordCompressor recordCompressor )
     {
 
-        super(getTransitionalRawStore(store), keyType, branchingFactor,
-                hardReferenceQueue, NEGINF, comparator,
-                PackedAddressSerializer.INSTANCE, keySer, valueSer,
-                NodeFactory.INSTANCE);
+        super(getTransitionalRawStore(store), 
+                branchingFactor,
+                0/* initialBufferCapacity will be estimated */,
+                hardReferenceQueue,
+                PackedAddressSerializer.INSTANCE, valueSer,
+                NodeFactory.INSTANCE, recordCompressor, true /* useChecksum */);
 
         /*
          * Note: the mutable BTree has a limit here so that split() will always
@@ -451,21 +439,6 @@ public class BTree extends AbstractBTree implements IBTree {
          */
         assert hardReferenceQueue.capacity() >= MINIMUM_LEAF_QUEUE_CAPACITY;
         
-         /*
-          * FIXME There is no fixed upper limit for URIs (or strings in
-          * general), therefore the btree may have to occasionally resize its
-          * buffer to accomodate very long variable length keys.
-          */
-        int maxNodeOrLeafSize = Math.max(
-                // max size for a leaf.
-                nodeSer.getSize(true, branchingFactor),
-                // max size for a node.
-                nodeSer.getSize(false, branchingFactor - 1));
-        
-        log.info("maxNodeOrLeafSize="+maxNodeOrLeafSize);
-        
-        this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
-
         this.height = 0;
 
         this.nnodes = 0;
@@ -482,32 +455,22 @@ public class BTree extends AbstractBTree implements IBTree {
      * 
      * @param store
      *            The persistence store.
-     * @param metadataId
-     *            The persistent identifier of btree metadata.
+     * @param metadata
+     *            The btree metadata record.
      * @param hardReferenceQueue
      *            The hard reference queue for {@link Leaf}s.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the values in a
-     *            {@link Leaf}.
      * 
-     * @todo deserialize the keySer, valueSer, comparator, and NEGINF from the
-     *       metadata record?  Use default java serialization? extSer?
+     * @see BTreeMetadata#read(IRawStore2, long)
      */
-    public BTree(
-            IRawStore store,
-            BTreeMetadata metadata,
-            HardReferenceQueue<PO> hardReferenceQueue,
-            Object NEGINF,
-            Comparator comparator,
-            IKeySerializer keySer,
-            IValueSerializer valueSer
-            )
-    {
+    public BTree(IRawStore store, BTreeMetadata metadata,
+            HardReferenceQueue<PO> hardReferenceQueue) {
 
-        super(getTransitionalRawStore(store), metadata.keyType,
-                metadata.branchingFactor, hardReferenceQueue, NEGINF,
-                comparator, PackedAddressSerializer.INSTANCE, keySer, valueSer,
-                NodeFactory.INSTANCE);
+        super(getTransitionalRawStore(store), metadata.branchingFactor,
+                0/* initialBufferCapacity will be estimated */,
+                hardReferenceQueue, 
+                PackedAddressSerializer.INSTANCE, 
+                metadata.valueSer, NodeFactory.INSTANCE,
+                metadata.recordCompressor, metadata.useChecksum);
         
         // save a reference to the immutable metadata record.
         this.metadata = metadata;
@@ -518,21 +481,6 @@ public class BTree extends AbstractBTree implements IBTree {
         this.nleaves = metadata.nleaves;
         this.nentries = metadata.nentries;
         
-        /*
-         * FIXME There is no fixed upper limit for URIs (or strings in
-         * general), therefore the btree may have to occasionally resize its
-         * buffer to accomodate very long variable length keys.
-         */
-        int maxNodeOrLeafSize = Math.max(
-                // max size for a leaf.
-                nodeSer.getSize(true, branchingFactor),
-                // max size for a node.
-                nodeSer.getSize(false, branchingFactor - 1));
-
-        log.info("maxNodeOrLeafSize="+maxNodeOrLeafSize);
-        
-        this.buf = ByteBuffer.allocate(maxNodeOrLeafSize);
-
         /*
          * Read the root node of the btree.
          */
@@ -621,32 +569,108 @@ public class BTree extends AbstractBTree implements IBTree {
     protected static class NodeFactory implements INodeFactory {
 
         public static final INodeFactory INSTANCE = new NodeFactory();
-        
-        private NodeFactory() {}
-        
-        public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, Object[] values) {
 
-            return new Leaf((BTree) btree, id, branchingFactor, nkeys, keys,
-                    values);
-            
+        private NodeFactory() {
         }
 
-        public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, /*int nnodes, int nleaves,*/ int nentries,
-                int nkeys, Object keys, long[] childAddr, int[] childEntryCounts) {
-            
-            return new Node((BTree) btree, id, branchingFactor,/* nnodes,
-                    nleaves, */ nentries, nkeys, keys, childAddr, childEntryCounts);
-            
+        public ILeafData allocLeaf(IBTree btree, long addr,
+                int branchingFactor, IKeyBuffer keys, Object[] values) {
+
+            return new Leaf((BTree) btree, addr, branchingFactor, keys,
+                    values);
+
+        }
+
+        public INodeData allocNode(IBTree btree, long addr,
+                int branchingFactor, int nentries, IKeyBuffer keys,
+                long[] childAddr, int[] childEntryCounts) {
+
+            return new Node((BTree) btree, addr, branchingFactor, nentries,
+                    keys, childAddr, childEntryCounts);
+
         }
 
     }
     
-//    /*
-//     * Interface for transactional isolation. 
-//     */
-//    
+    /*
+     * Interface for transactional isolation.
+     * 
+     * The basic design for isolation requires that reads are performed against
+     * a historical committed state of the store (the ground state, which is
+     * typically the last committed state of the store at the time that the
+     * transaction begins) while writes are isolated (they are not visible
+     * outside of the transaction). The basic mechanism for isolation is a
+     * isolated btree that reads through to a read-only btree loaded from a
+     * historical metadata record while writes go into the isolated btree. The
+     * isolated btree is used by the transaction and never by another
+     * transaction.
+     * 
+     * In order to commit, the transaction must validate the write set on the
+     * isolated btree against the then current committed state of the btree. If
+     * there have been no intervening commits then validation is a NOP since the
+     * read-only btree that the isolated btree reads through to is the current
+     * committed state. If there have been intervening commits, then validation
+     * may identify write-write conflicts (read-write conflicts are obviated by
+     * the basic design). A write-write conflict exists when a concurrent
+     * transaction wrote a record for the same key as the transaction that is
+     * being validated and has already committed (conflicts are not visible
+     * until a writer has committed). Write-write conflicts may be resolved by
+     * data type specific merge rules. Examples include debits and credits on a
+     * bank account or conflicts on link set metadata but not state for a
+     * generic object. If a conflict can not be validated then the transaction
+     * is aborted and may be retried.
+     * 
+     * Once a transaction has validated it is merged down onto the globally
+     * visible state of the btree. This process consists simply of applying the
+     * changes to the globally visible btree, including both inserts of
+     * key-value pairs and removal of keys that were deleted during the
+     * transaction.
+     * 
+     * If a transaction is reading from or writing on more than one btree, then
+     * it must validate the write set for each btree during its validation stage
+     * and merge down the write set for each btree during its merge state. Once
+     * this merge process is complete, the btree is flushed to the backing store
+     * which results in a new metadata record. The mapping from btree identifier
+     * to btree metadata record is then updated on the backing store. Finally,
+     * an atomic commit is then performed on the backing store. At this point
+     * the transaction has successfully completed.
+     * 
+     * @todo efficient sharing of nodes and leaves for concurrent read-only
+     * views (stealing children vs wrapping them with a flyweight wrapper; reuse
+     * of the same btree instance for reading from the same historical state).
+     * 
+     * @todo the read-only view must be against the partitioned index, not just
+     * the btree on the journal. this makes life more complicated.
+     * 
+     * @todo handle journal overflow smoothly with respect to transactional
+     * isolation, including how to handle both short and long-lived readers and
+     * writers. draw some boundaries on what is supported and what is not.
+     * 
+     * @todo explore transaction designs for a distributed paritioned index.
+     * 
+     * @todo is double-deletion of a deleted key on an isolated btree is an
+     * error or should it be silently ignored?
+     */
+    
+    /*
+     * An alternative to isolation is to use a version expiration policy based
+     * on age or #of versions and to support atomic multi-row updates for small
+     * #s of rows (native nested transactions with group commit and timestamps).
+     */
+    
+    /* paritioned index.
+     * 
+     * @todo concurrent readers for index segments or serialize readers against
+     * a segment using a network api?
+     * 
+     * @todo partition maintenance (journal overflow, segment merge and split,
+     * and partition merge and split).
+     * 
+     * @todo distributed partitions by defining a network api.
+     * 
+     * @todo scale out boundaries.
+     */
+    
 //    /**
 //     * Returns a fully isolated btree suitable for use within a transaction.
 //     * Writes will be applied to the isolated btree. Reads will read first on
@@ -668,7 +692,7 @@ public class BTree extends AbstractBTree implements IBTree {
 //     * 
 //     * @todo There are a few problems with this approach <br>
 //     *       First, using a btree with MVCC requires that we record a timestamp
-//     *       or version counter with each object. This can be implemented using
+//     *       or version counter with each object in order to detect conflicts. This can be implemented using
 //     *       either a wrapper class (VersionedBTree) that delegates to BTree and
 //     *       encapsulates values as {value,timestamp} entries. Alternatively, we
 //     *       could maintain version counters either full time or optionally in
@@ -773,7 +797,7 @@ public class BTree extends AbstractBTree implements IBTree {
 //         */
 //        IStore readOnlyTx = null; // new ReadOnlyTx(journal);
 //        
-//        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
+//        final IEntryIterator itr = objectIndex.getRoot().entryIterator();
 //        
 //        while( itr.hasNext() ) {
 //            
@@ -978,7 +1002,7 @@ public class BTree extends AbstractBTree implements IBTree {
 //        // Verify that this is a transaction scope object index.
 //        assert baseObjectIndex != null;
 //        
-//        final KeyValueIterator itr = objectIndex.getRoot().entryIterator();
+//        final IEntryIterator itr = objectIndex.getRoot().entryIterator();
 //        
 //        while( itr.hasNext() ) {
 //            
@@ -1185,7 +1209,20 @@ public class BTree extends AbstractBTree implements IBTree {
 
             ISlotAllocation slots = asSlots(addr);
 
-            return delegate.read(slots,dst);
+            int nbytes = Addr.getByteCount(addr);
+            
+            if(dst != null) dst.clear();
+            
+            dst = delegate.read(slots,dst);
+            
+            assert dst.position() == 0;
+            assert dst.limit() == nbytes;
+            
+            dst.position(nbytes);
+
+            dst.flip();
+            
+            return dst;
         }
 
         public void delete(long addr) {

@@ -98,13 +98,11 @@ public class TestTouch extends AbstractBTreeTestCase {
         // The btree.
         final BTree btree = new BTree(
                 new SimpleStore(),
-                ArrayType.INT,
                 branchingFactor,
                 leafQueue,
-                Integer.valueOf(0),
-                null, // no comparator for primitive key type.
-                Int32OIdKeySerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE);
+                SimpleEntry.Serializer.INSTANCE,
+                null // no record compressor
+                );
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -171,14 +169,11 @@ public class TestTouch extends AbstractBTreeTestCase {
         // The btree.
         final BTree btree = new BTree(
                 new SimpleStore(),
-                ArrayType.INT,
                 branchingFactor,
                 leafQueue,
-                Integer.valueOf(0),
-                null, // no comparator for primitive key type.
-                Int32OIdKeySerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE
-                );
+                SimpleEntry.Serializer.INSTANCE,
+                null // no record compressor
+        );
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -247,14 +242,11 @@ public class TestTouch extends AbstractBTreeTestCase {
         // The btree.
         final BTree btree = new BTree(
                 new SimpleStore(),
-                ArrayType.INT,
                 branchingFactor,
                 leafQueue,
-                Integer.valueOf(0),
-                null, // no comparator for primitive key type.
-                Int32OIdKeySerializer.INSTANCE,
-                valSer
-                ); 
+                valSer,
+                null // no record compressor
+        ); 
         
         /*
          * verify the initial conditions - the root leaf is on the queue and

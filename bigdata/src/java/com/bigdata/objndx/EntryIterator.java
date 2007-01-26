@@ -55,15 +55,25 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class EntryIterator implements KeyValueIterator {
+class EntryIterator implements IEntryIterator {
 
     private final Leaf leaf;
 
     private final Tuple tuple;
-    
+
     private int index = 0;
 
     private int lastVisited = -1;
+
+    private final byte[] fromKey;
+    
+    private final byte[] toKey;
+
+    // first index to visit.
+    private final int fromIndex;
+
+    // first index to NOT visit.
+    private final int toIndex;
     
     public EntryIterator(Leaf leaf) {
 
@@ -73,17 +83,101 @@ class EntryIterator implements KeyValueIterator {
 
     public EntryIterator(Leaf leaf, Tuple tuple ) {
 
+        this(leaf,tuple,null,null);
+        
+    }
+    
+    /**
+     * 
+     * @param leaf
+     *            The leaf whose entries will be traversed.
+     * @param tuple
+     *            Used to hold the output values.
+     * @param fromKey
+     *            The first key whose entry will be visited or <code>null</code>
+     *            if the lower bound on the key traversal is not constrained.
+     * @param toKey
+     *            The first key whose entry will NOT be visited or
+     *            <code>null</code> if the upper bound on the key traversal is
+     *            not constrained.
+     * 
+     * @exception IllegalArgumentException
+     *                if fromKey is given and is greater than toKey.
+     */
+    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+
         assert leaf != null;
 
         this.leaf = leaf;
         
         this.tuple = tuple; // MAY be null.
 
+        this.fromKey = fromKey; // may be null (no lower bound).
+        
+        this.toKey = toKey; // may be null (no upper bound).
+
+        { // figure out the first index to visit.
+
+            int fromIndex;
+
+            if (fromKey != null) {
+
+                fromIndex = leaf.keys.search(fromKey);
+
+                if (fromIndex < 0) {
+
+                    fromIndex = -fromIndex - 1;
+
+                }
+
+            } else {
+
+                fromIndex = 0;
+
+            }
+
+            this.fromIndex = fromIndex;
+
+        }
+
+        { // figure out the first index to NOT visit.
+
+            int toIndex;
+
+            if (toKey != null) {
+
+                toIndex = leaf.keys.search(toKey);
+
+                if (toIndex < 0) {
+
+                    toIndex = -toIndex - 1;
+
+                }
+
+            } else {
+
+                toIndex = leaf.nkeys;
+
+            }
+
+            this.toIndex = toIndex;
+
+        }
+
+        if (fromIndex > toIndex) {
+            
+            throw new IllegalArgumentException("fromKey > toKey");
+            
+        }
+        
+        // starting index is the lower bound.
+        index = fromIndex;
+        
     }
 
     public boolean hasNext() {
 
-        return index < leaf.nkeys;
+        return index >= fromIndex && index < toIndex;
 
     }
 
@@ -103,9 +197,9 @@ class EntryIterator implements KeyValueIterator {
              * eagerly set the key/value on the tuple for a side-effect style
              * return.
              */
-            tuple.key = leaf.getKey(lastVisited);
+            tuple.key = leaf.keys.getKey(lastVisited);
             
-            tuple.val = leaf.values[lastVisited];            
+            tuple.val = leaf.values[lastVisited];
             
             return tuple.val;
             
@@ -127,7 +221,7 @@ class EntryIterator implements KeyValueIterator {
         
     }
     
-    public Object getKey() {
+    public byte[] getKey() {
         
         if( lastVisited == -1 ) {
             
@@ -135,7 +229,7 @@ class EntryIterator implements KeyValueIterator {
             
         }
         
-        return leaf.getKey(lastVisited);
+        return leaf.keys.getKey(lastVisited);
         
     }
     

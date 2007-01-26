@@ -48,7 +48,6 @@ package com.bigdata.objndx;
 
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
-import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
@@ -91,12 +90,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    final static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    final static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * The BTree.
@@ -130,33 +129,35 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * The #of valid keys for this node or leaf.  For a {@link Node}, the #of
      * children is always <code>nkeys+1</code>.  For a {@link Leaf}, the #of
      * values is always the same as the #of keys.
+     * 
+     * FIXME deprecate since also maintained by {@link IKeyBuffer}.
      */
     protected int nkeys = 0;
-
+    
     /**
-     * The external keys for the B+Tree. The #of keys depends on whether this is
-     * a {@link Node} or a {@link Leaf}. A leaf has one key per value - that
-     * is, the maximum #of keys for a leaf is specified by the branching factor.
-     * In contrast a node has m-1 keys where m is the maximum #of children (aka
-     * the branching factor). Therefore this field is initialized by the
-     * {@link Leaf} or {@link Node} - NOT by the {@link AbstractNode}.
+     * A representation of each key in the node or leaf. Each key is as a
+     * variable length unsigned byte[]. There are various implementations of
+     * {@link IKeyBuffer} that are optimized for mutable and immutable nodes.
      * 
-     * The interpretation of the key index for a leaf is one to one - key[0]
-     * corresponds to value[0].
+     * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
+     * A leaf has one key per value - that is, the maximum #of keys for a leaf
+     * is specified by the branching factor. In contrast a node has m-1 keys
+     * where m is the maximum #of children (aka the branching factor). Therefore
+     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
+     * the {@link AbstractNode}.
      * 
      * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
-     * one more than the maximum capacity so that the key that causes overflow
-     * and forces the split may be inserted.  This greatly simplifies the logic
-     * for computing the split point and performing the split.
+     * accept one more key than the maximum capacity so that the key that causes
+     * overflow and forces the split may be inserted. This greatly simplifies
+     * the logic for computing the split point and performing the split.
+     * Therefore you always allocate this object with a capacity <code>m</code>
+     * keys for a {@link Node} and <code>m+1</code> keys for a {@link Leaf}.
      * 
-     * @see #findChild(int key)
-     * @see Search#search(int, int[], int)
+     * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
+     * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
      */
-//    protected int[] keys;
-//    protected Integer[] keys;
-//    protected Object[] keys;
-    protected Object keys;
-
+    protected IKeyBuffer keys;
+    
     /**
      * The parent of this node. This is null for the root node. The parent is
      * required in order to set the persistent identity of a newly persisted
@@ -215,12 +216,13 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     }
 
     /**
-     * The parent iff the node has been added as the child of another node
-     * and the parent reference has not been cleared.
+     * The parent iff the node has been added as the child of another node and
+     * the parent reference has not been cleared.
      * 
-     * @return The parent.
+     * @return The parent or null if (a) this is the root node or (b) the
+     *         {@link WeakReference} to the parent has been cleared.
      */
-    public Node getParent() {
+    final public Node getParent() {
 
         Node p = null;
 
@@ -293,16 +295,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         // Add to the hard reference queue.
         btree.touch(this);
         
-//        /*
-//         * If this is a {@link Node} then ensures that the btree holds a hard
-//         * reference to the node.
-//         */
-//        if( !isLeaf() ) {
-//                
-//            btree.nodes.add((Node)this);
-//
-//        }
-
     }
 
     /**
@@ -511,54 +503,70 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract public Iterator postOrderIterator(boolean dirtyNodesOnly);
 
-    public KeyValueIterator entryIterator() {
-
-//        /*
-//         * Begin with a post-order iterator.
-//         */
-//        return new Striterator(postOrderIterator()).addFilter(new Expander() {
-//
-//            private static final long serialVersionUID = 1L;
-//
-//            /*
-//             * Expand the value objects for each leaf visited in the post-order
-//             * traversal.
-//             */
-//            protected Iterator expand(Object childObj) {
-//                /*
-//                 * A child of this node.
-//                 */
-//                AbstractNode child = (AbstractNode) childObj;
-//
-//                if (child instanceof Leaf) {
-//
-//                    return ((Leaf) child).entryIterator();
-//
-//                } else {
-//
-//                    return EmptyKeyValueIterator.INSTANCE;
-//
-//                }
-//            }
-//        });
+    public IEntryIterator entryIterator() {
 
         return new PostOrderEntryIterator(postOrderIterator());
         
     }
 
     /**
-     * Helper class expands a post-order node and leaf traversal to visits
-     * the entries in the leaves.
+     * Return an iterator that visits the entries in a half-open key range.
+     * 
+     * @param fromKey
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * FIXME constrain first and last Node/Leaf visited. right now this will
+     * visit the entire tree, just filtering for only the entries in the key
+     * range. the logic for visiting the children needs to pay attention to the
+     * fromKey and toKey so that the post-order node traversal will be
+     * appropriately constrained.
+     * 
+     * FIXME when using an {@link IndexSegment} provide for direct leaf
+     * successor scans.
+     * 
+     * @todo add leaf or node counter to this iterator?
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+        return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
+                fromKey, toKey);
+
+    }
+
+    /**
+     * Post-order traveral of nodes and leaves in the tree with a key range
+     * constraint. For any given node, its children are always visited before
+     * the node itself (hence the node occurs in the post-order position in the
+     * traveral). The iterator is NOT safe for concurrent modification.
+     * 
+     * @param fromKey
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @return Iterator visiting {@link AbstractNode}s.
+     */
+    abstract public Iterator postOrderIterator(byte[] fromKey, byte[] toKey);
+
+    /**
+     * Helper class expands a post-order node and leaf traversal to visit the
+     * entries in the leaves.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class PostOrderEntryIterator extends Striterator implements KeyValueIterator {
+    private static class PostOrderEntryIterator extends Striterator implements IEntryIterator {
         
         /**
          * The key-value for each entry are set as a side-effect on a private
          * {@link Tuple} field so that this class can implement
-         * {@link KeyValueIterator}.
+         * {@link IEntryIterator}.
          * 
          * @see EntryIterator#EntryIterator(Leaf, Tuple)
          */
@@ -607,12 +615,59 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         }
 
-        public Object getKey() {
+        public PostOrderEntryIterator(Iterator postOrderIterator, final byte[] fromKey, final byte[] toKey) {
+            
+            super(postOrderIterator);
+            
+            addFilter(new Expander() {
+
+                private static final long serialVersionUID = 1L;
+
+                /*
+                 * Expand the value objects for each leaf visited in the
+                 * post-order traversal.
+                 */
+                protected Iterator expand(Object childObj) {
+                    /*
+                     * A child of this node.
+                     */
+                    AbstractNode child = (AbstractNode) childObj;
+
+                    if (child instanceof Leaf) {
+
+                        Leaf leaf = (Leaf) child;
+                        
+                        if (leaf.nkeys == 0) {
+
+                            return EmptyKeyValueIterator.INSTANCE;
+
+                        }
+
+                        return new EntryIterator(leaf, tuple, fromKey, toKey);
+
+//                        return ((Leaf)child).entryIterator();
+
+                    } else {
+
+                        return EmptyKeyValueIterator.INSTANCE;
+
+                    }
+                }
+
+            });
+        
+        }
+
+        public byte[] getKey() {
+            
             return tuple.key;
+            
         }
 
         public Object getValue() {
+            
             return tuple.val;
+            
         }
         
     }
@@ -676,24 +731,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             // max #of keys.
             assert nkeys <= maxKeys;
 
-//            if( ! isLeaf() ) {
-//
-//                int nentries = 0;
-//            
-//                for( int i=0; i<=nkeys; i++) {
-//                
-//                    int n = ((Node)this).childEntryCounts[i];
-//                    
-//                    assert n > 0;
-//                    
-//                    nentries += n;
-//                    
-//                }
-//                
-//                assert nentries == ((Node)this).nentries;
-//                
-//            }
-            
         } catch (AssertionError ex) {
 
             log.fatal("Invariants failed\n"
@@ -706,265 +743,81 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         }
 
     }
-
-    /**
-     * Test that the keys are suitable for this tree.
-     * 
-     * @param btree
-     *            The owing btree.
-     * @param keys
-     *            The keys[].
-     * @param length
-     *            The required length of the keys[].
-     */
-    static protected final void assertKeyTypeAndLength(AbstractBTree btree,
-            Object keys, int length) {
-        
-        assert btree != null;
-        assert keys != null;
-        ArrayType keyType = ArrayType.getArrayType(keys);
-        assert btree.keyType == keyType;
-        assert getLength(keys) == length;
-        
-    }
-    
-    /**
-     * Return the length of the key array (its dimension). This method works for
-     * both primitive and object array types.
-     * 
-     * @param keys
-     *            The key array.
-     * 
-     * @return Its length.
-     */
-    final static protected int getLength(Object keys) {
-        switch(ArrayType.getArrayType(keys)) {
-        case BYTE: return ((byte[])keys).length;
-        case SHORT: return ((short[])keys).length;
-        case CHAR: return ((char[])keys).length;
-        case INT: return ((int[])keys).length;
-        case LONG: return ((long[])keys).length;
-        case FLOAT: return ((float[])keys).length;
-        case DOUBLE: return ((double[])keys).length;
-        case OBJECT: return ((Object[])keys).length;
-        default: throw new UnsupportedOperationException();
-        }
-    }
     
     /**
      * Verify keys are monotonically increasing.
      */
     protected final void assertKeysMonotonic() {
 
-        Object lastKey = btree.NEGINF;
+        if(keys instanceof MutableKeyBuffer) {
 
-        int limit = getLength(keys);
-        
-        for (int i = 0; i < limit; i++) {
-
-            Object key = getKey(i);
-
-            if (i < nkeys) {
-                
-                if (compare(key,lastKey) <= 0) {
-
-                    throw new AssertionError("Keys out of order at index=" + i
-                            + ", lastKey=" + lastKey + ", keys[" + i + "]="
-                            + key);
-
-                }
-
-            } else if (((Integer)key) != btree.NEGINF) {
-                
-                // undefined keys.
-                throw new AssertionError("Expecting NEGINF(" + btree.NEGINF
-                        + ") at index=" + i + ", nkeys=" + nkeys
-                        + ", but found keys[" + i + "]=" + key);
-                
-            }
-
-            lastKey = key;
-
+            /*
+             * iff mutable keys - immutable keys should be checked during
+             * de-serialization or construction.
+             */
+            
+            ((MutableKeyBuffer)keys).assertKeysMonotonic();
+            
         }
 
     }
     
     /**
-     * Generic key comparison.
-     * 
-     * Note: This is used only for ease in debugging routines. All key
-     * comparison for search is performed within data type specific methods.
-     * 
-     * @param k1
-     *            A key (non-null).
-     * @param k2
-     *            Another key (non-null).
-     * 
-     * @return a negative integer, zero, or a positive integer as the first
-     *         argument is less than, equal to, or greater than the second.
-     * 
-     * @see #search(Object)
-     */
-    final protected int compare(Object k1,Object k2) {
-        switch(btree.keyType) {
-        case BYTE: return ((Byte)k1).compareTo((Byte)k2);
-        case SHORT: return ((Short)k1).compareTo((Short)k2);
-        case CHAR: return ((Character)k1).compareTo((Character)k2);
-        case INT: return ((Integer)k1).compareTo((Integer)k2);
-        case LONG: return ((Long)k1).compareTo((Long)k2);
-        case FLOAT: return ((Float)k1).compareTo((Float)k2);
-        case DOUBLE: return ((Double)k1).compareTo((Double)k2);
-        case OBJECT: return btree.comparator.compare(k1,k2);
-        default: throw new UnsupportedOperationException();
-        }        
-    }
-    
-    /**
-     * A type agnostic wrapper directs the request to a type appropriate search
-     * implementation based on the key type as defined for the btree.
+     * Return a human readable representation of the key. The key is a variable
+     * length unsigned byte[]. The returned string is a representation of that
+     * unsigned byte[].  This is use a wrapper for {@link BytesUtil#toString()}.
      * 
      * @param key
      *            The key.
-     * 
-     * @return index of the search key, if it is contained in the array;
-     *         otherwise, <code>(-(insertion point) - 1)</code>. The
-     *         insertion point is defined as the point at which the key would be
-     *         inserted into the array. Note that this guarantees that the
-     *         return value will be >= 0 if and only if the key is found.
      */
-    final protected int search(Object key) {
-        switch(btree.keyType) {
-        // @todo handle at least float, double here and in Search.java
-        case INT: return Search.search(((Integer)key).intValue(), (int[])keys, nkeys);
-        case LONG: return Search.search(((Long)key).longValue(), (long[])keys, nkeys);
-        case OBJECT: return Search.search(key, (Object[])keys, nkeys,btree.comparator);
-        default: throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
-     * The value of the key at the specified index.
-     * 
-     * @param index
-     *            The key index in [0:maxKeys-1].
-     *            
-     * @return The value of the key at that index. If the key is a primitive
-     *         data type then it will be autoboxed as an instance of its
-     *         corresponding Class.
-     *         
-     * @see #setKey(int, Object)
-     * @see #copyKey(int, AbstractNode, int)
-     */
-    final protected Object getKey(int index) {
-//        assert index >=0 && index < maxKeys;
-        switch(btree.keyType) {
-        case BYTE: return ((byte[])keys)[index];
-        case SHORT: return ((short[])keys)[index];
-        case CHAR: return ((char[])keys)[index];
-        case INT: return ((int[])keys)[index];
-        case LONG: return ((long[])keys)[index];
-        case FLOAT: return ((float[])keys)[index];
-        case DOUBLE: return ((double[])keys)[index];
-        case OBJECT: return ((Object[])keys)[index];
-        default: throw new UnsupportedOperationException();
-        }        
-    }
-
-    /**
-     * Update the value of the key at the specified index.
-     * 
-     * @param index
-     *            The key index in [0:maxKeys-1];
-     * @param key
-     *            The value to be assigned to the key at that index. If the keys
-     *            are represented as a primitive data type then the
-     *            corresponding primitive value for the key will be extracted.
-     * 
-     * @see #copyKey(int, AbstractNode, int)
-     * @see #getKey(int)
-     */
-    final protected void setKey(int index,Object key) {
-//        assert index >=0 && index < maxKeys;
-        switch(btree.keyType) {
-        case BYTE: ((byte[])keys)[index] = (Byte)key; break;
-        case SHORT: ((short[])keys)[index] = (Short)key; break;
-        case CHAR: ((char[])keys)[index] = (Character)key; break;
-        case INT: ((int[])keys)[index] = (Integer)key; break;
-        case LONG: ((long[])keys)[index] = (Long)key; break;
-        case FLOAT: ((float[])keys)[index] = (Float)key; break;
-        case DOUBLE: ((double[])keys)[index] = (Double)key; break;
-        case OBJECT: ((Object[])keys)[index] = key; break;
-        default: throw new UnsupportedOperationException();
-        }        
+    final static protected String keyAsString(byte[] key) {
+        
+        return BytesUtil.toString(key);
+        
     }
     
     /**
      * Copy a key from the source node into this node. This method does not
      * modify the source node. This method does not update the #of keys in this
-     * node. This method has the substantial advantage that primitive keys are
-     * not boxed and unboxed solely to perform the cop.
+     * node.
+     * 
+     * Note: Whenever possible the key reference is copied rather than copying
+     * the data. This optimization is valid since we never modify the contents
+     * of a key.
      * 
      * @param dstpos
      *            The index position to which the key will be copied on this
      *            node.
      * @param src
-     *            The source node from which the key will be copied.
+     *            The source keys.
      * @param srcpos
      *            The index position from which the key will be copied.
+     * 
+     * @todo move to {@link MutableKeyBuffer}
      */
-    final protected void copyKey(int dstpos,AbstractNode src,int srcpos) {
-//          assert index >=0 && index < maxKeys;
-          switch(btree.keyType) {
-          case BYTE: ((byte[])keys)[dstpos] = ((byte[])src.keys)[srcpos]; break;
-          case SHORT: ((short[])keys)[dstpos] = ((short[])src.keys)[srcpos]; break;
-          case CHAR: ((char[])keys)[dstpos] = ((char[])src.keys)[srcpos]; break;
-          case INT: ((int[])keys)[dstpos] = ((int[])src.keys)[srcpos]; break;
-          case LONG: ((long[])keys)[dstpos] = ((long[])src.keys)[srcpos]; break;
-          case FLOAT: ((float[])keys)[dstpos] = ((float[])src.keys)[srcpos]; break;
-          case DOUBLE: ((double[])keys)[dstpos] = ((double[])src.keys)[srcpos]; break;
-          case OBJECT: ((Object[])keys)[dstpos] = ((Object[])src.keys)[srcpos]; break;
-          default: throw new UnsupportedOperationException();
-          }     
+    final protected void copyKey(int dstpos, IKeyBuffer srckeys, int srcpos) {
+
+        assert dirty;
+        
+        ((MutableKeyBuffer)keys).keys[dstpos] = srckeys.getKey(srcpos);
+        
     }
-    
-    /**
-     * Return a representation of the keys.
-     */
-    static protected String keysAsString(Object keys) {
-        switch(ArrayType.getArrayType(keys)) {
-        case BYTE: return Arrays.toString((byte[])keys);
-        case SHORT: return Arrays.toString((short[])keys);
-        case CHAR: return Arrays.toString((char[])keys);
-        case INT: return Arrays.toString((int[])keys);
-        case LONG: return Arrays.toString((long[])keys);
-        case FLOAT: return Arrays.toString((float[])keys);
-        case DOUBLE: return Arrays.toString((double[])keys);
-        case OBJECT: return Arrays.toString((Object[])keys);
-        default: throw new UnsupportedOperationException();
-        }
-    }
-    
+
     abstract public boolean isLeaf();
 
-    public int getBranchingFactor() {
+    final public int getBranchingFactor() {
         
         return branchingFactor;
         
     }
     
-    public ArrayType getKeyType() {
-        
-        return btree.keyType;
-        
-    }
-    
-    public int getKeyCount() {
+    final public int getKeyCount() {
         
         return nkeys;
         
     }
     
-    public Object getKeys() {
+    final public IKeyBuffer getKeys() {
         
         return keys;
         
@@ -1185,17 +1038,79 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract protected void merge(AbstractNode sibling, boolean isRightSibling);
 
-    abstract public Object insert(Object key, Object entry);
+    /**
+     * Batch insert of one or more tuples.
+     * 
+     * The behavior for each tuple is equivilent to a recursive search that
+     * locates the approprate leaf and inserts or updates a tuple under the key.
+     * The leaf is split iff necessary. Splitting the leaf can cause splits to
+     * cascade up towards the root. If the root is split then the total depth of
+     * the tree is inceased by one.
+     * 
+     * This operation can be very efficient if the tuples are presented in key
+     * order.
+     * 
+     * @param ntuples
+     *            The #of tuples that are being inserted(in).
+     * @param tupleIndex
+     *            The index of the tuple to be inserted (in)
+     * @param searchKeys
+     *            The array of keys (one key per tuple) (in).
+     * @param values
+     *            Values (one element per key) (in/out). Null elements are
+     *            allowed. On output, each element is either null (if there was
+     *            no entry for that key) or the old value stored under that key
+     *            (which may be null).
+     * 
+     * @return The #of tuples processed.
+     */
+    abstract public int insert(int ntuples, int tupleIndex,
+            byte[][] searchKeys, Object[] values);
 
-    abstract public Object remove(Object key);
+    /**
+     * Batch lookup of one or more tuples.
+     * 
+     * @param ntuples
+     *            The #of tuples that are being looked up (in).
+     * @param tupleIndex
+     *            The index of the tuple to be looked up (in)
+     * @param searchKeys
+     *            The array of keys (one key per tuple) (in).
+     * @param values
+     *            Values (one element per key) (out). On output, each element is
+     *            either null (if there was no entry for that key) or the old
+     *            value stored under that key (which may be null).
+     * 
+     * @return The #of tuples processed.
+     */
+    abstract public int lookup(int ntuples, int tupleIndex,
+            byte[][] searchKeys, Object[] values);
 
-    abstract public Object lookup(Object key);
+    /**
+     * Batch removal of one or more tuples, returning their existing values and
+     * timestamps.
+     * 
+     * @param ntuples
+     *            The #of tuples that are being removed (in).
+     * @param tupleIndex
+     *            The index of the tuple to be removed (in).
+     * @param searchKeys
+     *            The array of keys (one key per tuple) (in).
+     * @param values
+     *            Values (one element per key) (out). On output, each element is
+     *            either null (if there was no entry for that key) or the old
+     *            value stored under that key (which may be null).
+     * 
+     * @return The #of tuples processed.
+     */
+    abstract public int remove(int ntuples, int tupleIndex,
+            byte[][] searchKeys, Object[] values);
 
     /**
      * Recursive search locates the appropriate leaf and returns the index
      * position of the entry.
      * 
-     * @param key
+     * @param searchKey
      *            The search key.
      * 
      * @return the index of the search key, if found; otherwise,
@@ -1205,7 +1120,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *         this guarantees that the return value will be >= 0 if and only if
      *         the key is found.
      */
-    abstract public int indexOf(Object key);
+    abstract public int indexOf(byte[] searchKey);
     
     /**
      * Recursive search locates the entry at the specified index position in the
@@ -1222,7 +1137,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @exception IndexOutOfBoundsException
      *                if index is greater than the #of entries.
      */
-    abstract public Object keyAt(int index);
+    abstract public byte[] keyAt(int index);
     
     /**
      * Recursive search locates the entry at the specified index position in the
@@ -1313,6 +1228,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
     }
 
-    private static final String ws = "                                                                                                                                                                                                                  ";
+    private static final transient String ws = "                                                                                                                                                                                                                  ";
 
 }

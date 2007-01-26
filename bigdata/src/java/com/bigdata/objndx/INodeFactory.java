@@ -14,18 +14,14 @@ public interface INodeFactory {
      * 
      * @param btree
      *            The owning btree.
-     * @param id
+     * @param addr
      *            The address from which the node was read.
      * @param branchingFactor
      *            The branching factor for the node.
-     * @param keyType
-     *            The data type used to store the keys.
      * @param nentries
      *            The #of entries spanned by this node.
-     * @param nkeys
-     *            The #of keys defined in the node.
      * @param keys
-     *            An array containing the keys found in the node.
+     *            A representation of the defined keys in the node.
      * @param childAddr
      *            An array of the persistent addresses for the children of this
      *            node.
@@ -34,14 +30,9 @@ public interface INodeFactory {
      * 
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-            ArrayType keyType,
-            int nentries,
-            int nkeys,
-            Object keys,
-            long[] childAddr,
-            int[] childEntryCount
-            );
+    public INodeData allocNode(IBTree btree, long addr, int branchingFactor,
+            int nentries, IKeyBuffer keys, long[] childAddr,
+            int[] childEntryCount);
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
@@ -49,21 +40,18 @@ public interface INodeFactory {
      * 
      * @param btree
      *            The owning btree.
-     * @param id
+     * @param addr
      *            The address from which the leaf was read.
      * @param branchingFactor
      *            The branching factor for the leaf.
-     * @param keyType
-     *            The data type used to store the keys.
-     * @param nkeys
-     *            The #of keys defined in the leaf.
      * @param keys
-     *            An array containing the keys found in the leaf.
+     *            A representation of the defined keys in the node.
      * @param values
      *            An array containing the values found in the leaf.
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf( IBTree btree, long id, int branchingFactor, ArrayType keyType, int nkeys, Object keys, Object[] values);
+    public ILeafData allocLeaf(IBTree btree, long addr, int branchingFactor,
+            IKeyBuffer keys, Object[] values);
 
 }

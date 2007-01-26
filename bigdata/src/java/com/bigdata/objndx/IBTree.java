@@ -47,44 +47,48 @@
 
 package com.bigdata.objndx;
 
-import com.bigdata.objndx.ndx.NoSuccessorException;
-
 /**
- * Interface for a B-Tree mapping arbitrary non-null keys to arbitrary values.
+ * <p>
+ * Interface for a B+-Tree mapping arbitrary non-null keys to arbitrary values.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME re-define and re-implement this interface using a default
+ * {@link KeyBuilder}.
  */
 public interface IBTree {
 
     /**
-     * Insert an entry under the external key.
+     * Insert or update a value under the key.
      * 
      * @param key
-     *            The external key.
-     * @param entry
-     *            The value.
-     *            
-     * @return The previous entry under that key or <code>null</code> if the
+     *            The key. 
+     * @param value
+     *            The value (may be null).
+     * 
+     * @return The previous value under that key or <code>null</code> if the
      *         key was not found.
      */
-    public Object insert(Object key, Object entry);
-
+    public Object insert(Object key, Object value);
+    
     /**
-     * Lookup an entry for an external key.
+     * Lookup a value for a key.
      * 
-     * @return The entry or null if there is no entry for that key.
+     * @return The value or <code>null</code> if there is no entry for that
+     *         key.
      */
     public Object lookup(Object key);
 
     /**
-     * Remove the entry for the external key.
+     * Remove the key and its associated value.
      * 
      * @param key
-     *            The external key.
+     *            The key.
      * 
-     * @return The entry stored under that key and null if there was no
-     *         entry for that key.
+     * @return The value stored under that key or <code>null</code> if the key
+     *         was not found.
      */
     public Object remove(Object key);
     

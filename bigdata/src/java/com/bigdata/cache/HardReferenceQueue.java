@@ -166,7 +166,7 @@ public class HardReferenceQueue<T> {
     /**
      * The  listener specified to the constructor.
      */
-    public HardReferenceQueueEvictionListener<T> getListener() {
+    final public HardReferenceQueueEvictionListener<T> getListener() {
         
         return listener;
         
@@ -175,7 +175,7 @@ public class HardReferenceQueue<T> {
     /**
      * The cache capacity specified to the constructor.
      */
-    public int capacity() {
+    final public int capacity() {
         
         return capacity;
         
@@ -184,7 +184,7 @@ public class HardReferenceQueue<T> {
     /**
      * The #of references that are tested on append requests.
      */
-    public int nscan() {
+    final public int nscan() {
         
         return nscan;
         
@@ -196,7 +196,7 @@ public class HardReferenceQueue<T> {
      * 
      * @return
      */
-    public int size() {
+    final public int size() {
 
         return count;
         
@@ -205,7 +205,7 @@ public class HardReferenceQueue<T> {
     /**
      * True iff the cache is empty.
      */
-    public boolean isEmpty() {
+    final public boolean isEmpty() {
         
         return count == 0;
         
@@ -214,7 +214,7 @@ public class HardReferenceQueue<T> {
     /**
      * True iff the cache is full.
      */
-    public boolean isFull() {
+    final public boolean isFull() {
         
         return count == capacity;
         
@@ -232,7 +232,7 @@ public class HardReferenceQueue<T> {
      * @return True iff the reference was added to the cache and false iff the
      *         reference was found in a scan of the nscan MRU cache entries.
      */
-    public boolean append(T ref) {
+    final public boolean append(T ref) {
         
         if( ref == null ) throw new IllegalArgumentException();
         
@@ -279,7 +279,7 @@ public class HardReferenceQueue<T> {
      * 
      * @see HardReferenceQueueEvictionListener
      */
-    public boolean evict() {
+    final public boolean evict() {
         
         // The cache must not be empty.
         if( count <= 0 ) return false;
@@ -305,7 +305,7 @@ public class HardReferenceQueue<T> {
      *            This may be false to force persistence of the references in
      *            the cache without actually clearing the cache.
      */
-    public void evictAll(boolean clear) {
+    final public void evictAll(boolean clear) {
 
         if( clear ) {
 
@@ -355,21 +355,21 @@ public class HardReferenceQueue<T> {
     /**
      * The head index (the insertion point).
      */
-    int head() {
+    final int head() {
         return head;
     }
     
     /**
      * The tail index (the LRU position).
      */
-    int tail() {
+    final int tail() {
         return tail;
     }
     
     /**
      * The backing array.
      */
-    T[] array() {
+    final T[] array() {
         return refs;
     }
     
@@ -380,7 +380,7 @@ public class HardReferenceQueue<T> {
      * @todo We can also write getHead(), but note that the {@link #head} is the
      *       insertion point NOT the index of the last reference inserted.
      */
-    public T getTail() {
+    final public T getTail() {
         
         return refs[tail];
         
@@ -398,7 +398,7 @@ public class HardReferenceQueue<T> {
      *            
      * @return True iff we found <i>ref</i> in the scanned queue positions.
      */
-    public boolean scanHead(int nscan, T ref) {
+    final public boolean scanHead(int nscan, T ref) {
         assert nscan > 0;
         assert ref != null;
         /*
@@ -453,7 +453,7 @@ public class HardReferenceQueue<T> {
      * 
      * FIXME Write unit tests for this method.
      */
-    public boolean scanTail(int nscan, T ref) {
+    final public boolean scanTail(int nscan, T ref) {
 
         assert nscan > 0 ;
         

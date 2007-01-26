@@ -53,7 +53,9 @@ package com.bigdata.objndx;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ *
+ * @deprecated not in use at this time.
  */
-public interface IRangeIterator extends KeyValueIterator {
+public interface IRangeIterator extends IEntryIterator {
 
 }

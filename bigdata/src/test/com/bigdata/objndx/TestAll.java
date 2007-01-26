@@ -6,7 +6,7 @@ import junit.framework.TestSuite;
 
 /**
  * Aggregates test suites into increasing dependency order.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -34,6 +34,25 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("BTree");
 
+        /*
+         * test key encoding and comparison support.
+         */
+        // test low level variable length byte[] operations.
+        suite.addTestSuite( TestBytesUtil.class );
+        // test key encoding operations.
+        suite.addTestSuite(TestKeyBuilder.class);
+        // test mutable key buffer.
+        suite.addTestSuite(TestMutableKeyBuffer.class);
+        // test immutable key buffer.
+        suite.addTestSuite(TestImmutableKeyBuffer.class);
+        // test key search routines on the key buffer implementations.
+        suite.addTestSuite( TestKeyBufferSearch.class );
+        // test key buffer (de-)serialization.
+        suite.addTestSuite( TestKeyBufferSerializer.class );
+        
+        /*
+         * test store support.
+         */
         // test address encoding and decoding; @todo move to journal package to replace ISlotsAllocation
         suite.addTestSuite( TestAddr.class );
         // test classes that let us treat a ByteBuffer as an input/output stream.
@@ -41,15 +60,18 @@ public class TestAll extends TestCase {
         // test bulk data compression.
         suite.addTestSuite( TestRecordCompressor.class );
 
-        // test key search routines (linear and binary and various key types).
-        suite.addTest( TestSearch.suite() );
+        /*
+         * test btree fundementals.
+         */
+        // test static and instance utility methods on AbstractNode and ArrayType.
+        suite.addTestSuite( TestUtilMethods.class );
         // test assertions that test for node/leaf invariants.
         suite.addTestSuite( TestInvariants.class );
         // test finding a child of a node by its key.
         suite.addTestSuite( TestFindChild.class );
-        // @todo test successor(key), including for application defined key types.
         // test insert, lookup, and remove for root leaf w/o splitting it.
         suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
+        suite.addTestSuite( TestInsertLookupRemoveOnRootLeafWithBatchApi.class );
         // test splitting the root leaf.
         suite.addTestSuite( TestSplitRootLeaf.class );
         // test splitting and joining the root leaf (no more than two levels).
@@ -66,31 +88,61 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBTree.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
-        // test index entry serialization
-        suite.addTestSuite( TestIndexEntrySerializer.class );
         // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
-        // test prefix compression for nodes and leaves.
-        suite.addTestSuite( TestPrefixCompression.class );
         // test iterator semantics for visiting only "dirty" nodes or leaves.
         suite.addTestSuite( TestDirtyIterators.class );
         // test incremental write of leaves and nodes.
         suite.addTestSuite( TestIncrementalWrite.class );
         // test copy-on-write scenarios.
         suite.addTestSuite( TestCopyOnWrite.class );
-        // test the commit protocol. @todo expand tests.
-        suite.addTestSuite( TestCommit.class );
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
-        // test index is restart safe.
-        // @todo test tree operations for correct transaction isolation and GC.
-        // @todo test journal commit semantics for index.
-        // @todo test journal abort semantics for index.
-        // @todo test journal restart semantics w/o shutdown.
-        // @todo stress test (correctness as object index for store for each journal mode).
-        // @todo test journal transaction isolation using the new object index.
-        // @todo test journal restart semantics once persistent allocation index is implemented.
 
+        /*
+         * test atomic commit
+         * 
+         * @todo test btree may be reloaded from its metadata record.
+         * 
+         * @todo that failure to commit results in effective rollback of
+         * btree(s) on a journal (writes are ignored since the btree metadata
+         * index is not updated).
+         * 
+         * @todo test atomic commit of btree(s) on a journal.
+         * 
+         * @todo test journal restart semantics w/o shutdown (uncomitted changes
+         * are ignored).
+         * 
+         * @todo test journal transaction isolation using the new object index.
+         */
+        // test the commit protocol. @todo expand tests.
+        suite.addTestSuite( TestCommit.class );
+
+        /*
+         * use of btree to support transactional isolation.
+         *
+         * @todo verify that null is allowed to represent a delted value.
+         * 
+         * @todo test of double-delete.
+         * 
+         * @todo test as simple object store (persistent identifiers) by
+         * refactoring the journal test suites.
+         * 
+         * @todo test on partitioned index.
+         */
+
+        /*
+         * use of btree to support column store.
+         * 
+         * @todo handle column names as part of the key?
+         * 
+         * @todo test version expiration based on age
+         * 
+         * @todo test version expiration based on #of versions.
+         * 
+         * @todo test on paritioned index. 
+         */
+        
         /*
          * index rebuilding.
          */
@@ -105,13 +157,29 @@ public class TestAll extends TestCase {
         // test of the bloom filter integration.
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
         // @todo test compacting merge of two index segments.
-        // @todo test compacting merge of N index segments?
+        suite.addTestSuite( TestIndexSegmentMerger.class );
+        // @todo test merge that results in enough data to warrent a split.
+
+        /*
+         * journal overflow
+         * 
+         * @todo test overflow triggers near journal capacity
+         * 
+         * @todo test overflow will abort transactions if necessary, e.g., after
+         * a grace period and possible journal extension.
+         */
         
         /*
          * partitioned indices.
+         * 
+         * @todo test overflow resulting in parition merge or split.
+         * 
+         * @todo test DistributedBTree (reads through to active index segments
+         * if miss on BTree in the journal). there is a lot to test here
+         * including all of the transactional semantics.
+         * 
+         * @todo test metadata management for index segments.
          */
-        // @todo test SegmentedBTree (reads through to active index segments if miss on BTree in the journal).
-        // @todo test metadata management for index segments.
        
         return suite;
         

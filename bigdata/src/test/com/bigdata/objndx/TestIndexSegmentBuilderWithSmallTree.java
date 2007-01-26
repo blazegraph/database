@@ -129,11 +129,9 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         7, 7),
                 // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
+                btree.nodeSer.valueSerializer);
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(3,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
@@ -205,12 +203,10 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         3, 3),
                 // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                btree.nodeSer.valueSerializer
                 );
         TestIndexSegmentPlan.assertEquals(9,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
@@ -253,26 +249,24 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         BTree btree = getProblem1();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,10,0.);
+        new IndexSegmentBuilder(outFile, tmpDir, btree, 10, 0.);
 
          /*
-          * Verify can load the index file and that the metadata
-          * associated with the index file is correct (we are only
-          * checking those aspects that are easily defined by the test
-          * case and not, for example, those aspects that depend on the
-          * specifics of the length of serialized nodes or leaves).
-          */
+             * Verify can load the index file and that the metadata associated
+             * with the index file is correct (we are only checking those
+             * aspects that are easily defined by the test case and not, for
+             * example, those aspects that depend on the specifics of the length
+             * of serialized nodes or leaves).
+             */
         final IndexSegment seg = new IndexSegment(new FileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         1, 1),
                 // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                        btree.nodeSer.valueSerializer
                 );
         TestIndexSegmentPlan.assertEquals(10,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(0,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
@@ -349,13 +343,10 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         3, 3),
-                // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                        btree.nodeSer.valueSerializer
                 );
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(3,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(9,seg.getEntryCount());
@@ -445,13 +436,10 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         11, 11),
-                // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer
+                        btree.nodeSer.valueSerializer
                 );
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(ArrayType.INT,seg.getKeyType());
         TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());
         TestIndexSegmentPlan.assertEquals(4,seg.getNodeCount());
         TestIndexSegmentPlan.assertEquals(20,seg.getEntryCount());

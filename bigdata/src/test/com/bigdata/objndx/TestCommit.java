@@ -93,15 +93,13 @@ public class TestCommit extends TestCase2 {
         {
 
             BTree btree = new BTree(store,
-                    ArrayType.INT,
                     branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                             BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                            SimpleEntry.Serializer.INSTANCE);
+                            SimpleEntry.Serializer.INSTANCE,
+                            null // no record compressor
+                            );
 
             assertTrue(btree.root.isDirty());
 
@@ -123,15 +121,18 @@ public class TestCommit extends TestCase2 {
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, new BTreeMetadata(BTree
+            BTree btree = new BTree(store, BTreeMetadata.read(BTree
                     .getTransitionalRawStore(store), addrMetadata),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                            SimpleEntry.Serializer.INSTANCE);
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN)
+                            );
+//            Integer.valueOf(0),
+//                            null, // no comparator for primitive key type.
+//                            Int32OIdKeySerializer.INSTANCE,
+//                            SimpleEntry.Serializer.INSTANCE,
+//                            null // no record compressor
+//                            );
 
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());
@@ -154,15 +155,17 @@ public class TestCommit extends TestCase2 {
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = new BTree(store, new BTreeMetadata(BTree
+            BTree btree = new BTree(store, BTreeMetadata.read(BTree
                     .getTransitionalRawStore(store), addrMetadata),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                    SimpleEntry.Serializer.INSTANCE);
+                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN)
+//                            Integer.valueOf(0),
+//                            null, // no comparator for primitive key type.
+//                            Int32OIdKeySerializer.INSTANCE,
+//                    SimpleEntry.Serializer.INSTANCE,
+//                    null // no record compressor
+            );
 
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());

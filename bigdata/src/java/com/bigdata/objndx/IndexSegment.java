@@ -2,7 +2,6 @@ package com.bigdata.objndx;
 
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -10,8 +9,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Comparator;
 
 import org.CognitiveWeb.extser.LongPacker;
 
@@ -29,8 +26,11 @@ import com.bigdata.journal.Bytes;
  * Note: iterators returned by this class do not support removal (the nodes and
  * leaves will all refuse mutation operations).
  * 
- * @todo Support efficient leaf scans in forward order (could also do reverse
- *       order by serializing the priorId into the leaf).
+ * FIXME Support efficient leaf scans in forward order, which requires writing
+ * the size of the next leaf so that it can be read out when the current leaf is
+ * read out, i.e., as a int field outside of the serialized leaf record. We
+ * could also do reverse order by serializing the addr of the prior leaf into
+ * the leaf since it is always onhand.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -68,12 +68,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
     }
 
-    public ArrayType getKeyType() {
-        
-        return fileStore.metadata.keyType;
-        
-    }
-    
     public int getHeight() {
         
         return fileStore.metadata.height;
@@ -116,9 +110,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      *            capacity should be relatively low and the #of entries to scan
      *            should be relatively high since each entry is relatively
      *            large, e.g., try with 100 and 20 respectively.
-     * @param NEGINF
-     * @param comparator
-     * @param keySer
      * @param valSer
      * @throws IOException
      * 
@@ -126,42 +117,34 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      *       splitting into a leafQueue and a nodeQueue.
      */
     public IndexSegment(FileStore fileStore,
-            HardReferenceQueue<PO> hardReferenceQueue, Object NEGINF,
-            Comparator comparator, IKeySerializer keySer,
+            HardReferenceQueue<PO> hardReferenceQueue,
             IValueSerializer valSer) throws IOException {
 
-        super(fileStore, fileStore.metadata.keyType,
-                fileStore.metadata.branchingFactor, hardReferenceQueue, NEGINF,
-                comparator, new CustomAddressSerializer(
-                        fileStore.metadata.offsetNodes), keySer, valSer,
-                ImmutableNodeFactory.INSTANCE);
+        super(fileStore, fileStore.metadata.branchingFactor,
+                fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
+                new CustomAddressSerializer(fileStore.metadata.offsetNodes),
+                valSer, ImmutableNodeFactory.INSTANCE, new RecordCompressor(),
+                true/* useChecksum */);
 
         // Type-safe reference to the backing store.
         this.fileStore = (FileStore) fileStore;
         
-        /*
-         * This buffer should be perfectly sized. It is used by the methods on
-         * the base class to read a node or leaf from the store.
-         * 
-         * @todo if there are concurrent reads on the index segment then this
-         * buffer should not be shared and would have to be allocated on each
-         * read against the file - no great loss - however, the base class
-         * assumes a shared instance buffer.
-         * 
-         * @todo if the index is just a root leaf then we do not need to retain
-         * this buffer.
-         */
-        buf = ByteBuffer.allocateDirect(fileStore.metadata.maxNodeOrLeafLength);
-        
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.metadata.addrRoot);
 
-        // read in the optional bloom filter from its addr.
         if( fileStore.metadata.addrBloom == 0L ) {
         
+            /*
+             * No bloom filter.
+             */
+            
             this.bloomFilter = null;
             
         } else {
+
+            /*
+             * Read in the optional bloom filter from its addr.
+             */
 
             this.bloomFilter = readBloomFilter(fileStore.metadata.addrBloom);
             
@@ -252,94 +235,110 @@ public class IndexSegment extends AbstractBTree implements IBTree {
     }
     
 //    /**
-//     * The internal addresses for child nodes found in a node of the index
-//     * segment are relative to the start of the index nodes block in the file.
-//     * To differentiate them from addresses for leaves, which are correct, the
-//     * sign is flipped so that a node address is always a negative integer. This
-//     * method looks for the negative address, flips the sign, and adds in the
-//     * offset of the node block in the file so that the resulting address
-//     * correctly addresses an absolute offset in the file.
+//     * Overrides the base class to use the optional bloom filter when present.
 //     * 
-//     * @param addr
-//     *            An {@link Addr}. When negative, the address is for a node and
-//     *            must be decoded per the commentary above.
+//     * @todo Verify that the bloom filter is safe for concurrent readers
 //     * 
-//     * @return The node or leaf at that address in the file.
+//     * FIXME restore use of the bloom filter once I update the api to byte[]s.
 //     * 
-//     * @see IndexSegmentBuilder.SimpleNodeData
+//     * FIXME use the bloom filter for the batch lookup api as well.
 //     */
-//    protected AbstractNode readNodeOrLeaf(long addr) {
+//    public Object lookup(Object key) {
 //
-//        if (addr < 0) {
-//    
-//            /*
-//             * Always a reference to a node as represented in childAddr[] of
-//             * some node.
-//             */
-//            
-//            // flip the sign
-//            addr = -(addr);
-//            
-//            // compute the absolute offset into the file.
-//            int offset = (int) fileStore.metadata.offsetNodes
-//                    + Addr.getOffset(addr);
-//            
-//            // the size of the record in bytes.
-//            int nbytes = Addr.getByteCount(addr);
-//            
-//            // form an absolute Addr.
-//            addr = Addr.toLong(nbytes, offset);
-//            
-//            // read the node from the file.
-//            return (Node) super.readNodeOrLeaf(addr);
+//        if (key == null) {
 //
-//        } else {
+//            throw new IllegalArgumentException();
 //            
-//            /*
-//             * Either a leaf -or- the root node (which does not use an encoded
-//             * address!)
-//             */
-//            
-//            // read the node or leaf from the file.
-//            return super.readNodeOrLeaf(addr);
-//
 //        }
-//    
+//
+//        Object key2;
+//        if(stride > 1) {
+//            /*
+//             * When the stride is greater than one the application needs to
+//             * provide an array parameter anyway so you do not need to copy
+//             * anything.
+//             */
+//            key2 = key;
+//        } else {
+//            /*
+//             * unautobox the key. When unboxing a key, we need to allocate a new
+//             * buffer each time in order to support concurrent readers.
+//             */
+//            key2 = ArrayType.alloc(keyType, 1, stride);
+//            unbox(key,key2);
+//        }
+//
+//        if( bloomFilter != null && ! containsKey(key2)) {
+//
+//            /*
+//             * If the bloom filter reports that the key does not exist then we
+//             * always believe it.
+//             */
+//
+//            counters.nbloomRejects++;
+//            
+//            return null;
+//        
+//        }
+//        
+//        /*
+//         * Either there is no bloom filter or the bloom filter believes that the
+//         * key exists. Either way we now lookup the entry in the btree.  Again,
+//         * we allocate temporary arrays in order to support concurrent readers.
+//         */
+//
+//        final Object[] values = new Object[1];
+//
+//        /*
+//         * use the super class implementation since we already tested the bloom
+//         * filter.
+//         */
+//        super.lookup(1,key2,values);
+//        
+//        return values[0];
+//
 //    }
 
     /**
-     * Overrides the base class to use the optional bloom filter when present.
+     * Operation is not supported.
      */
-    public Object lookup(Object key) {
+    public void insert(int ntuples, Object keys, Object[] values) {
 
-        if (key == null) {
-
-            throw new IllegalArgumentException();
-            
-        }
-
-        if( bloomFilter != null && ! containsKey(key)) {
-
-            /*
-             * If the bloom filter reports that the key does not exist then we
-             * always believe it.
-             */
-
-            counters.nbloomRejects++;
-            
-            return null;
+        throw new UnsupportedOperationException();
         
-        }
-        
-        /*
-         * Either there is no bloom filter or the bloom filter believes that the
-         * key exists. Either way we now lookup the entry in the btree.
-         */
-        counters.nfinds++;
-        
-        return getRoot().lookup(key);
-
     }
+
+    /**
+     * Operation is not supported.
+     */
+    public void remove(int ntuples, Object keys, Object[] values) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+//    /**
+//     * Used to unbox an application key into a supplied buffer.
+//     * 
+//     * @param src
+//     *            The application key (Integer, Long, etc).
+//     * @param dst
+//     *            A polymorphic array with room for a single key.
+//     */
+//    private void unbox(Object src,Object dst) {
+//        assert stride == 1;
+//        switch(keyType) {
+//        case BYTE: ((byte[])dst)[0] = ((Byte)src).byteValue(); break;
+//        case SHORT: ((short[])dst)[0] = ((Short)src).shortValue(); break;
+//        case CHAR: ((char[])dst)[0] = ((Character)src).charValue(); break;
+//        case INT: ((int[])dst)[0] = ((Integer)src).intValue(); break;
+//        case LONG: ((long[])dst)[0] = ((Long)src).longValue(); break;
+//        case FLOAT: ((float[])dst)[0] = ((Float)src).floatValue(); break;
+//        case DOUBLE: ((double[])dst)[0] = ((Double)src).doubleValue(); break;
+//        case OBJECT: ((Object[])dst)[0] = src; break;
+//        default: throw new UnsupportedOperationException();
+//        }
+//    }
 
     /**
      * Returns true if the optional bloom filter reports that the key exists.
@@ -352,35 +351,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      *         is, in fact, present in the index. When false, you do NOT need to
      *         test the index.
      * 
-     * @todo This reuses a type-specific private instance array to test the
-     *       bloom filter and is therefore not safe for concurrent callers as
-     *       they will overwrite one anothers data. This could be fixed simply
-     *       by adding an appropriate synchronized keyword on the method, but
-     *       that is not necessary in a single threaded environment.
-     * 
-     * @todo handle all key types.
-     * 
-     * @todo examine the #of weights in use by the filter.
+     * @todo examine the #of weights in use by the bloom filter and its impact
+     *       on false positives for character data.
      */
-    final protected boolean containsKey(Object key) {
+    final protected boolean containsKey(byte[] key) {
+
         assert bloomFilter != null;
-        switch(keyType) {
-//        case BYTE: bloomFilter.add(((byte[])keys)[index]); break;
-//        case SHORT: bloomFilter.add(((short[])keys)[index]); break;
-//        case CHAR: bloomFilter.add(((char[])keys)[index]); break;
-        case INT: {
-            _bloomKeys_int[0] = ((Integer)key).intValue(); 
-            return bloomFilter.contains(_bloomKeys_int);
-        }
-//        case LONG: bloomFilter.add(((long[])keys)[index]); break;
-//        case FLOAT: bloomFilter.add(((float[])keys)[index]); break;
-//        case DOUBLE: bloomFilter.add(((double[])keys)[index]); break;
-//        case OBJECT: bloomFilter.add(((Object[])keys)[index]); break;
-        default: throw new UnsupportedOperationException();
-        }
+        
+        return bloomFilter.contains(key);
+        
     }
-    final private int stride = 1;
-    final private int[] _bloomKeys_int = new int[stride];
 
     /**
      * Operation is disallowed.
@@ -409,28 +389,21 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
         private ImmutableNodeFactory() {}
         
-        public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, Object[] values) {
+        public ILeafData allocLeaf(IBTree btree, long addr,
+                int branchingFactor, IKeyBuffer keys, Object[] values) {
 
-            return new ImmutableLeaf((AbstractBTree) btree, id,
-                    branchingFactor, nkeys, keys, values);
+            return new ImmutableLeaf((AbstractBTree) btree, addr,
+                    branchingFactor, keys, values);
 
         }
 
-        public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType,
-//                int nnodes, int nleaves,
-                int nentries,
-                int nkeys, Object keys, long[] childAddr, int[] childEntryCount) {
+        public INodeData allocNode(IBTree btree, long addr,
+                int branchingFactor, int nentries, IKeyBuffer keys,
+                long[] childAddr, int[] childEntryCount) {
 
-            return new ImmutableNode((AbstractBTree) btree, id,
-                    branchingFactor,
-//                    nnodes, nleaves, 
-                    nentries, nkeys, keys,
-                    childAddr,
-                    childEntryCount
-                    );
-            
+            return new ImmutableNode((AbstractBTree) btree, addr,
+                    branchingFactor, nentries, keys, childAddr, childEntryCount);
+
         }
 
         /**
@@ -446,24 +419,19 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
             /**
              * @param btree
-             * @param id
+             * @param addr
              * @param branchingFactor
              * @param nentries
-             * @param nkeys
              * @param keys
              * @param childKeys
              */
-            protected ImmutableNode(AbstractBTree btree, long id,
-                    int branchingFactor,
-//                    int nnodes, int nleaves,
-                    int nentries,
-                    int nkeys, Object keys, long[] childKeys, int[] childEntryCount) {
+            protected ImmutableNode(AbstractBTree btree, long addr,
+                    int branchingFactor, int nentries, IKeyBuffer keys,
+                    long[] childKeys, int[] childEntryCount) {
 
-                super(btree, id, branchingFactor,
-//                        nnodes, nleaves,
-                        nentries,
-                        nkeys, keys, childKeys, childEntryCount);
-                
+                super(btree, addr, branchingFactor, nentries, keys,
+                        childKeys, childEntryCount);
+
             }
 
             public void delete() {
@@ -499,14 +467,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
             /**
              * @param btree
-             * @param id
+             * @param addr
              * @param branchingFactor
-             * @param nkeys
              * @param keys
              * @param values
              */
-            protected ImmutableLeaf(AbstractBTree btree, long id, int branchingFactor, int nkeys, Object keys, Object[] values) {
-                super(btree, id, branchingFactor, nkeys, keys, values);
+            protected ImmutableLeaf(AbstractBTree btree, long addr,
+                    int branchingFactor, IKeyBuffer keys, Object[] values) {
+                
+                super(btree, addr, branchingFactor, keys, values);
+                
             }
             
             public void delete() {
@@ -563,14 +533,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
          */
         protected final IndexSegmentMetadata metadata;
         
-        /**
-         * Used to decompress nodes and leaves as they are read.
-         * 
-         * @todo we do not need to retain this if the index consists of just a
-         *       root leaf.
-         */
-        protected final RecordCompressor compressor = new RecordCompressor();
-
         /**
          * Open the read-only store.
          * 
@@ -655,35 +617,12 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         /**
          * Read from the index segment. If the request is in the node region and
          * the nodes have been buffered then this uses a slice on the node
-         * buffer. Otherwise this reads through to the backing file. In either
-         * case the data are decompressed before they are returned to the
-         * caller.
-         * 
-         * @param addr
-         *            The address (encoding both the offset and the length).
-         * 
-         * @return A read-only buffer containing the data at that address.
-         * 
-         * @todo javadoc: this method uses [dst], which should be big enough for
-         *       any record serialized on the store based on the index segment
-         *       metadata, but always returns a shared instance buffer internal
-         *       to the {@link RecordCompressor}.
+         * buffer. Otherwise this reads through to the backing file.
          */
         public ByteBuffer read(long addr, ByteBuffer dst) {
 
             if(!open) throw new IllegalStateException();
             
-            /*
-             * The caller generally passes in [buf], but this is in keeping with
-             * our API contract. (One exception is when we read the bloom filter
-             * from the store).
-             */
-            if (dst == null) {
-                
-                dst = ByteBuffer.allocate(Addr.getByteCount(addr));
-
-            }
-         
             final int offset = Addr.getOffset(addr);
 
             final int length = Addr.getByteCount(addr);
@@ -700,8 +639,9 @@ public class IndexSegment extends AbstractBTree implements IBTree {
                 // correct the offset so that it is relative to the buffer.
                 int off = offset - (int)metadata.offsetNodes;
                 
+//              System.err.println("offset="+offset+", length="+length);
+                
                 // set the limit on the buffer to the end of the record.
-                System.err.println("offset="+offset+", length="+length);
                 buf_nodes.limit(off + length);
 
                 // set the position on the buffer to the start of the record.
@@ -712,6 +652,15 @@ public class IndexSegment extends AbstractBTree implements IBTree {
                 
             } else {
 
+                /*
+                 *  Allocate if not provided by the caller.
+                 */
+                if (dst == null) {
+                    
+                    dst = ByteBuffer.allocate(length);
+
+                }
+             
                 /*
                  * the data need to be read from the file.
                  */
@@ -724,8 +673,6 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
                     // read into [dst] - does not modify the channel's position().
                     raf.getChannel().read(dst, offset);
-
-                    dst.flip(); // Flip buffer for reading.
                     
                 } catch (IOException ex) {
 
@@ -733,29 +680,25 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
                 }
 
+                dst.flip(); // Flip buffer for reading.
+
             }
+
+            return dst;
             
-            /*
-             * Decompress the data, returning a view into a shared instance
-             * buffer.
-             * 
-             * Note: [dst] contains the compressed data. position() is the start
-             * of the compressed record, and may be a view onto a buffered
-             * region of the file. limit() is set to the first byte beyond the
-             * end of the compressed record.
-             * 
-             * Note: The returned buffer will be a view onto a shared instance
-             * buffer held internally by the RecordCompressor.
-             */
-
-            return compressor.decompress(dst); // Decompress.
-
         }
         
         /**
          * Reads the index nodes into a buffer.
          * 
          * @return A read-only view of a buffer containing the index nodes.
+         * 
+         * FIXME write the #of bytes in the node region in the metadata record
+         * and use that here for the end point of the read rather than the length
+         * of the file. the current code works, but it reads too much data when
+         * the bloom filter is defined.  for consistency, probably write both the
+         * offset and the length of the node and leaf regions.  those could be
+         * encapsulated as a long {@link Addr}.
          */
         protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
                 throws IOException {

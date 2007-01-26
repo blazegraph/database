@@ -53,7 +53,7 @@ package com.bigdata.objndx.ndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME copy test suite from gql package and refactor to use common code.
+ * @deprecated the routines are being moved to {@link KeyBuilder}.
  */
 
 public class SuccessorUtil {

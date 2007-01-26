@@ -50,61 +50,25 @@ package com.bigdata.objndx;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 
 /**
  * (De-)serialize the keys in a {@link Leaf} or {@link Node}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Support implementations that factor out the longest common prefix for
- *       the keys in a node or leaf. The prefix is stored once per node/leaf and
- *       only the remainder is stored once per key. It requires data-type
- *       specific handling to do this efficiently. (There is a variant in which
- *       the full prefix is stored on the leaves but only the increment from the
- *       parent node is stored on a node and the full prefix is then dynamically
- *       reconstructed from the traversal path through the tree.)
  */
-public interface IKeySerializer {
+public interface IKeySerializer extends Serializable {
 
-    /**
-     * The data type used to store the keys.
-     * 
-     * @return The data type for the keys. This will either correspond to one of
-     *         the primitive data types or to an {@link Object}.
-     *         {@link #getKeys()} will return an object that may be cast to an
-     *         array of the corresponding type.
-     */
-    public ArrayType getKeyType();
-    
-    /**
-     * The maximum size of a sequence of serialized keys in bytes. This is used
-     * to compute the maximum required size of a buffer to (de-)serialize nodes
-     * and values.
-     * 
-     * @param n
-     *            The #of values in the sequence.
-     */
-    public int getSize(int n);
-    
     /**
      * De-serialize the keys.
      * 
      * @param is
      *            The input stream.
-     * @param nkeys
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be read from the buffer and
-     *            written on the array.
-     * @param capacity
-     *            The capacity of the key array to be returned.
      * 
-     * @return The array into which the keys were written. Note that this return
-     *         type declaration makes it possible to return either an array of
-     *         primitives or an array of objects.
+     * @return The keys.
      */
-    public void getKeys(DataInputStream is, Object keys, int nkeys)
-        throws IOException;
+    public IKeyBuffer getKeys(DataInputStream is) throws IOException;
 
     /**
      * Serialize the keys onto the buffer.
@@ -113,14 +77,9 @@ public interface IKeySerializer {
      *            The output stream (the caller is responsible for flushing
      *            the stream).
      * @param keys
-     *            The array of keys from a {@link Leaf} or {@link Node}. Note
-     *            that this parameter type declaration makes it possible to
-     *            pass either an array of primitives or an array of objects.
-     * @param nkeys
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be written.
+     *            The keys from a {@link Leaf} or {@link Node}.
      */
-    public void putKeys(DataOutputStream os, Object keys,int nkeys)
-        throws IOException;
+    public void putKeys(DataOutputStream os, IKeyBuffer keys)
+            throws IOException;
 
 }

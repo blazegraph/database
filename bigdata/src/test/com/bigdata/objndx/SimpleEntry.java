@@ -110,16 +110,15 @@ class SimpleEntry {
      */
     static class Serializer implements IValueSerializer {
 
-        public static final Serializer INSTANCE = new Serializer();
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 4515322522558633041L;
         
-        private Serializer() {}
+        public transient static final Serializer INSTANCE = new Serializer();
+        
+        public Serializer() {}
 
-        public int getSize(int n ) {
-            
-            return n * Bytes.SIZEOF_INT;
-            
-        }
-        
         public void putValues(DataOutputStream os, Object[] values, int n)
                 throws IOException {
 
@@ -152,17 +151,16 @@ class SimpleEntry {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class NoSerializer implements IValueSerializer {
+    public static class NoSerializer implements IValueSerializer {
 
-        public static final NoSerializer INSTANCE = new NoSerializer();
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -6467578720380911380L;
         
-        private NoSerializer() {}
+        public transient static final NoSerializer INSTANCE = new NoSerializer();
         
-        public int getSize(int n ) {
-            
-            return n * Bytes.SIZEOF_INT;
-            
-        }
+        public NoSerializer() {}
         
         public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
 

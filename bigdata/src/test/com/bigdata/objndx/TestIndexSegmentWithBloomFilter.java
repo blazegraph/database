@@ -66,6 +66,9 @@ import com.bigdata.objndx.IndexSegment.FileStore;
  * and then compares the performance and correctness of index point tests with
  * and without the use of the bloom filter.
  * 
+ * @todo test with multiple versions enabled (behavior is to report true if
+ *       there is a key for any timestamp).
+ * 
  * @todo compare performance with and without the bloom filter.
  * 
  * @todo test points that will not be in the index as well as those that are.
@@ -155,14 +158,12 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             final int nscan = 10;
 
             BTree btree = new BTree(journal,
-                    ArrayType.INT,
                     branchingFactor,
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             leafQueueCapacity, nscan),
-                            Integer.valueOf(0),
-                            null, // no comparator for primitive key type.
-                            Int32OIdKeySerializer.INSTANCE,
-                    SimpleEntry.Serializer.INSTANCE);
+                    SimpleEntry.Serializer.INSTANCE,
+                    null // no record compressor
+            );
 
             return btree;
 
@@ -285,12 +286,12 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         BloomFilter bloomFilter = builder2.bloomFilter;
         
         // false positive tests (should succeed with resonable errorRate).
-        assertTrue("3",bloomFilter.contains(new int[]{3}));
-        assertTrue("5",bloomFilter.contains(new int[]{5}));
-        assertTrue("7",bloomFilter.contains(new int[]{7}));
+        assertTrue("3",bloomFilter.contains(i2k(3)));
+        assertTrue("5",bloomFilter.contains(i2k(5)));
+        assertTrue("7",bloomFilter.contains(i2k(7)));
         // correct rejections (must succeed)
-        assertFalse("4",bloomFilter.contains(new int[]{4}));
-        assertFalse("9",bloomFilter.contains(new int[]{9}));
+        assertFalse("4",bloomFilter.contains(i2k(4)));
+        assertFalse("9",bloomFilter.contains(i2k(9)));
 
         /*
          * Verify can load the index file and that the metadata
@@ -304,9 +305,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 // setup reference queue.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         100, 20),
-                // take the other parameters from the btree.
-                btree.NEGINF, btree.comparator,
-                btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
+                btree.nodeSer.valueSerializer);
 
         /*
          * Verify the total index order.
@@ -318,14 +317,14 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         bloomFilter = seg2.bloomFilter;
         
         // false positive tests (should succeed with resonable errorRate).
-        assertTrue("3",bloomFilter.contains(new int[]{3}));
-        assertTrue("5",bloomFilter.contains(new int[]{5}));
-        assertTrue("7",bloomFilter.contains(new int[]{7}));
+        assertTrue("3",bloomFilter.contains(i2k(3)));
+        assertTrue("5",bloomFilter.contains(i2k(5)));
+        assertTrue("7",bloomFilter.contains(i2k(7)));
         // correct rejections (must succeed)
-        assertFalse("4",bloomFilter.contains(new int[]{4}));
-        assertFalse("9",bloomFilter.contains(new int[]{9}));
+        assertFalse("4",bloomFilter.contains(i2k(4)));
+        assertFalse("9",bloomFilter.contains(i2k(9)));
         
-        Object[] keys = new Object[btree.getEntryCount()];
+        byte[][] keys = new byte[btree.getEntryCount()][];
         Object[] vals = new Object[btree.getEntryCount()];
 
         getKeysAndValues(btree,keys,vals);
@@ -402,9 +401,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                     // setup reference queue.
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             100, 20),
-                    // take the other parameters from the btree.
-                    btree.NEGINF, btree.comparator,
-                    btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
+                            btree.nodeSer.valueSerializer);
 
             /*
              * Verify can load the index file and that the metadata
@@ -418,15 +415,13 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                     // setup reference queue.
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             100, 20),
-                    // take the other parameters from the btree.
-                    btree.NEGINF, btree.comparator,
-                    btree.nodeSer.keySerializer, btree.nodeSer.valueSerializer);
+                            btree.nodeSer.valueSerializer);
 
             /*
              * Explicitly test the bloom filter against ground truth. 
              */
             
-            Object[] keys = new Object[btree.getEntryCount()];
+            byte[][] keys = new byte[btree.getEntryCount()][];
             Object[] vals = new Object[btree.getEntryCount()];
 
             getKeysAndValues(btree,keys,vals);
@@ -487,21 +482,17 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      *            The ground truth keys that were inserted into the bloom
      *            filter.
      */
-    protected void doBloomFilterTest(String label, BloomFilter bloomFilter, Object[] keys) {
+    protected void doBloomFilterTest(String label, BloomFilter bloomFilter, byte[][] keys) {
         
         System.err.println("\ncondition: "+label+", size="+bloomFilter.size());
         
         int[] order = getRandomOrder(keys.length);
 
-        int[] _key = new int[1]; 
-
         for(int i=0; i<order.length; i++) {
             
-            Object key = keys[order[i]];
+            byte[] key = keys[order[i]];
             
-            _key[0] = ((Integer)key).intValue();
-            
-            boolean found = bloomFilter.contains(_key);
+            boolean found = bloomFilter.contains(key);
             
             assertTrue("false negative: i="+i+", key="+key, found);
             

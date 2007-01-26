@@ -32,7 +32,12 @@ public class IndexSegmentMetadata {
     /**
      * Magic value written at the start of the metadata record.
      */
-    static final public int MAGIC = 0x87ab34f5;
+    static transient final public int MAGIC = 0x87ab34f5;
+    
+    /**
+     * Version 0 of the serialization format.
+     */
+    static transient final public int VERSION0 = 0x0;
     
     /**
      * Branching factor for the index segment.
@@ -46,10 +51,11 @@ public class IndexSegmentMetadata {
     final public int height;
     
     /**
-     * The key type used in the index.
+     * When true, the checksum was computed and stored for the nodes and leaves
+     * in the file and will be verified on de-serialization.
      */
-    final public ArrayType keyType;
-
+    final public boolean useChecksum;
+    
     /**
      * The #of leaves serialized in the file.
      */
@@ -159,12 +165,20 @@ public class IndexSegmentMetadata {
         }
 
         // @todo add assertions here parallel to those in the other ctor.
+
+        final int version = raf.readInt();
+        
+        if( version != VERSION0 ) {
+            
+            throw new IOException("unknown version="+version);
+            
+        }
         
         branchingFactor = raf.readInt();
 
         height = raf.readInt();
         
-        keyType = ArrayType.parseInt(raf.readInt());
+        useChecksum = raf.readBoolean();
         
         nleaves = raf.readInt();
         
@@ -205,7 +219,6 @@ public class IndexSegmentMetadata {
      * 
      * @param branchingFactor
      * @param height
-     * @param keyType
      * @param nleaves
      * @param nnodes
      * @param nentries
@@ -222,7 +235,7 @@ public class IndexSegmentMetadata {
      * @todo javadoc.
      */
     public IndexSegmentMetadata(int branchingFactor, int height,
-            ArrayType keyType, int nleaves, int nnodes, int nentries,
+            boolean useChecksum, int nleaves, int nnodes, int nentries,
             int maxNodeOrLeafLength, long offsetLeaves, long offsetNodes,
             long addrRoot, double errorRate, long addrBloom, long length,
             long timestamp, String name) {
@@ -230,8 +243,6 @@ public class IndexSegmentMetadata {
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
         assert height >= 0;
-        
-        assert keyType != null;
         
         assert nleaves > 0; // always at least one leaf.
         
@@ -269,13 +280,13 @@ public class IndexSegmentMetadata {
         assert name != null;
         
         assert name.length() <= MAX_NAME_LENGTH;
-        
+
         this.branchingFactor = branchingFactor;
 
         this.height = height;
-        
-        this.keyType = keyType;
 
+        this.useChecksum = useChecksum;
+        
         this.nleaves = nleaves;
         
         this.nnodes = nnodes;
@@ -315,12 +326,14 @@ public class IndexSegmentMetadata {
 //        raf.seek(0);
         
         raf.writeInt(MAGIC);
+
+        raf.writeInt(VERSION0);
         
         raf.writeInt(branchingFactor);
                         
         raf.writeInt(height);
         
-        raf.writeInt(keyType.intValue());
+        raf.writeBoolean(useChecksum);
         
         raf.writeInt(nleaves);
 
@@ -358,7 +371,6 @@ public class IndexSegmentMetadata {
         sb.append("magic="+Integer.toHexString(MAGIC));
         sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
-        sb.append(", keyType=" + keyType);
         sb.append(", nleaves=" + nleaves);
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);

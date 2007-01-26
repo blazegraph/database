@@ -61,18 +61,11 @@ import org.apache.log4j.Level;
  * 
  * @see TestDirtyIterators, which handles tests when some nodes or leaves are
  *      NOT dirty and verifies that the iterators do NOT visit such nodes or
- *      leaves.
+ *      leaves. This tests {@link AbstractNode#postOrderIterator()} as well
+ *      since that is just {@link AbstractNode#postOrderIterator(boolean)} with
+ *      <code>false</code> passed in.
  * 
- * FIXME test {@link KeyValueIterator} for each of the iterators, including the
- *       {@link AbstractNode#entryIterator()} which is not being tested in this
- *       suite right now. There are some hoops used to get the
- *       {@link KeyValueIterator} to work correct that definately need testing.
- *       It would also be nice to be able to define a keyIterator(), but that
- *       probably means changing entryIterator() to visit a {@link Tuple}.
- * 
- * @todo Define key range iterator visiting values with keys available for
- *       inspection. This will be used for key range scans. Ideally this will
- *       eventually allow concurrent modification of the btree during traversal.
+ * @todo write tests for efficient key range traversals for {@link IndexSegment}.
  * 
  * @todo write a test suite for concurrent modification under traversal and
  *       implement support for that feature in the various iterators.
@@ -104,27 +97,64 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         final Leaf root = (Leaf) btree.root;
         
+        final byte[] k1 = i2k(1); // before any used key.
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k7 = i2k(7);
+        final byte[] k8 = i2k(8); // successor of all used keys.
+        
         SimpleEntry v3 = new SimpleEntry(3);
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
         // insert keys until the root leaf is full.
         assertSameIterator(new Object[]{},root.entryIterator());
-        btree.insert(7, v7);
+        btree.insert(k7, v7);
         assertSameIterator(new Object[]{v7},root.entryIterator());
-        btree.insert(5, v5);
+        btree.insert(k5, v5);
         assertSameIterator(new Object[]{v5,v7},root.entryIterator());
-        btree.insert(3, v3);
+        btree.insert(k3, v3);
         assertSameIterator(new Object[]{v3,v5,v7},root.entryIterator());
+        // node range iterator tests.
+        assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
+        assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
+        // entry range iterator tests.
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(k3, k8));
+        assertSameIterator(new Object[]{v3,v5},root.rangeIterator(k3, k7));
+        assertSameIterator(new Object[]{v5},root.rangeIterator(k5, k7));
+        assertSameIterator(new Object[]{v5,v7},root.rangeIterator(k5, k8));
+        
+        try {
+            /*
+             * try with search keys out of order.
+             * 
+             * Note: calling next() is required to force construction of an
+             * EntryIterator that actually detects the search key ordering
+             * problem.
+             */
+            root.rangeIterator(k8, k3).next();
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
         
         // remove keys until the root leaf is empty.
-        assertEquals(v5,btree.remove(5));
+        assertEquals(v5,btree.remove(k5));
         assertSameIterator(new Object[]{v3,v7},root.entryIterator());
-        assertEquals(v7,btree.remove(7));
+        assertEquals(v7,btree.remove(k7));
         assertSameIterator(new Object[]{v3},root.entryIterator());
-        assertEquals(v3,btree.remove(3));
+        assertEquals(v3,btree.remove(k3));
         assertSameIterator(new Object[]{},root.entryIterator());
-        
+        // node range iterator tests.
+        assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
+        assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
+        // entry range iterator tests.
+        assertSameIterator(new Object[]{},root.rangeIterator(k3, k8));
+        assertSameIterator(new Object[]{},root.rangeIterator(k3, k7));
+        assertSameIterator(new Object[]{},root.rangeIterator(k5, k7));
+        assertSameIterator(new Object[]{},root.rangeIterator(k5, k8));
+
     }
 
     /**
@@ -136,6 +166,16 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         final Leaf a = (Leaf) btree.root;
         
+//        final byte[] k0 = i2k(0); // lies before any used key.
+        final byte[] k1 = i2k(1);
+        final byte[] k2 = i2k(2);
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k6 = i2k(6); // lies between leaf(a) and leaf(b)
+        final byte[] k7 = i2k(7);
+        final byte[] k9 = i2k(9);
+        final byte[] k10 = i2k(10); // lies after any used key.
+
         SimpleEntry v1 = new SimpleEntry(1);
         SimpleEntry v2 = new SimpleEntry(2);
         SimpleEntry v3 = new SimpleEntry(3);
@@ -162,6 +202,46 @@ public class TestIterators extends AbstractBTreeTestCase {
         // verify visiting all children.
         assertSameIterator(new IAbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(false));
+        // verify visiting all entries.
+        assertSameIterator(new Object[]{v3,v5,v7,v9},btree.entryIterator());
+        /*
+         * verify child range iterator.
+         * 
+         * Note: there are interesting fence posts here. The key range is
+         * sensitive to the separator key in (c) (which is 7) NOT to the keys
+         * actually found in (a) and (b). For this reason, a child range query
+         * with fromKey := 6 will visit (a) since the separator key is 7 and we
+         * would insert 6 into (a) if the key existed.
+         */
+        assertSameIterator(new Object[]{a,b},c.childIterator(null,null));
+        assertSameIterator(new Object[]{a},c.childIterator(k3,k6));
+        assertSameIterator(new Object[]{b},c.childIterator(k7,k10));
+        assertSameIterator(new Object[]{a},c.childIterator(k3,k5)); // fence post - only visits (a).
+        assertSameIterator(new Object[]{b},c.childIterator(k7,k9)); // fence post - only visits (b).
+        assertSameIterator(new Object[]{a,b},c.childIterator(k6,k7)); // fence post - visits (a) and (b).
+        // verify node range iterator.
+        assertSameIterator(new Object[]{a,b,c},c.postOrderIterator(null,null));
+        assertSameIterator(new Object[]{a,c},c.postOrderIterator(k3,k6));
+        assertSameIterator(new Object[]{b,c},c.postOrderIterator(k7,k10));
+        assertSameIterator(new Object[]{a,b,c},c.postOrderIterator(k6,k7)); // fence post - visits both leaves even though no keys lie in the range.
+        // verify entry range iterator.
+        assertSameIterator(new Object[]{v3,v5,v7,v9},btree.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,k5));
+        assertSameIterator(new Object[]{v5,v7,v9},btree.rangeIterator(k5,k10));
+
+        try { // try with search keys out of order.
+            c.childIterator(k9, k3);
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+
+        try { // try with search keys out of order.
+            btree.rangeIterator(k9, k3);
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
 
         /*
          * split another leaf so that there are now three children to visit. at
@@ -183,6 +263,28 @@ public class TestIterators extends AbstractBTreeTestCase {
         // verify visiting all children.
         assertSameIterator(new IAbstractNode[] { a, d, b }, ((Node) btree.root)
                 .childIterator(false));
+        // verify visiting children in a key range.
+        assertSameIterator(new Object[]{a,d,b},c.childIterator(null,null));
+        assertSameIterator(new Object[]{a},c.childIterator(k1,k2));
+        assertSameIterator(new Object[]{d},c.childIterator(k3,k5));
+        assertSameIterator(new Object[]{b},c.childIterator(k7,k9));
+        assertSameIterator(new Object[]{a,d},c.childIterator(k1,k3));
+        assertSameIterator(new Object[]{d,b},c.childIterator(k3,k9));
+        // verify node range iterator.
+        assertSameIterator(new Object[]{a,d,b,c},c.postOrderIterator(null,null));
+        assertSameIterator(new Object[]{a,c},c.postOrderIterator(k1,k2));
+        assertSameIterator(new Object[]{d,c},c.postOrderIterator(k3,k5));
+        assertSameIterator(new Object[]{b,c},c.postOrderIterator(k7,k9));
+        assertSameIterator(new Object[]{a,d,c},c.postOrderIterator(k1,k3));
+        assertSameIterator(new Object[]{d,b,c},c.postOrderIterator(k3,k9));
+        assertSameIterator(new Object[]{a,d,b,c},c.postOrderIterator(k1,k9));
+        // verify entry range iterator.
+        assertSameIterator(new Object[]{v1,v2,v3,v5,v7,v9},btree.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3,v5,v7,v9},btree.rangeIterator(k3,k10));
+        assertSameIterator(new Object[]{v2,v3},btree.rangeIterator(k2,i2k(4)));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,i2k(4)));
+        assertSameIterator(new Object[]{v5,v7},btree.rangeIterator(k5,i2k(8)));
+        assertSameIterator(new Object[]{v5,v7,v9},btree.rangeIterator(k5,k10));
 
         /*
          * remove a key from a leaf forcing two leaves to join and verify the

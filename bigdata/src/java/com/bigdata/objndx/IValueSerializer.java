@@ -50,27 +50,15 @@ package com.bigdata.objndx;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 
 /**
  * (De-)serialize the values in a {@link Leaf}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo There should be a way to leverage the fact that one or more attributes
- *       of the value may already be stored in the key.
  */
-public interface IValueSerializer {
-
-    /**
-     * The maximum size of a sequence of serialized values in bytes. This is
-     * used to compute the maximum required size of a buffer to (de-)serialize
-     * nodes and values.
-     * 
-     * @param n
-     *            The #of values in the sequence.
-     */
-    public int getSize(int n);
+public interface IValueSerializer extends Serializable {
 
     /**
      * De-serialize the values.

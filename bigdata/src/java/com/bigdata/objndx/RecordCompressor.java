@@ -50,6 +50,7 @@ package com.bigdata.objndx;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -74,7 +75,12 @@ import java.util.zip.InflaterInputStream;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RecordCompressor {
+public class RecordCompressor implements Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -2028159717578047153L;
 
     /**
      * A huge portion of the cost associated with using {@link Deflator} is
@@ -91,7 +97,7 @@ public class RecordCompressor {
      * be exceeded. This will achieve a steady state sufficient to decompress
      * any given input in a single pass.
      */
-    private byte[] _buf = new byte[1024];
+    private transient byte[] _buf = new byte[1024];
 
     /**
      * Create a record compressor.
@@ -267,10 +273,11 @@ public class RecordCompressor {
      * @param bin
      *            The compressed data.
      * 
-     * @return A view onto a shared buffer. The data between position() and
-     *         limit() are the decompressed data. The contents of this buffer
-     *         are valid only until the next compression or decompression
-     *         request.
+     * @return A read-only view onto a shared buffer. The data between
+     *         position() and limit() are the decompressed data. The contents of
+     *         this buffer are valid only until the next compression or
+     *         decompression request. The position will be zero. The limit will
+     *         be the #of decompressed bytes.
      */
     public ByteBuffer decompress(byte[] bin) {
      
@@ -293,10 +300,11 @@ public class RecordCompressor {
      * suited to single-threaded processes that achieve a suitable buffer size
      * and then perform zero allocations thereafter.
      * 
-     * @return A view onto a shared buffer. The data between position() and
-     *         limit() are the decompressed data. The contents of this buffer
-     *         are valid only until the next compression or decompression
-     *         request.
+     * @return A read-only view onto a shared buffer. The data between
+     *         position() and limit() are the decompressed data. The contents of
+     *         this buffer are valid only until the next compression or
+     *         decompression request. The position will be zero. The limit will
+     *         be the #of decompressed bytes.
      */
     protected ByteBuffer decompress(InflaterInputStream iis) {
 
@@ -349,7 +357,7 @@ public class RecordCompressor {
 ////     return tmp;
 //        return ByteBuffer.wrap(tmp, 0, off);
 
-        return ByteBuffer.wrap(_buf, 0, off);
+        return ByteBuffer.wrap(_buf, 0, off).asReadOnlyBuffer();
 
     }
 

@@ -57,9 +57,6 @@ import junit.framework.TestCase2;
 /**
  * Test suite for {@link RecordCompressor}.
  * 
- * @todo performance tests during build of {@link IndexSegment}s and reading of
- *       {@link Leaf leaves} from an {@link IndexSegment} (another test suite).
- * 
  * @todo verify performance on real data of the best speed, best space, and
  *       default compression algorithms (is default the same as best space or
  *       best speed?)

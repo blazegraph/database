@@ -60,7 +60,6 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.Bytes;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
@@ -105,6 +104,8 @@ import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
+ * FIXME use the shortest separator key.
+ * 
  * @todo Support merging index segments. This will probably be a merge sort
  *       using two leaf scans in parallel followed by a scan over the merged
  *       result that builds the index segment. The latter leaf scan will be
@@ -122,7 +123,7 @@ import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 public class IndexSegmentBuilder {
 
     /**
-     * Logger for building {@link IndexSegment}s.
+     * Logger.
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentBuilder.class);
@@ -159,35 +160,6 @@ public class IndexSegmentBuilder {
     final String mode = "rw"; // also rws or rwd
     
     /**
-     * The buffer used to serialize individual stack and leaves before they are
-     * written onto the file.
-     * 
-     * @todo The capacity of this buffer is a SWAG. It is too large for most
-     *       purposes but it is unlikely to be too small for most purposes. If
-     *       you see a buffer overflow exception then you may have extremely
-     *       long keys and/or very large values. The BTree class has the same
-     *       problem with the buffer that it uses to serialize stack and leaves,
-     *       but its stack and leaves are smaller since it uses a smaller
-     *       branching factor.
-     */
-    final ByteBuffer buf = ByteBuffer.allocateDirect(1*Bytes.megabyte32);
-
-    /**
-     * Buffer for compressed records.
-     * 
-     * @todo The capacity of this buffer is a SWAG.
-     */
-    final ByteBuffer cbuf = ByteBuffer.allocateDirect(Bytes.megabyte32/2);
-    
-    /**
-     * Compressor used for stack and leaves.
-     * 
-     * @todo review choice of best speed vs best compression and possibly
-     *       elevate to a constuctor parameter.
-     */
-    final RecordCompressor compressor = new RecordCompressor();
-
-    /**
      * The file specified by the caller on which the {@link IndexSegment} is
      * written.
      */
@@ -214,11 +186,6 @@ public class IndexSegmentBuilder {
      */
     protected RandomAccessFile tmp = null;
     
-    /**
-     * The data type used for the keys in the btree.
-     */
-    final ArrayType keyType;
-
     /**
      * Used to serialize the stack and leaves of the output tree.
      */
@@ -365,21 +332,62 @@ public class IndexSegmentBuilder {
     public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
             int m, double errorRate)
             throws IOException {
+    
+        this(outFile,tmpDir,btree,null,m,errorRate);
+        
+    }
+
+    /**
+     * Variant constructor performs a compacting merge of two btrees.
+     * 
+     * @param outFile
+     * @param tmpDir
+     * @param btree
+     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
+     *            being evicted into an {@link IndexSegment}.
+     * @param btree2
+     *            Typically, a pre-existing {@link IndexSegment} to be merged
+     *            with the <i>btree</i> (optional). When <code>non-null</code>,
+     *            the entries in the two btrees will be combined into an interim
+     *            data structure representing their merge. Once the entries have
+     *            been merged we know how many entries will be present in the
+     *            output btree. The merge is efficient since both btrees are
+     *            already in sorted order.
+     * @param m
+     * @param errorRate
+     * @throws IOException
+     * 
+     * @todo Note: the input btree is only used to setup some aspects of the
+     *       output btree (e.g., keyType). the #of entries in the output btree
+     *       is the #of entries in the input btree when there is only one input
+     *       tree and the #of entries that survive the merge when there are two
+     *       input btrees. either way we generate a plan and pass a _leaf_
+     *       iterator into the logic that generates the output btree.
+     * 
+     * @todo make useChecksum a constructor parameter?
+     */
+    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
+            AbstractBTree btree2, int m, double errorRate) throws IOException {
 
         assert outFile != null;
         assert btree != null;
         assert m >= AbstractBTree.MIN_BRANCHING_FACTOR;
         
         final long begin = System.currentTimeMillis();
-        
-        // The data type used for the keys in the btree.
-        keyType = btree.keyType;
+
+        // whether or not checksums are computed for nodes and leaves.
+        boolean useChecksum = true;
         
         // Used to serialize the stack and leaves for the output tree.
+        int initialBufferCapacity = 0; // will be estimated.
         nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
+                m,
+                initialBufferCapacity,
                 new IndexSegment.CustomAddressSerializer(),
                 btree.nodeSer.keySerializer,
-                btree.nodeSer.valueSerializer
+                btree.nodeSer.valueSerializer,
+                new RecordCompressor(),
+                useChecksum
                 );
 
         // Create a plan for generating the output tree.
@@ -400,7 +408,7 @@ public class IndexSegmentBuilder {
         
         for (int h = 0; h < plan.height; h++) {
 
-            SimpleNodeData node = new SimpleNodeData(h, m, keyType);
+            SimpleNodeData node = new SimpleNodeData(h, m);
 
             node.max = plan.numInNode[h][0];
             
@@ -410,7 +418,7 @@ public class IndexSegmentBuilder {
         
         // the output leaf (reused for each leaf we populate).
         
-        leaf = new SimpleLeafData(plan.height,m,keyType);
+        leaf = new SimpleLeafData(plan.height,m);
 
         leaf.max = plan.numInNode[plan.height][0];
 
@@ -434,9 +442,8 @@ public class IndexSegmentBuilder {
             
         } else {
             
-            // FIXME compute [d] based on the error rate.
-            bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(btree
-                    .getEntryCount());
+            // @todo compute [d] based on the error rate.
+            bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(plan.nentries);
             
         }
         
@@ -557,6 +564,8 @@ public class IndexSegmentBuilder {
 
                 leaf.reset(plan.numInNode[leaf.level][i]);
 
+                MutableKeyBuffer keys = (MutableKeyBuffer)leaf.keys;
+                
                 /*
                  * Fill in defined keys and values for this leaf.
                  * 
@@ -583,17 +592,20 @@ public class IndexSegmentBuilder {
                                                 
                     }
                     
-                    leaf.copyKey(leaf.nkeys, sourceLeaf, nconsumed);
+                    // copy key from the source leaf.
+//                    leaf.copyKey(keys.nkeys, sourceLeaf, nconsumed);
+                    keys.keys[keys.nkeys] = sourceLeaf.keys.getKey(nconsumed);
                     
                     leaf.vals[j] = sourceLeaf.values[nconsumed];
 
                     if( bloomFilter != null ) {
                         
-                        leaf.addKey(bloomFilter,leaf.nkeys);
+//                        leaf.addKey(bloomFilter,keys.nkeys);
+                        bloomFilter.add(keys.keys[keys.nkeys]);
                         
                     }
                     
-                    leaf.nkeys++;
+                    keys.nkeys++;
                     
                     nconsumed++;
 
@@ -629,6 +641,10 @@ public class IndexSegmentBuilder {
              * All stack and leaves have been written. Now we prepare the final
              * metadata record. If we wrote any stack onto the temporary channel
              * then we also have to bulk copy them into the output channel.
+             * 
+             * @todo include both offset and length for the leaf and node
+             * regions of the file in the metadata record, e.g., by representing
+             * them as {@link Addr}s.
              */
             final long offsetLeaves = IndexSegmentMetadata.SIZE;
             final long offsetNodes;
@@ -772,13 +788,13 @@ public class IndexSegmentBuilder {
                 // timestamp for the index segment.
                 final long now = System.currentTimeMillis();
                 
-                // @todo name of the index segment - drop this field?
+                // @todo name of the index segment - drop this field? add uuids?
                 final String name = "<no name>";
                 
                 outChannel.position(0);
                 
                 IndexSegmentMetadata md = new IndexSegmentMetadata(m,
-                        plan.height, keyType, plan.nleaves, nnodesWritten,
+                        plan.height, useChecksum, plan.nleaves, nnodesWritten,
                         plan.nentries, maxNodeOrLeafLength, offsetLeaves,
                         offsetNodes, addrRoot, errorRate, addrBloom, out
                                 .length(), now, name);
@@ -866,7 +882,7 @@ public class IndexSegmentBuilder {
         if (DEBUG)
             log.debug("closing " + (node.isLeaf() ? "leaf" : "node") + "; h="
                     + h + ", col=" + col + ", max=" + node.max + ", nkeys="
-                    + node.nkeys);
+                    + node.keys.getKeyCount());
         
         // Note: This uses shared buffers!
         final long addr = writeNodeOrLeaf(node);
@@ -1016,7 +1032,9 @@ public class IndexSegmentBuilder {
          */ 
         final int maxKeys = parent.max - 1;
         
-        if( parent.nkeys < maxKeys ) {
+        MutableKeyBuffer parentKeys = (MutableKeyBuffer) parent.keys;
+        
+        if( parentKeys.nkeys < maxKeys ) {
             
             /*
              * Copy the first key from the leaf into this parent, incrementing
@@ -1028,7 +1046,12 @@ public class IndexSegmentBuilder {
                         + parent.level + ", col="
                         + writtenInLevel[parent.level]);
 
-            parent.copyKey(parent.nkeys++, leaf, 0 );
+            /*
+             * copy the first key from the leaf into the next free position on
+             * the parent.
+             */
+            parentKeys.keys[parentKeys.nkeys++] = leaf.keys.getKey(0);
+//            parent.copyKey(parentKeys.nkeys++, leaf, 0 );
 
         } else {
 
@@ -1064,50 +1087,6 @@ public class IndexSegmentBuilder {
     }
     
     /**
-     * Serialize and compress a node or leaf.
-     * 
-     * @return {@link #cbuf}, which contains the serialized and compressed
-     *         representation of the node or leaf. The buffer is already flipped
-     *         in preparation for writing onto a {@link FileChannel}.
-     * 
-     * @see #buf, which is used to serialize the node or leaf.
-     * @see #cbuf, which is used to compress the node or leaf.
-     */
-    protected ByteBuffer serializeAndCompress(AbstractSimpleNodeData node)
-        throws IOException
-    {
-    
-        // clear the serialization buffer.
-        buf.clear();
-
-        // serialize onto buffer.
-        nodeSer.putNodeOrLeaf(buf, node);
-        
-        // flip for reading.
-        buf.flip();
-        
-        // clear compression buffer.
-        cbuf.clear();
-        
-        // setup writer onto compression buffer.
-        ByteBufferOutputStream bbos = new ByteBufferOutputStream(cbuf);
-        
-        // compress the serialized leaf.
-        compressor.compress(buf, bbos);
-        
-        // flush the compression buffer.
-        bbos.flush();
-        
-        bbos.close();
-        
-        // flip the compressed buffer to prepare for writing.
-        cbuf.flip();
-        
-        return cbuf;
-
-    }
-
-    /**
      * Serialize, compress, and write the node or leaf onto the appropriate
      * output channel.
      * 
@@ -1119,6 +1098,12 @@ public class IndexSegmentBuilder {
     protected long writeNodeOrLeaf(AbstractSimpleNodeData node)
             throws IOException {
 
+//        /*
+//         * Convert to immutable representation, which is generally more compact
+//         * and efficient.
+//         */
+//        node.keys = new ImmutableKeyBuffer( (MutableKeyBuffer) node.keys );
+        
         return node.isLeaf() ? writeLeaf((SimpleLeafData) node)
                 : writeNode((SimpleNodeData) node);
         
@@ -1143,16 +1128,16 @@ public class IndexSegmentBuilder {
     protected long writeLeaf(final SimpleLeafData leaf)
         throws IOException
     {
-
-        FileChannel outChannel = out.getChannel();
-        
-        // serialize and compress onto [cbuf].
-        serializeAndCompress( leaf );
+       
+        // serialize.
+        ByteBuffer buf = nodeSer.putLeaf(leaf);
 
         /*
          * Write leaf on the channel.
          */
         
+        FileChannel outChannel = out.getChannel();
+
         // position on the channel before the write.
         final long offset = outChannel.position();
         
@@ -1162,10 +1147,10 @@ public class IndexSegmentBuilder {
             
         }
         
-        // write the compressed record on the channel.
-        final int nbytes = outChannel.write(cbuf);
+        // write on the channel.
+        final int nbytes = outChannel.write(buf);
         
-        assert nbytes == cbuf.limit();
+        assert nbytes == buf.limit();
         
         if( nbytes > maxNodeOrLeafLength ) { 
          
@@ -1177,7 +1162,7 @@ public class IndexSegmentBuilder {
         // the offset where we just wrote the last leaf.
         lastLeafOffset = offset;
 
-        // the size of the compressed leaf that we just wrote out.
+        // the size of the leaf that we just wrote out.
         lastLeafSize = nbytes;
 
         // the #of leaves written so far.
@@ -1185,8 +1170,6 @@ public class IndexSegmentBuilder {
         
         System.err.print("."); // wrote a leaf.
 
-//        return Addr.toLong(nbytes, (int)offset);
-        
         // Encode the address.
         final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
                 true);
@@ -1208,14 +1191,14 @@ public class IndexSegmentBuilder {
         throws IOException
     {
 
-        FileChannel tmpChannel = tmp.getChannel();
-
-        // serialize and compress onto [cbuf].
-        serializeAndCompress( node );
+        // serialize node.
+        ByteBuffer buf = nodeSer.putNode( node );
         
         /*
          * Write node on the temporary channel.
          */
+
+        FileChannel tmpChannel = tmp.getChannel();
         
         // position on the temporary channel before the write.
         final long offset = tmpChannel.position();
@@ -1226,10 +1209,10 @@ public class IndexSegmentBuilder {
             
         }
         
-        // write the compressed record on the temporary channel.
-        final int nbytes = tmpChannel.write(cbuf);
+        // write the record on the temporary channel.
+        final int nbytes = tmpChannel.write(buf);
         
-        assert nbytes == cbuf.limit();
+        assert nbytes == buf.limit();
         
         if( nbytes > maxNodeOrLeafLength ) { 
          
@@ -1238,21 +1221,10 @@ public class IndexSegmentBuilder {
             
         }
 
-//        node.written = true;
-
-//        // the offset where we just wrote the last node.
-//        lastNodeOffset = offset;
-//
-//        // the size of the compressed node that we just wrote out.
-//        lastNodeSize = nbytes;
-
         // the #of stack written so far.
         nnodesWritten++;
         
         System.err.print("x"); // wrote a node.
-
-//        // flip the sign to indicate a relative reference to a node.
-//        long addr = - ( Addr.toLong(nbytes, (int)offset) );
 
         // Encode the address.
         final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
@@ -1263,7 +1235,7 @@ public class IndexSegmentBuilder {
         return addr;
         
     }
-
+    
     /**
      * Abstract base class for classes used to construct and serialize stack and
      * leaves written onto the index segment.
@@ -1279,10 +1251,9 @@ public class IndexSegmentBuilder {
          */
         final int level;
         final int m;
-        final ArrayType keyType;
+
         // mutable.
-        final Object keys;
-        int nkeys;
+        IKeyBuffer keys;
         
         /**
          * We precompute the #of children to be assigned to each node and the
@@ -1291,68 +1262,65 @@ public class IndexSegmentBuilder {
          * assigned to the node.
          */
         int max = -1;
-        
 
-        protected AbstractSimpleNodeData(int level,int m,ArrayType keyType,Object keys) {
+        protected AbstractSimpleNodeData(int level,int m,byte[][] keys) {
+            
             this.level = level;
+            
             this.m = m;
-            this.keyType = keyType;
-            this.nkeys = 0;
-            this.keys = keys;
+            
+            this.keys = new MutableKeyBuffer(m);
+            
         }
 
         protected void reset(int max) {
             
-            nkeys = 0;
+            this.keys = new MutableKeyBuffer(m);
             
             this.max = max;
             
         }
         
         public int getBranchingFactor() {
+            
             return m;
+            
         }
 
         public int getKeyCount() {
-            return nkeys;
+
+            return keys.getKeyCount();
+            
         }
 
-        public ArrayType getKeyType() {
-            return keyType;
-        }
+        public IKeyBuffer getKeys() {
 
-        public Object getKeys() {
             return keys;
+            
         }
 
-        /**
-         * Copy a key from the source node into this node. This method does not
-         * modify the source node. This method does not update the #of keys in
-         * this node. This method has the substantial advantage that primitive
-         * keys are not boxed and unboxed solely to perform the cop.
-         * 
-         * @param dstpos
-         *            The index position to which the key will be copied on this
-         *            node.
-         * @param src
-         *            The source node from which the key will be copied.
-         * @param srcpos
-         *            The index position from which the key will be copied.
-         */
-        final protected void copyKey(int dstpos,IAbstractNodeData src,int srcpos) {
-            Object srcKeys = src.getKeys();
-            switch(keyType) {
-            case BYTE: ((byte[])keys)[dstpos] = ((byte[])srcKeys)[srcpos]; break;
-            case SHORT: ((short[])keys)[dstpos] = ((short[])srcKeys)[srcpos]; break;
-            case CHAR: ((char[])keys)[dstpos] = ((char[])srcKeys)[srcpos]; break;
-            case INT: ((int[])keys)[dstpos] = ((int[])srcKeys)[srcpos]; break;
-            case LONG: ((long[])keys)[dstpos] = ((long[])srcKeys)[srcpos]; break;
-            case FLOAT: ((float[])keys)[dstpos] = ((float[])srcKeys)[srcpos]; break;
-            case DOUBLE: ((double[])keys)[dstpos] = ((double[])srcKeys)[srcpos]; break;
-            case OBJECT: ((Object[])keys)[dstpos] = ((Object[])srcKeys)[srcpos]; break;
-            default: throw new UnsupportedOperationException();
-            }
-        }
+//        /**
+//         * Copy a reference to a key from the source node into this node. This
+//         * method does not modify the source node. This method does not update
+//         * the #of keys in this node.
+//         * 
+//         * @param dstpos
+//         *            The index position to which the key whose reference will
+//         *            be copied on this node.
+//         * @param src
+//         *            The source node from which the key will be copied.
+//         * @param srcpos
+//         *            The index position from which the key will be copied.
+//         * 
+//         * @todo this could be optimized away since we have total control and
+//         *       visibility into the implementation classes used for the keys
+//         *       in this context.
+//         */
+//        final protected void copyKey(int dstpos,IAbstractNodeData src,int srcpos) {
+//            
+//            keys.keys[dstpos] = src.getKeys().getKey(srcpos);
+//
+//        }
 
     }
     
@@ -1368,72 +1336,63 @@ public class IndexSegmentBuilder {
         // mutable.
         final Object[] vals;
         
-        public SimpleLeafData(int level,int m,ArrayType keyType) {
+        public SimpleLeafData(int level,int m) {
 
-            super(level,m,keyType,ArrayType.alloc(keyType, m));
+            super(level,m,new byte[m][]);
             
             this.vals = new Object[m];
             
         }
         
-        /**
-         * 
-         * @param max The #of values that must be assigned to this leaf.
-         */
-        public void reset(int max) {
-            super.reset(max);
-        }
+//        /**
+//         * 
+//         * @param max The #of values that must be assigned to this leaf.
+//         */
+//        public void reset(int max) {
+//
+//            super.reset(max);
+//            
+//        }
         
         public int getValueCount() {
-            return nkeys;
+            
+            return keys.getKeyCount();
+            
         }
 
         public Object[] getValues() {
+            
             return vals;
+            
         }
 
         public boolean isLeaf() {
+            
             return true;
+            
         }
 
         public int getEntryCount() {
             
-            return nkeys;
+            return keys.getKeyCount();
             
         }
     
-        /**
-         * Adds the key at the specified index to the bloom filter.
-         * 
-         * @param bloomFilter
-         *            the bloom filter.
-         * 
-         * @param index
-         *            The key index in [0:maxKeys-1].
-         * 
-         * FIXME handle all key types.
-         */
-        final protected void addKey(it.unimi.dsi.mg4j.util.BloomFilter bloomFilter,int index) {
-            switch(keyType) {
-//            case BYTE: bloomFilter.add(((byte[])keys)[index]); break;
-//            case SHORT: bloomFilter.add(((short[])keys)[index]); break;
-//            case CHAR: bloomFilter.add(((char[])keys)[index]); break;
-//            case INT: bloomFilter.add((int[])keys,index,1); break;
-            case INT: {
-                _bloomKeys_int[0] = ((int[])keys)[index];
-                bloomFilter.add(_bloomKeys_int);
-                break;
-            }
-//            case LONG: bloomFilter.add(((long[])keys)[index]); break;
-//            case FLOAT: bloomFilter.add(((float[])keys)[index]); break;
-//            case DOUBLE: bloomFilter.add(((double[])keys)[index]); break;
-//            case OBJECT: bloomFilter.add(((Object[])keys)[index]); break;
-            default: throw new UnsupportedOperationException();
-            }        
-        }
-
-        final private int stride = 1;
-        final private int[] _bloomKeys_int = new int[stride];
+//        /**
+//         * Adds the key at the specified index to the bloom filter.
+//         * 
+//         * @param bloomFilter
+//         *            the bloom filter.
+//         * 
+//         * @param index
+//         *            The key index in [0:maxKeys-1].
+//         */
+//        final protected void addKey(
+//                it.unimi.dsi.mg4j.util.BloomFilter bloomFilter, int index) {
+//
+//            bloomFilter.add(keys.getKey(index));
+//
+//        }
 
     }
 
@@ -1504,21 +1463,6 @@ public class IndexSegmentBuilder {
          */
         int[] childEntryCount;
         
-//        /**
-//         * #of leaves spanned by this node.
-//         */
-//        int nleaves;
-//        /**
-//         * #of nodes spanned by this node.
-//         */
-//        int nnodes;
-//        /**
-//         * #of bytes in leaves spanned by this node.
-//         * 
-//         * @todo de-serialize and expose in {@link IndexSegment}.
-//         */
-//        int nbytes;
-
         public int getEntryCount() {
             
             return nentries;
@@ -1531,24 +1475,9 @@ public class IndexSegmentBuilder {
             
         }
         
-//        public int getLeafCount() {
-//            return nleaves;
-//        }
-//
-//        public int getNodeCount() {
-//            return nnodes;
-//        }
-//
-//        /**
-//         * Cumulative #of bytes in leaves spanned by this node.
-//         */
-//        public int getByteCount() {
-//            return nbytes;
-//        }
-        
-        public SimpleNodeData(int level,int m,ArrayType keyType) {
+        public SimpleNodeData(int level,int m) {
 
-            super(level,m,keyType,ArrayType.alloc(keyType, m-1));
+            super(level,m, new byte[m-1][]);
             
             this.childAddr = new long[m];
             
@@ -1570,26 +1499,26 @@ public class IndexSegmentBuilder {
             
             nchildren = 0;
 
-//            nnodes = 0;
-//            
-//            nleaves = 0;
-            
             nentries = 0;
-
-//            nbytes = 0;
             
         }
 
         public long[] getChildAddr() {
+            
             return childAddr;
+            
         }
 
         public int getChildCount() {
-            return nkeys+1;
+
+            return keys.getKeyCount() + 1;
+            
         }
 
         public boolean isLeaf() {
+            
             return false;
+            
         }
         
     }
@@ -1600,22 +1529,21 @@ public class IndexSegmentBuilder {
     protected static class NOPNodeFactory implements INodeFactory {
 
         public static final INodeFactory INSTANCE = new NOPNodeFactory();
-        
-        private NOPNodeFactory() {}
-        
-        public ILeafData allocLeaf(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType, int nkeys, Object keys, Object[] values) {
 
+        private NOPNodeFactory() {
+        }
+
+        public ILeafData allocLeaf(IBTree btree, long addr,
+                int branchingFactor, IKeyBuffer keys, Object[] values) {
+            
             throw new UnsupportedOperationException();
             
         }
 
-        public INodeData allocNode(IBTree btree, long id, int branchingFactor,
-                ArrayType keyType,
-//                int nnodes, int nleaves,
-                int nentries,
-                int nkeys, Object keys, long[] childAddr, int[] childEntryCounts) {
-            
+        public INodeData allocNode(IBTree btree, long addr,
+                int branchingFactor, int nentries, IKeyBuffer keys,
+                long[] childAddr, int[] childEntryCount) {
+
             throw new UnsupportedOperationException();
             
         }

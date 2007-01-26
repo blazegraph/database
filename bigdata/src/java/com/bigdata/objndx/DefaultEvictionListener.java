@@ -87,7 +87,7 @@ public class DefaultEvictionListener implements
         
         if (--node.referenceCount == 0) {
 
-            if( node.isDeleted() ) {
+            if( node.deleted ) {
                 
                 /*
                  * Deleted nodes are ignored as the are evicted from the queue.
@@ -99,7 +99,7 @@ public class DefaultEvictionListener implements
                 
             }
             
-            if (node.isDirty()) {
+            if (node.dirty) {
 
                 if (node.isLeaf()) {
 

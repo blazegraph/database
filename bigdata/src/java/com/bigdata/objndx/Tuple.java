@@ -55,7 +55,7 @@ package com.bigdata.objndx;
  */
 class Tuple {
 
-    public Object key;
+    public byte[] key;
     
     public Object val;
     

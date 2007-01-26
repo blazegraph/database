@@ -55,9 +55,9 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyKeyValueIterator implements KeyValueIterator {
+public class EmptyKeyValueIterator implements IEntryIterator {
     
-    public static final KeyValueIterator INSTANCE = new EmptyKeyValueIterator();
+    public static final IEntryIterator INSTANCE = new EmptyKeyValueIterator();
     
     private EmptyKeyValueIterator() {}
 
@@ -73,7 +73,7 @@ public class EmptyKeyValueIterator implements KeyValueIterator {
         throw new UnsupportedOperationException();
     }
     
-    public Object getKey() {
+    public byte[] getKey() {
         throw new IllegalStateException();
     }
 

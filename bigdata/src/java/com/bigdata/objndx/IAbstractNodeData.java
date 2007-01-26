@@ -83,29 +83,10 @@ public interface IAbstractNodeData {
      * @return The #of defined keys.
      */
     public int getKeyCount();
-
-    /**
-     * The data type used to store the keys.
-     * 
-     * @return The data type for the keys. This will either correspond to one of
-     *         the primitive data types or to an {@link Object}.
-     *         {@link #getKeys()} will return an object that may be cast to an
-     *         array of the corresponding type.
-     */
-    public ArrayType getKeyType();
     
     /**
-     * The backing array in which the keys are stored. Only the first
-     * {@link #getKeyCount()} entries in the array are defined. The use of this
-     * array is dangerous since mutations are directly reflected in the node or
-     * leaf, but it may be highly efficient. In particular, operations that are
-     * concerned about forcing object creation when accessing primitive keys
-     * should make read-only use of the returned array to access the keys
-     * directly.
-     * 
-     * @return The backing array containing the keys. The return value will be
-     *         an array whose data type is indicated by {@link #getKeyType()}.
+     * The object used to contain and manage the keys.
      */
-    public Object getKeys();
+    public IKeyBuffer getKeys();
     
 }

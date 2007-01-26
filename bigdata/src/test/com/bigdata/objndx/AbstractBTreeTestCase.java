@@ -69,8 +69,24 @@ import com.bigdata.journal.IRawStore;
  */
 abstract public class AbstractBTreeTestCase extends TestCase2 {
 
-    Random r = new Random();
+    protected Random r = new Random();
+
+    protected KeyBuilder keyBuilder = new KeyBuilder();
     
+    /**
+     * Encodes an integer as a unsigned byte[] key.
+     * 
+     * @param v
+     *            An integer.
+     *            
+     * @return The sort key for that integer.
+     */
+    protected byte[] i2k(int v) {
+        
+        return keyBuilder.reset().append(v).getKey();
+        
+    }
+
     /**
      * Logger for the test suites in this package.
      */
@@ -92,37 +108,47 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Test helper verifies the #of keys, their ordered values, and that all
-     * keys beyond the last defined key are {@link BTree#NEGINF}.
+     * Test helper verifies the #of keys and their ordered values.
      * 
      * @param expected
-     *            An array containing the expected defined keys. The #of values
-     *            in this array should be exactly the #of defined keys (that is,
-     *            do not include trailing zeros or attempt to size the array to
-     *            the branching factor of the tree).
+     *            A ground truth node.
      * @param actual
-     *            The node.
+     *            The actual node.
      */
     public void assertKeys(AbstractNode expected,AbstractNode actual) {
-        switch(ArrayType.getArrayType(expected.keys)) {
-        case BYTE: assertKeys(expected.nkeys,(byte[])expected.keys,actual); break;
-        case SHORT: assertKeys(expected.nkeys,(short[])expected.keys,actual); break;
-        case CHAR: assertKeys(expected.nkeys,(char[])expected.keys,actual); break;
-        case INT: assertKeys(expected.nkeys,(int[])expected.keys, actual); break;
-        case LONG: assertKeys(expected.nkeys,(long[])expected.keys, actual); break;
-        case FLOAT: assertKeys(expected.nkeys,(float[])expected.keys,actual); break;
-        case DOUBLE: assertKeys(expected.nkeys,(double[])expected.keys,actual); break;
-        case OBJECT: assertKeys(expected.nkeys,(Object[])expected.keys,actual); break;
-        default: throw new UnsupportedOperationException();
+
+        // verify the #of defined keys.
+        assertEquals("nkeys", expected.keys.getKeyCount(), actual.keys.getKeyCount());
+        assertEquals("nkeys", expected.nkeys, actual.nkeys);
+        
+        // verify ordered values for the defined keys.
+        for( int i=0; i<expected.nkeys; i++ ) {
+
+            assertEquals(0, BytesUtil.compareBytes(expected.keys.getKey(i),
+                    actual.keys.getKey(i)));
+            
         }
+        
     }
     
-    private void assertKeys(int nkeys, byte[] keys, AbstractNode node) {
+    /**
+     * Test helper provides backwards compatibility for a large #of tests that
+     * were written with <code>int</code> keys. Each key is encoded by the
+     * {@link KeyBuilder} before comparison with the key at the corresponding
+     * index in the node.
+     * 
+     * @param keys
+     *            An array of the defined <code>int</code> keys.
+     * @param node
+     *            The node whose keys will be tested.
+     */
+    public void assertKeys(int[] keys, AbstractNode node) {
         
-        byte[] actualKeys = (byte[]) node.keys;
+//        // verify the capacity of the keys[] on the node.
+//        assertEquals("keys[] capacity", (node.maxKeys + 1) * stride,
+//                actualKeys.length);
         
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
+        final int nkeys = keys.length;
         
         // verify the #of defined keys.
         assertEquals("nkeys", nkeys, node.nkeys);
@@ -130,205 +156,26 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // verify ordered values for the defined keys.
         for( int i=0; i<nkeys; i++ ) {
 
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
+            byte[] expectedKey = keyBuilder.reset().append(keys[i]).getKey();
             
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
+            byte[] actualKey = node.keys.getKey(i);
             
-            assertEquals("keys[" + i + "]", ((Byte) node.btree.NEGINF)
-                    .byteValue(), actualKeys[i]);
-            
-        }
-        
-    }
+            if(BytesUtil.compareBytes(expectedKey, actualKey)!=0) {
 
-    private void assertKeys(int nkeys,char[] keys, AbstractNode node ) {
-        
-        char[] actualKeys = (char[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
+                fail("keys[" + i + "]: expected="
+                        + BytesUtil.toString(expectedKey) + ", actual="
+                        + BytesUtil.toString(actualKey));
+                
+            }
             
         }
         
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Character) node.btree.NEGINF)
-                    .charValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,short[] keys, AbstractNode node ) {
-        
-        short[] actualKeys = (short[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Short) node.btree.NEGINF)
-                    .shortValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,int[] keys, AbstractNode node ) {
-        
-        int[] actualKeys = (int[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
-                    .intValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,long[] keys, AbstractNode node ) {
-        
-        long[] actualKeys = (long[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Long) node.btree.NEGINF)
-                    .longValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,float[] keys, AbstractNode node ) {
-        
-        float[] actualKeys = (float[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Float) node.btree.NEGINF)
-                    .floatValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,double[] keys, AbstractNode node ) {
-        
-        double[] actualKeys = (double[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Double) node.btree.NEGINF)
-                    .doubleValue(), actualKeys[i]);
-            
-        }
-        
-    }
-
-    private void assertKeys(int nkeys,Object[] keys, AbstractNode node ) {
-        
-        Object[] actualKeys = (Object[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
-
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
-            
-        }
-        
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys["+i+"]", node.btree.NEGINF, actualKeys[i]);
-            
-        }
+//        // verify the undefined keys are all NEGINF.
+//        for (int i = nkeys * stride; i < actualKeys.length; i++) {
+//
+//            assertEquals("keys[" + i + "]", (byte) 0, actualKeys[i]);
+//
+//        }
         
     }
 
@@ -534,40 +381,42 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Special purpose helper used to vet a key[] with a specific data type
+     * Validate the keys in the node.
      * 
      * @param keys
-     *            An array all of whose values will be tested against the
+     *            An array all of whose entries will be tested against the
      *            corresponding keys in the node.
      * @param node
      *            The node.
      */
-    public void assertKeys(int[] keys, AbstractNode node ) {
+    public void assertKeys(byte[][] keys, AbstractNode node ) {
         
-        int nkeys = keys.length;
-        
-        int[] actualKeys = (int[]) node.keys;
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("keys[] capacity", node.maxKeys+1, actualKeys.length );
+//        // verify the capacity of the keys[] on the node.
+//        assertEquals("keys[] capacity", (node.maxKeys + 1) * stride,
+//                actualKeys.length);
         
         // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
+        assertEquals("nkeys", keys.length, node.nkeys);
+        assertEquals("nkeys", keys.length, node.keys.getKeyCount());
         
         // verify ordered values for the defined keys.
-        for( int i=0; i<nkeys; i++ ) {
+        for( int i=0; i<keys.length; i++ ) {
 
-            assertEquals("keys["+i+"]", keys[i], actualKeys[i]);
+            if( BytesUtil.compareBytes(keys[i], node.keys.getKey(i)) != 0) {
+                
+                fail("expected=" + BytesUtil.toString(keys[i]) + ", actual="
+                        + BytesUtil.toString(node.keys.getKey(i)));
+                
+            }
             
         }
         
-        // verify the undefined keys are all NEGINF.
-        for( int i=nkeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", ((Integer) node.btree.NEGINF)
-                    .intValue(), actualKeys[i]);
-            
-        }
+//        // verify the undefined keys are all NEGINF.
+//        for (int i = node.nkeys * stride; i < actualKeys.length; i++) {
+//
+//            assertEquals("keys[" + i + "]", (int) 0, actualKeys[i]);
+//
+//        }
         
     }
 
@@ -641,15 +490,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         final int nscan = 10;
 
-        BTree btree = new BTree(store,
-                ArrayType.INT,
-                branchingFactor,
+        BTree btree = new BTree(store, branchingFactor,
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan),
-                        Integer.valueOf(0),
-                        null, // no comparator for primitive key type.
-                        Int32OIdKeySerializer.INSTANCE,
-                        SimpleEntry.Serializer.INSTANCE);
+                SimpleEntry.Serializer.INSTANCE, null // no record compressor
+        );
 
         return btree;
         
@@ -852,7 +697,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = ((Integer)btree.NEGINF).intValue() + 1;
+        int lastKey = 1;
         
         for (int i = 0; i < ninserts; i++) {
         
@@ -1387,7 +1232,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         int[] keys = new int[ninserts];
         SimpleEntry[] entries = new SimpleEntry[ninserts];
         
-        int lastKey = ((Integer)btree.NEGINF).intValue() + 1;
+        int lastKey = 1;
         for( int i=0; i<ninserts; i++) {
             keys[i] = lastKey;
             entries[i] = new SimpleEntry();
@@ -1705,16 +1550,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // The #of entries must agree.
         assertEquals(expected.getEntryCount(), actual.getEntryCount());
         
-        // The key type must agree.
-        assertEquals(expected.getKeyType(), actual.getKeyType());
-
         // verify the entry iterator.
         doEntryIteratorTest(actual,expected);
         
         /*
          * Extract the ground truth mapping from the input btree.
          */
-        Object[] keys = new Object[expected.getEntryCount()];
+        byte[][] keys = new byte[expected.getEntryCount()][];
         
         Object[] vals = new Object[expected.getEntryCount()];
         
@@ -1765,14 +1607,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The btree to be tested.
      * 
-     * @see #doRandomLookupTest(String, AbstractBTree, Object[], Object[])
-     * @see #doRandomIndexOfTest(String, AbstractBTree, Object[], Object[])
+     * @see #doRandomLookupTest(String, AbstractBTree, byte[][], Object[])
+     * @see #doRandomIndexOfTest(String, AbstractBTree, byte[][], Object[])
      */
     protected void doEntryIteratorTest(AbstractBTree expected, AbstractBTree actual ) {
 
-        KeyValueIterator expectedItr = expected.entryIterator();
+        IEntryIterator expectedItr = expected.entryIterator();
         
-        KeyValueIterator actualItr = actual.entryIterator();
+        IEntryIterator actualItr = actual.entryIterator();
         
         int index = 0;
         
@@ -1788,9 +1630,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             Object actualVal = actualItr.next();
 
-            Object expectedKey = expectedItr.getKey();
+            byte[] expectedKey = expectedItr.getKey();
             
-            Object actualKey = expectedItr.getKey();
+            byte[] actualKey = expectedItr.getKey();
 
 //            System.err.println("index="+index+", key="+actualKey+", val="+actualVal);
             
@@ -1843,10 +1685,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            The values in key order (out).
      */
-    protected void getKeysAndValues(AbstractBTree btree, Object[] keys,
+    protected void getKeysAndValues(AbstractBTree btree, byte[][] keys,
             Object[] vals) {
         
-        KeyValueIterator itr = btree.entryIterator();
+        IEntryIterator itr = btree.entryIterator();
 
         int i = 0;
         
@@ -1854,7 +1696,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             Object val = itr.next();
             
-            Object key = itr.getKey();
+            byte[] key = itr.getKey();
 
             assert val != null;
             
@@ -1887,7 +1729,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    protected void doRandomLookupTest(String label, AbstractBTree btree, Object[] keys, Object[] vals) {
+    protected void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
         
         int nentries = btree.getEntryCount();
         
@@ -1903,7 +1745,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             int entryIndex = randomOrder ? order[i] : i;
             
-            Object key = keys[entryIndex];
+            byte[] key = keys[entryIndex];
         
             Object val = btree.lookup(key);
             
@@ -1941,7 +1783,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    protected void doRandomIndexOfTest(String label, AbstractBTree btree, Object[] keys, Object[] vals) {
+    protected void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
         
         int nentries = btree.getEntryCount();
         
@@ -1957,7 +1799,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             int entryIndex = randomOrder ? order[i] : i;
             
-            Object key = keys[entryIndex];
+            byte[] key = keys[entryIndex];
         
             assertEquals("indexOf",entryIndex,btree.indexOf(key));
             

@@ -49,7 +49,6 @@ package com.bigdata.objndx;
 
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
-import java.util.Comparator;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
@@ -58,18 +57,48 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.IndexSegment.FileStore;
-import com.bigdata.objndx.ndx.NoSuccessorException;
-import com.bigdata.objndx.ndx.SuccessorUtil;
+import com.ibm.icu.text.RuleBasedCollator;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Base class for mutable and immutable B+Tree implementations.
+ * <p>
+ * Base class for mutable and immutable B+-Tree implementations.
+ * </p>
+ * <p>
+ * The B+-Tree implementation supports variable length unsigned byte[] keys and
+ * provides a {@link KeyBuilder} utility class designed to make it possible to
+ * generate keys from any combination of primitive data types and Unicode
+ * strings. The total ordering imposed by the index is that of a bit-wise
+ * comparison of the variable length unsigned byte[] keys. Encoding Unicode keys
+ * is support by an integration with ICU4J and applications may choose the
+ * locale, strength, and other properties that govern the sort order of sort
+ * keys generated from Unicode strings. Sort keys produces by different
+ * {@link RuleBaseCollator}s are NOT compable and applications that use Unicode
+ * data in their keys MUST make sure that they use a {@link RuleBasedCollator}
+ * that imposes the same sort order each time they provision a
+ * {@link KeyBuilder}. ICU4J provides a version number that is changed each
+ * time a software revision would result in a change in the generated sort
+ * order.
+ * </p>
+ * <p>
+ * The use of variable length unsigned byte[] keys makes it possible for the
+ * B+-Tree to perform very fast comparison of a search key with keys in the
+ * nodes and leaves of the tree. To support fast search, the leading prefix is
+ * factored out each time a node or leaf is made immutable, e.g., directly
+ * proceeding serialization. Further, the separator keys are choosen to be the
+ * shortest separator key in order to further shorten the keys in the nodes of
+ * the tree.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see KeyBuilder
+ * @see RuleBasedCollator
+ * @see http://icu.sourceforge.net
+ * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
  */
 abstract public class AbstractBTree implements IBTree {
 
@@ -100,6 +129,11 @@ abstract public class AbstractBTree implements IBTree {
             .toInt();
 
     /**
+     * flag turns on some more expensive assertions.
+     */
+    final protected boolean debug = false; 
+    
+    /**
      * Counters tracking various aspects of the btree.
      */
     protected final Counters counters = new Counters(this);
@@ -110,14 +144,6 @@ abstract public class AbstractBTree implements IBTree {
     final protected IRawStore2 store;
 
     /**
-     * The type for keys for this btree. The key type may be a primitive data
-     * type or {@link Object}.
-     * 
-     * @see ArrayType
-     */
-    final protected ArrayType keyType;
-
-    /**
      * The branching factor for the btree.
      */
     final protected int branchingFactor;
@@ -126,61 +152,6 @@ abstract public class AbstractBTree implements IBTree {
      * Used to serialize and de-serialize the nodes and leaves of the tree.
      */
     final protected NodeSerializer nodeSer;
-
-    /**
-     * Used to serialize and de-serialize the nodes and leaves of the tree.
-     * 
-     * This should be pre-allocated to the maximum size of any node or leaf. If
-     * the buffer overflows it will be re-allocated and the operation will be
-     * retried.
-     * 
-     * @todo handle realloc. modify RecordCompressor to NOT use 2x for extending
-     *       its buffer. try += 4k each time instead.
-     */
-    protected ByteBuffer buf;
-    
-    /**
-     * The comparator used iff the key type is not a primitive data type. When
-     * the key type is a primitive data type then comparison is performed using
-     * the operations for EQ, GT, LT, etc. rather than a {@link Comparator}.
-     * 
-     * @todo extend to permit comparison of the value as well as the key so that
-     *       a total order can be established that permits key duplicates with
-     *       distinct value attributes -or- support duplicates by put(k,v) vs
-     *       add(k,v) and set(k,v) semantics and provision a given tree either
-     *       to permit duplicates or not.
-     */
-    final protected Comparator comparator;
-
-    /**
-     * An invalid key. This is used primarily as the value of keys that are not
-     * defined within a node or a leaf of the tree. The value choosen for a
-     * primitive data type is arbitrary, but common choices are zero (0), -1,
-     * and the largest negative value in the value space for the data type. When
-     * the btree is serving as an object identifier index, then the value
-     * choosen is always zero(0) since it also carries the semantics of a null
-     * reference. When the keys are Objects then the value choosen MUST be
-     * <code>null</code>. The need to have an illegal value for keys of a
-     * primitive data necessarily imposes a restriction of a value that may not
-     * appear as a legal key.
-     * 
-     * @todo rename as "NULL" since it means a null reference and hence an
-     *       invalid key more than it means anything else.
-     * 
-     * @todo do we actually need an illegal value for primitive keys or is this
-     *       just paranoia that insists on unused keys being NEGINF vs whatever
-     *       the last key value was (essentially garbage). As long as the code
-     *       never looks at an unused key I think that things should be ok. As
-     *       far as I can tell there is not any requirement for a key less than
-     *       any valid key in the btree implementation. We do use NEGINF in
-     *       several assertions and test suites in both the sense of the value
-     *       that an unused key must have an in the sense of a value less than
-     *       any legal key. There used to be a concept of POSINF but it proved
-     *       useless except as part of range checking the keys and key range
-     *       restrictions are best imposed, by subclassing or application
-     *       constraints, or be a more declarative interface.
-     */
-    protected final Object NEGINF;
 
     /**
      * Leaves are added to a hard reference queue when they are created or read
@@ -220,109 +191,83 @@ abstract public class AbstractBTree implements IBTree {
      *       the #of leaves in memory can vary and leaves require much more
      *       memory than nodes (for most trees).
      */
-    final HardReferenceQueue<PO> leafQueue;
+    final protected HardReferenceQueue<PO> leafQueue;
 
     /**
-     * The minimum allowed branching factor (3).
+     * The minimum allowed branching factor (3).  The branching factor may be
+     * odd or even.
      */
     static public final int MIN_BRANCHING_FACTOR = 3;
     
     /**
      * @param store
      *            The persistence store.
+     * @param branchingFactor
+     *            The branching factor is the #of children in a node or values
+     *            in a leaf and must be an integer greater than or equal to
+     *            three (3). Larger branching factors result in trees with fewer
+     *            levels. However there is a point of diminishing returns at
+     *            which the amount of copying performed to move the data around
+     *            in the nodes and leaves exceeds the performance gain from
+     *            having fewer levels.
+     * @param initialBufferCapacity
+     *            When non-zero, this is the initial buffer capacity used by the
+     *            {@link NodeSerializer}. When zero the initial buffer capacity
+     *            will be estimated based on the branching factor, the key
+     *            serializer, and the value serializer. The initial estimate is
+     *            not critical and the buffer will be resized by the
+     *            {@link NodeSerializer} if necessary.
      * @param headReferenceQueue
      *            The hard reference queue.
-     * @param NEGINF
-     *            When keyType is {@link ArrayType#OBJECT} then this MUST be
-     *            <code>null</code>. Otherwise this MUST be an instance of
-     *            the Class corresponding to the primitive data type for the
-     *            key, e.g., {@link Integer} for <code>int</code> keys, and
-     *            the value of that instance is generally choosen to be zero(0).
-     * @param comparator
-     *            When keyType is {@link ArrayType#OBJECT} this is the
-     *            comparator used to place the keys into a total ordering. It
-     *            must be null for otherwise.
      * @param addrSer
      *            Object that knows how to (de-)serialize the child addresses in
      *            an {@link INodeData}.
-     * @param keySer
-     *            Object that knows how to (de-)serialize the keys in an
-     *            {@link INodeData} or an {@link ILeafData} of the tree.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in an
      *            {@link ILeafData}.
      * @param nodeFactory
      *            Object that provides a factory for node and leaf objects.
+     * @param recordCompressor
+     *            Object that knows how to (de-)compress serialized nodes and
+     *            leaves (optional).
+     * @param useChecksum
+     *            When true, computes and verifies checksum of serialized nodes
+     *            and leaves. This option is not recommended for use with a
+     *            fully buffered store, such as a {@link Journal}, since all
+     *            reads are against memory which is presumably already parity
+     *            checked.
      */
-    protected AbstractBTree(IRawStore2 store, ArrayType keyType,
-            int branchingFactor, HardReferenceQueue<PO> hardReferenceQueue,
-            Object NEGINF, Comparator comparator, IAddressSerializer addrSer,
-            IKeySerializer keySer, IValueSerializer valueSer,
-            INodeFactory nodeFactory) {
+    protected AbstractBTree(IRawStore2 store,
+            int branchingFactor,
+            int initialBufferCapacity,
+            HardReferenceQueue<PO> hardReferenceQueue,
+            IAddressSerializer addrSer, IValueSerializer valueSer,
+            INodeFactory nodeFactory, RecordCompressor recordCompressor,
+            boolean useChecksum) {
         
         assert store != null;
         
-        assert keyType != null;
-
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
         assert hardReferenceQueue != null;
         
         assert addrSer != null;
         
-        assert keySer != null;
-        
         assert valueSer != null;
 
         assert nodeFactory != null;
         
-        if( keyType == ArrayType.OBJECT ) {
-            
-            if (NEGINF != null) {
-
-                throw new IllegalArgumentException(
-                        "NEGINF must be null when not using a primitive key type.");
-
-            }
-
-            if( comparator == null ) {
-                
-                throw new IllegalArgumentException(
-                        "A comparator must be specified unless using a primitive key type.");
-                
-            }
-            
-        } else {
-            
-            if( NEGINF == null ) {
-                
-                throw new IllegalArgumentException(
-                        "NEGINF must be non-null when using a primtive key type.");
-                
-            }
-            
-            if( comparator != null ) {
-                
-                throw new IllegalArgumentException("The comparator must be null when using a primitive key type");
-                
-            }
-            
-        }
-        
         this.store = store;
-
-        this.keyType = keyType;
 
         this.branchingFactor = branchingFactor;
 
         this.leafQueue = hardReferenceQueue;
-
-        this.comparator = comparator;
         
-        this.NEGINF = NEGINF;
-
-        this.nodeSer = new NodeSerializer(nodeFactory, addrSer, keySer, valueSer);
-
+        this.nodeSer = new NodeSerializer(nodeFactory, branchingFactor,
+                initialBufferCapacity, addrSer,
+                KeyBufferSerializer.INSTANCE, valueSer,
+                recordCompressor, useChecksum);
+        
     }
     
     /**
@@ -343,15 +288,6 @@ abstract public class AbstractBTree implements IBTree {
         
     }
     
-    /**
-     * The key type for the btree.
-     */
-    public ArrayType getKeyType() {
-        
-        return keyType;
-        
-    }
-
     /**
      * The height of the btree. The height is the #of levels minus one. A btree
      * with only a root leaf has <code>height := 0</code>. A btree with a
@@ -398,23 +334,274 @@ abstract public class AbstractBTree implements IBTree {
      */
     abstract public IAbstractNode getRoot();
     
-    public Object insert(Object key, Object entry) {
+    /**
+     * Batch insert operation of N tuples presented in sorted order. This
+     * operation can be very efficient if the tuples are presented sorted by key
+     * order.
+     * 
+     * @param ntuples
+     *            The #of tuples in the operation (in). Additional elements of
+     *            the parameter arrays will be ignored.
+     * 
+     * @param keys
+     *            A series of keys paired to values (in). Each key is an
+     *            variable length unsigned byte[]. The keys must be presented in
+     *            sorted order in order to obtain maximum efficiency for the
+     *            batch operation.<br>
+     *            The individual byte[] keys provided to this method MUST be
+     *            immutable - if the content of a given byte[] in <i>keys</i>
+     *            is changed after the method is invoked then the change MAY
+     *            have a side-effect on the keys stored in leaves of the tree.
+     *            While this constraint applies to the individual byte[] keys,
+     *            the <i>keys</i> byte[][] itself may be reused from invocation
+     *            to invocation without side-effect.
+     * 
+     * @param values
+     *            Values (one element per key) (in/out). Null elements are
+     *            allowed. On output, each element is either null (if there was
+     *            no entry for that key) or the old value stored under that key
+     *            (which may be null).
+     * 
+     * @param values
+     *            An array of values, one per tuple (in/out).
+     * 
+     * @exception IllegalArgumentException
+     *                if the dimensions of the arrays are not sufficient for the
+     *                #of tuples declared.
+     * 
+     * @todo support batch api for indexOf(), keyAt(), valueAt()?
+     * 
+     * FIXME handle isolation using a TimestampValue(long,Object). This properly
+     * encapsulates the timestamp with the value so that the timestamp is
+     * returned with the value by the api. It also allows the isolated btree to
+     * set the timestamp to the timestamp associated with the tx or to treat it
+     * as an update counter.
+     * 
+     * @todo disallow null value? it was allowed for isolation to indicate a
+     *       removed value, but we can do that with a null value inside of a
+     *       TimestampEntry object.
+     */
+    public void insert(int ntuples, byte[][] keys, Object[] values) {
+
+        if (ntuples <= 0)
+            throw new IllegalArgumentException("ntuples is non-positive");
+            
+        if (keys == null)
+            throw new IllegalArgumentException("keys is null");
+
+        if( keys.length < ntuples )
+            throw new IllegalArgumentException("not enough keys");
+
+        if (values == null)
+            throw new IllegalArgumentException("values is null");
+
+        if( values.length < ntuples )
+            throw new IllegalArgumentException("not enough values");
+
+        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+
+            /*
+             * Each call MAY process more than one tuple.
+             */
+            int nused = ((AbstractNode) getRoot()).insert(ntuples, tupleIndex,
+                    keys, values);
+            
+            assert nused > 0;
+            
+            counters.ninserts += nused;
+            
+            tupleIndex += nused;
+
+        }
+
+    }
+
+    /**
+     * Batch lookup operation for N tuples returns the most recent timestamp and
+     * value for each key. This operation can be very efficient if the keys are
+     * presented in sorted order.
+     * 
+     * @param ntuples
+     *            The #of tuples in the operation (in).
+     * 
+     * @param keys
+     *            A series of keys paired to values (in). Each key is an
+     *            variable length unsigned byte[]. The keys must be presented in
+     *            sorted order in order to obtain maximum efficiency for the
+     *            batch operation.
+     * 
+     * @param values
+     *            An array of values, one per tuple (out). The array element
+     *            corresponding to a tuple will be null if the key does not
+     *            exist -or- if the key exists with a null value (null values
+     *            are used to mark deleted keys in an isolated btree).
+     * 
+     * @todo timestamps do not belong in the network api since they are only
+     *       used for transactional isolation.
+     */
+    public void lookup(int ntuples, byte[][] keys, Object[] values) {
+     
+        if (ntuples <= 0)
+            throw new IllegalArgumentException("ntuples is non-positive");
+            
+        if (keys == null)
+            throw new IllegalArgumentException("keys is null");
+
+        if( keys.length < ntuples )
+            throw new IllegalArgumentException("not enough keys");
+
+        if (values == null)
+            throw new IllegalArgumentException("values is null");
+        
+        if( values.length < ntuples )
+            throw new IllegalArgumentException("not enough values");
+
+        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+
+            /*
+             * Each call MAY process more than one tuple.
+             */
+            int nused = ((AbstractNode) getRoot()).lookup(ntuples, tupleIndex,
+                    keys, values);
+            
+            assert nused > 0;
+            
+            counters.ninserts += nused;
+            
+            tupleIndex += nused;
+
+        }
+        
+    }
+
+    /**
+     * Batch remove of N tuples. This operation can be very efficient if the
+     * keys are presented in sorted order.
+     * 
+     * @param ntuples
+     *            The #of tuples in the operation (in).
+     * 
+     * @param keys
+     *            A series of keys paired to values (in). Each key is an
+     *            variable length unsigned byte[]. The keys must be presented in
+     *            sorted order in order to obtain maximum efficiency for the
+     *            batch operation.
+     * 
+     * @param values
+     *            An array of values, one per tuple (out). The array element
+     *            corresponding to a tuple will be null if the key did not exist
+     *            -or- if the key existed with a null value (null values are
+     *            used to mark deleted keys in an isolated btree).
+     * 
+     * @todo consider using insert() with a null value instead of remove when
+     *       using the btree to support isolation. this will result in an entry
+     *       with an updated timestamp and a null value and would leave the
+     *       semantics of remove() removing the entry from the tree.
+     */
+    public void remove(int ntuples, byte[][] keys, Object[] values ) {
+
+        if (ntuples <= 0)
+            throw new IllegalArgumentException("ntuples is non-positive");
+            
+        if (keys == null)
+            throw new IllegalArgumentException("keys is null");
+
+        if( keys.length < ntuples )
+            throw new IllegalArgumentException("not enough keys");
+
+        if (values == null)
+            throw new IllegalArgumentException("values is null");
+
+        if( values.length < ntuples )
+            throw new IllegalArgumentException("not enough values");
+
+        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+
+            /*
+             * Each call MAY process more than one tuple.
+             */
+            int nused = ((AbstractNode) getRoot()).remove(ntuples, tupleIndex,
+                    keys, values);
+            
+            assert nused > 0;
+            
+            counters.ninserts += nused;
+            
+            tupleIndex += nused;
+
+        }
+
+    }
+
+    /*
+     * buffers used to convert non-batch operations into batch api
+     * calls.
+     * 
+     * @todo we could also avoid autoboxing by exposing a type safe api
+     * with appropriate key types, but that would multiple the #of methods
+     * on the api several times.  derived classes could provide typesafe
+     * direct use of the batch api easily if we exposed these objects as
+     * protected arrays.
+     */
+    /** @deprecated */
+    private final byte[][] _keys = new byte[1][];
+    /** @deprecated */
+    private final Object[] _values = new Object[1];
+    /** @deprecated */
+    private final KeyBuilder keyBuilder = new KeyBuilder();
+    
+    /**
+     * Used to unbox an application key into a shared instance buffer
+     * {@link #_keys}. This is NOT safe for concurrent operations, but the
+     * mutable b+tree is only safe (and designed for) a single-threaded context.
+     * 
+     * @deprecated This is preserved solely to provide backward compatibility
+     *             for int keys passed into the non-batch api. It will disappear
+     *             as soon as I update the test suites.
+     */
+    final private byte[][] unbox(Object key) {
+        if(key instanceof Integer) {
+            return new byte[][]{
+                keyBuilder.reset().append(((Integer)key).intValue()).getKey()
+            };
+        } else {
+            return new byte[][] { (byte[]) key };
+        }
+//        throw new UnsupportedOperationException();
+//        if( stride > 1 ) return key;
+//        switch(keyType) {
+//        case BYTE: ((byte[])_keys)[0] = ((Byte)key).byteValue(); break;
+//        case SHORT: ((short[])_keys)[0] = ((Short)key).shortValue(); break;
+//        case CHAR: ((char[])_keys)[0] = ((Character)key).charValue(); break;
+//        case INT: ((int[])_keys)[0] = ((Integer)key).intValue(); break;
+//        case LONG: ((long[])_keys)[0] = ((Long)key).longValue(); break;
+//        case FLOAT: ((float[])_keys)[0] = ((Float)key).floatValue(); break;
+//        case DOUBLE: ((double[])_keys)[0] = ((Double)key).doubleValue(); break;
+//        case OBJECT: ((Object[])_keys)[0] = key; break;
+//        default: throw new UnsupportedOperationException();
+//        }
+//        return _keys;
+    }
+    
+    public Object insert(Object key, Object value) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        if (entry == null)
-            throw new IllegalArgumentException();
+        _values[0] = value;
         
-        counters.ninserts++;
+        insert(1,unbox(key),_values);
         
-        assert entry != null;
-
-        if(INFO) {
-            log.info("key="+key+", entry="+entry);
-        }
-
-        return getRoot().insert(key, entry);
+        return _values[0];
+        
+//
+//        counters.ninserts++;
+//        
+//        if(INFO) {
+//            log.info("key="+key+", entry="+entry);
+//        }
+//
+//        return getRoot().insert(key, entry);
 
     }
 
@@ -423,23 +610,32 @@ abstract public class AbstractBTree implements IBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
-        counters.nfinds++;
+        lookup(1,unbox(key),_values);
         
-        return getRoot().lookup(key);
+        return _values[0];
+        
+//        counters.nfinds++;
+//        
+//        return getRoot().lookup(key);
 
     }
 
     public Object remove(Object key) {
 
-        if( key == null ) throw new IllegalArgumentException();
+        if (key == null)
+            throw new IllegalArgumentException();
 
-        counters.nremoves++;
-
-        if(INFO) {
-            log.info("key="+key);
-        }
-
-        return getRoot().remove(key);
+        remove(1,unbox(key),_values);
+        
+        return _values[0];
+        
+//        counters.nremoves++;
+//
+//        if(INFO) {
+//            log.info("key="+key);
+//        }
+//
+//        return getRoot().remove(key);
 
     }
 
@@ -459,24 +655,17 @@ abstract public class AbstractBTree implements IBTree {
      * 
      * @todo promote to {@link IBTree}?
      * 
-     * @see #getKey(int)
-     * @see #getValue(int)
+     * @see #keyAt(int)
+     * @see #valueAt(int)
      */
-    public int indexOf(Object key) {
+    public int indexOf(byte[] key) {
         
-        if( key == null ) throw new IllegalArgumentException();
+        if (key == null)
+            throw new IllegalArgumentException();
 
         counters.nindexOf++;
         
         int index = ((AbstractNode)getRoot()).indexOf(key);
-        
-//        if( index < 0 ) {
-//            
-//            // not found.
-//            
-//            return -1;
-//            
-//        }
         
         return index;
         
@@ -499,7 +688,7 @@ abstract public class AbstractBTree implements IBTree {
      * @see #indexOf(Object)
      * @see #getValue(int)
      */
-    public Object keyAt(int index) {
+    public byte[] keyAt(int index) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException("less than zero");
@@ -528,7 +717,7 @@ abstract public class AbstractBTree implements IBTree {
      *                if index is greater than the #of entries.
      *                
      * @see #indexOf(Object)
-     * @see #getKey(int)
+     * @see #keyAt(int)
      */
     public Object valueAt(int index) {
 
@@ -548,13 +737,23 @@ abstract public class AbstractBTree implements IBTree {
      * Return an iterator that visits the entries in a half-open key range.
      * 
      * @param fromKey
-     *            The lowest key that will be visited (inclusive).
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
      * @param toKey
-     *            The first key that will not be visited (exclusive).
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @see #entryIterator(), which visits all entries in the btree.
      */
-    public IRangeIterator rangeIterator(Object fromKey, Object toKey) {
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
-        return new RangeIterator(this,fromKey,toKey);
+        /*
+         * Note: the code will check for fromKey > toKey no later than when
+         * next() is called for the first time. If eager rejection of bad
+         * parameters is desired then invoke compareBytes on the keys (if both
+         * are non-null) before calling rangeIterator on the root node.
+         */
+        return ((AbstractNode)getRoot()).rangeIterator(fromKey,toKey);
         
     }
 
@@ -579,8 +778,7 @@ abstract public class AbstractBTree implements IBTree {
      * @see #successor(Object), which may be used to produce a closed range for
      *      any given <i>toKey</i>.
      */
-    public int rangeCount(Object fromKey, Object toKey)
-            throws NoSuccessorException {
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null)
             throw new IllegalArgumentException();
@@ -611,49 +809,13 @@ abstract public class AbstractBTree implements IBTree {
         return ret;
         
     }
-
-    /**
-     * Return the successor of a key.
-     * 
-     * @param key
-     *            The key.
-     * 
-     * @return The successor of the key.
-     * 
-     * @exception IllegalArgumentException
-     *                if the key is null.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that key.
-     * 
-     * @todo add a successor parameter to the constructor for use when the
-     *       keyType is an Object.
-     */
-    protected Object successor(Object key) throws NoSuccessorException {
-       
-        if (key == null)
-            throw new IllegalArgumentException();
-        
-        switch(keyType) {
-        case BYTE: return Byte.valueOf(SuccessorUtil.successor((Byte)key));
-        case SHORT: return Short.valueOf(SuccessorUtil.successor((Short)key));
-        case CHAR: return Character.valueOf(SuccessorUtil.successor((Character)key));
-        case INT: return Integer.valueOf(SuccessorUtil.successor((Integer)key));
-        case LONG: return Long.valueOf(SuccessorUtil.successor((Long)key));
-        case FLOAT: return Float.valueOf(SuccessorUtil.successor((Float)key));
-        case DOUBLE: return Double.valueOf(SuccessorUtil.successor((Double)key));
-        case OBJECT: throw new UnsupportedOperationException();
-        default: throw new UnsupportedOperationException();
-        }
-        
-    }
     
     /**
      * Visits all entries in key order.
      * 
      * @return An iterator that will visit all entries in key order.
      */
-    public KeyValueIterator entryIterator() {
+    public IEntryIterator entryIterator() {
     
         return getRoot().entryIterator();
         
@@ -861,7 +1023,7 @@ abstract public class AbstractBTree implements IBTree {
      * @param node
      *            The node or leaf.
      */
-    protected void touch(AbstractNode node) {
+    final protected void touch(AbstractNode node) {
 
         assert node != null;
 
@@ -897,44 +1059,6 @@ abstract public class AbstractBTree implements IBTree {
     }
     
     /**
-     * Read a node or leaf from the store.
-     * 
-     * @param addr
-     *            The address in the store.
-     *            
-     * @return The node or leaf.
-     */
-    protected AbstractNode readNodeOrLeaf( long addr ) {
-        
-        buf.clear();
-        
-        ByteBuffer tmp = store.read(addr,buf);
-        
-        final int bytesRead = tmp.position();
-        
-        counters.bytesRead += bytesRead;
-        
-        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
-        
-        node.setDirty(false);
-        
-        if (node instanceof Leaf) {
-            
-            counters.leavesRead++;
-
-        } else {
-            
-            counters.nodesRead++;
-            
-        }
-                
-        touch(node);
-
-        return node;
-        
-    }
-    
-    /**
      * Write a dirty node and its children using a post-order traversal that
      * first writes any dirty leaves and then (recursively) their parent nodes.
      * The parent nodes are guarenteed to be dirty if there is a dirty child so
@@ -952,11 +1076,8 @@ abstract public class AbstractBTree implements IBTree {
     protected void writeNodeRecursive( AbstractNode node ) {
 
         assert node != null;
-        
-        assert node.isDirty();
-        
-        assert ! node.isDeleted();
-
+        assert node.dirty;
+        assert ! node.deleted;
         assert ! node.isPersistent();
         
         /*
@@ -1026,21 +1147,13 @@ abstract public class AbstractBTree implements IBTree {
      * Note: This will throw an exception if the backing store is read-only.
      * 
      * @return The persistent identity assigned by the store.
-     * 
-     * FIXME Support optional application of a {@link RecordCompressor} here or
-     * handle that in the {@link IRawStore} implementation? The use of
-     * compression only makes sense with large-ish branching factors, but it
-     * could be useful with the journal for some indices so that we can absorb
-     * more writes triggering an overflow. Compression could be added as a
-     * wrapper around the base {@link IRawStore}. The {@link IndexSegment}
-     * current builds compression into its {@link FileStore}.
      */
     protected long writeNodeOrLeaf( AbstractNode node ) {
 
         assert node != null;
         assert node.btree == this;
-        assert node.isDirty();
-        assert !node.isDeleted();
+        assert node.dirty;
+        assert !node.deleted;
         assert !node.isPersistent();
 
         /*
@@ -1078,33 +1191,39 @@ abstract public class AbstractBTree implements IBTree {
             
         }
         
+//        /*
+//         * Convert the keys buffer to an immutable keys buffer.  The immutable
+//         * keys buffer is potentially much more compact.
+//         */
+//        if( node.keys instanceof MutableKeyBuffer ) {
+//
+//            node.keys = new ImmutableKeyBuffer((MutableKeyBuffer)node.keys);
+//                
+//        }
+        
         /*
          * Serialize the node or leaf onto a shared buffer.
          */
         
-        node.assertInvariants();
+        if(debug) node.assertInvariants();
         
-        buf.clear();
+        final ByteBuffer buf;
         
         if( node.isLeaf() ) {
         
-            nodeSer.putLeaf(buf, (Leaf)node);
+            buf = nodeSer.putLeaf((Leaf)node);
 
             counters.leavesWritten++;
             
         } else {
 
-            nodeSer.putNode(buf, (Node) node);
+            buf = nodeSer.putNode((Node) node);
 
             counters.nodesWritten++;
 
         }
         
-        /*
-         * Flip the buffer and write the serialized node or leaf onto the store.
-         */
-        
-        buf.flip();
+        // write the serialized node or leaf onto the store.
         
         final long addr = store.write(buf);
         
@@ -1134,4 +1253,50 @@ abstract public class AbstractBTree implements IBTree {
 
     }
 
+    /**
+     * Read a node or leaf from the store.
+     * 
+     * @param addr
+     *            The address in the store.
+     * 
+     * @return The node or leaf.
+     */
+    protected AbstractNode readNodeOrLeaf( long addr ) {
+
+        /*
+         * offer the node serializer's buffer to the IRawStore.  it will be used
+         * iff it is large enough and the store does not prefer to return a
+         * read-only slice.
+         */
+//        nodeSer.buf.clear();
+        
+        ByteBuffer tmp = store.read(addr,nodeSer._buf);
+        assert tmp.position() == 0;
+        assert tmp.limit() == Addr.getByteCount(addr);
+        
+        final int bytesRead = tmp.limit();
+                
+        counters.bytesRead += bytesRead;
+
+        // extract the node from the buffer.
+        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
+        
+        node.setDirty(false);
+        
+        if (node instanceof Leaf) {
+            
+            counters.leavesRead++;
+
+        } else {
+            
+            counters.nodesRead++;
+            
+        }
+                
+        touch(node);
+
+        return node;
+        
+    }
+    
 }

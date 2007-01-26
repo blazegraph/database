@@ -58,47 +58,9 @@ import java.util.Iterator;
 public interface IAbstractNode {
 
     /**
-     * Recursive search locates the approprate leaf and inserts the entry under
-     * the key. The leaf is split iff necessary. Splitting the leaf can cause
-     * splits to cascade up towards the root. If the root is split then the
-     * total depth of the tree is inceased by one.
-     * 
-     * @param key
-     *            The external key.
-     * @param entry
-     *            The value.
-     * 
-     * @return The previous value or <code>null</code> if the key was not
-     *         found.
-     */
-    public Object insert(Object key, Object entry);
-
-    /**
-     * Recursive search locates the entry for the probe key.
-     * 
-     * @param key
-     *            The external key.
-     * 
-     * @return The entry or <code>null</code> iff there is no entry for
-     *         that key.
-     */
-    public Object lookup(Object key);
-
-    /**
-     * Recursive search locates the appropriate leaf and removes and returns
-     * the pre-existing value stored under the key (if any).
-     * 
-     * @param key
-     *            The external key.
-     *            
-     * @return The value or null if there was no entry for that key.
-     */
-    public Object remove(Object key);
-
-    /**
      * Traversal of index values in key order.
      */
-    public KeyValueIterator entryIterator();
+    public IEntryIterator entryIterator();
 
     /**
      * Post-order traveral of nodes and leaves in the tree. For any given

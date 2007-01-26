@@ -94,6 +94,9 @@ public interface IRawStore2 {
      * @return A long integer formed using {@link Addr} that encodes both the
      *         offset from which the data may be read and the #of bytes to be
      *         read.
+     * 
+     * @todo document whether the buffer position is advanced to the limit or
+     *       whether it is unmodified by this call.
      */
     public long write(ByteBuffer data);
     
@@ -115,16 +118,14 @@ public interface IRawStore2 {
      *            offset from which the data will be read and the #of bytes to
      *            be read.
      * @param dst
-     *            The destination buffer (optional). When specified, the data
-     *            will be appended starting at the current position. If there is
-     *            not enough room in the buffer then a new buffer will be
-     *            allocated and used for the read operation. In either case, the
-     *            position will be advanced as a side effect and the limit will
-     *            equal the final position.
+     *            The destination buffer (optional). When <code>null</code> or
+     *            too small then a new buffer MAY be allocated. However, an
+     *            implementation is encouraged to return a read-only slice
+     *            containing the data.
      * 
-     * @return The data read. A new buffer will be allocated if <i>dst</i> is
-     *         <code>null</code> -or- if the data will not fit in the provided
-     *         buffer.
+     * @return The data read. The buffer will be flipped to prepare for reading
+     *         (the position will be zero and the limit will be the #of bytes
+     *         read).
      */
     public ByteBuffer read(long addr, ByteBuffer dst);
 
