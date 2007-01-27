@@ -46,8 +46,6 @@ package com.bigdata.rdf.rio;
 import java.io.Reader;
 import java.util.Iterator;
 import java.util.Vector;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -59,12 +57,6 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Statement handled for the RIO RDF Parser that collects values and statements
@@ -102,7 +94,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PresortRioLoader implements StatementHandler
+public class PresortRioLoader implements IRioLoader, StatementHandler
 {
 
     /**
@@ -118,172 +110,6 @@ public class PresortRioLoader implements StatementHandler
     long insertTime;
     
     long insertStart;
-
-    final int queueCapacity = 1;
-    
-    final BlockingQueue<Buffer> queue = new ArrayBlockingQueue<Buffer>(queueCapacity); 
-    
-    static class Buffer {
-    
-        _URI[] uris;
-        _Literal[] literals;
-        _BNode[] bnodes;
-        _Statement[] stmts;
-        
-        int numURIs, numLiterals, numBNodes;
-        int numStmts;
-
-        /*
-         * @todo The use of these caches does not appear to improve performance.
-         */
-//        /**
-//         * Hash of the string of the URI to the URI makes URIs unique within a
-//         * buffer full of URIs. 
-//         */
-//        Map<String, _URI> uriMap;
-//        /**
-//         * FIXME this does not properly handle literals unless the source is a
-//         * Literal with optional language code and datatype uri fields. It will
-//         * falsely conflate a plain literal with a language code literal having
-//         * the same text.
-//         */
-//        Map<String, _Literal> literalMap;
-//        /**
-//         * @todo bnodes are always distinct, right?  Or at least often enough
-//         * that we don't want to do this.  Also, the bnode id can be encoded 
-//         * using a non-unicode conversion since we are generating them ourselves
-//         * for the most part.  what makes most sense is probably to pre-convert
-//         * a String ID given for a bnode to a byte[] and cache only such bnodes
-//         * in this map and all other bnodes should be assigned a byte[] key 
-//         * directly instead of an id, e.g., by an efficient conversion of a UUID
-//         * to a byte[].
-//         */
-//        Map<String, _BNode> bnodeMap;
-
-        protected final TripleStore store;
-        
-        /**
-         * The buffer capacity -or- <code>-1</code> if the {@link Buffer}
-         * object is signaling that no more buffers will be placed onto the
-         * queue by the producer and that the consumer should therefore
-         * terminate.
-         */
-        protected final int capacity;
- 
-        public Buffer(TripleStore store, int capacity) {
-        
-            this.store = store;
-            
-            this.capacity = capacity;
-        
-            if( capacity == -1 ) return;
-            
-            uris = new _URI[ capacity ];
-            
-            literals = new _Literal[ capacity ];
-            
-            bnodes = new _BNode[ capacity ];
-
-//            if (useTermMaps) {
-//
-//                uriMap = new HashMap<String, _URI>(capacity);
-//                
-//                literalMap = new HashMap<String, _Literal>(capacity);
-//                
-//                bnodeMap = new HashMap<String, _BNode>(capacity);
-//                
-//            }
-
-            stmts = new _Statement[ capacity ];
-            
-        }
-        
-        /**
-         * Bulk insert buffered data (terms and statements) into the store.
-         */
-        public void insert() {
-
-            store.insertTerms(uris, numURIs);
-
-            store.insertTerms(literals, numLiterals);
-            
-            store.insertTerms(bnodes, numBNodes);
-            
-            store.addStatements(stmts, numStmts);
-
-        }
-        
-        /**
-         * Returns true if the buffer has less than three slots remaining for
-         * any of the value arrays (URIs, Literals, or BNodes) or if there are
-         * no slots remaining in the statements array. Under those conditions
-         * adding another statement to the buffer could cause an overflow.
-         * 
-         * @return True if the buffer might overflow if another statement were
-         *         added.
-         */
-        public boolean nearCapacity() {
-            
-            if(numURIs+3>capacity) return true;
-
-            if(numLiterals+3>capacity) return true;
-            
-            if(numBNodes+3>capacity) return true;
-            
-            if(numStmts+1>capacity) return true;
-            
-            return false;
-            
-        }
-        
-        /**
-         * Adds the values and the statement into the buffer.
-         * 
-         * @param s
-         * @param p
-         * @param o
-         * 
-         * @exception IndexOutOfBoundsException if the buffer overflows.
-         * 
-         * @see #nearCapacity()
-         */
-        public void handleStatement( Resource s, URI p, Value o ) {
-
-            if ( s instanceof _URI ) {
-                
-                uris[numURIs++] = (_URI) s;
-                
-            } else {
-                
-                bnodes[numBNodes++] = (_BNode) s;
-                
-            }
-            
-            uris[numURIs++] = (_URI) p;
-            
-            if ( o instanceof _URI ) {
-                
-                uris[numURIs++] = (_URI) o;
-                
-            } else if ( o instanceof _BNode ) {
-                
-                bnodes[numBNodes++] = (_BNode) o;
-                
-            } else {
-                
-                literals[numLiterals++] = (_Literal) o;
-                
-            }
-            
-            stmts[numStmts++] = new _Statement
-                ( (_Resource) s,
-                  (_URI) p,
-                  (_Value) o
-                  );
-            
-        }
-        
-    }
     
     Vector<RioLoaderListener> listeners;
     

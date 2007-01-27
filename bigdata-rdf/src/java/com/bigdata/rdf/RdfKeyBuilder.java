@@ -370,13 +370,13 @@ public class RdfKeyBuilder {
         assert key.length == 8 * 3 + 1;
         assert ids.length == 3;
         
-        byte code = keyBuilder.decodeByte(key[0]);
+        byte code = KeyBuilder.decodeByte(key[0]);
 
-        ids[0] = keyBuilder.decodeLong(key, 1);
+        ids[0] = KeyBuilder.decodeLong(key, 1);
         
-        ids[1] = keyBuilder.decodeLong(key, 1+8);
+        ids[1] = KeyBuilder.decodeLong(key, 1+8);
         
-        ids[2] = keyBuilder.decodeLong(key, 1+8+8);
+        ids[2] = KeyBuilder.decodeLong(key, 1+8+8);
         
         return code;
         

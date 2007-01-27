@@ -54,6 +54,9 @@ import com.bigdata.rdf.AbstractTripleStoreTestCase;
 /**
  * A test of the RIO integration.
  * 
+ * @todo load a data file that we can include in CVS with some known
+ *       characteristics and verify those characteristics after the load.
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  */
 public class TestRioIntegration extends AbstractTripleStoreTestCase {
@@ -86,9 +89,9 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             
         }
         
-        TestRioIntegration test = new TestRioIntegration("TestTripleStore");
+        TestRioIntegration test = new TestRioIntegration("TestInsertRateStore");
         test.setUp();
-        test.doTest( args );
+        test.doTest( new PresortRioLoader(test.store), args );
         test.tearDown();
             
     }
@@ -117,15 +120,11 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      *            the triple store
      */
     
-    public void doTest( final String[] resources ) throws IOException {
+    public void doTest( IRioLoader loader, final String[] resources ) throws IOException {
 
         long total_stmts = 0;
 
         long begin = System.currentTimeMillis();
-        
-        
-//        BasicRioLoader loader = new BasicRioLoader();
-        PresortRioLoader loader = new PresortRioLoader( store );
         
         for ( int i = 0; i < resources.length; i++ ) {
 
@@ -195,15 +194,21 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
     }
 
-    /**
-     * @todo load a data file that we can include in CVS with some known
-     *       characteristics and verify those characteristics after the load.
-     *       
-     * @throws IOException
-     */
-    public void test_loadFile() throws IOException {
+    public void test_loadFile_basicRioLoader() throws IOException {
 
-        doTest(new String[] { "data/wordnet_nouns-20010201.rdf" });
+        doTest(new BasicRioLoader(), new String[] { "data/wordnet_nouns-20010201.rdf" });
+
+    }
+    
+    public void test_loadFile_presortRioLoader() throws IOException {
+
+        doTest(new PresortRioLoader( store ), new String[] { "data/wordnet_nouns-20010201.rdf" });
+
+    }
+    
+    public void test_loadFile_multiThreadedPresortRioLoader() throws IOException {
+
+        doTest(new MultiThreadedPresortRioLoader( store ), new String[] { "data/wordnet_nouns-20010201.rdf" });
 
     }
     

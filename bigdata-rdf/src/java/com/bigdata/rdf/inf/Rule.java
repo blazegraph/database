@@ -112,7 +112,7 @@ abstract public class Rule {
      *       concatenation operation variant for insert.
      * 
      * @todo the btree class is NOT safe for concurrent modification under
-     *       traversal so implementations of this method need to buffer the
+     *       traversal so implementations of this method need to bufferQueue the
      *       statements that they will insert.
      */
     abstract public int apply();

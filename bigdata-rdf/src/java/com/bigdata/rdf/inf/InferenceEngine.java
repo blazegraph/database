@@ -273,7 +273,7 @@ public class InferenceEngine extends TripleStore {
 
         final int n = ndx.rangeCount(fromKey, toKey);
 
-        // buffer for storing the extracted s:p:o data.
+        // bufferQueue for storing the extracted s:p:o data.
         SPO[] ids = new SPO[n];
 
         IEntryIterator itr1 = ndx.rangeIterator(fromKey, toKey);
@@ -349,7 +349,7 @@ public class InferenceEngine extends TripleStore {
         Properties answerSetProperties = new Properties();
         
         /*
-         * @todo support buffer extension for the transient mode or set the
+         * @todo support bufferQueue extension for the transient mode or set the
          * default capacity to something larger.  if things get too large
          * then we need to spill over to disk.
          */

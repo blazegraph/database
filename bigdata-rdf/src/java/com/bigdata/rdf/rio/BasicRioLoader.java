@@ -54,7 +54,7 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
-public class BasicRioLoader {
+public class BasicRioLoader implements IRioLoader {
 
     long stmtsAdded;
     

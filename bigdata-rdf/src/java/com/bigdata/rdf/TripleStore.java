@@ -73,6 +73,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
+import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
@@ -108,7 +109,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       IOs for the store. The way that we compensate for this is by increasing
  *       the branching factor for the indices, but that begins to run into
  *       overhead for moving keys during inserts on a node. Deferring writes
- *       from the direct buffer on the journal onto the backing file should
+ *       from the direct bufferQueue on the journal onto the backing file should
  *       provide a nice performance boost. The writes could even be async since
  *       we only need to sync at a commit when the writer must assert that all
  *       bytes up to a given {@link Addr} have been written onto the store.
@@ -247,7 +248,7 @@ public class TripleStore {
     
     /**
      * When true, terms and statements are added to the triple store. When
-     * false, they are not. This makes it possible to run the rio parser, buffer
+     * false, they are not. This makes it possible to run the rio parser, bufferQueue
      * terms and statements, and optionally sort them without actually inserting
      * anything into the triple store.
      * 
@@ -271,6 +272,33 @@ public class TripleStore {
 
         journal = new Journal(properties);
 
+        // setup key builder that handles unicode and primitive data types.
+        KeyBuilder _keyBuilder = new KeyBuilder(createCollator(), Bytes.kilobyte32 * 4);
+        
+        // setup key builder for RDF Values and Statements.
+        keyBuilder = new RdfKeyBuilder(_keyBuilder);
+
+        // perfect statement indices.
+        ndx_spo = new StatementIndex(journal,KeyOrder.SPO);
+        ndx_pos = new StatementIndex(journal,KeyOrder.POS);
+        ndx_osp = new StatementIndex(journal,KeyOrder.OSP);
+
+        ndx_termId = new TermIndex(journal, (short) 1);
+        
+        ndx_idTerm = new ReverseIndex(journal);
+
+    }
+
+    /**
+     * Create and return a new collator object responsible for encoding unicode
+     * strings into sort keys.
+     * 
+     * @return A new collator object.
+     * 
+     * @todo define properties for configuring the collator.
+     */
+    public RuleBasedCollator createCollator() {
+        
         // choose a collator for the default locale.
         RuleBasedCollator collator = (RuleBasedCollator) Collator
                 .getInstance(Locale.getDefault());
@@ -292,23 +320,10 @@ public class TripleStore {
 //        collator.setStrength(Collator.PRIMARY);
 //        collator.setStrength(Collator.SECONDARY);
 
-        // setup key builder that handles unicode and primitive data types.
-        KeyBuilder _keyBuilder = new KeyBuilder(collator, Bytes.kilobyte32 * 4);
+        return collator;
         
-        // setup key builder for RDF Values and Statements.
-        keyBuilder = new RdfKeyBuilder(_keyBuilder);
-
-        // perfect statement indices.
-        ndx_spo = new StatementIndex(journal,KeyOrder.SPO);
-        ndx_pos = new StatementIndex(journal,KeyOrder.POS);
-        ndx_osp = new StatementIndex(journal,KeyOrder.OSP);
-
-        ndx_termId = new TermIndex(journal, (short) 1);
-        
-        ndx_idTerm = new ReverseIndex(journal);
-
     }
-
+    
     public Properties getProperties() {
 
         return properties;
@@ -478,10 +493,60 @@ public class TripleStore {
                 + "ms, keyGen+insert=" + insertTime + "ms");
         
     }
-    
-    public void insertTerms( _Value[] terms, int numTerms ) {
 
-        if( numTerms == 0 ) return;
+    /**
+     * Generate the sort keys for the terms.
+     * 
+     * @param keyBuilder
+     *            The object used to generate the sort keys - <em>this is not
+     *            safe for concurrent writers</em>
+     * @param terms
+     *            The terms whose sort keys will be generated.
+     * @param numTerms
+     *            The #of terms in that array.
+     * 
+     * @see #createCollator()
+     * @see KeyBuilder
+     */
+    public void generateSortKeys(RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
+        
+        for (int i = 0; i < numTerms; i++) {
+
+            _Value term = terms[i];
+
+            if (term.key == null) {
+
+                term.key = keyBuilder.value2Key(term);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Batch insert of terms into the database.
+     * 
+     * @param terms
+     *            An array whose elements [0:nterms-1] will be inserted.
+     * @param numTerms
+     *            The #of terms to insert.
+     * @param haveKeys
+     *            True if the terms already have their sort keys.
+     * @param sorted
+     *            True if the terms are already sorted by their sort keys (in
+     *            the correct order for a batch insert).
+     * 
+     * @exception IllegalArgumentException
+     *                if <code>!haveKeys && sorted</code>.
+     */
+    public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
+
+        if (numTerms == 0)
+            return;
+
+        if (!haveKeys && sorted)
+            throw new IllegalArgumentException("sorted requires keys");
         
         long begin = System.currentTimeMillis();
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
@@ -495,24 +560,14 @@ public class TripleStore {
             /*
              * First make sure that each term has an assigned sort key.
              */
-            {
-                
+            if(!haveKeys) {
+
                 long _begin = System.currentTimeMillis();
                 
-                for ( int i = 0; i < numTerms; i++ ) {
-                    
-                    _Value term = terms[i];
-                    
-                    if(term.key==null) {
-                        
-                        term.key = keyBuilder.value2Key(term);
-                        
-                    }
-                    
-                }
-    
-                keyGenTime = System.currentTimeMillis() - _begin;
+                generateSortKeys(keyBuilder, terms, numTerms);
                 
+                keyGenTime = System.currentTimeMillis() - _begin;
+
             }
             
             /* 
@@ -520,7 +575,7 @@ public class TripleStore {
              * the natural order for the term:id index.
              */
 
-            if (sortBuffers) {
+            if (!sorted && sortBuffers) {
             
                 long _begin = System.currentTimeMillis();
                 
@@ -714,7 +769,7 @@ public class TripleStore {
         Reader reader = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file)));
 
-        PresortRioLoader loader = new PresortRioLoader( this );
+        IRioLoader loader = new PresortRioLoader( this );
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             

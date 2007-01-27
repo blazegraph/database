@@ -45,29 +45,26 @@ Modifications:
  * Created on Jan 27, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.rio;
+
+import java.io.Reader;
 
 /**
- * Test for for the {@link TripleStore}.
- * 
- * @todo write tests for the basic api.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTripleStore extends AbstractTripleStoreTestCase {
+public interface IRioLoader {
+    
+    public long getStatementsAdded();
+    
+    public long getInsertTime();
+    
+    public long getInsertRate();
 
-    /**
-     * 
-     */
-    public TestTripleStore() {
-    }
+    public void addRioLoaderListener( RioLoaderListener l );
+    
+    public void removeRioLoaderListener( RioLoaderListener l );
 
-    /**
-     * @param name
-     */
-    public TestTripleStore(String name) {
-        super(name);
-    }
+    public void loadRdfXml( Reader reader ) throws Exception;
     
 }

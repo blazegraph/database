@@ -195,6 +195,29 @@ public class TestRdfKeyBuilder extends TestCase2 {
         assertTrue(BytesUtil.compareBytes(k2, k3)<0);
         
     }
+
+    /**
+     * Test verifies the ordering among URIs, Literals, and BNodes. This
+     * ordering is important when batching terms of these different types into
+     * the term index since you want to insert the type types according to this
+     * order for the best performance.
+     */
+    public void test_termTypeOrder() {
+
+        /*
+         * one key of each type. the specific values for the types do not matter
+         * since we are only interested in the relative order between those
+         * types in this test.
+         */
+        
+        byte[] k1 = fixture.uri2key("http://www.cognitiveweb.org");
+        byte[] k2 = fixture.plainLiteral2key("hello world!");
+        byte[] k3 = fixture.blankNode2Key("a12");
+        
+        assertTrue(BytesUtil.compareBytes(k1, k2)<0);
+        assertTrue(BytesUtil.compareBytes(k2, k3)<0);
+        
+    }
     
     public void test_id2key() {
         
@@ -210,11 +233,15 @@ public class TestRdfKeyBuilder extends TestCase2 {
         System.err.println("k2(termId:"+id2+") = "+BytesUtil.toString(k2));
         System.err.println("k3(termId:"+id3+") = "+BytesUtil.toString(k3));
         
+        /*
+         * Verify that ids assigned in sequence result in an order for the
+         * corresponding keys in the same sequence.
+         */
         assertTrue(BytesUtil.compareBytes(k1, k2)<0);
         assertTrue(BytesUtil.compareBytes(k2, k3)<0);
         
     }
-    
+
     /**
      * @todo test rule and pred encoding and decoding as well.
      */

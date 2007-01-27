@@ -79,7 +79,7 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestRdfKeyBuilder.class );
         
-        suite.addTestSuite( TestTripleStore.class);
+        suite.addTestSuite( TestInsertRateStore.class);
 
         suite.addTest( com.bigdata.rdf.rio.TestAll.suite() );
 
