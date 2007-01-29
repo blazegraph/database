@@ -7,7 +7,6 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.objndx.IndexSegment.FileStore;
 
 /**
  * Test suite based on a small btree with known keys and values.
@@ -124,7 +123,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         7, 7),
@@ -198,7 +197,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         3, 3),
@@ -258,7 +257,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
              * example, those aspects that depend on the specifics of the length
              * of serialized nodes or leaves).
              */
-        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         1, 1),
@@ -339,7 +338,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         3, 3),
@@ -432,7 +431,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                 // setup reference queue to hold all leaves and nodes.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         11, 11),

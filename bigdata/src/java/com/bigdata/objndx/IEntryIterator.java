@@ -59,8 +59,7 @@ import java.util.Iterator;
 public interface IEntryIterator extends Iterator {
 
     /**
-     * The value of the key for the last entry visited by
-     * {@link Iterator#next()}.
+     * The key for the last entry visited by {@link Iterator#next()}.
      * 
      * @exception IllegalStateException
      *                if no entries have been visited.

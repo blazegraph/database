@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.lang.ref.WeakReference;
 
 /**
  * Test suite for the assertions that detect a violation of the invariants for a

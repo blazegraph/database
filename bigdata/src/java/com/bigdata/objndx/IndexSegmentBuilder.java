@@ -55,7 +55,6 @@ import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -105,23 +104,13 @@ import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
  *      less efficient on first glance.
  * 
  * FIXME use the shortest separator key.
- * 
- * @todo Support merging index segments. This will probably be a merge sort
- *       using two leaf scans in parallel followed by a scan over the merged
- *       result that builds the index segment. The latter leaf scan will be
- *       somewhat special but is required since we need to known the actual #of
- *       entries before we can build the tree. Alternatively, we could just
- *       compute the #of entries and then run two leaf scans merging as we build
- *       the index segment itself.
- * 
- * @todo Support external sorting? This is tricky since the key and value data
- *       type and comparator must have exactly the same semantics as in the
- *       {@link IBTree} which is a bit much to expect from an external sort
- *       routine. Also, since the data are pre-ordered a merging scan seems
- *       likely to be far more efficient.
+ *
+ * @see IndexSegment
+ * @see IndexSegmentFile
+ * @see IndexSegmentMerger
  */
 public class IndexSegmentBuilder {
-
+    
     /**
      * Logger.
      */
@@ -140,6 +129,13 @@ public class IndexSegmentBuilder {
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
+    /**
+     * The default error rate for a bloom filter.
+     * 
+     * @todo the error rate is only zero or non-zero at this time.
+     */
+    final public static double DEFAULT_ERROR_RATE = 1/128d;
+    
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
      * written.
@@ -163,14 +159,14 @@ public class IndexSegmentBuilder {
      * The file specified by the caller on which the {@link IndexSegment} is
      * written.
      */
-    protected final File outFile;
+    public final File outFile;
     
     /**
      * The temporary created to hold stack unless the index segment will consist
      * of just a root leaf. When created, this file is deleted regardless of the
      * outcome of the operation.
      */
-    protected final File tmpFile;
+    public final File tmpFile;
     
     /**
      * The file on which the {@link IndexSegment} is written. The file is closed
@@ -304,13 +300,15 @@ public class IndexSegmentBuilder {
      * </p>
      * 
      * @param outFile
-     *            The file on which the index segment is written.
+     *            The file on which the index segment is written.  The file MAY
+     *            exist but MUST have zero length if it does exist.
      * @param tmpDir
      *            The temporary directory in which the index stack are buffered
      *            during the build (optional - the default temporary directory
      *            is used if this is <code>null</code>).
      * @param btree
-     *            The btree.
+     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
+     *            being evicted into an {@link IndexSegment}.
      * @param m
      *            The branching factor for the generated tree. This can be
      *            choosen with an eye to minimizing the height of the generated
@@ -333,45 +331,63 @@ public class IndexSegmentBuilder {
             int m, double errorRate)
             throws IOException {
     
-        this(outFile,tmpDir,btree,null,m,errorRate);
+        this(outFile, tmpDir, btree.getEntryCount(), btree.entryIterator(), m,
+                btree.nodeSer.valueSerializer, errorRate);
         
     }
-
+    
     /**
      * Variant constructor performs a compacting merge of two btrees.
      * 
      * @param outFile
+     *            The file on which the index segment is written. The file MAY
+     *            exist but MUST have zero length if it does exist.
      * @param tmpDir
-     * @param btree
-     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
-     *            being evicted into an {@link IndexSegment}.
-     * @param btree2
-     *            Typically, a pre-existing {@link IndexSegment} to be merged
-     *            with the <i>btree</i> (optional). When <code>non-null</code>,
-     *            the entries in the two btrees will be combined into an interim
-     *            data structure representing their merge. Once the entries have
-     *            been merged we know how many entries will be present in the
-     *            output btree. The merge is efficient since both btrees are
-     *            already in sorted order.
+     *            The temporary directory in which the index node stack is
+     *            buffered during the build (optional - the default temporary
+     *            directory is used if this is <code>null</code>).
+     * @param entryCount
+     *            The #of entries.
+     * @param leafIterator
+     *            Used to visit the source {@link ILeafData} objects in key
+     *            order.
      * @param m
+     *            The branching factor for the generated tree. This can be
+     *            choosen with an eye to minimizing the height of the generated
+     *            tree. (Small branching factors are permitted for testing, but
+     *            generally you want something relatively large.)
+     * @param valueSerializer
+     *            Used to serialize values in the new {@link IndexSegment}.
      * @param errorRate
+     *            A value in [0:1] that is interpreted as an allowable false
+     *            positive error rate for a bloom filter. When zero, the bloom
+     *            filter is not constructed. The bloom filter provides efficient
+     *            fast rejection of keys that are not in the index. If the bloom
+     *            filter reports that a key is in the index then the index MUST
+     *            be tested to verify that the result is not a false positive.
+     *            Bloom filters are great if you have a lot of point tests to
+     *            perform but they are not used if you are doing range scans.
+     * 
      * @throws IOException
      * 
-     * @todo Note: the input btree is only used to setup some aspects of the
-     *       output btree (e.g., keyType). the #of entries in the output btree
-     *       is the #of entries in the input btree when there is only one input
-     *       tree and the #of entries that survive the merge when there are two
-     *       input btrees. either way we generate a plan and pass a _leaf_
-     *       iterator into the logic that generates the output btree.
-     * 
      * @todo make useChecksum a constructor parameter?
+     * 
+     * @todo make buffering of serialized nodes a constructor parameter. the
+     *       simplest implementation would be a linked list of the serialized
+     *       nodes. the advantage of buffering the nodes is less IO at the cost
+     *       of more RAM.
      */
-    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
-            AbstractBTree btree2, int m, double errorRate) throws IOException {
+    public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
+            IEntryIterator entryIterator, final int m,
+            IValueSerializer valueSerializer,
+            final double errorRate) throws IOException {
 
         assert outFile != null;
-        assert btree != null;
+        assert entryCount > 0;
+        assert entryIterator != null;
         assert m >= AbstractBTree.MIN_BRANCHING_FACTOR;
+        assert valueSerializer != null;
+        assert errorRate >= 0d;
         
         final long begin = System.currentTimeMillis();
 
@@ -384,14 +400,14 @@ public class IndexSegmentBuilder {
                 m,
                 initialBufferCapacity,
                 new IndexSegment.CustomAddressSerializer(),
-                btree.nodeSer.keySerializer,
-                btree.nodeSer.valueSerializer,
+                KeyBufferSerializer.INSTANCE,
+                valueSerializer,
                 new RecordCompressor(),
                 useChecksum
                 );
 
         // Create a plan for generating the output tree.
-        plan = new IndexSegmentPlan(m,btree.getEntryCount());
+        plan = new IndexSegmentPlan(m,entryCount);
 
         /*
          * Setup a stack of stack (one per non-leaf level) and one leaf. These
@@ -453,8 +469,8 @@ public class IndexSegmentBuilder {
 
         this.outFile = outFile;
         
-        if (outFile.exists()) {
-            throw new IllegalArgumentException("File exists: "
+        if (outFile.exists() && outFile.length() != 0L) {
+            throw new IllegalArgumentException("File exists and is not empty: "
                     + outFile.getAbsoluteFile());
         }
 
@@ -546,19 +562,16 @@ public class IndexSegmentBuilder {
              * Note that the root may be a leaf as a degenerate case.
              */
 
-            // visit leaves in order in the source tree.
-            Iterator sourceLeaves = btree.leafIterator();
-
-            /*
-             * The #of entries consumed in the current source leaf. When this
-             * reaches the #of keys in the source leaf then we have to read the
-             * next source leaf from the source leaf iterator.
-             */
-            Leaf sourceLeaf = (Leaf)sourceLeaves.next();
-            
-            int nconsumed = 0;
-            
-            int nsourceKeys = sourceLeaf.getKeyCount();
+//            /*
+//             * The #of entries consumed in the current source leaf. When this
+//             * reaches the #of keys in the source leaf then we have to read the
+//             * next source leaf from the source leaf iterator.
+//             */
+//            ILeafData sourceLeaf = leafIterator.next();
+//            
+//            int nconsumed = 0;
+//            
+//            int nsourceKeys = sourceLeaf.getKeyCount();
 
             for (int i = 0; i < plan.nleaves; i++) {
 
@@ -580,23 +593,26 @@ public class IndexSegmentBuilder {
                 
                 for (int j = 0; j < limit; j++) {
 
-                    if( nconsumed == nsourceKeys ) {
-                    
-                        // Read another leaf from the source tree.
-                        
-                        sourceLeaf = (Leaf)sourceLeaves.next();
-                        
-                        nconsumed = 0;
-                        
-                        nsourceKeys = sourceLeaf.getKeyCount();
-                                                
-                    }
+//                    if( nconsumed == nsourceKeys ) {
+//                    
+//                        // get the next source leaf.
+//                        sourceLeaf = leafIterator.next();
+//                        
+//                        nconsumed = 0;
+//                        
+//                        nsourceKeys = sourceLeaf.getKeyCount();
+//                                                
+//                    }
                     
                     // copy key from the source leaf.
 //                    leaf.copyKey(keys.nkeys, sourceLeaf, nconsumed);
-                    keys.keys[keys.nkeys] = sourceLeaf.keys.getKey(nconsumed);
-                    
-                    leaf.vals[j] = sourceLeaf.values[nconsumed];
+//                    keys.keys[keys.nkeys] = sourceLeaf.getKeys().getKey(nconsumed);
+//                    
+//                    leaf.vals[j] = ((Leaf)sourceLeaf).values[nconsumed];
+
+                    leaf.vals[j] = entryIterator.next();
+
+                    keys.keys[keys.nkeys] = entryIterator.getKey();
 
                     if( bloomFilter != null ) {
                         
@@ -607,7 +623,7 @@ public class IndexSegmentBuilder {
                     
                     keys.nkeys++;
                     
-                    nconsumed++;
+//                    nconsumed++;
 
                     if( i > 0 && j == 0 ) {
 
@@ -1298,29 +1314,6 @@ public class IndexSegmentBuilder {
             return keys;
             
         }
-
-//        /**
-//         * Copy a reference to a key from the source node into this node. This
-//         * method does not modify the source node. This method does not update
-//         * the #of keys in this node.
-//         * 
-//         * @param dstpos
-//         *            The index position to which the key whose reference will
-//         *            be copied on this node.
-//         * @param src
-//         *            The source node from which the key will be copied.
-//         * @param srcpos
-//         *            The index position from which the key will be copied.
-//         * 
-//         * @todo this could be optimized away since we have total control and
-//         *       visibility into the implementation classes used for the keys
-//         *       in this context.
-//         */
-//        final protected void copyKey(int dstpos,IAbstractNodeData src,int srcpos) {
-//            
-//            keys.keys[dstpos] = src.getKeys().getKey(srcpos);
-//
-//        }
 
     }
     

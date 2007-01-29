@@ -61,7 +61,6 @@ import java.util.TreeMap;
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.Bytes;
-import com.bigdata.objndx.ndx.NoSuccessorException;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -522,6 +521,7 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("km1<k0",BytesUtil.compareBytes(km1, k0)<0);
         assertTrue("k0<kp1",BytesUtil.compareBytes(k0, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
+        assertTrue("kmin<kmax",BytesUtil.compareBytes(kmin, kmax)<0);
 
         /*
          * verify decoding.

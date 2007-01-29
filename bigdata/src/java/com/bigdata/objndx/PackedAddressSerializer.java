@@ -51,6 +51,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import org.CognitiveWeb.extser.LongPacker;
+
 import com.bigdata.journal.Bytes;
 
 /**

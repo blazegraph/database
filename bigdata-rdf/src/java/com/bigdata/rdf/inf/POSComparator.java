@@ -57,23 +57,27 @@ public class POSComparator implements Comparator<SPO> {
 
     public int compare(SPO stmt1, SPO stmt2) {
 
-        long ret = stmt1.p - stmt2.p;
+        /*
+         * Note: logic avoids possible overflow of [long] by not computing the
+         * difference between two longs.
+         */
+        int ret;
+        
+        ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
         
         if( ret == 0 ) {
         
-            ret = stmt1.o - stmt2.o;
+            ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
             
             if( ret == 0 ) {
                 
-                ret = stmt1.s - stmt2.s;
+                ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
                 
             }
             
         }
-        
-        if( ret == 0 ) return 0;
-        if( ret > 0 ) return 1;
-        return -1;
+
+        return ret;
         
     }
     

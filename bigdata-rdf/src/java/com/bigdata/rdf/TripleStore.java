@@ -70,6 +70,7 @@ import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
@@ -635,22 +636,7 @@ public class TripleStore {
 
             long _begin = System.currentTimeMillis();
 
-            Arrays.sort(terms, 0, numTerms, new Comparator<_Value>() {
-
-                public int compare(_Value term1, _Value term2) {
-
-                    long diff = term1.termId - term2.termId;
-
-                    if (diff < 0)
-                        return -1;
-                    else if (diff > 0)
-                        return 1;
-                    else
-                        return 0;
-
-                }
-
-            });
+            Arrays.sort(terms, 0, numTerms, TermIdComparator.INSTANCE);
 
             sortTime += System.currentTimeMillis() - _begin;
 

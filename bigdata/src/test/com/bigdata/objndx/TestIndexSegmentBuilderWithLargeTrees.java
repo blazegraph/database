@@ -57,7 +57,6 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.objndx.BTree.TransitionalRawStore;
-import com.bigdata.objndx.IndexSegment.FileStore;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -196,7 +195,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 //          * case and not, for example, those aspects that depend on the
 //          * specifics of the length of serialized nodes or leaves).
 //          */
-//        final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+//        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
 //                // setup reference queue to hold all leaves and nodes.
 //                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
 //                        1, 1),
@@ -331,7 +330,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment.");
-            final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+            final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                     // setup reference queue.
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             100, 20),

@@ -59,7 +59,6 @@ import com.bigdata.journal.Bytes;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.objndx.BTree.TransitionalRawStore;
-import com.bigdata.objndx.IndexSegment.FileStore;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -301,7 +300,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * specifics of the length of serialized nodes or leaves).
          */
         System.err.println("Opening index segment w/ bloom filter.");
-        final IndexSegment seg2 = new IndexSegment(new FileStore(outFile2),
+        final IndexSegment seg2 = new IndexSegment(new IndexSegmentFileStore(outFile2),
                 // setup reference queue.
                 new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                         100, 20),
@@ -397,7 +396,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/o bloom filter.");
-            final IndexSegment seg = new IndexSegment(new FileStore(outFile),
+            final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
                     // setup reference queue.
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             100, 20),
@@ -411,7 +410,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/ bloom filter.");
-            final IndexSegment seg2 = new IndexSegment(new FileStore(outFile2),
+            final IndexSegment seg2 = new IndexSegment(new IndexSegmentFileStore(outFile2),
                     // setup reference queue.
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             100, 20),

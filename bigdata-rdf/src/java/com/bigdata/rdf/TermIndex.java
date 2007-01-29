@@ -56,6 +56,7 @@ import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.PO;
+import com.bigdata.rdf.rio.BulkRioLoader;
 
 /**
  * A persistent index mapping variable length byte[] keys formed from an RDF
@@ -69,18 +70,20 @@ import com.bigdata.objndx.PO;
 public class TermIndex extends BTree {
 
     /**
-     * The next identifier to be assigned to a string inserted into this
-     * index.
+     * The next identifier to be assigned to a string inserted into this index.
      * 
-     * @todo this needs to be (a) shared across all transactional instances
-     *       of this index; (b) restart safe; (c) set into a namespace that
-     *       is unique to the journal so that multiple writers on multiple
-     *       journals for a single distributed database can not collide;
-     *       and (d) set into a namespace that is unique to the index and
-     *       that is persistent as part of the index metadata (which should
-     *       be extensible for at least {@link BTree}).
+     * @todo this needs to be (a) shared across all transactional instances of
+     *       this index; (b) restart safe; (c) set into a namespace that is
+     *       unique to the journal so that multiple writers on multiple journals
+     *       for a single distributed database can not collide; and (d) set into
+     *       a namespace that is unique to the index and that is persistent as
+     *       part of the index metadata (which should be extensible for at least
+     *       {@link BTree}).
+     * 
+     * @todo the {@link BulkRioLoader} also uses this field but that use needs
+     *       to be reconciled for consistency if concurrent writers are allowed.
      */
-    protected long nextId = 1;
+    long nextId = 1;
     
     /**
      * An int16 value that may be used to multiplex identifier assignments for
@@ -95,6 +98,22 @@ public class TermIndex extends BTree {
      *       some other manner.
      */
     protected final short indexId;
+    
+    public long nextId() {
+
+        long id = nextId++;
+        
+        if( indexId != 0 ) {
+            
+            id <<= 16;
+            
+            id |= indexId;
+            
+        }
+        
+        return id;
+
+    }
     
     /**
      * Create a new index.
@@ -159,16 +178,8 @@ public class TermIndex extends BTree {
         Long id = (Long)lookup(key);
         
         if( id == null ) {
-            
-            id = nextId++;
-            
-            if( indexId != 0 ) {
-                
-                id <<= 16;
-                
-                id |= indexId;
-                
-            }
+
+            id = nextId();
             
             insert(key,id);
             

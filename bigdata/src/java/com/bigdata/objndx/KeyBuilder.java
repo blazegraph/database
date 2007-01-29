@@ -2,7 +2,6 @@ package com.bigdata.objndx;
 
 import java.util.Locale;
 
-import com.bigdata.objndx.ndx.NoSuccessorException;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RawCollationKey;
 import com.ibm.icu.text.RuleBasedCollator;

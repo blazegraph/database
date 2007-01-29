@@ -59,37 +59,10 @@ import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
- * Statement handled for the RIO RDF Parser that collects values and statements
- * in batches and inserts ordered batches into the {@link TripleStore}.
- * 
- * @todo setup a producer-consumer queue. that creates a more or less even
- *       division of labor so as to maximize load rate on a platform with at
- *       least 2 cpus. The producer runs rio fills in buffers, generates keys
- *       for terms, and sorts terms by their keys and then places the buffer
- *       onto the queue. The consumer accepts a buffer with pre-generated term
- *       keys and terms in sorted order by those keys and (a) inserts the terms
- *       into the database; and (b) generates the statement keys for each of the
- *       statement indices, ordered the statement for each index in turn, and
- *       bulk inserts the statements into each index in turn. <br>
- *       pre-generate keys before handing over the buffer to the consumer. <br>
- *       pre-sort terms by their keys before handing over the buffer to the
- *       consumer. <br>
- *       if an LRU cache is to be used, then allow it to cross buffer boundaries
- *       always returning the same value. such values will have a non-null key
- *       so their key will only be generated once. see if i can leverage the
- *       existing cweb LRU classes for this. <br>
- *       sort does not remove duplicate. therefore if we do not use some sort of
- *       cache in the term factory then it may be worth testing if terms in a
- *       sequence are the same term.
- * 
- * @todo compare a bulk insert for each batch with a "perfect" index build and a
- *       compacting merge (i.e., a bulk load that runs outside of the
- *       transaction mechanisms). small documents can clearly fit inside of a
- *       single buffer and batch insert. Up to N buffers could be collected
- *       before deciding whether the document is moderate in size vs very large.
- *       Very large documents can combine N buffers into an index segment and
- *       collect a set of index segments. the commit would merge those index
- *       segments with the database.
+ * Statement handler for the RIO RDF Parser that collects values and statements
+ * in batches and inserts ordered batches into the {@link TripleStore}.  The
+ * default batch size is large enough to absorb many ontologies in a single
+ * batch.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -98,13 +71,31 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
 {
 
     /**
+     * The default buffer size.
+     * <p>
      * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
      * value.
      */
-    final int BUFFER_SIZE = 1000000;
+    static final int DEFAULT_BUFFER_SIZE = 1000000;
     
-    TripleStore store;
+    /**
+     * Terms and statements are inserted into this store.
+     */
+    protected final TripleStore store;
     
+    /**
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * object is signaling that no more buffers will be placed onto the
+     * queue by the producer and that the consumer should therefore
+     * terminate.
+     */
+    protected final int capacity;
+
+    /**
+     * When true only distinct terms and statements are stored in the buffer.
+     */
+    protected final boolean distinct;
+
     long stmtsAdded;
     
     long insertTime;
@@ -113,16 +104,6 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     
     Vector<RioLoaderListener> listeners;
     
-//    /**
-//     * When true, each term in a type specific buffer will be placed into a
-//     * cannonicalizing map so that we never have more than once instance for
-//     * the same term in a buffer at a time.  When false those transient term
-//     * maps are not used.
-//     * 
-//     * Note: this does not show much of an effect.
-//     */
-//    final boolean useTermMaps = false;
-
     /**
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
@@ -131,9 +112,23 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     
     public PresortRioLoader( TripleStore store ) {
     
-        this.store = store;
+        this(store, DEFAULT_BUFFER_SIZE, false );
+        
+    }
+    
+    public PresortRioLoader(TripleStore store, int capacity, boolean distinct) {
 
-        this.buffer = new Buffer(store, BUFFER_SIZE);
+        assert store != null;
+        
+        assert capacity > 0;
+
+        this.store = store;
+        
+        this.capacity = capacity;
+        
+        this.distinct = distinct;
+        
+        this.buffer = new Buffer(store, capacity, distinct );
         
     }
     
@@ -232,19 +227,39 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         stmtsAdded = 0;
         
         // Allocate the initial buffer for parsed data.
-        buffer = new Buffer(store,BUFFER_SIZE);
+        if(buffer != null) {
+            
+            buffer = new Buffer(store,capacity,distinct);
+            
+        }
 
-        // Parse the data.
-        parser.parse( reader, "" );
-        
-        // bulk insert the buffered data into the store.
-        buffer.insert();
+        try {
 
-        // clear the old buffer reference.
-        buffer = null;
+            // Parse the data.
+            parser.parse(reader, "");
+
+            // bulk insert the buffered data into the store.
+            if(buffer != null) {
+                
+                buffer.insert();
+                
+            }
+
+        } catch (RuntimeException ex) {
+
+            log.error("While parsing: " + ex, ex);
+
+            throw ex;
+            
+        } finally {
+
+            // clear the old buffer reference.
+            buffer = null;
+
+        }
 
         store.commit();
-        
+
         insertTime += System.currentTimeMillis() - insertStart;
         
     }
@@ -262,7 +277,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
             buffer.insert();
 
             // allocate a new buffer.
-            buffer = new Buffer(store,BUFFER_SIZE);
+            buffer = new Buffer(store,capacity,distinct);
             
             // fall through.
             

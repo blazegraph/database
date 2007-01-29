@@ -51,8 +51,6 @@ import java.util.Arrays;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.objndx.ndx.NoSuccessorException;
-
 /**
  * Test suite for the "linear list" access methods.
  * 

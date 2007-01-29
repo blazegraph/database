@@ -49,7 +49,6 @@ import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -65,39 +64,20 @@ import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
- * Statement handled for the RIO RDF Parser that collects values and statements
- * in batches and inserts ordered batches into the {@link TripleStore}.
+ * Statement handler for the RIO RDF Parser that a producer-consumer queue to
+ * divide the work load.
+ * <p>
+ * The producer runs rio fills in buffers, generates keys for terms, and sorts
+ * terms by their keys and then places the bufferQueue onto the queue. The
+ * consumer accepts a bufferQueue with pre-generated term keys and terms in
+ * sorted order by those keys and (a) inserts the terms into the database; and
+ * (b) generates the statement keys for each of the statement indices, ordered
+ * the statement for each index in turn, and bulk inserts the statements into
+ * each index in turn.
+ * <p>
  * 
- * @todo (I've done this but the consumer is lagging far behind.) setup a
- *       producer-consumer queue. that creates a more or less even division of
- *       labor so as to maximize load rate on a platform with at least 2 cpus.
- *       The producer runs rio fills in buffers, generates keys for terms, and
- *       sorts terms by their keys and then places the bufferQueue onto the
- *       queue. The consumer accepts a bufferQueue with pre-generated term keys
- *       and terms in sorted order by those keys and (a) inserts the terms into
- *       the database; and (b) generates the statement keys for each of the
- *       statement indices, ordered the statement for each index in turn, and
- *       bulk inserts the statements into each index in turn. <br>
- *       pre-generate keys before handing over the bufferQueue to the consumer.
- *       <br>
- *       pre-sort terms by their keys before handing over the bufferQueue to the
- *       consumer. <br>
- *       if an LRU cache is to be used, then allow it to cross bufferQueue
- *       boundaries always returning the same value. such values will have a
- *       non-null key so their key will only be generated once. see if i can
- *       leverage the existing cweb LRU classes for this. <br>
- *       sort does not remove duplicate. therefore if we do not use some sort of
- *       cache in the term factory then it may be worth testing if terms in a
- *       sequence are the same term.
- * 
- * @todo compare a bulk insert for each batch with a "perfect" index build and a
- *       compacting merge (i.e., a bulk load that runs outside of the
- *       transaction mechanisms). small documents can clearly fit inside of a
- *       single bufferQueue and batch insert. Up to N buffers could be collected
- *       before deciding whether the document is moderate in size vs very large.
- *       Very large documents can combine N buffers into an index segment and
- *       collect a set of index segments. the commit would merge those index
- *       segments with the database.
+ * @todo The consumer lags behind the producer. Explore optimizations for the
+ *       btree batch api to improve the insert rate.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -105,16 +85,32 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandler
 {
 
-    public static Logger log = Logger.getLogger(ConsumerThread.class);
-
     /**
+     * The default buffer size.
+     * <p>
      * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
      * value.
      */
-    final int BUFFER_SIZE = 1000000;
+    static final int DEFAULT_BUFFER_SIZE = 100000;
     
-    TripleStore store;
+    /**
+     * Terms and statements are inserted into this store.
+     */
+    protected final TripleStore store;
     
+    /**
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * object is signaling that no more buffers will be placed onto the
+     * queue by the producer and that the consumer should therefore
+     * terminate.
+     */
+    protected final int capacity;
+
+    /**
+     * When true only distinct terms and statements are stored in the buffer.
+     */
+    protected final boolean distinct;
+
     long stmtsAdded;
     
     long insertTime;
@@ -145,16 +141,6 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     final RdfKeyBuilder keyBuilder;
 
     Vector<RioLoaderListener> listeners;
-    
-//    /**
-//     * When true, each term in a type specific bufferQueue will be placed into a
-//     * cannonicalizing map so that we never have more than once instance for
-//     * the same term in a bufferQueue at a time.  When false those transient term
-//     * maps are not used.
-//     * 
-//     * Note: this does not show much of an effect.
-//     */
-//    final boolean useTermMaps = false;
 
     /**
      * Used to bufferQueue RDF {@link Value}s and {@link Statement}s emitted by
@@ -164,9 +150,23 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     
     public MultiThreadedPresortRioLoader( TripleStore store ) {
     
-        this.store = store;
+        this( store, DEFAULT_BUFFER_SIZE, false );
+        
+    }
+    
+    public MultiThreadedPresortRioLoader( TripleStore store, int capacity, boolean distinct ) {
 
-        this.buffer = new Buffer(store, BUFFER_SIZE);
+        assert store != null;
+        
+        assert capacity > 0;
+
+        this.store = store;
+        
+        this.capacity = capacity;
+        
+        this.distinct = distinct;
+        
+        this.buffer = new Buffer(store, capacity, distinct );
        
         this.keyBuilder = new RdfKeyBuilder(new KeyBuilder(store
                 .createCollator(), Bytes.kilobyte32 * 4));
@@ -267,7 +267,11 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         stmtsAdded = 0;
         
         // Allocate the initial bufferQueue for parsed data.
-        buffer = new Buffer(store,BUFFER_SIZE);
+        if(buffer==null) {
+
+            buffer = new Buffer(store, capacity, distinct);
+            
+        }
 
         // Start thread to consume buffered data.
         consumer = new ConsumerThread(bufferQueue);
@@ -290,7 +294,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
              */
             if(buffer != null) {
 
-                putBufferOnQueue(buffer);
+                putBufferOnQueue();
                 
             }
 
@@ -299,7 +303,9 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
              * shutdown once it has processed everything on the queue. 
              */
 
-            putBufferOnQueue(new Buffer(store,-1));
+            buffer = new Buffer(store,-1,false);
+            
+            putBufferOnQueue();
             
             /* wait until the queue is empty.
              * 
@@ -366,7 +372,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      * 
      * @param buffer The buffer.
      */
-    protected void putBufferOnQueue(Buffer buffer) {
+    protected void putBufferOnQueue() {
 
         assert buffer != null;
 
@@ -391,21 +397,27 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
                                     + buffer.sorted + ")")
                     + " on the queue; queue length=" + bufferQueue.size());
 
-            /* 
+            /*
              * Put the buffer onto the queue, blocking if necessary.
+             * 
+             * If the ConsumerThread stops running while we are blocked here
+             * then checkConsumer() will throw an exception on the next
+             * iteration.
              */
             
             bufferQueue.put(buffer);
         
+            this.buffer = null;
+            
         } catch (InterruptedException ex) {
             
             /*
-             * @todo What is the right way to handle this?
+             * @todo interpret this as an error so that there is a means
+             * available to stop the parser while it is running?
              * 
-             * @todo What happens if the ConsumerThread stops running while
-             * we are blocked here? Should the ConsumerThread hold a
-             * reference to this thread and interrupt it so that it can
-             * terminate as well?
+             * @todo If the queue is at capacity and the {@link ConsumerThread}
+             * dies should it interrupt this thread so that the parser will
+             * quit?
              */
             
             throw new RuntimeException(
@@ -544,10 +556,10 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
          */
         if(buffer.nearCapacity()) {
 
-            putBufferOnQueue(buffer);
+            putBufferOnQueue();
             
             // allocate a new bufferQueue.
-            buffer = new Buffer(store,BUFFER_SIZE);
+            buffer = new Buffer(store,capacity,distinct);
             
             // fall through.
             

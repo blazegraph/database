@@ -59,7 +59,6 @@ public class TestAbstractKeyBuffer extends TestCase2 {
      * 
      */
     public TestAbstractKeyBuffer() {
-        // TODO Auto-generated constructor stub
     }
 
     /**
@@ -67,7 +66,6 @@ public class TestAbstractKeyBuffer extends TestCase2 {
      */
     public TestAbstractKeyBuffer(String name) {
         super(name);
-        // TODO Auto-generated constructor stub
     }
 
 }

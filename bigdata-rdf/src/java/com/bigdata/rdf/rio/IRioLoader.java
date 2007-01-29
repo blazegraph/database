@@ -49,12 +49,16 @@ package com.bigdata.rdf.rio;
 
 import java.io.Reader;
 
+import org.apache.log4j.Logger;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IRioLoader {
     
+    public static Logger log = Logger.getLogger(IRioLoader.class);
+
     public long getStatementsAdded();
     
     public long getInsertTime();

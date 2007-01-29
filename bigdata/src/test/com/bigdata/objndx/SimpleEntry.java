@@ -50,8 +50,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.bigdata.journal.Bytes;
-
 /**
  * Test helper provides an entry (aka value) for a {@link Leaf}.
  * 

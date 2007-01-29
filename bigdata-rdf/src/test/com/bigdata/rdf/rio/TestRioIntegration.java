@@ -196,20 +196,53 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
     public void test_loadFile_basicRioLoader() throws IOException {
 
-        doTest(new BasicRioLoader(), new String[] { "data/wordnet_nouns-20010201.rdf" });
+        doTest(new BasicRioLoader(), testData);
 
+        // Note: does not load any data.
+        
     }
     
     public void test_loadFile_presortRioLoader() throws IOException {
 
-        doTest(new PresortRioLoader( store ), new String[] { "data/wordnet_nouns-20010201.rdf" });
+        doTest(new PresortRioLoader( store ), testData);
 
+        assertDataLoaded();
+        
     }
     
     public void test_loadFile_multiThreadedPresortRioLoader() throws IOException {
 
-        doTest(new MultiThreadedPresortRioLoader( store ), new String[] { "data/wordnet_nouns-20010201.rdf" });
+        doTest(new MultiThreadedPresortRioLoader( store ), testData);
 
+        assertDataLoaded();
+        
+    }
+    
+    public void test_loadFile_bulkRioLoader() throws IOException {
+
+        doTest(new BulkRioLoader( store ), testData);
+
+        assertDataLoaded();
+        
+    }
+    
+    protected String[] testData = new String[] { "data/wordnet_nouns-20010201.rdf" };
+    
+    protected void assertDataLoaded() {
+
+        int nterms = 273644;
+        int nstatements = 223146;
+        
+        assertEquals("#terms",nterms,store.ndx_termId.getEntryCount());
+        
+        assertEquals("#ids",nterms,store.ndx_idTerm.getEntryCount());
+        
+        assertEquals("#spo",nstatements,store.ndx_spo.getEntryCount());
+        
+        assertEquals("#pos",nstatements,store.ndx_pos.getEntryCount());
+        
+        assertEquals("#ops",nstatements,store.ndx_osp.getEntryCount());
+        
     }
     
 }

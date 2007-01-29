@@ -42,44 +42,29 @@ Modifications:
 
 */
 /*
- * Created on May 9, 2006
+ * Created on Nov 9, 2005
  */
-package com.bigdata.objndx.ndx;
-
-import java.io.Serializable;
-import java.util.Comparator;
-
-import org.CognitiveWeb.extser.Stateless;
+package com.bigdata.objndx;
 
 /**
- * Comparator for {@link String} values using {@link java.lang.String#compareTo(java.lang.String)}.
- * 
- * @version $Id$
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * An instance of this class is thrown where there is no successor
+ * to a value within its value space.
  */
+public class NoSuccessorException extends RuntimeException
+{
 
-public final class StringComparator implements Comparator, Serializable, Stateless {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -2290043197024119560L;
 
-    private static final long serialVersionUID = 3162584716956701139L;
-
-    public static final Comparator INSTANCE = new StringComparator();
-
-    public StringComparator() {
-        super();
+    public NoSuccessorException() {
     }
 
-    public int compare(Object o1, Object o2) {
-        if (o1 == null ) {
-            throw new IllegalArgumentException();
-        }
-        if (o2 == null) {
-            throw new IllegalArgumentException();
-        }
-        return ((String) o1).compareTo((String) o2);
-    }
+    public NoSuccessorException(String msg) {
 
-    public boolean equals( Object o ) {
-        return this == o || o instanceof StringComparator;
+        super(msg);
+
     }
 
 }

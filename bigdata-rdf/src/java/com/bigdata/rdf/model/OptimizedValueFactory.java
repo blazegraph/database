@@ -62,6 +62,7 @@ import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.objndx.BytesUtil;
 import com.bigdata.rdf.RdfKeyBuilder;
+import com.bigdata.rdf.TripleStore;
 
 public class OptimizedValueFactory implements ValueFactory {
 
@@ -187,20 +188,63 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
-    public static class _Value implements Value {
-
-        public final String term;
-        
-        public long termId;
+    /**
+     * An RDF {@link Value} base class designed to support batch and bulk
+     * loading of parsed RDF data.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    abstract public static class _Value implements Value {
 
         /**
-         * The sort key under which this value will be placed into the terms
-         * index.
+         * The primary lexical term (URI, label for literal, ID for BNode).
+         * <p>
+         * Note that derived classes may define additional attributes such as
+         * the language code or datatype for a literal.
+         */
+        public final String term;
+        
+        /**
+         * The sort key under which this value will be placed into the
+         * {@link TripleStore#ndx_termId terms} index. The sort key is a
+         * representation of the total term, including any additional attributes
+         * such as the language code or the datatype URI.
          * 
          * @see RdfKeyBuilder
          */
-        public byte[] key;
+        public byte[] key = null;
 
+        /**
+         * The term identifier assigned to this term by the
+         * {@link TripleStore#ndx_termId terms} index and the identifier under
+         * which the lexical item may be recovered from the
+         * {@link TripleStore#ndx_idTerm term identifiers} index.
+         */
+        public long termId = 0;
+
+        /**
+         * Initially <code>false</code>, this field is set <code>true</code>
+         * if multiple occurrences of the same term are identified during an
+         * index load operation. Duplicate filtering is required only for bulk
+         * loads into {@link IndexSegments} since the inputs to that process are
+         * presumed to be an ordered set of distinct key-value data. While
+         * duplicate filtering is not always performed, a term is a duplicate if
+         * this field is set.
+         */
+        public boolean duplicate = false;
+        
+        /**
+         * Initially <code>false</code>, this field is set <code>true</code>
+         * if it is determined that a term has already been assigned a term
+         * identifier and is therefore in both the
+         * {@link TripleStore#ndx_termId terms} index and the
+         * {@link TripleStore#ndx_idTerm term identifiers} index. This is used
+         * to avoid re-definition of terms in the term identifiers index during
+         * a bulk load operation.
+         */
+        public boolean known = false;
+        
         public _Value(String term) {
 
             this.term = term;
@@ -284,7 +328,7 @@ public class OptimizedValueFactory implements ValueFactory {
      */
     public static class _ValueSortKeyComparator implements Comparator<_Value> {
 
-        public static final transient _ValueSortKeyComparator INSTANCE = new _ValueSortKeyComparator();;
+        public static final transient Comparator<_Value> INSTANCE = new _ValueSortKeyComparator();
 
         public int compare(_Value o1, _Value o2) {
 
@@ -295,6 +339,38 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
+    /**
+     * Places {@link #_Value}s into an ordering determined by their assigned
+     * {@link _Value#termId term identifiers}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see _Value#termId
+     */
+    public static class TermIdComparator implements Comparator<_Value> {
+
+        public static final transient Comparator<_Value> INSTANCE =
+            new TermIdComparator();
+
+        public int compare(_Value term1, _Value term2) {
+
+            /*
+             * Note: comparison avoids possible overflow of <code>long</code> by
+             * not computing the difference directly.
+             */
+
+            final long id1 = term1.termId;
+            final long id2 = term2.termId;
+            
+            if(id1 < id2) return -1;
+            if(id1 > id2) return 1;
+            return 0;
+
+        }
+
+    }
+    
     public static class _Resource extends _Value implements Resource {
 
         public _Resource(String term) {
@@ -445,6 +521,27 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public final _Value o;
 
+        /**
+         * Initially <code>false</code>, this field is set <code>true</code>
+         * if multiple occurrences of the same statement are identified during
+         * an index load operation. Duplicate filtering is required only for
+         * bulk loads into {@link IndexSegments} since the inputs to that
+         * process are presumed to be an ordered set of distinct key-value data.
+         * While duplicate filtering is not always performed, a statement is a
+         * duplicate if this field is set.
+         */
+        public boolean duplicate = false;
+        
+        /**
+         * Initially <code>false</code>, this field is set <code>true</code>
+         * if it is determined that a statement is known to the
+         * {@link StatementIndex statement indices} maintained by the
+         * {@link TripleStore}. This is used to avoid re-definition of
+         * statements in the during a bulk load operation where duplicate keys
+         * would violate the B+-Tree unique key constraint.
+         */
+        public boolean known = false;
+        
         public _Statement(_Resource s, _URI p, _Value o) {
 
             this.s = s;
@@ -473,6 +570,14 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        public boolean equals(_Statement stmt) {
+            
+            return (s.termId == stmt.s.termId) && //
+                   (p.termId == stmt.p.termId) && //
+                   (o.termId == stmt.o.termId);
+            
+        }
+        
         /**
          * Imposes s:p:o ordering based on termIds.
          */
@@ -484,21 +589,30 @@ public class OptimizedValueFactory implements ValueFactory {
 
             }
 
-            _Statement stmt = (_Statement) other;
+            final _Statement stmt1 = this;
+            final _Statement stmt2 = (_Statement) other;
 
-            long ret = s.termId - stmt.s.termId;
-            if (ret == 0) {
-                ret = p.termId - stmt.p.termId;
-                if (ret == 0) {
-                    ret = o.termId - stmt.o.termId;
+            /*
+             * Note: logic avoids possible overflow of [long] by not computing the
+             * difference between two longs.
+             */
+            int ret;
+            
+            ret = stmt1.s.termId < stmt2.s.termId ? -1 : stmt1.s.termId > stmt2.s.termId ? 1 : 0;
+            
+            if( ret == 0 ) {
+            
+                ret = stmt1.p.termId < stmt2.p.termId ? -1 : stmt1.p.termId > stmt2.p.termId ? 1 : 0;
+                
+                if( ret == 0 ) {
+                    
+                    ret = stmt1.o.termId < stmt2.o.termId ? -1 : stmt1.o.termId > stmt2.o.termId ? 1 : 0;
+                    
                 }
+                
             }
 
-            if (ret == 0)
-                return 0;
-            if (ret > 0)
-                return 1;
-            return -1;
+            return ret;
 
         }
 
@@ -516,25 +630,27 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
-            long ret = stmt1.s.termId - stmt2.s.termId;
-
-            if (ret == 0) {
-
-                ret = stmt1.p.termId - stmt2.p.termId;
-
-                if (ret == 0) {
-
-                    ret = stmt1.o.termId - stmt2.o.termId;
-
+            /*
+             * Note: logic avoids possible overflow of [long] by not computing the
+             * difference between two longs.
+             */
+            int ret;
+            
+            ret = stmt1.s.termId < stmt2.s.termId ? -1 : stmt1.s.termId > stmt2.s.termId ? 1 : 0;
+            
+            if( ret == 0 ) {
+            
+                ret = stmt1.p.termId < stmt2.p.termId ? -1 : stmt1.p.termId > stmt2.p.termId ? 1 : 0;
+                
+                if( ret == 0 ) {
+                    
+                    ret = stmt1.o.termId < stmt2.o.termId ? -1 : stmt1.o.termId > stmt2.o.termId ? 1 : 0;
+                    
                 }
-
+                
             }
 
-            if (ret == 0)
-                return 0;
-            if (ret > 0)
-                return 1;
-            return -1;
+            return ret;
 
         }
 
@@ -552,25 +668,27 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
-            long ret = stmt1.p.termId - stmt2.p.termId;
-
-            if (ret == 0) {
-
-                ret = stmt1.o.termId - stmt2.o.termId;
-
-                if (ret == 0) {
-
-                    ret = stmt1.s.termId - stmt2.s.termId;
-
+            /*
+             * Note: logic avoids possible overflow of [long] by not computing the
+             * difference between two longs.
+             */
+            int ret;
+            
+            ret = stmt1.p.termId < stmt2.p.termId ? -1 : stmt1.p.termId > stmt2.p.termId ? 1 : 0;
+            
+            if( ret == 0 ) {
+            
+                ret = stmt1.o.termId < stmt2.o.termId ? -1 : stmt1.o.termId > stmt2.o.termId ? 1 : 0;
+                
+                if( ret == 0 ) {
+                    
+                    ret = stmt1.s.termId < stmt2.s.termId ? -1 : stmt1.s.termId > stmt2.s.termId ? 1 : 0;
+                    
                 }
-
+                
             }
 
-            if (ret == 0)
-                return 0;
-            if (ret > 0)
-                return 1;
-            return -1;
+            return ret;
 
         }
 
@@ -588,25 +706,27 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
-            long ret = stmt1.o.termId - stmt2.o.termId;
-
-            if (ret == 0) {
-
-                ret = stmt1.s.termId - stmt2.s.termId;
-
-                if (ret == 0) {
-
-                    ret = stmt1.p.termId - stmt2.p.termId;
-
+            /*
+             * Note: logic avoids possible overflow of [long] by not computing the
+             * difference between two longs.
+             */
+            int ret;
+            
+            ret = stmt1.o.termId < stmt2.o.termId ? -1 : stmt1.o.termId > stmt2.o.termId ? 1 : 0;
+            
+            if( ret == 0 ) {
+            
+                ret = stmt1.s.termId < stmt2.s.termId ? -1 : stmt1.s.termId > stmt2.s.termId ? 1 : 0;
+                
+                if( ret == 0 ) {
+                    
+                    ret = stmt1.p.termId < stmt2.p.termId ? -1 : stmt1.p.termId > stmt2.p.termId ? 1 : 0;
+                    
                 }
-
+                
             }
 
-            if (ret == 0)
-                return 0;
-            if (ret > 0)
-                return 1;
-            return -1;
+            return ret;
 
         }
 

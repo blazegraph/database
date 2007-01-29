@@ -5,9 +5,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.Comparator;
-
-import com.bigdata.journal.Bytes;
 
 /**
  * Used to persist metadata for a {@link BTree} so that a historical state may
