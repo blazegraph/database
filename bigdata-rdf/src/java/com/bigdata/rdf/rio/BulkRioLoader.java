@@ -102,7 +102,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
      * value.
      * 
-     * @todo try 10M buffer for the bulk loader on a large data set.
+     * @todo try 10M or 100M buffer for the bulk loader on very large data sets.
      */
     static final int DEFAULT_BUFFER_SIZE = 1000000;
     

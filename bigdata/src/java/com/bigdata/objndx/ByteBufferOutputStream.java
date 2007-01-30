@@ -53,4 +53,31 @@ class ByteBufferOutputStream extends OutputStream {
 
     }
 
+    /**
+     * Write an array of bytes on the buffer. The {@link ByteBuffer#position()}
+     * is advanced as a side effect.
+     * 
+     * @param b
+     *            the data.
+     * @param off
+     *            the start offset in the data.
+     * @param len
+     *            the number of bytes to write.
+     * 
+     * @exception EOFException
+     *                if the buffer would overflow.
+     * 
+     */
+    public void write(byte b[], int off, int len) throws IOException {
+    
+        if(buf.remaining()<len) {
+
+            throw new EOFException();
+
+        }
+        
+        buf.put(b,off,len);
+        
+    }
+    
 }

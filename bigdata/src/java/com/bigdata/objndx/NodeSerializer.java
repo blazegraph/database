@@ -46,6 +46,7 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -93,20 +94,8 @@ import com.bigdata.journal.Bytes;
  * compression or packing techniques within the implementations of this
  * interfaces is encouraged.
  * </p>
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME test out the use of a buffered output stream in the (de-)serializer
- * methods and make sure that the buffered output stream is reading or writing
- * on the underlying ByteBuffer, which is typically direct, using a block byte[]
- * transfer. See {@link ByteBufferOutputStream} and
- * {@link ByteBufferInputStream} which do not currently perform bulk transfers
- * since they do not override {@link OutputStream#write(byte[], int, int)} and
- * {@link InputStream#read(byte[], int, int)}.  Basically, the hypothesis is that
- * the operations on the direct buffer might be slower than operations on a Java
- * byte[] so buffering and doing bulk transfers to/from the direct buffer might
- * be faster.
  * 
  * @todo automatically resize the decompression buffers as required and start
  *       with a smaller buffer.
@@ -420,30 +409,43 @@ public class NodeSerializer {
     }
 
     /**
-     * Allocate a buffer of the stated capacity.  When the capacity is larger
-     * than 8k a direct buffer will be used automatically.
+     * Allocate a buffer of the stated capacity.
      * 
-     * @param capacity The buffer capacity.
+     * @param capacity
+     *            The buffer capacity.
      * 
      * @return The buffer.
-     * 
-     * @todo review use of direct buffers here.  do we always want to use a
-     * direct buffer for better IO or only when the data size is large?
      */
     static protected ByteBuffer alloc(int capacity) {
         
-        return capacity < Bytes.kilobyte32 * 8 ? ByteBuffer
-                .allocate(capacity) : ByteBuffer
-                .allocateDirect(capacity);
-                
+//        return (true || capacity < Bytes.kilobyte32 * 8 )? ByteBuffer
+//                .allocate(capacity) : ByteBuffer
+//                .allocateDirect(capacity);
+
+        /*
+         * Note: this always allocates a buffer wrapping a Java <code>byte[]</code>
+         * NOT a direct {@link ByteBuffer}. There is a substantial performance
+         * gain when you are doing a lot of get/put byte operations to use a
+         * wrapped, rather than direct, {@link ByteBuffer} (this was observed
+         * using the Sun JDK 1.5.07 with the -server mode).
+         */
+
+        return ByteBuffer.allocate(capacity);
+        
     }
 
     /**
      * Extends the internal buffer used to serialize nodes and leaves.
      * <p>
-     * Note: large buffer requirements are not at all uncommon so we grow
-     * the buffer rapidly to avoid multiple resizing and the expense of a
-     * too large buffer.
+     * Note: large buffer requirements are not at all uncommon so we grow the
+     * buffer rapidly to avoid multiple resizing and the expense of a too large
+     * buffer.
+     * 
+     * FIXME We can encapsulate the extension of the buffer within a class
+     * derived from or using the {@link ByteBufferOutputStream} and simply copy
+     * the data when we need to extend the buffer rather than restarting
+     * serialization. This will make underestimates of the required buffer
+     * capacity much less costly.
      */
     protected void extendBuffer() {
 
@@ -638,10 +640,15 @@ public class NodeSerializer {
         buf.putShort(VERSION0);
         
         /*
-         * setup output stream over the buffer.
+         * Setup output stream over the buffer.
+         * 
+         * Note: I have tested the use of a {@link BufferedOutputStream} here
+         * and in putLeaf() and it actually slows things down a smidge.
          */
-        DataOutputStream os = new DataOutputStream(new ByteBufferOutputStream(
-                buf));
+        DataOutputStream os = new DataOutputStream(//
+                new ByteBufferOutputStream(buf)
+//              new BufferedOutputStream(new ByteBufferOutputStream(buf))
+                );
         
         try {
 
@@ -940,9 +947,13 @@ public class NodeSerializer {
         
         /*
          * Setup output stream over the buffer.
+         * 
+         * Note: wrapping this with a BufferedOutputStream is slightly slower.
          */
-        DataOutputStream os = new DataOutputStream(new ByteBufferOutputStream(
-                buf));
+        DataOutputStream os = new DataOutputStream(//
+                new ByteBufferOutputStream(buf)
+//                new BufferedOutputStream(new ByteBufferOutputStream(buf))
+                );
 
         try {
             
