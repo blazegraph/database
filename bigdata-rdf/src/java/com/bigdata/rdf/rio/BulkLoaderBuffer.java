@@ -50,6 +50,7 @@ package com.bigdata.rdf.rio;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 
 import com.bigdata.objndx.BytesUtil;
 import com.bigdata.objndx.IndexSegment;
@@ -73,11 +74,11 @@ import com.bigdata.rdf.rio.BulkRioLoader.Indices;
  */
 public class BulkLoaderBuffer extends Buffer {
 
-    /**
-     * #of duplicate URIs, literals and bnodes as determined by
-     * {@link #filterDuplicateTerms()}.
-     */
-    int numDupURIs = 0, numDupLiterals = 0, numDupBNodes = 0;
+//    /**
+//     * #of duplicate URIs, literals and bnodes as determined by
+//     * {@link #filterDuplicateTerms()}.
+//     */
+//    int numDupURIs = 0, numDupLiterals = 0, numDupBNodes = 0;
 
     /**
      * #of non-duplicate URIs, literals, and bnodes that have been determined to
@@ -98,10 +99,11 @@ public class BulkLoaderBuffer extends Buffer {
     /**
      * @param store
      * @param capacity
-     * @param distinct
      */
-    public BulkLoaderBuffer(TripleStore store, int capacity, boolean distinct) {
-        super(store, capacity, distinct);
+    public BulkLoaderBuffer(TripleStore store, int capacity) {
+        
+        super(store, capacity, true);
+        
     }
 
     /**
@@ -114,32 +116,32 @@ public class BulkLoaderBuffer extends Buffer {
         // #of terms identified by the parser.
         int numTerms = numURIs + numLiterals + numBNodes;
         
-        // #of terms that are duplicates of one another.
-        int numDupTerms = numDupURIs + numDupLiterals + numDupBNodes;
+//        // #of terms that are duplicates of one another.
+//        int numDupTerms = numDupURIs + numDupLiterals + numDupBNodes;
 
         // #of terms that are already known to the database.
         int numKnownTerms = numKnownURIs + numKnownLiterals + numKnownBNodes;
         
         // #of terms to be loaded into the index.
-        numTerms = numTerms - numDupTerms - numKnownTerms;
+        numTerms = numTerms - /*numDupTerms -*/ numKnownTerms;
         
         System.err.println("Building terms index segment: numTerms="+numTerms);
         
         final long begin = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, null, numTerms,
-                new UnknownAndDistinctTermIterator(this), branchingFactor,
+                new TermIdIterator(this), branchingFactor,
                 com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE,
                 IndexSegmentBuilder.DEFAULT_ERROR_RATE);
 
-        if(numDupURIs>0)
-            assignTermIdsToDuplicateTerms(uris, numURIs);
-            
-        if(numDupLiterals>0)
-            assignTermIdsToDuplicateTerms(literals, numLiterals);
-            
-        if(numDupBNodes>0)
-            assignTermIdsToDuplicateTerms(bnodes, numBNodes);
+//        if(numDupURIs>0)
+//            assignTermIdsToDuplicateTerms(uris, numURIs);
+//            
+//        if(numDupLiterals>0)
+//            assignTermIdsToDuplicateTerms(literals, numLiterals);
+//            
+//        if(numDupBNodes>0)
+//            assignTermIdsToDuplicateTerms(bnodes, numBNodes);
             
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -148,37 +150,42 @@ public class BulkLoaderBuffer extends Buffer {
 
     }
 
-    /**
-     * Assign termIds to the duplicate terms. This step is required since a
-     * {@link _Statement} may otherwise be linked to a term that was flagged as
-     * a duplicate and hence did not have a termId assigned by
-     * {@link #bulkLoadTermIndex(int, File)}.
-     */
-    protected void assignTermIdsToDuplicateTerms(_Value[] terms, int nterms) {
-       
-        int nassigned = 0;
-        
-        for( int i=1; i<nterms; i++) {
-            
-            if(terms[i].duplicate) {
-                
-                assert terms[i-1].termId != 0l;
-
-                terms[i].termId = terms[i-1].termId;
-                
-                nassigned++;
-                
-            }
-            
-        }
-        
-        if(nassigned != 0) {
-            
-            System.err.println("Assigned term identifiers to "+nassigned+" duplicate terms");
-            
-        }
-        
-    }
+//    /**
+//     * Assign termIds to the duplicate terms. This step is required since a
+//     * {@link _Statement} may otherwise be linked to a term that was flagged as
+//     * a duplicate and hence did not have a termId assigned by
+//     * {@link #bulkLoadTermIndex(int, File)}.
+//     */
+//    protected void assignTermIdsToDuplicateTerms(_Value[] terms, int nterms) {
+//       
+//        int nassigned = 0;
+//        
+//        for( int i=1; i<nterms; i++) {
+//            
+//            if(terms[i].duplicate) {
+//                
+//                if(terms[i-1].termId == 0l) {
+//
+//                    throw new RuntimeException("No termId: index=" + (i - 1)
+//                            + ", term=" + terms[i - 1]);
+//                    
+//                }
+//
+//                terms[i].termId = terms[i-1].termId;
+//                
+//                nassigned++;
+//                
+//            }
+//            
+//        }
+//        
+//        if(nassigned != 0) {
+//            
+//            System.err.println("Assigned term identifiers to "+nassigned+" duplicate terms");
+//            
+//        }
+//        
+//    }
     
     /**
      * Bulk loads the reverse mapping for pre-sorted, non-duplicate, non-known
@@ -188,7 +195,7 @@ public class BulkLoaderBuffer extends Buffer {
 
         int numTerms = numURIs + numLiterals + numBNodes;
         
-        numTerms -= numDupURIs + numDupLiterals + numDupBNodes;
+//        numTerms -= numDupURIs + numDupLiterals + numDupBNodes;
 
         numTerms -= numKnownURIs + numKnownLiterals + numKnownBNodes;
 
@@ -197,7 +204,7 @@ public class BulkLoaderBuffer extends Buffer {
         final long begin = System.currentTimeMillis();
 
         new IndexSegmentBuilder(outFile, null,
-                numTerms, new UnknownAndDistinctTermIterator(this),
+                numTerms, new TermIterator(this),
                 branchingFactor,
                 com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE,
                 IndexSegmentBuilder.DEFAULT_ERROR_RATE);
@@ -221,7 +228,7 @@ public class BulkLoaderBuffer extends Buffer {
         final long begin = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, null, numStmts,
-                new UnknownAndDistinctStatementIterator(keyOrder,this),
+                new UnknownStatementIterator(keyOrder,this),
                 branchingFactor,
                 com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE,
                 IndexSegmentBuilder.DEFAULT_ERROR_RATE);
@@ -233,130 +240,131 @@ public class BulkLoaderBuffer extends Buffer {
                 + ", elapsed=" + elapsed);
         
     }
-    
-    
-    /**
-     * Scans the sorted term buffers and flags terms that are duplicates of the
-     * immediately proceeding term in the buffer by setting
-     * {@link _Value#duplicate} to <code>true</code>.  The flagged duplicates
-     * are NOT removed from the buffers since that would require a compacting
-     * operation.
-     */
-    public void filterDuplicateTerms() {
         
-        assert haveKeys;
-        assert sorted;
-        assert uris != null;
-        assert literals != null;
-        assert bnodes != null;
-        assert numDupURIs == 0;
-        assert numDupLiterals == 0;
-        assert numDupBNodes == 0;
-        
-        final int numTerms = numURIs + numLiterals + numBNodes;
-        
-        final long begin = System.currentTimeMillis();
-        
-        numDupURIs = filterDuplicateTerms(uris, numURIs);
-        
-        numDupLiterals = filterDuplicateTerms(literals, numLiterals);
-        
-        numDupBNodes = filterDuplicateTerms(bnodes, numBNodes);
+//    /**
+//     * Scans the sorted term buffers and flags terms that are duplicates of the
+//     * immediately proceeding term in the buffer by setting
+//     * {@link _Value#duplicate} to <code>true</code>.  The flagged duplicates
+//     * are NOT removed from the buffers since that would require a compacting
+//     * operation.
+//     */
+//    public void filterDuplicateTerms() {
+//        
+//        assert haveKeys;
+//        assert sorted;
+//        assert uris != null;
+//        assert literals != null;
+//        assert bnodes != null;
+//        assert numDupURIs == 0;
+//        assert numDupLiterals == 0;
+//        assert numDupBNodes == 0;
+//        
+//        final int numTerms = numURIs + numLiterals + numBNodes;
+//        
+//        final long begin = System.currentTimeMillis();
+//        
+//        numDupURIs = filterDuplicateTerms(uris, numURIs);
+//        
+//        numDupLiterals = filterDuplicateTerms(literals, numLiterals);
+//        
+//        numDupBNodes = filterDuplicateTerms(bnodes, numBNodes);
+//
+//        final int numDuplicates = numDupURIs + numDupLiterals + numDupBNodes;
+//        
+//        System.err.println("filtered out " + numDuplicates
+//                + " duplicates from " + numTerms + " terms leaving "
+//                + (numTerms - numDuplicates) + " terms: "
+//                + (System.currentTimeMillis() - begin) + "ms");
+//        
+//        System.err.println("URIs    : "+numURIs+" with "+numDupURIs+" duplicates and "+(numURIs-numDupURIs)+" distinct");
+//        System.err.println("Literals: "+numLiterals+" with "+numDupLiterals+" duplicates and "+(numLiterals-numDupLiterals)+" distinct");
+//        System.err.println("BNodes  : "+numBNodes+" with "+numDupBNodes+" duplicates and "+(numBNodes-numDupBNodes)+" distinct");
+//        
+//    }
+//
+//    /**
+//     * Flag duplicate terms within the <i>terms</i> array.
+//     * 
+//     * @param terms
+//     *            The terms, which MUST be sorted on {@link _Value#key}.
+//     * @param numTerms
+//     *            The #of terms in that array.
+//     *            
+//     * @return The #of duplicate terms in that array.
+//     */
+//    private int filterDuplicateTerms(_Value[] terms, int numTerms) {
+//
+//        int numDuplicates = 0;
+//
+//        if (numTerms > 0) {
+//
+//            byte[] lastKey = terms[0].key;
+//
+//            for (int i = 1; i < numTerms; i++) {
+//
+//                final byte[] thisKey = terms[i].key;
+//
+//                if (BytesUtil.bytesEqual(lastKey, thisKey)) {
+//
+//                    terms[i].duplicate = true;
+//
+//                    numDuplicates++;
+//
+//                }
+//
+//                lastKey = thisKey;
+//                
+//            }
+//            
+//        }
+//
+//        return numDuplicates;
+//        
+//    }
 
-        final int numDuplicates = numDupURIs + numDupLiterals + numDupBNodes;
-        
-        System.err.println("filtered out " + numDuplicates
-                + " duplicates from " + numTerms + " terms leaving "
-                + (numTerms - numDuplicates) + " terms: "
-                + (System.currentTimeMillis() - begin) + "ms");
-        
-    }
-
-    /**
-     * Flag duplicate terms within the <i>terms</i> array.
-     * 
-     * @param terms
-     *            The terms, which MUST be sorted on {@link _Value#key}.
-     * @param numTerms
-     *            The #of terms in that array.
-     *            
-     * @return The #of duplicate terms in that array.
-     */
-    private int filterDuplicateTerms(_Value[] terms, int numTerms) {
-
-        int numDuplicates = 0;
-        
-        if(numTerms>0){
-
-            byte[] lastKey = terms[0].key; 
-            
-            for (int i = 1; i < numTerms; i++) {
-
-                byte[] thisKey = terms[i].key;
-                
-                if( BytesUtil.bytesEqual(lastKey, thisKey) ) {
-                    
-                    terms[i].duplicate = true;
-                    
-                    numDuplicates++;
-                    
-                } else {
-                    
-                    lastKey = thisKey;
-                    
-                }
-                
-            }
-            
-        }
-
-        return numDuplicates;
-        
-    }
-
-    /**
-     * Mark duplicate statements by setting {@link _Statement#duplicate}.
-     * <p>
-     * Pre-condition - the statements must be sorted by one of the access paths
-     * (SPO, POS, OSP). It does not matter which sort order is used, but
-     * duplicate detection requires sorted data.
-     */
-    public void filterDuplicateStatements() {
-
-        assert numDupStmts == 0;
-        
-        if(numStmts>0){
-
-            final long begin = System.currentTimeMillis();
-            
-            _Statement lastStmt = stmts[0]; 
-            
-            for (int i = 1; i < numStmts; i++) {
-
-                _Statement thisStmt = stmts[i];
-                
-                if( lastStmt.equals(thisStmt) ) {
-                    
-                    thisStmt.duplicate = true;
-                    
-                    numDupStmts++;
-                    
-                } else {
-                    
-                    lastStmt = thisStmt;
-                    
-                }
-                
-            }
-            
-            System.err.println("filtered out " + numDupStmts
-                    + " duplicate statements from " + numStmts + " leaving "
-                    + (numStmts - numDupStmts) + " statements: "
-                    + (System.currentTimeMillis() - begin) + "ms");
-
-        }
-
-    }
+//    /**
+//     * Mark duplicate statements by setting {@link _Statement#duplicate}.
+//     * <p>
+//     * Pre-condition - the statements must be sorted by one of the access paths
+//     * (SPO, POS, OSP). It does not matter which sort order is used, but
+//     * duplicate detection requires sorted data.
+//     */
+//    public void filterDuplicateStatements() {
+//
+//        assert numDupStmts == 0;
+//        
+//        if(numStmts>0){
+//
+//            final long begin = System.currentTimeMillis();
+//            
+//            _Statement lastStmt = stmts[0]; 
+//            
+//            for (int i = 1; i < numStmts; i++) {
+//
+//                _Statement thisStmt = stmts[i];
+//                
+//                if( lastStmt.equals(thisStmt) ) {
+//                    
+//                    thisStmt.duplicate = true;
+//                    
+//                    numDupStmts++;
+//                    
+//                } else {
+//                    
+//                    lastStmt = thisStmt;
+//                    
+//                }
+//                
+//            }
+//            
+//            System.err.println("filtered out " + numDupStmts
+//                    + " duplicate statements from " + numStmts + " leaving "
+//                    + (numStmts - numDupStmts) + " statements: "
+//                    + (System.currentTimeMillis() - begin) + "ms");
+//
+//        }
+//
+//    }
     
     /**
      * Bulk load the buffered data into {@link IndexSegment}s.
@@ -394,11 +402,48 @@ public class BulkLoaderBuffer extends Buffer {
         // sort each type of term (URI, Literal, BNode).
         sortTermsBySortKeys();
         
-        /*
-         * Mark duplicate terms (term.duplicate := true), counting the #of
-         * duplicate terms.
-         */
-        filterDuplicateTerms();
+//        /*
+//         * Mark duplicate terms (term.duplicate := true), counting the #of
+//         * duplicate terms.
+//         */
+//        filterDuplicateTerms();
+       
+        if(false) {
+
+//            final int nexpected_all = 820932;
+//            int termsFound = 0;
+//            {
+//                Iterator<_Value> itr = new TermIterator(this);
+//                while (itr.hasNext()) {
+//                    _Value term = itr.next();
+//                    if (termsFound < 1000)
+//                        System.err.println("terms[" + termsFound + "]="
+//                                + term.toString());
+//                    termsFound++;
+//                }
+//            }
+            final int nexpected_distinct = 223146;
+            int distinctTermsFound = 0;
+            {
+                Iterator<_Value> itr = new TermIterator(this);
+                while (itr.hasNext()) {
+                    _Value term = itr.next();
+                    if (distinctTermsFound < 1000)
+                        System.err.println("terms[" + distinctTermsFound + "]="
+                                + term.toString());
+                    distinctTermsFound++;
+                }
+            }
+//            if (termsFound != nexpected_all) {
+//                throw new RuntimeException("Expecting " + nexpected_all
+//                        + ", but found=" + termsFound);
+//            }
+            if (distinctTermsFound != nexpected_distinct) {
+                throw new RuntimeException("Expecting " + nexpected_distinct
+                        + ", but found=" + distinctTermsFound);
+            }
+            
+        }
         
         /*
          * FIXME resolve terms against bloom filter, journal or pre-existing
@@ -460,8 +505,8 @@ public class BulkLoaderBuffer extends Buffer {
             // sort on SPO index first.
             Arrays.sort(stmts, 0, numStmts, SPOComparator.INSTANCE);
 
-            // Mark duplicate statements.
-            filterDuplicateStatements();
+//            // Mark duplicate statements.
+//            filterDuplicateStatements();
 
             // FIXME Mark known statements by testing the bloom filter and/or
             // indices.

@@ -47,6 +47,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
 import com.bigdata.cache.HardReferenceQueue;
@@ -201,15 +202,14 @@ public class TermIndex extends BTree {
         
         Long id = (Long)lookup(key);
         
-        if( id == null ) return 0;
+        if( id == null ) return 0L;
             
         return id;
         
     }
 
     /**
-     * Note: There is no additional data serialized with a String. All the
-     * information is in the keys.
+     * The value is a <code>long</code> integer that is the term identifier.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -217,25 +217,53 @@ public class TermIndex extends BTree {
      */
     public static class ValueSerializer implements IValueSerializer {
 
-        /**
-         * 
-         */
         private static final long serialVersionUID = 8081006629809857019L;
+        
         public static transient final IValueSerializer INSTANCE = new ValueSerializer();
+        
+        /**
+         * Note: It is faster to use packed longs, at least on write with test
+         * data (bulk load of wordnet nouns).
+         */
+        final static boolean packedLongs = true;
         
         public ValueSerializer() {}
         
         public void getValues(DataInputStream is, Object[] values, int n)
                 throws IOException {
 
-            // NOP
+            for(int i=0; i<n; i++) {
+                
+                if (packedLongs) {
+
+                    values[i] = Long.valueOf(LongPacker.unpackLong(is));
+
+                } else {
+
+                    values[i] = Long.valueOf(is.readLong());
+
+                }
+                
+            }
             
         }
 
         public void putValues(DataOutputStream os, Object[] values, int n)
                 throws IOException {
-            
-            // NOP
+
+            for(int i=0; i<n; i++) {
+
+                if(packedLongs) {
+
+                    LongPacker.packLong(os, ((Long) values[i]).longValue());
+                    
+                } else {
+
+                    os.writeLong(((Long) values[i]).longValue());
+                
+                }
+                
+            }
             
         }
         

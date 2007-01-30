@@ -51,6 +51,7 @@ import java.io.Reader;
 
 import com.bigdata.journal.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.TripleStore;
 
 /**
  * A test of the RIO integration.
@@ -123,13 +124,14 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      * <p>
      * Basic loading (no presort): 273644 stmts added in 37.422 secs, rate= 7312
      * 
-     * 
-     * 
      * @param resources
-     *            list of test resources to be parsed and inserted into
-     *            the triple store
+     *            list of test resources to be parsed and inserted into the
+     *            triple store
+     * 
+     * @todo modify {@link TripleStore#loadData(java.io.File)} to chain input
+     *       sources together for better bulk builds rather than using a
+     *       separate loader for each input source.
      */
-    
     public void doTest( IRioLoader loader, final String[] resources ) throws IOException {
 
         long total_stmts = 0;
@@ -214,7 +216,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     public void test_loadFile_presortRioLoader() throws IOException {
 
-        doTest(new PresortRioLoader( store ), testData);
+        doTest(new PresortRioLoader(store,
+                PresortRioLoader.DEFAULT_BUFFER_SIZE, true), testData);
 
         assertDataLoaded();
         
@@ -236,7 +239,10 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         
     }
     
-    protected String[] testData = new String[] { "data/wordnet_nouns-20010201.rdf" };
+    protected String[] testData = new String[] {
+            "data/wordnet_nouns-20010201.rdf",
+            "data/nciOncology.owl"
+            };
     
     protected void assertDataLoaded() {
 

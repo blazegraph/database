@@ -61,14 +61,15 @@ public class BytesUtil {
 
     /**
      * True iff the two arrays compare as equal. This is somewhat optimized in
-     * that it tests the array lengths first and does not convert the bytes to
-     * unsigned integers before testing for equality.
+     * that it tests the array lengths first, assumes that it is being used on
+     * sorted data and therefore compares the last bytes first, and does not
+     * convert the bytes to unsigned integers before testing for equality.
      * 
      * @param a
      *            A byte[].
      * @param b
      *            Another byte[].
-     *            
+     * 
      * @return If the two arrays have the same data.
      */
     final public static boolean bytesEqual(final byte[] a, final byte[] b) {
@@ -77,13 +78,24 @@ public class BytesUtil {
 
         final int blen = b.length;
 
-        if(a.length!=b.length) return false;
+        if (alen != blen)
+            return false;
         
-        for (int i = 0; i < alen && i < blen; i++) {
+        int i = alen-1;
+
+        while(i>=0) {
         
             if( a[i] != b[i] ) return false;
-
+            
+            i--;
+            
         }
+
+//        for (int i = 0; i < alen; i++) {
+//        
+//            if( a[i] != b[i] ) return false;
+//
+//        }
         
         return true;
         

@@ -227,7 +227,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         stmtsAdded = 0;
         
         // Allocate the initial buffer for parsed data.
-        if(buffer != null) {
+        if(buffer == null) {
             
             buffer = new Buffer(store,capacity,distinct);
             

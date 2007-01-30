@@ -47,6 +47,10 @@ Modifications:
 
 package com.bigdata.rdf.model;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.Comparator;
 import java.util.UUID;
 
@@ -74,41 +78,11 @@ public class OptimizedValueFactory implements ValueFactory {
 
     public BNode createBNode(String id) {
 
-        //            _BNode bnode = null;
-        //            
-        //            if(bnodeMap!=null) bnode = bnodeMap.get( id );
-        //            
-        //            if ( bnode == null ) {
-        //                
-        //                bnode = new _BNode( id );
-        //                
-        //                if(bnodeMap!=null) bnodeMap.put( id, bnode );
-        //                
-        //            }
-        //            
-        //            return bnode;
-
         return new _BNode(id);
 
     }
 
     public Literal createLiteral(String label, String lang) {
-
-        //            _Literal literal = null;
-        //            
-        //            if( literalMap!=null) literalMap.get( label );
-        //            
-        //            if ( literal == null ) {
-        //                
-        //                literal = new _Literal( label );
-        //                
-        //                if(literalMap!=null) literalMap.put( label, literal );
-        //                
-        //            }
-        //            
-        //            literal.language = lang;
-        //            
-        //            return literal;
 
         return new _Literal(label, lang);
 
@@ -116,41 +90,11 @@ public class OptimizedValueFactory implements ValueFactory {
 
     public Literal createLiteral(String label, URI datatype) {
 
-        //            _Literal literal = null;
-        //            
-        //            if( literalMap!=null) literalMap.get( label );
-        //            
-        //            if ( literal == null ) {
-        //                
-        //                literal = new _Literal( label );
-        //                
-        //                if(literalMap!=null) literalMap.put( label, literal );
-        //                
-        //            }
-        //            
-        //            literal.datatype = datatype;
-        //            
-        //            return literal;
-
-        return new _Literal(label, datatype);
+        return new _Literal(label, (_URI)datatype);
 
     }
 
     public Literal createLiteral(String label) {
-
-        //            _Literal literal = null;
-        //            
-        //            if( literalMap!=null) literalMap.get( label );
-        //            
-        //            if ( literal == null ) {
-        //                
-        //                literal = new _Literal( label );
-        //                
-        //                if(literalMap!=null) literalMap.put( label, literal );
-        //                
-        //            }
-        //            
-        //            return literal;
 
         return new _Literal(label);
 
@@ -170,20 +114,6 @@ public class OptimizedValueFactory implements ValueFactory {
 
     public URI createURI(String uriStr) {
 
-        //            _URI uri = null;
-        //            
-        //            if(uriMap!=null) uriMap.get( uriStr );
-        //            
-        //            if ( uri == null ) {
-        //                
-        //                uri = new _URI( uriStr );
-        //                
-        //                if(uriMap!=null) uriMap.put( uriStr, uri );
-        //                
-        //            }
-        //            
-        //            return uri;
-
         return new _URI(uriStr);
 
     }
@@ -195,15 +125,18 @@ public class OptimizedValueFactory implements ValueFactory {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    abstract public static class _Value implements Value {
+    abstract public static class _Value implements Value, Externalizable {
 
         /**
          * The primary lexical term (URI, label for literal, ID for BNode).
          * <p>
          * Note that derived classes may define additional attributes such as
          * the language code or datatype for a literal.
+         * <p>
+         * Note: this field is not final since that interferes with the
+         * {@link Externalizable} implementation.
          */
-        public final String term;
+        public /*final*/ String term;
         
         /**
          * The sort key under which this value will be placed into the
@@ -224,15 +157,20 @@ public class OptimizedValueFactory implements ValueFactory {
         public long termId = 0;
 
         /**
-         * Initially <code>false</code>, this field is set <code>true</code>
-         * if multiple occurrences of the same term are identified during an
-         * index load operation. Duplicate filtering is required only for bulk
-         * loads into {@link IndexSegments} since the inputs to that process are
-         * presumed to be an ordered set of distinct key-value data. While
-         * duplicate filtering is not always performed, a term is a duplicate if
-         * this field is set.
+         * The #of times that this term has been used in a {@link Statement}.
          */
-        public boolean duplicate = false;
+        public int count = 0;
+        
+//        /**
+//         * Initially <code>false</code>, this field is set <code>true</code>
+//         * if multiple occurrences of the same term are identified during an
+//         * index load operation. Duplicate filtering is required only for bulk
+//         * loads into {@link IndexSegments} since the inputs to that process are
+//         * presumed to be an ordered set of distinct key-value data. While
+//         * duplicate filtering is not always performed, a term is a duplicate if
+//         * this field is set.
+//         */
+//        public boolean duplicate = false;
         
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
@@ -251,59 +189,63 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
-        public void setTermId(long termId) {
-
-            this.termId = termId;
-
-        }
-
-        public long getTermId() {
-
-            return termId;
-
-        }
-
-        public String getTerm() {
-
-            return term;
-
-        }
-
         public StatementIterator getObjectStatements() throws GraphException {
+
             throw new UnsupportedOperationException();
+            
         }
 
         /**
-         * @todo this does not handle typed literals correctly.
+         * Return the term code as defined by {@link RdfKeyBuilder} for this
+         * type of term. This is used to places URIs, different types of
+         * literals, and bnodes into disjoint parts of the key space for sort
+         * orders.
+         * 
+         * @see RdfKeyBuilder
          */
-        public int compareTo(Object o) {
+        abstract public byte getTermCode();
 
-            if (o == this) {
-
-                return 0;
-
-            }
-
-            if (o instanceof _Value) {
-
-                return ((_Value) o).term.compareTo(term);
-
-            }
-
-            return -1;
-
-        }
-
-        public boolean equals(Object o) {
-
-            return compareTo(o) == 0;
-
+        /**
+         * Compares two {@link _Value} objects, placing them into a total
+         * ordering based on the {@link #key}s assigned by the
+         * {@link RdfKeyBuilder}.
+         * 
+         * @exception IllegalStateException
+         *                if the sort keys have not been assigned.
+         * @exception ClassCastException
+         *                if <i>o</i> is not a {@link _Value}.
+         */
+        final public int compareTo(Object o) {
+        
+            if(key==null)
+                throw new IllegalStateException("no sort key");
+            
+            _Value oval = (_Value)o;
+            
+            if(oval.key==null)
+                throw new IllegalStateException("no sort key");
+            
+            return BytesUtil.compareBytes(key, oval.key);
+            
         }
 
         /**
-         * @todo this does not handle typed literals correctly.
+         * Compares to {@link _Value} objects for equality.
+         * 
+         * @param o
+         *            A {@link _Value} object.
+         * 
+         * @exception ClassCastException
+         *                if <i>o</i> is not a {@link _Value}.
          */
-        public int hashCode() {
+        abstract public boolean equals(Object o);
+
+        /**
+         * Note: the hash code is based solely on the {@link #term} and does not
+         * consider the term class (URI, some type of literal, or BNode) or the
+         * attributes for language code or datatype literals.
+         */
+        final public int hashCode() {
 
             return term.hashCode();
 
@@ -311,7 +253,9 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public String toString() {
 
-            return term;
+            return term + " {termId=" + termId + ", haveKey=" + (key != null)
+                    /* + ", dup=" + duplicate + */
+                    + ", known=" + known + "}";
 
         }
 
@@ -371,7 +315,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
     
-    public static class _Resource extends _Value implements Resource {
+    abstract public static class _Resource extends _Value implements Resource {
 
         public _Resource(String term) {
 
@@ -389,7 +333,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
-    public static class _BNode extends _Resource implements BNode {
+    final public static class _BNode extends _Resource implements BNode {
 
         public _BNode() {
 
@@ -402,39 +346,104 @@ public class OptimizedValueFactory implements ValueFactory {
             super(id);
 
         }
-
+        
         public String getID() {
 
             return term;
 
         }
 
+        /**
+         * @return {@link RdfKeyBuilder#CODE_BND}.
+         */
+        public byte getTermCode() {
+            
+            return RdfKeyBuilder.CODE_BND;
+            
+        }
+
+        public boolean equals(Object o) {
+
+            if (o == this) return true;
+
+            if( ! (o instanceof _BNode )) return false;
+            
+            _BNode oval = (_BNode)o;
+
+            return term.equals(oval.term);
+
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            term = in.readUTF();
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            out.writeUTF(term);
+            
+        }
+
     }
 
-    public static class _Literal extends _Value implements Literal {
+    final public static class _Literal extends _Value implements Literal {
 
-        String language;
+        /*
+         * Note: these fields are not final since that interfers with the
+         * Externalizable implementation.
+         */
 
-        URI datatype;
+        byte code;
+        
+        public String language;
+
+        public _URI datatype;
+
+        /**
+         * @return one of {@link RdfKeyBuilder#CODE_LIT plain literal},
+         *         {@link RdfKeyBuilder#CODE_LCL language code literal} or
+         *         {@link RdfKeyBuilder#CODE_DTL datatype literal}.
+         */
+        public byte getTermCode() {
+            
+            return code;
+            
+        }
 
         public _Literal(String label) {
 
             super(label);
+            
+            this.code = RdfKeyBuilder.CODE_LIT;
 
+            this.language = null;
+            
+            this.datatype = null;
+            
         }
 
         public _Literal(String label, String language) {
 
             super(label);
 
+            this.code = RdfKeyBuilder.CODE_LCL;
+
             this.language = language;
 
+            this.datatype = null;
+            
         }
 
-        public _Literal(String label, URI datatype) {
+        public _Literal(String label, _URI datatype) {
 
             super(label);
 
+            this.code = RdfKeyBuilder.CODE_DTL;
+
+            this.language = null;
+            
             this.datatype = datatype;
 
         }
@@ -457,10 +466,82 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        public boolean equals(Object o) {
+
+            if (o == this) return true;
+
+            if( ! (o instanceof _Literal )) return false;
+            
+            _Literal oval = (_Literal)o;
+
+            // wrong type of literal.
+            if( code != oval.code) return false;
+
+            // wrong label.
+            if(!term.equals(oval.term)) return false;
+            
+            if(code==RdfKeyBuilder.CODE_LIT) {
+                
+                return true;
+                
+            } else if(code==RdfKeyBuilder.CODE_LCL) {
+
+                // check language code.
+                return language.equals(oval.language);
+                
+            } else if(code==RdfKeyBuilder.CODE_DTL) {
+
+                // check datatype.
+                return datatype.equals(oval.datatype);
+
+            } else {
+                
+                throw new AssertionError();
+                
+            }
+
+        }
+        
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+            code = in.readByte();
+            
+            term = in.readUTF();
+            
+            if(code == RdfKeyBuilder.CODE_LCL) {
+                
+                language = in.readUTF();
+                
+            } else if(code == RdfKeyBuilder.CODE_DTL ) {
+                
+                datatype = new _URI(in.readUTF());
+                
+            }
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            out.writeByte(code);
+
+            out.writeUTF(term);
+            
+            if (language != null) {
+            
+                out.writeUTF(language);
+                
+            } else if (language != null) {
+                
+                out.writeUTF(datatype.getURI());
+                
+            }
+            
+        }
+
     }
 
-    public static class _URI extends _Resource implements URI {
-
+    final public static class _URI extends _Resource implements URI {
+        
         public _URI(String uri) {
 
             super(uri);
@@ -511,6 +592,39 @@ public class OptimizedValueFactory implements ValueFactory {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * @return {@link RdfKeyBuilder#CODE_URI}.
+         */
+        public byte getTermCode() {
+
+            return RdfKeyBuilder.CODE_URI;
+            
+        }
+
+        public boolean equals(Object o) {
+
+            if (o == this) return true;
+
+            if( ! (o instanceof _URI )) return false;
+            
+            _URI oval = (_URI)o;
+
+            return term.equals(oval.term);
+
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            term = in.readUTF();
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            out.writeUTF(term);
+            
+        }
+
     }
 
     public static class _Statement implements Statement {
@@ -522,15 +636,10 @@ public class OptimizedValueFactory implements ValueFactory {
         public final _Value o;
 
         /**
-         * Initially <code>false</code>, this field is set <code>true</code>
-         * if multiple occurrences of the same statement are identified during
-         * an index load operation. Duplicate filtering is required only for
-         * bulk loads into {@link IndexSegments} since the inputs to that
-         * process are presumed to be an ordered set of distinct key-value data.
-         * While duplicate filtering is not always performed, a statement is a
-         * duplicate if this field is set.
+         * The #of times this statement is encountered within a
+         * {@link com.bigdata.rdf.rio.Buffer}.
          */
-        public boolean duplicate = false;
+        public int count = 0;
         
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
@@ -591,7 +700,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
             final _Statement stmt1 = this;
             final _Statement stmt2 = (_Statement) other;
-
+            
             /*
              * Note: logic avoids possible overflow of [long] by not computing the
              * difference between two longs.
@@ -613,6 +722,40 @@ public class OptimizedValueFactory implements ValueFactory {
             }
 
             return ret;
+
+        }
+        
+        /**
+         * True iff the statements are the same object or if they have the same
+         * non-zero term identifiers assigned for the subject, predicate and
+         * object positions, or if they have terms in the subject, predicate,
+         * and object positions that compare as {@link _Value#equals(Object)}.
+         */
+        public boolean equals(Object o) {
+
+            if (o == this)
+                return true;
+
+            final _Statement stmt1 = this;
+            final _Statement stmt2 = (_Statement) o;
+            
+            if (stmt1.s.termId == 0 || stmt1.p.termId == 0
+                    || stmt1.o.termId == 0 || stmt2.s.termId == 0
+                    || stmt2.p.termId == 0 || stmt2.o.termId == 0) {
+
+                /*
+                 * Note: one or more term identifiers are not assigned so we
+                 * compare the terms themselves.
+                 */
+                return stmt1.s.equals(stmt2.s) && stmt1.p.equals(stmt2.p)
+                        && stmt1.o.equals(stmt2.o);
+                
+            }
+            
+            // All term identifiers are assigned so we compare them.
+            return stmt1.s.termId == stmt2.s.termId
+                    && stmt1.p.termId == stmt2.p.termId
+                    && stmt1.o.termId == stmt2.o.termId;
 
         }
 

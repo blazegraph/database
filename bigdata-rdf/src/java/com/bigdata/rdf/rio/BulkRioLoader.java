@@ -129,11 +129,6 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     protected final int capacity;
 
     /**
-     * When true only distinct terms and statements are stored in the buffer.
-     */
-    protected final boolean distinct;
-
-    /**
      * Used to assign ordered names to each index segment.
      */
     private int batchId = 0;
@@ -160,11 +155,11 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     
     public BulkRioLoader( TripleStore store ) {
     
-        this(store, DEFAULT_BUFFER_SIZE, false );
+        this(store, DEFAULT_BUFFER_SIZE );
         
     }
     
-    public BulkRioLoader(TripleStore store, int capacity, boolean distinct) {
+    public BulkRioLoader(TripleStore store, int capacity) {
 
         assert store != null;
         
@@ -174,9 +169,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         
         this.capacity = capacity;
         
-        this.distinct = distinct;
-        
-        this.buffer = new BulkLoaderBuffer(store, capacity, distinct );
+        this.buffer = new BulkLoaderBuffer(store, capacity);
         
     }
     
@@ -275,9 +268,9 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         stmtsAdded = 0;
         
         // Allocate the initial buffer for parsed data.
-        if(buffer != null) {
+        if(buffer == null) {
             
-            buffer = new BulkLoaderBuffer(store,capacity,distinct);
+            buffer = new BulkLoaderBuffer(store,capacity);
             
         }
 
@@ -335,7 +328,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             }
 
             // allocate a new buffer.
-            buffer = new BulkLoaderBuffer(store,capacity,distinct);
+            buffer = new BulkLoaderBuffer(store,capacity);
             
             // fall through.
             

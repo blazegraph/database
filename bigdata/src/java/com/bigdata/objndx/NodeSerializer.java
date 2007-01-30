@@ -156,6 +156,11 @@ public class NodeSerializer {
     protected final INodeFactory nodeFactory;
     
     /**
+     * The declared maximum branching factor.
+     */
+    protected final int branchingFactor;
+    
+    /**
      * An object that knows how to (de-)serialize child addresses.
      */
     protected final IAddressSerializer addrSerializer;
@@ -190,9 +195,11 @@ public class NodeSerializer {
     protected final boolean useChecksum;
 
     /**
-     * The default initial capacity for the (de-)serialization buffer.
+     * The default initial capacity multipler for the (de-)serialization buffer.
+     * The total initial buffer capacity is this value times the
+     * {@link #branchingFactor}.
      */
-    public static final transient int DEFAULT_BUFFER_CAPACITY = Bytes.kilobyte32 * 100;
+    public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 * 1;
     
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the
@@ -389,6 +396,8 @@ public class NodeSerializer {
 
         this.nodeFactory = nodeFactory;
         
+        this.branchingFactor = branchingFactor;
+        
         this.addrSerializer = addrSerializer;
         
         this.keySerializer = keySerializer;
@@ -401,7 +410,8 @@ public class NodeSerializer {
         
         if (initialBufferCapacity == 0) {
 
-            initialBufferCapacity = DEFAULT_BUFFER_CAPACITY;
+            initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
+                    * branchingFactor;
 
         }
         
@@ -430,12 +440,16 @@ public class NodeSerializer {
 
     /**
      * Extends the internal buffer used to serialize nodes and leaves.
+     * <p>
+     * Note: large buffer requirements are not at all uncommon so we grow
+     * the buffer rapidly to avoid multiple resizing and the expense of a
+     * too large buffer.
      */
     protected void extendBuffer() {
 
         int capacity = _buf.capacity();
         
-        capacity += Math.max(Bytes.kilobyte32 * 4, capacity / 2);
+        capacity *= 2;
 
         System.err.println("Extending buffer to capacity=" + capacity
                 + " bytes.");

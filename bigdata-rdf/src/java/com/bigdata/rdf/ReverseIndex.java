@@ -45,10 +45,12 @@ package com.bigdata.rdf;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
+import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
 import com.bigdata.cache.HardReferenceQueue;
@@ -59,6 +61,12 @@ import com.bigdata.objndx.BytesUtil;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.PO;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
+import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
+import com.ibm.icu.text.UnicodeCompressor;
+import com.ibm.icu.text.UnicodeDecompressor;
 
 /**
  * A persistent index for reversing term identifiers to {@link String}s.
@@ -151,84 +159,159 @@ public class ReverseIndex extends BTree {
         
     }
             
-//    /**
-//     * Key serializer.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class KeySerializer implements IKeySerializer {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = -3286178987689136643L;
-//        static final IKeySerializer INSTANCE = new KeySerializer();
-//
-//        public ArrayType getKeyType() {
-//            
-//            return ArrayType.LONG;
-//            
-//        }
-//
-//        public void getKeys(DataInputStream is, Object keys, int nkeys) throws IOException {
-//
-//            long[] a = (long[])keys;
-//            
-//            for( int i=0; i<nkeys; i++) {
-//                
-//                a[i] = LongPacker.unpackLong(is);
-//                
-//            }
-//            
-//        }
-//
-//        /**
-//         * May overestimate since we pack values.
-//         */
-//        public int getSize(int n) {
-//
-//            return Bytes.SIZEOF_LONG * n;
-//            
-//        }
-//
-//        public void putKeys(DataOutputStream os, Object keys, int nkeys) throws IOException {
-//
-//            long[] a = (long[])keys;
-//            
-//            for( int i=0; i<nkeys; i++) {
-//                
-//                LongPacker.packLong(os,a[i]);
-//                
-//            }
-//
-//        }
-//        
-//    }
-
     /**
-     * Serializes the RDF {@link Value}.
+     * Serializes the RDF {@link Value} using custom logic.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo this is using object input and object output streams which are
-     *       extremely fat and slow. this could be improved by implementing the
-     *       Externalizable interface by a custom serialization helper or by
-     *       using extser (if we have a place to stick the state).
-     * 
-     * @todo use UTF compression utilities from ICU4J.
+     * @todo Optimize ICU UTF compression using the incremental APIs. This will
+     *       reduce heap allocation as well during (de-)serialization. Without
+     *       optimization, UTF compression is just slightly slower on write.
      * 
      * @todo use a per-leaf dictionary to factor out common strings as codes,
      *       e.g., Hamming codes.
      */
     public static class ValueSerializer implements IValueSerializer {
 
-        private static final long serialVersionUID = 2393897553755023082L;
+        private static final long serialVersionUID = 6950535691724083790L;
+
+        public static final int VERSION0 = 0x0;
         
         public static transient final IValueSerializer INSTANCE = new ValueSerializer();
         
+        public static final boolean utfCompression = false;
+        
         public ValueSerializer() {}
+        
+        protected void writeUTF(DataOutputStream os,String s) throws IOException {
+            
+            if (utfCompression) {
+
+                byte[] data = UnicodeCompressor.compress(s);
+
+                LongPacker.packLong(os, data.length);
+
+                os.write(data);
+
+            } else {
+
+                os.writeUTF(s);
+
+            }
+            
+        }
+        
+        protected String readUTF(DataInputStream is) throws IOException {
+            
+            if(utfCompression) {
+            
+                int len = (int)LongPacker.unpackLong(is);
+                
+                byte[] data = new byte[len];
+                
+                is.readFully(data);
+                
+                return UnicodeDecompressor.decompress(data);
+            
+            } else {
+                
+                return is.readUTF();
+                
+            }
+            
+        }
+        
+        public void getValues(DataInputStream is, Object[] vals, int n)
+                throws IOException {
+
+            final int version = (int)LongPacker.unpackLong(is);
+            
+            if (version != VERSION0)
+                throw new RuntimeException("Unknown version: " + version);
+            
+            for (int i = 0; i < n; i++) {
+                
+                final _Value val;
+        
+                final byte code = is.readByte();
+
+                final String term = readUTF(is); 
+                
+                switch(code) {
+                case RdfKeyBuilder.CODE_URI:
+                    val = new _URI(term);
+                    break;
+                case RdfKeyBuilder.CODE_LIT:
+                    val = new _Literal(term);
+                    break;
+                case RdfKeyBuilder.CODE_LCL:
+                    val = new _Literal(term,readUTF(is));
+                    break;
+                case RdfKeyBuilder.CODE_DTL:
+                    val = new _Literal(term,new _URI(readUTF(is)));
+                    break;
+                case RdfKeyBuilder.CODE_BND:
+                    val = new _BNode(term);
+                    break;
+                default: throw new AssertionError("Unknown code="+code);
+                }
+
+                vals[i] = val;
+                
+            }
+            
+        }
+
+        public void putValues(DataOutputStream os, Object[] vals, int n)
+                throws IOException {
+
+            LongPacker.packLong(os, VERSION0);
+            
+            for (int i = 0; i < n; i++) {
+
+                _Value value = (_Value)vals[i];
+                
+                byte code = value.getTermCode();
+                
+                os.writeByte(code);
+                
+                writeUTF(os,value.term);
+                
+                switch(code) {
+                case RdfKeyBuilder.CODE_URI: break;
+                case RdfKeyBuilder.CODE_LIT: break;
+                case RdfKeyBuilder.CODE_LCL:
+                    writeUTF(os,((_Literal)value).language);
+                    break;
+                case RdfKeyBuilder.CODE_DTL:
+                    writeUTF(os,((_Literal)value).datatype.term);
+                    break;
+                case RdfKeyBuilder.CODE_BND: break;
+                default: throw new AssertionError("Unknown code="+code);
+                }
+
+            }
+
+        }
+        
+    }
+    
+    /**
+     * Serializes the RDF {@link Value}s using default Java serialization. The
+     * {@link _Value} class heirarchy implements {@link Externalizable} in order
+     * to boost performance a little bit.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class DefaultJavaValueSerializer implements IValueSerializer {
+
+        private static final long serialVersionUID = 2393897553755023082L;
+        
+        public static transient final IValueSerializer INSTANCE = new DefaultJavaValueSerializer();
+        
+        public DefaultJavaValueSerializer() {}
         
         public void getValues(DataInputStream is, Object[] vals, int n)
                 throws IOException {

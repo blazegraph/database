@@ -48,6 +48,8 @@ Modifications:
 package com.bigdata.rdf.rio;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.openrdf.model.Resource;
@@ -69,6 +71,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Striterator;
@@ -79,53 +82,27 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class Buffer {
+public class Buffer {
 
-    _URI[] uris;
-    _Literal[] literals;
-    _BNode[] bnodes;
-    _Statement[] stmts;
+    final _URI[] uris;
+    final _Literal[] literals;
+    final _BNode[] bnodes;
+    final _Statement[] stmts;
     
     int numURIs, numLiterals, numBNodes;
     int numStmts;
 
-//  /**
-//  * When true, each term in a type specific buffer will be placed into a
-//  * cannonicalizing map so that we never have more than once instance for
-//  * the same term in a buffer at a time.  When false those transient term
-//  * maps are not used.
-//  * 
-//  * Note: this does not show much of an effect.
-//  */
-// final boolean useTermMaps = false;
-
-    /*
-     * @todo The use of these caches does not appear to improve performance.
+    /**
+     * Map used to filter out duplicate terms.  The use of this map provides
+     * a ~40% performance gain.
      */
-//    /**
-//     * Hash of the string of the URI to the URI makes URIs unique within a
-//     * bufferQueue full of URIs. 
-//     */
-//    Map<String, _URI> uriMap;
-//    /**
-//     * FIXME this does not properly handle literals unless the source is a
-//     * Literal with optional language code and datatype uri fields. It will
-//     * falsely conflate a plain literal with a language code literal having
-//     * the same text.
-//     */
-//    Map<String, _Literal> literalMap;
-//    /**
-//     * @todo bnodes are always distinct, right?  Or at least often enough
-//     * that we don't want to do this.  Also, the bnode id can be encoded 
-//     * using a non-unicode conversion since we are generating them ourselves
-//     * for the most part.  what makes most sense is probably to pre-convert
-//     * a String ID given for a bnode to a byte[] and cache only such bnodes
-//     * in this map and all other bnodes should be assigned a byte[] key 
-//     * directly instead of an id, e.g., by an efficient conversion of a UUID
-//     * to a byte[].
-//     */
-//    Map<String, _BNode> bnodeMap;
+    final Map<_Value, _Value> distinctTermMap;
 
+    /**
+     * Map used to filter out duplicate statements. 
+     */
+    final Map<_Statement,_Statement> distinctStmtMap;
+    
     protected final TripleStore store;
     
     /**
@@ -165,12 +142,19 @@ class Buffer {
         this.capacity = capacity;
     
         this.distinct = distinct;
-
-        if (distinct)
-            throw new UnsupportedOperationException(
-                    "distinct is not supported.");
         
-        if( capacity == -1 ) return;
+        if( capacity == -1 ) {
+            
+            uris = null;
+            literals = null;
+            bnodes = null;
+            stmts = null;
+            distinctTermMap = null;
+            distinctStmtMap = null;
+            
+            return;
+            
+        }
         
         uris = new _URI[ capacity ];
         
@@ -178,17 +162,29 @@ class Buffer {
         
         bnodes = new _BNode[ capacity ];
 
-//        if (useTermMaps) {
-//
-//            uriMap = new HashMap<String, _URI>(capacity);
-//            
-//            literalMap = new HashMap<String, _Literal>(capacity);
-//            
-//            bnodeMap = new HashMap<String, _BNode>(capacity);
-//            
-//        }
-
         stmts = new _Statement[ capacity ];
+
+        if (distinct) {
+
+            /*
+             * initialize capacity to 3x the #of statements allowed. this is the
+             * maximum #of distinct terms and would only be realized if each
+             * statement used distinct values. in practice the #of distinct terms
+             * will be much lower.  however, also note that the map will be resized
+             * at .75 of the capacity so we want to over-estimate the maximum likely
+             * capacity by at least 25% to avoid re-building the hash map.
+             */
+            distinctTermMap = new HashMap<_Value, _Value>(capacity * 3);
+
+            distinctStmtMap = new HashMap<_Statement, _Statement>(capacity);
+            
+        } else {
+            
+            distinctTermMap = null;
+
+            distinctStmtMap = null;
+            
+        }
         
     }
     
@@ -237,7 +233,7 @@ class Buffer {
      */
     public void sortTermsBySortKeys() {
         
-        assert haveKeys;
+//        assert haveKeys;
         assert ! sorted;
         assert uris != null;
         assert literals != null;
@@ -331,88 +327,287 @@ class Buffer {
     }
     
     /**
+     * Uniquify a term.
+     * 
+     * @param term
+     *            A term.
+     *            
+     * @return Either the term or the pre-existing term in the buffer with the
+     *         same data.
+     */
+    protected _Value getDistinctTerm(_Value term) {
+
+        assert distinct == true;
+        
+        _Value existingTerm = distinctTermMap.get(term);
+        
+        if(existingTerm != null) {
+            
+            // return the pre-existing term.
+            
+            return existingTerm;
+            
+        } else {
+            
+            // put the new term in the map.
+            
+            if(distinctTermMap.put(term, term)!=null) {
+                
+                throw new AssertionError();
+                
+            }
+            
+            // return the new term.
+            
+            return term;
+            
+        }
+        
+    }
+    
+    /**
+     * Uniquify a statement.
+     * 
+     * @param stmt
+     * 
+     * @return Either the statement or the pre-existing statement in the buffer
+     *         with the same data.
+     */
+    protected _Statement getDistinctStatement(_Statement stmt) {
+
+        assert distinct == true;
+        
+        _Statement existingStmt = distinctStmtMap.get(stmt);
+        
+        if(existingStmt!= null) {
+            
+            // return the pre-existing statement.
+            
+            return existingStmt;
+            
+        } else {
+
+            // put the new statement in the map.
+            
+            if(distinctStmtMap.put(stmt, stmt)!=null) {
+                
+                throw new AssertionError();
+                
+            }
+
+            // return the new statement.
+            return stmt;
+            
+        }
+        
+    }
+    
+    /**
      * Adds the values and the statement into the bufferQueue.
+     * <p>
+     * Note: the RIO parser can report the same value on multiple invocations of
+     * this handler method. I suspect that this issue goes back to the syntax of
+     * RDF/XML which allows on to make multiple statements about the same
+     * subject without repeating the lexical item for the subject. In a similar
+     * fashion, some of the other RDF interchange languages may permit one to
+     * make multiple statements about the same subject and predicate (I believe
+     * that N3 does this). This is an issue for how we filter the parsed values
+     * for duplicates.
      * 
      * @param s
      * @param p
      * @param o
      * 
-     * @exception IndexOutOfBoundsException if the bufferQueue overflows.
+     * @exception IndexOutOfBoundsException
+     *                if the bufferQueue overflows.
      * 
      * @see #nearCapacity()
      */
     public void handleStatement( Resource s, URI p, Value o ) {
 
-        if ( s instanceof _URI ) {
-            
-            uris[numURIs++] = (_URI) s;
-            
-        } else {
-            
-            bnodes[numBNodes++] = (_BNode) s;
+        boolean duplicateS = false;
+        boolean duplicateP = false;
+        boolean duplicateO = false;
+        
+        if (distinct) {
+            {
+                _Value tmp = getDistinctTerm((_Value) s);
+//                if (tmp != s) {
+                if(tmp.count>0){
+                    duplicateS = true;
+                }
+                s = (Resource) tmp;
+            }
+            {
+                _Value tmp = getDistinctTerm((_Value) p);
+//                if (tmp != p) {
+                if(tmp.count>0) {
+                    duplicateP = true;
+                }
+                p = (URI) tmp;
+            }
+            {
+                _Value tmp = getDistinctTerm((_Value) o);
+//                if (tmp != o) {
+                if(tmp.count>0) {
+                    duplicateO = true;
+                }
+                o = (Value) tmp;
+            }
+        }
+
+        if (!duplicateS) {
+
+            if (s instanceof _URI) {
+
+                uris[numURIs++] = (_URI) s;
+
+            } else {
+
+                bnodes[numBNodes++] = (_BNode) s;
+
+            }
             
         }
-        
-        uris[numURIs++] = (_URI) p;
-        
-        if ( o instanceof _URI ) {
+
+        if (!duplicateP) {
             
-            uris[numURIs++] = (_URI) o;
-            
-        } else if ( o instanceof _BNode ) {
-            
-            bnodes[numBNodes++] = (_BNode) o;
-            
-        } else {
-            
-            literals[numLiterals++] = (_Literal) o;
+            uris[numURIs++] = (_URI) p;
             
         }
+
+        if (!duplicateO) {
+            
+            if (o instanceof _URI) {
+
+                uris[numURIs++] = (_URI) o;
+
+            } else if (o instanceof _BNode) {
+
+                bnodes[numBNodes++] = (_BNode) o;
+
+            } else {
+
+                literals[numLiterals++] = (_Literal) o;
+
+            }
+            
+        }
+
+        _Statement stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o);
         
-        stmts[numStmts++] = new _Statement
-            ( (_Resource) s,
-              (_URI) p,
-              (_Value) o
-              );
+        if(distinct) {
+
+            _Statement tmp = getDistinctStatement(stmt);
+
+            if(tmp.count++ == 0){
+           
+                stmts[numStmts++] = tmp;
+              
+                // increment usage counts on terms IFF the statement is added to
+                // the buffer.
+                ((_Value)s).count++;
+                ((_Value)p).count++;
+                ((_Value)o).count++;
+
+            }
+          
+        } else {
+
+            stmts[numStmts++] = stmt;
+
+            // increment usage counts on terms IFF the statement is added to
+            // the buffer.
+            ((_Value)s).count++;
+            ((_Value)p).count++;
+            ((_Value)o).count++;
+
+        }
+
+    }
+    
+    /**
+     * Visits URIs, Literals, and BNodes marked as {@link _Value#known unknown}
+     * in their current sorted order.
+     */
+    public static class UnknownTermIterator implements IEntryIterator {
+        
+        private final IStriterator src;
+        private _Value current = null;
+        
+        public UnknownTermIterator(Buffer buffer) {
+
+            src = new Striterator(new TermIterator(buffer)).addFilter(new Filter(){
+
+                private static final long serialVersionUID = 1L;
+
+                protected boolean isValid(Object arg0) {
+                    
+                    _Value term = (_Value)arg0;
+                    
+                    return 
+//                    term.duplicate == false &&
+                    term.known == false;
+                }
+                
+            }
+            );
+            
+        }
+
+        public byte[] getKey() {
+            
+            return current.key;
+            
+        }
+
+        public Object getValue() {
+            
+            return current;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
+        public Object next() {
+            
+            current = (_Value) src.next();
+            
+            return current;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
         
     }
     
     /**
-     * Visits all non-duplicate, non-known URIs, Literals, and BNodes in their
-     * current order.
+     * Visits all URIs, Literals, and BNodes in their current order.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class UnknownAndDistinctTermIterator implements IEntryIterator {
+    public static class TermIterator implements IEntryIterator {
 
         private final IStriterator src;
-        private final TripleStore store;
         
-        private int nvisited = 0;
         private _Value current = null;
-        
 
-        public UnknownAndDistinctTermIterator(Buffer buffer) {
+        public TermIterator(Buffer buffer) {
             
-            this.store = buffer.store;
-            
-            src = new Striterator(new TermClassIterator(buffer.uris, buffer.numURIs)).append(
-                    new TermClassIterator(buffer.literals, buffer.numLiterals)).append(
-                    new TermClassIterator(buffer.bnodes, buffer.numBNodes)).addFilter(
-                    new Filter() {
-
-                        private static final long serialVersionUID = 1L;
-
-                        protected boolean isValid(Object arg0) {
-
-                            _Value term = (_Value) arg0;
-
-                            return !term.duplicate && !term.known;
-
-                        }
-
-                    });
+            src = new Striterator(EmptyIterator.DEFAULT)
+                .append(new TermClassIterator(buffer.uris, buffer.numURIs))
+                .append(new TermClassIterator(buffer.literals, buffer.numLiterals))
+                .append(new TermClassIterator(buffer.bnodes,buffer.numBNodes))
+                ;
             
         }
 
@@ -440,8 +635,74 @@ class Buffer {
             
         }
 
+        public Object next() {
+            
+            current = (_Value) src.next();
+            
+            return current;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits the term identifier for all URIs, Literals, and BNodes in their current order.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TermIdIterator implements IEntryIterator {
+
+        private final IStriterator src;
+        private final TripleStore store;
+        
+        private int nvisited = 0;
+        private _Value current = null;
+
+        public TermIdIterator(Buffer buffer) {
+            
+            this.store = buffer.store;
+            
+            src = new Striterator(EmptyIterator.DEFAULT)
+                .append(new TermClassIterator(buffer.uris, buffer.numURIs))
+                .append(new TermClassIterator(buffer.literals, buffer.numLiterals))
+                .append(new TermClassIterator(buffer.bnodes,buffer.numBNodes))
+                ;
+            
+        }
+
+        public byte[] getKey() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current.key;
+            
+        }
+
+        public Object getValue() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current.termId;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
         /**
-         * FIXME this assigns a term identifier if one is not found and breaks
+         * FIXME this assigns a term identifier if one is not found which breaks
          * down the iterator abstraction.
          */
         public Object next() {
@@ -466,7 +727,7 @@ class Buffer {
                 
             }
             
-            return current;
+            return current.termId;
             
         }
 
@@ -647,14 +908,22 @@ class Buffer {
         
     }
 
-    public static class UnknownAndDistinctStatementIterator implements IEntryIterator {
+    /**
+     * Visits statements in the buffer in their current sorted order that are
+     * not found in the statement index as indicated by the
+     * {@link _Statement#known} flag.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class UnknownStatementIterator implements IEntryIterator {
 
         private final KeyOrder keyOrder;
         private final RdfKeyBuilder keyBuilder;
         private final IStriterator src;
         private _Statement current;
         
-        public UnknownAndDistinctStatementIterator(KeyOrder keyOrder, Buffer buffer) {
+        public UnknownStatementIterator(KeyOrder keyOrder, Buffer buffer) {
         
             this.keyOrder = keyOrder;
             
@@ -669,7 +938,7 @@ class Buffer {
 
                             _Statement stmt = (_Statement) arg0;
 
-                            return !stmt.duplicate && !stmt.known;
+                            return !stmt.known;
 
                         }
 

@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
+import java.util.Iterator;
+
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
@@ -54,10 +56,12 @@ import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.Buffer.UnknownTermIterator;
+import com.bigdata.rdf.rio.Buffer.UnknownStatementIterator;
 import com.bigdata.rdf.rio.Buffer.StatementIterator;
 import com.bigdata.rdf.rio.Buffer.TermClassIterator;
-import com.bigdata.rdf.rio.Buffer.UnknownAndDistinctTermIterator;
-import com.bigdata.rdf.rio.Buffer.UnknownAndDistinctStatementIterator;
+import com.bigdata.rdf.rio.Buffer.TermIterator;
 
 /**
  * Test suite for {@link Buffer}.
@@ -87,6 +91,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         Buffer buffer = new Buffer(store,capacity,false);
         
         assertEquals(store,buffer.store);
+        assertFalse(buffer.distinct);
         assertEquals(capacity,buffer.capacity);
         assertEquals(capacity,buffer.uris.length);
         assertEquals(capacity,buffer.literals.length);
@@ -103,7 +108,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         
         final int capacity = 5;
         
-        BulkLoaderBuffer buffer = new BulkLoaderBuffer(store,capacity,false);
+        Buffer buffer = new Buffer(store,capacity,false);
         
         /*
          * add a statement.
@@ -120,6 +125,9 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertEquals(0,buffer.numBNodes);
         assertEquals(1,buffer.numStmts);
 
+        /*
+         * verify term class (URI, Literal or BNode) iterators.
+         */
         assertSameIterator(new Object[] { s1, p1, o1 },
                 new TermClassIterator(buffer.uris, buffer.numURIs));
 
@@ -129,6 +137,15 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertSameIterator(new Object[] {},
                 new TermClassIterator(buffer.bnodes, buffer.numBNodes));
 
+        /*
+         * verify all terms iterator.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1 },
+                new TermIterator(buffer));
+
+        /*
+         * verify statement iterator.
+         */
         assertSameIterator(new Object[] { buffer.stmts[0] },
                 new StatementIterator(KeyOrder.SPO, buffer));
         
@@ -147,6 +164,9 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertEquals(0,buffer.numBNodes);
         assertEquals(2,buffer.numStmts);
 
+        /*
+         * verify term class (URI, Literal or BNode) iterators.
+         */
         assertSameIterator(new Object[] { s1, p1, o1, s2, p2 },
                 new TermClassIterator(buffer.uris, buffer.numURIs));
 
@@ -156,14 +176,226 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertSameIterator(new Object[] {},
                 new TermClassIterator(buffer.bnodes, buffer.numBNodes));
 
+        /*
+         * verify all terms iterator.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1, s2, p2, o2 },
+                new TermIterator(buffer));
+
+        /*
+         * verify statement iterator.
+         */
         assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
                 new StatementIterator(KeyOrder.SPO, buffer));
         
+        /*
+         * verify sort keys NOT assigned for terms.
+         */
+        {
+            Iterator<_Value> itr = new TermIterator(buffer);
+            while(itr.hasNext()) {
+                assertNull(itr.next().key);
+            }
+        }
+
         /*
          * assign sort keys for terms.
          */
         buffer.generateTermSortKeys(store.keyBuilder);
 
+        /*
+         * verify sort keys assigned for terms.
+         */
+        {
+            Iterator<_Value> itr = new TermIterator(buffer);
+            while(itr.hasNext()) {
+                assertNotNull(itr.next().key);
+            }
+        }
+
+        /*
+         * sort terms by the assigned sort keys.
+         */
+        buffer.sortTermsBySortKeys();
+
+        /*
+         * show terms in sorted order.
+         */
+        {
+            Iterator<_Value> itr = new TermIterator(buffer);
+            while(itr.hasNext()) {
+                System.err.println(itr.next().toString());
+            }
+        }
+        
+        /* verify term iterator
+         * 
+         * Note: order URIs < Literals < BNodes.
+         * 
+         * Note: Arrays.sort() is stable.
+         * 
+         * Note: The sort order depends on the sort keys.  If you use an ASCII
+         * sort keys then the sort order is different from treating the strings
+         * as US-English Unicode data.  So this test can flunk depending on how
+         * you are encoding unicode strings to keys. 
+         */
+        assertSameIterator(new Object[] { s1, s2, p1, p2, o1, o2 },
+                new TermIterator(buffer));
+        
+    }
+    
+    /**
+     * Test with the <code>distinct</code> terms feature is enabled to uniquify
+     * the terms in the buffer.
+     */
+    public void test_handleStatement_distinct() {
+        
+        final int capacity = 5;
+        
+        Buffer buffer = new Buffer(store,capacity,true);
+        
+        assertTrue(buffer.distinct);
+        
+        /*
+         * add a statement.
+         */
+        
+        _URI s1 = new _URI("http://www.foo.org");
+        _URI p1 = new _URI( RDF.TYPE);
+        _URI o1 =  new _URI(RDFS.RESOURCE);
+
+        buffer.handleStatement(s1, p1, o1 );
+        
+        assertEquals(3,buffer.numURIs);
+        assertEquals(0,buffer.numLiterals);
+        assertEquals(0,buffer.numBNodes);
+        assertEquals(1,buffer.numStmts);
+        
+        assertEquals(1,s1.count);
+        assertEquals(1,p1.count);
+        assertEquals(1,o1.count);
+
+        /*
+         * verify term class (URI, Literal or BNode) iterators.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1 },
+                new TermClassIterator(buffer.uris, buffer.numURIs));
+
+        assertSameIterator(new Object[] {},
+                new TermClassIterator(buffer.literals, buffer.numLiterals));
+
+        assertSameIterator(new Object[] {},
+                new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+
+        /*
+         * verify all terms iterator.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1 },
+                new TermIterator(buffer));
+
+        /*
+         * verify statement iterator.
+         */
+        assertSameIterator(new Object[] { buffer.stmts[0] },
+                new StatementIterator(KeyOrder.SPO, buffer));
+        
+        /*
+         * add another statement.
+         */
+        
+        _URI s2 = new _URI("http://www.foo.org"); // duplicate term!
+        _URI p2 = new _URI( RDFS.LABEL);
+        _Literal o2 =  new _Literal("test uri.");
+        
+        buffer.handleStatement(s2, p2, o2 );
+
+        assertEquals(4,buffer.numURIs); // only 4 since one is a duplicate.
+        assertEquals(1,buffer.numLiterals);
+        assertEquals(0,buffer.numBNodes);
+        assertEquals(2,buffer.numStmts);
+
+        assertEquals(2,s1.count);
+        assertEquals(1,p1.count);
+        assertEquals(1,o1.count);
+        assertEquals(0,s2.count);
+        assertEquals(1,p2.count);
+        assertEquals(1,o2.count);
+
+        /*
+         * verify term class (URI, Literal or BNode) iterators.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2 }, // s2 was a duplicate.
+                new TermClassIterator(buffer.uris, buffer.numURIs));
+
+        assertSameIterator(new Object[] { o2 },
+                new TermClassIterator(buffer.literals, buffer.numLiterals));
+
+        assertSameIterator(new Object[] {},
+                new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+
+        /*
+         * verify all terms iterator.
+         */
+        assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2, o2 },
+                new TermIterator(buffer));
+        
+        /*
+         * verify statement iterator.
+         */
+        assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
+                new StatementIterator(KeyOrder.SPO, buffer));
+
+        /*
+         * add a duplicate statement.
+         */
+        
+        _URI s3 = new _URI("http://www.foo.org"); // duplicate term!
+        _URI p3 = new _URI( RDFS.LABEL);
+        _Literal o3 =  new _Literal("test uri.");
+        
+        buffer.handleStatement(s3, p3, o3 );
+
+        assertEquals(4,buffer.numURIs);
+        assertEquals(1,buffer.numLiterals);
+        assertEquals(0,buffer.numBNodes);
+        assertEquals(3,buffer.numStmts);
+
+        assertEquals(3,s1.count);
+        assertEquals(1,p1.count);
+        assertEquals(1,o1.count);
+        assertEquals(0,s2.count);
+        assertEquals(2,p2.count);
+        assertEquals(2,o2.count);
+        assertEquals(0,s3.count);
+        assertEquals(0,p3.count);
+        assertEquals(0,o3.count);
+
+        /*
+         * add a duplicate statement using the _same_ term objects.
+         */
+        
+        buffer.handleStatement(s3, p3, o3 );
+
+        assertEquals(4,buffer.numURIs);
+        assertEquals(1,buffer.numLiterals);
+        assertEquals(0,buffer.numBNodes);
+        assertEquals(4,buffer.numStmts);
+
+        assertEquals(4,s1.count);
+        assertEquals(1,p1.count);
+        assertEquals(1,o1.count);
+        assertEquals(0,s2.count);
+        assertEquals(3,p2.count);
+        assertEquals(3,o2.count);
+        assertEquals(0,s3.count);
+        assertEquals(0,p3.count);
+        assertEquals(0,o3.count);
+
+        /*
+         * generate the term sort keys.
+         */
+        buffer.generateTermSortKeys(store.keyBuilder);
+        
         /*
          * sort terms by the assigned sort keys.
          */
@@ -174,43 +406,55 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
          * Note: order URIs<Literals<BNodes.
          * 
          * Note: Arrays.sort() is stable.
+         * 
+         * Note: The sort order depends on the sort keys.  If you use an ASCII
+         * sort keys then the sort order is different from treating the strings
+         * as US-English Unicode data.  So this test can flunk depending on how
+         * you are encoding unicode strings to keys. 
          */
-        assertSameIterator(new Object[] { s1, s2, p1, o1, p2, o2 },
-                new UnknownAndDistinctTermIterator(buffer));
+        assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
+                new TermIterator(buffer));
+        assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
+                new UnknownTermIterator(buffer));
 
-        s1.duplicate = true;
-        p1.known = true;
-        
-        assertSameIterator(new Object[] { s2, o1, p2, o2 },
-                new UnknownAndDistinctTermIterator(buffer));
-        
-        s1.duplicate = false;
-        p1.known = false;
+//        s1.duplicate = true;
+//        p1.known = true;
+//        
+//        assertSameIterator(new Object[] { s1, s2, p1, o1, p2, o2 },
+//                new TermIterator(buffer));
+//        assertSameIterator(new Object[] { s2, o1, p2, o2 },
+//                new UnknownTermIterator(buffer));
+//        
+//        s1.duplicate = false;
+//        p1.known = false;
 
-        /*
-         * filter out duplicate terms automatically.
-         */
-        
-        buffer.filterDuplicateTerms();
-        
-        assertEquals(1,buffer.numDupURIs);
-        assertEquals(0,buffer.numDupLiterals);
-        assertEquals(0,buffer.numDupBNodes);
-        assertFalse(s1.duplicate);
-        assertFalse(p1.duplicate);
-        assertFalse(o1.duplicate);
-        assertTrue(s2.duplicate);
-        assertFalse(p2.duplicate);
-        assertFalse(o2.duplicate);
-        
-        assertSameIterator(new Object[] { s1, p1, o1, p2, o2 },
-                new UnknownAndDistinctTermIterator(buffer));
+//        /*
+//         * filter out duplicate terms automatically.
+//         */
+//        
+//        buffer.filterDuplicateTerms();
+//        
+//        assertEquals(1,buffer.numDupURIs);
+//        assertEquals(0,buffer.numDupLiterals);
+//        assertEquals(0,buffer.numDupBNodes);
+//        assertFalse(s1.duplicate);
+//        assertFalse(p1.duplicate);
+//        assertFalse(o1.duplicate);
+//        assertTrue(s2.duplicate);
+//        assertFalse(p2.duplicate);
+//        assertFalse(o2.duplicate);
+//        
+//        assertSameIterator(new Object[] { s1, s2, p1, o1, p2, o2 },
+//                new TermIterator(buffer));
+//        assertSameIterator(new Object[] { s1, p1, o1, p2, o2 },
+//                new UnknownTermIterator(buffer));
         
         /*
          * 
          */
-        assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
-                new UnknownAndDistinctStatementIterator(KeyOrder.SPO,buffer));
+        assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1],
+                buffer.stmts[2], buffer.stmts[3] },
+                new UnknownStatementIterator(KeyOrder.SPO, buffer));
         
     }
         

@@ -124,7 +124,7 @@ public class RdfKeyBuilder {
      * since it avoids all use of unicode aware collation rules and also
      * produces shorter keys.
      */
-    final public boolean assumeUSASCII = true;
+    final public boolean assumeUSASCII = false;
     
     protected final KeyBuilder appendString(String s) {
         
