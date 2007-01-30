@@ -384,10 +384,10 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
             if (buffer.capacity > 0) {
 
                 // pre-generate the sort keys.
-                buffer.generateSortKeys(keyBuilder);
+                buffer.generateTermSortKeys(keyBuilder);
 
                 // pre-sort the terms.
-                buffer.sortTerms();
+                buffer.sortTermsBySortKeys();
                 
             }
             

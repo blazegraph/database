@@ -77,7 +77,9 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RIO Integration");
 
-        suite.addTestSuite( TestTermIdComparator.class);
+        suite.addTestSuite( TestComparators.class);
+
+        suite.addTestSuite( TestBuffer.class);
 
         suite.addTestSuite( TestRioIntegration.class);
         

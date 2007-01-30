@@ -60,18 +60,18 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTermIdComparator extends TestCase2 {
+public class TestComparators extends TestCase2 {
 
     /**
      * 
      */
-    public TestTermIdComparator() {
+    public TestComparators() {
     }
 
     /**
      * @param name
      */
-    public TestTermIdComparator(String name) {
+    public TestComparators(String name) {
         super(name);
     }
 

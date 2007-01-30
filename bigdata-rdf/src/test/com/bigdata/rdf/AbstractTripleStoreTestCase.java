@@ -92,7 +92,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 //                    .toString());
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
-            properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*200);
+            properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
         }
 
@@ -102,6 +102,19 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 
     private Properties properties;
 
+    /**
+     * Invoked the first time {@link #getProperties()} is called for each test
+     * to set the initial extent of the journal.
+     * 
+     * @return The initial extent for the journal (default is 10M). Some tests
+     *         need significantly larger journals.
+     */
+    protected long getInitialExtent() {
+        
+        return Bytes.megabyte*10;
+        
+    }
+    
     public void setUp() throws Exception {
         
         Properties properties = getProperties();

@@ -46,10 +46,11 @@ package com.bigdata.rdf.rio;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 import org.openrdf.model.Resource;
@@ -60,18 +61,23 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IndexSegment;
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.objndx.IndexSegmentFileStore;
+import com.bigdata.objndx.PO;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 
 /**
  * Bulk loader statement handler for the RIO RDF Parser that collects distinct
  * values and statements into batches and bulk loads those batches into
  * {@link IndexSegment}s.
+ * 
+ * @todo one hypothesis is that serialization is the main difference in cost
+ *       between the old and the new btree code.  that might account for the
+ *       minor speedup observed using a bulk index build.
  * 
  * @todo we have to resolve terms against a fused view of the existing btree and
  *       or index segments in order to avoid inconsistent assignments of term
@@ -95,6 +101,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * <p>
      * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
      * value.
+     * 
+     * @todo try 10M buffer for the bulk loader on a large data set.
      */
     static final int DEFAULT_BUFFER_SIZE = 1000000;
     
@@ -125,6 +133,17 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      */
     protected final boolean distinct;
 
+    /**
+     * Used to assign ordered names to each index segment.
+     */
+    private int batchId = 0;
+
+    /**
+     * The set of {@link IndexSegment}s generated for each index during the
+     * batch load.
+     */
+    protected Indices indices = new Indices();
+    
     long stmtsAdded;
     
     long insertTime;
@@ -137,7 +156,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
-    Buffer buffer;
+    BulkLoaderBuffer buffer;
     
     public BulkRioLoader( TripleStore store ) {
     
@@ -157,7 +176,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         
         this.distinct = distinct;
         
-        this.buffer = new Buffer(store, capacity, distinct );
+        this.buffer = new BulkLoaderBuffer(store, capacity, distinct );
         
     }
     
@@ -258,7 +277,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         // Allocate the initial buffer for parsed data.
         if(buffer != null) {
             
-            buffer = new Buffer(store,capacity,distinct);
+            buffer = new BulkLoaderBuffer(store,capacity,distinct);
             
         }
 
@@ -270,7 +289,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             // bulk load insert the buffered data into the store.
             if(buffer!=null) {
                 
-                bulkLoad(buffer);
+                // Bulk load the buffered data into {@link IndexSegment}s.
+                buffer.bulkLoad(batchId++,branchingFactor,indices);
                 
             }
 
@@ -305,7 +325,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             // bulk insert the buffered data into the store.
             try {
                 
-                bulkLoad(buffer);
+                // Bulk load the buffered data into {@link IndexSegment}s.
+                buffer.bulkLoad(batchId++,branchingFactor,indices);
                 
             } catch(IOException ex) {
 
@@ -314,7 +335,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             }
 
             // allocate a new buffer.
-            buffer = new Buffer(store,capacity,distinct);
+            buffer = new BulkLoaderBuffer(store,capacity,distinct);
             
             // fall through.
             
@@ -332,143 +353,130 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         }
         
     }
-    
+
     /**
-     * Bulk load the buffered data into {@link IndexSegment}s.
-     * <p>
-     * The {@link TripleStore} maintain one index to map term:id, one index to
-     * map id:term, and one index per access path for the statements. For each
-     * of these indices we now generate an {@link IndexSegment}.
-     * <p>
+     * A collection of indices each of which has at least one index segments
+     * generated during the load.
      * 
-     * @param buffer
-     * 
-     * FIXME try buffering nodes in memory to remove disk IO from the picture
-     * during the index segment builds.  
-     * 
-     * @todo try a high precision bloom filter for the terms and spo indices as
-     *       a fast means to detect whether a non-duplicate term or statement
-     *       has been seen already during the load. if the bloom filter reports
-     *       false, then we definately have NOT seen that term/statement. if the
-     *       bloom filter reports true, then we have to test the actual index(s)
-     *       and see whether or not the term or statement already exists.
-     * 
-     * @todo an alternative to testing for known terms or statements is to form
-     *       a consistent view. note however that allowing inconsistencies in
-     *       the term:id mapping will require us to update (delete + insert)
-     *       statements formed with term identifiers that are deemed
-     *       inconsistent.
+     * @todo store File or String and if String then the absolute or the
+     *       relative filename?
+     *       
+     * @todo and hash lookup of the index segments iff open (isolate as
+     *       getTermIndices:Iterator<IndexSegment>?)
      */
-    protected void bulkLoad(Buffer buffer) throws IOException {
-        
-        // generate sort keys.
-        buffer.generateSortKeys(store.keyBuilder);
-        
-        // sort each type of term (URI, Literal, BNode).
-        buffer.sortTerms();
-        
-        /*
-         * Mark duplicate terms (term.duplicate := true), counting the #of
-         * duplicate terms.
+    public static class Indices {
+    
+        List<File> terms = new ArrayList<File>();
+
+        List<File> ids = new ArrayList<File>();
+
+        List<File> spo = new ArrayList<File>();
+
+        List<File> pos = new ArrayList<File>();
+
+        List<File> osp = new ArrayList<File>();
+
+        public Indices() {
+            
+        }
+
+        /**
+         * Map of the currently open {@link IndexSegment}s.
          * 
-         * FIXME I am not seeing the expected #of distinct terms for wordnet
-         * when compared with the other load methods.
+         * @todo could be a weak value hash map with an LRU to retain segments
+         *       that are getting use.
          */
-        buffer.filterDuplicateTerms();
-        
-        /*
-         * FIXME resolve terms against bloom filter, journal or pre-existing
-         * index segments. if found, set termId on the term and set flag to
-         * indicate that it is already known (known:=true), counting #of terms
-         * to insert (numTerms - numDuplicates - numKnown). if not found, then
-         * assign a termId - assigned termIds MUST be disjoint from those
-         * already assigned or those that might be assigned concurrently.
+        Map<File,IndexSegment> indices = new HashMap<File,IndexSegment>();
+
+        /**
+         * @todo these variants could be combined if we saved more of the metadata
+         * in the index
          */
-        if(store.ndx_termId.getEntryCount()>0 || ! indices_termId.isEmpty()) {
+        protected IndexSegment getTermIndex(File file) {
+
+            IndexSegment seg = indices.get(file);
+
+            if (seg == null) {
+                
+                try {
+                
+                    seg = new IndexSegment(
+                            new IndexSegmentFileStore(file),
+                            new HardReferenceQueue<PO>(
+                                    new DefaultEvictionListener(),
+                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
+                            com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE);
+                    
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+            }
             
-            /*
-             * read against the terms index on the journal and each segment of
-             * the terms index that has already been built.
-             * 
-             * @todo eventually read against a historical state for the terms
-             * index.
-             */
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        /*
-         * Insert non-duplicate, non-known terms into term index using a single
-         * index segment build for all term types (URIs, Literals, and BNodes).
-         */
-        buffer.bulkLoadTermIndex(branchingFactor,getNextOutFile("terms"));
-        
-        /*
-         * Bulk load the reverse termId:term index with the unknown terms. 
-         */
-        buffer.sortTermIds(); // first sort by termIds.
-        buffer.bulkLoadTermIdentifiersIndex(branchingFactor,getNextOutFile("ids"));
-        
-        /*
-         * For each statement access path, generate the corresponding key and
-         * load an IndexSegment for that access path.
-         */
-
-        // sort on SPO index first.
-        Arrays.sort(buffer.stmts, 0, buffer.numStmts, SPOComparator.INSTANCE);
-
-        // Mark duplicate statements.
-        buffer.filterDuplicateStatements();
-        
-        // FIXME Mark known statements by testing the bloom filter and/or indices.
-        
-        if(store.ndx_spo.getEntryCount()>0 || ! indices_spo.isEmpty()) {
-
-            throw new UnsupportedOperationException();
+            return seg;
             
         }
 
-        // Note: already sorted on SPO key.
-        buffer.bulkLoadStatementIndex(KeyOrder.SPO,branchingFactor,getNextOutFile("spo"));
-        
-        Arrays.sort(buffer.stmts, 0, buffer.numStmts, POSComparator.INSTANCE);
-        buffer.bulkLoadStatementIndex(KeyOrder.POS,branchingFactor,getNextOutFile("pos"));
 
-        Arrays.sort(buffer.stmts, 0, buffer.numStmts, OSPComparator.INSTANCE);
-        buffer.bulkLoadStatementIndex(KeyOrder.OSP,branchingFactor,getNextOutFile("ops"));
-        
-        // End of this batch.
-        batchId++;
-        
+        protected IndexSegment getIdIndex(File file) {
+
+            IndexSegment seg = indices.get(file);
+
+            if (seg == null) {
+                
+                try {
+                
+                    seg = new IndexSegment(
+                            new IndexSegmentFileStore(file),
+                            new HardReferenceQueue<PO>(
+                                    new DefaultEvictionListener(),
+                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
+                            com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE);
+                    
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+            }
+            
+            return seg;
+            
+        }
+
+        protected IndexSegment getStatementIndex(File file) {
+
+            IndexSegment seg = indices.get(file);
+
+            if (seg == null) {
+                
+                try {
+                
+                    seg = new IndexSegment(
+                            new IndexSegmentFileStore(file),
+                            new HardReferenceQueue<PO>(
+                                    new DefaultEvictionListener(),
+                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
+                            com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE);
+                    
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+            }
+            
+            return seg;
+            
+        }
+
     }
-    
-    /*
-     * The index segments generated during the load.
-     */
-    List<IndexSegment> indices_termId = new LinkedList<IndexSegment>();
-    List<IndexSegment> indices_idTerm= new LinkedList<IndexSegment>();
-    List<IndexSegment> indices_spo = new LinkedList<IndexSegment>();
-    List<IndexSegment> indices_pos = new LinkedList<IndexSegment>();
-    List<IndexSegment> indices_ops = new LinkedList<IndexSegment>();
 
-    /**
-     * Used to assign ordered names to each index segment.
-     */
-    private int batchId = 0;
-
-    /**
-     * Return a unique file name that will be used to create an index segment of
-     * the same name.
-     * 
-     * @param name
-     *            The index name (terms, ids, spo, pos, ops).
-     * 
-     * @return The unique file name.
-     */
-    protected File getNextOutFile(String name) throws IOException {
-
-        return File.createTempFile(name + "-" + batchId, "seg");
-        
-    }
-    
 }

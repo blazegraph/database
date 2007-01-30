@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+import com.bigdata.journal.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 
 /**
@@ -60,6 +61,15 @@ import com.bigdata.rdf.AbstractTripleStoreTestCase;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  */
 public class TestRioIntegration extends AbstractTripleStoreTestCase {
+
+    /**
+     * 200M
+     */
+    protected long getInitialExtent() {
+        
+        return Bytes.megabyte*200;
+        
+    }
 
     /**
      * 
@@ -230,8 +240,9 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     protected void assertDataLoaded() {
 
-        int nterms = 273644;
-        int nstatements = 223146;
+        final int nterms = 223146;
+        
+        final int nstatements = 273644;
         
         assertEquals("#terms",nterms,store.ndx_termId.getEntryCount());
         

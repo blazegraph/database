@@ -47,24 +47,15 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BytesUtil;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentBuilder;
-import com.bigdata.objndx.IndexSegmentFileStore;
 import com.bigdata.objndx.NoSuccessorException;
-import com.bigdata.objndx.PO;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.TripleStore;
@@ -78,7 +69,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
 
-import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Striterator;
@@ -99,28 +89,6 @@ class Buffer {
     int numURIs, numLiterals, numBNodes;
     int numStmts;
 
-    /**
-     * #of duplicate URIs, literals and bnodes as determined by
-     * {@link #filterDuplicateTerms()}.
-     */
-    int numDupURIs = 0, numDupLiterals = 0, numDupBNodes = 0;
-
-    /**
-     * #of non-duplicate URIs, literals, and bnodes that have been determined to
-     * already be in the terms index.
-     */
-    int numKnownURIs = 0, numKnownLiterals = 0, numKnownBNodes = 0;
-
-    /**
-     * #of duplicate statements.
-     */
-    int numDupStmts = 0;
-
-    /**
-     * #of already known statements.
-     */
-    int numKnownStmts = 0;
-    
 //  /**
 //  * When true, each term in a type specific buffer will be placed into a
 //  * cannonicalizing map so that we never have more than once instance for
@@ -240,10 +208,12 @@ class Buffer {
      *            the same manner with respect to unicode support in order
      *            for keys to be comparable!
      */
-    public void generateSortKeys(RdfKeyBuilder keyBuilder) {
+    public void generateTermSortKeys(RdfKeyBuilder keyBuilder) {
 
         assert !haveKeys;
 
+        final int numTerms = numURIs + numLiterals + numBNodes;
+        
         final long begin = System.currentTimeMillis();
         
         store.generateSortKeys(keyBuilder, uris, numURIs);
@@ -254,7 +224,7 @@ class Buffer {
         
         haveKeys = true;
         
-        System.err.println("generated term sort keys: "
+        System.err.println("generated "+numTerms+" term sort keys: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
     }
@@ -265,7 +235,7 @@ class Buffer {
      * 
      * @see #generateSortKeys(), which must be invoked as a pre-condition.
      */
-    public void sortTerms() {
+    public void sortTermsBySortKeys() {
         
         assert haveKeys;
         assert ! sorted;
@@ -273,6 +243,8 @@ class Buffer {
         assert literals != null;
         assert bnodes != null;
         
+        final int numTerms = numURIs + numLiterals + numBNodes;
+
         final long begin = System.currentTimeMillis();
         
         if (numURIs > 0)
@@ -286,7 +258,7 @@ class Buffer {
 
         sorted = true;
 
-        System.err.println("sorted terms: "
+        System.err.println("sorted "+numTerms+" terms: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
     }
@@ -294,7 +266,7 @@ class Buffer {
     /**
      * Sorts the terms by their pre-assigned termIds.
      */
-    public void sortTermIds() {
+    public void sortTermsByTermIds() {
         
         final long begin = System.currentTimeMillis();
         
@@ -312,127 +284,6 @@ class Buffer {
         System.err.println("sorted terms by ids: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
-    }
-    
-    /**
-     * Scans the sorted term buffers and flags terms that are duplicates of the
-     * immediately proceeding term in the buffer by setting
-     * {@link _Value#duplicate} to <code>true</code>.  The flagged duplicates
-     * are NOT removed from the buffers since that would require a compacting
-     * operation.
-     */
-    public void filterDuplicateTerms() {
-        
-        assert haveKeys;
-        assert sorted;
-        assert uris != null;
-        assert literals != null;
-        assert bnodes != null;
-
-        final long begin = System.currentTimeMillis();
-        
-        numDupURIs = filterDuplicateTerms(uris, numURIs);
-        
-        numDupLiterals = filterDuplicateTerms(uris, numLiterals);
-        
-        numDupBNodes = filterDuplicateTerms(uris, numBNodes);
-
-        int numDuplicates = numDupURIs + numDupLiterals + numDupBNodes;
-        
-        System.err.println("filtered "+numDuplicates+" duplicate terms: "
-                + (System.currentTimeMillis() - begin) + "ms");
-        
-    }
-
-    /**
-     * Flag duplicate terms within the <i>terms</i> array.
-     * 
-     * @param terms
-     *            The terms, which MUST be sorted on {@link _Value#key}.
-     * @param numTerms
-     *            The #of terms in that array.
-     *            
-     * @return The #of duplicate terms in that array.
-     */
-    private int filterDuplicateTerms(_Value[] terms, int numTerms) {
-
-        int numDuplicates = 0;
-        
-        if(numTerms>0){
-
-            byte[] lastKey = terms[0].key; 
-            
-            for (int i = 1; i < numTerms; i++) {
-
-                byte[] thisKey = terms[i].key;
-                
-                if( BytesUtil.bytesEqual(lastKey, thisKey) ) {
-                    
-                    terms[i].duplicate = true;
-                    
-                    numDuplicates++;
-                    
-                } else {
-                    
-                    lastKey = thisKey;
-                    
-                }
-                
-            }
-            
-        }
-
-        return numDuplicates;
-        
-    }
-
-    /**
-     * Mark duplicate statements by setting {@link _Statement#duplicate}.
-     * <p>
-     * Pre-condition - the statements must be sorted by one of the access paths
-     * (SPO, POS, OSP). It does not matter which sort order is used, but
-     * duplicate detection requires sorted data.
-     * 
-     * @return The #of duplicate statements flagged.
-     */
-    public int filterDuplicateStatements() {
-
-        int numDuplicates = 0;
-        
-        if(numStmts>0){
-
-            final long begin = System.currentTimeMillis();
-            
-            _Statement lastStmt = stmts[0]; 
-            
-            for (int i = 1; i < numStmts; i++) {
-
-                _Statement thisStmt = stmts[i];
-                
-                if( lastStmt.equals(thisStmt) ) {
-                    
-                    thisStmt.duplicate = true;
-                    
-                    numDuplicates++;
-                    
-                } else {
-                    
-                    lastStmt = thisStmt;
-                    
-                }
-                
-            }
-            
-            System.err.println("filtered " + numDuplicates
-                    + " duplicate statements: "
-                    + (System.currentTimeMillis() - begin) + "ms");
-
-        }
-
-        this.numDupStmts = numDuplicates;
-        
-        return numDuplicates;
-
     }
     
     /**
@@ -525,7 +376,7 @@ class Buffer {
               );
         
     }
-
+    
     /**
      * Visits all non-duplicate, non-known URIs, Literals, and BNodes in their
      * current order.
@@ -533,46 +384,35 @@ class Buffer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class TermIterator implements IEntryIterator {
+    public static class UnknownAndDistinctTermIterator implements IEntryIterator {
 
+        private final IStriterator src;
+        private final TripleStore store;
+        
+        private int nvisited = 0;
         private _Value current = null;
         
-        /**
-         * Visits non-duplicate, non-known terms in total sorted order (URIs
-         * before literals before BNodes).
-         * 
-         * @todo This also assigned termIds when none is found for a term,
-         *       however it might be best to move that behavior into a different
-         *       processing stage in {@link BulkRioLoader#bulkLoad(Buffer)}.
-         */
-        private final Striterator src;
-        
-        public TermIterator() {
 
-            assert haveKeys;
-            assert sorted;
+        public UnknownAndDistinctTermIterator(Buffer buffer) {
             
-            src = new Striterator(EmptyIterator.DEFAULT);
-
-            src.append(new TermClassIterator(uris,numURIs));
-
-            src.append(new TermClassIterator(literals,numLiterals));
+            this.store = buffer.store;
             
-            src.append(new TermClassIterator(bnodes,numBNodes));
+            src = new Striterator(new TermClassIterator(buffer.uris, buffer.numURIs)).append(
+                    new TermClassIterator(buffer.literals, buffer.numLiterals)).append(
+                    new TermClassIterator(buffer.bnodes, buffer.numBNodes)).addFilter(
+                    new Filter() {
 
-            src.addFilter(new Filter() {
+                        private static final long serialVersionUID = 1L;
 
-                private static final long serialVersionUID = 1L;
+                        protected boolean isValid(Object arg0) {
 
-                protected boolean isValid(Object arg0) {
-                    
-                    _Value term = (_Value)arg0;
+                            _Value term = (_Value) arg0;
 
-                    return !term.duplicate && !term.known;
-                    
-                }
-                
-            });
+                            return !term.duplicate && !term.known;
+
+                        }
+
+                    });
             
         }
 
@@ -600,13 +440,28 @@ class Buffer {
             
         }
 
+        /**
+         * FIXME this assigns a term identifier if one is not found and breaks
+         * down the iterator abstraction.
+         */
         public Object next() {
             
-            current = (_Value) src.next();
+            try {
+
+                current = (_Value) src.next();
+                
+                nvisited++;
+                
+            } catch(NoSuchElementException ex) {
+                
+                System.err.println("*** Iterator exhausted after: "+nvisited+" elements");
+                
+                throw ex;
+                
+            }
             
             if(current.termId == 0L) {
                 
-                // Note: this assigns a term identifier!
                 current.termId = store.ndx_termId.nextId();
                 
             }
@@ -646,21 +501,27 @@ class Buffer {
         }
 
         public byte[] getKey() {
+            
             if( lastVisited == -1 ) {
                 
                 throw new IllegalStateException();
                 
             }
+            
             return terms[lastVisited].key;
+            
         }
 
         public Object getValue() {
+            
             if( lastVisited == -1 ) {
                 
                 throw new IllegalStateException();
                 
             }
+            
             return terms[lastVisited];
+            
         }
 
         public boolean hasNext() {
@@ -671,7 +532,7 @@ class Buffer {
 
         public Object next() {
             
-            if(!hasNext()) {
+            if (index >= nterms) {
                 
                 throw new NoSuccessorException();
                 
@@ -684,7 +545,9 @@ class Buffer {
         }
 
         public void remove() {
+            
             throw new UnsupportedOperationException();
+            
         }
         
     }
@@ -695,15 +558,31 @@ class Buffer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class StatementIterator implements IEntryIterator {
+    public static class StatementIterator implements IEntryIterator {
 
-        private KeyOrder keyOrder;
+        private final KeyOrder keyOrder;
+        private final RdfKeyBuilder keyBuilder;
+        private final _Statement[] stmts;
+        private final int numStmts;
+        
         private int lastVisited = -1;
         private int index = 0;
+
+        public StatementIterator(KeyOrder keyOrder,Buffer buffer) {
+            
+            this(keyOrder,buffer.store.keyBuilder,buffer.stmts,buffer.numStmts);
+            
+        }
         
-        public StatementIterator(KeyOrder keyOrder) {
+        public StatementIterator(KeyOrder keyOrder,RdfKeyBuilder keyBuilder,_Statement[] stmts,int numStmts) {
             
             this.keyOrder = keyOrder;
+            
+            this.keyBuilder = keyBuilder;
+            
+            this.stmts = stmts;
+            
+            this.numStmts = numStmts;
             
         }
 
@@ -719,13 +598,13 @@ class Buffer {
 
             switch (keyOrder) {
             case SPO:
-                return store.keyBuilder.statement2Key(stmt.s.termId,
+                return keyBuilder.statement2Key(stmt.s.termId,
                         stmt.p.termId, stmt.o.termId);
             case POS:
-                return store.keyBuilder.statement2Key(stmt.p.termId,
+                return keyBuilder.statement2Key(stmt.p.termId,
                         stmt.o.termId, stmt.s.termId);
             case OSP:
-                return store.keyBuilder.statement2Key(stmt.o.termId,
+                return keyBuilder.statement2Key(stmt.o.termId,
                         stmt.s.termId, stmt.p.termId);
             default:
                 throw new UnsupportedOperationException();
@@ -768,17 +647,20 @@ class Buffer {
         
     }
 
-    class UnknownAndDistinctStatementIterator implements IEntryIterator {
+    public static class UnknownAndDistinctStatementIterator implements IEntryIterator {
 
         private final KeyOrder keyOrder;
+        private final RdfKeyBuilder keyBuilder;
         private final IStriterator src;
         private _Statement current;
         
-        public UnknownAndDistinctStatementIterator(KeyOrder keyOrder) {
+        public UnknownAndDistinctStatementIterator(KeyOrder keyOrder, Buffer buffer) {
         
             this.keyOrder = keyOrder;
             
-            src = new Striterator(new StatementIterator(keyOrder))
+            this.keyBuilder = buffer.store.keyBuilder;
+            
+            src = new Striterator(new StatementIterator(keyOrder,buffer))
                     .addFilter(new Filter() {
 
                         private static final long serialVersionUID = 1L;
@@ -807,14 +689,14 @@ class Buffer {
 
             switch (keyOrder) {
             case SPO:
-                return store.keyBuilder.statement2Key(stmt.s.termId,
-                        stmt.p.termId, stmt.o.termId);
+                return keyBuilder.statement2Key(stmt.s.termId, stmt.p.termId,
+                        stmt.o.termId);
             case POS:
-                return store.keyBuilder.statement2Key(stmt.p.termId,
-                        stmt.o.termId, stmt.s.termId);
+                return keyBuilder.statement2Key(stmt.p.termId, stmt.o.termId,
+                        stmt.s.termId);
             case OSP:
-                return store.keyBuilder.statement2Key(stmt.o.termId,
-                        stmt.s.termId, stmt.p.termId);
+                return keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+                        stmt.p.termId);
             default:
                 throw new UnsupportedOperationException();
             }
@@ -852,122 +734,6 @@ class Buffer {
             throw new UnsupportedOperationException();
             
         }
-        
-    }
-
-    /**
-     * Bulk loads the mapping from term to term identifier for pre-sorted,
-     * non-duplicate, non-known terms into a new {@link IndexSegment}.
-     * 
-     * @return The new {@link IndexSegment}.
-     */
-    public IndexSegment bulkLoadTermIndex(int branchingFactor,File outFile) throws IOException {
-
-        int numTerms = numURIs + numLiterals + numBNodes;
-        
-        numTerms -= numDupURIs + numDupLiterals + numDupBNodes;
-
-        numTerms -= numKnownURIs + numKnownLiterals + numKnownBNodes;
-        
-        System.err.println("Building terms index segment: numTerms="+numTerms);
-        
-        final long begin = System.currentTimeMillis();
-        
-        IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile, null,
-                numTerms, new TermIterator(),
-                branchingFactor,
-                com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
-
-        IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(
-                builder.outFile), new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), 
-                com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE);
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("Built terms index segment: numTerms="+numTerms+", elapsed="+elapsed);
-
-        return seg;
-        
-    }
-    
-    /**
-     * Bulk loads the reverse mapping for pre-sorted, non-duplicate, non-known
-     * terms into a new {@link IndexSegment}.
-     * 
-     * @return The new {@link IndexSegment}.
-     */
-    public IndexSegment bulkLoadTermIdentifiersIndex(int branchingFactor, File outFile) throws IOException {
-
-        int numTerms = numURIs + numLiterals + numBNodes;
-        
-        numTerms -= numDupURIs + numDupLiterals + numDupBNodes;
-
-        numTerms -= numKnownURIs + numKnownLiterals + numKnownBNodes;
-
-        System.err.println("Building ids index segment: numTerms="+numTerms);
-        
-        final long begin = System.currentTimeMillis();
-
-        IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile, null,
-                numTerms, new TermIterator(),
-                branchingFactor,
-                com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
-
-        IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(
-                builder.outFile), new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE);
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("Built ids index segment: numTerms="+numTerms+", elapsed="+elapsed);
-
-        return seg;
-        
-    }
-
-    /**
-     * Bulk loads the reverse mapping for pre-sorted, non-duplicate, non-known
-     * statements into a new {@link IndexSegment}.
-     * 
-     * @return The new {@link IndexSegment}.
-     */
-    public IndexSegment bulkLoadStatementIndex(KeyOrder keyOrder, int branchingFactor, File outFile) throws IOException {
-
-        int numStmts = this.numStmts - numDupStmts - numKnownStmts;
-        
-        System.err.println("Building statement index segment: numStmts="+numStmts);
-        
-        final long begin = System.currentTimeMillis();
-
-        IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile, null,
-                numStmts, new UnknownAndDistinctStatementIterator(keyOrder),
-                branchingFactor,
-                com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
-
-        IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(
-                builder.outFile), new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE
-                );
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("Built " + keyOrder
-                + " statement index segment: numStmts=" + numStmts
-                + ", elapsed=" + elapsed);
-
-        return seg;
         
     }
 

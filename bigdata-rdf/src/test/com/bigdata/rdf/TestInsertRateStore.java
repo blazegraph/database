@@ -54,6 +54,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
+import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BytesUtil.UnsignedByteArrayComparator;
 
@@ -95,6 +96,15 @@ import com.bigdata.objndx.BytesUtil.UnsignedByteArrayComparator;
  * @version $Id$
  */
 public class TestInsertRateStore extends AbstractTripleStoreTestCase {
+
+    /**
+     * 200M
+     */
+    protected long getInitialExtent() {
+        
+        return Bytes.megabyte*200;
+        
+    }
 
     /**
      * 

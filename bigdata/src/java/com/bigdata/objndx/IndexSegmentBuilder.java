@@ -55,6 +55,7 @@ import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -376,6 +377,11 @@ public class IndexSegmentBuilder {
      *       simplest implementation would be a linked list of the serialized
      *       nodes. the advantage of buffering the nodes is less IO at the cost
      *       of more RAM.
+     * 
+     * @todo make record compression optional and preserve the decision in the
+     *       index segment metadata.
+     * 
+     * @todo support efficient prior/next leaf scans.
      */
     public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
             IEntryIterator entryIterator, final int m,
@@ -573,6 +579,9 @@ public class IndexSegmentBuilder {
 //            
 //            int nsourceKeys = sourceLeaf.getKeyCount();
 
+            // #of entries used so far.
+            int nused = 0;
+            
             for (int i = 0; i < plan.nleaves; i++) {
 
                 leaf.reset(plan.numInNode[leaf.level][i]);
@@ -610,7 +619,19 @@ public class IndexSegmentBuilder {
 //                    
 //                    leaf.vals[j] = ((Leaf)sourceLeaf).values[nconsumed];
 
-                    leaf.vals[j] = entryIterator.next();
+                    try {
+                        
+                        leaf.vals[j] = entryIterator.next();
+                        
+                        nused++;
+                        
+                    } catch(NoSuchElementException ex) {
+                        
+                        throw new RuntimeException("Iterator exhausted after "
+                                + nused + " entries, but expected "
+                                + entryCount + " entries", ex);
+                        
+                    }
 
                     keys.keys[keys.nkeys] = entryIterator.getKey();
 
