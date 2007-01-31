@@ -20,7 +20,7 @@ import com.bigdata.journal.Bytes;
  * and the nodes of the segment in an arbitrary order. It is possible to map or
  * buffer the part of the file containing the index nodes or the entire file
  * depending on application requirements.
- * 
+ * <p>
  * Note: iterators returned by this class do not support removal (the nodes and
  * leaves will all refuse mutation operations).
  * 
@@ -121,8 +121,9 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
                 new CustomAddressSerializer(fileStore.metadata.offsetNodes),
-                valSer, ImmutableNodeFactory.INSTANCE, new RecordCompressor(),
-                true/* useChecksum */);
+                valSer, ImmutableNodeFactory.INSTANCE,
+                fileStore.metadata.useRecordCompressor ? new RecordCompressor()
+                        : null, fileStore.metadata.useChecksum);
 
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentFileStore) fileStore;

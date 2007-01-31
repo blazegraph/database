@@ -1315,7 +1315,10 @@ public class Journal implements IRawStore, IStore {
      *       shutdown when there are active or prepar(ed|ing) transactions,
      *       timeouts on transactions during shutdown, notification of abort for
      *       transactions that do not complete in a timely manner, and
-     *       survivability of prepared transactions across restart.
+     *       survivability of prepared transactions across restart.  Reconcile
+     *       the semantics of this method with those declared by the raw store
+     *       interface, probably by declaring a variant that accepts parameters
+     *       specifying how to handle the shutdown (immediate vs wait).
      */
     public void close() {
         

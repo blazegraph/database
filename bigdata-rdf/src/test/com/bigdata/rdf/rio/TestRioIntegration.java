@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.TripleStore;
@@ -69,6 +70,12 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     protected long getInitialExtent() {
         
         return Bytes.megabyte*200;
+        
+    }
+    
+    protected BufferMode getBufferMode() {
+        
+        return BufferMode.Transient;
         
     }
 
@@ -240,8 +247,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     }
     
     protected String[] testData = new String[] {
-            "data/wordnet_nouns-20010201.rdf",
-            "data/nciOncology.owl"
+            "data/nciOncology.owl" // nterms := 289844
+//            "data/wordnet_nouns-20010201.rdf"
             };
     
     protected void assertDataLoaded() {

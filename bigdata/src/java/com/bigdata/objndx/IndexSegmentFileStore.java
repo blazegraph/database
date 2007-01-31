@@ -226,4 +226,24 @@ public class IndexSegmentFileStore implements IRawStore2 {
 
     }
 
+    public void commit() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public long getAddr(int rootSlot) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public boolean isOpen() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public void registerCommitter(int rootSlot, ICommitter committer) {
+        // TODO Auto-generated method stub
+        
+    }
+
 }

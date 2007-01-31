@@ -54,6 +54,16 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
+/**
+ * Parses data but does not load it into the indices.
+ * 
+ * @todo do a variant that uses the non-batch, non-bulk apis to load each term
+ *       and statement as it is parsed into the indices. this will be
+ *       interesting as a point of comparison with the other loaders.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class BasicRioLoader implements IRioLoader {
 
     long stmtsAdded;

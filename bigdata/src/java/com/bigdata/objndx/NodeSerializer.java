@@ -405,6 +405,21 @@ public class NodeSerializer {
         }
         
         this._buf = alloc(initialBufferCapacity);
+
+        /*
+         * Allocate compression buffer iff a compression algorithm is used.
+         * 
+         * FIXME The capacity of this buffer is a SWAG. If it is too small then
+         * an EOFException will be thrown. This needs to be modified start with
+         * a smaller buffer and grow as required.  An alternative would be to
+         * re-allocate this whenever _buf is resize since the compressed data
+         * should never be larger than the original data.
+         */
+    
+        cbuf = recordCompressor != null //
+//                ? ByteBuffer.allocate(Bytes.megabyte32) //
+                ? ByteBuffer.allocateDirect(Bytes.megabyte32*2) //
+                : null;
         
     }
 
@@ -428,6 +443,10 @@ public class NodeSerializer {
          * gain when you are doing a lot of get/put byte operations to use a
          * wrapped, rather than direct, {@link ByteBuffer} (this was observed
          * using the Sun JDK 1.5.07 with the -server mode).
+         * 
+         * @todo verify that this is true when using the Transient vs Direct
+         * buffer modes and how it interacts with whether the Journal's buffer
+         * is transient or direct.
          */
 
         return ByteBuffer.allocate(capacity);
@@ -1326,12 +1345,8 @@ public class NodeSerializer {
 
     /**
      * Buffer for compressed records.
-     * 
-     * @todo The capacity of this buffer is a SWAG. it needs to begin life as a
-     *       smaller buffer and grow as required.
      */
-    final private ByteBuffer cbuf = ByteBuffer
-            .allocateDirect(Bytes.megabyte32 / 2);
+    final private ByteBuffer cbuf;
         
     /**
      * If compression is enabled, then decompress the data.

@@ -86,13 +86,13 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
 
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
 //                    .toString());
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
-                    .toString());
+            properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
 //                    .toString());
+            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
-            properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*200);
+            properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
         }
 
@@ -102,6 +102,34 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
 
     private Properties properties;
 
+    /**
+     * Invoked the first time {@link #getProperties()} is called for each test
+     * to set the initial extent of the journal.
+     * 
+     * @return The initial extent for the journal (default is 10M). Some tests
+     *         need significantly larger journals.
+     */
+    protected long getInitialExtent() {
+        
+        return Bytes.megabyte*10;
+        
+    }
+
+    /**
+     * Invoked the first time {@link #getProperties()} is called for each test
+     * to set mode in which the {@link Journal} will be opened.
+     * 
+     * @return {@link BufferMode#Transient}
+     * 
+     * @see BufferMode#Transient
+     * @see BufferMode#Direct
+     */
+    protected BufferMode getBufferMode() {
+        
+        return BufferMode.Transient;
+        
+    }
+    
     public void setUp() throws Exception {
         
         Properties properties = getProperties();

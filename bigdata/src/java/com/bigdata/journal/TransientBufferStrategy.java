@@ -25,8 +25,12 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
     
     TransientBufferStrategy(SlotMath slotMath,long initialExtent) {
         
+        /*
+         * Note: I have not observed much performance gain from the use of
+         * a direct buffer for the transient mode.
+         */
         super(journalHeaderSize,BufferMode.Transient, slotMath, ByteBuffer
-                .allocateDirect((int) assertNonDiskExtent(initialExtent)));
+                .allocate/*Direct*/((int) assertNonDiskExtent(initialExtent)));
     
         open = true;
         

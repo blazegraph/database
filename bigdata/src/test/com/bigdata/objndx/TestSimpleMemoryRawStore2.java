@@ -42,56 +42,63 @@ Modifications:
 
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Jan 31, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.objndx;
 
-import java.io.File;
-import java.io.IOException;
 
 /**
- * Test suite for full forward closure.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
+public class TestSimpleMemoryRawStore2 extends AbstractRawStore2TestCase {
 
     /**
      * 
      */
-    public TestFullForwardClosure() {
+    public TestSimpleMemoryRawStore2() {
     }
 
     /**
      * @param name
      */
-    public TestFullForwardClosure(String name) {
+    public TestSimpleMemoryRawStore2(String name) {
         super(name);
     }
-        
-    /**
-     * Test of full forward closure.
-     * 
-     * @throws IOException
-     */
-    public void testFullForwardClosure01() throws IOException {
 
-        /*
-         * @todo this is committing the data first we do not want to do if we
-         * know that we are closing the store.
-         * 
-         * @todo use a dataset that we can add to CVS for a performance test and
-         * hand-crafted data sets to test the rule implementations.
-         */
-        store.loadData(new File("data/alibaba_v41.rdf"));
-//        store.loadData(new File("data/nciOncology.owl"));
-
-        store.fullForwardClosure();
+    protected IRawStore2 getStore() {
         
-        store.commit();
+        return new SimpleMemoryRawStore2();
+
+    }
+    
+    protected boolean deleteInvalidatesAddress() {
+
+        return true;
         
     }
+
+    public void test_ctor() {
         
+        new SimpleMemoryRawStore2();
+
+        new SimpleMemoryRawStore2(0);
+        
+        new SimpleMemoryRawStore2(10);
+        
+        try {
+
+            new SimpleMemoryRawStore2(-1);
+            
+            fail("Expecting: "+IllegalArgumentException.class);
+                
+        } catch(IllegalArgumentException ex) {
+            
+            System.err.println("Ignoring expected exception: "+ex);
+            
+        }
+        
+    }
+
 }

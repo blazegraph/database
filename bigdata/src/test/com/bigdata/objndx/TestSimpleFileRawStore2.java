@@ -42,56 +42,81 @@ Modifications:
 
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Jan 31, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.objndx;
 
 import java.io.File;
 import java.io.IOException;
 
 /**
- * Test suite for full forward closure.
+ * Test suite for {@link SimpleFileRawStore2}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
+public class TestSimpleFileRawStore2 extends AbstractRawStore2TestCase {
 
     /**
      * 
      */
-    public TestFullForwardClosure() {
+    public TestSimpleFileRawStore2() {
     }
 
     /**
      * @param name
      */
-    public TestFullForwardClosure(String name) {
+    public TestSimpleFileRawStore2(String name) {
         super(name);
     }
-        
-    /**
-     * Test of full forward closure.
-     * 
-     * @throws IOException
-     */
-    public void testFullForwardClosure01() throws IOException {
 
-        /*
-         * @todo this is committing the data first we do not want to do if we
-         * know that we are closing the store.
-         * 
-         * @todo use a dataset that we can add to CVS for a performance test and
-         * hand-crafted data sets to test the rule implementations.
-         */
-        store.loadData(new File("data/alibaba_v41.rdf"));
-//        store.loadData(new File("data/nciOncology.owl"));
+    private SimpleFileRawStore2 store;
 
-        store.fullForwardClosure();
-        
-        store.commit();
+    protected boolean deleteInvalidatesAddress() {
+
+        return true;
         
     }
+
+    protected IRawStore2 getStore() {
+
+        if (store != null)
+            return store;
         
+        File file = new File(getName()+".raw2");
+
+        if(file.exists() && !file.delete()) {
+
+            throw new RuntimeException("Could not delete existing file: "
+                    + file.getAbsoluteFile());
+            
+        }
+        
+        try {
+        
+            return new SimpleFileRawStore2(file,"rw");
+            
+        }
+        catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+    
+    public void tearDown() throws Exception {
+        
+        super.tearDown();
+        
+        if(store != null && store.isOpen()) {
+            
+            // force release of any file handle.
+            store.raf.close();
+            
+        }
+        
+    }
+
 }

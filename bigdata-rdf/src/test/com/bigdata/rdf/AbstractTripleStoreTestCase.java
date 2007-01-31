@@ -89,6 +89,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
             properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
 //                    .toString());
+            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());

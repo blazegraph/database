@@ -1236,6 +1236,34 @@ public class BTree extends AbstractBTree implements IBTree {
             return delegate.write(data).toLong();
             
         }
+
+        public void close() {
+
+            delegate.close();
+            
+        }
+
+        public boolean isOpen() {
+            
+            return delegate.isOpen();
+            
+        }
+
+        public void commit() {
+
+            delegate.commit();
+            
+        }
+
+        public long getAddr(int rootSlot) {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public void registerCommitter(int rootSlot, ICommitter committer) {
+            // TODO Auto-generated method stub
+            
+        }
         
     }
     

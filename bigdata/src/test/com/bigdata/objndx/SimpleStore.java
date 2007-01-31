@@ -63,6 +63,8 @@ import com.bigdata.journal.SlotMath;
  */
 public class SimpleStore implements IRawStore {
 
+    private boolean open = true;
+    
     /**
      * Used to assign slots.
      */
@@ -145,6 +147,26 @@ public class SimpleStore implements IRawStore {
 
         store.remove(key.toLong());
 
+    }
+
+    public void close() {
+        
+        if(!open) throw new IllegalStateException();
+
+        open = false;
+        
+    }
+
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+    
+    public void commit() {
+        
+        // NOP.
+        
     }
 
 }

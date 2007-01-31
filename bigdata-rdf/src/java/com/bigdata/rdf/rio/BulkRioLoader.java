@@ -76,7 +76,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * {@link IndexSegment}s.
  * 
  * @todo one hypothesis is that serialization is the main difference in cost
- *       between the old and the new btree code.  that might account for the
+ *       between the old and the new btree code. that might account for the
  *       minor speedup observed using a bulk index build.
  * 
  * @todo we have to resolve terms against a fused view of the existing btree and

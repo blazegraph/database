@@ -120,4 +120,30 @@ public interface IRawStore {
      */
     public void delete(ISlotAllocation slots);
     
+    /**
+     * True iff the store is open.
+     * 
+     * @return <code>true</code> iff the store is open.
+     */
+    public boolean isOpen();
+    
+    /**
+     * Closes the store without invoking {@link #commit()}. Any uncommitted
+     * changes will be lost.
+     * 
+     * @exception IllegalStateException
+     *                if the store is not open.
+     */
+    public void close();
+
+    /**
+     * Request an atomic commit.
+     * 
+     * @exception IllegalStateException
+     *                if the store is not open.
+     * @exception IllegalStateException
+     *                if the store is not writable.
+     */
+    public void commit();
+
 }

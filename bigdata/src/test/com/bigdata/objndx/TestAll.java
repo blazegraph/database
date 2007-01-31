@@ -52,9 +52,15 @@ public class TestAll extends TestCase {
         
         /*
          * test store support.
+         * 
+         * @todo move most of this to the journal package.
          */
-        // test address encoding and decoding; @todo move to journal package to replace ISlotsAllocation
+        // test address encoding and decoding;
         suite.addTestSuite( TestAddr.class );
+        // test memory-resident implementation of IRawStore2.
+        suite.addTestSuite( TestSimpleMemoryRawStore2.class );
+        // test file-based implementation of IRawStore2.
+        suite.addTestSuite( TestSimpleFileRawStore2.class );
         // test classes that let us treat a ByteBuffer as an input/output stream.
         suite.addTestSuite( TestByteBufferStreams.class );
         // test bulk data compression.

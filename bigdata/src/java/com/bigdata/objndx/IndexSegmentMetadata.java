@@ -57,6 +57,15 @@ public class IndexSegmentMetadata {
     final public boolean useChecksum;
     
     /**
+     * When true, a {@link RecordCompressor} was used to write the nodes and
+     * leaves of the {@link IndexSegment}.
+     * 
+     * @todo modify to specify the implementation of a record compressor
+     *       interface.
+     */
+    final public boolean useRecordCompressor;
+    
+    /**
      * The #of leaves serialized in the file.
      */
     final public int nleaves;
@@ -180,6 +189,8 @@ public class IndexSegmentMetadata {
         
         useChecksum = raf.readBoolean();
         
+        useRecordCompressor = raf.readBoolean();
+        
         nleaves = raf.readInt();
         
         nnodes = raf.readInt();
@@ -235,10 +246,11 @@ public class IndexSegmentMetadata {
      * @todo javadoc.
      */
     public IndexSegmentMetadata(int branchingFactor, int height,
-            boolean useChecksum, int nleaves, int nnodes, int nentries,
-            int maxNodeOrLeafLength, long offsetLeaves, long offsetNodes,
-            long addrRoot, double errorRate, long addrBloom, long length,
-            long timestamp, String name) {
+            boolean useChecksum, boolean useRecordCompressor, int nleaves,
+            int nnodes, int nentries, int maxNodeOrLeafLength,
+            long offsetLeaves, long offsetNodes, long addrRoot,
+            double errorRate, long addrBloom, long length, long timestamp,
+            String name) {
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -286,6 +298,8 @@ public class IndexSegmentMetadata {
         this.height = height;
 
         this.useChecksum = useChecksum;
+
+        this.useRecordCompressor = useRecordCompressor;
         
         this.nleaves = nleaves;
         
@@ -334,6 +348,8 @@ public class IndexSegmentMetadata {
         raf.writeInt(height);
         
         raf.writeBoolean(useChecksum);
+                
+        raf.writeBoolean(useRecordCompressor);
         
         raf.writeInt(nleaves);
 
@@ -371,6 +387,8 @@ public class IndexSegmentMetadata {
         sb.append("magic="+Integer.toHexString(MAGIC));
         sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
+        sb.append(", useChecksum=" + useChecksum);
+        sb.append(", useRecordCompressor=" + useRecordCompressor);
         sb.append(", nleaves=" + nleaves);
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);

@@ -64,6 +64,9 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * default batch size is large enough to absorb many ontologies in a single
  * batch.
  * 
+ * @todo try optimization using async IO to write data buffered on the journal
+ *       to disk.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -112,7 +115,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     
     public PresortRioLoader( TripleStore store ) {
     
-        this(store, DEFAULT_BUFFER_SIZE, false );
+        this(store, DEFAULT_BUFFER_SIZE, true );
         
     }
     
