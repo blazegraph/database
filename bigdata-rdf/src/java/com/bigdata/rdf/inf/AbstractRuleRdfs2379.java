@@ -46,12 +46,10 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Vector;
 
-import org.openrdf.model.URI;
 
+public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
-public class AbstractRuleRdfs511 extends AbstractRuleRdf {
-
-    public AbstractRuleRdfs511
+    public AbstractRuleRdfs2379
         ( InferenceEngine store, 
           Triple head, 
           Pred[] body
@@ -62,47 +60,51 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
     }
     
     protected SPO[] collectEntailments() {
-        
-                // the predicate is fixed for all parts of the rule.
-        final long p = head.p.id;
-        
-        // the key for that predicate.
-        final byte[] pkey = store.keyBuilder.statement2Key(p, 0, 0);
-        
-        // the successor of that key.
-        final byte[] pkey1 = store.keyBuilder.statement2Key(p+1, 0, 0);
 
-        /*
-         * Query for the 1st part of the rule.
-         * 
-         * Note that it does not matter which half of the rule we execute
-         * first since they are both 2-unbound with the same predicate bound
-         * and will therefore have exactly the same results.
-         * 
-         * Further note that we can perform a self-join on the returned
-         * triples without going back to the database.
-         */
+        // create a place to hold the entailments
+        Vector<SPO> stmts3 = new Vector<SPO>();
 
-        // in POS order.
-        SPO[] stmts1 = store.getStatements(store.ndx_pos, pkey, pkey1);
-        // in SPO order.
-        Arrays.sort(stmts1,SPOComparator.INSTANCE);
-        // a clone of the answer set
-        SPO[] stmts2 = stmts1.clone();
-
-        Vector<SPO> v = new Vector<SPO>();
-        // the simplest n^2 algorithm
-        for( int i = 0; i < stmts1.length; i++ ) {
-            // printStatement(stmts1[i]);
+        SPO[] stmts1 = getStmts1();
+        for ( int i = 0; i < stmts1.length; i++ ) {
+            SPO[] stmts2 = getStmts2( stmts1[i] );
             for ( int j = 0; j < stmts2.length; j++ ) {
-                if ( stmts1[i].o == stmts2[j].s ) {
-                    v.add( new SPO(stmts1[i].s, p, stmts2[j].o) );
-                }
+                stmts3.add( buildStmt3( stmts1[i], stmts2[j] ) );
             }
         }
+
+        return stmts3.toArray( new SPO[stmts3.size()] );
+
+    }
+    
+    // default behavior is to use POS index to match body[0] and then sort
+    // using POSComparator since the default for body[1] is the POS index
+    // again (is the sort even necessary?)
+    protected SPO[] getStmts1() {
         
-        return v.toArray( new SPO[v.size()] );
+        // use the POS index to look up the matches for body[0], the more
+        // constrained triple
+        byte[] fromKey = store.keyBuilder.statement2Key( body[0].p.id, 0, 0 );
+        byte[] toKey = store.keyBuilder.statement2Key( body[0].p.id+1, 0, 0 );
+        SPO[] stmts1 = store.getStatements(store.ndx_pos, fromKey, toKey);
+
+        // make sure the statements are in POS order, since we are going to be
+        // doing lookups against the POS index in a moment
+        Arrays.sort(stmts1,POSComparator.INSTANCE);
+        
+        return stmts1;
         
     }
+    
+    // default behavior is to join the subject of stmt1 with the predicate
+    // of body[1] using the POS index
+    protected SPO[] getStmts2( SPO stmt1 ) {
+        
+        byte[] fromKey = store.keyBuilder.statement2Key(stmt1.s, 0, 0);
+        byte[] toKey = store.keyBuilder.statement2Key(stmt1.s+1, 0, 0);
+        return store.getStatements(store.ndx_pos, fromKey, toKey);
+    
+    }
+    
+    protected abstract SPO buildStmt3( SPO stmt1, SPO stmt2 );
 
 }

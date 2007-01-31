@@ -43,13 +43,12 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Iterator;
 import java.util.Vector;
 
 import com.bigdata.objndx.IEntryIterator;
 
 
-public class RuleRdf01 extends Rule {
+public class RuleRdf01 extends AbstractRuleRdf {
 
     public RuleRdf01(InferenceEngine store, Var u, Var v, Var x) {
 
@@ -59,50 +58,10 @@ public class RuleRdf01 extends Rule {
                 });
 
     }
-    
-    public int apply() {
 
-        int numAdded = 0;
+    protected SPO[] collectEntailments() {
         
-        long startTime = System.currentTimeMillis();
-        
-        long[] predicates = collectPredicates();
-        
-        // countLiterals();
-        
-        long collectionTime = System.currentTimeMillis() - startTime;
-        
-        System.out.println( "rdf1 collected " + predicates.length + 
-                            " predicates in " + collectionTime + " millis" );
-        
-        System.out.println( "rdf1 number of statements before: " + store.ndx_spo.getEntryCount());
-        
-        for ( int i = 0; i < predicates.length; i++ ) {
-            
-            long _s = predicates[i];
-            long _p = store.rdfType.id;
-            long _o = store.rdfProperty.id;
-            
-            byte[] spoKey = store.keyBuilder.statement2Key(_s, _p, _o);
-            
-            if ( !store.ndx_spo.contains(spoKey) ) {
-                store.ndx_spo.insert(spoKey,null);
-                store.ndx_pos.insert(store.keyBuilder.statement2Key(_p, _o, _s),null);
-                store.ndx_osp.insert(store.keyBuilder.statement2Key(_p, _s, _p),null);
-                numAdded++;
-            }
-            
-        }
-        
-        System.out.println( "rdf1 number of statements after: " + store.ndx_spo.getEntryCount());
-        
-        return numAdded;
-
-    }
-    
-    protected long[] collectPredicates() {
-        
-        Vector<SPO> stmts = new Vector<SPO>();
+        Vector<SPO> entailments = new Vector<SPO>();
         
         long lastP = -1;
         
@@ -112,35 +71,21 @@ public class RuleRdf01 extends Rule {
             
             it.next();
             
-            SPO stmt = new SPO(store.ndx_pos.keyOrder,store.keyBuilder,it.getKey());
+            SPO stmt = 
+                new SPO(store.ndx_pos.keyOrder,store.keyBuilder,it.getKey());
             
             if ( stmt.p != lastP ) {
                 
                 lastP = stmt.p;
                 
-                stmts.add( stmt );
+                entailments.add
+                    ( new SPO(stmt.p, store.rdfType.id, store.rdfProperty.id) );
                 
             }
             
         }
         
-        int i = 0;
-        
-        long[] predicates = new long[stmts.size()];
-        
-        for ( Iterator<SPO> it2 = stmts.iterator(); it2.hasNext(); ) {
-            
-            SPO stmt = it2.next();
-         
-            predicates[i++] = stmt.p;
-         
-            // Value v = (Value) store.ndx_idTerm.lookup(store.keyBuilder.id2key(stmt.p));
-         
-            // System.err.println(((URI)v).getURI());
-            
-        }
-        
-        return predicates;
+        return entailments.toArray( new SPO[entailments.size()] );
         
     }
 /*

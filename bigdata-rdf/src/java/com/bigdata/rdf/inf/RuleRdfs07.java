@@ -44,30 +44,21 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 
-public class RuleRdfs09 extends AbstractRuleRdfs2379 {
 
-    public RuleRdfs09( InferenceEngine store, Var u, Var x, Var v ) {
+public class RuleRdfs07 extends AbstractRuleRdfs2379 {
 
-        super(store, new Triple(v, store.rdfType, x),
+    public RuleRdfs07( InferenceEngine store, Var a, Var b, Var u, Var y ) {
+
+        super(store, new Triple(u, b, y),
                 new Pred[] {
-                new Triple(u, store.rdfsSubClassOf, x),
-                new Triple(v, store.rdfType, u)
+                new Triple(a, store.rdfsSubPropertyOf, b),
+                new Triple(u, a, y)
                 });
 
     }
     
-    protected SPO[] getStmts2( SPO stmt1 ) {
-        
-        byte[] fromKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s,0);
-        byte[] toKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s+1,0);
-        return store.getStatements(store.ndx_pos, fromKey, toKey);
-    
-    }
-    
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        return new SPO( stmt2.s, store.rdfType.id, stmt1.o );
+        return new SPO( stmt2.s, stmt1.o, stmt2.o );
     }
 
 }

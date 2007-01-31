@@ -46,7 +46,6 @@ package com.bigdata.rdf.inf;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
@@ -149,6 +148,8 @@ public class InferenceEngine extends TripleStore {
     Id rdfProperty;
     Id rdfsSubClassOf;
     Id rdfsSubPropertyOf;
+    Id rdfsDomain;
+    Id rdfsRange;
     Id rdfsClass;
     Id rdfsResource;
     Id rdfsCMP;
@@ -160,8 +161,11 @@ public class InferenceEngine extends TripleStore {
      * Rules.
      */
     Rule rdf1;
+    Rule rdfs2;
+    Rule rdfs3;
     Rule rdfs5;
     Rule rdfs6;
+    Rule rdfs7;
     Rule rdfs8;
     Rule rdfs9;
     Rule rdfs10;
@@ -212,6 +216,10 @@ public class InferenceEngine extends TripleStore {
 
         rdfsSubPropertyOf = new Id(addTerm(new _URI(RDFS.SUBPROPERTYOF)));
 
+        rdfsDomain = new Id(addTerm(new _URI(RDFS.DOMAIN)));
+
+        rdfsRange = new Id(addTerm(new _URI(RDFS.RANGE)));
+
         rdfsClass = new Id(addTerm(new _URI(RDFS.CLASS)));
         
         rdfsResource = new Id(addTerm(new _URI(RDFS.RESOURCE)));
@@ -228,27 +236,33 @@ public class InferenceEngine extends TripleStore {
 
     public void setupRules() {
 
-        rdf1 = new RuleRdf01(this, nextVar(), nextVar(), nextVar());
+        rdf1 = new RuleRdf01(this,nextVar(),nextVar(),nextVar());
         
-        rdfs5 = new RuleRdfs05(this, nextVar(), nextVar(), nextVar());
+        rdfs2 = new RuleRdfs02(this,nextVar(),nextVar(),nextVar(),nextVar());
 
-        rdfs6 = new RuleRdfs06(this, nextVar(), nextVar(), nextVar());
+        rdfs3 = new RuleRdfs03(this,nextVar(),nextVar(),nextVar(),nextVar());
 
-        rdfs8 = new RuleRdfs08(this, nextVar(), nextVar(), nextVar());
+        rdfs5 = new RuleRdfs05(this,nextVar(),nextVar(),nextVar());
 
-        rdfs9 = new RuleRdfs09(this, nextVar(), nextVar(), nextVar());
+        rdfs6 = new RuleRdfs06(this,nextVar(),nextVar(),nextVar());
 
-        rdfs10 = new RuleRdfs10(this, nextVar(), nextVar(), nextVar());
+        rdfs7 = new RuleRdfs07(this,nextVar(),nextVar(),nextVar(),nextVar());
 
-        rdfs11 = new RuleRdfs11(this, nextVar(), nextVar(), nextVar());
+        rdfs8 = new RuleRdfs08(this,nextVar(),nextVar(),nextVar());
 
-        rdfs12 = new RuleRdfs12(this, nextVar(), nextVar(), nextVar());
+        rdfs9 = new RuleRdfs09(this,nextVar(),nextVar(),nextVar());
 
-        rdfs13 = new RuleRdfs13(this, nextVar(), nextVar(), nextVar());
+        rdfs10 = new RuleRdfs10(this,nextVar(),nextVar(),nextVar());
+
+        rdfs11 = new RuleRdfs11(this,nextVar(),nextVar(),nextVar());
+
+        rdfs12 = new RuleRdfs12(this,nextVar(),nextVar(),nextVar());
+
+        rdfs13 = new RuleRdfs13(this,nextVar(),nextVar(),nextVar());
 
         // rules = new Rule[] { rdfs9, rdfs11 };
         
-        rules = new Rule[] { rdf1, rdfs5, rdfs6, rdfs8, rdfs10, rdfs11, rdfs12, rdfs13 };
+        rules = new Rule[] { rdf1, rdfs2, rdfs3, rdfs5, rdfs6, rdfs7, rdfs8, rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 };
 
     }
 
@@ -269,7 +283,9 @@ public class InferenceEngine extends TripleStore {
 
         final int nrules = rules.length;
 
-        int lastStatementCount = ndx_spo.getEntryCount();
+        int firstStatementCount = ndx_spo.getEntryCount();
+
+        int lastStatementCount = firstStatementCount;
 
         final long begin = System.currentTimeMillis();
 
@@ -307,7 +323,8 @@ public class InferenceEngine extends TripleStore {
         final long elapsed = System.currentTimeMillis() - begin;
 
         System.err.println("Closed store in " + elapsed + "ms yeilding "
-                + lastStatementCount + " statements total");
+                + lastStatementCount + " statements total, " + 
+                (lastStatementCount - firstStatementCount) + " inferences");
 
     }
 

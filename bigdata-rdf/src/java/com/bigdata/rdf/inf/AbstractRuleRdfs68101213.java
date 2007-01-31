@@ -43,62 +43,26 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Iterator;
 import java.util.Vector;
-
-import org.openrdf.model.Value;
 
 import com.bigdata.objndx.IEntryIterator;
 
 
-public class AbstractRuleRdfs68101213 extends Rule {
+public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
 
-    public AbstractRuleRdfs68101213(InferenceEngine store, Triple head, Triple body) {
+    public AbstractRuleRdfs68101213
+        ( InferenceEngine store, 
+          Triple head, 
+          Triple body
+          ) {
 
         super(store, head, new Pred[] { body });
 
     }
     
-    public int apply() {
-
-        int numAdded = 0;
+    protected SPO[] collectEntailments() {
         
-        long startTime = System.currentTimeMillis();
-        
-        long[] subjects = collectSubjects();
-        
-        long collectionTime = System.currentTimeMillis() - startTime;
-        
-        System.out.println( getClass().getName() + " collected " + subjects.length + 
-                            " subjects in " + collectionTime + " millis" );
-        
-        System.out.println( getClass().getName() + " number of statements before: " + store.ndx_spo.getEntryCount());
-        
-        for ( int i = 0; i < subjects.length; i++ ) {
-
-            long _s = head.s.isVar() ? subjects[i] : head.s.id;
-            long _p = head.p.isVar() ? subjects[i] : head.p.id;
-            long _o = head.o.isVar() ? subjects[i] : head.o.id;
-            
-            byte[] spoKey = store.keyBuilder.statement2Key(_s, _p, _o);
-            if ( !store.ndx_spo.contains(spoKey) ) {
-                store.ndx_spo.insert(spoKey,null);
-                store.ndx_pos.insert(store.keyBuilder.statement2Key(_p, _o, _s),null);
-                store.ndx_osp.insert(store.keyBuilder.statement2Key(_p, _s, _p),null);
-                numAdded++;
-            }
-            
-        }
-        
-        System.out.println( getClass().getName() + " number of statements after: " + store.ndx_spo.getEntryCount());
-        
-        return numAdded;
-
-    }
-    
-    protected long[] collectSubjects() {
-        
-        Vector<Long> subjects = new Vector<Long>();
+        Vector<SPO> entailments = new Vector<SPO>();
         
         byte[] startKey = store.keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id, 0
@@ -113,28 +77,18 @@ public class AbstractRuleRdfs68101213 extends Rule {
         while ( it.hasNext() ) {
             
             it.next();
+            SPO stmt = 
+                new SPO(store.ndx_pos.keyOrder,store.keyBuilder,it.getKey());
             
-            SPO stmt = new SPO(store.ndx_pos.keyOrder,store.keyBuilder,it.getKey());
+            long _s = head.s.isVar() ? stmt.s : head.s.id;
+            long _p = head.p.isVar() ? stmt.s : head.p.id;
+            long _o = head.o.isVar() ? stmt.s : head.o.id;
             
-            subjects.add( stmt.s );
-            
-            // Value v = (Value) store.ndx_idTerm.lookup(store.keyBuilder.id2key(stmt.s));
-         
-            // System.err.println(((URI)v).getURI());
-            
-        }
-        
-        int i = 0;
-        
-        long[] longs = new long[subjects.size()];
-        
-        for ( Iterator<Long> it2 = subjects.iterator(); it2.hasNext(); ) {
-            
-            longs[i++] = it2.next();
+            entailments.add( new SPO(_s, _p, _o) );
             
         }
         
-        return longs;
+        return entailments.toArray( new SPO[entailments.size()] );
         
     }
 
