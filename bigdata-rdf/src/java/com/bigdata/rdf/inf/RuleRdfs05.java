@@ -49,19 +49,19 @@ package com.bigdata.rdf.inf;
  * rdfs11:
  * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?x) :-
- *          triple(?u,rdfs:subClassOf,?v),
- *          triple(?v,rdf:subClassOf,?x). 
+ *       triple(?u,rdfs:subPropertyOf,?x) :-
+ *          triple(?u,rdfs:subPropertyOf,?v),
+ *          triple(?v,rdfs:subPropertyOf,?x). 
  * </pre>
  */
-public class RuleRdfs11 extends AbstractRuleRdfs511 {
+public class RuleRdfs05 extends AbstractRuleRdfs511 {
 
-    public RuleRdfs11(InferenceEngine store,Var u, Var v, Var x) {
+    public RuleRdfs05(InferenceEngine store,Var u, Var v, Var x) {
 
-        super(store, new Triple(u, store.rdfsSubClassOf, x), //
+        super(store, new Triple(u, store.rdfsSubPropertyOf, x), //
                 new Pred[] { //
-                new Triple(u, store.rdfsSubClassOf, v),//
-                new Triple(v, store.rdfsSubClassOf, x) //
+                new Triple(u, store.rdfsSubPropertyOf, v),//
+                new Triple(v, store.rdfsSubPropertyOf, x) //
                 });
 
     }

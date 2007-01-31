@@ -160,6 +160,7 @@ public class InferenceEngine extends TripleStore {
      * Rules.
      */
     Rule rdf1;
+    Rule rdfs5;
     Rule rdfs6;
     Rule rdfs8;
     Rule rdfs9;
@@ -229,6 +230,8 @@ public class InferenceEngine extends TripleStore {
 
         rdf1 = new RuleRdf01(this, nextVar(), nextVar(), nextVar());
         
+        rdfs5 = new RuleRdfs05(this, nextVar(), nextVar(), nextVar());
+
         rdfs6 = new RuleRdfs06(this, nextVar(), nextVar(), nextVar());
 
         rdfs8 = new RuleRdfs08(this, nextVar(), nextVar(), nextVar());
@@ -245,7 +248,7 @@ public class InferenceEngine extends TripleStore {
 
         // rules = new Rule[] { rdfs9, rdfs11 };
         
-        rules = new Rule[] { rdf1, rdfs6, rdfs8, rdfs10, rdfs12, rdfs13 };
+        rules = new Rule[] { rdf1, rdfs5, rdfs6, rdfs8, rdfs10, rdfs11, rdfs12, rdfs13 };
 
     }
 
@@ -329,6 +332,7 @@ public class InferenceEngine extends TripleStore {
 
         while (itr1.hasNext()) {
 
+            itr1.next();
             ids[i++] = new SPO(ndx.keyOrder,keyBuilder,itr1.getKey());
 
         }
