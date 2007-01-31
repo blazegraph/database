@@ -67,7 +67,7 @@ import com.bigdata.objndx.KeyBuilder;
  */
 public class RdfKeyBuilder {
 
-    protected final KeyBuilder keyBuilder;
+    public final KeyBuilder keyBuilder;
     
     public RdfKeyBuilder(KeyBuilder keyBuilder) {
         
@@ -154,6 +154,18 @@ public class RdfKeyBuilder {
         return appendString(uri).getKey();
         
     }
+    
+    public byte[] uriStartKey() {
+        
+        return keyBuilder.reset().append(CODE_URI).getKey();
+        
+    }
+
+    public byte[] uriEndKey() {
+        
+        return keyBuilder.reset().append(CODE_LIT).getKey();
+        
+    }
 
     public byte[] plainLiteral2key(String text) {
         
@@ -219,6 +231,18 @@ public class RdfKeyBuilder {
         }
         
         return keyBuilder.getKey();
+        
+    }
+
+    public byte[] litStartKey() {
+        
+        return keyBuilder.reset().append(CODE_LIT).getKey();
+        
+    }
+
+    public byte[] litEndKey() {
+        
+        return keyBuilder.reset().append(CODE_BND).getKey();
         
     }
 

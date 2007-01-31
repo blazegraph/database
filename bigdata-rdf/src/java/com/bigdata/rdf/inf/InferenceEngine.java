@@ -57,6 +57,7 @@ import com.bigdata.rdf.StatementIndex;
 import com.bigdata.rdf.TermIndex;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 
 /**
  * Adds support for RDFS inference.
@@ -145,13 +146,27 @@ public class InferenceEngine extends TripleStore {
      * Identifiers for well-known RDF values. 
      */
     Id rdfType;
+    Id rdfProperty;
     Id rdfsSubClassOf;
+    Id rdfsSubPropertyOf;
+    Id rdfsClass;
+    Id rdfsResource;
+    Id rdfsCMP;
+    Id rdfsDatatype;
+    Id rdfsMember;
+    Id rdfsLiteral;
 
     /*
      * Rules.
      */
+    Rule rdf1;
+    Rule rdfs6;
+    Rule rdfs8;
     Rule rdfs9;
+    Rule rdfs10;
     Rule rdfs11;
+    Rule rdfs12;
+    Rule rdfs13;
 
     /**
      * All rules defined by the inference engine.
@@ -188,19 +203,49 @@ public class InferenceEngine extends TripleStore {
      */
     protected void setupIds() {
 
-        rdfType = new Id(addTerm(new URIImpl(RDF.TYPE)));
+        rdfType = new Id(addTerm(new _URI(RDF.TYPE)));
 
-        rdfsSubClassOf = new Id(addTerm(new URIImpl(RDFS.SUBCLASSOF)));
+        rdfProperty = new Id(addTerm(new _URI(RDF.PROPERTY)));
 
+        rdfsSubClassOf = new Id(addTerm(new _URI(RDFS.SUBCLASSOF)));
+
+        rdfsSubPropertyOf = new Id(addTerm(new _URI(RDFS.SUBPROPERTYOF)));
+
+        rdfsClass = new Id(addTerm(new _URI(RDFS.CLASS)));
+        
+        rdfsResource = new Id(addTerm(new _URI(RDFS.RESOURCE)));
+        
+        rdfsCMP = new Id(addTerm(new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY)));
+        
+        rdfsDatatype = new Id(addTerm(new _URI(RDFS.DATATYPE)));
+        
+        rdfsMember = new Id(addTerm(new _URI(RDFS.MEMBER)));
+        
+        rdfsLiteral = new Id(addTerm(new _URI(RDFS.LITERAL)));
+    
     }
 
     public void setupRules() {
 
-        rdfs9 = new RuleRdfs9(this, nextVar(), nextVar(), nextVar());
+        rdf1 = new RuleRdf01(this, nextVar(), nextVar(), nextVar());
+        
+        rdfs6 = new RuleRdfs06(this, nextVar(), nextVar(), nextVar());
+
+        rdfs8 = new RuleRdfs08(this, nextVar(), nextVar(), nextVar());
+
+        rdfs9 = new RuleRdfs09(this, nextVar(), nextVar(), nextVar());
+
+        rdfs10 = new RuleRdfs10(this, nextVar(), nextVar(), nextVar());
 
         rdfs11 = new RuleRdfs11(this, nextVar(), nextVar(), nextVar());
 
-        rules = new Rule[] { rdfs9, rdfs11 };
+        rdfs12 = new RuleRdfs12(this, nextVar(), nextVar(), nextVar());
+
+        rdfs13 = new RuleRdfs13(this, nextVar(), nextVar(), nextVar());
+
+        // rules = new Rule[] { rdfs9, rdfs11 };
+        
+        rules = new Rule[] { rdf1, rdfs6, rdfs8, rdfs10, rdfs12, rdfs13 };
 
     }
 
@@ -251,6 +296,8 @@ public class InferenceEngine extends TripleStore {
                 break;
 
             }
+            
+            lastStatementCount = statementCount;
 
         }
 

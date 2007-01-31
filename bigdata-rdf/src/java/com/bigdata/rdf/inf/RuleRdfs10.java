@@ -43,32 +43,13 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+public class RuleRdfs10 extends AbstractRuleRdfs68101213 {
 
-/**
- * rdfs9:
- * 
- * <pre>
- * triple(?v,rdf:type,?x) :-
- *    triple(?u,rdfs:subClassOf,?x),
- *    triple(?v,rdf:type,?u). 
- * </pre>
- */
-public class RuleRdfs9 extends Rule {
+    public RuleRdfs10(InferenceEngine store, Var u, Var v, Var x) {
 
-    public RuleRdfs9(InferenceEngine store,Var u, Var v, Var x) {
-        super(store,
-                new Triple(v, store.rdfType, x), //
-                new Pred[] { //
-                        new Triple(u, store.rdfsSubClassOf, x),//
-                        new Triple(v, store.rdfType, u) //
-                });
+        super(store, new Triple(u, store.rdfsSubClassOf, u), 
+                     new Triple(u, store.rdfType, store.rdfsClass));
+
     }
-
-    // FIXME implement rdfs9.
-    public int apply() {
-        
-        return 0;
-        
-    }
-
+    
 }

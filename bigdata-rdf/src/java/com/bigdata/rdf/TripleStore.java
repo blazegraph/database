@@ -54,7 +54,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Locale;
 import java.util.Properties;
 
@@ -71,7 +70,9 @@ import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IRioLoader;
@@ -751,6 +752,8 @@ public class TripleStore {
         final long begin = System.currentTimeMillis();
         
         long total_stmts = 0L;
+        
+        log.debug( "loading: " + file.getAbsolutePath() );
         
         Reader reader = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file)));
