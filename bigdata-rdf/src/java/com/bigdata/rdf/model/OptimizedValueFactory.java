@@ -335,6 +335,11 @@ public class OptimizedValueFactory implements ValueFactory {
 
     final public static class _BNode extends _Resource implements BNode {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 8835732082253951776L;
+
         public _BNode() {
 
             super(UUID.randomUUID().toString());
@@ -394,6 +399,11 @@ public class OptimizedValueFactory implements ValueFactory {
          * Note: these fields are not final since that interfers with the
          * Externalizable implementation.
          */
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -5276702268990981415L;
 
         byte code;
         
@@ -542,6 +552,11 @@ public class OptimizedValueFactory implements ValueFactory {
 
     final public static class _URI extends _Resource implements URI {
         
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 8085405245340777144L;
+
         public _URI(String uri) {
 
             super(uri);
@@ -628,6 +643,11 @@ public class OptimizedValueFactory implements ValueFactory {
     }
 
     public static class _Statement implements Statement {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3259278872142669482L;
 
         public final _Resource s;
 

@@ -62,6 +62,7 @@ import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IndexSegment;
@@ -113,7 +114,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      *       ids, and statements).  also review good branching factors for the
      *       mutable indices used for non-bulk operations. 
      */
-    static final int branchingFactor = 4096;
+    static final int branchingFactor = 4*Bytes.kilobyte32;
     
     /**
      * Terms and statements are inserted into this store.

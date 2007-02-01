@@ -53,7 +53,7 @@
         <jar destfile="${jar.name}">
             <fileset dir="${build.dir}"/>
             <manifest>
-                <attribute name="Main-Class" value="com/bigdata/rdf/TestRioIntegration"/>
+                <attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>
             </manifest>
         </jar>
     </target>

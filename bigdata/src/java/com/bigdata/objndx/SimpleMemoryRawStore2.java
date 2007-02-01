@@ -274,25 +274,10 @@ public class SimpleMemoryRawStore2 implements IRawStore2 {
         
     }
 
-    /*
-     * commit protocol (not implemented yet).
-     */
-    public void commit() {
+    public void force(boolean metadata) {
         
-        throw new UnsupportedOperationException();
+        // NOP.
         
     }
-
-    public long getAddr(int rootSlot) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    public void registerCommitter(int rootSlot, ICommitter committer) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
+    
 }

@@ -297,25 +297,18 @@ public class SimpleFileRawStore2 implements IRawStore2 {
         
     }
 
-    /*
-     * commit protocol (not implemented yet).
-     */
-    public void commit() {
-        
-        throw new UnsupportedOperationException();
-        
+    public void force(boolean metadata) {
+
+        try {
+            
+            raf.getChannel().force(metadata);
+            
+        } catch( IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+                
     }
-
-    public long getAddr(int rootSlot) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    public void registerCommitter(int rootSlot, ICommitter committer) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
+    
 }

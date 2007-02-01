@@ -15,6 +15,8 @@ import java.nio.ByteBuffer;
  * This interface is always used within a single-threaded context.
  * </p>
  * 
+ * @todo reconcile with {@link IRawStore} and {@link IRawStore2}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -102,7 +104,9 @@ public interface IBufferStrategy {
     
     /**
      * Force the data to stable storage. This method MUST be invoked during
-     * {@link #close()} and MAY be invoked during commit processing.
+     * {@link #close()} and MAY be invoked during commit processing. While this
+     * is NOT sufficient to guarentee an atomic commit, the data must be forced
+     * to disk as part of an atomic commit protocol.
      * 
      * @param metadata
      *            If true, then force both the file contents and the file

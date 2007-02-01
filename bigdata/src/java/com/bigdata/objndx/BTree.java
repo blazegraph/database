@@ -1249,19 +1249,13 @@ public class BTree extends AbstractBTree implements IBTree {
             
         }
 
-        public void commit() {
-
-            delegate.commit();
+        public void force(boolean metadata) {
             
-        }
-
-        public long getAddr(int rootSlot) {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public void registerCommitter(int rootSlot, ICommitter committer) {
-            // TODO Auto-generated method stub
+            if(delegate instanceof Journal) {
+                
+                ((Journal)delegate).getBufferStrategy().force(metadata);
+                
+            }
             
         }
         

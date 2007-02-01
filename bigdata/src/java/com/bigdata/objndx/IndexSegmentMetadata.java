@@ -5,7 +5,6 @@ import java.io.RandomAccessFile;
 import java.util.Date;
 
 import com.bigdata.journal.Bytes;
-import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
 
 /**
  * The metadata record for an {@link IndexSegment}.
@@ -14,18 +13,24 @@ import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
  * @version $Id$
  * 
  * @todo consider recording the min/max key or just making it easy to determine
- *       that for an {@link IndexSegment}.  This has do to with both correct
+ *       that for an {@link IndexSegment}. This has do to with both correct
  *       rejection of queries directed to the wrong index segment and managing
  *       the metadata for a distributed index.
  * 
  * @todo add a uuid for each index segment and a uuid for the index to which the
- *       segments belong?  examine the format of the uuid.  can we use part of
- *       it as the unique basis for one up identifiers within a parition?
+ *       segments belong? examine the format of the uuid. can we use part of it
+ *       as the unique basis for one up identifiers within a parition?
  * 
- * @todo We need a general mechanism for persisting metadata including NEGINF,
- *       Comparator, keySer, and valSer for indices.  This can probably be done
- *       using a fat metadata record and standard Java serialization for these
- *       things rather than trying to bootstrap extSer for this purpose.
+ * FIXME We need a general mechanism for persisting metadata including the
+ * valSer, record compressor, and user-defined objects for indices. These data
+ * can go into a series of extensible metadata records located at the end of the
+ * file. The bloom filter itself could be an example of such a metadata record.
+ * Such metadata should survive conversions from a btree to an index segment,
+ * mergers of index segments or btrees, and conversion from an index segment to
+ * a btree.
+ * 
+ * FIXME introduce two timestamps in the metadata record. the record is valid
+ * iff both timestamps agree and are non-zero.
  */
 public class IndexSegmentMetadata {
     
@@ -92,18 +97,21 @@ public class IndexSegmentMetadata {
     final public int maxNodeOrLeafLength;
     
     /**
-     * The offset to the start of the serialized leaves in the file.
-     * 
-     * Note: This should be equal to {@link #SIZE} since the leaves are
-     * written immediately after the {@link PartitionMetadata} record.
+     * The {@link Addr address} of the contiguous region containing the
+     * serialized leaves in the file.
+     * <p>
+     * Note: The offset component of this address must be equal to {@link #SIZE}
+     * since the leaves are written immediately after the
+     * {@link IndexSegmentMetadata} record.
      */
-    final public long offsetLeaves;
+    final public long addrLeaves;
     
     /**
-     * The offset to the start of the serialized nodes in the file or
-     * <code>0L</code> iff there are no nodes in the file.
+     * The {@link Addr address} of the contiguous region containing the
+     * serialized nodes in the file or <code>0L</code> iff there are no nodes
+     * in the file.
      */
-    final public long offsetNodes;
+    final public long addrNodes;
     
     /**
      * Address of the root node or leaf in the file.
@@ -199,9 +207,9 @@ public class IndexSegmentMetadata {
 
         maxNodeOrLeafLength = raf.readInt();
         
-        offsetLeaves = raf.readLong();
+        addrLeaves = raf.readLong();
 
-        offsetNodes = raf.readLong();
+        addrNodes = raf.readLong();
         
         addrRoot = raf.readLong();
 
@@ -228,27 +236,12 @@ public class IndexSegmentMetadata {
      * Create a new metadata record in preparation for writing it on a file
      * containing a newly constructed {@link IndexSegment}.
      * 
-     * @param branchingFactor
-     * @param height
-     * @param nleaves
-     * @param nnodes
-     * @param nentries
-     * @param maxNodeOrLeafLength
-     * @param offsetLeaves
-     * @param offsetNodes
-     * @param addrRoot
-     * @param errorRate
-     * @param addrBloom
-     * @param length
-     * @param timestamp
-     * @param name
-     * 
      * @todo javadoc.
      */
     public IndexSegmentMetadata(int branchingFactor, int height,
             boolean useChecksum, boolean useRecordCompressor, int nleaves,
             int nnodes, int nentries, int maxNodeOrLeafLength,
-            long offsetLeaves, long offsetNodes, long addrRoot,
+            long addrLeaves, long addrNodes, long addrRoot,
             double errorRate, long addrBloom, long length, long timestamp,
             String name) {
         
@@ -267,19 +260,21 @@ public class IndexSegmentMetadata {
         
         assert maxNodeOrLeafLength > 0;
         
-        assert offsetLeaves > 0;
+        assert addrLeaves != 0L;
+        assert Addr.getOffset(addrLeaves)==SIZE;
+        assert Addr.getByteCount(addrLeaves) > 0;
 
         if(nnodes == 0) {
             // the root is a leaf.
-            assert offsetNodes == 0L;
-            assert offsetLeaves < length;
-            assert Addr.getOffset(addrRoot) >= offsetLeaves;
+            assert addrNodes == 0L;
+            assert Addr.getOffset(addrLeaves) < length;
+            assert Addr.getOffset(addrRoot) >= Addr.getOffset(addrLeaves);
             assert Addr.getOffset(addrRoot) < length;
         } else {
             // the root is a node.
-            assert offsetNodes > offsetLeaves;
-            assert offsetNodes < length;
-            assert Addr.getOffset(addrRoot) >= offsetNodes;
+            assert Addr.getOffset(addrNodes) > Addr.getOffset(addrLeaves);
+            assert Addr.getOffset(addrNodes) < length;
+            assert Addr.getOffset(addrRoot) >= Addr.getOffset(addrNodes);
             assert Addr.getOffset(addrRoot) < length;
         }
 
@@ -309,9 +304,9 @@ public class IndexSegmentMetadata {
 
         this.maxNodeOrLeafLength = maxNodeOrLeafLength;
         
-        this.offsetLeaves = offsetLeaves;
+        this.addrLeaves = addrLeaves;
         
-        this.offsetNodes = offsetNodes;
+        this.addrNodes = addrNodes;
         
         this.addrRoot = addrRoot;
 
@@ -359,9 +354,9 @@ public class IndexSegmentMetadata {
 
         raf.writeInt(maxNodeOrLeafLength);
         
-        raf.writeLong(offsetLeaves);
+        raf.writeLong(addrLeaves);
         
-        raf.writeLong(offsetNodes);
+        raf.writeLong(addrNodes);
 
         raf.writeLong(addrRoot);
 
@@ -393,8 +388,8 @@ public class IndexSegmentMetadata {
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", offsetLeaves=" + offsetLeaves);
-        sb.append(", offsetNodes=" + offsetNodes);
+        sb.append(", addrLeaves=" + addrLeaves);
+        sb.append(", addrNodes=" + addrNodes);
         sb.append(", addrRoot=" + Addr.toString(addrRoot));
         sb.append(", errorRate=" + errorRate);
         sb.append(", addrBloom=" + Addr.toString(addrBloom));

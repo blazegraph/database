@@ -1,5 +1,6 @@
 package com.bigdata.objndx;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -168,8 +169,17 @@ public class KeyBufferSerializer implements IKeySerializer {
         
         /*
          * Write out deltas between offsets.
+         * 
+         * FIXME this is 60% of the cost of this method. This is not pack long
+         * so much as doing individual byte put operations on the output stream
+         * (which is over a ByteBuffer).  Just using a BAOS here doubles the 
+         * index segment build throughput.
          */
-        int lastOffset = 0;
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(nkeys*8);
+            DataOutputStream dbaos = new DataOutputStream(baos);
+
+            int lastOffset = 0;
         
         for( int i=0; i<nkeys; i++) {
             
@@ -177,10 +187,15 @@ public class KeyBufferSerializer implements IKeySerializer {
             
             int delta = offset - lastOffset;
             
-            LongPacker.packLong(os, delta);
+            LongPacker.packLong(dbaos, delta);
             
             lastOffset = offset;
             
+        }
+        
+        dbaos.flush();
+        
+        os.write(baos.toByteArray());
         }
         
         /*

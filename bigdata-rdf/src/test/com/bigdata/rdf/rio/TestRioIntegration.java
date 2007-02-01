@@ -75,7 +75,9 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     protected BufferMode getBufferMode() {
         
-        return BufferMode.Transient;
+//        return BufferMode.Transient;
+        
+        return BufferMode.Direct;
         
     }
 
@@ -103,13 +105,18 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
         if ( args.length == 0 ) {
             
-            args = new String[] { "data/wordnet_nouns-20010201.rdf" };
+            args = new String[] {
+//                    "data/wordnet_nouns-20010201.rdf"
+                    "data/nciOncology.owl"
+//                    "data/alibaba_v41.rdf"
+                    };
             
         }
         
         TestRioIntegration test = new TestRioIntegration("TestInsertRateStore");
         test.setUp();
-        test.doTest( new PresortRioLoader(test.store), args );
+//        test.doTest( new PresortRioLoader(test.store), args );
+        test.doTest( new BulkRioLoader(test.store), args );
         test.tearDown();
             
     }

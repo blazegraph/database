@@ -53,6 +53,7 @@ import java.util.Arrays;
 
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
+import com.bigdata.objndx.KeyBufferSerializer;
 import com.bigdata.objndx.NodeSerializer;
 import com.bigdata.objndx.RecordCompressor;
 import com.bigdata.rdf.KeyOrder;
@@ -87,10 +88,17 @@ public class BulkLoaderBuffer extends Buffer {
      * When true, the {@link IndexSegment}s will be built in memory rather than
      * using disk to buffer the nodes.
      * 
-     * FIXME buffer both nodes and leaves - this only buffers the nodes at the
-     * moment and we do much more leaf IO than node IO.
+     * @todo try modifying the {@link NodeSerializer} to use a
+     *       {@link ByteArrayOutputStream} and see if that is any faster the the
+     *       {@link ByteBufferOutputStream}. Be sure to undo the hack in
+     *       {@link KeyBufferSerializer}.
+     * 
+     * @todo fully buffered is now marginally faster, but the disk buffer
+     *       version winds up writing the leaves on disk and then transfering
+     *       them to another disk file. fix that and then compare performance
+     *       again.
      */
-    boolean fullyBuffer = false;
+    boolean fullyBuffer = true;
     
     /**
      * @todo experiment with and without checksum computation.
@@ -102,9 +110,23 @@ public class BulkLoaderBuffer extends Buffer {
      *       indices - I have seen some EOFs that relate to a too small
      *       compression buffer in the {@link NodeSerializer} - the fix for that
      *       is to grow that buffer as required.
+     * 
+     * @todo look for faster implementations of the ZIP algorithm.
+     * @todo try hamming codes for the keys.
+     * @todo try dictionaries for the values.
+     * @todo try prefix isolation for the ids index values (the terms).
      */
 //    RecordCompressor recordCompressor = new RecordCompressor();
     RecordCompressor recordCompressor = null;
+
+    /**
+     * The error rate for the bloom filter or zero to disable.
+     * 
+     * FIXME the bloom filter is only required on the spo index! (and possibly
+     * on the terms index).  The bloom filter is QUITE EXPENSIVE to generate!
+     */
+//    double errorRate = IndexSegmentBuilder.DEFAULT_ERROR_RATE;
+    double errorRate = 0d;
     
     /**
      * @param store
@@ -139,7 +161,7 @@ public class BulkLoaderBuffer extends Buffer {
                 new TermIdIterator(this), branchingFactor,
                 com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
+                errorRate);
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -167,7 +189,7 @@ public class BulkLoaderBuffer extends Buffer {
                 branchingFactor,
                 com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
+                errorRate);
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -192,7 +214,7 @@ public class BulkLoaderBuffer extends Buffer {
                 branchingFactor,
                 com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
-                IndexSegmentBuilder.DEFAULT_ERROR_RATE);
+                errorRate);
         
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -366,7 +388,7 @@ public class BulkLoaderBuffer extends Buffer {
      */
     protected File getNextOutFile(String name, int batchId) throws IOException {
 
-        return File.createTempFile(name + "-" + batchId, "seg");
+        return File.createTempFile(name + "-" + batchId, ".seg", new File("."));
         
     }
 

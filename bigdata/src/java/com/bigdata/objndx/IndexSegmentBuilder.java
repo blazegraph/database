@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import it.unimi.dsi.mg4j.util.BloomFilter;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -140,19 +142,6 @@ public class IndexSegmentBuilder {
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
      * written.
-     * 
-     * @todo consider the file mode and buffering. We should at least buffer
-     *       several pages of data per write and can experiment with writing
-     *       through (vs caching writes in the OS layer). The file does not need
-     *       to be "live" until it is completely written, so there is no need to
-     *       update file metadata until the end of the build process.
-     * 
-     * @todo Consider using {@link FileOutputStream#FileOutputStream(File, boolean)} to open
-     *       the temporary file in an append only mode and then get the
-     *       {@link FileChannel} from {@link FileOutputStream#getChannel()}.
-     *       Does this improve performance? Can we still read from the channel?
-     *       Try this on the {@link Journal} as well, at least for cases where
-     *       we will never read from the journal (i.e., fully buffered).
      */
     final String mode = "rw"; // also rws or rwd
     
@@ -163,11 +152,19 @@ public class IndexSegmentBuilder {
     public final File outFile;
     
     /**
-     * The temporary created to hold nodes unles the index segment will consist
+     * The temporary file created to hold leaves unless the index build
+     * operation is fully buffered. When created, this file is deleted
+     * regardless of the outcome of the operation.
+     */
+    public final File leafFile;
+    
+    /**
+     * The temporary file created to hold nodes unless either (a) the index
+     * build operation is fully buffered; or (b) the index segment will consist
      * of just a root leaf. When created, this file is deleted regardless of the
      * outcome of the operation.
      */
-    public final File tmpFile;
+    public final File nodeFile;
     
     /**
      * The file on which the {@link IndexSegment} is written. The file is closed
@@ -176,11 +173,28 @@ public class IndexSegmentBuilder {
     protected RandomAccessFile out = null;
 
     /**
+     * The buffer used to hold leaves so that they can be evicted en mass onto
+     * a region of the {@link #outFile}.
+     */
+    protected Buffer leafBuffer;
+    
+    /**
      * The buffer used to hold nodes so that they can be evicted en mass onto
      * a region of the {@link #outFile}.
      */
     protected Buffer nodeBuffer;
     
+    /**
+     * True iff checksums are used for the serialized node and leaf records.
+     */
+    final protected boolean useChecksum;
+    
+    /**
+     * The record compressor used for node and leaf records or <code>null</code>
+     * if record compression was not used.
+     */
+    final protected RecordCompressor recordCompressor;
+
     /**
      * Used to serialize the nodes and leaves of the output tree.
      */
@@ -196,7 +210,7 @@ public class IndexSegmentBuilder {
     /**
      * The bloom filter iff we build one (errorRate != 0.0).
      */
-    final it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
+    final BloomFilter bloomFilter;
     
     /**
      * The offset in the output file of the last leaf written onto that file.
@@ -268,6 +282,24 @@ public class IndexSegmentBuilder {
     final long elapsed;
     
     /**
+     * The time to setup the index build, including the generation of the index
+     * plan and the initialization of some helper objects.
+     */
+    final long elapsed_setup;
+    
+    /**
+     * The time to write the nodes and leaves into their respective buffers, not
+     * including the time to transfer those buffered onto the output file.
+     */
+    final long elapsed_build;
+    
+    /**
+     * The time to write the nodes and leaves from their respective buffers
+     * onto the output file and synch and close that output file.
+     */
+    final long elapsed_write;
+    
+    /**
      * <p>
      * Builds an index segment on the disk from a {@link BTree}. The index
      * segment will be written on the identified file, which must not exist. The
@@ -328,7 +360,10 @@ public class IndexSegmentBuilder {
      * @throws IOException
      * 
      * @todo make fullyBuffer, checksum, and record compression parameters in
-     *       this constructor variant; test with and without each of these options.
+     *       this constructor variant
+     * 
+     * FIXME test with and without each of these options {fullyBuffer,
+     *       useChecksum, recordCompressor}.
      */
     public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
             int m, double errorRate)
@@ -388,25 +423,7 @@ public class IndexSegmentBuilder {
      * 
      * @throws IOException
      * 
-     * @todo make buffering of serialized nodes a constructor parameter. the
-     *       simplest implementation would be a linked list of the serialized
-     *       nodes. the advantage of buffering the nodes is less IO at the cost
-     *       of more RAM. The index store format could be a standard Journal if
-     *       we work out a means to have the leaves in sequence order and the
-     *       nodes isolated in a known region of the file. This could be
-     *       realized simply the order in which the data are written. There are
-     *       some advantages to this since the resulting store could then be
-     *       used for mutable operations. Supporting mutation would require that
-     *       we mark the state so that we know whether or not the nodes are
-     *       groups and may be mapped into a buffer and would also benefit from
-     *       dialing in a percentage full (e.g., 75%) for each node and leaf
-     *       since mutatations will always trigger copy-on-write but if the
-     *       nodes or leaves are also full then they will trigger a split or
-     *       join as well. Note that the percentage full should be choosen to
-     *       minimize the likelyhood of split/joins NOT to increase the density
-     *       since nodes and leaves are always written using a dense format.
-     * 
-     * @todo support efficient prior/next leaf scans.
+     * FIXME support efficient prior/next leaf scans.
      */
     public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
             IEntryIterator entryIterator, final int m,
@@ -421,81 +438,98 @@ public class IndexSegmentBuilder {
         assert valueSerializer != null;
         assert errorRate >= 0d;
         
+        this.useChecksum = useChecksum;
+        this.recordCompressor = recordCompressor;
+
         final long begin = System.currentTimeMillis();
         
-        // Used to serialize the nodes and leaves for the output tree.
-        int initialBufferCapacity = 0; // will be estimated.
-        nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
-                m,
-                initialBufferCapacity,
-                new IndexSegment.CustomAddressSerializer(),
-                KeyBufferSerializer.INSTANCE,
-                valueSerializer,
-                recordCompressor,
-                useChecksum
-                );
-
-        // Create a plan for generating the output tree.
-        plan = new IndexSegmentPlan(m,entryCount);
-
         /*
-         * Setup a stack of nodes (one per non-leaf level) and one leaf. These
-         * are filled in based on the plan and the entries visited in the source
-         * btree. Nodes and leaves are written out to their respective channel
-         * each time they are complete as defined (by the plan) by the #of
-         * children assigned to a node or values assigned to a leaf.
+         * Create the index plan and do misc setup.
          */
+        {
 
-        stack = new AbstractSimpleNodeData[plan.height + 1];
+            final long begin_setup = System.currentTimeMillis();
 
-        // Note: assumes defaults to all zeros.
-        writtenInLevel = new int[plan.height + 1];
-        
-        for (int h = 0; h < plan.height; h++) {
+            // Create a plan for generating the output tree.
+            plan = new IndexSegmentPlan(m, entryCount);
 
-            SimpleNodeData node = new SimpleNodeData(h, m);
+            /*
+             * Setup a stack of nodes (one per non-leaf level) and one leaf.
+             * These are filled in based on the plan and the entries visited in
+             * the source btree. Nodes and leaves are written out to their
+             * respective channel each time they are complete as defined (by the
+             * plan) by the #of children assigned to a node or values assigned
+             * to a leaf.
+             */
 
-            node.max = plan.numInNode[h][0];
-            
-            stack[h] = node;
+            stack = new AbstractSimpleNodeData[plan.height + 1];
+
+            // Note: assumes defaults to all zeros.
+            writtenInLevel = new int[plan.height + 1];
+
+            for (int h = 0; h < plan.height; h++) {
+
+                SimpleNodeData node = new SimpleNodeData(h, m);
+
+                node.max = plan.numInNode[h][0];
+
+                stack[h] = node;
+
+            }
+
+            // the output leaf (reused for each leaf we populate).
+
+            leaf = new SimpleLeafData(plan.height, m);
+
+            leaf.max = plan.numInNode[plan.height][0];
+
+            stack[plan.height] = leaf;
+
+            /*
+             * Setup optional bloom filter.
+             */
+            if (errorRate < 0.0 || errorRate > 1.0) {
+
+                throw new IllegalArgumentException(
+                        "errorRate must be in [0:1], not " + errorRate);
+
+            }
+
+            this.errorRate = errorRate;
+
+            if (errorRate == 0.0) {
+
+                bloomFilter = null;
+
+            } else {
+
+                // @todo compute [d] based on the error rate.
+                bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(
+                        plan.nentries);
+
+            }
+
+            // Used to serialize the nodes and leaves for the output tree.
+            nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
+                    m,
+                    0, /*initialBufferCapacity - will be estimated. */
+                    new IndexSegment.CustomAddressSerializer(),
+                    KeyBufferSerializer.INSTANCE,
+                    valueSerializer,
+                    recordCompressor,
+                    useChecksum
+                    );
+
+            elapsed_setup = System.currentTimeMillis() - begin_setup;
             
         }
-        
-        // the output leaf (reused for each leaf we populate).
-        
-        leaf = new SimpleLeafData(plan.height,m);
-
-        leaf.max = plan.numInNode[plan.height][0];
-
-        stack[plan.height] = leaf;
-
-        /*
-         * Setup optional bloom filter.
-         */
-        if( errorRate < 0.0 || errorRate > 1.0 ) {
-            
-            throw new IllegalArgumentException(
-                    "errorRate must be in [0:1], not " + errorRate);
-            
-        }
-        
-        this.errorRate = errorRate;
-        
-        if(errorRate == 0.0) {
-
-            bloomFilter = null;
-            
-        } else {
-            
-            // @todo compute [d] based on the error rate.
-            bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(plan.nentries);
-            
-        }
-        
+    
         /*
          * Setup for IO.
          */
 
+        long begin_build = System.currentTimeMillis();
+        
         this.outFile = outFile;
         
         if (outFile.exists() && outFile.length() != 0L) {
@@ -503,12 +537,21 @@ public class IndexSegmentBuilder {
                     + outFile.getAbsoluteFile());
         }
 
-        // the temporary file is used iff there are nodes to write.
-        tmpFile = (plan.nleaves > 1 ? File.createTempFile("index", ".seg",
-                tmpDir) : null);
+        /*
+         * the temporary file used to buffer leaves if the index build operation
+         * is not fully buffered.
+         */
+        leafFile = (!fullyBuffer ? File.createTempFile("index",
+                ".leaves.seg", tmpDir) : null);
+
+        /*
+         * the temporary file is used if there are nodes to write and the build
+         * operation is not fully buffered.
+         */
+        nodeFile = (plan.nnodes > 0 && !fullyBuffer ? File.createTempFile(
+                "index", ".nodes.seg", tmpDir) : null);
 
         final FileChannel outChannel;
-//        final FileChannel tmpChannel;
         
         try {
 
@@ -528,53 +571,28 @@ public class IndexSegmentBuilder {
             }
 
             /*
+             * Open the leaf buffer. We always do this, but we choose the type
+             * of the buffer based on whether or not the index build operation
+             * is fully buffered. Note that an index normally has much more data
+             * in the leaves so the leafBuffer is where most of the IO is. By
+             * writing the leaves into memory and evicting them all at once onto
+             * the disk we can realize a substantial decrease in latency for the
+             * index build operation.
+             */
+            leafBuffer = fullyBuffer ? new MemoryBuffer() : new FileBuffer(
+                    leafFile, mode);
+            
+            /*
              * Open the node buffer. We only do this if there will be at least
              * one node written, i.e., the output tree will consist of more than
-             * just a root leaf.
+             * just a root leaf. The type of buffer depends on whether or not
+             * the index build operation is fully buffered. When fully buffered
+             * we use a memory-based buffer, otherwise the buffer is an
+             * abstraction for a disk file.
              */
+            nodeBuffer = plan.nnodes > 0 && fullyBuffer ? new MemoryBuffer()
+                    : plan.nnodes > 0 ? new FileBuffer(nodeFile, mode) : null;
 
-            if (tmpFile != null) {
-
-//                tmp = new RandomAccessFile(tmpFile, mode);
-//
-//                FileChannel tmpChannel = tmp.getChannel();
-//
-//                if (tmpChannel.tryLock() == null) {
-//
-//                    throw new IOException("Could not lock file: "
-//                            + tmpFile.getAbsoluteFile());
-//
-//                }
-//                
-                nodeBuffer = fullyBuffer ? new MemoryBuffer() : new FileBuffer(
-                        tmpFile, mode);
-
-            } else {
-                
-                /*
-                 * Set to null iff temp file not opened because there are no
-                 * nodes to write (only one root leaf).
-                 */
-
-//                tmpChannel = null;
-                nodeBuffer = null;
-                
-            }
-
-            /*
-             * Skip over the metadata record, which we have to write once we
-             * know how the leaves and nodes fit onto the file once they have
-             * been serialized and compressed.
-             * 
-             * @todo we could serialize the metadata record with zeros for
-             * values that we do not know until after the index has been
-             * generated and then patch them up afterwards. This would let us
-             * compute the final record size while also permitting the use of
-             * Java default serialization to store things like NEGINF,
-             * comparator, keySer, valSer, and the record compressor.
-             */
-            outChannel.position(IndexSegmentMetadata.SIZE);
-            
             /*
              * Scan the source btree leaves in key order writing output leaves
              * onto the index segment file with the new branching factor. We
@@ -700,219 +718,14 @@ public class IndexSegmentBuilder {
             
             // Verify that all nodes were written out.
             assert plan.nnodes == nnodesWritten;
+
+            elapsed_build = System.currentTimeMillis() - begin_build;
             
-            /*
-             * All nodes and leaves have been written. If we wrote any nodes
-             * onto the temporary channel then we also have to bulk copy them
-             * into the output channel.
-             * 
-             * @todo include both offset and length for the leaf and node
-             * regions of the file in the metadata record, e.g., by representing
-             * them as {@link Addr}s.
-             */
-            final long offsetLeaves = IndexSegmentMetadata.SIZE;
-            final long offsetNodes;
-            final long addrRoot;
+            final long begin_write = System.currentTimeMillis();
             
-//            if (tmpChannel != null) {
-//
-//                /*
-//                 * Direct copy the node index from the temporary file into the
-//                 * output file and clear the reference to the temporary file.
-//                 * The temporary file itself will be deleted as a post-condition
-//                 * of the index build operation.
-//                 */
-//                
-//                offsetNodes = outChannel.position();
-//                
-//                if(offsetNodes + offsetLeaves > Integer.MAX_VALUE) {
-//                    
-//                    throw new IOException("Index segment exceeds int32 bytes.");
-//                    
-//                }
-//                
-//                // #of bytes to transfer.
-//                long nodeBytes = tmp.length();
-//                
-//                /* 
-//                 * Transfer data.
-//                 */
-//                
-//                // Set the fromPosition on source channel.
-//                tmpChannel.position(0);
-//
-//                // Extend the output file (@todo it looks like this should be required so look into this further!)
-////                out.setLength(offsetNodes+nodeBytes);
-//                
-//                // Transfer the data.
-//                long nxfer = outChannel.transferFrom(tmpChannel, /* toPosition */
-//                        offsetNodes, /* count */ nodeBytes);
-//                
-//                // Verify transfer is complete.
-//                if( nxfer != nodeBytes ) {
-//                    throw new IOException("Expected to transfer "+nodeBytes+", but transferred "+nxfer);
-//                }
-//                
-//                // Close the temporary file - also releases the lock.
-//                tmp.close();
-//
-//                /*
-//                 * The addrRoot is computed from the offset on the tmp channel
-//                 * at which we wrote the root node plus the offset on the output
-//                 * channel to which we transferred the contents of the temporary
-//                 * channel. This provides a correct address for the root node in
-//                 * the output file.  (The addrRoot is the only _node_ address
-//                 * that is correct for the output file. All internal node
-//                 * references require some translation.)
-//                 */
-//                
-////                long addr = - ( ((SimpleNodeData)stack[0]).addr ); // flip sign
-//                
-//                long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
-//                
-//                int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
-//                
-//                int nbytes = Addr.getByteCount(addr); // #of bytes in root node.
-//                
-//                addrRoot = Addr.toLong(nbytes, offset); // form correct addr.
-//                
-//                log.info("addrRoot(Node): "+addrRoot+", "+Addr.toString(addrRoot));
-
-            if (nodeBuffer!= null) {
-
-                /*
-                 * Direct copy the node index from the buffer into the output
-                 * file. If the buffer was backed by a file then that file will
-                 * be deleted as a post-condition on the index build operation.
-                 */
-                
-                offsetNodes = outChannel.position();
-                
-                if(offsetNodes + offsetLeaves > Integer.MAX_VALUE) {
-                    
-                    throw new IOException("Index segment exceeds int32 bytes.");
-                    
-                }
-                
-                // transfer the nodes en mass onto the output channel.
-                nodeBuffer.transferTo(outChannel);
-                
-                // Close the buffer.
-                nodeBuffer.close();
-
-                /*
-                 * The addrRoot is computed from the offset on the tmp channel
-                 * at which we wrote the root node plus the offset on the output
-                 * channel to which we transferred the contents of the temporary
-                 * channel. This provides a correct address for the root node in
-                 * the output file.  (The addrRoot is the only _node_ address
-                 * that is correct for the output file. All internal node
-                 * references require some translation.)
-                 */
-                
-//                long addr = - ( ((SimpleNodeData)stack[0]).addr ); // flip sign
-                
-                long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
-                
-                int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
-                
-                int nbytes = Addr.getByteCount(addr); // #of bytes in root node.
-                
-                addrRoot = Addr.toLong(nbytes, offset); // form correct addr.
-                
-                log.info("addrRoot(Node): "+addrRoot+", "+Addr.toString(addrRoot));
-                
-            } else {
-
-                /*
-                 * The tree consists of just a root leaf.
-                 */
-                
-                offsetNodes = 0L;
-
-                addrRoot = Addr.toLong(lastLeafSize, (int)lastLeafOffset);
-                
-                log.info("addrRoot(Leaf): "+addrRoot+", "+Addr.toString(addrRoot));
-                
-            }
-
-            /*
-             * If the bloom filter was constructed then serialize it on the end of
-             * the file.
-             */
-            final long addrBloom;
+            // write everything out on the outFile.
+            writeIndexSegment(outChannel);
             
-            if( bloomFilter == null ) {
-        
-                addrBloom = 0L;
-                
-            } else {
-
-                /*
-                 * Serialize the bloom filter.
-                 * 
-                 * Note: This is standard java serialization onto a buffer. We
-                 * then write the buffer on the file and note the offset and #of
-                 * bytes in the representation so that it can be de-serialized
-                 * later.
-                 * 
-                 * @todo support alternative serialization that is more
-                 * flexible?
-                 * 
-                 * @todo compress the bloom filter?
-                 */
-                assert out.length() < Integer.MAX_VALUE;
-                
-                final int offset = (int)out.length(); 
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                
-                ObjectOutputStream oos = new ObjectOutputStream(baos);
-                
-                oos.writeObject(bloomFilter);
-                
-                oos.flush();
-                
-                oos.close();
-                
-                final byte[] bloomBytes = baos.toByteArray();
-
-                // seek to the end of the file.
-                out.seek(offset);
-                
-                // write the serialized bloom filter.
-                out.write(bloomBytes, 0, bloomBytes.length);
-                
-                // note its address.
-                addrBloom = Addr.toLong(bloomBytes.length,offset);
-                
-            }
-            
-            /*
-             * Seek to the start of the file and write out the metadata record.
-             */
-            {
-
-                // timestamp for the index segment.
-                final long now = System.currentTimeMillis();
-                
-                // @todo name of the index segment - drop this field? add uuids?
-                final String name = "<no name>";
-                
-                outChannel.position(0);
-                
-                IndexSegmentMetadata md = new IndexSegmentMetadata(m,
-                        plan.height, useChecksum, recordCompressor != null,
-                        plan.nleaves, nnodesWritten, plan.nentries,
-                        maxNodeOrLeafLength, offsetLeaves, offsetNodes,
-                        addrRoot, errorRate, addrBloom, out.length(), now, name);
-
-                md.write(out);
-                
-                log.info(md.toString());
-                
-            }
-                        
             /*
              * Flush this channel to disk and close the channel. This also
              * releases our lock. We are done and the index segment is ready for
@@ -922,13 +735,21 @@ public class IndexSegmentBuilder {
             out.close(); // also releases the lock.
 //            out = null;
 
+            elapsed_write = System.currentTimeMillis() - begin_write;
+            
             /*
              * log run time.
              */
             
             elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("finished: elapsed=" + elapsed + "ms, nentries="
+
+            System.err.println("index segment build: total=" + elapsed
+                    + "ms := setup(" + elapsed_setup + "ms) + build("
+                    + elapsed_build + "ms) +  write(" + elapsed_write+"ms)");
+
+            log.info("finished: total=" + elapsed + "ms := setup("
+                    + elapsed_setup + "ms) + build(" + elapsed_build
+                    + "ms) +  write(" + elapsed_write + "ms); nentries="
                     + plan.nentries + ", branchingFactor=" + m + ", nnodes="
                     + nnodesWritten + ", nleaves=" + nleavesWritten);
 
@@ -954,16 +775,32 @@ public class IndexSegmentBuilder {
             /*
              * make sure that the temporary file gets deleted regardless.
              */
+            if (leafBuffer != null && leafBuffer.isOpen()) {
+                try {
+                    leafBuffer.close();
+                } catch (Throwable t) {
+                }
+            }
+            if (leafFile != null) {
+                if(!leafFile.delete()) {
+                    log.warn("Could not delete temporary file: "
+                            + leafFile.getAbsoluteFile());
+                }
+            }
+            
+            /*
+             * make sure that the temporary file gets deleted regardless.
+             */
             if (nodeBuffer != null && nodeBuffer.isOpen()) {
                 try {
                     nodeBuffer.close();
                 } catch (Throwable t) {
                 }
             }
-            if (tmpFile != null) {
-                if(!tmpFile.delete()) {
+            if (nodeFile != null) {
+                if(!nodeFile.delete()) {
                     log.warn("Could not delete temporary file: "
-                            + tmpFile.getAbsoluteFile());
+                            + nodeFile.getAbsoluteFile());
                 }
             }
             
@@ -1234,23 +1071,34 @@ public class IndexSegmentBuilder {
         // serialize.
         ByteBuffer buf = nodeSer.putLeaf(leaf);
 
-        /*
-         * Write leaf on the channel.
-         */
-        
-        FileChannel outChannel = out.getChannel();
+//        /*
+//         * Write leaf on the channel.
+//         */
+//        
+//        FileChannel outChannel = out.getChannel();
+//
+//        // position on the channel before the write.
+//        final long offset = outChannel.position();
+//        
+//        if(offset>Integer.MAX_VALUE) {
+//            
+//            throw new IOException("Index segment exceeds int32 bytes.");
+//            
+//        }
+//        
+//        // write on the channel.
+//        final int nbytes = outChannel.write(buf);
 
-        // position on the channel before the write.
-        final long offset = outChannel.position();
+        final long addr1 = leafBuffer.write(buf);
         
-        if(offset>Integer.MAX_VALUE) {
-            
-            throw new IOException("Index segment exceeds int32 bytes.");
-            
-        }
-        
-        // write on the channel.
-        final int nbytes = outChannel.write(buf);
+        final int nbytes = Addr.getByteCount(addr1);
+
+        /*
+         * Note: The offset is adjusted by the size of the metadata record such
+         * that the offset is correct for the generated file NOT the buffer into
+         * which the leaves are being written.
+         */
+        final int offset = Addr.getOffset(addr1) + IndexSegmentMetadata.SIZE;
         
         assert nbytes == buf.limit();
         
@@ -1272,7 +1120,10 @@ public class IndexSegmentBuilder {
         
         System.err.print("."); // wrote a leaf.
 
-        // Encode the address.
+        /*
+         * Encode the address of the leaf. Since this is a leaf address we know
+         * the absolute offset into the file at which the leaf was written.
+         */
         final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
                 true);
         
@@ -1296,24 +1147,6 @@ public class IndexSegmentBuilder {
         // serialize node.
         ByteBuffer buf = nodeSer.putNode( node );
         
-//        /*
-//         * Write node on the temporary channel.
-//         */
-//        
-//        // position on the temporary channel before the write.
-//        final long offset = tmpChannel.position();
-//        
-//        if(offset>Integer.MAX_VALUE) {
-//            
-//            throw new IOException("Index segment exceeds int32 bytes.");
-//            
-//        }
-//        
-//        // write the record on the temporary channel.
-//        final int nbytes = tmpChannel.write(buf);
-//        
-//        assert nbytes == buf.limit();
-
         // write the node on the buffer.
         final long addr2 = nodeBuffer.write(buf);
 
@@ -1333,7 +1166,11 @@ public class IndexSegmentBuilder {
         
         System.err.print("x"); // wrote a node.
 
-        // Encode the address.
+        /*
+         * Encode the node address. This address is relative to the start of the
+         * region in the file containing the nodes (NOT to the start of the
+         * file).
+         */
         final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
                 false);
         
@@ -1341,6 +1178,244 @@ public class IndexSegmentBuilder {
         
         return addr;
         
+    }
+
+    /**
+     * Serialize the bloom filter.
+     * <p>
+     * Note: This is standard java serialization onto a buffer. We then write
+     * the buffer on the file and note the offset and #of bytes in the
+     * representation so that it can be de-serialized later.
+     * 
+     * @todo support alternative serialization that is more flexible?
+     * 
+     * @todo compress the bloom filter?
+     */
+    protected byte[] serializeBloomFilter(BloomFilter bloomFilter) throws IOException {
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        
+        oos.writeObject(bloomFilter);
+        
+        oos.flush();
+        
+        oos.close();
+        
+        final byte[] bloomBytes = baos.toByteArray();
+
+        return bloomBytes;
+        
+    }
+
+    /**
+     * Writes the complete file format for the index segment.
+     * <p>
+     * The file is divided up as follows:
+     * 
+     * <pre>
+     * metadata record
+     * leaves
+     * nodes (may be empty)
+     * extension metadata records, including the optional bloom filter.
+     * </pre>
+     * 
+     * Each of these regions has a variable length and some may be missing
+     * entirely.
+     * <p>
+     * Once all nodes and leaves have been buffered we are ready to start
+     * writing the data. We skip over a fixed size metadata record since
+     * otherwise we are unable to pre-compute the offset to the leaves and hence
+     * the {@link Addr addresses} of the leaves. The node {@link Addr addresses}
+     * are written in an encoding that requires active translation by the
+     * receiver who must be aware of the offset to the start of the node region.
+     * We can not write the metadata record until we know the size and length of
+     * each of these regions (leaves, nodes, and the bloom filter, or other
+     * metadata records) since that information is required in order to be able
+     * to form their {@link Addr addresses} for insertion in the metadata
+     * record.
+     * <p>
+     * 
+     * @param outChannel
+     * 
+     * @throws IOException
+     * 
+     * @todo the metadata record can be divided into a base record with a fixed
+     *       format containing only essential data and an extensible record to
+     *       be written at the end of the file. the latter section is where we
+     *       would write the bloom filters and other variable length metadata
+     *       including the _name_ of the index, or additional metadata defined
+     *       by a specific class of index.
+     *       <p>
+     *       the commit point for the index segment file should be a metadata
+     *       record at the head of the file having identical timestamps at the
+     *       start and end of its data section. since the file format is
+     *       immutable it is ok to have what is essentially only a single root
+     *       block. if the timestamps do not agree then the build was no
+     *       successfully completed.
+     *       <p>
+     *       the checksum of the index segment file should be stored in the
+     *       partitioned index so that it can be validated after being moved
+     *       around, etc.
+     * 
+     * @todo it would be nice to have the same file format and addresses as the
+     *       journal. in order to do this we need to (a) write two root blocks
+     *       having the same format as the journal; (b) use the root blocks to
+     *       look up each btree metadata record on the journal, where that
+     *       record has the same format as the record for a mutable btree; and
+     *       (d) store the bloom filter and its addresss, but note that it must
+     *       be discard as soon as a key is removed from the index; and (c)
+     *       devise a means for marking addresses that require decoding by
+     *       offset translation from those which do not such that we can use the
+     *       encoded addresses for the child addresses in the nodes as written
+     *       by the index build operation yet be able to begin mutable
+     *       operations on the index using copy-on-write.
+     */
+    protected void writeIndexSegment(FileChannel outChannel) throws IOException {
+
+        /*
+         * All nodes and leaves have been written. If we wrote any nodes
+         * onto the temporary channel then we also have to bulk copy them
+         * into the output channel.
+         */
+//        final long offsetLeaves = IndexSegmentMetadata.SIZE;
+        final long offsetNodes;
+        final long addrLeaves;
+        final long addrNodes;
+        final long addrRoot;
+
+        /*
+         * Direct copy the leaves from their buffer into the output file. If the
+         * buffer was backed by a file then that file will be deleted as a
+         * post-condition on the index build operation.
+         */
+        {
+
+            // Skip over the metadata record at the start of the file.
+            outChannel.position(IndexSegmentMetadata.SIZE);
+            
+            // Transfer the leaf buffer en mass onto the output channel.
+            long count = leafBuffer.transferTo(out);
+            
+            // The offset to the start of the node region.
+            offsetNodes = IndexSegmentMetadata.SIZE + count;
+            
+            // Close the buffer.
+            leafBuffer.close();
+
+            assert outChannel.position() == offsetNodes;
+
+            // Address for the contiguous region containing the leaves.
+            addrLeaves = Addr.toLong((int)count,IndexSegmentMetadata.SIZE);
+            
+        }
+        
+        /*
+         * Direct copy the node index from the buffer into the output
+         * file. If the buffer was backed by a file then that file will
+         * be deleted as a post-condition on the index build operation.
+         */
+        if (nodeBuffer!= null) {
+
+            // transfer the nodes en mass onto the output channel.
+            long count = nodeBuffer.transferTo(out);
+            
+            // Close the buffer.
+            nodeBuffer.close();
+
+            /*
+             * The addrRoot is computed from the offset on the tmp channel
+             * at which we wrote the root node plus the offset on the output
+             * channel to which we transferred the contents of the temporary
+             * channel. This provides a correct address for the root node in
+             * the output file.  (The addrRoot is the only _node_ address
+             * that is correct for the output file. All internal node
+             * references require some translation.)
+             */
+            
+            long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
+            
+            int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
+            
+            int nbytes = Addr.getByteCount(addr); // #of bytes in root node.
+            
+            addrRoot = Addr.toLong(nbytes, offset); // form correct addr.
+
+            // Address for the contiguous region containing the nodes.
+            addrNodes = Addr.toLong((int)count,(int)offsetNodes);
+
+            log.info("addrRoot(Node): "+addrRoot+", "+Addr.toString(addrRoot));
+            
+        } else {
+
+            /*
+             * The tree consists of just a root leaf.
+             */
+
+            // This MUST be 0L in the metadata record if there are no leaves.
+            addrNodes = 0L;
+            
+            addrRoot = Addr.toLong(lastLeafSize, (int)lastLeafOffset);
+            
+            log.info("addrRoot(Leaf): "+addrRoot+", "+Addr.toString(addrRoot));
+            
+        }
+        
+        /*
+         * If the bloom filter was constructed then serialize it on the end
+         * of the file.
+         */
+        final long addrBloom;
+        
+        if( bloomFilter == null ) {
+    
+            addrBloom = 0L;
+            
+        } else {
+
+            byte[] bloomBytes = serializeBloomFilter(bloomFilter);
+
+            assert out.length() < Integer.MAX_VALUE;
+            
+            final int offset = (int)out.length(); 
+
+            // seek to the end of the file.
+            out.seek(offset);
+            
+            // write the serialized bloom filter.
+            out.write(bloomBytes, 0, bloomBytes.length);
+            
+            // note its address.
+            addrBloom = Addr.toLong(bloomBytes.length,offset);
+            
+        }
+        
+        /*
+         * Seek to the start of the file and write out the metadata record.
+         */
+        {
+
+            // timestamp for the index segment.
+            final long now = System.currentTimeMillis();
+            
+            // @todo name of the index segment - drop this field? add uuids?
+            final String name = "<no name>";
+            
+            outChannel.position(0);
+            
+            IndexSegmentMetadata md = new IndexSegmentMetadata(plan.m,
+                    plan.height, useChecksum, recordCompressor != null,
+                    plan.nleaves, nnodesWritten, plan.nentries,
+                    maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
+                    errorRate, addrBloom, out.length(), now, name);
+
+            md.write(out);
+            
+            log.info(md.toString());
+            
+        }
+
     }
     
     /**
@@ -1467,7 +1542,7 @@ public class IndexSegmentBuilder {
     /**
      * A class that can be used to (de-)serialize the data for a node without
      * any of the logic for operations on the node.
-     * 
+     * <p>
      * Note: All node addresses that are internal to a node and reference a
      * child node (vs a leaf) are correct relative to the start of the node
      * block. This is an unavoidable consequence of serializing the nodes before
@@ -1628,19 +1703,42 @@ public class IndexSegmentBuilder {
 
         /**
          * A block operation that transfers the serialized records en mass from
-         * the buffer onto a {@link FileChannel}. The buffered records are
-         * written "in order" starting at the current position on the output
-         * channel.
+         * the buffer onto a file. The buffered records are written "in order"
+         * starting at the current position on the file.  The file is grow if
+         * necessary.
          * 
-         * @param outChannel
-         *            The output channel.
-         *            
+         * @param out
+         *            The file to which the buffer contents will be transferred.
+         * 
+         * @return The #of bytes written.
+         * 
          * @throws IOException
          */
-        public void transferTo(FileChannel outChannel) throws IOException;
+        public long transferTo(RandomAccessFile out) throws IOException;
         
     }
 
+    /**
+     * Note: the comments below really apply to the base
+     * {@link SimpleFileRawStore2} class.
+     * 
+     * @todo consider the file mode and buffering. We should at least buffer
+     *       several pages of data per write and can experiment with writing
+     *       through (vs caching writes in the OS layer). The file does not need
+     *       to be "live" until it is completely written, so there is no need to
+     *       update file metadata until the end of the build process.
+     * 
+     * @todo Consider using
+     *       {@link FileOutputStream#FileOutputStream(File, boolean)} to open
+     *       the temporary file in an append only mode and then get the
+     *       {@link FileChannel} from {@link FileOutputStream#getChannel()}.
+     *       Does this improve performance? Can we still read from the channel?
+     *       Try this on the {@link Journal} as well, at least for cases where
+     *       we will never read from the journal (i.e., fully buffered).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     static class FileBuffer extends SimpleFileRawStore2 implements Buffer {
 
         public FileBuffer(File file, String mode) throws IOException {
@@ -1649,13 +1747,13 @@ public class IndexSegmentBuilder {
             
         }
 
-        public long write(ByteBuffer data) {
-            
-            System.err.println("\nwriting "+data.remaining()+" bytes on buffer.");
-            
-            return super.write(data);
-            
-        }
+//        public long write(ByteBuffer data) {
+//            
+//            System.err.println("\nwriting "+data.remaining()+" bytes on buffer.");
+//            
+//            return super.write(data);
+//            
+//        }
 
         /**
          * Disallowed.
@@ -1666,16 +1764,24 @@ public class IndexSegmentBuilder {
             
         }
 
-        public void transferTo(FileChannel outChannel) throws IOException {
+        public long transferTo(RandomAccessFile out) throws IOException {
 
             final long begin = System.currentTimeMillis();
             
             // #of bytes to transfer.
             final long count = raf.length();
 
+            final FileChannel outChannel = out.getChannel();
+            
             // current position on the output channel.
             final long toPosition = outChannel.position();
             
+            if(toPosition + count > Integer.MAX_VALUE) {
+                
+                throw new IOException("Index segment exceeds int32 bytes.");
+                
+            }
+
             /* 
              * Transfer data from channel to channel.
              */
@@ -1686,28 +1792,48 @@ public class IndexSegmentBuilder {
             tmpChannel.position(0);
 
             /*
-             * Extend the output file (@todo it looks like this should be
-             * required so look into this further!)
+             * Extend the output file 
              */
-//            out.setLength(offsetNodes+nodeBytes);
-            
+            out.setLength(toPosition+count);
+                        
             // Transfer the data.
-            final long nxfer = outChannel.transferFrom(tmpChannel, toPosition,
-                    count);
+
+//            System.err.println("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
+
+            long nxfer = 0l; // #of bytes transferred.
             
-            // Verify transfer is complete.
-            if( nxfer != count ) {
+            int nwrites = 0; // #of write operations.
             
-                throw new IOException("Expected to transfer " + count
-                        + ", but transferred " + nxfer);
+            while(nxfer<count){
+
+                nxfer += outChannel.transferFrom(tmpChannel, toPosition, count);
                 
+                nwrites++;
+            
+//            // Verify transfer is complete.
+//                if (nxfer != count) {
+//
+//                    throw new IOException("Expected to transfer " + count
+//                            + ", but transferred " + nxfer);
+//
+//                }
+
             }
+
+            /*
+             * Update the position on the output channel since transferFrom does
+             * NOT do this itself.
+             */
+            outChannel.position(toPosition+count);
             
             final long elapsed = System.currentTimeMillis() - begin;
             
             System.err.println("\nTransferred " + count
                     + " bytes from disk channel to disk channel (offset="
-                    + toPosition + ") in " + elapsed + "ms");
+                    + toPosition + ") in " + nwrites + " writes and " + elapsed
+                    + "ms");
+
+            return count;
             
         }
 
@@ -1723,13 +1849,13 @@ public class IndexSegmentBuilder {
      */
     static class MemoryBuffer extends SimpleMemoryRawStore2 implements Buffer {
         
-        public long write(ByteBuffer data) {
-        
-            System.err.println("\nwriting "+data.remaining()+" bytes on buffer.");
-            
-            return super.write(data);
-            
-        }
+//        public long write(ByteBuffer data) {
+//        
+//            System.err.println("\nwriting "+data.remaining()+" bytes on buffer.");
+//            
+//            return super.write(data);
+//            
+//        }
         
         /**
          * Disallowed.
@@ -1740,7 +1866,7 @@ public class IndexSegmentBuilder {
             
         }
 
-        public void transferTo(FileChannel outChannel) throws IOException {
+        public long transferTo(RandomAccessFile out) throws IOException {
             
             long count = 0L;
             
@@ -1758,9 +1884,17 @@ public class IndexSegmentBuilder {
                 
             }
             
+            final FileChannel outChannel = out.getChannel();
+            
             // current position on the output channel.
             final long toPosition = outChannel.position();
 
+            if(toPosition + count > Integer.MAX_VALUE) {
+                
+                throw new IOException("Index segment exceeds int32 bytes.");
+                
+            }
+            
             /*
              * use a single nio operation to write all the data onto the output
              * channel.
@@ -1783,6 +1917,8 @@ public class IndexSegmentBuilder {
             System.err.println("\nTransferred " + count + " bytes in " + n
                     + " records from memory to disk at offset=" + toPosition
                     + " in " + elapsed + "ms");
+
+            return count;
             
         }
         

@@ -38,6 +38,11 @@ public class IndexSegmentFileStore implements IRawStore2 {
     protected final IndexSegmentMetadata metadata;
 
     /**
+     * True iff the store is open.
+     */
+    private boolean open = false;
+
+    /**
      * Open the read-only store.
      * 
      * @param file
@@ -46,7 +51,7 @@ public class IndexSegmentFileStore implements IRawStore2 {
      * 
      * @todo make it optional to fully buffer the index nodes?
      * @todo make it optional to fully buffer the entire file.
-     * @todo hide IOException?
+     * @todo hide IOException in constructor?
      */
     public IndexSegmentFileStore(File file) throws IOException {
 
@@ -83,9 +88,12 @@ public class IndexSegmentFileStore implements IRawStore2 {
 
     }
 
-    /**
-     * Close the read-only store.
-     */
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+   
     public void close() {
 
         if (!open)
@@ -105,8 +113,6 @@ public class IndexSegmentFileStore implements IRawStore2 {
 
     }
 
-    private boolean open = false;
-
     public void delete(long addr) {
 
         throw new UnsupportedOperationException();
@@ -117,6 +123,12 @@ public class IndexSegmentFileStore implements IRawStore2 {
 
         throw new UnsupportedOperationException();
 
+    }
+
+    public void force(boolean metadata) {
+        
+        throw new UnsupportedOperationException();
+        
     }
 
     /**
@@ -132,8 +144,10 @@ public class IndexSegmentFileStore implements IRawStore2 {
         final int offset = Addr.getOffset(addr);
 
         final int length = Addr.getByteCount(addr);
+        
+        final int offsetNodes = Addr.getOffset(metadata.addrNodes);
 
-        if (offset >= metadata.offsetNodes && buf_nodes != null) {
+        if (offset >= offsetNodes && buf_nodes != null) {
 
             /*
              * the data are buffered. create a slice onto the read-only
@@ -143,9 +157,9 @@ public class IndexSegmentFileStore implements IRawStore2 {
              */
 
             // correct the offset so that it is relative to the buffer.
-            int off = offset - (int) metadata.offsetNodes;
+            int off = offset - offsetNodes;
 
-            //              System.err.println("offset="+offset+", length="+length);
+            // System.err.println("offset="+offset+", length="+length);
 
             // set the limit on the buffer to the end of the record.
             buf_nodes.limit(off + length);
@@ -199,51 +213,32 @@ public class IndexSegmentFileStore implements IRawStore2 {
      * 
      * @return A read-only view of a buffer containing the index nodes.
      * 
-     * FIXME write the #of bytes in the node region in the metadata record
-     * and use that here for the end point of the read rather than the length
-     * of the file. the current code works, but it reads too much data when
-     * the bloom filter is defined.  for consistency, probably write both the
-     * offset and the length of the node and leaf regions.  those could be
-     * encapsulated as a long {@link Addr}.
+     * @todo compare use of direct vs heap ByteBuffer for performance. The
+     *       direct buffer imposes a higher burden on the JVM and all operations
+     *       after we read the data from the disk should be faster with a heap
+     *       buffer, so my expectation is that a heap buffer is the correct
+     *       choice here.
      */
     protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
 
-        long start = metadata.offsetNodes;
+        if(metadata.addrNodes == 0L) {
+            
+            throw new IllegalStateException("No nodes.");
+            
+        }
+        
+        final int offset = Addr.getOffset(metadata.addrNodes);
 
-        long length = metadata.length - start;
+        final int nbytes = Addr.getByteCount(metadata.addrLeaves);
 
-        if (length > Integer.MAX_VALUE)
-            throw new RuntimeException();
+//        ByteBuffer buf = ByteBuffer.allocateDirect(nbytes);
+        ByteBuffer buf = ByteBuffer.allocate(nbytes);
 
-        final int capacity = (int) length;
-
-        ByteBuffer buf = ByteBuffer.allocateDirect(capacity);
-
-        raf.getChannel().read(buf, start);
+        raf.getChannel().read(buf, offset);
 
         return buf.asReadOnlyBuffer();
 
-    }
-
-    public void commit() {
-        // TODO Auto-generated method stub
-        
-    }
-
-    public long getAddr(int rootSlot) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public boolean isOpen() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public void registerCommitter(int rootSlot, ICommitter committer) {
-        // TODO Auto-generated method stub
-        
     }
 
 }

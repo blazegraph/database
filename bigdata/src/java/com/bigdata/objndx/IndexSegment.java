@@ -111,8 +111,10 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      * @param valSer
      * @throws IOException
      * 
-     * @todo explore good defaults for the hard reference queue. consider
-     *       splitting into a leafQueue and a nodeQueue.
+     * @todo explore good defaults for the hard reference queue, which should
+     *       probably be much smaller as the branching factor grows larger.
+     * 
+     * FIXME move the value serializer into the metadata record.
      */
     public IndexSegment(IndexSegmentFileStore fileStore,
             HardReferenceQueue<PO> hardReferenceQueue,
@@ -120,8 +122,9 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
-                new CustomAddressSerializer(fileStore.metadata.offsetNodes),
-                valSer, ImmutableNodeFactory.INSTANCE,
+                new CustomAddressSerializer(Addr
+                        .getOffset(fileStore.metadata.addrNodes)), valSer,
+                ImmutableNodeFactory.INSTANCE,
                 fileStore.metadata.useRecordCompressor ? new RecordCompressor()
                         : null, fileStore.metadata.useChecksum);
 
@@ -503,11 +506,12 @@ public class IndexSegment extends AbstractBTree implements IBTree {
     /**
      * <p>
      * A custom serializer class provides a workaround for node offsets (which
-     * are relative to the start of the nodes in the file) in contract to leaf
-     * offsets (which are relative to the start of the file). This condition
-     * arises as a side effect of serializing nodes onto a temporary channel at
-     * the same time that the {@link IndexSegmentBuilder} is serializing leaves
-     * onto the primary channel.
+     * are relative to the start of the nodes block) in contrast to leaf offsets
+     * (which are relative to a known offset from the start of the index segment
+     * file). This condition arises as a side effect of serializing nodes at the
+     * same time that the {@link IndexSegmentBuilder} is serializing leaves such
+     * that we can not both group the nodes and leaves into distinct regions and
+     * know the absolute offset to each node or leave as it is serialized.
      * </p>
      * <p>
      * Addresses are required to be left-shifted by one bit on the
