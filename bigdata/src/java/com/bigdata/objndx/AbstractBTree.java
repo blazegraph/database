@@ -100,7 +100,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @see http://icu.sourceforge.net
  * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
  */
-abstract public class AbstractBTree implements IBTree {
+abstract public class AbstractBTree implements IBTree, IBatchBTree {
 
     /**
      * Log for btree opeations.
@@ -335,51 +335,21 @@ abstract public class AbstractBTree implements IBTree {
     abstract public IAbstractNode getRoot();
     
     /**
-     * Batch insert operation of N tuples presented in sorted order. This
-     * operation can be very efficient if the tuples are presented sorted by key
-     * order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in). Additional elements of
-     *            the parameter arrays will be ignored.
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.<br>
-     *            The individual byte[] keys provided to this method MUST be
-     *            immutable - if the content of a given byte[] in <i>keys</i>
-     *            is changed after the method is invoked then the change MAY
-     *            have a side-effect on the keys stored in leaves of the tree.
-     *            While this constraint applies to the individual byte[] keys,
-     *            the <i>keys</i> byte[][] itself may be reused from invocation
-     *            to invocation without side-effect.
-     * 
-     * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
-     * 
-     * @param values
-     *            An array of values, one per tuple (in/out).
-     * 
-     * @exception IllegalArgumentException
-     *                if the dimensions of the arrays are not sufficient for the
-     *                #of tuples declared.
-     * 
-     * @todo support batch api for indexOf(), keyAt(), valueAt()?
-     * 
-     * FIXME handle isolation using a TimestampValue(long,Object). This properly
-     * encapsulates the timestamp with the value so that the timestamp is
-     * returned with the value by the api. It also allows the isolated btree to
-     * set the timestamp to the timestamp associated with the tx or to treat it
-     * as an update counter.
+     * @todo handle isolation using a TimestampValue(long,Object). This properly
+     *       encapsulates the timestamp with the value so that the timestamp is
+     *       returned with the value by the api. It also allows the isolated
+     *       btree to set the timestamp to the timestamp associated with the tx
+     *       or to treat it as an update counter. using a null value in a
+     *       TimestampValue instead of remove when using the btree to support
+     *       isolation. this will result in an entry with an updated timestamp
+     *       and a null value and would leave the semantics of remove() removing
+     *       the entry from the tree.
      * 
      * @todo disallow null value? it was allowed for isolation to indicate a
      *       removed value, but we can do that with a null value inside of a
      *       TimestampEntry object.
+     * 
+     * @todo factor out error messages into constants.
      */
     public void insert(int ntuples, byte[][] keys, Object[] values) {
 
@@ -416,25 +386,6 @@ abstract public class AbstractBTree implements IBTree {
 
     }
 
-    /**
-     * Batch lookup operation for N tuples returns the most recent timestamp and
-     * value for each key. This operation can be very efficient if the keys are
-     * presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param values
-     *            An array of values, one per tuple (out). The array element
-     *            corresponding to a tuple will be null if the key does not
-     *            exist -or- if the key exists with a null value.
-     */
     public void lookup(int ntuples, byte[][] keys, Object[] values) {
      
         if (ntuples <= 0)
@@ -462,7 +413,7 @@ abstract public class AbstractBTree implements IBTree {
             
             assert nused > 0;
             
-            counters.ninserts += nused;
+            counters.nfinds += nused;
             
             tupleIndex += nused;
 
@@ -471,24 +422,6 @@ abstract public class AbstractBTree implements IBTree {
     }
 
     /**
-     * Batch lookup operation for N tuples returns the most recent timestamp and
-     * value for each key. This operation can be very efficient if the keys are
-     * presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param contains
-     *            An array of boolean flags, one per tuple (out). The array
-     *            element corresponding to a tuple will be true iff the key
-     *            exists.
-     * 
      * @todo write tests for this - the code was cloned from lookup so it should
      *       work but there it no test suite for contains() at this time.
      */
@@ -508,9 +441,18 @@ abstract public class AbstractBTree implements IBTree {
         
         if( contains.length < ntuples )
             throw new IllegalArgumentException("not enough values");
-
+        
         for( int tupleIndex=0; tupleIndex<ntuples; ) {
 
+            // skip tuples already marked as true.
+            if (contains[tupleIndex]) {
+                
+                tupleIndex++;
+                
+                continue;
+                
+            }
+                
             /*
              * Each call MAY process more than one tuple.
              */
@@ -519,38 +461,14 @@ abstract public class AbstractBTree implements IBTree {
             
             assert nused > 0;
             
-            counters.ninserts += nused;
-            
+            counters.nfinds += nused;
+                
             tupleIndex += nused;
-
+                
         }
         
     }
 
-    /**
-     * Batch remove of N tuples. This operation can be very efficient if the
-     * keys are presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param values
-     *            An array of values, one per tuple (out). The array element
-     *            corresponding to a tuple will be null if the key did not exist
-     *            -or- if the key existed with a null value (null values are
-     *            used to mark deleted keys in an isolated btree).
-     * 
-     * @todo consider using insert() with a null value instead of remove when
-     *       using the btree to support isolation. this will result in an entry
-     *       with an updated timestamp and a null value and would leave the
-     *       semantics of remove() removing the entry from the tree.
-     */
     public void remove(int ntuples, byte[][] keys, Object[] values ) {
 
         if (ntuples <= 0)
@@ -680,6 +598,8 @@ abstract public class AbstractBTree implements IBTree {
         if( key == null )
             throw new IllegalArgumentException();
 
+        _contains[0] = false; // otherwise the request is ignored!
+        
         contains(1,unbox(key),_contains);
         
         return _contains[0];
@@ -799,18 +719,6 @@ abstract public class AbstractBTree implements IBTree {
 
     }
     
-    /**
-     * Return an iterator that visits the entries in a half-open key range.
-     * 
-     * @param fromKey
-     *            The first key that will be visited (inclusive). When
-     *            <code>null</code> there is no lower bound.
-     * @param toKey
-     *            The first key that will NOT be visited (exclusive). When
-     *            <code>null</code> there is no upper bound.
-     * 
-     * @see #entryIterator(), which visits all entries in the btree.
-     */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         /*
@@ -824,39 +732,22 @@ abstract public class AbstractBTree implements IBTree {
     }
 
     /**
-     * Return the #of entries in a half-open key range. The fromKey and toKey
-     * need not be defined in the btree. This method computes the #of entries in
-     * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
-     * The cost is equal to the cost of lookup of the both keys.
-     * 
-     * @param fromKey
-     *            The lowest key that will be counted (inclusive).
-     * @param toKey
-     *            The first key that will not be counted (exclusive).
-     * 
-     * @return The #of entries in the half-open key range. This will be zero if
-     *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
-     *         total ordering.
-     * 
      * @todo perhaps place the count of entries or entries remaining on the
      *       {@link IRangeIterator}?
-     * 
-     * @see #successor(Object), which may be used to produce a closed range for
-     *      any given <i>toKey</i>.
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
-        if (fromKey == null)
-            throw new IllegalArgumentException();
-
-        if (toKey == null)
-            throw new IllegalArgumentException();
+//        if (fromKey == null)
+//            throw new IllegalArgumentException();
+//
+//        if (toKey == null)
+//            throw new IllegalArgumentException();
         
         final AbstractNode root = (AbstractNode)getRoot();
         
-        int fromIndex = root.indexOf(fromKey);
-        
-        int toIndex = root.indexOf(toKey);
+        int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
+
+        int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
         
         // Handle case when fromKey is not found.
         if( fromIndex < 0 ) fromIndex = -fromIndex - 1;

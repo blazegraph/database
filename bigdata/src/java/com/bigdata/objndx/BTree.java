@@ -262,11 +262,7 @@ import com.bigdata.journal.SlotMath;
  * 
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
- * 
- * @todo one way to increase performance while maintaining the separation of the
- *       control logic and the keyType is to use template classes, but I am not
- *       sure that this is worth it.
- * 
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

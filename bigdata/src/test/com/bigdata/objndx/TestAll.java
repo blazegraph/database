@@ -92,6 +92,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestTouch.class );
         // stress test basic tree operations w/o IO.
         suite.addTestSuite( TestBTree.class );
+        // test fused view operations on ordered list of trees.
+        suite.addTestSuite( TestFusedView.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
         // test node/leaf serialization.
@@ -104,7 +106,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestCopyOnWrite.class );
         // stress test using journal as the backing store.
         suite.addTestSuite( TestBTreeWithJournal.class );
-
+        
         /*
          * test atomic commit
          * 

@@ -219,6 +219,11 @@ public class DistributedIndex implements IBTree {
         return null;
     }
 
+    public boolean contains(byte[] key) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
     public Object remove(Object key) {
         // TODO Auto-generated method stub
         return null;
@@ -457,6 +462,16 @@ public class DistributedIndex implements IBTree {
             
         }
         
+    }
+
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

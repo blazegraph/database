@@ -49,7 +49,8 @@ package com.bigdata.objndx;
 
 /**
  * <p>
- * Interface for a B+-Tree mapping arbitrary non-null keys to arbitrary values.
+ * Interface for non-batch operations on a B+-Tree mapping arbitrary non-null
+ * keys to arbitrary values.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -82,6 +83,16 @@ public interface IBTree {
     public Object lookup(Object key);
 
     /**
+     * Return true iff there is an entry for the key.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return True if the btree contains an entry for that key.
+     */
+    public boolean contains(byte[] key);
+        
+    /**
      * Remove the key and its associated value.
      * 
      * @param key
@@ -91,5 +102,38 @@ public interface IBTree {
      *         was not found.
      */
     public Object remove(Object key);
+    
+    /**
+     * Return an iterator that visits the entries in a half-open key range.
+     * 
+     * @param fromKey
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @see #entryIterator(), which visits all entries in the btree.
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
+
+    /**
+     * Return the #of entries in a half-open key range. The fromKey and toKey
+     * need not be defined in the btree. This method computes the #of entries in
+     * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
+     * The cost is equal to the cost of lookup of the both keys.
+     * 
+     * @param fromKey
+     *            The lowest key that will be counted (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will not be counted (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @return The #of entries in the half-open key range. This will be zero if
+     *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
+     *         total ordering.
+     */
+    public int rangeCount(byte[] fromKey, byte[] toKey);
     
 }

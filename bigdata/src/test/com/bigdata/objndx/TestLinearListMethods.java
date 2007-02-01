@@ -139,6 +139,26 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         assertEquals(0,btree.rangeCount(i2k(8), i2k(8)));
         assertEquals(0,btree.rangeCount(i2k(9), i2k(8)));
 
+        assertEquals(3,btree.rangeCount(null,null));
+        
+        assertEquals(3,btree.rangeCount(i2k(1),null));
+        assertEquals(3,btree.rangeCount(i2k(2),null));
+        assertEquals(3,btree.rangeCount(i2k(3),null));
+        assertEquals(2,btree.rangeCount(i2k(4),null));
+        assertEquals(2,btree.rangeCount(i2k(5),null));
+        assertEquals(1,btree.rangeCount(i2k(6),null));
+        assertEquals(1,btree.rangeCount(i2k(7),null));
+        assertEquals(0,btree.rangeCount(i2k(8),null));
+        
+        assertEquals(0,btree.rangeCount(null,i2k(1)));
+        assertEquals(0,btree.rangeCount(null,i2k(2)));
+        assertEquals(0,btree.rangeCount(null,i2k(3)));
+        assertEquals(1,btree.rangeCount(null,i2k(4)));
+        assertEquals(1,btree.rangeCount(null,i2k(5)));
+        assertEquals(2,btree.rangeCount(null,i2k(6)));
+        assertEquals(2,btree.rangeCount(null,i2k(7)));
+        assertEquals(3,btree.rangeCount(null,i2k(8)));
+        
         /*
          * test of keyAt [3,5,7]
          */
@@ -265,6 +285,26 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         assertEquals(1,btree.rangeCount(i2k(7), i2k(8)));
         assertEquals(0,btree.rangeCount(i2k(8), i2k(8)));
         assertEquals(0,btree.rangeCount(i2k(9), i2k(8)));
+
+        assertEquals(4,btree.rangeCount(null,null));
+        
+        assertEquals(4,btree.rangeCount(i2k(1),null));
+        assertEquals(4,btree.rangeCount(i2k(2),null));
+        assertEquals(3,btree.rangeCount(i2k(3),null));
+        assertEquals(2,btree.rangeCount(i2k(4),null));
+        assertEquals(2,btree.rangeCount(i2k(5),null));
+        assertEquals(1,btree.rangeCount(i2k(6),null));
+        assertEquals(1,btree.rangeCount(i2k(7),null));
+        assertEquals(0,btree.rangeCount(i2k(8),null));
+        
+        assertEquals(4,btree.rangeCount(null,i2k(8)));
+        assertEquals(3,btree.rangeCount(null,i2k(7)));
+        assertEquals(3,btree.rangeCount(null,i2k(6)));
+        assertEquals(2,btree.rangeCount(null,i2k(5)));
+        assertEquals(2,btree.rangeCount(null,i2k(4)));
+        assertEquals(1,btree.rangeCount(null,i2k(3)));
+        assertEquals(0,btree.rangeCount(null,i2k(2)));
+        assertEquals(0,btree.rangeCount(null,i2k(1)));
 
         /*
          * test of keyAt [2,3,5,7]
@@ -664,6 +704,32 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         assertEquals(2,btree.rangeCount(k3, k5));
         assertEquals(3,btree.rangeCount(k3, k6));
         assertEquals(4,btree.rangeCount(k3, k7));
+
+        assertEquals(8,btree.rangeCount(null,null));
+
+        // test rangeCount: [1,2,3,4,5,6,7,8]
+        assertEquals(8,btree.rangeCount(i2k(0),null));
+        assertEquals(8,btree.rangeCount(i2k(1),null));
+        assertEquals(7,btree.rangeCount(i2k(2),null));
+        assertEquals(6,btree.rangeCount(i2k(3),null));
+        assertEquals(5,btree.rangeCount(i2k(4),null));
+        assertEquals(4,btree.rangeCount(i2k(5),null));
+        assertEquals(3,btree.rangeCount(i2k(6),null));
+        assertEquals(2,btree.rangeCount(i2k(7),null));
+        assertEquals(1,btree.rangeCount(i2k(8),null));
+        assertEquals(0,btree.rangeCount(i2k(9),null));
+
+        // test rangeCount: [1,2,3,4,5,6,7,8]
+        assertEquals(8,btree.rangeCount(null,i2k(9)));
+        assertEquals(7,btree.rangeCount(null,i2k(8)));
+        assertEquals(6,btree.rangeCount(null,i2k(7)));
+        assertEquals(5,btree.rangeCount(null,i2k(6)));
+        assertEquals(4,btree.rangeCount(null,i2k(5)));
+        assertEquals(3,btree.rangeCount(null,i2k(4)));
+        assertEquals(2,btree.rangeCount(null,i2k(3)));
+        assertEquals(1,btree.rangeCount(null,i2k(2)));
+        assertEquals(0,btree.rangeCount(null,i2k(1)));
+        assertEquals(0,btree.rangeCount(null,i2k(0)));
 
         /*
          * test keyAt: [1,2,3,4,5,6,7,8]

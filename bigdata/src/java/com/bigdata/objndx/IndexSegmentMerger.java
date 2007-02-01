@@ -77,6 +77,11 @@ import com.bigdata.objndx.IndexSegmentBuilder.SimpleLeafData;
  * @todo support deletion based on history policy (requires timestamps).
  * 
  * @todo integrate to allow compacting merges.
+ * 
+ * FIXME rewrite to use {@link IRawStore2} objects as buffers ala the
+ * {@link IndexSegmentBuilder}.
+ * 
+ * @todo reconcile with {@link FusedView}.
  */
 public class IndexSegmentMerger {
 

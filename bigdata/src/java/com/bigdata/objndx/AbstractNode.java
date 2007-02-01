@@ -1096,8 +1096,10 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param searchKeys
      *            The array of keys (one key per tuple) (in).
      * @param contains
-     *            Flags (one element per key) (out). On output, each element is
-     *            true iff the corresponding search key was found.
+     *            Flags (one element per key) (in,out). On input, the key will
+     *            be searched for iff the element is <code>false</code>. On
+     *            output, each element is true iff the corresponding search key
+     *            was found.
      * 
      * @return The #of tuples processed.
      */

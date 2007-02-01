@@ -62,9 +62,9 @@ class ChildIterator implements INodeIterator {
 
     private int lastVisited = -1;
     
-    private final byte[] fromKey;
-    
-    private final byte[] toKey;
+//    private final byte[] fromKey;
+//    
+//    private final byte[] toKey;
 
     // first index to visit.
     private final int fromIndex;
@@ -99,9 +99,9 @@ class ChildIterator implements INodeIterator {
 
         this.node = node;
 
-        this.fromKey = fromKey; // may be null (no lower bound).
-        
-        this.toKey = toKey; // may be null (no upper bound).
+//        this.fromKey = fromKey; // may be null (no lower bound).
+//        
+//        this.toKey = toKey; // may be null (no upper bound).
 
         { // figure out the first index to visit.
 
