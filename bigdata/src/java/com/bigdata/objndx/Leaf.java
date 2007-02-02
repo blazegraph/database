@@ -377,8 +377,24 @@ public class Leaf extends AbstractNode implements ILeafData {
          * 
          * Note: We do NOT search before triggering copy-on-write for an object
          * index since an insert/update always triggers a mutation.
+         * 
+         * @todo This logic should optimized when the newval is a UDF such that
+         * we defer copy-on-write until we know that we will change the leaf in
+         * order to get a performance benefit from conditional inserts.  However
+         * the code will still benefit by performing 1/2 of the #of searches when
+         * compared to {if(!contains(key)) insert(key,val);}
+         * 
+         * @todo Consider the interaction between UDFs and transaction isolation. 
          */
-        int entryIndex = this.keys.search(searchKeys[tupleIndex]);
+
+        // the search key.
+        final byte[] searchKey = searchKeys[tupleIndex];
+
+        // the value to be inserted into the leaf.
+        Object newval = values[tupleIndex];
+
+        // look for the search key in the leaf.
+        int entryIndex = this.keys.search(searchKey);
 
         if (entryIndex >= 0) {
 
@@ -387,11 +403,26 @@ public class Leaf extends AbstractNode implements ILeafData {
              * existing entry.
              */
             
-            Object oldval = this.values[entryIndex];
+            // the old value for the search key.
+            Object oldval = this.values[entryIndex];            
             
-            this.values[entryIndex] = values[tupleIndex];
-            
-            values[tupleIndex] = oldval; // return value by side-effect.
+            if(newval instanceof UserDefinedFunction) {
+
+                UserDefinedFunction udf = ((UserDefinedFunction) newval);
+                
+                // apply the UDF.
+                newval = udf.found(searchKey, oldval);
+
+                // allow UDF to override the return value.
+                oldval = udf.returnValue(searchKey, oldval);
+                
+            }
+
+            // return old value by side-effect.
+            values[tupleIndex] = oldval;
+
+            // update the entry.
+            this.values[entryIndex] = newval;
             
             return 1;
 
@@ -401,6 +432,42 @@ public class Leaf extends AbstractNode implements ILeafData {
          * The insert goes into this leaf.
          */
         
+        Object oldval = null;
+        
+        if(newval instanceof UserDefinedFunction) {
+
+            UserDefinedFunction udf = ((UserDefinedFunction) newval);
+            
+            // apply UDF
+            newval = udf.notFound(searchKey);
+
+            oldval = udf.returnValue(searchKey, oldval);
+            
+            if(newval == null) {
+                
+                // The state of the entry was NOT modified.
+
+                // return old value by side-effect.
+                values[tupleIndex] = oldval;
+
+                return 1;
+                
+            }
+            
+            if(newval == UserDefinedFunction.INSERT_NULL) {
+                
+                // Force insert of a null value.
+                newval = null;
+                
+            }
+            
+            // fall through and do insert.
+            
+        }
+
+        // return old value by side-effect.
+        values[tupleIndex] = oldval;
+
         // Convert the position to obtain the insertion point.
         entryIndex = -entryIndex - 1;
 
@@ -428,11 +495,8 @@ public class Leaf extends AbstractNode implements ILeafData {
             // Insert at index.
             MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
 //            copyKey(entryIndex, searchKeys, tupleIndex);
-            keys.keys[entryIndex] = searchKeys[tupleIndex]; // note: presumes caller does not reuse the searchKeys!
-            this.values[entryIndex] = values[tupleIndex];
-
-            // return old value by side-effect.
-            values[tupleIndex] = null;
+            keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
+            this.values[entryIndex] = newval;
 
             nkeys++; keys.nkeys++;
 

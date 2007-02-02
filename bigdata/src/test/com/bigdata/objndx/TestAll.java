@@ -77,6 +77,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestFindChild.class );
         // test insert, lookup, and remove for root leaf w/o splitting it.
         suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
+        // test insert, lookup, and remove for root leaf w/o splitting it using the batch api.
         suite.addTestSuite( TestInsertLookupRemoveOnRootLeafWithBatchApi.class );
         // test splitting the root leaf.
         suite.addTestSuite( TestSplitRootLeaf.class );
@@ -94,6 +95,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBTree.class );
         // test fused view operations on ordered list of trees.
         suite.addTestSuite( TestFusedView.class );
+        // test of user-defined functions.
+        suite.addTestSuite( TestUserDefinedFunction.class );
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
         // test node/leaf serialization.

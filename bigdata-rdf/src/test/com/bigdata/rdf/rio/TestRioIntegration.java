@@ -75,9 +75,9 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     protected BufferMode getBufferMode() {
         
-//        return BufferMode.Transient;
+        return BufferMode.Transient;
         
-        return BufferMode.Direct;
+//        return BufferMode.Direct;
         
     }
 

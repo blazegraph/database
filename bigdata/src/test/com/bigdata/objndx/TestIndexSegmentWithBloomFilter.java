@@ -65,17 +65,12 @@ import com.bigdata.objndx.BTree.TransitionalRawStore;
  * and then compares the performance and correctness of index point tests with
  * and without the use of the bloom filter.
  * 
- * @todo test with multiple versions enabled (behavior is to report true if
- *       there is a key for any timestamp).
- * 
  * @todo compare performance with and without the bloom filter.
  * 
  * @todo test points that will not be in the index as well as those that are.
  * 
  * @todo report on the cost to construct the filter and its serialized size and
  *       runtime space.
- * 
- * @todo verify that we can use the filter with any key type.
  * 
  * @todo verify the target error rate.
  * 
@@ -378,8 +373,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                     + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                     + "), out(m=" + m + ")");
             
-            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
-                    tmpDir, btree, m, 0.);
+            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
 
             System.err.println("Building index segment (w/ bloom): in(m="
                     + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()

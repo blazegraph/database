@@ -133,6 +133,17 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      */
     final protected boolean debug = false; 
     
+    /*
+     * Error messages.
+     * 
+     * @todo add error codes; localize.
+     */
+    private static final transient String ERR_NTUPLES_NON_POSITIVE = "ntuples is non-positive";
+    private static final transient String ERR_KEYS_NULL = "keys is null";
+    private static final transient String ERR_VALS_NULL = "values is null";
+    private static final transient String ERR_NOT_ENOUGH_KEYS= "not enough keys";
+    private static final transient String ERR_NOT_ENOUGH_VALS= "not enough values";
+
     /**
      * Counters tracking various aspects of the btree.
      */
@@ -350,23 +361,23 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      *       TimestampEntry object.
      * 
      * @todo factor out error messages into constants.
-     */
+     */    
     public void insert(int ntuples, byte[][] keys, Object[] values) {
 
         if (ntuples <= 0)
-            throw new IllegalArgumentException("ntuples is non-positive");
+            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
             
         if (keys == null)
-            throw new IllegalArgumentException("keys is null");
+            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
         if( keys.length < ntuples )
-            throw new IllegalArgumentException("not enough keys");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
 
         if (values == null)
-            throw new IllegalArgumentException("values is null");
+            throw new IllegalArgumentException(ERR_VALS_NULL);
 
         if( values.length < ntuples )
-            throw new IllegalArgumentException("not enough values");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
 
         for( int tupleIndex=0; tupleIndex<ntuples; ) {
 
@@ -389,19 +400,19 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     public void lookup(int ntuples, byte[][] keys, Object[] values) {
      
         if (ntuples <= 0)
-            throw new IllegalArgumentException("ntuples is non-positive");
+            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
             
         if (keys == null)
-            throw new IllegalArgumentException("keys is null");
+            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
         if( keys.length < ntuples )
-            throw new IllegalArgumentException("not enough keys");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
 
         if (values == null)
-            throw new IllegalArgumentException("values is null");
-        
+            throw new IllegalArgumentException(ERR_VALS_NULL);
+
         if( values.length < ntuples )
-            throw new IllegalArgumentException("not enough values");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
 
         for( int tupleIndex=0; tupleIndex<ntuples; ) {
 
@@ -428,19 +439,19 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     public void contains(int ntuples, byte[][] keys, boolean[] contains) {
      
         if (ntuples <= 0)
-            throw new IllegalArgumentException("ntuples is non-positive");
+            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
             
         if (keys == null)
-            throw new IllegalArgumentException("keys is null");
+            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
         if( keys.length < ntuples )
-            throw new IllegalArgumentException("not enough keys");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
 
         if (contains == null)
-            throw new IllegalArgumentException("contains is null");
+            throw new IllegalArgumentException(ERR_VALS_NULL);
         
         if( contains.length < ntuples )
-            throw new IllegalArgumentException("not enough values");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
         
         for( int tupleIndex=0; tupleIndex<ntuples; ) {
 
@@ -472,19 +483,19 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     public void remove(int ntuples, byte[][] keys, Object[] values ) {
 
         if (ntuples <= 0)
-            throw new IllegalArgumentException("ntuples is non-positive");
+            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
             
         if (keys == null)
-            throw new IllegalArgumentException("keys is null");
+            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
         if( keys.length < ntuples )
-            throw new IllegalArgumentException("not enough keys");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
 
         if (values == null)
-            throw new IllegalArgumentException("values is null");
+            throw new IllegalArgumentException(ERR_VALS_NULL);
 
         if( values.length < ntuples )
-            throw new IllegalArgumentException("not enough values");
+            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
 
         for( int tupleIndex=0; tupleIndex<ntuples; ) {
 
@@ -737,12 +748,6 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
-//        if (fromKey == null)
-//            throw new IllegalArgumentException();
-//
-//        if (toKey == null)
-//            throw new IllegalArgumentException();
-        
         final AbstractNode root = (AbstractNode)getRoot();
         
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
@@ -775,69 +780,6 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     public IEntryIterator entryIterator() {
     
         return getRoot().entryIterator();
-        
-    }
-
-    /**
-     * <p>
-     * An instance of this class may be used to obtain an estimate of various
-     * counters for a key range. Such estimates may be useful when planning
-     * joins.
-     * </p>
-     * <p>
-     * The cost and quality of the estimate depends on the {@link AbstractBTree}
-     * implementation. Some implementations have better or worse information
-     * available at low cost. For example, exact information is available at low
-     * cost (zero IOs and no scans) for an {@link IndexSegment} whose nodes are
-     * fully buffered. Likewise, a {@link BTree} backed by a fully buffered
-     * {@link Journal} can provide the estimates without any IOs, but it has
-     * less information available and would therefore have to de-serialize the
-     * leaves in to create that estimate.
-     * </p>
-     * <p>
-     * When creating estimates for a paritioned index there are multiple
-     * {@link IndexSegment}s in addition to a {@link BTree} for a given index
-     * partition and cheapest estimate may simply be the #of partitions spanned
-     * by the key range.
-     * </p>
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @see AbstractBTree#keyRangeEstimate(com.bigdata.objndx.AbstractBTree.KeyRangeEstimate)
-     * 
-     * @todo the size of a node or leaf is available from its {@link Addr}.
-     * 
-     * @todo create estimates for {@link BTree} and {@link IndexSegment}.
-     * 
-     * @todo provide a means to create easily consumed order of magnitude
-     *       estimates for join planning for a partitioned index.
-     */
-    public static class KeyRangeEstimate {
-    
-        public int nentries;
-        public int nleaves;
-        public int nbytes;
-        
-    }
-    
-    /**
-     * Estimate the count, #of IOs, and #of bytes in a half-open key range.
-     * 
-     * @param fromKey
-     *            The lowest key that will be included in the estimate
-     *            (inclusive).
-     * @param toKey
-     *            The first key that will not be included in the estimate
-     *            (exclusive).
-     * 
-     * @return The estimate.
-     */
-    public KeyRangeEstimate keyRangeEstimate(KeyRangeEstimate est) {
-
-        // @todo implement keyRangeEstimate(est)
-        
-        return est;
         
     }
     

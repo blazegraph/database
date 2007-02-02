@@ -46,6 +46,7 @@ package com.bigdata.rdf;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
@@ -57,63 +58,140 @@ import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.PO;
+import com.bigdata.objndx.UserDefinedFunction;
 import com.bigdata.rdf.rio.BulkRioLoader;
 
 /**
  * A persistent index mapping variable length byte[] keys formed from an RDF
  * {@link Value} to {@link Long} integer term identifiers.
  * 
- * FIXME review use of indexId.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class TermIndex extends BTree {
 
+    public final AutoIncCounter counter;
+    
     /**
-     * The next identifier to be assigned to a string inserted into this index.
+     * Auto-increment counter.
+     * <p>
      * 
-     * @todo this needs to be (a) shared across all transactional instances of
-     *       this index; (b) restart safe; (c) set into a namespace that is
-     *       unique to the journal so that multiple writers on multiple journals
-     *       for a single distributed database can not collide; and (d) set into
-     *       a namespace that is unique to the index and that is persistent as
-     *       part of the index metadata (which should be extensible for at least
-     *       {@link BTree}).
+     * FIXME this is not restart safe since it is (a) stateful; and (b) not part
+     * of the persistent metadata record for the btree. Also, it is not safe for
+     * paritioned or distributed indices. In order to maintain state with the
+     * btree the counter needs to be part of the metadata record for the btree,
+     * which is easy enough. <br>
+     * Supporting a partitioned or distributed index is more challenging. The
+     * most obvious approach is change the goal from a globally coherent one up
+     * counter to a globally unique identifier. One approach is to simply assign
+     * a {@link UUID} which is both stateless and simple. However, if there are
+     * dependent indices then merging must be used to reconcile the UUIDs
+     * assigned in different transactions. <br>
+     * Note: changing this to a UUID would have the effect of scattering the
+     * term identifiers randomly across index partitions and I am not sure how
+     * that would effect index performance when mapping terms to identifiers. It
+     * could help if we scatter queries and it could hurt by touching more or
+     * all term index partitions on each query.  Changing to a UUID would also
+     * change the datatype from long to UUID and there is a lot of code that
+     * currently assumes a <code>long</code>.  Finally, UUIDs appear to have
+     * fat serialization and are declared as <code>final</code>.
      * 
-     * @todo the {@link BulkRioLoader} also uses this field but that use needs
+     * @todo the {@link BulkRioLoader} also uses this counter and that use needs
      *       to be reconciled for consistency if concurrent writers are allowed.
-     */
-    long nextId = 1;
-    
-    /**
-     * An int16 value that may be used to multiplex identifier assignments for
-     * one or more distributed indices. When non-zero the next identifier that
-     * would be assigned by this index is first shifted 16 bits to the left and
-     * then ORed with the indexId. This limits the #of distinct terms that can
-     * be stored in the index to 2^48.
      * 
-     * @todo for a paritioned index this needs to get into place based on the
-     *       journal to which the request is directed.  frankly, I can not see
-     *       how to do this right now so we may have to support concurrency in
-     *       some other manner.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected final short indexId;
-    
-    public long nextId() {
+    public static class AutoIncCounter implements UserDefinedFunction {
 
-        long id = nextId++;
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4281749674236461781L;
+
+        /**
+         * The next identifier to be assigned to a string inserted into this index.
+         * 
+         * @todo this needs to be (a) shared across all transactional instances of
+         *       this index; (b) restart safe; (c) set into a namespace that is
+         *       unique to the journal so that multiple writers on multiple journals
+         *       for a single distributed database can not collide; and (d) set into
+         *       a namespace that is unique to the index and that is persistent as
+         *       part of the index metadata (which should be extensible for at least
+         *       {@link BTree}).
+         */
+        long nextId = 1;
         
-        if( indexId != 0 ) {
+        /**
+         * An int16 value that may be used to multiplex identifier assignments for
+         * one or more distributed indices. When non-zero the next identifier that
+         * would be assigned by this index is first shifted 16 bits to the left and
+         * then ORed with the indexId. This limits the #of distinct terms that can
+         * be stored in the index to 2^48.
+         * 
+         * @todo for a paritioned index this needs to get into place based on the
+         *       journal to which the request is directed.  frankly, I can not see
+         *       how to do this right now so we may have to support concurrency in
+         *       some other manner.
+         */
+        protected final short indexId;
+        
+        /**
+         * The last value assigned by the counter.
+         */
+        private Object retval;
+        
+        public AutoIncCounter(short indexId) {
             
-            id <<= 16;
-            
-            id |= indexId;
+            this.indexId = indexId;
             
         }
         
-        return id;
+        public long nextId() {
 
+            long id = nextId++;
+            
+            if( indexId != 0 ) {
+                
+                id <<= 16;
+                
+                id |= indexId;
+                
+            }
+            
+            return id;
+
+        }
+        
+        /**
+         * If the key is found then we do not update the value.
+         */
+        public Object found(byte[] key, Object val) {
+
+            this.retval = val;
+            
+            return val;
+            
+        }
+
+        /**
+         * If the key is not found then we insert the current value of the
+         * counter and increment the counter.
+         */
+        public Object notFound(byte[] key) {
+            
+            retval = Long.valueOf(nextId());
+            
+            return retval;
+            
+        }
+        
+        public Object returnValue(byte[] key,Object oldval) {
+            
+            return retval;
+            
+        }
+        
     }
     
     /**
@@ -139,8 +217,9 @@ public class TermIndex extends BTree {
                 ValueSerializer.INSTANCE,
                 null // new RecordCompressor() // record compressor
                 );
-        
-        this.indexId = indexId;
+
+        // @todo save with the btree metadata record or make stateless.
+        counter = new AutoIncCounter( indexId );
         
     }
     
@@ -159,8 +238,8 @@ public class TermIndex extends BTree {
                 new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
                 DEFAULT_HARD_REF_QUEUE_SCAN));
         
-        // @todo store and recover the indexId from the metadata record.
-        this.indexId = 0;
+        // @todo recover from with the btree metadata record or make stateless.
+        counter = new AutoIncCounter( (short) 0x1 );
 
     }
 
@@ -175,18 +254,20 @@ public class TermIndex extends BTree {
      * @return The termId, which was either assigned or resolved by the index.
      */
     public long add(byte[] key) {
-        
-        Long id = (Long)lookup(key);
-        
-        if( id == null ) {
 
-            id = nextId();
-            
-            insert(key,id);
-            
-        }
+        return (Long)insert(key,counter);
         
-        return id;
+//        Long id = (Long)lookup(key);
+//        
+//        if( id == null ) {
+//
+//            id = nextId();
+//            
+//            insert(key,id);
+//            
+//        }
+//        
+//        return id;
         
     }
 

@@ -420,6 +420,10 @@ public class IndexSegmentBuilder {
      *            be tested to verify that the result is not a false positive.
      *            Bloom filters are great if you have a lot of point tests to
      *            perform but they are not used if you are doing range scans.
+     *            <br>
+     *            Generating the bloom filter is fairly expensive and this
+     *            option should only be enabled if you know that point access
+     *            tests are a hotspot for an index.
      * 
      * @throws IOException
      * 
@@ -1792,23 +1796,35 @@ public class IndexSegmentBuilder {
             tmpChannel.position(0);
 
             /*
-             * Extend the output file 
+             * Extend the output file. This is required at least for some
+             * circumstances.
              */
             out.setLength(toPosition+count);
                         
-            // Transfer the data.
+            /*
+             * Transfer the data. It is possible that this will take multiple
+             * writes for at least some implementations.
+             */
 
 //            System.err.println("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
 
-            long nxfer = 0l; // #of bytes transferred.
-            
             int nwrites = 0; // #of write operations.
-            
-            while(nxfer<count){
 
-                nxfer += outChannel.transferFrom(tmpChannel, toPosition, count);
+            {
                 
-                nwrites++;
+                long n = count;
+                
+                long to = toPosition;
+                
+                while (n > 0) {
+    
+                    long nxfer = outChannel.transferFrom(tmpChannel, to, n);
+                    
+                    to += nxfer;
+                    
+                    n -= nxfer;
+                    
+                    nwrites++;
             
 //            // Verify transfer is complete.
 //                if (nxfer != count) {
@@ -1818,8 +1834,10 @@ public class IndexSegmentBuilder {
 //
 //                }
 
+                }
+                
             }
-
+            
             /*
              * Update the position on the output channel since transferFrom does
              * NOT do this itself.

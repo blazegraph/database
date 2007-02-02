@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
+import it.unimi.dsi.mg4j.util.BloomFilter;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -121,9 +123,14 @@ public class BulkLoaderBuffer extends Buffer {
 
     /**
      * The error rate for the bloom filter or zero to disable.
-     * 
-     * FIXME the bloom filter is only required on the spo index! (and possibly
-     * on the terms index).  The bloom filter is QUITE EXPENSIVE to generate!
+     * <p>
+     * Note: The bloom filter is QUITE EXPENSIVE to generate and is not required
+     * for inference or common queries and it is therefore disabled at this
+     * time. If you need to enable this, you should look into the versions of
+     * the {@link BloomFilter} derived by the heritrix project since they put
+     * some effort into optimizing performance. Note that all keys are variable
+     * length byte[]s, so that is the only hash method that needs to be
+     * implemented by the bloom filter class.
      */
 //    double errorRate = IndexSegmentBuilder.DEFAULT_ERROR_RATE;
     double errorRate = 0d;
