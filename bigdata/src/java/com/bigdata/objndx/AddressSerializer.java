@@ -51,7 +51,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.bigdata.journal.Bytes;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Serializes each address as an unpacked long integer.

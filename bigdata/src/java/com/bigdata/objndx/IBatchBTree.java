@@ -56,7 +56,10 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME add batch api for rangeCount and rangeQuery.
+ * @see KeyBuilder, which may be used to encode one or more values into a
+ *      variable length unsigned byte[] key.
+ *      
+ * @todo add batch api for rangeCount and rangeQuery.
  * 
  * @todo support batch api for indexOf(), keyAt(), valueAt()?
  */

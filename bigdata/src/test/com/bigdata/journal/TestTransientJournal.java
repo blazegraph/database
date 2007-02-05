@@ -50,9 +50,11 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
+
+import com.bigdata.rawstore.AbstractRawStore2TestCase;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Test suite for {@link BufferMode#Transient} journals.
@@ -89,6 +91,9 @@ public class TestTransientJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestTransientJournal.class);
 
+        // test suite for the IRawStore api.
+        suite.addTestSuite( TestRawStore.class );
+
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
          * all the tests will run with the configuration specified in this test
@@ -120,12 +125,7 @@ public class TestTransientJournal extends AbstractTestCase {
 
         final Properties properties = getProperties();
 
-        properties.setProperty(Options.SLOT_SIZE,"128");
-
         Journal journal = new Journal(properties);
-
-        assertNotNull("slotMath", journal.slotMath);
-        assertEquals("slotSize", 128, journal.slotMath.slotSize);
 
         TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
 
@@ -134,9 +134,59 @@ public class TestTransientJournal extends AbstractTestCase {
         assertEquals(Options.BUFFER_MODE, BufferMode.Transient, bufferStrategy
                 .getBufferMode());
         assertNotNull("directBuffer", bufferStrategy.directBuffer);
-        assertEquals("", bufferStrategy.getExtent(),
+        assertEquals("userExtent", bufferStrategy.getExtent(), bufferStrategy
+                .getUserExtent());
+        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
                 bufferStrategy.directBuffer.capacity());
         
     }
         
+    
+    /**
+     * Test suite integration for {@link AbstractRawStore2TestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo While the transient store uses root blocks there is no means
+     *       currently defined to re-open a journal based on a transient store
+     *       and hence it is not possible to extend
+     *       {@link AbstractRestartSafeTestCase}.
+     */
+    public static class TestRawStore extends AbstractRawStore2TestCase {
+        
+        public TestRawStore() {
+            super();
+        }
+
+        public TestRawStore(String name) {
+            super(name);
+        }
+
+        public Properties getProperties() {
+
+            Properties properties = super.getProperties();
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+
+            return properties;
+
+        }
+
+        protected IRawStore getStore() {
+            
+            try {
+
+                return new Journal(getProperties());
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
+        }
+
+    }
+
 }

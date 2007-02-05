@@ -62,12 +62,12 @@ import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentFileStore;
 import com.bigdata.objndx.PO;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
@@ -250,7 +250,6 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * @param reader
      *                  the RDF/XML source
      */
-
     public void loadRdfXml( Reader reader ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();

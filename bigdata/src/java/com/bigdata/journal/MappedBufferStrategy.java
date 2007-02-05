@@ -3,6 +3,8 @@ package com.bigdata.journal;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
+import com.bigdata.rawstore.Addr;
+
 /**
  * <p>
  * Memory-mapped journal strategy (this mode is NOT recommended).
@@ -29,12 +31,17 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
     /**
      * A strongly typed reference to the buffer exposing memory-map specific
      * operations.
+     * <p>
+     * Note: The buffer is mapped onto the user extent from the first byte after
+     * the root blocks through the last byte of the file.  This means that we do
+     * not need to translate the offset of an {@link Addr address} when writing
+     * onto the buffer.
      */
     final MappedByteBuffer mappedBuffer;
     
-    MappedBufferStrategy(FileMetadata fileMetadata, SlotMath slotMath) {
+    MappedBufferStrategy(FileMetadata fileMetadata) {
         
-        super(BufferMode.Mapped, fileMetadata, slotMath);
+        super(BufferMode.Mapped, fileMetadata);
         
         this.mappedBuffer = (MappedByteBuffer) fileMetadata.buffer;
         
@@ -80,12 +87,25 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      * The file channel is closed, but according to
      * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038 there is no
      * way to guarentee when the mapped file will be released.
-     */
-    
+     */    
     public void close() {
         
         super.close();
         
     }
 
+    /**
+     * Note: Extension and truncation of a mapped file are not possible with the
+     * JDK since there is no way to guarentee that the mapped file will be
+     * unmapped in a timely manner.
+     * 
+     * @exception UnsupportedOperationException Always thrown.
+     */
+    public void truncate(long newExtent) {
+
+        throw new UnsupportedOperationException(
+                "Mapped file may not be extended or truncated.");
+        
+    }
+    
 }

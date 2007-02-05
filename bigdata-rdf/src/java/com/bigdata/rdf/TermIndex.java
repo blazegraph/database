@@ -52,13 +52,13 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.IRawStore;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.PO;
 import com.bigdata.objndx.UserDefinedFunction;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.rio.BulkRioLoader;
 
 /**
@@ -233,7 +233,7 @@ public class TermIndex extends BTree {
      */
     public TermIndex(IRawStore store, long metadataId) {
     
-        super(store, BTreeMetadata.read(BTree.getTransitionalRawStore(store),
+        super(store, BTreeMetadata.read(store,
                 metadataId), new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
                 DEFAULT_HARD_REF_QUEUE_SCAN));

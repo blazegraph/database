@@ -78,6 +78,8 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite("RDF");
 
         suite.addTestSuite( TestRdfKeyBuilder.class );
+     
+        suite.addTestSuite( TestRestartSafe.class );
         
         suite.addTestSuite( TestInsertRateStore.class);
 

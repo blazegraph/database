@@ -1,5 +1,7 @@
 package com.bigdata.objndx;
 
+import com.bigdata.util.TestChecksumUtility;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -37,6 +39,8 @@ public class TestAll extends TestCase {
         /*
          * test key encoding and comparison support.
          */
+        // test methods that compute the successor for various data types.
+        suite.addTestSuite( TestSuccessorUtil.class );
         // test low level variable length byte[] operations.
         suite.addTestSuite( TestBytesUtil.class );
         // test key encoding operations.
@@ -51,18 +55,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestKeyBufferSerializer.class );
         
         /*
-         * test store support.
-         * 
-         * @todo move most of this to the journal package.
+         * test record compression support.
          */
-        // test address encoding and decoding;
-        suite.addTestSuite( TestAddr.class );
-        // test memory-resident implementation of IRawStore2.
-        suite.addTestSuite( TestSimpleMemoryRawStore2.class );
-        // test file-based implementation of IRawStore2.
-        suite.addTestSuite( TestSimpleFileRawStore2.class );
-        // test classes that let us treat a ByteBuffer as an input/output stream.
-        suite.addTestSuite( TestByteBufferStreams.class );
         // test bulk data compression.
         suite.addTestSuite( TestRecordCompressor.class );
 
@@ -97,8 +91,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestFusedView.class );
         // test of user-defined functions.
         suite.addTestSuite( TestUserDefinedFunction.class );
-        // test checksum computations (used by serialization).
-        suite.addTestSuite( TestChecksumUtility.class );
         // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
         // test iterator semantics for visiting only "dirty" nodes or leaves.
@@ -128,6 +120,8 @@ public class TestAll extends TestCase {
          */
         // test the commit protocol. @todo expand tests.
         suite.addTestSuite( TestCommit.class );
+        // verify that a store may be re-opened and the data in the btree(s) is preserved.
+        suite.addTestSuite( TestRestartSafe.class );
 
         /*
          * use of btree to support transactional isolation.
@@ -181,7 +175,13 @@ public class TestAll extends TestCase {
          */
         
         /*
-         * partitioned indices.
+         * FIXME partitioned indices.
+         * 
+         * @todo test leaf search rule. The leaf search rule for the index
+         * partitions is the first entry having a key less than or equal to the
+         * search key. This search rule lets us locate the corresponding
+         * partition much as the node search rule lets us direct search to
+         * correct node or leaf in the the next level down of the btree.
          * 
          * @todo test overflow resulting in parition merge or split.
          * 

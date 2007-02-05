@@ -3,6 +3,8 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.rawstore.Addr;
+
 
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through
@@ -12,43 +14,47 @@ import java.nio.ByteBuffer;
  * @version $Id$
  * 
  * @see BufferMode#Direct
+ * 
+ * @todo modify to support aio (asynchronous io). aio can be supported with a
+ *       2nd thread that writes behind from the cache to the file. force() will
+ *       need to be modified to wait until the aio thread has caught up to the
+ *       nextOffset (i.e., has written all data that is dirty on the buffer).
  */
-
 public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
-    DirectBufferStrategy(FileMetadata fileMetadata, SlotMath slotMath) {
+    DirectBufferStrategy(FileMetadata fileMetadata) {
 
-        super(BufferMode.Direct,fileMetadata,slotMath);
+        super(BufferMode.Direct,fileMetadata);
 
     }
 
     /**
      * Extends the basic behavior to write through to the backing file.
      */
-    public void writeSlice(ISlotAllocation slots,ByteBuffer data) {
-        
+    public long write(ByteBuffer data) {
+
+        if (data == null)
+            throw new IllegalArgumentException("Buffer is null");
+
         /*
          * The #of bytes to be written (this is modified as a side effect by the
          * call to our superclass to we have to get it before we make that
          * call).
          */
         final int remaining = data.remaining();
-        
-        // Write on the buffer image.
-        super.writeSlice(slots, data);
+
+        final long addr = super.write(data);
 
         // Position the buffer on the current slot.
-        final int pos = journalHeaderSize + slotSize * slots.firstSlot();
+        final int offset = Addr.getOffset(addr);
 
         /*
          * Set limit to write just those bytes that were written on the buffer.
-         * This includes the slot header in addition to the data written onto
-         * the slot.
          */
-        directBuffer.limit( pos + remaining );
+        directBuffer.limit( offset + remaining );
         
         // Set position on the buffer.
-        directBuffer.position( pos );
+        directBuffer.position( offset );
 
         try {
 
@@ -59,7 +65,8 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              * memory buffer so that transfer to the disk cache should be
              * optimized by Java and the OS.
              */
-            final int nwritten = raf.getChannel().write(directBuffer,pos);
+            final int nwritten = raf.getChannel().write(directBuffer,
+                    headerSize + offset);
             
             assert nwritten == remaining;
             
@@ -70,55 +77,24 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
             throw new RuntimeException( ex );
             
         }
+        
+        return addr;
 
     }
     
-    /**
-     * Extends the basic behavior to write through to the backing file.
-     */
-    public void writeSlot(int slot, ByteBuffer data) {
-
-        /*
-         * The #of bytes to be written (this is modified as a side effect by the
-         * call to our superclass to we have to get it before we make that
-         * call).
-         */
-        final int remaining = data.remaining();
+    public void truncate(long newExtent) {
         
-        // Write on the buffer image.
-        super.writeSlot(slot, data);
-
-        // Position the buffer on the current slot.
-        final int pos = journalHeaderSize + slotSize * slot;
-
-        /*
-         * Set limit to write just those bytes that were written on the buffer.
-         * This includes the slot header in addition to the data written onto
-         * the slot.
-         */
-        directBuffer.limit( pos + remaining );
+        super.truncate(newExtent);
         
-        // Set position on the buffer.
-        directBuffer.position( pos );
-
         try {
 
-            /*
-             * Write on the backing file.
-             * 
-             * Note: We use the direct buffer as the source since it is a native
-             * memory buffer so that transfer to the disk cache should be
-             * optimized by Java and the OS.
-             */
-            final int nwritten = raf.getChannel().write(directBuffer,pos);
+            raf.setLength(newExtent);
             
-            assert nwritten == remaining;
+            System.err.println("Disk file: newLength="+newExtent);
             
-        }
-
-        catch( IOException ex ) {
+        } catch(IOException ex) {
             
-            throw new RuntimeException( ex );
+            throw new RuntimeException(ex);
             
         }
         

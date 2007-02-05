@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IRawStore;
+
 /**
  * A read-only store backed by a file. The section of the file containing
  * the index nodes may be fully buffered.
@@ -12,7 +15,7 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentFileStore implements IRawStore2 {
+public class IndexSegmentFileStore implements IRawStore {
 
     /**
      * A buffer containing the disk image of the nodes in the index segment.
@@ -94,6 +97,12 @@ public class IndexSegmentFileStore implements IRawStore2 {
         
     }
    
+    public boolean isStable() {
+        
+        return true;
+        
+    }
+    
     public void close() {
 
         if (!open)
@@ -110,12 +119,6 @@ public class IndexSegmentFileStore implements IRawStore2 {
         }
 
         open = false;
-
-    }
-
-    public void delete(long addr) {
-
-        throw new UnsupportedOperationException();
 
     }
 

@@ -6,6 +6,10 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
+import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IRawStore;
+
 /**
  * Used to persist metadata for a {@link BTree} so that a historical state may
  * be re-loaded from the store.
@@ -92,7 +96,7 @@ public class BTreeMetadata implements Serializable {
      * 
      * @return The address of the metadata record.
      */
-    protected long write(IRawStore2 store) {
+    protected long write(IRawStore store) {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -124,7 +128,7 @@ public class BTreeMetadata implements Serializable {
      *            
      * @return the metadata record.
      */
-    public static BTreeMetadata read(IRawStore2 store, long addr) {
+    public static BTreeMetadata read(IRawStore store, long addr) {
         
         ByteBuffer buf = store.read(addr,null);
         
@@ -152,7 +156,7 @@ public class BTreeMetadata implements Serializable {
 //     * 
 //     * @return The address of the metadata record.
 //     */
-//    protected long write(IRawStore2 store) {
+//    protected long write(IRawStore store) {
 //
 //        ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
 //
@@ -176,7 +180,7 @@ public class BTreeMetadata implements Serializable {
 //     * 
 //     * @return The persistent identifier of the root of the btree.
 //     */
-//    public BTreeMetadata(IRawStore2 store,long addrMetadata) {
+//    public BTreeMetadata(IRawStore store,long addrMetadata) {
 //
 //        assert store != null;
 //        

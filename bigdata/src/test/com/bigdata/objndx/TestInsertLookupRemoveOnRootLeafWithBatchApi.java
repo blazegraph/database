@@ -312,8 +312,10 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
-        // @todo validate in detail.
-        
+        // @todo verify in more detail.
+        assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
+                btree.entryIterator());
+                
     }
     
 }

@@ -47,21 +47,37 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 
+import org.CognitiveWeb.extser.LongPacker;
+
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.DefaultEvictionListener;
+import com.bigdata.objndx.IValueSerializer;
+import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.objndx.PO;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+
 /**
  * <p>
- * An object journal for very fast write absorbtion. The journal supports
- * concurrent fully isolated transactions and is designed to absorb writes
- * destined for a read-optimized database file. Writes are logically appended to
+ * An append-only persistence capable data structure supporting atomic commit and
+ * transactions.  Writes are logically appended to
  * the journal to minimize disk head movement.
  * </p>
+ *
  * <p>
  * The journal provides for fast migration of committed data to a read-optimized
  * database. Data may be migrated as soon as a transaction commits and only the
@@ -209,8 +225,6 @@ import java.util.Properties;
  * be relatively expensive.</li>
  * </ul>
  * 
- * FIXME Expand on latency and decision criteria for int64 assignments.
- * 
  * FIXME Expand on latency and decision criteria for notifying clients when
  * pages or objects of interest have been modified by another transaction that
  * has committed (or in the case of distributed workers on a single transaction,
@@ -221,15 +235,12 @@ import java.util.Properties;
  * of key ranges for a clustered index as part of the above. It is absolutely
  * essential that the total cost of clustered index operations remains efficient
  * in the distributed database, that clustered indices can be readily (in terms
- * of transaction isolation) and efficient (in terms of cost) split into and old
- * and a new segment (this may presume binary copy, which we don't really
+ * of transaction isolation) and efficiently (in terms of cost) split into and
+ * old and a new segment (this may presume binary copy, which we don't really
  * support!). The tool that we have to work with is the journal, which can
  * absorb writes while we split the segment. However it MAY be MUCH easier to
  * manage this when the native segment model is a key range rather than int64
  * OIDs.
- * 
- * FIXME Explore use of bloom filters in front of segments. How does this
- * interact with transaction isolation?
  * 
  * FIXME The disk writes are not being verified for the "direct" mode since we
  * are not testing restart and the journal is reading from an in-memory image.
@@ -244,32 +255,12 @@ import java.util.Properties;
  * spotty release of slots rather than releasing entire ranges written by some
  * transaction.
  * 
- * FIXME Migration of data to the read-optimized database means that the current
- * committed version is on the database. However, subsequent migration of
- * another version of the same data item can require the re-introduction of a
- * mapping into the object index IFF there are active transactions that can read
- * the now historical data version. This suggests that migration probably should
- * not remove the entry from the object index, but rather flag that the current
- * version is on the database. That flag can be cleared when the version is
- * replaced. This also suggests efficient lookup of prior versions is required.
- * 
  * FIXME The notion of a committed state needs to be captured by a persistent
  * structure in the journal until (a) there are no longer any active
  * transactions that can read from that committed state; and (b) the slots
  * allocated to that committed state have been released on the journal. Those
  * commit states need to be locatable on the journal, suggesting a record
  * written by PREPARE and finalized by COMMIT.
- * 
- * FIXME When is the most efficient time to migrate committed state to the read-
- * optimized database? How does this trade off system resources and latency?
- * 
- * FIXME I need to work through the conditional deallocation of slots using a
- * persistence capable slot allocation before putting more effort into a
- * persistence capable object index. I can do that by working through making the
- * store restart safe, even if the object index is a full serialization of a
- * hash table rather than incremental updates of a persistent btree. The commit
- * time will suck, but it will provide the design for conditional deallocation
- * and restart.
  * 
  * @todo Do we need to explicitly zero the allocated buffers? Are they already
  *       zeroed? How much do we actually need to write on them before the rest
@@ -313,9 +304,6 @@ import java.util.Properties;
  * @todo Flushing to disk on commit could be optional, e.g., if there are
  *       redundent journals then this is not required.
  * 
- * @todo cache index and allocation nodes regardless of the strategy since those
- *       are materialized objects.
- * 
  * @todo cache objects? They are materialized only for state-based validation.
  *       If possible, validation should occur in its own layer so that the basic
  *       store can handle IO using either byte[] or streams (allocated from a
@@ -325,33 +313,12 @@ import java.util.Properties;
  *       interesting things with it, including write it to disk with the
  *       appropriate file header and root blocks so that it becomes restartable.
  * 
- * @todo Make decision about whether or not id == 0 is allowed and whether or
- *       not ids are 32bit clean. The main purpose for the journal is part of
- *       bigdata and in that role it needs to absorb any within segment
- *       identifier that is legal for bigdata. If bigdata uses 32bit ids, then
- *       the journal must as well. However, I think that it is quite unlikely
- *       that bigdata will use a 32-bit within segment identifier with an int16
- *       page and int16 slot since the goal is to keep the #of pages in a
- *       segment down (this is true even for large (blob) segments since they
- *       just use large pages). When the journal is used as part of an embedded
- *       database, id == 0 is typically treated as null and disallowed. Thse
- *       only part of the code that depends on this in any way may be the object
- *       index which has a test for a "null" key value and needs to know the
- *       minimum and maximum key values. Other than that the constraint is just
- *       imposed by checks on read(), write() and delete() on the Journal and Tx
- *       classes.
- * 
  * FIXME Implement a read only transaction and write test suites for its
  * semantics, including both the inability to write (or delete) on the
  * transaction, the handling of pre-existing versions, and the non-duplication
  * of per-tx data structures.
  * 
- * FIXME Write test suites for the {@link TransactionServer} - this will prove
- * out the GC design.
- * 
- * FIXME Write a migration thread that just moves the data into another journal
- * or a jdbm instance. The point is to prove out the migration design in code
- * and with tests.
+ * FIXME Write test suites for the {@link TransactionServer}.
  * 
  * FIXME Write a test that performs an index split. This is one of the remaining
  * tricky issues and I want to work it through in more depth. Binary copy of the
@@ -364,15 +331,6 @@ import java.util.Properties;
  * structure that models a keyrange as sorted data on disk, i.e., the rows are
  * arranged in sorted order. As far as I can tell, these become the same thing
  * when a row is an index node is a sufficiently large page.
- * 
- * FIXME Consider a journal that combines log information destined for multiple
- * segments on the same host. With one journal per segment, we have sequential
- * access per journal but the head must seek from one journal to the next. With
- * one journal for N segments, there is less head seek time. This probably does
- * NOT make the basic concurrency control logic any more complex, but it
- * probably does make it more complex to move a segment from one host to
- * another. That can be handled by differentiating the host on which the data
- * resides on disk from the host serving requests for a segment.
  * 
  * FIXME I've been considering the problem of a distributed index more. A
  * mutiplexed journal holding segments for one or more clustered indices
@@ -473,31 +431,16 @@ import java.util.Properties;
  * 
  * @todo I need to revisit the assumptions for very large objects in the face of
  *       the recent / planned redesign.
- *       
- * @todo Can the backing file be opened in "append" mode?  Does that offer any
- *       performance benefits?
  */
-public class Journal implements IRawStore, IStore {
-
-    final SlotMath slotMath;
-    
-    public SlotMath getSlotMath() {
-        
-        return slotMath;
-        
-    }
+public class Journal implements IRawStore, IAtomicStore, IStore {
     
     /**
+     * A clone of the properties used to initialize the {@link Journal}.
+     */
+    final protected Properties properties;
+
+    /**
      * The implementation logic for the current {@link BufferMode}.
-     * 
-     * @todo Support dynamically changing the buffer mode or just require that
-     *       the journal be closed and opened under a new buffer mode? The
-     *       latter is much simpler, but the operation can potentially be
-     *       optimized when the data is already in memory. The most interesting
-     *       cases are promoting from a direct buffer strategy to a disk-only
-     *       strategy or from a transient strategy to a persistent strategy. It
-     *       is also interesting to back down from a memory mapped strategy (or
-     *       even a disk-only strategy) to one using a buffer.
      */
     final IBufferStrategy _bufferStrategy;
 
@@ -510,35 +453,25 @@ public class Journal implements IRawStore, IStore {
         
     }
 
-    private final IConflictResolver conflictResolver;
-    
-    /**
-     * The delegate that handles write-write conflict resolution during backward
-     * validation. The conflict resolver is expected to make a best attempt
-     * using data type specific rules to reconcile the state for two versions of
-     * the same persistent identifier. If the conflict can not be resolved, then
-     * validation will fail. State-based conflict resolution when combined with
-     * validation (aka optimistic locking) is capable of validating the greatest
-     * number of interleavings of transactions (aka serialization orders).
-     * 
-     * @return The conflict resolver to be applied during validation or
-     *         <code>null</code> iff no conflict resolution will be performed.
-     */
-    public IConflictResolver getConflictResolver() {
-        
-        return conflictResolver;
-        
-    }
-    
-    /**
-     * The object index.
-     */
-    final IObjectIndex objectIndex;
-    
-    /**
-     * The slot allocation index.
-     */
-    final ISlotAllocationIndex allocationIndex;
+//    private final IConflictResolver conflictResolver;
+//    
+//    /**
+//     * The delegate that handles write-write conflict resolution during backward
+//     * validation. The conflict resolver is expected to make a best attempt
+//     * using data type specific rules to reconcile the state for two versions of
+//     * the same persistent identifier. If the conflict can not be resolved, then
+//     * validation will fail. State-based conflict resolution when combined with
+//     * validation (aka optimistic locking) is capable of validating the greatest
+//     * number of interleavings of transactions (aka serialization orders).
+//     * 
+//     * @return The conflict resolver to be applied during validation or
+//     *         <code>null</code> iff no conflict resolution will be performed.
+//     */
+//    public IConflictResolver getConflictResolver() {
+//        
+//        return conflictResolver;
+//        
+//    }
 
     /**
      * Option controls how the journal behaves during a commit.
@@ -616,7 +549,7 @@ public class Journal implements IRawStore, IStore {
         
         Long id = tx.getId();
         
-        IStore tx2 = activeTx.remove(id);
+        ITx tx2 = activeTx.remove(id);
         
         if( tx2 == null ) throw new IllegalStateException("Not active: tx="+tx);
         
@@ -645,9 +578,9 @@ public class Journal implements IRawStore, IStore {
         
         Long id = tx.getId();
         
-        IStore txActive = activeTx.remove(id);
+        ITx txActive = activeTx.remove(id);
         
-        IStore txPrepared = preparedTx.remove(id);
+        ITx txPrepared = preparedTx.remove(id);
         
         if( txActive == null && txPrepared == null ) {
             
@@ -681,143 +614,143 @@ public class Journal implements IRawStore, IStore {
         
     }
     
-    /**
-     * <p>
-     * Deallocate slots for versions having a transaction timestamp less than or
-     * equal to <i>timestamp</i> that have since been overwritten (or deleted)
-     * by a committed transaction having a timestamp greater than <i>timestamp</i>.
-     * </p>
-     * <p>
-     * The criteria for deallocating historical versions is that (a) there is a
-     * more recent version; and (b) there is no ACTIVE (vs PENDING or COMPLETED)
-     * transaction which could read from that historical version. The journal
-     * does NOT locally have enough information to decide when it can swept
-     * historical versions written by a given transaction. This notice MUST come
-     * from a transaction service which has global knowledge of which
-     * transactions have PREPARED or ABORTED and can generate notices when all
-     * transactions before a given timestamp have been PREPARED or ABORTED. For
-     * example, a long running transaction can cause notice to be delayed for
-     * many short lived transactions that have since completed. Once the long
-     * running transaction completes, the transaction server can compute the
-     * largest timestamp value below which there are no active transactions and
-     * generate a single notice with that timestamp.
-     * </p>
-     * 
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @todo This operation MUST be extremely efficient.
-     * 
-     * @todo This method is exposed suposing a transaction service that will
-     *       deliver notice when the operation should be conducted based on
-     *       total knowledge of the state of all transactions running against
-     *       the distributed database. As such, it may have to scan the journal
-     *       to locate the commit record for transactions satisifying the
-     *       timestamp criteria.
-     */
-    void gcTx( long timestamp ) {
+//     /**
+//      * <p>
+//      * Deallocate slots for versions having a transaction timestamp less than or
+//      * equal to <i>timestamp</i> that have since been overwritten (or deleted)
+//      * by a committed transaction having a timestamp greater than <i>timestamp</i>.
+//      * </p>
+//      * <p>
+//      * The criteria for deallocating historical versions is that (a) there is a
+//      * more recent version; and (b) there is no ACTIVE (vs PENDING or COMPLETED)
+//      * transaction which could read from that historical version. The journal
+//      * does NOT locally have enough information to decide when it can swept
+//      * historical versions written by a given transaction. This notice MUST come
+//      * from a transaction service which has global knowledge of which
+//      * transactions have PREPARED or ABORTED and can generate notices when all
+//      * transactions before a given timestamp have been PREPARED or ABORTED. For
+//      * example, a long running transaction can cause notice to be delayed for
+//      * many short lived transactions that have since completed. Once the long
+//      * running transaction completes, the transaction server can compute the
+//      * largest timestamp value below which there are no active transactions and
+//      * generate a single notice with that timestamp.
+//      * </p>
+//      * 
+//      * @param timestamp
+//      *            The timestamp.
+//      * 
+//      * @todo This operation MUST be extremely efficient.
+//      * 
+//      * @todo This method is exposed suposing a transaction service that will
+//      *       deliver notice when the operation should be conducted based on
+//      *       total knowledge of the state of all transactions running against
+//      *       the distributed database. As such, it may have to scan the journal
+//      *       to locate the commit record for transactions satisifying the
+//      *       timestamp criteria.
+//      */
+//     void gcTx( long timestamp ) {
 
-//        * <p>
-//        * Note: Migration to the read-optimized database is NOT a pre-condition for
-//        * deallocation of historical versions - rather it enables us to remove the
-//        * <em>current</em> committed version from the journal.
-//        * </p>
+// //        * <p>
+// //        * Note: Migration to the read-optimized database is NOT a pre-condition for
+// //        * deallocation of historical versions - rather it enables us to remove the
+// //        * <em>current</em> committed version from the journal.
+// //        * </p>
 
-        /*
-         * FIXME Implement garbage collection of overwritten and unreachable
-         * versions. Without migration to a read-optimized database, GC by
-         * itself is NOT sufficient to allow us to deallocate versions that have
-         * NOT been overwritten and hence is NOT sufficient to allow us to
-         * discard historical transactions in their entirety.
-         * 
-         * Given a transaction Tn that overwrites one or more pre-existing
-         * versions, the criteria for deallocation of the overwritten versions
-         * are:
-         * 
-         * (A) Tn commits, hence its intention has been made persistent; and
-         * 
-         * (B) There are no active transactions remaining that started from a
-         * committed state before the commit state resulting from Tn, hence the
-         * versions overwritten by Tn are not visible to any active transaction.
-         * Any new transaction will read through the committed state produced by
-         * Tn and will perceive the new versions rather than the overwritten
-         * versions.
-         * 
-         * Therefore, once Tn commits (assuming it has overwritten at least one
-         * pre-existing version), we can add each concurrent transaction Ti that
-         * is still active when Tn commits to a set of transactions that must
-         * either validate or abort before we may GC(Tn). Since Tn has committed
-         * it is not possible for new transactions to be created that would have
-         * to be included in this set since any new transaction would start from
-         * the committed state of Tn or its successors in the serialization
-         * order. As transactions validate or abort they are removed from
-         * GC(Tn). When this set is empty, we garbage collect the pre-existing
-         * versions that were overwritten by Tn.
-         * 
-         * The sets GC(T) must be restart safe. Changes to the set can only
-         * occur when a transaction commits or aborts.  However, even the abort
-         * of a transaction MUST be noticable on restart.
-         * 
-         * A summary may be used that is the highest transaction timestamp for
-         * which Tn must wait before running GC(Tn).  That can be written once
-         * 
-         * 
-         * Note that multiple transactions may have committed, so we may find
-         * that Tn has successors in the commit/serialization order that also
-         * meet the above criteria. All such committed transactions may be
-         * processed at once, but they MUST be processed in their commit order.
-         * 
-         * Once those pre-conditions have been met the following algorithm is
-         * applied to GC the historical versions that were overwritten by Tn:
-         * 
-         * 1. For each write by Ti where n < i <= m that overwrote a historical
-         * version, deallocate the slots for that historical version. This is
-         * valid since there are no active transactions that can read from that
-         * historical state. The processing order for Ti probably does not
-         * matter, but in practice there may be a reason to choose the
-         * serialization or reverse serialization order
-         * 
-         * ---- this is getting closed but is not yet correct ----
-         * 
-         * All versions written by a given transaction have the timestamp of
-         * that transaction.
-         * 
-         * The committed transactions are linked by their commit records into a
-         * reverse serialization sequence.
-         * 
-         * Each committed transaction has an object index that is accessible
-         * from its commit record. The entries in this index are versions that
-         * were written (or deleted) by that transaction. This index reads
-         * through into the object index for the committed state of the journal
-         * from which the transaction was minted.
-         * 
-         * We could maintain in the entry information about the historical
-         * version that was overwritten. For example, its firstSlot or a run
-         * length encoding of the slots allocated to the historical version.
-         * 
-         * We could maintain an index for all overwritten versions from
-         * [timestamp + dataId] to [slotId] (or a run-length encoding of the
-         * slots on which the version was written). Given a timestamp, we would
-         * then do a key scan from the start of the index for all entries whose
-         * timestamp was less than or equal to the given timestamp. For each
-         * such entry, we would deallocate the version and delete the entry from
-         * the index.
-         * 
-         * tx0 : begin tx0 : write id0 (v0) tx0 : commit journal : deallocate <=
-         * tx0 (NOP since no overwritten versions)
-         * 
-         * tx1 : begin tx2 : begin tx1 : write id0 (v1) tx1 : commit journal :
-         * deallocate <= tx1 (MUST NOT BE GENERATED since dependencies exist :
-         * tx1 and tx0 both depend on the committed state of tx0 -- sounds like
-         * lock style dependencies for deallocation !) tx2 : commit journal :
-         * deallocate <= tx2
-         * 
-         * index:: [ tx0 : id0 ] : v0 [ tx1 : id1 ] : v1
-         * 
-         * keyscan <= tx2
-         */
+//         /*
+//          * FIXME Implement garbage collection of overwritten and unreachable
+//          * versions. Without migration to a read-optimized database, GC by
+//          * itself is NOT sufficient to allow us to deallocate versions that have
+//          * NOT been overwritten and hence is NOT sufficient to allow us to
+//          * discard historical transactions in their entirety.
+//          * 
+//          * Given a transaction Tn that overwrites one or more pre-existing
+//          * versions, the criteria for deallocation of the overwritten versions
+//          * are:
+//          * 
+//          * (A) Tn commits, hence its intention has been made persistent; and
+//          * 
+//          * (B) There are no active transactions remaining that started from a
+//          * committed state before the commit state resulting from Tn, hence the
+//          * versions overwritten by Tn are not visible to any active transaction.
+//          * Any new transaction will read through the committed state produced by
+//          * Tn and will perceive the new versions rather than the overwritten
+//          * versions.
+//          * 
+//          * Therefore, once Tn commits (assuming it has overwritten at least one
+//          * pre-existing version), we can add each concurrent transaction Ti that
+//          * is still active when Tn commits to a set of transactions that must
+//          * either validate or abort before we may GC(Tn). Since Tn has committed
+//          * it is not possible for new transactions to be created that would have
+//          * to be included in this set since any new transaction would start from
+//          * the committed state of Tn or its successors in the serialization
+//          * order. As transactions validate or abort they are removed from
+//          * GC(Tn). When this set is empty, we garbage collect the pre-existing
+//          * versions that were overwritten by Tn.
+//          * 
+//          * The sets GC(T) must be restart safe. Changes to the set can only
+//          * occur when a transaction commits or aborts.  However, even the abort
+//          * of a transaction MUST be noticable on restart.
+//          * 
+//          * A summary may be used that is the highest transaction timestamp for
+//          * which Tn must wait before running GC(Tn).  That can be written once
+//          * 
+//          * 
+//          * Note that multiple transactions may have committed, so we may find
+//          * that Tn has successors in the commit/serialization order that also
+//          * meet the above criteria. All such committed transactions may be
+//          * processed at once, but they MUST be processed in their commit order.
+//          * 
+//          * Once those pre-conditions have been met the following algorithm is
+//          * applied to GC the historical versions that were overwritten by Tn:
+//          * 
+//          * 1. For each write by Ti where n < i <= m that overwrote a historical
+//          * version, deallocate the slots for that historical version. This is
+//          * valid since there are no active transactions that can read from that
+//          * historical state. The processing order for Ti probably does not
+//          * matter, but in practice there may be a reason to choose the
+//          * serialization or reverse serialization order
+//          * 
+//          * ---- this is getting closed but is not yet correct ----
+//          * 
+//          * All versions written by a given transaction have the timestamp of
+//          * that transaction.
+//          * 
+//          * The committed transactions are linked by their commit records into a
+//          * reverse serialization sequence.
+//          * 
+//          * Each committed transaction has an object index that is accessible
+//          * from its commit record. The entries in this index are versions that
+//          * were written (or deleted) by that transaction. This index reads
+//          * through into the object index for the committed state of the journal
+//          * from which the transaction was minted.
+//          * 
+//          * We could maintain in the entry information about the historical
+//          * version that was overwritten. For example, its firstSlot or a run
+//          * length encoding of the slots allocated to the historical version.
+//          * 
+//          * We could maintain an index for all overwritten versions from
+//          * [timestamp + dataId] to [slotId] (or a run-length encoding of the
+//          * slots on which the version was written). Given a timestamp, we would
+//          * then do a key scan from the start of the index for all entries whose
+//          * timestamp was less than or equal to the given timestamp. For each
+//          * such entry, we would deallocate the version and delete the entry from
+//          * the index.
+//          * 
+//          * tx0 : begin tx0 : write id0 (v0) tx0 : commit journal : deallocate <=
+//          * tx0 (NOP since no overwritten versions)
+//          * 
+//          * tx1 : begin tx2 : begin tx1 : write id0 (v1) tx1 : commit journal :
+//          * deallocate <= tx1 (MUST NOT BE GENERATED since dependencies exist :
+//          * tx1 and tx0 both depend on the committed state of tx0 -- sounds like
+//          * lock style dependencies for deallocation !) tx2 : commit journal :
+//          * deallocate <= tx2
+//          * 
+//          * index:: [ tx0 : id0 ] : v0 [ tx1 : id1 ] : v1
+//          * 
+//          * keyscan <= tx2
+//          */
         
-    }
+//     }
     
 //    /**
 //     * The transaction identifier of the last transaction begun on this journal.
@@ -883,29 +816,24 @@ public class Journal implements IRawStore, IStore {
      *       buffer (since the buffer does not pre-exist by definition); (c)
      *       that read-only mode reports an error if the file does not
      *       pre-exist; and (d) that you can not write on a read-only journal.
-     * 
-     * @todo Caller should start migration thread.
-     * 
-     * @todo Caller should provide network interface and distributed commit
-     *       support.
      */
-    
     public Journal(Properties properties) throws IOException {
-        
-        long segment;
-        int slotSize;
+                
+        int segmentId;
         long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
-        int objectIndexSize = Options.DEFAULT_OBJECT_INDEX_SIZE;
+        boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
         boolean create = Options.DEFAULT_CREATE;
         boolean readOnly = Options.DEFAULT_READ_ONLY;
         boolean deleteOnClose = Options.DEFAULT_DELETE_ON_CLOSE;
         ForceEnum forceWrites = Options.DEFAULT_FORCE_WRITES;
         ForceEnum forceOnCommit = Options.DEFAULT_FORCE_ON_COMMIT;
         
-        Class conflictResolverClass = null;
+//        Class conflictResolverClass = null;
         String val;
 
         if( properties == null ) throw new IllegalArgumentException();
+
+        this.properties = properties = (Properties) properties.clone();
 
         /*
          * "bufferMode" mode. Note that very large journals MUST use the
@@ -918,6 +846,18 @@ public class Journal implements IRawStore, IStore {
             val = BufferMode.Direct.toString();
 
         BufferMode bufferMode = BufferMode.parse(val);
+
+        /*
+         * "useDirectBuffers"
+         */
+
+        val = properties.getProperty(Options.USE_DIRECT_BUFFERS);
+        
+        if( val != null ) {
+
+            useDirectBuffers = Boolean.parseBoolean(val);
+            
+        }
 
         /*
          * "segment".
@@ -939,35 +879,7 @@ public class Journal implements IRawStore, IStore {
             
         }
 
-        segment = Long.parseLong(val);
-        
-        /*
-         * "slotSize"
-         */
-
-        val = properties.getProperty(Options.SLOT_SIZE);
-
-        if (val == null) {
-         
-            val = "128";
-            
-        }
-
-        slotSize = Integer.parseInt(val);
-
-        if (slotSize < Options.MIN_SLOT_SIZE ) {
-
-            throw new RuntimeException("'" + Options.SLOT_SIZE
-                    + "' must be at least " + Options.MIN_SLOT_SIZE
-                    + ", but found " + slotSize);
-
-        }
-
-        /*
-         * Helper object for slot-based computations.
-         */
-        
-        this.slotMath = new SlotMath(slotSize);
+        segmentId = Integer.parseInt(val);
 
         /*
          * "initialExtent"
@@ -1029,29 +941,6 @@ public class Journal implements IRawStore, IStore {
         this.forceOnCommit = forceOnCommit;
         
         /*
-         * "objectIndexSize"
-         */
-
-        val = properties.getProperty(Options.OBJECT_INDEX_SIZE);
-        
-        if( val != null ) {
-
-            objectIndexSize = Integer.parseInt(val);
-
-            if (objectIndexSize < Options.MIN_OBJECT_INDEX_SIZE
-                    || objectIndexSize > Options.MAX_OBJECT_INDEX_SIZE) {
-
-                throw new RuntimeException("'"
-                        + Options.DEFAULT_OBJECT_INDEX_SIZE + "' must be in ["
-                        + Options.MIN_OBJECT_INDEX_SIZE + ":"
-                        + Options.MAX_OBJECT_INDEX_SIZE + "], but found "
-                        + objectIndexSize);
-                
-            }
-            
-        }
-
-        /*
          * "deleteOnClose"
          */
 
@@ -1065,42 +954,42 @@ public class Journal implements IRawStore, IStore {
         
         this.deleteOnClose = deleteOnClose;
 
-        /*
-         * "conflictResolver"
-         */
-
-        val = properties.getProperty(Options.CONFLICT_RESOLVER);
-        
-        if( val != null ) {
-
-            try {
-
-                conflictResolverClass = getClass().getClassLoader().loadClass(val);
-
-                if (!IConflictResolver.class
-                        .isAssignableFrom(conflictResolverClass)) {
-
-                    throw new RuntimeException(
-                            "Conflict resolver does not implement: "
-                                    + IConflictResolver.class
-                                    + ", name=" + val);
-
-                }
-
-            } catch (ClassNotFoundException ex) {
-
-                throw new RuntimeException(
-                        "Could not load conflict resolver class: name=" + val
-                                + ", " + ex, ex);
-                
-            }
-
-            /*
-             * Note: initialization of the conflict resolver is delayed until
-             * the journal is fully initialized.
-             */
-            
-        }
+//        /*
+//         * "conflictResolver"
+//         */
+//
+//        val = properties.getProperty(Options.CONFLICT_RESOLVER);
+//        
+//        if( val != null ) {
+//
+//            try {
+//
+//                conflictResolverClass = getClass().getClassLoader().loadClass(val);
+//
+//                if (!IConflictResolver.class
+//                        .isAssignableFrom(conflictResolverClass)) {
+//
+//                    throw new RuntimeException(
+//                            "Conflict resolver does not implement: "
+//                                    + IConflictResolver.class
+//                                    + ", name=" + val);
+//
+//                }
+//
+//            } catch (ClassNotFoundException ex) {
+//
+//                throw new RuntimeException(
+//                        "Could not load conflict resolver class: name=" + val
+//                                + ", " + ex, ex);
+//                
+//            }
+//
+//            /*
+//             * Note: initialization of the conflict resolver is delayed until
+//             * the journal is fully initialized.
+//             */
+//            
+//        }
 
         /*
          * Create the appropriate IBufferStrategy object.
@@ -1121,12 +1010,24 @@ public class Journal implements IRawStore, IStore {
             
             }
 
-            _bufferStrategy = new TransientBufferStrategy(slotMath,
-                    initialExtent);
+            _bufferStrategy = new TransientBufferStrategy(useDirectBuffers,initialExtent);
 
-            // FIXME Refactor code for bootstrapping the root block and use it
-            // here also.
-            this._rootBlock = null;
+            /*
+             * setup the root blocks.
+             */
+            final int nextOffset = 0;
+            final long firstTxId = 0L;
+            final long lastTxId = 0L;
+            final long commitCounter = 0L;
+            final long[] rootIds = new long[ RootBlockView.MAX_ROOT_ADDRS ];
+            IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
+                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
+            IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
+                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
+            _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
+            _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
+
+            this._rootBlock = rootBlock1;
             
             break;
             
@@ -1152,11 +1053,11 @@ public class Journal implements IRawStore, IStore {
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segment, file,
-                    BufferMode.Direct, initialExtent, slotSize,
-                    objectIndexSize, create, readOnly, forceWrites);
+            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+                    BufferMode.Direct, useDirectBuffers, initialExtent, create,
+                    readOnly, forceWrites);
 
-            _bufferStrategy = new DirectBufferStrategy(fileMetadata, slotMath);
+            _bufferStrategy = new DirectBufferStrategy(fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1185,11 +1086,11 @@ public class Journal implements IRawStore, IStore {
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segment, file,
-                    BufferMode.Mapped, initialExtent, slotSize,
-                    objectIndexSize, create, readOnly, forceWrites);
+            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+                    BufferMode.Mapped, useDirectBuffers, initialExtent,
+                    create, readOnly, forceWrites);
 
-            _bufferStrategy = new MappedBufferStrategy(fileMetadata, slotMath);
+            _bufferStrategy = new MappedBufferStrategy(fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1218,11 +1119,11 @@ public class Journal implements IRawStore, IStore {
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segment, file,
-                    BufferMode.Disk, initialExtent, slotSize, objectIndexSize,
+            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+                    BufferMode.Disk, useDirectBuffers, initialExtent,
                     create, readOnly, forceWrites);
             
-            _bufferStrategy = new DiskOnlyStrategy(fileMetadata, slotMath);
+            _bufferStrategy = new DiskOnlyStrategy(fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
             
@@ -1235,64 +1136,43 @@ public class Journal implements IRawStore, IStore {
             throw new AssertionError();
         
         }
-        
-        /*
-         * An index of the free and used slots in the journal.
-         * 
-         * FIXME For any of the file-backed modes we need to read the slot
-         * allocation index and the object index from the file.
-         * 
-         * FIXME This needs to be refactored to be a persistent data structure.
-         * 
-         * FIXME We need to set _nextSlot based on the persistent slot
-         * allocation index chain.
-         */
-        allocationIndex = new SimpleSlotAllocationIndex(slotMath,
-                _bufferStrategy.getSlotLimit());
 
         /*
-         * FIXME Change this to use the persistence capable object index, which
-         * currently lacks an entryIterator supporting remove().  This could be
-         * overcome either by using a transient (concurrent) hash map for the tx
-         * isolation level rather than a persistence capable btree or by adding
-         * support for traversal under concurrent modification to the BTree.  I
-         * am also considering a drastic refactor in which the existing concept
-         * of the IObjectIndex is discarded in favor of some new interfaces.
+         * Give the store a chance to set any committers that it defines.
          */
-//        objectIndex = new ObjectIndex(this,allocationIndex);
-        objectIndex = new SimpleObjectIndex(allocationIndex);
+        setupCommitters();
         
-        /*
-         * Initialize the conflict resolver.
-         */
-        
-        if( conflictResolverClass != null ) {
-
-            try {
-
-                Constructor ctor = conflictResolverClass
-                        .getConstructor(new Class[] { Journal.class });
-
-                this.conflictResolver = (IConflictResolver) ctor
-                        .newInstance(new Object[] { this });
-                
-            }
-
-            catch (Exception ex) {
-
-                throw new RuntimeException("Conflict resolver: " + ex, ex);
-
-            }
-            
-        } else {
-            
-            /*
-             * The journal will not attempt to resolve write-write conflicts.
-             */
-            
-            this.conflictResolver = null;
-            
-        }
+//        /*
+//         * Initialize the conflict resolver.
+//         */
+//        
+//        if( conflictResolverClass != null ) {
+//
+//            try {
+//
+//                Constructor ctor = conflictResolverClass
+//                        .getConstructor(new Class[] { Journal.class });
+//
+//                this.conflictResolver = (IConflictResolver) ctor
+//                        .newInstance(new Object[] { this });
+//                
+//            }
+//
+//            catch (Exception ex) {
+//
+//                throw new RuntimeException("Conflict resolver: " + ex, ex);
+//
+//            }
+//            
+//        } else {
+//            
+//            /*
+//             * The journal will not attempt to resolve write-write conflicts.
+//             */
+//            
+//            this.conflictResolver = null;
+//            
+//        }
 
 //        /*
 //         * FIXME This is NOT restart safe. We need to store the state on the
@@ -1304,7 +1184,7 @@ public class Journal implements IRawStore, IStore {
     }
     
     /**
-     * Shutdown the journal.
+     * Shutdown the journal politely.
      * 
      * @exception IllegalStateException
      *                if there are active transactions.
@@ -1320,8 +1200,8 @@ public class Journal implements IRawStore, IStore {
      *       interface, probably by declaring a variant that accepts parameters
      *       specifying how to handle the shutdown (immediate vs wait).
      */
-    public void close() {
-        
+    public void shutdown() {
+
         assertOpen();
 
         final int nactive = activeTx.size();
@@ -1339,7 +1219,19 @@ public class Journal implements IRawStore, IStore {
             throw new IllegalStateException("There are "+nprepare+" prepared transactions.");
             
         }
+
+        // close immediately.
+        close();
         
+    }
+
+    /**
+     * Close immediately.
+     */
+    public void close() {
+    
+        assertOpen();
+                
         _bufferStrategy.close();
         
         if( deleteOnClose ) {
@@ -1352,6 +1244,7 @@ public class Journal implements IRawStore, IStore {
             _bufferStrategy.deleteFile();
             
         }
+        
         
     }
     
@@ -1371,6 +1264,12 @@ public class Journal implements IRawStore, IStore {
         
     }
     
+    public boolean isStable() {
+        
+        return _bufferStrategy.isStable();
+        
+    }
+    
     /**
      * <p>
      * Extend the journal by at least this many bytes. The actual number of
@@ -1384,662 +1283,568 @@ public class Journal implements IRawStore, IStore {
      * 
      * @param minBytes
      *            The minimum #of bytes to extend the journal.
-     * 
-     * FIXME Implement the ability to extend the journal. The
-     * {@link #_bufferStrategy} and {@link #allocationIndex} are both effected
-     * by this operation. If the new extent would exceed the limits of the
-     * current strategy, then this operation requires changing to a
-     * {@link BufferMode#Disk} buffer strategy.
-     * 
-     * FIXME Implement the ability to transparently change the buffer mode. For
-     * example, the journal comes only using a disk-only mode (paged, low memory
-     * burden) but access starts to heat up. We need to be able to convert
-     * access to direct without forcing restart of the journal. There could be a
-     * similar conversion to a special "transient" mode in which redundent
-     * servers provide restart safety for even high performance. Likewise, we
-     * should be able to reduce the resource consumption of the journal at any
-     * time by converting from direct to disk-only.
      */
     public void extend( int minBytes ) {
         
         throw new UnsupportedOperationException();
         
     }
-    
-    /**
-     * Insert the data into the store and associate it with the persistent
-     * identifier from which the data can be retrieved (non-transactional).
-     */
-    public void write(int id,ByteBuffer data) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-        
-        assertOpen();
-
-        /*
-         * Write the data onto the journal and obtain the slots onto which the
-         * data was written.
-         */
-        ISlotAllocation slots = write(data);
-
-        /*
-         * Update the object index so that the current data version is mapped
-         * onto the slots on which the data was just written.
-         */
-
-        objectIndex.put(id, slots);
-
-    }
-    
-    /**
-     * Write the data on the journal. This method is not isolated and does not
-     * update the object index. It operates directly on the slots in the journal
-     * and returns a {@link ISlotAllocation} that may be used to recover the
-     * data.
-     * 
-     * @param data
-     *            The data. The bytes from the current position to the limit
-     *            (exclusive) will be written onto the journal. The position
-     *            will be updated as a side effect. An attempt will be made to
-     *            write the data onto a contiguous run of slots.
-     * 
-     * @return A {@link ISlotAllocation} representing the slots on which the
-     *         data was written. This may be used to read the data back from the
-     *         journal.
-     * 
-     * @todo Since we try hard to use contiguous slot runs, that has
-     *       implications for the best way to encode the {@link ISlotAllocation}.
-     *       If we require contiguous runs, then all we need is the firstSlot
-     *       and the size (in bytes) of the allocation (4 bytes tops).
-     * 
-     * FIXME WRITE and READ with contiguous slot allocations should bulk get /
-     * put all the data at once rather than performing one operation per slot.
-     */
-    public ISlotAllocation write(ByteBuffer data) {
-        
-        assertOpen();
-
-        if( data == null ) {
-            
-            throw new IllegalArgumentException("data is null");
-            
-        }
-        
-        // #of bytes of data that fit in a single slot. @todo move onto the journal.
-        final int slotSize = slotMath.slotSize;
-
-        // #of bytes to be written.
-        int remaining = data.remaining();
-        
-        /*
-         * Verify that there is some data to be written. While nothing really
-         * prevents writing empty records, this is a useful test for "gotcha's"
-         * when the caller has not setup the buffer correctly for the write.
-         */
-        if( remaining == 0 ) {
-            
-            throw new IllegalArgumentException(
-                    "No bytes remaining in data buffer.");
-            
-        }
-        
-        // Total size of the data in bytes.
-        final int nbytes = remaining;
-
-        /*
-         * Obtain an allocation of slots sufficient to write this many bytes
-         * onto the journal.
-         */
-        ISlotAllocation slots = allocationIndex.alloc( nbytes );
-        
-        if( slots == null ) {
-            
-            extend( nbytes );
-            
-            slots = allocationIndex.alloc(nbytes);
-            
-            if( slots == null ) {
-                
-                /*
-                 * There should always be enough space after an extension.
-                 */
-                
-                throw new AssertionError();
-                
-            }
-            
-        }
-
-        // current position on source.
-        int pos = data.position();
-        
-        // starting position -- used to test post-conditions.
-        final int startingPosition = pos;
-
-        /*
-         * Write data onto the allocated slots.
-         */
-        for( int slot=slots.firstSlot(); slot != -1; slot=slots.nextSlot() ) {
-
-            assert(allocationIndex.isAllocated(slot));
-
-            // #of bytes to write onto this slot.
-            final int thisCopy = remaining > slotSize ? slotSize : remaining; 
-            
-            // Set limit on data to be written on the slot.
-            data.limit( pos + thisCopy );
-
-            // write data on the slot.
-            _bufferStrategy.writeSlot(slot, data);
-
-            // Update #of bytes remaining in data.
-            remaining -= thisCopy;
-
-            // Update the position.
-            pos += thisCopy;
-
-            // post-condition tests.
-            assert pos == data.position();
-            assert data.position() == data.limit();
-                        
-        }
-
-        assert pos == startingPosition + nbytes;
-        assert data.position() == pos;
-        assert data.limit() == pos;
-
-        // The slots on which the data were written.
-        return slots;
-        
-    }
-    
-    /**
-     * <p>
-     * Read the data from the store (non-transactional).
-     * </p>
-     */
-    public ByteBuffer read(int id, ByteBuffer dst ) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-
-        assertOpen();
-        
-        ISlotAllocation slots = objectIndex.get(id);
-        
-        if( slots == null ) return null;
-        
-        return read( slots, dst );
-        
-    }
-    
-    /**
-     * Reads data from the slot allocation in sequence, assembling the result in
-     * a buffer. This method is not isolated.
-     * 
-     * @param slots
-     *            The slots whose data will be read.
-     * @param dst
-     *            The destination buffer (optional). When specified, the data
-     *            will be appended starting at the current position. If there is
-     *            not enough room in the buffer then a new buffer will be
-     *            allocated and used for the read operation. In either case, the
-     *            position will be advanced as a side effect and the limit will
-     *            equal the final position.
-     * 
-     * @return The data read from those slots. A new buffer will be allocated if
-     *         <i>dst</i> is <code>null</code> -or- if the data will not fit
-     *         in the provided buffer.
-     * 
-     * FIXME WRITE and READ with contiguous slot allocations should bulk get /
-     * put all the data at once rather than performing one operation per slot.
-     * The code for this partly exists as readSlice() and writeSlice() on
-     * {@link BasicBufferStrategy}. Refactor those methods into the
-     * {@link IBufferStrategy} interface and deprecate the readSlot() and
-     * writeSlot() methods (which could provide alternative implementations of
-     * the slots methods based on the read() and write() methods in the Journal
-     * class if we allowed non-contiguous allocations).
-     * 
-     * FIXME {@link SimpleSlotAllocationIndex} is WAY TO SLOW.
-     */
-    public ByteBuffer read(ISlotAllocation slots, ByteBuffer dst) {
-
-        assertOpen();
-
-        // #of bytes in a slot.
-        final int slotSize = slotMath.slotSize;
-        
-        // The #of bytes to be read.
-        final int nbytes = slots.getByteCount();
-        
-        /*
-         * The starting position on the destination buffer.
-         */
-        final int startingPosition;
-        
-        /*
-         * Verify that the destination buffer exists and has sufficient
-         * remaining capacity.
-         */
-        if (dst == null || dst.remaining() < nbytes) {
-
-//            if( _bufferStrategy instanceof BasicBufferStrategy ) {
-//                
-//                /*
-//                 * For direct buffered modes (including "transient", "direct",
-//                 * and "mapped"), we just return a read-only slice of the
-//                 * buffer.
-//                 * 
-//                 * Note: This relies on the assumption that slot allocations are
-//                 * contiguous.
-//                 */
-//                
-//                return ((BasicBufferStrategy)_bufferStrategy).getSlice(slots);
-//                
-//            } else {
-
-                /*
-                 * Allocate a destination buffer to size.
-                 * 
-                 * @todo Allocate from a pool?
-                 */
-            
-                dst = ByteBuffer.allocate(nbytes);
-            
-//            }
-            
-            startingPosition = 0;
-            
-        } else {
-            
-            startingPosition = dst.position();
-            
-        }
-        
-        // Set the limit on the copy operation.
-        dst.limit( startingPosition + nbytes );
-
-        /*
-         * Read the data into the buffer.
-         */
-
-        int slotsRead = 0;
-        
-        int remaining = nbytes;
-        
-        int pos = startingPosition;
-        
-        for( int slot=slots.firstSlot(); slot != -1; slot = slots.nextSlot() ) {
-
-            // Verify that this slot has been allocated.
-            assert( allocationIndex.isAllocated(slot) );
-
-            /*
-             * In this operation we copy no more than the remaining bytes and no
-             * more than the data available in the slot.
-             */
-            final int thisCopy = remaining > slotSize ? slotSize : remaining; 
-
-            dst.limit(pos + thisCopy);
-            
-            // Append the data into the buffer.
-            _bufferStrategy.readSlot(slot, dst);
-
-            pos += thisCopy;
-            
-            remaining -= thisCopy;
-            
-            slotsRead++;
-            
-        }
-        
-        if (dst.limit() - startingPosition != nbytes) {
-
-            throw new AssertionError("Expected to read " + nbytes + " bytes in "
-                    + slots.getSlotCount() + " slots, but read=" + dst.limit()
-                    + " bytes over " + slotsRead + " slots");
-            
-        }
-
-        dst.position( startingPosition );
-        
-        return dst;
-        
-    }
-
-    /**
-     * Delete the data from the store (non-transactional).
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * 
-     * @exception DataDeletedException
-     *                if the persistent identifier is already deleted.
-     * 
-     * @todo This notion of deleting probably interfers with the ability to
-     *       latter reuse the same persistent identifier for new data. Explore
-     *       the scope of such interference and its impact on the read-optimized
-     *       database. Can we get into a situation with persistent identifier
-     *       exhaustion for some logical page? {@link Tx#delete(int)} does
-     *       basically the same thing.
-     */
-    public void delete(int id) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-
-        assertOpen();
-
-        // No isolation.
-        objectIndex.delete(id );
-            
-    }
-
-    /**
-     * Immediately deallocates the slot allocation (no isolation).
-     * 
-     * @param slots
-     *            The slot allocation.
-     */
-    public void delete(ISlotAllocation slots) {
-
-        allocationIndex.clear(slots);
-        
-    }
-    
-    /**
-     * Writes the new data on the journal and deallocates the old data. This
-     * low-level method is NOT isolated and SHOULD NOT be used for general
-     * purpose applications. The change is NOT restart safe unless (a) the new
-     * allocation is reachable from the root block; and (b) you write a new root
-     * block that can access the new allocation.
-     * 
-     * @param oldSlots
-     *            The old slots (required). The caller MUST take care that this
-     *            is in fact the slots on which the current version of the data
-     *            is written.
-     * @param data
-     *            The new version of the data (required).
-     * 
-     * @return The slots on which the new version of the data is written.
-     * 
-     * @todo The slots deallocated by this method need to be with held from
-     *       reallocation until the next commit or there is the danger that the
-     *       contents of those slots may have changed while the slots are not
-     *       reachable if the restart occurs before the next root block is
-     *       written. This might be automagically handled by multi-state values
-     *       for the slot allocation index entries (deallocated, vs allocated,
-     *       vs allocated+commited, vs conditionally-deallocated).
-     * 
-     * @deprecated Is this method required?
-     */
-    public ISlotAllocation update(ISlotAllocation oldSlots,ByteBuffer data) {
-        
-        ISlotAllocation newSlots = write(data);
-        
-        allocationIndex.clear(oldSlots);
-        
-        return newSlots;
-        
-    }
-
-//    /*
-//     * Low-level interface for non-isolated reads, writes of objects (vs
-//     * ByteBuffer's) using the extensible serialization API.
-//     */
-//    
-//    /**
-//     * Write an object on the store (no isolation). This method does NOT use the
-//     * object index. The caller MUST explicitly manage the store. Normally this
-//     * consists of ensuring that the object is recoverable from metadata in a
-//     * root block or a commit record. For example, the {@link IObjectIndex} uses
-//     * this method to store its nodes. The root node of the current object index
-//     * is stored in the commit record.
-//     * 
-//     * @param obj
-//     *            The object to be inserted into the store (required). The
-//     *            object will be serialized using the extSer package.
-//     * 
-//     * @return The <em>journal local</em> persistent identifier assigned to
-//     *         the object. This is simply a compact encoding of the
-//     *         {@link ISlotAllocation} on which the object is written.
-//     */
-//    public long _insertObject(Object obj) {
-//
-//        if( obj == null ) throw new IllegalArgumentException();
-//
-//        try {
-//
-//            return write(
-//                ByteBuffer.wrap(getExtensibleSerializer()
-//                .serialize(0, obj))).toLong();
-//            
-//        }
-//        
-//        catch(IOException ex ) {
-//
-//            throw new RuntimeException(ex);
-//            
-//        }
-//        
-//    }
-//    
-//    /**
-//     * Fetch an object from the store (no isolation). This operation is
-//     * unchecked. As long as the identifier decodes into a
-//     * {@link ISlotAllocation} the contents of that slot allocation will be read
-//     * into a buffer and an attempt will be made to deserialize the buffer into
-//     * an object using the extSer package.
-//     * 
-//     * @param id
-//     *            The <em>journal local</em> persistent identifier for the
-//     *            object.
-//     * 
-//     * @return The object.
-//     */
-//    public Object _readObject( long id ) {
-//    
-//        ByteBuffer tmp = read( slotMath.toSlots(id), null );
-//
-//        try {
-//
-//            return getExtensibleSerializer().deserialize(id, tmp.array() );
-//            
-//        }
-//        
-//        catch(IOException ex ) {
-//
-//            throw new RuntimeException(ex);
-//            
-//        }
-//
-//    }
-//    
-//    /**
-//     * Update an object in the store (no isolation). The object will serialized
-//     * using the extSer package and the resulting byte[] will be written onto a
-//     * new {@link ISlotAllocation}. That allocation will be converted into a
-//     * long integer by {@link SlotMath#toLong(ISlotAllocation)} and the
-//     * resulting long integer value is returned to the caller.
-//     * 
-//     * @param id
-//     *            The <em>journal local</em> persistent identifier for the
-//     *            current version of the object. The slots allocated to the
-//     *            object will be deallocated, releasing the space on the store.
-//     *            (This deallocation operation is unchecked. As long as the
-//     *            identifier decodes into a {@link ISlotAllocation}, the slot
-//     *            allocation will be deallocated.)
-//     * 
-//     * @param obj
-//     *            The object to be written (required).
-//     * 
-//     * @return The <em>new journal local</em> persistent identifier for that
-//     *         object. The new identifier is NOT the same as the old identifier.
-//     *         The old identifier MUST now be considered to be invalid. Further
-//     *         reads on the old identifier are STRONGLY DISCOURAGED but
-//     *         nevertheless unchecked.
-//     */
-//    public long _updateObject(long id, Object obj) {
-//
-//        if( obj == null ) throw new IllegalArgumentException();
-//        
-//        try {
-//
-//            return update(
-//                    slotMath.toSlots(id),
-//                    ByteBuffer
-//                            .wrap(getExtensibleSerializer().serialize(0, obj)))
-//                    .toLong();
-//
-//        }
-//
-//        catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//    }
-//
-//    /**
-//     * Delete an object from the store (no isolation). The slots allocated to
-//     * the object will be deallocated, releasing the space on the store. (This
-//     * deallocation operation is unchecked. As long as the identifier decodes
-//     * into a {@link ISlotAllocation}, the slot allocation will be
-//     * deallocated.)
-//     * 
-//     * @param id
-//     *            The <em>journal local</em> persistent identifier of the
-//     *            object.
-//     */
-//    public void _deleteObject( long id )
-//    {
-//
-//        delete( slotMath.toSlots(id) );
-//        
-//    }
 
     /*
      * commit processing support.
      */
     
-    /**
-     * Return the first commit record whose transaction timestamp is less than
-     * or equal to the given timestamp.
-     * 
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @param exact
-     *            When true, only an exact match is accepted.
-     * 
-     * @return The commit record.
-     * 
-     * @todo Define ICommitRecord.
-     * 
-     * @todo A transaction may not begin if a transaction with a later timestamp
-     *       has already committed. Use this method to verify that. Since the
-     *       commit records are cached, this probably needs to be moved back
-     *       into the Journal.
-     * 
-     * @todo Read the commit records into memory on startup.
-     * 
-     * @todo The commit records are chained together by a "pointer" to the prior
-     *       commit record together with the timestamp of that record. The root
-     *       block contains the timestamp of the earliest commit record that is
-     *       still on the journal. Traversal of the prior pointers stops when
-     *       the referenced record has a timestamp before the earliest versions
-     *       still on hand.
-     */
-    protected Object getCommitRecord(long timestamp, boolean exact) {
- 
-        /*
-         * @todo Search backwards from the current {@link IRootBlockView}.
-         */
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * FIXME Write commit record, including: the transaction identifier, the
-     * location of the object index and the slot allocation index, the location
-     * of a run length encoded representation of slots allocated by this
-     * transaction, and the identifier and location of the prior transaction
-     * serialized on this journal.
-     */
-    protected void writeCommitRecord(IStore tx) {
-        
-    }
+//    /**
+//     * Return the first commit record whose transaction timestamp is less than
+//     * or equal to the given timestamp.
+//     * 
+//     * @param timestamp
+//     *            The timestamp.
+//     * 
+//     * @param exact
+//     *            When true, only an exact match is accepted.
+//     * 
+//     * @return The commit record.
+//     * 
+//     * @todo Define ICommitRecord.
+//     * 
+//     * @todo A transaction may not begin if a transaction with a later timestamp
+//     *       has already committed. Use this method to verify that. Since the
+//     *       commit records are cached, this probably needs to be moved back
+//     *       into the Journal.
+//     * 
+//     * @todo Read the commit records into memory on startup.
+//     * 
+//     * @todo The commit records are chained together by a "pointer" to the prior
+//     *       commit record together with the timestamp of that record. The root
+//     *       block contains the timestamp of the earliest commit record that is
+//     *       still on the journal. Traversal of the prior pointers stops when
+//     *       the referenced record has a timestamp before the earliest versions
+//     *       still on hand.
+//     */
+//    protected Object getCommitRecord(long timestamp, boolean exact) {
+// 
+//        /*
+//         * @todo Search backwards from the current {@link IRootBlockView}.
+//         */
+//        throw new UnsupportedOperationException();
+//        
+//    }
+//
+//    /**
+//     * FIXME Write commit record, including: the transaction identifier, the
+//     * location of the object index and the slot allocation index, the location
+//     * of a run length encoded representation of slots allocated by this
+//     * transaction, and the identifier and location of the prior transaction
+//     * serialized on this journal.
+//     */
+//    protected void writeCommitRecord(IStore tx) {
+//        
+//    }
 
     /**
      * Return a read-only view of the current root block.
      * 
      * @return The current root block.
-     * 
-     * @todo Currently [null] for the transient buffer mode.
      */
     public IRootBlockView getRootBlockView() {
 
         return _rootBlock;
         
     }
-    IRootBlockView _rootBlock;
-
+    
     /**
-     * FIXME Write a new root block. This provides atomic commit for a
-     * transaction. After this method has been invoked the intention of the
-     * transaction is persistent the journal. This is achieved by updating the
-     * root of the object index, which is stored as part of the root block.
-     * 
-     * @todo Where is the divide between PREPARE and COMMIT? What do we do with
-     *       PREPARE on restart?
+     * The current root block.  This is updated each time a new root block is
+     * written.
      */
-    public void writeRootBlock() {
+    private IRootBlockView _rootBlock;
+    
+    /**
+     * Invoked iff a transaction fails after it has begun writing data onto the
+     * global state from its isolated state. Once the transaction has begun this
+     * process it has modified the global (unisolated) state and the next commit
+     * will make those changes restart-safe. While this processing is not begun
+     * unless the commit SHOULD succeed, errors can nevertheless occur.
+     * Therefore, if the transaction fails its writes on the unisolated state
+     * must be discarded. Since the isolatable data structures (btrees) use a
+     * copy-on-write policy, writing new data never overwrites old data so
+     * nothing has been lost.
+     * <p>
+     * We can not simply reload the last root block since concurrent
+     * transactions may write non-restart safe data onto the store (transactions
+     * may use btrees to isolate changes, and those btrees will write on the
+     * store). Reloading the root block would discarding all writes, including
+     * those occurring in isolation in concurrent transactions.
+     * <p>
+     * Instead, what we do is discard the unisolated objects, reloading them
+     * from the current root addresses on demand. This correctly discards any
+     * writes on those unisolated objects while NOT resetting the nextOffset at
+     * which writes will occur on the store and NOT causing persistence capable
+     * objects (btrees) used for isolated by concurrent transactions to lose
+     * their write sets.
+     */
+    final protected void _discardCommitters() {
         
-        final IRootBlockView old = getRootBlockView();
-        
-        // @todo currently null for the transient buffer mode.
-        if( old != null ) {
+        // clear the array of committers.
+        _committers = new ICommitter[_committers.length];
 
-            // FIXME Need to update the slot allocation chain root.
-            // FIXME Need to update the object index root.
-            //
-            // Those data are probably from the transaction.  Does it make sense
-            // to do this without isolation?
-            //
-            // @todo A clone constructor with some overrides might make a lot of
-            // sense here, especially as we add metadata to the root block.
+        // discard any hard references that might be cached.
+        discardCommitters();
+        
+        // setup new committers, e.g., by reloading from their last root addr.
+        setupCommitters();
+        
+    }
+    
+    /**
+     * The default implementation discards the btree mapping names to named
+     * btrees.
+     * <p>
+     * Subclasses MAY extend this method to discard their own committers but
+     * MUST NOT override it completely.
+     */
+    public void discardCommitters() {
+        
+        // discard.
+        name2Addr = null;
+        
+    }
+    
+    /**
+     * An atomic commit is performed by directing each registered
+     * {@link ICommitter} to flush its state onto the store using
+     * {@link ICommitter#handleCommit()}. The {@link Addr address} returned by
+     * that method is the address from which the {@link ICommitter} may be
+     * reloaded (and its previous address if its state has not changed). That
+     * address is saved in the slot of the root block under which that committer
+     * was {@link #registerCommitter(int, ICommitter) registered}. We then force
+     * the data to stable store, update the root block, and force the root block
+     * and the file metadata to stable store.
+     */
+    public void commit() {
+        
+        int ncommitters = 0;
+
+        long[] rootAddrs = new long[_committers.length];
+        
+        for(int i=0; i<_committers.length; i++ ) {
+
+            if( _committers[i] == null ) continue;
             
+            rootAddrs[i] = _committers[i].handleCommit();
+            
+            ncommitters++;
+            
+        }
+
+        /*
+         * force application data to stable store.
+         * 
+         * @todo this is a double sync since writing the root block also does
+         * a snyc.
+         * 
+         * @todo is it true that we only need to sync the file metadata if we
+         * are extending the store?
+         */
+        _bufferStrategy.force(false);
+        
+        /*
+         * update the root block.
+         * 
+         * @todo this can actually do two syncs, one for the user data and one
+         * for the root block. this is definately safer if perhaps paranoid.
+         * consider however that the buffer uses a write behind cache. the force
+         * to addrMax insures that all data buffered up to that address is
+         * written, which we need to do. if we also force the data to disk
+         * before updating the root blocks then that is more secure since
+         * otherwise it is possible for the os or hardware to optimize by first
+         * writing the root block and then failing while writing the user data
+         * onto the disk.
+         */
+        {
+
+            final IRootBlockView old = _rootBlock;
+
             /*
-             * @todo The notional use case for named roots is storing things
-             * such as the root of the named object map or the state of an
-             * extser instance for an embedded database. In order to do that,
-             * the array needs to be made visible one layer up so that the root
-             * ids may be modified before they are set on the new root block.
-             */ 
-            int[] rootIds = old.getRootIds();
-            
+             * FIXME update the firstTxId the first time a transaction commits
+             * and the lastTxId each time a transaction commits. This needs to
+             * be coordinated with the Tx class or the maps that maintain
+             * metadata about transactions on the Journal.
+             */
             IRootBlockView newRootBlock = new RootBlockView(
-                    !old.isRootBlock0(), old.getSegmentId(), old.getSlotSize(),
-                    old.getSlotLimit(), old.getObjectIndexSize(), old
-                            .getSlotIndexChainHead(), old.getObjectIndexRoot(),
-                    old.getCommitCounter() + 1, rootIds);
+                    !old.isRootBlock0(), old.getSegmentId(), _bufferStrategy
+                            .getNextOffset(), old.getFirstTxId(), old
+                            .getLastTxId(), old.getCommitCounter() + 1,
+                    rootAddrs);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
-            
+
+            _rootBlock = newRootBlock;
+
         }
         
     }
 
-    /**
-     * @todo This is a notional non-transactional commit. It just writes a new
-     *       root block.
-     */
-    public void commit() {
+    public void force(boolean metadata) {
+
+        assertOpen();
         
-        writeRootBlock();
+        _bufferStrategy.force(metadata);
         
     }
+
+    public long write(ByteBuffer data) {
+
+        assertOpen();
+        
+        return _bufferStrategy.write(data);
+        
+    }
+
+    public ByteBuffer read(long addr, ByteBuffer dst) {
+        
+        assertOpen();
+
+        return _bufferStrategy.read(addr, dst);
+        
+    }
+
+    public long getAddr(int rootSlot) {
+        
+        return _rootBlock.getRootAddr(rootSlot);
+        
+    }
+
+    /**
+     * The basic implementation sets up the btree that is responsible for
+     * resolving named btrees.
+     * <p>
+     * Subclasses may extend this method to setup their own committers but MUST
+     * NOT override it completely.
+     */
+    public void setupCommitters() {
+
+        setupName2AddrBTree();
+
+    }
     
-//    /**
+    /**
+     * Setup the btree that resolved named btrees.
+     */
+    private void setupName2AddrBTree() {
+
+        assert name2Addr == null;
+        
+        // the root address of the btree.
+        long addr = _rootBlock.getRootAddr(ROOT_NAME2ADDR);
+
+        if (addr == 0L) {
+
+            /*
+             * The btree has either never been created or if it had been created
+             * then the store was never committed and the btree had since been
+             * discarded.  In any case we create a new btree now.
+             */
+
+            // create btree mapping names to addresses.
+            name2Addr = new NameAddrBTree(this);
+
+        } else {
+
+            /*
+             * Reload the btree from its root address.
+             */
+
+            name2Addr = new NameAddrBTree(this, addr);
+
+        }
+
+        // register for commit notices.
+        setCommitter(ROOT_NAME2ADDR, name2Addr);
+
+    }
+    
+    /**
+     * Set a persistence capable data structure for callback during the commit
+     * protocol.
+     * <p>
+     * Note: the committers must be reset after restart or whenever the
+     * committers are discarded (the committers are themselves transient
+     * objects).
+     * 
+     * @param rootSlot
+     *            The slot in the root block where the {@link Addr address} of
+     *            the {@link ICommitter} will be recorded.
+     * 
+     * @param committer
+     *            The commiter.
+     */
+    public void setCommitter(int rootSlot, ICommitter committer) {
+
+        _committers[rootSlot] = committer;
+            
+    }
+
+    /**
+     * The index of the root slot whose value is the address of the persistent
+     * {@link NameAddrBTree} mapping names to {@link BTree}s registered for the
+     * store.
+     */
+    public final int ROOT_NAME2ADDR = 0;
+    
+    /**
+     * The registered committers for each slot in the root block.
+     */
+    private ICommitter[] _committers = new ICommitter[RootBlockView.MAX_ROOT_ADDRS];
+    
+    /**
+     * Register the named btree.  Once registered the btree will participate in
+     * atomic commits.
+     * 
+     * @param name The name that can be used to recover the btree.
+     * 
+     * @param btree The btree.
+     * 
+     * @todo is it possible to register a btree inside of a transaction?
+     */
+    public void registerBTree(String name, BTree btree) {
+
+        if( getBTree(name) != null ) {
+            
+            throw new IllegalStateException("BTree already registered: name="+name);
+            
+        }
+        
+        // add to the persistent name map.
+        name2Addr.add(name, btree);
+        
+    }
+
+    /**
+     * Return the named unisolated btree. Writes on the returned btree will be
+     * made restart-safe with the next {@link #commit()} regardless of the
+     * success or failure of a transaction. Transactional writes must use the
+     * same named method on the {@link Tx} in order to obtain an isolated
+     * version of the named btree.
+     */
+    public AbstractBTree getBTree(String name) {
+
+        if(name==null) throw new IllegalArgumentException();
+        
+        return name2Addr.get(name);
+
+    }
+
+    /**
+     * BTree mapping btree names to the last metadata record committed
+     * for the named btree.  The keys are ASCII strings.  The values
+     * are the last known  {@link Addr address} of the named btree.
+     */
+    private NameAddrBTree name2Addr;
+
+    /**
+     * BTree mapping btree names to the last metadata record committed for the
+     * named btree. The keys are ASCII strings. The values are the last known
+     * {@link Addr address} of the named btree.
+     * 
+     * @todo we could of course use unicode names, but that requires a more
+     *       expensive encoding.
+     */
+    public static class NameAddrBTree extends BTree {
+
+        // @todo default locale or US-ASCII?
+        private KeyBuilder keyBuilder = new KeyBuilder();
+
+        /**
+         * Cache of added/retrieved btrees.  Only btrees found in this cache
+         * are candidates for the commit protocol.
+         */
+        private Map<String,BTree> name2BTree = new HashMap<String,BTree>();
+
+        public NameAddrBTree(IRawStore store) {
+            super(store, DEFAULT_BRANCHING_FACTOR, new HardReferenceQueue<PO>(
+                    new DefaultEvictionListener(),
+                    DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                    DEFAULT_HARD_REF_QUEUE_SCAN), ValueSerializer.INSTANCE,
+                    null // record compressor.
+            );
+
+        }
+
+        /**
+         * Load from the store.
+         * 
+         * @param store
+         *            The backing store.
+         * @param metadataId
+         *            The metadata record identifier for the index.
+         */
+        public NameAddrBTree(IRawStore store, long metadataId) {
+
+            super(store, BTreeMetadata.read(store, metadataId));
+
+        }
+
+        /**
+         * Extends the default behavior to cause each named btree to flush
+         * itself to the store, updates the {@link Addr address} from which that
+         * btree may be reloaded within its internal mapping, and finally
+         * flushes itself and returns the address from which this btree may be
+         * reloaded.
+         */
+        public long handleCommit() {
+
+            Iterator<Map.Entry<String,BTree>> itr = name2BTree.entrySet().iterator();
+            
+            while(itr.hasNext()) {
+                
+                Map.Entry<String, BTree> entry = itr.next();
+                
+                String name = entry.getKey();
+                
+                BTree btree = entry.getValue();
+                
+                // request commit.
+                long addr = btree.handleCommit();
+                
+                // update persistent mapping.
+                insert(name,Long.valueOf(addr));
+                
+            }
+            
+            // and flushes out this btree as well.
+            return super.handleCommit();
+            
+        }
+        
+        protected byte[] getKey(String name) {
+
+            return keyBuilder.reset().appendASCII(name).getKey();
+
+        }
+
+        public BTree get(String name) {
+
+            BTree btree = name2BTree.get(name);
+            
+            if(btree!=null) return btree;
+            
+            long addr = lookup(name);
+            
+            if(addr == 0L) return null;
+            
+            btree = new BTree(this.store,BTreeMetadata.read(this.store, addr));
+            
+            // save name -> btree mapping in transient cache.
+            name2BTree.put(name,btree);
+            
+            return btree;
+
+        }
+        
+        protected long lookup(String name) {
+
+            if(name==null) throw new IllegalArgumentException();
+
+            Long addr = (Long) super.lookup(getKey(name));
+
+            if(addr == null) return 0L;
+
+            return addr.longValue();
+            
+        }
+
+        public void add(String name,BTree btree) {
+            
+            if(name==null) throw new IllegalArgumentException();
+            
+            if(btree==null) throw new IllegalArgumentException();
+
+            byte[] key = getKey(name);
+            
+            if(contains(key)) {
+                
+                throw new IllegalArgumentException("already registered: "+name);
+                
+            }
+            
+            // flush btree to the store to get the metadata record address.
+            long addr = btree.write();
+            
+            // record the address in this tree.
+            insert(key,Long.valueOf(addr));
+            
+            // add name -> btree mapping to the transient cache.
+            name2BTree.put(name, btree);
+            
+        }
+        
+        /**
+         * The value is a <code>long</code> integer that is the term
+         * identifier.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        public static class ValueSerializer implements IValueSerializer {
+
+            private static final long serialVersionUID = 6428956857269979589L;
+
+            public static transient final IValueSerializer INSTANCE = new ValueSerializer();
+
+            /**
+             * Note: It is faster to use packed longs, at least on write with
+             * test data (bulk load of wordnet nouns).
+             */
+            final static boolean packedLongs = true;
+
+            public ValueSerializer() {
+            }
+
+            public void getValues(DataInputStream is, Object[] values, int n)
+                    throws IOException {
+
+                for (int i = 0; i < n; i++) {
+
+                    if (packedLongs) {
+
+                        values[i] = Long.valueOf(LongPacker.unpackLong(is));
+
+                    } else {
+
+                        values[i] = Long.valueOf(is.readLong());
+
+                    }
+
+                }
+
+            }
+
+            public void putValues(DataOutputStream os, Object[] values, int n)
+                    throws IOException {
+
+                for (int i = 0; i < n; i++) {
+
+                    if (packedLongs) {
+
+                        LongPacker.packLong(os, ((Long) values[i]).longValue());
+
+                    } else {
+
+                        os.writeLong(((Long) values[i]).longValue());
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+    
+    //    /**
 //     * FIXME Make this more flexible in terms of a service vs a static instance
 //     * (for journal only to support the object index) vs true extensibility (for
 //     * an embedded database).
@@ -2054,5 +1859,5 @@ public class Journal implements IRawStore, IStore {
 //    
 //    // FIXME This is NOT restart safe :-)
 //    final private ExtensibleSerializer _extSer;
-
+    
 }

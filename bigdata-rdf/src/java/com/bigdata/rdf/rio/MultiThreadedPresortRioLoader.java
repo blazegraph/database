@@ -57,8 +57,8 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
-import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;

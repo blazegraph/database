@@ -18,12 +18,12 @@ import com.bigdata.util.TimestampFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Support notion of transactions on {@link IOM}. In fact, the problem
- *       is more like supporting unisolated operations.
+ * @todo Support notion of transactions on {@link IOM}. In fact, the problem is
+ *       more like supporting unisolated operations.
  * 
- * @todo Refine the {@link IOM} API. There is a distinction between what is
- *       good for the store and what is good for applications. For example, are
- *       the raw operations on byte[], ByteBuffer, or Object using extSer?
+ * @todo Refine the {@link IOM} API. There is a distinction between what is good
+ *       for the store and what is good for applications. For example, are the
+ *       raw operations on byte[], ByteBuffer, or Object using extSer?
  * 
  * @todo Integrate object caching.
  * 
@@ -36,13 +36,17 @@ import com.bigdata.util.TimestampFactory;
  *       thread for store operations. CRUD operations need to use the cache
  *       first and must be enqueued when they read or write through the cache.
  * 
- * @todo Hook up and debug the btree integration.
+ * @todo Hook up and debug the btree integration. Figure out how to handle the
+ *       per-link set indices for GOM. One way is to use a single index for all
+ *       link sets in a family and generate the keys so as to partition the
+ *       indices. There are doubtless other solutions.  Pay attention to both
+ *       small and large indices.
  * 
  * @todo Hook this up to GOM and test performance with the various _journal
  *       backends.
  * 
- * @todo Consider disallowing unisolated store operations (by removing the
- *       IOM interface or simply moving the CRUD operations into ITx).
+ * @todo Consider disallowing unisolated store operations (by removing the IOM
+ *       interface or simply moving the CRUD operations into ITx).
  */
 public class JournalStore implements IStore {
 
@@ -139,6 +143,12 @@ public class JournalStore implements IStore {
         private final IStore store;
         private final Journal journal;
 
+        /**
+         * The name of the B+-Tree used to store objects. Its keys are long
+         * integers. Its values are the serialized objects.
+         */
+        private final static transient String OBJNDX = "_objndx";
+        
         // FIXME This is NOT restart safe :-)
         final private OMExtensibleSerializer _extSer;
         

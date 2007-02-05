@@ -49,6 +49,8 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.rawstore.Addr;
+
 /**
  * Interface for a root block on the journal. The root block provides metadata
  * about the journal, e.g., slot size, the #of slots, the head of the slot index
@@ -87,23 +89,29 @@ public interface IRootBlockView {
     /**
      * The segment identifier.
      */
-    public long getSegmentId();
+    public int getSegmentId();
     
     /**
-     * The size of a slot in the journal in bytes.
+     * The next offset at which a data item would be written on the store.
      */
-    public int getSlotSize();
-
+    public int getNextOffset();
+    
     /**
-     * The #of slots in the journal. The valid slot indices are the half-open
-     * range [0:slotLimit).
+     * The timestamp of the earliest transaction whose data are on the store or
+     * 0L iff no transactions have committed on the store.
+     * 
+     * @return The timestamp of the earliest transaction committed on the store.
      */
-    public int getSlotLimit();
-
+    public long getFirstTxId();
+    
     /**
-     * The #of keys in a node of the object index (aka branching factor).
+     * The timestamp of the most recent transaction whose data are on the store
+     * or 0L iff no transactions have committed on the store.
+     * 
+     * @return The timestamp of the most recent transaction committed on the
+     *         store.
      */
-    public int getObjectIndexSize();
+    public long getLastTxId();
     
     /**
      * The timestamp at which the root block was last modified.
@@ -125,43 +133,43 @@ public interface IRootBlockView {
      */
     public long getCommitCounter();
     
-    /**
-     * Return the slot index of the head of the slot index chain.
-     * 
-     * @see ISlotAllocationIndex
-     */
-    public int getSlotIndexChainHead();
+//    /**
+//     * Return the slot index of the head of the slot index chain.
+//     * 
+//     * @see ISlotAllocationIndex
+//     */
+//    public int getSlotIndexChainHead();
+//
+//    /**
+//     * Return the slot index of the root of the object index.
+//     * 
+//     * @see IObjectIndex
+//     */
+//    public int getObjectIndexRoot();
 
     /**
-     * Return the slot index of the root of the object index.
-     * 
-     * @see IObjectIndex
-     */
-    public int getObjectIndexRoot();
-
-    /**
-     * Return the value of the indicated root id. Each root id is an int32
-     * field. Root ids are normally int32 persistent within segment object
-     * identifiers. Some common uses are the identifier for a map storing named
-     * root objects, etc.
+     * Return the value of the indicated root {@link Addr address}.  A root
+     * address is the only restart-safe mechanism for loading a persistence
+     * capable data structure from the store.
      * 
      * @param index
-     *            The index of the root id.
+     *            The index of the root {@link Addr address}.
      * 
-     * @return The int32 id stored at that index.
+     * @return The {@link Addr address} stored at that index.
      * 
      * @exception IndexOutOfBoundsException
-     *                if the root id is negative or too large.
+     *                if the index is negative or too large.
      */
-    public int getRootId(int index);
+    public long getRootAddr(int index);
 
     /**
-     * Returns a read-only view of the root ids. The caller may modify the
-     * returned array without changing the state of the {@link RootBlockView}.
+     * Returns a read-only view of the root {@link Addr addresses}. The caller
+     * may modify the returned array without changing the state of the
+     * {@link RootBlockView}.
      * 
-     * @return The root ids.
+     * @return The root {@link Addr addresses}.
      */
-    public int[] getRootIds();
+    public long[] getRootAddrs();
 
     /**
      * A read-only buffer whose contents are the root block.

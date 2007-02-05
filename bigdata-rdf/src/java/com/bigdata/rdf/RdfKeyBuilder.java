@@ -75,6 +75,12 @@ public class RdfKeyBuilder {
         
     }
     
+    /**
+     * The length of a key for one of the statement indices.  This is one byte
+     * for the code followed by 3 long integers.
+     */
+    final public static int stmtKeyLen = 1 + 8 * 3;
+    
     /*
      * Define bytes indicating whether a key in a statement index is a
      * statement, predicate (rule without a body), or a rule with a body. This
@@ -358,6 +364,31 @@ public class RdfKeyBuilder {
         
     }
 
+    /*
+     * The problem with this method is that it encourages us to reuse a key
+     * buffer but the btree (at least when used as part of a local api) requires
+     * that we donate the key buffer to the btree.
+     */
+//    /**
+//     * Encodes a statement into the supplied <i>key</i> buffer.
+//     * <p>
+//     * Note: This can be significantly faster than
+//     * {@link #statement2Key(long, long, long)}
+//     * 
+//     * @param id1
+//     * @param id2
+//     * @param id3
+//     * @param key
+//     *            A buffer of length 28 (1 byte for the {@link #CODE_STMT},
+//     *            plus three long integers).
+//     */
+//    public void statement2Key(long id1, long id2, long id3,byte[] key) {
+//
+//        keyBuilder.reset().append(CODE_STMT).append(id1).append(id2)
+//                .append(id3).copyKey(key);
+//
+//    }
+    
     public byte[] pred2Key(long id1, long id2, long id3) {
         
         return keyBuilder.reset().append(CODE_PRED).append(id1).append(id2)

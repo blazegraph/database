@@ -11,7 +11,9 @@ import java.nio.ByteBuffer;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.Bytes;
+import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a

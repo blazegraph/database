@@ -40,6 +40,12 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
         
     }
 
+    public boolean isStable() {
+        
+        return true;
+        
+    }
+
     /**
      * Forces the data to disk.
      */
@@ -66,8 +72,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
         try {
 
-            force( true );
-            
             raf.close();
             
         } catch( IOException ex ) {
@@ -93,9 +97,10 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
         
     }
     
-    DiskBackedBufferStrategy(BufferMode bufferMode, FileMetadata fileMetadata, SlotMath slotMath) {
+    DiskBackedBufferStrategy(BufferMode bufferMode, FileMetadata fileMetadata) {
 
-        super(fileMetadata.journalHeaderSize, bufferMode,slotMath,fileMetadata.buffer);
+        super(fileMetadata.nextOffset, fileMetadata.headerSize0,
+                fileMetadata.extent, bufferMode, fileMetadata.buffer);
 
         this.file = fileMetadata.file;
         
@@ -113,13 +118,21 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
             FileChannel channel = raf.getChannel();
 
-            channel.write(rootBlock.asReadOnlyBuffer(), rootBlock
-                    .isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
-                    : FileMetadata.OFFSET_ROOT_BLOCK1);
+            final int count = channel.write(rootBlock.asReadOnlyBuffer(),
+                    rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+                            : FileMetadata.OFFSET_ROOT_BLOCK1);
+
+            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
+                
+                throw new IOException("Expecting to write "
+                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
+                        + count + " bytes.");
+                
+            }
 
             if( forceOnCommit != ForceEnum.No ) {
 
-                force(forceOnCommit==ForceEnum.ForceMetadata);
+                force(forceOnCommit == ForceEnum.ForceMetadata);
             
             }
 

@@ -13,24 +13,33 @@ import java.nio.ByteBuffer;
  */
 public class TransientBufferStrategy extends BasicBufferStrategy {
     
-    /**
-     * The transient journal does not have a header (no magic, no version, and
-     * no root blocks).
-     * 
-     * FIXME Verify that we can (and want to) operate without root blocks.
-     */
-    static private final int journalHeaderSize = 0;
-    
     private boolean open = false;
+
+    /**
+     * The root blocks.
+     */
+    final private IRootBlockView rootBlocks[] = new IRootBlockView[2];
     
-    TransientBufferStrategy(SlotMath slotMath,long initialExtent) {
+    /**
+     * Either zero (0) or one (1).
+     */
+    private int currentRootBlock = 0;
+    
+    TransientBufferStrategy(boolean useDirectBuffers,long extent) {
         
         /*
          * Note: I have not observed much performance gain from the use of
          * a direct buffer for the transient mode.
          */
-        super(journalHeaderSize,BufferMode.Transient, slotMath, ByteBuffer
-                .allocate/*Direct*/((int) assertNonDiskExtent(initialExtent)));
+        super(  0/* nextOffset */, //
+                0/*headerSize*/, //
+                extent, //
+                BufferMode.Transient, //
+                (useDirectBuffers ? ByteBuffer
+                        .allocateDirect((int) assertNonDiskExtent(extent))
+                        : ByteBuffer
+                                .allocate((int) assertNonDiskExtent(extent)))
+                );
     
         open = true;
         
@@ -58,7 +67,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
             
         }
 
-        force(true);
+//        force(true);
         
         open = false;
         
@@ -70,7 +79,20 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
+    public boolean isStable() {
+        
+        return true;
+        
+    }
+
     public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
+        
+        if(rootBlock == null) throw new IllegalArgumentException();
+        
+        currentRootBlock = rootBlock.isRootBlock0() ? 0 : 1;
+
+        rootBlocks[currentRootBlock] = rootBlock;
+        
     }
 
 }

@@ -205,9 +205,13 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
             /*
              * Deallocate the object on the store.
+             * 
+             * Note: This operation is not meaningful on an append only store.
+             * If a read-write store is defined then this is where you would
+             * delete the old version.
              */
 
-            btree.store.delete(identity);
+//            btree.store.delete(identity);
             
         }
         

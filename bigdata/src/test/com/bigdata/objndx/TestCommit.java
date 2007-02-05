@@ -50,7 +50,8 @@ package com.bigdata.objndx;
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.IRawStore;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore2;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.
@@ -84,7 +85,7 @@ public class TestCommit extends TestCase2 {
      */
     public void test_commit01() {
 
-        IRawStore store = new SimpleStore();
+        IRawStore store = new SimpleMemoryRawStore2();
 
         final int branchingFactor = 4;
         
@@ -121,8 +122,7 @@ public class TestCommit extends TestCase2 {
         {
 
             // Load the tree.
-            BTree btree = new BTree(store, BTreeMetadata.read(BTree
-                    .getTransitionalRawStore(store), addrMetadata),
+            BTree btree = new BTree(store, BTreeMetadata.read(store, addrMetadata),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                             BTree.DEFAULT_HARD_REF_QUEUE_SCAN)
@@ -155,17 +155,11 @@ public class TestCommit extends TestCase2 {
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = new BTree(store, BTreeMetadata.read(BTree
-                    .getTransitionalRawStore(store), addrMetadata),
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN)
-//                            Integer.valueOf(0),
-//                            null, // no comparator for primitive key type.
-//                            Int32OIdKeySerializer.INSTANCE,
-//                    SimpleEntry.Serializer.INSTANCE,
-//                    null // no record compressor
-            );
+            BTree btree = new BTree(store, BTreeMetadata.read(store,
+                    addrMetadata), new HardReferenceQueue<PO>(
+                    new DefaultEvictionListener(),
+                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
 
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());

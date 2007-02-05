@@ -47,12 +47,28 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
 
 /**
  * <p>
  * A transaction. An instance of this class corresponds to a transaction.
- * Transactions are fully isolated.
+ * </p>
+ * <p>
+ * A transaction is a context in which the application can access named btrees.
+ * btrees returned within the transaction will be isolated according to the
+ * isolation level of the transaction. transactions may be requested that are
+ * read-only for some historical timestamp, that are read-committed (data
+ * committed by _other_ transactions during the transaction will be visible
+ * within that transaction), or that are fully isolated (changes made in other
+ * transactions are not visible within the transaction).
+ * 
+ * When using an isolated transaction, changes are accumulated in an isolated
+ * btree. The update set must then be validated and finally merged down onto the
+ * global state when the transaction commits.
  * </p>
  * <p>
  * Transaction isolation is accomplished as follows. Within a transaction, the
@@ -83,6 +99,8 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo update javadoc.
+ * 
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
  *       state. This is, perhaps, excessive. Futher, since this is used in a
@@ -92,37 +110,9 @@ import java.nio.ByteBuffer;
  *       pre-conditions itself and exceptions being thrown from here if the
  *       server failed to test the pre-conditions and they were not met
  * 
- * @todo Define isolation for the allocation index. We can actually ignore the
- *       problem if we explictly deallocate slots allocated to a transaction on
- *       abort, however the journal will falsely believe that slots allocated to
- *       an active transaction are still allocated in cases in which (a) the
- *       journal crashes while the transaction is active and (b) slot allocation
- *       index nodes have been flushed to the journal either by incremental
- *       writes or by a concurrent transaction committing.
- * 
- * @todo Define the commit procotol.
- * 
  * @todo Is it possible to have more than one transaction PREPARE must
  *       concurrent PREPARE operations be serialized?
- * 
- * @todo Define the abort protocol. On abort, the root block is simply not
- *       updated, all current data versions in the transaction scope are marked
- *       as available, and the slots dedicated to the transaction scope object
- *       index nodes are themselves marked as available. (This could be done
- *       asynchronously but we have not yet defined a slot reaper. This will
- *       have to be interleaved with the thread performing operations on the
- *       journal. So, either they are the same thread that somehow switches
- *       tasks, or the journal is handed off between threads based on workload
- *       (sounds good), or we have to make the journal thread safe.)
- * 
- * @todo This implementation actually uses a two level transient hash map for
- *       the object index (this is not restart safe). The first level is the
- *       transaction scope object index. All changes are made to that index. If
- *       an object is not found in that index, then we read the entry from the
- *       base object index. If it is not found there, then it is not found
- *       period.
  */
-
 public class Tx implements IStore, ITx {
 
     /*
@@ -135,16 +125,14 @@ public class Tx implements IStore, ITx {
     
     final private Journal journal;
     final private long timestamp;
-    final private IObjectIndex objectIndex;
-    
-    IObjectIndex getObjectIndex() {
-        
-        return objectIndex;
-        
-    }
-    
+
     private RunState runState;
 
+    /**
+     * BTrees isolated by this transactions.
+     */
+    private Map<String,BTree> btrees = new HashMap<String,BTree>();
+    
     /**
      * Create a transaction starting the last committed state of the journal as
      * of the specified timestamp.
@@ -166,23 +154,10 @@ public class Tx implements IStore, ITx {
         
         this.timestamp = timestamp;
 
-        /* FIXME This can work, but a COMMIT MUST replace the object
-         * index on the journal so that this transaction continues to
-         * resolve objects against the object index for the last committed
-         * state at the time that the transaction was created.
-         */
-        if(journal.objectIndex instanceof SimpleObjectIndex) {
-        this.objectIndex = new SimpleObjectIndex(
-                (SimpleObjectIndex) journal.objectIndex);
-        } else {
-//            this.objectIndex = new ObjectIndex((ObjectIndex)journal.objectIndex);
-            throw new UnsupportedOperationException();
-        }
-
         journal.activateTx(this);
         
         this.runState = RunState.ACTIVE;
-        
+
     }
     
     /**
@@ -199,145 +174,6 @@ public class Tx implements IStore, ITx {
     public String toString() {
         
         return ""+timestamp;
-        
-    }
-
-    /**
-     * Read the current version of the data from the store.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param dst
-     *            When non-null and having sufficient bytes remaining, the data
-     *            version will be read into this buffer. If null or if the
-     *            buffer does not have sufficient bytes remaining, then a new
-     *            (non-direct) buffer will be allocated that is right-sized for
-     *            the data version, the data will be read into that buffer, and
-     *            the buffer will be returned to the caller.
-     * 
-     * @return The data. The position will always be zero if a new buffer was
-     *         allocated. Otherwise, the position will be invariant across this
-     *         method. The limit - position will be the #of bytes read into the
-     *         buffer, starting at the position. A <code>null</code> return
-     *         indicates that the object was not found in the journal, in which
-     *         case the application MUST attempt to resolve the object against
-     *         the database (i.e., the object MAY have been migrated onto the
-     *         database and the version logically deleted on the journal).
-     * 
-     * @exception DataDeletedException
-     *                if the current version of the identifier data has been
-     *                deleted within the scope visible to the transaction. The
-     *                caller MUST NOT read through to the database if the data
-     *                were deleted.
-     * 
-     * @exception IllegalStateException
-     *                if the transaction is not active.  If the transaction is
-     *                not complete, then it will be aborted.
-     */
-    public ByteBuffer read( int id, ByteBuffer dst ) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-
-        if( ! isActive() ) {
-            
-            if( ! isComplete() ) {
-                
-                abort();
-                
-            }
-            
-            throw new IllegalStateException(NOT_ACTIVE);
-            
-        }
-        
-        ISlotAllocation slots = objectIndex.get(id);
-        
-        if( slots == null ) return null;
-
-        return journal.read( slots, dst );
-        
-    }
-
-    /**
-     * Write a data version. The data version of the data will not be visible
-     * outside of this transaction until the transaction is committed.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param data
-     *            The data to be written. The bytes from
-     *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
-     *            will be written.
-     *            
-     * @exception DataDeletedException
-     *                if the persistent identifier is deleted.
-     *                
-     * @exception IllegalStateException
-     *                if the transaction is not active.  If the transaction is
-     *                not complete, then it will be aborted.
-     */
-    public void write(int id,ByteBuffer data) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-
-        if( runState != RunState.ACTIVE ) {
-            
-            if( ! isComplete() ) {
-                
-                abort();
-                
-            }
-            
-            throw new IllegalStateException(NOT_ACTIVE);
-            
-        }
-
-        /*
-         * Write the data onto the journal and obtain the slots onto which the
-         * data was written.
-         */
-        ISlotAllocation slots = journal.write( data );
-        
-        /*
-         * Update the object index so that the current data version is mapped
-         * onto the slots on which the data was just written.
-         */
-
-        objectIndex.put(id, slots);
-        
-    }
-    
-    /**
-     * Delete the data from the store.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     *            
-     * @exception DataDeletedException
-     *                if the persistent identifier is already deleted.
-     *                
-     * @exception IllegalStateException
-     *                if the transaction is not active.  If the transaction is
-     *                not complete, then it will be aborted.
-     */
-    public void delete( int id) {
-
-        if( id <= 0 ) throw new IllegalArgumentException();
-
-        if( ! isActive() ) {
-            
-            if( ! isComplete() ) {
-                
-                abort();
-                
-            }
-            
-            throw new IllegalStateException(NOT_ACTIVE);
-            
-        }
-
-        // Transactional isolation.
-        objectIndex.delete( id );
         
     }
     
@@ -368,7 +204,7 @@ public class Tx implements IStore, ITx {
              * Validate against the current state of the journal's object index.
              */
 
-            if( ! objectIndex.validate(journal,this) ) {
+            if( ! validate() ) {
                 
                 abort();
                 
@@ -419,18 +255,45 @@ public class Tx implements IStore, ITx {
          * slots used by the versions written by the transaction as 'committed'.
          * This operation MUST succeed since we have already validated.
          * 
-         * FIXME This MUST be ATOMIC.
-         * 
-         * FIXME Note that non-transactional operations on the global scope
-         * should probably be disallowed if they would conflict with a prepared
-         * transaction, otherwise this merge operation would not have its
-         * pre-conditions satisified.
+         * Note: non-transactional operations on the global scope should be
+         * disallowed when using transactions since they (a) could invalidate
+         * the pre-condition for the merge; and (b) uncommitted changes would be
+         * discarded if the merge operation fails.
          */
-        objectIndex.mergeWithGlobalObjectIndex(journal);
+        try {
 
-        journal.writeCommitRecord( this );
-        
-        journal.writeRootBlock();
+            mergeOntoGlobalState();
+            
+            // Atomic commit.
+            journal.commit();
+            
+        } catch( Throwable t) {
+
+            /*
+             * If the operation fails then we need to discard any changes that
+             * have been merged down into the global state. Failure to do this
+             * will result in those changes becoming restart-safe when the next
+             * transaction commits!
+             * 
+             * This will be legal if we are observing serializability; that is,
+             * in no one writes on the global state for a restart-safe btree
+             * except mergeOntoGlobalState(). When this constraint is observed
+             * it is impossible for there to be uncommitted changes when we
+             * begin to merge down onto the store and any changes may simply be
+             * discarded.
+             * 
+             * Note: we can not simply reload the current root block (or reset
+             * the nextOffset to be assigned) since concurrent transactions may
+             * be writing non-restart safe data on the store in their own
+             * isolated btrees.
+             */
+            journal._discardCommitters(); 
+
+            releaseBTrees();
+            
+            throw new RuntimeException( t );
+            
+        }
         
         runState = RunState.COMMITTED;
         
@@ -444,16 +307,13 @@ public class Tx implements IStore, ITx {
      */
     public void abort() {
 
-        if( isComplete() ) throw new IllegalStateException(IS_COMPLETE);
+        if (isComplete())
+            throw new IllegalStateException(IS_COMPLETE);
 
+        releaseBTrees();
+        
         journal.completedTx(this);
 
-        /*
-         * FIXME Implement abort. There are some deallocation operations that
-         * need to be performed for an abort, including slot allocation index
-         * and object index nodes in addition to the data version slots.
-         */
-        
         runState = RunState.ABORTED;
         
     }
@@ -521,28 +381,64 @@ public class Tx implements IStore, ITx {
     }
 
     /**
-     * Garbage collect pre-existing versions that were overwritten or deleted
-     * during this transactions. This method MUST NOT be invoked by the
-     * application since its pre-conditions require total knowledge of the state
-     * of transactions running against the distributed database. That knowledge
-     * is available for the journal locally IFF it is running as a standalone /
-     * embedded database. Otherwise the knowledge is only available to the
-     * distributed transaction server.
-     * 
-     * @exception IllegalStateException
-     *                if the transaction has not committed.
-     * 
-     * @todo When a pre-existing version is deleted within a transaction scope
-     *       and the transaction later commits and is finally GC'd, document
-     *       whether or not the GC will cause the index to report "not found" as
-     *       a post-condition rather than "deleted".
+     * Validate all isolated btrees written on by this transaction.
      */
-    void gc() {
+    private boolean validate() {
+        throw new UnsupportedOperationException();
+    }
+    
+    /**
+     * Merge down the write set from all isolated btrees written on by this
+     * transactions into the corresponding btrees in the global state.
+     */
+    private void mergeOntoGlobalState() {
+        throw new UnsupportedOperationException();
+    }
+    
+    /**
+     * Return a named btree. The btree will be isolated at the same level as
+     * this transaction. Changes on the btree will be made restart-safe iff the
+     * transaction successfully commits.
+     * 
+     * @param name The name of the btree.
+     * 
+     * @return The named btree or <code>null</code> if no btree was registered
+     *         under that name.
+     */
+    public AbstractBTree getBTree(String name) {
 
-        if( ! isCommitted() ) throw new IllegalStateException(NOT_COMMITTED);
+        if(name==null) throw new IllegalArgumentException();
         
-        objectIndex.gc(journal.allocationIndex);
+        /*
+         * store the btrees in hash map so that we can recover the same instance
+         * on each call within the same transaction.
+         */
+        BTree btree = btrees.get(name);
+        
+        if(btree == null) {
+            
+            /*
+             * FIXME isolate the same named btree in the global scope and store
+             * it in the map.
+             */
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        return btree;
         
     }
 
+    /**
+     * This method must be invoked any time a transaction completes (aborts or
+     * commits) in order to release the hard references to any named btrees
+     * isolated within this transaction so that the JVM may reclaim the space
+     * allocated to them on the heap.
+     */
+    private void releaseBTrees() {
+
+        btrees.clear();
+        
+    }
+    
 }

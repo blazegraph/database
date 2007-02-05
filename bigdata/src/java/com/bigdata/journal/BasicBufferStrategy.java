@@ -2,6 +2,9 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.rawstore.Addr;
+
+
 
 /**
  * Implements logic to read from and write on a buffer. This is sufficient
@@ -16,165 +19,194 @@ import java.nio.ByteBuffer;
 abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     /**
-     * A direct buffer containing a write through image of the backing file.
+     * A buffer containing a write through image of the backing file. The image
+     * begins after the root blocks, making it impossible to write on the root
+     * blocks using the buffer. The offset of the image into the backing file is
+     * given by {@link AbstractBufferStrategy#headerSize}.
      */
-    final ByteBuffer directBuffer;
+    protected ByteBuffer directBuffer;
 
+    /**
+     * The size of the journal header, including MAGIC, version, and both root
+     * blocks. This is used as an offset when computing the address of a record
+     * in an underlying file and is ignored by buffer modes that are not backed
+     * by a file (e.g., transient) or that are memory mapped (since the map is
+     * setup to skip over the header)
+     */
+    final int headerSize;
+    
     /**
      * The current length of the backing file in bytes.
      */
-    final long extent;
+    protected long extent;
 
+    /**
+     * The size of the user data space in bytes.
+     */
+    protected long userExtent;
+    
     public long getExtent() {
 
         return extent;
 
     }
 
-    /**
-     * The index of the first slot that MUST NOT be addressed (e.g., nslots).
-     */
-    final int slotLimit;
-
-    public int getSlotLimit() {
-        return slotLimit;
+    public long getUserExtent() {
+        
+        return userExtent;
+        
     }
 
-    /**
-     * Asserts that the slot index is in the legal range for the journal
-     * <code>[1:slotLimit-1]</code>
-     * 
-     * @param slot
-     *            The slot index.
-     */
+    BasicBufferStrategy(int nextOffset, int headerSize, long extent, BufferMode bufferMode, ByteBuffer buffer) {
 
-    void assertSlot(int slot) {
-
-        if (slot >= 1 && slot < slotLimit)
-            return;
-
-        throw new AssertionError("slot=" + slot + " is not in [1:" + slotLimit
-                + ")");
-
-    }
-
-    BasicBufferStrategy(int journalHeaderSize, BufferMode bufferMode,
-            SlotMath slotMath, ByteBuffer buffer) {
-
-        super(journalHeaderSize, bufferMode, slotMath);
+        super(nextOffset, bufferMode);
 
         this.directBuffer = buffer;
 
-        this.extent = buffer.capacity();
-
-        /*
-         * The first slot index that MUST NOT be addressed.
-         * 
-         * Note: The same computation occurs in DiskOnlyStrategy and
-         * FileMetadata.
-         */
-
-        this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
-
-        System.err.println("slotLimit=" + slotLimit);
+        this.extent = extent;
+        
+        this.headerSize = headerSize;
+        
+        this.userExtent = extent - headerSize;
 
     }
 
-    /**
-     * Return a read-only slice of the direct buffer.
-     * 
-     * @param slots
-     *            The slot allocation (MUST be contiguous).
-     * 
-     * @return The slice.
-     */
-    public ByteBuffer getSlice(ISlotAllocation slots) {
-
-        assert slots != null;
+    public long write(ByteBuffer data) {
         
-        assert slots.isContiguous();
+        if (data == null)
+            throw new IllegalArgumentException("Buffer is null");
 
-        int firstSlot = slots.firstSlot();
+        // #of bytes to store.
+        final int nbytes = data.remaining();
 
-        int nbytes = slots.getByteCount();
+        if (nbytes == 0)
+            throw new IllegalArgumentException("No bytes remaining in buffer");
 
-        final int pos = journalHeaderSize + slotSize * firstSlot;
-        directBuffer.limit(pos + nbytes);
-        directBuffer.position(pos);
-
-        return directBuffer.slice().asReadOnlyBuffer();
-
-    }
-    
-    /**
-     * Write the data onto a mutable slice of the buffer corresponding to the
-     * specified allocation.
-     * 
-     * @param slots
-     *            The slot allocation (MUST be contiguous).
-     * 
-     * @param data
-     *            The data (required, MUST be no larger than the capacity of the
-     *            slots).
-     */
-    public void writeSlice(ISlotAllocation slots, ByteBuffer data ) {
-
-        assert slots != null;
+        // the next offset.
+        final int offset = nextOffset;
         
-        assert slots.isContiguous();
-
-        int firstSlot = slots.firstSlot();
-
-        int nbytes = slots.getByteCount();
-
-        final int pos = journalHeaderSize + slotSize * firstSlot;
-        directBuffer.limit(pos + nbytes);
-        directBuffer.position(pos);
-
-        ByteBuffer slice = directBuffer.slice();
+        if(offset+nbytes>userExtent) {
+            
+            truncate(userExtent*2);
+            
+        }
+       
+        directBuffer.limit(offset + nbytes);
+        directBuffer.position(offset);
         
-        slice.put(data);
-
-    }
-
-    public void writeSlot(int slot, ByteBuffer data) {
-
-        assertSlot(slot);
-        assert data != null;
-
-        // Position the buffer on the current slot.
-        final int pos = journalHeaderSize + slotSize * slot;
-        directBuffer.limit(pos + slotSize);
-        directBuffer.position(pos);
-
-        // Write the slot data, advances data.position().
         directBuffer.put(data);
+        
+        // increment by the #of bytes written.
+        nextOffset += nbytes;
+        
+        // formulate the address that can be used to recover that record.
+        long addr = Addr.toLong(nbytes, offset);
+
+        return addr;
 
     }
 
-    public ByteBuffer readSlot(int slot, ByteBuffer dst) {
+    public ByteBuffer read(long addr, ByteBuffer dst) {
+        
+        if (addr == 0L)
+            throw new IllegalArgumentException("Address is 0L");
+        
+        final int offset = Addr.getOffset(addr);
+        
+        final int nbytes = Addr.getByteCount(addr);
 
-        assertSlot(slot);
-        assert dst != null;
+        if(nbytes==0) {
+            
+            throw new IllegalArgumentException(
+                    "Address encodes record length of zero");
+            
+        }
+        
+        if (offset + nbytes > nextOffset) {
+            
+            throw new IllegalArgumentException("Address never written.");
 
-        final int remaining = dst.remaining();
+        }
+        
+        if(dst != null && dst.remaining()>=nbytes) {
 
-        assert remaining <= slotSize;
+            // copy into the caller's buffer.
+            directBuffer.limit(offset+nbytes);
+            directBuffer.position(offset);
+            dst.put(directBuffer);
+            
+            // flip for reading.
+            
+            dst.flip();
+            
+            // the caller's buffer.
+            
+            return dst;
+            
+        } else {
 
+            // return a read-only view onto the data in the store.
+            
+            directBuffer.limit(offset + nbytes);
+            directBuffer.position(offset);
+
+            return directBuffer.slice().asReadOnlyBuffer();
+            
+        }
+                
+    }
+
+    /**
+     * FIXME write tests of this method.
+     */
+    public void truncate(long newExtent) {
+
+        long newUserExtent =  newExtent - headerSize;
+        
+        if (newUserExtent < getNextOffset() ) {
+           
+            throw new IllegalArgumentException("Would truncate written data.");
+            
+        }
+
+        if (newUserExtent > Integer.MAX_VALUE) {
+
+            throw new IllegalArgumentException("User extent would exceed int32 bytes");
+            
+        }
+        
+        if(newUserExtent == getUserExtent()) {
+            
+            // NOP.
+            return;
+            
+        }
+        
+        boolean isDirect = directBuffer.isDirect();
+
+        final int newCapacity = (int) newUserExtent;
+        
+        ByteBuffer tmp = (isDirect?ByteBuffer.allocateDirect(newCapacity):
+            ByteBuffer.allocate(newCapacity)
+            );
+        
         /*
-         * Setup the source (limit and position).
+         * Copy at most those bytes that have been written on.
          */
-        final int pos = journalHeaderSize + slotSize * slot;
-        directBuffer.limit(pos + remaining);
-        directBuffer.position(pos);
-
-        /*
-         * Copy data from slot.
-         */
-        // dst.limit(dst.position() + thisCopy);
-        dst.put(directBuffer);
-
-        return dst;
+        directBuffer.limit(Math.min(nextOffset,newCapacity));
+        directBuffer.position(0);
+        
+        // Copy to the new buffer.
+        tmp.put(directBuffer);
+     
+        // Replace the buffer reference.
+        directBuffer = tmp;
+        
+        extent = newUserExtent + headerSize;
+        
+        userExtent = newUserExtent;
+        
+        System.err.println("Buffer: newCapacity="+newCapacity);
 
     }
     

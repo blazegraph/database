@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.objndx;
 
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
+import com.bigdata.rawstore.Addr;
 
 /**
  * Tests logic to encode and decode the addresses of nodes and leaves in an {@link

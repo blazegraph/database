@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -88,6 +87,9 @@ public class TestDirectJournal extends AbstractTestCase {
         
         // tests defined by this class.
         suite.addTestSuite(TestDirectJournal.class);
+
+        // test suite for the IRawStore api.
+        suite.addTestSuite( TestRawStore.class );
         
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
@@ -123,15 +125,10 @@ public class TestDirectJournal extends AbstractTestCase {
     public void test_create_direct01() throws IOException {
 
         final Properties properties = getProperties();
-        
-        properties.setProperty(Options.SLOT_SIZE,"128");
 
         try {
             
             Journal journal = new Journal(properties);
-
-            assertNotNull("slotMath", journal.slotMath);
-            assertEquals("slotSize", 128, journal.slotMath.slotSize);
             
             DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
             
@@ -141,7 +138,8 @@ public class TestDirectJournal extends AbstractTestCase {
             assertNotNull("raf", bufferStrategy.raf);
             assertEquals("bufferMode", BufferMode.Direct, bufferStrategy.getBufferMode());
             assertNotNull("directBuffer", bufferStrategy.directBuffer);
-            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
+            assertTrue( "userExtent", bufferStrategy.getExtent() > bufferStrategy.getUserExtent());
+            assertEquals( "bufferCapacity", bufferStrategy.getUserExtent(), bufferStrategy.directBuffer
                     .capacity());
 
             journal.close();
@@ -149,6 +147,30 @@ public class TestDirectJournal extends AbstractTestCase {
         } finally {
             
             deleteTestJournalFile();
+            
+        }
+        
+    }
+
+    /**
+     * Test suite integration for {@link AbstractRestartSafeTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestRawStore extends AbstractRestartSafeTestCase {
+        
+        public TestRawStore() {
+            super();
+        }
+
+        public TestRawStore(String name) {
+            super(name);
+        }
+
+        protected BufferMode getBufferMode() {
+            
+            return BufferMode.Direct;
             
         }
         

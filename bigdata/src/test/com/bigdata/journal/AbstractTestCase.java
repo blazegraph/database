@@ -53,9 +53,6 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.journal.SimpleObjectIndex.IObjectIndexEntry;
-
-import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
@@ -466,8 +463,13 @@ abstract public class AbstractTestCase
      * @see {@link #getProperties()}, which sets the "deleteOnClose" flag for
      *      unit tests.
      */
-    
     protected String getTestJournalFile(Properties properties) {
+        
+        return getTestJournalFile(getName(),properties);
+        
+    }
+
+    static public String getTestJournalFile(String name,Properties properties) {
 
         // Used to name the file.
         String bufferMode = properties.getProperty(Options.BUFFER_MODE);
@@ -479,7 +481,7 @@ abstract public class AbstractTestCase
 
             // Create the temp. file.
             File tmp = File.createTempFile("test-" + bufferMode + "-"
-                    + getName() + "-", ".jnl");
+                    + name + "-", ".jnl");
             
             // Delete the file otherwise the Journal will attempt to open it.
             if (!tmp.delete()) {
@@ -585,23 +587,15 @@ abstract public class AbstractTestCase
     protected Random r = new Random();
 
     /**
-     * Returns random data that will fit in N slots. N is choosen randomly, the
-     * slotSize is assumed to be 128, and then the actual length is choosen
-     * randomly within that slot.
+     * Returns random data that will fit in N bytes. N is choosen randomly in
+     * 1:1024.
      * 
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
      *         random length and having random contents.
      */
     public ByteBuffer getRandomData(Journal journal) {
         
-        final int slotSize = journal.slotMath.slotSize;
-        
-        // @todo change the distribution shape to make 1 slot very common and
-        // give it a modestly long tail, e.g., out to 50 slots.
-        final int nslots = r.nextInt(5) + 1;
-        
-        final int nbytes = ((nslots - 1) * slotSize)
-                + r.nextInt(slotSize) + 1;
+        final int nbytes = r.nextInt(1024) + 1;
         
         byte[] bytes = new byte[nbytes];
         
@@ -611,274 +605,182 @@ abstract public class AbstractTestCase
         
     }
     
-    /**
-     * Test helper verifies that the data is deleted.
-     */
-    public void assertDeleted(IStore store, int id) {
+//    /**
+//     * Test helper verifies that the data is deleted.
+//     */
+//    public void assertDeleted(IStore store, int id) {
+//
+//        try {
+//
+//            store.read(id, null);
+//
+//            fail("Expecting " + DataDeletedException.class);
+//
+//        } catch (DataDeletedException ex) {
+//
+//            System.err.println("Ignoring expected exception: " + ex);
+//
+//        }
+//        
+//    }
 
-        try {
+//    /**
+//     * Test helper checks for the parameter for the semantics of "not found" as
+//     * defined by {@link IStore#read(int, ByteBuffer)}.
+//     * 
+//     * @param actual
+//     *            The value returned by either of those methods.
+//     */
+//    public void assertNotFound(ByteBuffer actual) {
+//        
+//        assertNull("Expecting 'not found'", actual);
+//        
+//    }
 
-            store.read(id, null);
-
-            fail("Expecting " + DataDeletedException.class);
-
-        } catch (DataDeletedException ex) {
-
-            System.err.println("Ignoring expected exception: " + ex);
-
-        }
-        
-    }
-
-    /**
-     * Test helper checks for the parameter for the semantics of "not found" as
-     * defined by {@link IStore#read(int, ByteBuffer)}.
-     * 
-     * @param actual
-     *            The value returned by either of those methods.
-     */
-    public void assertNotFound(ByteBuffer actual) {
-        
-        assertNull("Expecting 'not found'", actual);
-        
-    }
-
-    /**
-     * Verify that the {@link ISlotAllocation}s are consistent (the same slots
-     * in the same order).
-     * 
-     * @param expected
-     *            The expected slot allocation.
-     * @param actual
-     *            The actual slot allocation.
-     */
-    public void assertEquals(ISlotAllocation expected, ISlotAllocation actual) {
-
-        /* Note: We MUST use a reference test here since the visitation pattern
-         * does not support concurrent traversal.  Failure to test for the same
-         * reference here will cause a seemingly suprious IllegalStateException
-         * when trying to compare a SingletonSlotAllocation with itself.
-         */ 
-        if( expected == actual ) return; // same same.
-        
-        if( expected == null && actual != null ) fail("Expected null.");
-        
-        if( expected != null && actual == null ) fail("Expected non-null");
-        
-        assertEquals("capacity",expected.capacity(),actual.capacity());
-
-        assertEquals("closed",expected.isClosed(),actual.isClosed());
-        
-        assertEquals("#bytes",expected.getByteCount(),actual.getByteCount());
-        
-        assertEquals("#slots",expected.getSlotCount(),actual.getSlotCount());
-
-        // check the first slot.
-        int expectedSlot = expected.firstSlot();
-        int actualSlot = actual.firstSlot();
-        assertEquals("firstSlot",expectedSlot,actualSlot);
-
-        // check the remaining slots.
-        int i = 1;
-        do {
-            
-            expectedSlot = expected.nextSlot();
-            
-//            try {
-                actualSlot = actual.nextSlot();
-//            }
-//            catch( IllegalStateException ex ) {
-//                System.err.println("expected: "+expected.getClass());
-//                System.err.println("actual  : "+actual.getClass());
-//                throw ex;
-//            }
-            
-            assertEquals("slot[" + i + "]", expectedSlot, actualSlot);
-
-            i++;
-            
-        } while( expectedSlot != -1 );
-
-    }
-
-    /**
-     * Verify that the slots are marked as indicated in the specified
-     * {@link ISlotAllocationIndex}.
-     * 
-     * @param slots
-     *            The slots.
-     * @param allocationIndex
-     *            The slot allocation index.
-     * @param allocated
-     *            true iff the slots must be marked as allocated in the index.
-     */
-//    * @param committed
-//    *            true iff the slots must be marked as committed in the index.
-    public void assertSlotAllocationState(ISlotAllocation slots,
-            ISlotAllocationIndex allocationIndex, boolean allocated) {
-
-        assert slots != null;
-        
-        assert allocationIndex != null;
-        
-        int i = 0;
-        
-        for (int slot = slots.firstSlot(); slot != -1; slot = slots.nextSlot()) {
-
-            assertEquals(
-                    "nslots=" + slots.getSlotCount() + " : slot[" + i + "]",
-                    allocated, allocationIndex.isAllocated(slot));
-
-            i++;
-            
-        }
-        
-    }
-
-    /**
-     * Test the version counter for a persistent identifier in the global scope.
-     * 
-     * @param journal
-     *            The journal.
-     * @param id
-     *            The int32 within segment persistent identifier.
-     * @param expectedVersionCounter
-     *            The expected value of the version counter.
-     * 
-     * @exception AssertionFailedError
-     *                if the persistent identifier is not found in the global
-     *                object index.
-     * @exception AssertionFailedError
-     *                if the identifer is found, but the version counter value
-     *                differs from the expected version counter.
-     */
-    protected void assertVersionCounter(Journal journal, int id, long expectedVersionCounter ) {
-
-        // FIXME hardwired to SimpleObjectIndex.
-        IObjectIndexEntry entry = ((SimpleObjectIndex)journal.objectIndex).objectIndex.get(id);
-        
-        if( entry == null ) fail("No entry in journal: id="+id);
-        
-        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
-        
-    }
-
-    /**
-     * Test the version counter for a persistent identifier in the transaction
-     * scope.
-     * 
-     * @param tx
-     *            The transaction.
-     * @param id
-     *            The int32 within segment persistent identifier.
-     * @param expectedVersionCounter
-     *            The expected value of the version counter.
-     * @exception AssertionFailedError
-     *                if the persistent identifier is not found in the
-     *                transaction's outer object index (this test does NOT read
-     *                through to the inner index so you MUST NOT invoke it
-     *                before the version has been overwritten by the
-     *                transaction).
-     * @exception AssertionFailedError
-     *                if the identifer is found, but the version counter value
-     *                differs from the expected version counter.
-     */
-    protected void assertVersionCounter(Tx tx, int id, int expectedVersionCounter ) {
-        
-        // FIXME hardwired to SimpleObjectIndex.
-        IObjectIndexEntry entry = ((SimpleObjectIndex)tx.getObjectIndex()).objectIndex.get(id);
-        
-//        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
-        
-        if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
-        
-        assertEquals("versionCounter", (short) expectedVersionCounter, entry.getVersionCounter() );
-        
-    }
+//    /**
+//     * Test the version counter for a persistent identifier in the global scope.
+//     * 
+//     * @param journal
+//     *            The journal.
+//     * @param id
+//     *            The int32 within segment persistent identifier.
+//     * @param expectedVersionCounter
+//     *            The expected value of the version counter.
+//     * 
+//     * @exception AssertionFailedError
+//     *                if the persistent identifier is not found in the global
+//     *                object index.
+//     * @exception AssertionFailedError
+//     *                if the identifer is found, but the version counter value
+//     *                differs from the expected version counter.
+//     */
+//    protected void assertVersionCounter(Journal journal, int id, long expectedVersionCounter ) {
+//
+//        // FIXME hardwired to SimpleObjectIndex.
+//        IObjectIndexEntry entry = ((SimpleObjectIndex)journal.objectIndex).objectIndex.get(id);
+//        
+//        if( entry == null ) fail("No entry in journal: id="+id);
+//        
+//        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
+//        
+//    }
+//
+//    /**
+//     * Test the version counter for a persistent identifier in the transaction
+//     * scope.
+//     * 
+//     * @param tx
+//     *            The transaction.
+//     * @param id
+//     *            The int32 within segment persistent identifier.
+//     * @param expectedVersionCounter
+//     *            The expected value of the version counter.
+//     * @exception AssertionFailedError
+//     *                if the persistent identifier is not found in the
+//     *                transaction's outer object index (this test does NOT read
+//     *                through to the inner index so you MUST NOT invoke it
+//     *                before the version has been overwritten by the
+//     *                transaction).
+//     * @exception AssertionFailedError
+//     *                if the identifer is found, but the version counter value
+//     *                differs from the expected version counter.
+//     */
+//    protected void assertVersionCounter(Tx tx, int id, int expectedVersionCounter ) {
+//        
+//        // FIXME hardwired to SimpleObjectIndex.
+//        IObjectIndexEntry entry = ((SimpleObjectIndex)tx.getObjectIndex()).objectIndex.get(id);
+//        
+////        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
+//        
+//        if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
+//        
+//        assertEquals("versionCounter", (short) expectedVersionCounter, entry.getVersionCounter() );
+//        
+//    }
     
-    /**
-     * Write a data version consisting of N random bytes and verify that we can
-     * read it back out again.
-     * 
-     * @param store
-     *            The store.
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param nbytes
-     *            The data version length.
-     * 
-     * @return The data written. This can be used to re-verify the write after
-     *         intervening reads.
-     */
-    
-    protected byte[] doWriteRoundTripTest(IStore store, int id, int nbytes) {
-
-        System.err.println("Test writing: id="+id+", nbytes="+nbytes);
-        
-        byte[] expected = new byte[nbytes];
-        
-        r.nextBytes(expected);
-        
-        ByteBuffer data = ByteBuffer.wrap(expected);
-        
-//        assertNull((tx == null ? journal.objectIndex.getSlots(id)
-//                : tx.getObjectIndex().getSlots(id)));
-        
-        store.write(id,data);
-        assertEquals("limit() != #bytes", expected.length, data.limit());
-        assertEquals("position() != limit()",data.limit(),data.position());
-
-//        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
-//                : tx.getObjectIndex().getSlots(id));
-//        assertEquals("#bytes",nbytes,slots.getByteCount());
-//        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
-//        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
-        
-        /*
-         * Read into a buffer allocated by the Journal.
-         */
-        ByteBuffer actual = store.read(id, null);
-
-        assertEquals("acutal.position()",0,actual.position());
-        assertEquals("acutal.limit()",expected.length,actual.limit());
-        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
-        assertEquals(expected,actual);
-
-        /*
-         * Read multiple copies into a buffer that we allocate ourselves.
-         */
-        final int ncopies = 7;
-        int pos = 0;
-        actual = ByteBuffer.allocate(expected.length * ncopies);
-        for( int i=0; i<ncopies; i++ ) {
-
-            /*
-             * Setup to read into the next slice of our buffer.
-             */
-//            System.err.println("reading @ i="+i+" of "+ncopies);
-            pos = i * expected.length;
-            actual.limit( actual.capacity() );
-            actual.position( pos );
-            
-            ByteBuffer tmp = store.read(id, actual);
-            assertTrue("Did not read into the provided buffer", tmp == actual);
-            assertEquals("position()", pos, actual.position() );
-            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
-            assertEquals(expected,actual);
-
-            /*
-             * Attempt to read with insufficient remaining bytes in the buffer
-             * and verify that the data are read into a new buffer.
-             */
-            actual.limit(pos+expected.length-1);
-            tmp = store.read(id, actual);
-            assertFalse("Read failed to allocate a new buffer", tmp == actual);
-            assertEquals(expected,tmp);
-
-        }
-        
-        return expected;
-        
-    }
+//    /**
+//     * Write a data version consisting of N random bytes and verify that we can
+//     * read it back out again.
+//     * 
+//     * @param store
+//     *            The store.
+//     * @param id
+//     *            The int32 within-segment persistent identifier.
+//     * @param nbytes
+//     *            The data version length.
+//     * 
+//     * @return The data written. This can be used to re-verify the write after
+//     *         intervening reads.
+//     */
+//    
+//    protected byte[] doWriteRoundTripTest(IStore store, int id, int nbytes) {
+//
+//        System.err.println("Test writing: id="+id+", nbytes="+nbytes);
+//        
+//        byte[] expected = new byte[nbytes];
+//        
+//        r.nextBytes(expected);
+//        
+//        ByteBuffer data = ByteBuffer.wrap(expected);
+//        
+////        assertNull((tx == null ? journal.objectIndex.getSlots(id)
+////                : tx.getObjectIndex().getSlots(id)));
+//        
+//        store.write(id,data);
+//        assertEquals("limit() != #bytes", expected.length, data.limit());
+//        assertEquals("position() != limit()",data.limit(),data.position());
+//
+////        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
+////                : tx.getObjectIndex().getSlots(id));
+////        assertEquals("#bytes",nbytes,slots.getByteCount());
+////        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
+////        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
+//        
+//        /*
+//         * Read into a buffer allocated by the Journal.
+//         */
+//        ByteBuffer actual = store.read(id, null);
+//
+//        assertEquals("acutal.position()",0,actual.position());
+//        assertEquals("acutal.limit()",expected.length,actual.limit());
+//        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
+//        assertEquals(expected,actual);
+//
+//        /*
+//         * Read multiple copies into a buffer that we allocate ourselves.
+//         */
+//        final int ncopies = 7;
+//        int pos = 0;
+//        actual = ByteBuffer.allocate(expected.length * ncopies);
+//        for( int i=0; i<ncopies; i++ ) {
+//
+//            /*
+//             * Setup to read into the next slice of our buffer.
+//             */
+////            System.err.println("reading @ i="+i+" of "+ncopies);
+//            pos = i * expected.length;
+//            actual.limit( actual.capacity() );
+//            actual.position( pos );
+//            
+//            ByteBuffer tmp = store.read(id, actual);
+//            assertTrue("Did not read into the provided buffer", tmp == actual);
+//            assertEquals("position()", pos, actual.position() );
+//            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
+//            assertEquals(expected,actual);
+//
+//            /*
+//             * Attempt to read with insufficient remaining bytes in the buffer
+//             * and verify that the data are read into a new buffer.
+//             */
+//            actual.limit(pos+expected.length-1);
+//            tmp = store.read(id, actual);
+//            assertFalse("Read failed to allocate a new buffer", tmp == actual);
+//            assertEquals(expected,tmp);
+//
+//        }
+//        
+//        return expected;
+//        
+//    }
     
 }

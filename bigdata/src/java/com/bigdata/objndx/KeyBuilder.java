@@ -54,14 +54,18 @@ import com.ibm.icu.text.RuleBasedCollator;
  * 
  * @todo transparent use of ICU4JNI when available.
  * 
- * @todo update successor methods and tests for GOM index helper classes.
- * 
- * @todo drop the package (com.bigdata.objndx.ndx) containing type-specific
- *       successor and comparator methods since they are no longer needed with
- *       the advent of unsigned byte[] keys.
+ * @todo update successor tests for GOM index helper classes, perhaps by
+ *       refactoring the successor utilties into a base class and then isolating
+ *       their test suite from that of the key builder.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see SuccessorUtil, which may be used to compute the successor of a value before
+ *      encoding it as a component of a key.
+ * 
+ * @see BytesUtil#successor(byte[]), which may be used to compute the successor
+ *      of an encoded key.
  */
 public class KeyBuilder {
 
@@ -244,7 +248,7 @@ public class KeyBuilder {
         
     }
 
-    public RuleBasedCollator getCollator() {
+    final public RuleBasedCollator getCollator() {
         
         return collator;
         
@@ -272,7 +276,7 @@ public class KeyBuilder {
      *            
      * @return this.
      */
-    public KeyBuilder append(int off, int len, byte[] a) {
+    final public KeyBuilder append(int off, int len, byte[] a) {
         
         ensureFree(len);
         
@@ -280,7 +284,7 @@ public class KeyBuilder {
         
         this.len += len;
         
-        assert this.len <= buf.length;
+//        assert this.len <= buf.length;
         
         return this;
         
@@ -290,11 +294,19 @@ public class KeyBuilder {
      * Ensure that at least <i>len</i> bytes are free in the buffer. The
      * {@link #buf buffer} may be grown by this operation but it will not be
      * truncated.
+     * <p>
+     * This operation is equivilent to
+     * 
+     * <pre>
+     * ensureCapacity(this.len + len)
+     * </pre>
+     * 
+     * and the latter is often used as an optimization.
      * 
      * @param len
      *            The minimum #of free bytes.
      */
-    public void ensureFree(int len) {
+    final public void ensureFree(int len) {
         
         ensureCapacity(this.len + len );
         
@@ -308,16 +320,19 @@ public class KeyBuilder {
      * @param capacity
      *            The minimum #of bytes in the buffer.
      */
-    public void ensureCapacity(int capacity) {
+    final public void ensureCapacity(int capacity) {
         
         if(capacity<0) throw new IllegalArgumentException();
+//        assert capacity >= 0;
         
-        int overflow = capacity - buf.length;
+        final int overflow = capacity - buf.length;
         
         if(overflow>0) {
         
-            // extend to the target capacity.
-            byte[] tmp = new byte[capacity];
+            /*
+             * extend to at least the target capacity.
+             */
+            final byte[] tmp = new byte[capacity];
             
             // copy only the defined bytes.
             System.arraycopy(buf, 0, tmp, 0, this.len);
@@ -331,12 +346,16 @@ public class KeyBuilder {
     /**
      * Return the encoded key. Comparison of keys returned by this method MUST
      * treat the array as an array of <em>unsigned bytes</em>.
+     * <p>
+     * Note that keys are <em>donated</em> to the btree so it is important to
+     * allocate new keys when running in the same process space.  When using a
+     * network api, the api provides the necessary decoupling. 
      * 
      * @return A new array containing the key.
      * 
      * @see BytesUtil#compareBytes(byte[], byte[])
      */
-    public byte[] getKey() {
+    final public byte[] getKey() {
         
         byte[] tmp = new byte[this.len];
         
@@ -346,12 +365,32 @@ public class KeyBuilder {
         
     }
     
+    /*
+     * The problem with this method is that it encourages us to reuse a key
+     * buffer but the btree (at least when used as part of a local api) requires
+     * that we donate the key buffer to the btree.
+     */
+//    /**
+//     * Copy the key from the internal buffer into the supplied buffer.
+//     * 
+//     * @param b
+//     *            A byte[].
+//     * 
+//     * @exception IndexOutOfBoundsException
+//     *                if the supplied buffer is not large enough.
+//     */
+//    final public void copyKey(byte[] b) {
+//    
+//        System.arraycopy(this.buf, 0, b, 0, this.len);
+//        
+//    }
+    
     /**
      * Reset the key length to zero before building another key.
      * 
      * @return This {@link KeyBuilder}.
      */
-    public KeyBuilder reset() {
+    final public KeyBuilder reset() {
         
         len = 0;
         
@@ -425,6 +464,12 @@ public class KeyBuilder {
      *            A String containing US-ASCII characters.
      * 
      * @return This key builder.
+     * 
+     * @todo This could be written using {@link String#toCharArray()} or {@link
+     *       String#getBytes(int, int, byte[], int)} with a post-processing
+     *       fixup of the bytes into ones complement values. The latter method
+     *       would doubtless be the fastest approach but it is deprecated in the
+     *       {@link String} api.
      */
     public KeyBuilder appendASCII(String s) {
         
@@ -432,7 +477,7 @@ public class KeyBuilder {
         
         ensureFree(len);
         
-        for(int i=0; i<s.length(); i++) {
+        for(int i=0; i<len; i++) {
             
             char ch = s.charAt(i);
             
@@ -462,7 +507,7 @@ public class KeyBuilder {
      * @param a
      *            The array of bytes.
      */
-    public KeyBuilder append(byte[] a) {
+    final public KeyBuilder append(byte[] a) {
         
         return append(0,a.length,a);
         
@@ -479,9 +524,11 @@ public class KeyBuilder {
      * @param d
      *            The double-precision floating point value.
      */
-    public KeyBuilder append(double d) {
+    final public KeyBuilder append(double d) {
         
-        ensureFree(8);
+        // performance tweak.
+        if (len + 8 > buf.length) ensureCapacity(len+8);
+//        ensureFree(8);
 
         long v = Double.doubleToLongBits(d);
         
@@ -509,9 +556,11 @@ public class KeyBuilder {
      * @param f
      *            The single-precision floating point value.
      */
-    public KeyBuilder append(float f) {
+    final public KeyBuilder append(float f) {
 
-        ensureFree(4);
+        // performance tweak.
+        if (len + 4 > buf.length) ensureCapacity(len+4);
+//        ensureFree(4);
 
         int v = Float.floatToIntBits(f);
 
@@ -532,9 +581,12 @@ public class KeyBuilder {
      * lexiographic ordering as an unsigned long integer and then appending it
      * into the buffer as 8 bytes using a big-endian order.
      */
-    public KeyBuilder append(long v) {
+    final public KeyBuilder append(long v) {
 
-        ensureFree(8);
+        // performance tweak adds .3% on rdfs bulk load.
+        if (len + 8 > buf.length) ensureCapacity(len+8);
+//        ensureFree(8);
+//        ensureCapacity( len + 8 );
         
         // lexiographic ordering as unsigned long integer.
 
@@ -605,9 +657,11 @@ public class KeyBuilder {
      * lexiographic ordering as an unsigned integer and then appending it into
      * the buffer as 4 bytes using a big-endian order.
      */
-    public KeyBuilder append(int v) {
+    final public KeyBuilder append(int v) {
 
-        ensureFree(4);
+        // performance tweak.
+        if (len + 4 > buf.length) ensureCapacity(len+4);
+//        ensureFree(4);
         
         // lexiographic ordering as unsigned int.
         
@@ -636,9 +690,11 @@ public class KeyBuilder {
      * two-complete representation supporting unsigned byte[] comparison and
      * then appending it into the buffer as 2 bytes using a big-endian order.
      */
-    public KeyBuilder append(short v) {
+    final public KeyBuilder append(short v) {
 
-        ensureFree(2);
+        // performance tweak.
+        if (len + 2 > buf.length) ensureCapacity(len+2);
+//        ensureFree(2);
         
         // lexiographic ordering as unsigned short.
         
@@ -680,9 +736,11 @@ public class KeyBuilder {
      * @param v
      *            The signed byte.
      */
-    public KeyBuilder append(final byte v) {
+    final public KeyBuilder append(final byte v) {
 
-        ensureFree(1);
+        // performance tweak
+        if (len + 1 > buf.length) ensureCapacity(len+1);
+        // ensureFree(1);
 
         // lexiographic ordering as unsigned byte.
         
@@ -727,9 +785,11 @@ public class KeyBuilder {
      * 
      * @return this.
      */
-    public KeyBuilder appendNul() {
+    final public KeyBuilder appendNul() {
         
-        ensureFree(1);
+        // performance tweak.
+        if (len + 1 > buf.length) ensureCapacity(len+1);
+//        ensureFree(1);
         
         buf[len++] = (byte) 0;
         
@@ -802,340 +862,4 @@ public class KeyBuilder {
 
     }
     
-    /**
-     * Computes the successor of a <code>byte</code> value.
-     * 
-     * @param n
-     *            A value
-     *            
-     * @return The successor of that value.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that value.
-     */
-
-    public static byte successor( byte n ) throws NoSuccessorException {
-
-        if (Byte.MAX_VALUE == n) {
-
-            throw new NoSuccessorException();
-
-        } else {
-
-            return (byte) (n + 1);
-
-        }
-
-    }
-    
-    /**
-     * Computes the successor of a <code>char</code> value.
-     * 
-     * @param n
-     *            A value
-     *            
-     * @return The successor of that value.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that value.
-     */
-
-    public static char successor( char n ) throws NoSuccessorException
-    {
-        
-        if (Character.MAX_VALUE == n) {
-
-            throw new NoSuccessorException();
-
-        } else {
-
-            return (char) (n + 1);
-
-        }
-        
-    }
-    
-    /**
-     * Computes the successor of a <code>short</code> value.
-     * 
-     * @param n
-     *            A value
-     *            
-     * @return The successor of that value.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that value.
-     */
-
-    public static short successor( short n ) throws NoSuccessorException
-    {
-        
-        if (Short.MAX_VALUE == n) {
-
-            throw new NoSuccessorException();
-
-        } else {
-
-            return (short) (n + 1);
-
-        }
-        
-    }
-    
-    /**
-     * Computes the successor of an <code>int</code> value.
-     * 
-     * @param n
-     *            A value
-     *            
-     * @return The successor of that value.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that value.
-     */
-
-    public static int successor( int n ) throws NoSuccessorException
-    {
-    
-        if (Integer.MAX_VALUE == n) {
-
-            throw new NoSuccessorException();
-
-        } else {
-
-            return n + 1;
-
-        }
-
-    }
-
-    /**
-     * Computes the successor of a <code>long</code> value.
-     * 
-     * @param n
-     *            A value
-     *            
-     * @return The successor of that value.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no successor for that value.
-     */
-
-    public static long successor( long n ) throws NoSuccessorException
-    {
-
-        if (Long.MAX_VALUE == n) {
-
-            throw new NoSuccessorException();
-
-        } else {
-
-            return n + 1L;
-
-        }
-   
-    }
-    
-    /**
-     * <p>
-     * Computes the successor of a <code>float</code> value.
-     * </p>
-     * <p>
-     * The IEEE floating point standard provides a means for computing the next
-     * larger or smaller floating point value using a bit manipulation trick.
-     * See <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson. The Java
-     * {@link Float} and {@link Double} clases provide the static methods
-     * required to convert a float or double into its IEEE 754 floating point
-     * bit layout, which can be treated as an int (for floats) or a long (for
-     * doubles). By testing for the sign, you can just add (or subtract) one (1)
-     * to get the bit pattern of the successor (see the above referenced
-     * article). Special exceptions must be made for NaNs, negative infinity and
-     * positive infinity.
-     * </p>
-     * 
-     * @param f
-     *            The float value.
-     * 
-     * @return The next value in the value space for <code>float</code>.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no next value in the value space.
-     */
-
-    static public float successor( float f )
-        throws NoSuccessorException
-    {
-        
-        if (f == Float.MAX_VALUE) {
-
-            return Float.POSITIVE_INFINITY;
-
-        }
-
-        if (Float.isNaN(f)) {
-
-            throw new NoSuccessorException("NaN");
-
-        }
-
-        if (Float.isInfinite(f)) {
-
-            if (f > 0) {
-
-                throw new NoSuccessorException("Positive Infinity");
-
-            } else {
-
-                /* no successor for negative infinity (could be the largest
-                 * negative value).
-                 */
-
-                throw new NoSuccessorException("Negative Infinity");
-
-            }
-
-        }
-
-        int bits = Float.floatToIntBits(f);
-
-        if (bits == 0x80000000) {
-            
-            /*
-             * the successor of -0.0f is +0.0f
-             * 
-             * @todo Java defines the successor of floating point zeros as the
-             * first non-zero value so maybe we should change this.
-             */
-            return +0.0f;
-            
-        }
-
-        if (f >= +0.0f) {
-
-            bits += 1;
-
-        } else {
-
-            bits -= 1;
-
-        }
-
-        float nxt = Float.intBitsToFloat(bits);
-        
-        return nxt;
-        
-    }
-    
-    /**
-     * <p>
-     * Computes the successor of a <code>double</code> value.
-     * </p>
-     * <p>
-     * The IEEE floating point standard provides a means for computing the next
-     * larger or smaller floating point value using a bit manipulation trick.
-     * See <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson. The Java
-     * {@link Float} and {@link Double} clases provide the static methods
-     * required to convert a float or double into its IEEE 754 floating point
-     * bit layout, which can be treated as an int (for floats) or a long (for
-     * doubles). By testing for the sign, you can just add (or subtract) one (1)
-     * to get the bit pattern of the successor (see the above referenced
-     * article). Special exceptions must be made for NaNs, negative infinity and
-     * positive infinity.
-     * </p>
-     * 
-     * @param d The double value.
-     * 
-     * @return The next value in the value space for <code>double</code>.
-     * 
-     * @exception NoSuccessorException
-     *                if there is no next value in the value space.
-     */
-
-    public static double successor( double d ) 
-        throws NoSuccessorException
-    {
-        
-        if (d == Double.MAX_VALUE) {
-
-            return Double.POSITIVE_INFINITY;
-
-        }
-
-        if (Double.isNaN(d)) {
-
-            throw new NoSuccessorException("Nan");
-
-        }
-
-        if (Double.isInfinite(d)) {
-
-            if (d > 0) {
-
-                throw new NoSuccessorException("Positive Infinity");
-
-            } else {
-
-                // The successor of negative infinity.
-
-                return Double.MIN_VALUE;
-
-            }
-
-        }
-
-        long bits = Double.doubleToLongBits(d);
-
-        if (bits == 0x8000000000000000L) {
-            
-            /* the successor of -0.0d is +0.0d
-             * 
-             * @todo Java defines the successor of floating point zeros as the
-             * first non-zero value so maybe we should change this.
-             */
-            return +0.0d;
-            
-        }
-
-//        if (f >= +0.0f) {
-
-        if (d >= +0.0) {
-
-            bits += 1;
-
-        } else {
-
-            bits -= 1;
-
-        }
-
-        double nxt = Double.longBitsToDouble(bits);
-
-        return nxt;
-
-    }
-    
-    /**
-     * The successor of a string value is formed by appending a <code>nul</code>.
-     * The successor of a <code>null</code> string reference is an empty
-     * string. The successor of a string value is defined unless the string is
-     * too long.
-     * 
-     * @param s The string reference or <code>null</code>.
-     * 
-     * @return The successor and never <code>null</code>
-     */
-
-    public static String successor(String s) {
-
-        if (s == null)
-            return "\0";
-
-        return s + "\0";
-
-    }
-
 }

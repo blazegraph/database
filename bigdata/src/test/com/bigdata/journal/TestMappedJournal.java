@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -89,6 +88,9 @@ public class TestMappedJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestMappedJournal.class);
 
+        // test suite for the IRawStore api.
+        suite.addTestSuite( TestRawStore.class );
+
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
          * all the tests will run with the configuration specified in this test
@@ -124,15 +126,10 @@ public class TestMappedJournal extends AbstractTestCase {
 
         final Properties properties = getProperties();
         
-        properties.setProperty(Options.SLOT_SIZE,"128");
-
         try {
             
             Journal journal = new Journal(properties);
 
-            assertNotNull("slotMath", journal.slotMath);
-            assertEquals("slotSize", 128, journal.slotMath.slotSize);
-            
             MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
             
             assertEquals("file", properties.getProperty(Options.FILE), bufferStrategy.file.toString());
@@ -142,8 +139,8 @@ public class TestMappedJournal extends AbstractTestCase {
             assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
             assertNotNull("directBuffer", bufferStrategy.directBuffer);
             assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
-            assertEquals("mappedBuffer",bufferStrategy.directBuffer,bufferStrategy.directBuffer);
-            assertEquals("", bufferStrategy.getExtent(), bufferStrategy.directBuffer
+            assertTrue( "userExtent", bufferStrategy.getExtent() > bufferStrategy.getUserExtent());
+            assertEquals( "bufferCapacity", bufferStrategy.getUserExtent(), bufferStrategy.directBuffer
                     .capacity());
             
             journal.close();
@@ -156,4 +153,29 @@ public class TestMappedJournal extends AbstractTestCase {
 
     }
     
+    
+    /**
+     * Test suite integration for {@link AbstractRestartSafeTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestRawStore extends AbstractRestartSafeTestCase {
+        
+        public TestRawStore() {
+            super();
+        }
+
+        public TestRawStore(String name) {
+            super(name);
+        }
+
+        protected BufferMode getBufferMode() {
+            
+            return BufferMode.Mapped;
+            
+        }
+
+    }
+
 }

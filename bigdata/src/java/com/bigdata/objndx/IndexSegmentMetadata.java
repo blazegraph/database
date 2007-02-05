@@ -4,7 +4,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
 
-import com.bigdata.journal.Bytes;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * The metadata record for an {@link IndexSegment}.

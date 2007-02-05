@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -83,11 +82,7 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite("All Journals");
 
         suite.addTestSuite( TestAccount.class );
-        suite.addTestSuite( TestSlotMath.class );
         suite.addTestSuite( TestRootBlockView.class );
-        suite.addTestSuite( TestSlotAllocation.class );
-        suite.addTestSuite( TestSimpleObjectIndex.class );
-        suite.addTestSuite( TestSimpleSlotAllocationIndex.class );
         
         suite.addTest( TestTransientJournal.suite() );
         suite.addTest( TestDirectJournal.suite() );

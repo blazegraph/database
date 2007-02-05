@@ -40,6 +40,14 @@
   </description>
 
   <versions>
+  
+  <!-- There is a tag (BIGDATA_FAST_BTREE_BRANCH) and a branch
+       (BIGDATA_FAST_BTREE_BRANCH_FOR_REAL) for the version of the
+       btree before I added, and then removed, the stride support
+       and before I converted to the varable length unsigned byte[]
+       keys.  This version is significantly faster for reasons that
+       I have not been able to track down yet. -->
+
   </versions>
 
   <!-- copy down inheritance applies. -->

@@ -8,18 +8,15 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Helper object used when opening or creating journal file in any of the
  * file-based modes.
  * 
- * FIXME Write tests that verify the correct initialization of a new journal
- * file.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-
 class FileMetadata {
 
     static final int SIZE_MAGIC = Bytes.SIZEOF_INT;
@@ -39,7 +36,7 @@ class FileMetadata {
     /**
      * The unique segment identifier.
      */
-    final long segment;
+    final int segment;
     
     /**
      * The file that was opened.
@@ -60,17 +57,18 @@ class FileMetadata {
      * The extent of the file in bytes.
      */
     final long extent;
+    
+    /**
+     * The extent of the user data space (everything after the root blocks).
+     */
+    final long userExtent;
 
     /**
-     * The actual slot size for the file (which may differ from the given slot
-     * size when opening a pre-existing file).
+     * The next offset at which a record would be written on the store.  The
+     * offset is relative to the start of the user data space.  Offset zero(0)
+     * addresses the first byte after the root blocks.
      */
-    final int slotSize;
-
-    /**
-     * The actual or computed slot limit for the file.
-     */
-    final int slotLimit;
+    final int nextOffset;
     
     /**
      * True iff the file was opened in a read-only mode.
@@ -81,16 +79,18 @@ class FileMetadata {
      * Offset of the first root block in the file.
      */
     static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
+    
     /**
      * Offset of the second root block in the file.
      */
     static final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
+    
     /**
      * The size of the journal header, including MAGIC, version, and both root
      * blocks. This is as an offset when computing the index of a slot on the
      * journal.
      */
-    final int journalHeaderSize  = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
+    final int headerSize0  = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
     
     /**
      * Depending on the mode, this will be either a direct buffer, a mapped
@@ -112,20 +112,19 @@ class FileMetadata {
     /**
      * Prepare a journal file for use by an {@link IBufferStrategy}.
      * 
-     * @param segment
+     * @param segmentId
      *            The unique segment identifier.
      * @param file
      *            The name of the file to be opened.
      * @param bufferMode
      *            The {@link BufferMode}.
+     * @param useDirectBuffers
+     *            true if a buffer should be allocated using
+     *            {@link ByteBuffer#allocateDirect(int)} rather than
+     *            {@link ByteBuffer#allocate(int)}. This has no effect for the
+     *            {@link BufferMode#Disk} and {@link BufferMode#Mapped} modes.
      * @param initialExtent
      *            The initial extent of the file iff a new file is created.
-     * @param slotSize
-     *            The slot size iff a new file is created.
-     * @param objectIndexSize
-     *            The #of keys in a node of the object index (aka branching
-     *            factor). This value must be even, and positive. Typically it
-     *            is a power of two. E.g., 64, 128, 256.
      * @param create
      *            When true, the file is created if it does not exist.
      * @param readOnly
@@ -138,11 +137,9 @@ class FileMetadata {
      * 
      * @throws IOException
      */
-
-    FileMetadata(long segment, File file, BufferMode bufferMode,
-            long initialExtent, int slotSize, int objectIndexSize,
-            boolean create, boolean readOnly, ForceEnum forceWrites)
-            throws IOException {
+    FileMetadata(int segmentId, File file, BufferMode bufferMode, boolean useDirectBuffers,
+            long initialExtent, boolean create, boolean readOnly,
+            ForceEnum forceWrites) throws IOException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -173,7 +170,7 @@ class FileMetadata {
 
         }
 
-        this.segment = segment;
+        this.segment = segmentId;
         
         this.file = file;
         
@@ -237,7 +234,8 @@ class FileMetadata {
                  * We were not able to get a lock on the file.
                  */
 
-                throw new RuntimeException("Could not lock file: " + file.getAbsoluteFile());
+                throw new RuntimeException("Could not lock file: "
+                        + file.getAbsoluteFile());
 
             }
 
@@ -251,7 +249,9 @@ class FileMetadata {
 
             this.extent = raf.length();
             
-            if( this.extent <= journalHeaderSize ) {
+            this.userExtent = extent - headerSize0;
+            
+            if( this.extent <= headerSize0 ) {
 
                 /*
                  * By throwing an exception for files that are not large enough
@@ -276,7 +276,7 @@ class FileMetadata {
                  * an int32.
                  */
 
-                AbstractBufferStrategy.assertNonDiskExtent(extent);
+                AbstractBufferStrategy.assertNonDiskExtent(userExtent);
                 
             }
 
@@ -296,25 +296,24 @@ class FileMetadata {
             /*
              * Check root blocks (magic, timestamps), choose root block, read
              * constants (slotSize, segmentId).
-             * 
-             * @todo figure out whether the journal is empty or not. If it is
-             * then it could be simply discarded (this decision really needs to
-             * be at a high level).
-             * 
-             * @todo make decision whether to compact and truncate the journal
-             * 
-             * FIXME read the slot allocation index (how is this passed along to
-             * the Journal; what about the transient journal?)
-             * 
-             * FIXME read the object index (how is this passed along to the
-             * Journal; what about the transient journal?)
              */
             
             FileChannel channel = raf.getChannel();
             ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
             ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-            channel.read(tmp0, OFFSET_ROOT_BLOCK0);
-            channel.read(tmp1, OFFSET_ROOT_BLOCK1);
+            int nread;
+            if ((nread = channel.read(tmp0, OFFSET_ROOT_BLOCK0)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
+                throw new IOException("Expected to read "
+                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
+                        + nread + " bytes");
+            }
+            if ((nread = channel.read(tmp1, OFFSET_ROOT_BLOCK1)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
+                throw new IOException("Expected to read "
+                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
+                        + nread + " bytes");
+            }
+            tmp0.position(0); // resets the position.
+            tmp1.position(0);
             IRootBlockView rootBlock0 = null;
             IRootBlockView rootBlock1 = null;
             try {
@@ -337,21 +336,33 @@ class FileMetadata {
                     : rootBlock1
                     );
             
-            this.slotSize = rootBlock.getSlotSize();
-            this.slotLimit = rootBlock.getSlotLimit();
+            /*
+             * The offset into the user extent at which the next record will be
+             * written.
+             */
+            this.nextOffset = rootBlock.getNextOffset();
             
             switch (bufferMode) {
-            case Direct:
+            case Direct: {
                 // Allocate a direct buffer.
-                buffer = ByteBuffer.allocateDirect((int) extent);
+                buffer = ByteBuffer.allocateDirect((int) userExtent);
+                // Setup to read data from file into the buffer.
+                buffer.limit(nextOffset);
+                buffer.position(0);
                 // Read the file image into the direct buffer.
-                raf.getChannel().read(buffer, 0L);
+                final int nbytes = raf.getChannel().read(buffer,
+                        headerSize0);
+                if (nbytes != nextOffset) {
+                    throw new IOException("Expected to read " + nextOffset
+                            + " bytes, but read " + nbytes + " bytes");
+                }
                 break;
-            case Mapped:
+            }
+            case Mapped: {
                 // Map the file.
                 boolean loadMappedFile = false; // @todo expose as property.
                 buffer = raf.getChannel().map(
-                        FileChannel.MapMode.READ_WRITE, 0L, extent);
+                        FileChannel.MapMode.READ_WRITE, headerSize0, extent);
                 if( loadMappedFile ) {
                     /*
                      * Load the image into mapped memory. Generally, I would
@@ -363,6 +374,7 @@ class FileMetadata {
                     ((MappedByteBuffer)buffer).load();
                 }
                 break;
+            }
             case Disk:
                 buffer = null;
                 break;
@@ -371,17 +383,10 @@ class FileMetadata {
             }
 
             /*
-             * @todo Review requirements for restart processing. I believe that
-             * we only need to deallocate all slots that are marked as allocated
-             * but not committed.
-             * 
-             * Other than that there should be no processing required on restart
-             * since the intention of transactions that did not commit will not
-             * be visible. However, that may change once we nail down the
-             * multi-phase commit strategy.
+             * Note: there should be no processing required on restart since the
+             * intention of transactions that did not commit will not be
+             * visible.
              */
-
-            throw new UnsupportedOperationException("Restart not supported");
             
         } else {
 
@@ -395,6 +400,8 @@ class FileMetadata {
 
             this.extent = initialExtent;
 
+            this.userExtent = extent - headerSize0;
+            
             if( bufferMode != BufferMode.Disk ) {
 
                 /*
@@ -404,12 +411,13 @@ class FileMetadata {
                  * an int32.
                  */
 
-                AbstractBufferStrategy.assertNonDiskExtent(extent);
+                AbstractBufferStrategy.assertNonDiskExtent(userExtent);
                 
             }
 
             /* 
-             * Extend the file.
+             * Extend the file.  We do this eagerly in an attempt to convince
+             * the OS to place the data into a contiguous region on the disk.
              */
             raf.setLength(extent);
 
@@ -421,70 +429,59 @@ class FileMetadata {
             raf.writeInt(VERSION1);
 
             /*
-             * FIXME bootstrap the slot allocation and object indices. These
-             * data structures need to be written on the buffer (where one is
-             * used) and then flushed to disk. For at least the slot allocation
-             * index we will maintain a resident data structure for instant
-             * access.
-             */
-            
-            final int slotChain = 0; // @todo bootstrap slot allocation index.
-            
-            final int objectIndex = 0; // @todo bootstrap object index.
-            
-            this.slotSize = slotSize;
-            
-            /*
-             * The first slot index that MUST NOT be addressed.
-             * 
-             * Note: The same computation occurs in DiskOnlyStrategy and BasicBufferStrategy.
-             */
-            this.slotLimit = (int) (extent - journalHeaderSize) / slotSize;
-
-            /*
-             * Generate the root blocks. The are for all practical purposes
+             * Generate the root blocks. They are for all practical purposes
              * identical (in fact, their timestamps will be distict). The root
              * block are then written into their locations in the file.
              */
+            
+            /*
+             * The offset at which the first record will be written. This is
+             * zero(0) since the buffer offset (0) is the first byte after the
+             * root blocks.
+             */
+            nextOffset = 0;
             final long commitCounter = 0L;
-            int[] rootIds = new int[ RootBlockView.MAX_ROOT_ID ];
-            IRootBlockView rootBlock0 = new RootBlockView(true, segment,
-                    slotSize, slotLimit, objectIndexSize, slotChain,
-                    objectIndex, commitCounter, rootIds);
-            IRootBlockView rootBlock1 = new RootBlockView(false, segment,
-                    slotSize, slotLimit, objectIndexSize, slotChain,
-                    objectIndex, commitCounter, rootIds);
+            final long firstTxId = 0L;
+            final long lastTxId = 0L;
+            final long[] rootIds = new long[ RootBlockView.MAX_ROOT_ADDRS ];
+            IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
+                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
+            IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
+                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
             FileChannel channel = raf.getChannel();
             channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
             channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
             this.rootBlock = rootBlock0;
             
-            // Force the changes to disk.
-            channel.force(false);
+            /*
+             * Force the changes to disk. We also force the file metadata to
+             * disk since we just changed the file size and we do not want to
+             * loose track of that.
+             */
+            channel.force(true);
 
             switch (bufferMode) {
             case Direct:
-                // Allocate a direct buffer.
-                buffer = ByteBuffer.allocateDirect((int) extent);
                 /*
-                 * Read in the journal header, including the root blocks since
-                 * those are not-zeroed.
+                 * Allocate a direct buffer.
                  * 
-                 * FIXME It might be safer to not read the journal header into
-                 * the buffer since that would mean that we could not write on
-                 * it by mistake since it was not in the buffer. That could be
-                 * consistent with the transient journal not having a header at
-                 * all. The memory-mapped mode would have to be changed to not
-                 * map the header either.
+                 * Note that we do not read in any data since no user data has
+                 * been written and the root blocks are not cached in the buffer
+                 * to avoid possible overwrites.
                  */
-                buffer.position(0);
-                buffer.limit(journalHeaderSize);
-                channel.read(buffer, 0);
+//                buffer = ByteBuffer.allocateDirect((int) userExtent);
+                buffer = (useDirectBuffers ? ByteBuffer
+                        .allocateDirect((int)userExtent)
+                        : ByteBuffer
+                                .allocate((int)userExtent));
                 break;
             case Mapped:
-                // Map the file.
-                buffer = raf.getChannel().map(
-                        FileChannel.MapMode.READ_WRITE, 0L, extent);
+                /*
+                 * Map the file starting from the first byte of the user space
+                 * and continuing through the entire user extent.
+                 */
+                buffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE,
+                        headerSize0, userExtent);
                 break;
             case Disk:
                 buffer = null;

@@ -62,10 +62,11 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.journal.Bytes;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.Addr;
+import com.bigdata.journal.RootBlockView;
 import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -83,12 +84,33 @@ import com.ibm.icu.text.RuleBasedCollator;
 /**
  * A triple store based on bigdata.
  * 
+ * @todo persue some alternative strategies for restart safety and scale: (1)
+ *       TripleStore extends Journal and manages its indices directly as
+ *       {@link ICommitter}s without transaction support. This can be a scale
+ *       up solution using a disk-only buffer and the LRUs internal to the
+ *       different indices. I would expect fair performance. (2) A partitioned
+ *       index variant.; (3) a transactional variant, but see various notes
+ *       below about isolation for rdfs stores; and (4) a distributed database
+ *       (scale out) variant.
+ * 
+ * @todo try loading some very large data sets; try Transient vs Disk vs Direct
+ *       modes. If Transient has significantly better performance then it
+ *       indicates that we are waiting on IO so introduce AIO support in the
+ *       Journal and try Disk vs Direct with aio. Otherwise, consider
+ *       refactoring the btree to have the values be variable length byte[]s
+ *       with serialization in the client and other tuning focused on IO (the
+ *       only questions with that approach are appropriate compression
+ *       techniques and handling transparently timestamps as part of the value
+ *       when using an isolated btree in a transaction).
+ * 
  * @todo the only added cost for a quad store is the additional statement
  *       indices. There are only three more statement indices in a quad store.
  *       Since statement indices are so cheap, it is probably worth implementing
  *       them now, even if only as a configuration option.
  * 
- * @todo verify read after commit.
+ * @todo verify read after commit (restart safe) for large data sets and test
+ *       re-load rate for a data set and verify that no new statements are
+ *       added.
  * 
  * @todo add bulk data export (buffering statements and bulk resolving term
  *       identifiers).
@@ -96,29 +118,13 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @todo The use of long[] identifiers for statements also means that the SPO
  *       and other statement indices are only locally ordered so they can not be
  *       used to perform a range scan that is ordered in the terms without
- *       joining against the various term indices.
+ *       joining against the various term indices and then sorting the outputs.
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
  * 
  * @todo support metadata about the statement, e.g., whether or not it is an
  *       inference.
- * 
- * @todo The more that we pack things down the slower we can expect this to run
- *       since IOs will be smaller ... until we begin buffering writes to larger
- *       IOs for the store. The way that we compensate for this is by increasing
- *       the branching factor for the indices, but that begins to run into
- *       overhead for moving keys during inserts on a node. Deferring writes
- *       from the direct bufferQueue on the journal onto the backing file should
- *       provide a nice performance boost. The writes could even be async since
- *       we only need to sync at a commit when the writer must assert that all
- *       bytes up to a given {@link Addr} have been written onto the store.
- * 
- * @todo The term indices need to use a distinct suffix code so that the
- *       identifiers assigned by each index are unique. Or just use one
- *       heterogenous reverse index to reverse any term identifier to a term and
- *       make sure that the term indices use distinct suffix codes so that there
- *       is never a cross-index collision.
  * 
  * @todo compute the MB/sec rate at which this test runs and compare it with the
  *       maximum transfer rate for the journal without the btree and the maximum
@@ -142,13 +148,16 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @todo I've been thinking about rdfs stores in the light of the work on
  *       bigdata. Transactional isolation for rdf is really quite simple. Since
  *       lexicons (uri, literal or bnode indices) do not (really) support
- *       deletion, the only acts are asserting and retracting statements. since
- *       a statement always merges with an existing statement, inserts never
- *       cause conflicts. Hence the only possible write-write conflict is a
- *       write-delete conflict. quads do not really make this more complex (or
- *       expensive) since merges only occur when there is a context match.
- *       however entailments can cause twists depending on how they are
- *       realized.
+ *       deletion, the only acts are asserting term and asserting and retracting
+ *       statements. since assertion terms can lead to write-write conflicts,
+ *       which must be resolved and can cascade into the statement indices since
+ *       the statement key depends directly on the assigned term identifiers. a
+ *       statement always merges with an existing statement, inserts never cause
+ *       conflicts. Hence the only possible write-write conflict for the
+ *       statement indices is a write-delete conflict. quads do not really make
+ *       this more complex (or expensive) since merges only occur when there is
+ *       a context match. however entailments can cause twists depending on how
+ *       they are realized.
  * 
  * If we do a pure RDF layer (vs RDF over GOM over bigdata), then it seems that
  * we could simple use a statement index (no lexicons for URIs, etc). Normally
@@ -209,68 +218,41 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       persistence capable differential indices and the load could even span
  *       more than one journal extent.
  * 
- * @todo What about BNodes? These need to get in here somewhere.... So does
- *       support for language tag literals and data type literals. XML (or other
- *       large value literals) will cause problems unless they are factored into
- *       large object references if we actually store values directly in the
- *       statement index.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore {
+public class TripleStore extends Journal {
     
     public Logger log = Logger.getLogger(TripleStore.class);
 
-    public Properties properties;
-
-    public Journal journal;
-
-    public RdfKeyBuilder keyBuilder;
+    /*
+     * Declare indices for root addresses for the different indices maintained
+     * by the store.
+     */
+    protected final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
+    protected final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
+    protected final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
+    protected final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
+    protected final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
     
+    public RdfKeyBuilder keyBuilder;
+
+    /*
+     * Note: You MUST NOT retain hard references to these indices across
+     * operations since they may be discarded and re-loaded.
+     */
+    public TermIndex ndx_termId;
+    public ReverseIndex ndx_idTerm;
     public StatementIndex ndx_spo;
     public StatementIndex ndx_pos;
     public StatementIndex ndx_osp;
 
-    public TermIndex ndx_termId;
-
-    public ReverseIndex ndx_idTerm;
-
-    /**
-     * When true the term, termId, and statement buffers are sorted before being
-     * presented to the btrees. This is much faster. This field allows you to
-     * turn off this behavior so that you can access just how much faster it
-     * actually is.
-     * 
-     * Note: Sorting helps the btree operations have good locality.
-     */
-    final boolean sortBuffers = true;
-    
-    /**
-     * When true, terms and statements are added to the triple store. When
-     * false, they are not. This makes it possible to run the rio parser, bufferQueue
-     * terms and statements, and optionally sort them without actually inserting
-     * anything into the triple store.
-     * 
-     * Note in order for sort to profile when loading data is disabled terms are
-     * assigned one up identifiers using {@link #nextFakeTermId}.
-     */
-    final boolean loadData = true;
-
-    /**
-     * Used to assign fake term identifiers so that sort has something to work
-     * on with buffered data when {@link #loadData} is false.
-     */
-    private long nextFakeTermId = 1;
-    
     /**
      * 
      */
     public TripleStore(Properties properties) throws IOException {
 
-        this.properties = (Properties) properties.clone();
-
-        journal = new Journal(properties);
+        super(properties);
 
         // setup key builder that handles unicode and primitive data types.
         KeyBuilder _keyBuilder = new KeyBuilder(createCollator(), Bytes.kilobyte32 * 4);
@@ -278,17 +260,103 @@ public class TripleStore {
         // setup key builder for RDF Values and Statements.
         keyBuilder = new RdfKeyBuilder(_keyBuilder);
 
-        // perfect statement indices.
-        ndx_spo = new StatementIndex(journal,KeyOrder.SPO);
-        ndx_pos = new StatementIndex(journal,KeyOrder.POS);
-        ndx_osp = new StatementIndex(journal,KeyOrder.OSP);
-
-        ndx_termId = new TermIndex(journal, (short) 1);
-        
-        ndx_idTerm = new ReverseIndex(journal);
-
     }
 
+    /**
+     * Extends the default behavior to create/re-load the indices defined by the
+     * {@link TripleStore} and to cache hard references to those indices.
+     */
+    public void setupCommitters() {
+
+        super.setupCommitters();
+        
+        assert ndx_termId == null;
+        assert ndx_idTerm == null;
+        assert ndx_spo == null;
+        assert ndx_pos == null;
+        assert ndx_osp == null;
+
+        long addr;
+        
+        if((addr=getRootBlockView().getRootAddr(ROOT_TERM_ID))==0L) {
+
+            ndx_termId = new TermIndex(this, (short) 1);
+            
+        } else {
+            
+            ndx_termId = new TermIndex(this, addr);
+            
+        }
+
+        if((addr=getRootBlockView().getRootAddr(ROOT_ID_TERM))==0L) {
+
+            ndx_idTerm = new ReverseIndex(this);
+            
+        } else {
+            
+            ndx_idTerm = new ReverseIndex(this, addr);
+            
+        }
+        
+        if((addr=getRootBlockView().getRootAddr(ROOT_SPO))==0L) {
+
+            ndx_spo = new StatementIndex(this,KeyOrder.SPO);
+            
+        } else {
+            
+            ndx_spo = new StatementIndex(this, addr, KeyOrder.SPO);
+            
+        }
+        
+        if((addr=getRootBlockView().getRootAddr(ROOT_POS))==0L) {
+
+            ndx_pos = new StatementIndex(this,KeyOrder.POS);
+            
+        } else {
+            
+            ndx_pos = new StatementIndex(this, addr, KeyOrder.POS);
+            
+        }
+
+        if((addr=getRootBlockView().getRootAddr(ROOT_OSP))==0L) {
+
+            ndx_osp = new StatementIndex(this,KeyOrder.OSP);
+            
+        } else {
+            
+            ndx_osp = new StatementIndex(this, addr, KeyOrder.OSP);
+            
+        }
+
+        /*
+         * declare the comitters.
+         */
+        setCommitter(ROOT_TERM_ID, ndx_termId);
+        setCommitter(ROOT_ID_TERM, ndx_idTerm);
+        setCommitter(ROOT_SPO, ndx_spo);
+        setCommitter(ROOT_POS, ndx_pos);
+        setCommitter(ROOT_OSP, ndx_osp);
+
+        usage();
+        
+    }
+    
+    /**
+     * Extends the default behavior to discard hard references to the indices
+     * defined by the {@link TripleStore}.
+     */
+    public void discardCommitters() {
+        
+        super.discardCommitters();
+        
+        ndx_termId = null;
+        ndx_idTerm = null;
+        ndx_spo = null;
+        ndx_pos = null;
+        ndx_osp = null;
+        
+    }
+    
     /**
      * Create and return a new collator object responsible for encoding unicode
      * strings into sort keys.
@@ -324,12 +392,6 @@ public class TripleStore {
         
     }
     
-    public Properties getProperties() {
-
-        return properties;
-
-    }
-
     /**
      * The #of triples in the store.
      */
@@ -396,7 +458,7 @@ public class TripleStore {
 
         if (ndx_spo != null) {
 
-            if (sortBuffers) {
+            { // sort
 
                 long _begin = System.currentTimeMillis();
                 
@@ -405,8 +467,8 @@ public class TripleStore {
                 sortTime += System.currentTimeMillis() - _begin;
                 
             }
-
-            if (loadData) {
+            
+            { // load
 
                 long _begin = System.currentTimeMillis();
 
@@ -414,8 +476,8 @@ public class TripleStore {
 
                     final _Statement stmt = stmts[i];
 
-                    ndx_spo.insert(keyBuilder.statement2Key(stmt.s.termId,
-                            stmt.p.termId, stmt.o.termId), null);
+                    ndx_spo.insert(keyBuilder.statement2Key(stmt.s.termId, stmt.p.termId,
+                            stmt.o.termId), null);
                     
                 }
 
@@ -427,7 +489,7 @@ public class TripleStore {
 
         if (ndx_pos != null) {
 
-            if (sortBuffers) {
+            { // sort
 
                 long _begin = System.currentTimeMillis();
 
@@ -437,14 +499,14 @@ public class TripleStore {
 
             }
 
-            if (loadData) {
+            { // load
 
                 long _begin = System.currentTimeMillis();
                 
                 for (int i = 0; i < numStmts; i++) {
 
                     final _Statement stmt = stmts[i];
-
+                    
                     ndx_pos.insert(keyBuilder.statement2Key(stmt.p.termId,
                             stmt.o.termId, stmt.s.termId), null);
 
@@ -458,7 +520,7 @@ public class TripleStore {
 
         if (ndx_osp != null) {
 
-            if (sortBuffers) {
+            { // sort
 
                 long _begin = System.currentTimeMillis();
 
@@ -468,7 +530,7 @@ public class TripleStore {
 
             }
 
-            if (loadData) {
+            { // load
 
                 long _begin = System.currentTimeMillis();
                 
@@ -476,8 +538,8 @@ public class TripleStore {
 
                     final _Statement stmt = stmts[i];
 
-                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId,
-                            stmt.s.termId, stmt.p.termId), null);
+                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+                            stmt.p.termId), null);
 
                 }
                 
@@ -555,7 +617,7 @@ public class TripleStore {
         
         System.err.print("Writing "+numTerms+" terms ("+terms.getClass().getSimpleName()+")...");
 
-        if(loadData) {
+        {
 
             /*
              * First make sure that each term has an assigned sort key.
@@ -575,7 +637,7 @@ public class TripleStore {
              * the natural order for the term:id index.
              */
 
-            if (!sorted && sortBuffers) {
+            if (!sorted ) {
             
                 long _begin = System.currentTimeMillis();
                 
@@ -609,19 +671,9 @@ public class TripleStore {
                 
             }
             
-        } else {
-            
-            // assign fake termIds.
-
-            for( int i=0; i<numTerms; i++) {
-
-                terms[i].termId = nextFakeTermId++;
-                
-            }
-            
         }
         
-        if (sortBuffers) {
+        {
             
             /*
              * Sort terms based on their assigned termId.
@@ -641,7 +693,7 @@ public class TripleStore {
 
         }
         
-        if(loadData) {
+        {
         
             /*
              * add terms to the reverse index.  this is what we use to lookup
@@ -683,13 +735,11 @@ public class TripleStore {
      */
     public long addTerm(Value value) {
 
-        // @todo avoid encoding if _Value and .key is set.
-        
         // forward mapping assigns identifier.
         final long termId = ndx_termId.add(keyBuilder.value2Key(value));
 
         // reverse mapping from identifier to term (non-batch mode).
-        ndx_idTerm.add(keyBuilder.id2key(termId), value);
+        ndx_idTerm.add(keyBuilder.id2key(termId), (_Value) value);
         
         return termId;
 
@@ -710,26 +760,31 @@ public class TripleStore {
 
     }
     
-    /**
-     * @todo restart safety requires that the individual indices are flushed
-     *       to disk and their metadata records written and that we update
-     *       the corresponding root in the root block with the new metadata
-     *       record location and finally commit the journal.
-     * 
-     * @todo transactional isolation requires that we have isolation
-     *       semantics (nested index, validation, and merging down) built
-     *       into each index.
-     */
     public void commit() {
 
-        System.err.println("incremental commit");
+        final long begin = System.currentTimeMillis();
 
-        ndx_termId.write();
-        ndx_idTerm.write();
-        ndx_spo.write();
-        ndx_pos.write();
-        ndx_osp.write();
-        journal.commit();
+        super.commit();
+        
+//        ndx_termId.write();
+//        ndx_idTerm.write();
+//        ndx_spo.write();
+//        ndx_pos.write();
+//        ndx_osp.write();
+//        journal.commit();
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println("commit: commit latency="+elapsed+"ms");
+
+        usage();
+        
+    }
+
+    /**
+     * Writes out some usage details on System.err.
+     */
+    public void usage() {
 
         System.err.println("#termId="+ndx_termId.getEntryCount());
         System.err.println("#idTerm="+ndx_idTerm.getEntryCount());
@@ -738,11 +793,12 @@ public class TripleStore {
         System.err.println("#osp="+ndx_osp.getEntryCount());
         
     }
-
+    
     /**
      * Load a file into the triple store.
-     * @param store
-     * @param file
+     *
+     * @param file The file.
+     * 
      * @throws IOException
      */
     public void loadData(File file ) throws IOException {

@@ -56,9 +56,11 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.IndexSegmentBuilder.NOPNodeFactory;
 import com.bigdata.objndx.IndexSegmentBuilder.SimpleLeafData;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Class supporting a compacting merge of two btrees into a series of ordered
@@ -78,7 +80,7 @@ import com.bigdata.objndx.IndexSegmentBuilder.SimpleLeafData;
  * 
  * @todo integrate to allow compacting merges.
  * 
- * FIXME rewrite to use {@link IRawStore2} objects as buffers ala the
+ * FIXME rewrite to use {@link IRawStore} objects as buffers ala the
  * {@link IndexSegmentBuilder}.
  * 
  * @todo reconcile with {@link FusedView}.

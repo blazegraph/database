@@ -55,10 +55,9 @@ import java.util.Properties;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Bytes;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.BTree.TransitionalRawStore;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -462,7 +461,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * Closing the journal.
          */
         System.err.println("Closing journal.");
-        ((Journal)((TransitionalRawStore)btree.getStore()).delegate).close();
+        btree.getStore().close();
         
     }
 

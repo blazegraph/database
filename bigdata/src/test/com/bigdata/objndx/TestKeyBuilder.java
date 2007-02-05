@@ -60,7 +60,7 @@ import java.util.TreeMap;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.journal.Bytes;
+import com.bigdata.rawstore.Bytes;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -70,9 +70,6 @@ import com.ibm.icu.text.RuleBasedCollator;
  * 
  * @see http://docs.hp.com/en/B3906-90004/ch02s02.html#d0e1095 for ranges on
  * negative float and double values.
- * 
- * @todo finish the double precision tests per the single precision tests, e.g.,
- *       for successor(double), etc.
  * 
  * @todo write performance test for encoding strings, possibly in the context of
  *       parsed rdf data, and see if there are any easy wins in how the encoding
@@ -536,579 +533,19 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
-    /**
-     * Positive zero.
-     */
-    final protected float fp0 = Float.intBitsToFloat(0x00000000);
-
-    /**
-     * Negative zero.
-     */
-    final protected float fm0 = Float.intBitsToFloat(0x80000000);
-    
-    /**
-     * Smallest non-zero positive value.
-     */
-    final protected float fpos = Float.intBitsToFloat(0x00000001);
-    
-    /**
-     * Smallest non-zero negative value.
-     */
-    final protected float fneg = Float.intBitsToFloat(0x80000001);
-    
-    /**
-     * Positive one (1f).
-     */
-    final protected float fp1 = 1f;
-
-    /**
-     * Negative one (-1f).
-     */
-    final protected float fn1 = -1f;
-
-    /**
-     * Largest negative float.
-     */
-    final protected float fmin = Float.intBitsToFloat(0xFF7FFFFF);
-    
-    /**
-     * Largest positive float.
-     */
-    final protected float fmax = Float.MAX_VALUE;
-    
-    public void test_float_data_points() {
-
-        // positive value space.
-        assertTrue(fp0<fmax);
-        assertTrue(fp0<fpos);
-        assertTrue(fpos<fp1);
-        
-        // negative value space.
-        assertTrue(fneg>fmin);
-        assertTrue(fm0>fneg);
-        assertTrue(fneg>fn1);
-
-        /*
-         * Note: +0f and -0f will compare as _equal_ in the langage. This means
-         * that you can not write tests that directly distinguish positive and
-         * negative zero using >, <, or ==.
-         */
-        assertTrue(fm0 == fp0);
-        
-    }
-    
-    /**
-     * Positive zero.
-     */
-    final protected double dp0 = Double.longBitsToDouble(0x0000000000000000L);
-
-    /**
-     * Negative zero.
-     */
-    final protected double dm0 = Double.longBitsToDouble(0x8000000000000000L);
-    
-    /**
-     * Smallest non-zero positive value.
-     */
-    final protected double dpos = Double.longBitsToDouble(0x0000000000000001L);
-    
-    /**
-     * Smallest non-zero negative value.
-     */
-    final protected double dneg = Double.longBitsToDouble(0x8000000000000001L);
-    
-    /**
-     * Positive one (1d).
-     */
-    final protected double dp1 = 1d;
-
-    /**
-     * Negative one (-1d).
-     */
-    final protected double dn1 = -1d;
-
-    /**
-     * Largest negative double.
-     */
-    final protected double dmin = Double.longBitsToDouble(0xFFEFFFFFFFFFFFFFL);
-    
-    /**
-     * Largest positive double.
-     */
-    final protected double dmax = Double.MAX_VALUE;
-    
-    public void test_double_data_points() {
-
-        // positive value space.
-        assertTrue(dp0<dmax);
-        assertTrue(dp0<dpos);
-        assertTrue(dpos<dp1);
-        
-        // negative value space.
-        assertTrue(dneg>dmin);
-        assertTrue(dm0>dneg);
-        assertTrue(dneg>dn1);
-
-        /*
-         * Note: +0f and -0f will compare as _equal_ in the langage. This means
-         * that you can not write tests that directly distinguish positive and
-         * negative zero using >, <, or ==.
-         */
-        assertTrue(dm0 == dp0);
-        
-    }
-    
-//    /**
-//     * The double precision number that is one less than zero in the double
-//     * precision value space.
-//     */
-//    final protected double dm1 = Double.longBitsToDouble(KeyBuilder.d2l(0d)-1);
-//
-//    /**
-//     * The double precision number that is one more than zero in the double
-//     * precision value space.
-//     */
-//    final protected double dp1 = Double.longBitsToDouble(KeyBuilder.d2l(0d)-1);
-    
-    /**
-     * Derived from <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson.
-     *
-     * @param A A floating point value.
-     * @param B Another floating point value
-     * @param maxUlps The maximum error in terms of Units in the Last
-     * Place. This specifies how big an error we are willing to accept
-     * in terms of the value of the least significant digit of the
-     * floating point number’s representation.  <i>maxUlps</i> can
-     * also be interpreted in terms of how many representable floats
-     * we are willing to accept between A and B.  This function will
-     * allow <code>maxUlps-1</code> floats between <i>A</i> and
-     * <i>B</i>.
-     */
-    static protected int getUlps(float A, float B) {
-
-        int aInt = Float.floatToIntBits(A); // *(int*)&A;
-
-        // Make aInt lexicographically ordered as a twos-complement
-        // int.
-
-        if (aInt < 0) {
-
-            aInt = 0x80000000 - aInt;
-
-        }
-
-        // Make bInt lexicographically ordered as a twos-complement
-        // int.
-
-        int bInt = Float.floatToIntBits(B); // *(int*)&B;
-
-        if (bInt < 0) {
-
-            bInt = 0x80000000 - bInt;
-
-        }
-
-        int intDiff = Math.abs(aInt - bInt);
-
-        return intDiff;
-
-    }
-
-    /**
-     * Derived from <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson.
-     *
-     * @param A A double precision floating point value.
-     * @param B Another double precision floating point value
-     * @param maxUlps The maximum error in terms of Units in the Last
-     * Place. This specifies how big an error we are willing to accept
-     * in terms of the value of the least significant digit of the
-     * floating point number’s representation.  <i>maxUlps</i> can
-     * also be interpreted in terms of how many representable doubles
-     * we are willing to accept between A and B.  This function will
-     * allow <code>maxUlps-1</code> doubles between <i>A</i> and
-     * <i>B</i>.
-     */
-    static protected long getUlps(double A, double B) {
-
-        long aLong = Double.doubleToLongBits(A); // *(int*)&A;
-
-        // Make aInt lexicographically ordered as a twos-complement
-        // long.
-
-        if (aLong < 0) {
-
-            aLong = 0x8000000000000000L - aLong;
-
-        }
-
-        // Make bInt lexicographically ordered as a twos-complement
-        // int.
-
-        long bLong = Double.doubleToLongBits(B); // *(int*)&B;
-
-        if (bLong < 0) {
-
-            bLong = 0x8000000000000000L - bLong;
-
-        }
-
-        long longDiff = Math.abs(aLong - bLong);
-
-        return longDiff;
-
-    }
-
-    /**
-     * Verify zero ULPs difference between the values.
-     * @param f1
-     * @param f2
-     */
-    protected void assertZeroUlps(float f1, float f2) {
-
-        int ulps = getUlps(f1,f2);
-        
-        if( ulps != 0 ) {
-
-            fail("Expecting zero ulps, but found: "+ulps+"; f1="+f1+", f2="+f2);
-            
-        }
-        
-    }
-    
-    /**
-     * The value space for <code>float</code> and <code>double</code> is
-     * complex. The "next" floating point value is defined in terms of the next
-     * bit pattern for the underlying floating point representation. Also, we
-     * have to be aware of the trade off between precision and magnitude, the
-     * maximum expressible value, NaNs, positive and negative infinity, etc.
-     * <p>
-     * 
-     * First we verify the data that we are going to use in the test. Each of
-     * these asserts verifies that a bit pattern, expressed as an int, is
-     * equilivant to the specified float. This SHOULD be true, but it is down to
-     * the metal enough to make it worth checking.
-     * <p>
-     * 
-     * These test data were derived from: <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson.
-     */
-    public void test_keyBuilder_successor_float_data()
-    {
-
-        assertZeroUlps
-            ( 1.99999976f,  // 0x3FFFFFFE
-              Float.intBitsToFloat( 1073741822 )
-              );
-    
-        assertZeroUlps
-            ( 1.99999988f,  //  0x3FFFFFFF
-              Float.intBitsToFloat( 1073741823 )
-              );
-     
-        assertZeroUlps
-            ( 2.00000000f,  //  0x40000000
-              Float.intBitsToFloat( 1073741824 )
-              );
-     
-        assertZeroUlps
-            ( 2.00000024f,  // 0x40000001
-              Float.intBitsToFloat( 1073741825 )
-              );
-     
-        assertZeroUlps
-            ( 2.00000048f,  //  0x40000002
-              Float.intBitsToFloat( 1073741826 )
-              );
-    
-    }
-
-    /**
-     * Now verify the successor for each of the data points that we
-     * verified in the previous test as being successors in the float
-     * value space.
-     */
-    public void test_keyBuilder_successor_float_positiveValue()
-        throws NoSuccessorException
-    {
-
-        assertZeroUlps(1.99999988f, KeyBuilder.successor(1.99999976f));
-
-        assertZeroUlps(2.00000000f, KeyBuilder.successor(1.99999988f));
-
-        assertZeroUlps(2.00000024f, KeyBuilder.successor(2.00000000f));
-
-        assertZeroUlps(2.00000048f, KeyBuilder.successor(2.00000024f));
-
-    }
-
-    /**
-     * Test a few values from the middle of the negative region of the value
-     * space.  The successor is formed by subtracting one from the integer
-     * representation when in the negative value space.
-     */
-    public void test_keyBuilder_successor_float_negativeValue()
-        throws NoSuccessorException
-    {
-
-        float neg1 = Float.intBitsToFloat(0x81111111);
-        
-        float neg2 = Float.intBitsToFloat(0x81111110);
-        
-        System.err.println("neg1="+neg1);
-        System.err.println("neg2="+neg2);
-        
-        assertTrue("neg1<neg2", neg1<neg2);
-        
-        assertZeroUlps(neg2, KeyBuilder.successor(neg1));
-
-    }
-
-    /**
-     * Verifies some data points that we use in the next test. These test data
-     * were derived from:
-     * 
-     * <a
-     * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
-     * Comparing floating point numbers </a> by Bruce Dawson.
-     */
-    public void test_keyBuilder_successor_float_nearZero_data()
-    {
-    
-        assertZeroUlps
-            ( 4.2038954e-045f,  // 0x00000003
-              Float.intBitsToFloat( 3 )
-              );
-     
-        assertZeroUlps
-            ( 2.8025969e-045f,  // 0x00000002
-              Float.intBitsToFloat( 2 )
-              );
-     
-        assertZeroUlps
-            ( 1.4012985e-045f,  // 0x00000001
-              Float.intBitsToFloat( 1 )
-              );
-     
-        assertZeroUlps
-            ( +0.00000000f, // 0x00000000
-              Float.intBitsToFloat( 0 )
-              );
-     
-        assertZeroUlps
-            ( -0.00000000f, // 0x80000000
-              Float.intBitsToFloat( -2147483648 )
-              );
-
-
-        // Note: -0.0f and +0.0f are often conflated by the language.
-//        assertTrue( +0.00000000f !=   // 0x00000000
-//                         -0.00000000f // 0x80000000
-//                  );
-//
-//        assertEquals(1,
-//        getUlps( +0.00000000f, // 0x00000000
-//                 -0.00000000f) // 0x80000000
-//          );
-
-        assertZeroUlps
-            ( -1.4012985e-045f, // 0x80000001
-              Float.intBitsToFloat( -2147483647 )
-              );
-     
-        assertZeroUlps
-            ( -2.8025969e-045f, // 0x80000002
-              Float.intBitsToFloat( -2147483646 )
-              );
-     
-        assertZeroUlps
-            ( -4.2038954e-045f, // 0x80000003
-              Float.intBitsToFloat( -2147483645 )
-              ); 
-    
-    }
-
-    /**
-     * Verifies that the successor function imposes the correct ordering as we
-     * approach and cross zero from the positive region of the value space into
-     * the negative region of the value space. Note that the value set includes
-     * not only the finite nonzero values, NaN values, and positive infinity,
-     * and negative infinity, but also positive zero and negative zero, which
-     * Java hides from you most of the time since positive zero and negative
-     * zero compare as equals (for Java).
-     * <p>
-     * 
-     * Note: The data points used in this test are verified by the previous
-     * test.
-     * <p>
-     */
-    public void test_keyBuilder_successor_float_nearZero()
-        throws NoSuccessorException
-    {
-
-//  assertEquals
-//      ( 4.2038954e-045f,  // 0x00000003
-//        Float.intBitsToFloat( 3 )
-//        );
-
-        /*
-         * successor of small positive numbers.
-         */
-        assertZeroUlps
-        ( 4.2038954e-045f, // 0x00000003 
-          KeyBuilder.successor( 2.8025969e-045f ) // 0x00000002
-          );
- 
-        assertZeroUlps
-        ( 2.8025969e-045f,  // 0x00000002
-          KeyBuilder.successor( 1.4012985e-045f)  // 0x00000001
-          );
- 
-        assertZeroUlps
-        ( 1.4012985e-045f,  // 0x00000001
-          KeyBuilder.successor( +0.00000000f) // 0x00000000
-          );
-
-        /*
-         * successor of negative zero is positive zero.
-         */
-        assertTrue(-0.00000000f == Float.intBitsToFloat(0x80000000));
-
-        assertEquals(Float.intBitsToFloat(0x00000000), KeyBuilder
-                .successor(Float.intBitsToFloat(0x80000000)));
-        
-        assertZeroUlps
-        ( +0.00000000f,  // 0x00000000
-          KeyBuilder.successor( -0.00000000f ) // 0x80000000
-          );
-
-        /*
-         * successor of small negative numbers.
-         */
-        assertZeroUlps
-        ( -0.00000000f,  // 0x80000000
-          KeyBuilder.successor( -1.4012985e-045f ) // 0x80000001
-          );
- 
-        assertZeroUlps
-        ( -0.00000000f,  // 0x80000000
-          KeyBuilder.successor( -1.4012985e-045f ) // 0x80000001
-          );
- 
-        assertZeroUlps
-        ( -1.4012985e-045f,  // 0x80000001
-          KeyBuilder.successor( -2.8025969e-045f ) // 0x80000002
-          );
-
-    }
-
-    /**
-     * Verifies that the successor of the penultimate float is
-     * correct.
-     */
-    public void test_keyBuilder_successor_float_penultimateValue()
-        throws NoSuccessorException
-    {
-
-        int maxValueAsInt = Float.floatToIntBits(Float.MAX_VALUE);
-
-        float penultimateValue = Float.intBitsToFloat(maxValueAsInt - 1);
-
-        assertZeroUlps(Float.MAX_VALUE, KeyBuilder.successor(penultimateValue));
-
-    }
-
-    /**
-     * Verifies that successor of the maximum float value is positive infinity.
-     */
-    public void test_keyBuilder_successor_float_maxValue() 
-        throws NoSuccessorException
-    {
-
-        assertZeroUlps(Float.POSITIVE_INFINITY, KeyBuilder
-                .successor(Float.MAX_VALUE));
-
-    }
-
-    /**
-     * Verifies that there is no successor for a NaN.
-     */
-    public void test_keyBuilder_successor_float_NaN() {
-
-        try {
-    
-            KeyBuilder.successor(Float.NaN);
-            
-            fail("Expecting: " + NoSuccessorException.class);
-            
-        } catch (NoSuccessorException ex) {
-            
-            System.err.println("Ignoring expected exception: " + ex);
-            
-        }
-
-    }
-
-    /**
-     * Verifies that there is no successor for negative infinity.
-     *
-     * @todo Alternatively, we could make the successor the largest
-     * negative floating point value - if we knew what that was.
-     */
-    public void test_keyBuilder_successor_float_negativeInfinity()
-    {
-
-        try {
-            
-            KeyBuilder.successor(Float.NEGATIVE_INFINITY);
-            
-            fail("Expecting: " + NoSuccessorException.class);
-            
-        } catch (NoSuccessorException ex) {
-            
-            System.err.println("Ignoring expected exception: " + ex);
-            
-        }
-
-    }
-
-    /**
-     * Verifies that there is no successor for positive infinity.
-     */
-
-    public void test_GValue_successor_Number_Float_positiveInfinity()
-    {
-
-        try {
-            
-            KeyBuilder.successor(Float.POSITIVE_INFINITY);
-            
-            fail("Expecting: " + NoSuccessorException.class);
-            
-        } catch (NoSuccessorException ex) {
-            
-            System.err.println("Ignoring expected exception: " + ex);
-            
-        }
-
-    }
 
     public void test_keyBuilder_float_key() throws NoSuccessorException {
         
         KeyBuilder keyBuilder = new KeyBuilder();
         
-        byte[] kmin = keyBuilder.reset().append(fmin).getKey(); // largest negative float.
-        byte[] kn1 = keyBuilder.reset().append(fn1).getKey(); // -1f
-        byte[] kneg = keyBuilder.reset().append(fneg).getKey(); // smallest negative float.
-        byte[] km0 = keyBuilder.reset().append(fm0).getKey(); // -0.0f
-        byte[] kp0 = keyBuilder.reset().append(fp0).getKey(); // +0.0f
-        byte[] kpos = keyBuilder.reset().append(fpos).getKey(); // smallest positive float.
-        byte[] kp1 = keyBuilder.reset().append(fp1).getKey(); // +1f;
-        byte[] kmax = keyBuilder.reset().append(fmax).getKey(); // max pos float.
+        byte[] kmin = keyBuilder.reset().append(SuccessorUtil.FNEG_MAX).getKey(); // largest negative float.
+        byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.FNEG_ONE).getKey(); // -1f
+        byte[] kneg = keyBuilder.reset().append(SuccessorUtil.FNEG_MIN).getKey(); // smallest negative float.
+        byte[] km0 = keyBuilder.reset().append(SuccessorUtil.FNEG_ZERO).getKey(); // -0.0f
+        byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.FPOS_ZERO).getKey(); // +0.0f
+        byte[] kpos = keyBuilder.reset().append(SuccessorUtil.FPOS_MIN).getKey(); // smallest positive float.
+        byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.FPOS_ONE).getKey(); // +1f;
+        byte[] kmax = keyBuilder.reset().append(SuccessorUtil.FPOS_MAX).getKey(); // max pos float.
 
         assertEquals(4,kmin.length);
         assertEquals(4,kn1.length);
@@ -1119,14 +556,14 @@ public class TestKeyBuilder extends TestCase2 {
         assertEquals(4,kp1.length);
         assertEquals(4,kmax.length);
 
-        System.err.println("kmin("+fmin+")="+BytesUtil.toString(kmin));
-        System.err.println("kn1("+fn1+")="+BytesUtil.toString(kn1));
-        System.err.println("kneg("+fneg+")="+BytesUtil.toString(kneg));
-        System.err.println("km0("+fm0+")="+BytesUtil.toString(km0));
-        System.err.println("kp0("+fp0+")="+BytesUtil.toString(kp0));
-        System.err.println("kpos("+fpos+")="+BytesUtil.toString(kpos));
-        System.err.println("kp1("+fp1+")"+BytesUtil.toString(kp1));
-        System.err.println("kmax("+fmax+")="+BytesUtil.toString(kmax));
+        System.err.println("kmin("+SuccessorUtil.FNEG_MAX+")="+BytesUtil.toString(kmin));
+        System.err.println("kn1("+SuccessorUtil.FNEG_ONE+")="+BytesUtil.toString(kn1));
+        System.err.println("kneg("+SuccessorUtil.FNEG_MIN+")="+BytesUtil.toString(kneg));
+        System.err.println("km0("+SuccessorUtil.FNEG_ZERO+")="+BytesUtil.toString(km0));
+        System.err.println("kp0("+SuccessorUtil.FPOS_ZERO+")="+BytesUtil.toString(kp0));
+        System.err.println("kpos("+SuccessorUtil.FPOS_MIN+")="+BytesUtil.toString(kpos));
+        System.err.println("kp1("+SuccessorUtil.FPOS_ONE+")"+BytesUtil.toString(kp1));
+        System.err.println("kmax("+SuccessorUtil.FPOS_MAX+")="+BytesUtil.toString(kmax));
         
         assertTrue("kmin<kn1",BytesUtil.compareBytes(kmin, kn1)<0);
         assertTrue("kn1<kneg",BytesUtil.compareBytes(kn1, kneg)<0);
@@ -1142,14 +579,14 @@ public class TestKeyBuilder extends TestCase2 {
         
         KeyBuilder keyBuilder = new KeyBuilder();
         
-        byte[] kmin = keyBuilder.reset().append(dmin).getKey(); // largest negative double.
-        byte[] kn1 = keyBuilder.reset().append(dn1).getKey(); // -1f
-        byte[] kneg = keyBuilder.reset().append(dneg).getKey(); // smallest negative double.
-        byte[] km0 = keyBuilder.reset().append(dm0).getKey(); // -0.0f
-        byte[] kp0 = keyBuilder.reset().append(dp0).getKey(); // +0.0f
-        byte[] kpos = keyBuilder.reset().append(dpos).getKey(); // smallest positive double.
-        byte[] kp1 = keyBuilder.reset().append(dp1).getKey(); // +1f;
-        byte[] kmax = keyBuilder.reset().append(dmax).getKey(); // max pos double.
+        byte[] kmin = keyBuilder.reset().append(SuccessorUtil.DNEG_MAX).getKey(); // largest negative double.
+        byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.DNEG_ONE).getKey(); // -1f
+        byte[] kneg = keyBuilder.reset().append(SuccessorUtil.DNEG_MIN).getKey(); // smallest negative double.
+        byte[] km0 = keyBuilder.reset().append(SuccessorUtil.DNEG_ZERO).getKey(); // -0.0f
+        byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.DPOS_ZERO).getKey(); // +0.0f
+        byte[] kpos = keyBuilder.reset().append(SuccessorUtil.DPOS_MIN).getKey(); // smallest positive double.
+        byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.DPOS_ONE).getKey(); // +1f;
+        byte[] kmax = keyBuilder.reset().append(SuccessorUtil.DPOS_MAX).getKey(); // max pos double.
 
         assertEquals(8,kmin.length);
         assertEquals(8,kn1.length);
@@ -1160,14 +597,14 @@ public class TestKeyBuilder extends TestCase2 {
         assertEquals(8,kp1.length);
         assertEquals(8,kmax.length);
 
-        System.err.println("kmin("+dmin+")="+BytesUtil.toString(kmin));
-        System.err.println("kn1("+dn1+")="+BytesUtil.toString(kn1));
-        System.err.println("kneg("+dneg+")="+BytesUtil.toString(kneg));
-        System.err.println("km0("+dm0+")="+BytesUtil.toString(km0));
-        System.err.println("kp0("+dp0+")="+BytesUtil.toString(kp0));
-        System.err.println("kpos("+dpos+")="+BytesUtil.toString(kpos));
-        System.err.println("kp1("+dp1+")"+BytesUtil.toString(kp1));
-        System.err.println("kmax("+dmax+")="+BytesUtil.toString(kmax));
+        System.err.println("kmin("+SuccessorUtil.DNEG_MAX+")="+BytesUtil.toString(kmin));
+        System.err.println("kn1("+SuccessorUtil.DNEG_ONE+")="+BytesUtil.toString(kn1));
+        System.err.println("kneg("+SuccessorUtil.DNEG_MIN+")="+BytesUtil.toString(kneg));
+        System.err.println("km0("+SuccessorUtil.DNEG_ZERO+")="+BytesUtil.toString(km0));
+        System.err.println("kp0("+SuccessorUtil.DPOS_ZERO+")="+BytesUtil.toString(kp0));
+        System.err.println("kpos("+SuccessorUtil.DPOS_MIN+")="+BytesUtil.toString(kpos));
+        System.err.println("kp1("+SuccessorUtil.DPOS_ONE+")"+BytesUtil.toString(kp1));
+        System.err.println("kmax("+SuccessorUtil.DPOS_MAX+")="+BytesUtil.toString(kmax));
         
         assertTrue("kmin<kn1",BytesUtil.compareBytes(kmin, kn1)<0);
         assertTrue("kn1<kneg",BytesUtil.compareBytes(kn1, kneg)<0);

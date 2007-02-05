@@ -50,11 +50,14 @@ package com.bigdata.rdf;
 import java.io.File;
 import java.util.Properties;
 
+import javax.swing.text.html.Option;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Bytes;
+import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.Options;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Base class for test suites for inference engine and the magic sets
@@ -84,12 +87,14 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 
             properties = super.getProperties();
 
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
-//                    .toString());
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
             properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
-//                    .toString());
-            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+            
+            properties.setProperty(Options.FORCE_WRITES,ForceEnum.No.toString());
+//            properties.setProperty(Options.FORCE_WRITES,ForceEnum.Force.toString());
+//            properties.setProperty(Options.FORCE_WRITES,ForceEnum.ForceMetadata.toString());
+            
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
@@ -100,7 +105,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 
     }
 
-    private Properties properties;
+    protected Properties properties;
 
     /**
      * Invoked the first time {@link #getProperties()} is called for each test
@@ -154,7 +159,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
     
     public void tearDown() {
 
-        store.journal.close();
+        store.close();
         
     }
     

@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -60,7 +59,6 @@ import junit.framework.Test;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-
 public class TestDiskJournal extends AbstractTestCase {
 
     public TestDiskJournal() {
@@ -88,6 +86,9 @@ public class TestDiskJournal extends AbstractTestCase {
         
         // tests defined by this class.
         suite.addTestSuite(TestDiskJournal.class);
+
+        // test suite for the IRawStore api.
+        suite.addTestSuite( TestRawStore.class );
 
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
@@ -123,15 +124,10 @@ public class TestDiskJournal extends AbstractTestCase {
     public void test_create_disk01() throws IOException {
         
         final Properties properties = getProperties();
-        
-        properties.setProperty(Options.SLOT_SIZE,"128");
 
         try {
             
             Journal journal = new Journal(properties);
-
-            assertNotNull("slotMath", journal.slotMath);
-            assertEquals("slotSize", 128, journal.slotMath.slotSize);
             
             DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
             
@@ -146,6 +142,30 @@ public class TestDiskJournal extends AbstractTestCase {
         } finally {
             
             deleteTestJournalFile();
+            
+        }
+
+    }
+    
+    /**
+     * Test suite integration for {@link AbstractRestartSafeTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestRawStore extends AbstractRestartSafeTestCase {
+        
+        public TestRawStore() {
+            super();
+        }
+
+        public TestRawStore(String name) {
+            super(name);
+        }
+
+        protected BufferMode getBufferMode() {
+            
+            return BufferMode.Disk;
             
         }
 

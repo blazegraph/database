@@ -46,14 +46,9 @@ Modifications:
  */
 package com.bigdata.objndx;
 
-import java.nio.ByteBuffer;
-
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.ContiguousSlotAllocation;
-import com.bigdata.journal.IRawStore;
-import com.bigdata.journal.ISlotAllocation;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.SlotMath;
+import com.bigdata.journal.ICommitter;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * <p>
@@ -266,7 +261,7 @@ import com.bigdata.journal.SlotMath;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IBTree {
+public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommitter {
     
     /**
      * The default branching factor.
@@ -422,7 +417,7 @@ public class BTree extends AbstractBTree implements IBTree {
             RecordCompressor recordCompressor )
     {
 
-        super(getTransitionalRawStore(store), 
+        super(store, 
                 branchingFactor,
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue,
@@ -456,12 +451,12 @@ public class BTree extends AbstractBTree implements IBTree {
      * @param hardReferenceQueue
      *            The hard reference queue for {@link Leaf}s.
      * 
-     * @see BTreeMetadata#read(IRawStore2, long)
+     * @see BTreeMetadata#read(IRawStore, long)
      */
     public BTree(IRawStore store, BTreeMetadata metadata,
             HardReferenceQueue<PO> hardReferenceQueue) {
 
-        super(getTransitionalRawStore(store), metadata.branchingFactor,
+        super(store, metadata.branchingFactor,
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue, 
                 PackedAddressSerializer.INSTANCE, 
@@ -484,6 +479,23 @@ public class BTree extends AbstractBTree implements IBTree {
 
     }
 
+    /**
+     * Reload a btree using a default hard reference queue configuration.
+     * 
+     * @param store
+     *            The backing store.
+     * 
+     * @param metadata
+     *            The metadata record.
+     */
+    public BTree(IRawStore store, BTreeMetadata metadata) {
+
+        this(store, metadata, new HardReferenceQueue<PO>(
+                new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                DEFAULT_HARD_REF_QUEUE_SCAN));
+        
+    }
+    
     /**
      * Writes dirty nodes using a post-order traversal that first writes any
      * dirty leaves and then (recursively) their parent nodes. The parent nodes
@@ -517,6 +529,44 @@ public class BTree extends AbstractBTree implements IBTree {
         
         return metadata.addrMetadata;
 
+    }
+
+    /**
+     * Handle request for a commit by {@link #write()}ing dirty nodes and
+     * leaves onto the store, writing a new metadata record, and returning the
+     * address of that metadata record.<
+     * <p>
+     * Note: In order to avoid needless writes the existing metadata record is
+     * always returned iff all of the folowing are true:
+     * <ol>
+     * <li> it metadata record is defined (it is not defined when a btree is
+     * first created).</li>
+     * <li> the root of the btree is NOT dirty </li>
+     * <li> the persistent address of the root of the btree is the same as the
+     * address record in the metadata record.</li>
+     * </ol>
+     * 
+     * @return The {@link Addr address} of a metadata record from which the
+     *         btree may be reloaded.
+     */
+    public long handleCommit() {
+
+        if (metadata != null && !root.isDirty()
+                && metadata.addrRoot == root.getIdentity()) {
+
+            /*
+             * There have not been any writes on this btree.
+             */
+            return metadata.addrMetadata;
+            
+        }
+        
+        /*
+         * Flush the btree, write its metadata record, and return the address of
+         * that metadata record.
+         */
+        return write();
+        
     }
     
     /**
@@ -1145,116 +1195,118 @@ public class BTree extends AbstractBTree implements IBTree {
 //    }
 //}
 
-    static protected IRawStore2 getTransitionalRawStore(IRawStore store) {
-     
-        if( store instanceof IRawStore2 ) {
-            
-            return (IRawStore2) store;
-            
-        } else {
-            
-            return new TransitionalRawStore( store );
-            
-        }
-        
-    }
+//    static IRawStore getTransitionalRawStore(IRawStore store) {
+//     
+//        if( store instanceof IRawStore ) {
+//            
+//            return (IRawStore) store;
+//            
+//        } else {
+//            
+//            return new TransitionalRawStore( store );
+//            
+//        }
+//        
+//    }
     
-    /**
-     * Transition class allows the {@link BTree} to be used with the
-     * {@link Journal} while I defer refactoring of the {@link Journal} to use
-     * {@link Addr} vs {@link ISlotAllocation}.
-     */
-    protected static class TransitionalRawStore implements IRawStore2 {
-        
-        protected final IRawStore delegate;
-        
-        public TransitionalRawStore(IRawStore delegate) {
-            
-            assert delegate != null;
-            
-            this.delegate = delegate;
-            
-        }
-        
-        /**
-         * Convert the persistent identifier into an {@link ISlotAllocation}.
-         * 
-         * @param id
-         *            The persistent identifier.
-         * 
-         * @return The {@link ISlotAllocation}
-         */
-        protected ISlotAllocation asSlots(long id) {
-            
-            final int firstSlot = SlotMath.getFirstSlot(id);
-            
-            final int byteCount = SlotMath.getByteCount(id);
-
-            final int slotCount = delegate.getSlotMath().getSlotCount(byteCount);
-            
-            return new ContiguousSlotAllocation(byteCount, slotCount, firstSlot);
-
-        }
-
-        /**
-         * Note: This is the target method for reading data on the new
-         * interface. The method signatures with {@link ISlotAllocation} are all
-         * deprecated and will be refactor out soon.
-         */
-        public ByteBuffer read(long addr, ByteBuffer dst) {
-
-            ISlotAllocation slots = asSlots(addr);
-
-            int nbytes = Addr.getByteCount(addr);
-            
-            if(dst != null) dst.clear();
-            
-            dst = delegate.read(slots,dst);
-            
-            assert dst.position() == 0;
-            assert dst.limit() == nbytes;
-            
-            dst.position(nbytes);
-
-            dst.flip();
-            
-            return dst;
-        }
-
-        public void delete(long addr) {
-            
-            delegate.delete(asSlots(addr));
-            
-        }
-
-        public long write(ByteBuffer data) {
-            
-            return delegate.write(data).toLong();
-            
-        }
-
-        public void close() {
-
-            delegate.close();
-            
-        }
-
-        public boolean isOpen() {
-            
-            return delegate.isOpen();
-            
-        }
-
-        public void force(boolean metadata) {
-            
-            if(delegate instanceof Journal) {
-                
-                ((Journal)delegate).getBufferStrategy().force(metadata);
-                
-            }
-            
-        }
-        
-    }
+//    /**
+//     * Transition class allows the {@link BTree} to be used with the
+//     * {@link Journal} while I defer refactoring of the {@link Journal} to use
+//     * {@link Addr} vs {@link ISlotAllocation}.
+//     */
+//    protected static class TransitionalRawStore implements IRawStore {
+//        
+//        protected final IRawStore delegate;
+//        
+//        public TransitionalRawStore(IRawStore delegate) {
+//            
+//            assert delegate != null;
+//            
+//            this.delegate = delegate;
+//            
+//        }
+//        
+//        /**
+//         * Convert the persistent identifier into an {@link ISlotAllocation}.
+//         * 
+//         * @param id
+//         *            The persistent identifier.
+//         * 
+//         * @return The {@link ISlotAllocation}
+//         */
+//        protected ISlotAllocation asSlots(long id) {
+//            
+//            final int firstSlot = SlotMath.getFirstSlot(id);
+//            
+//            final int byteCount = SlotMath.getByteCount(id);
+//
+//            final int slotCount = delegate.getSlotMath().getSlotCount(byteCount);
+//            
+//            return new ContiguousSlotAllocation(byteCount, slotCount, firstSlot);
+//
+//        }
+//
+//        /**
+//         * Note: This is the target method for reading data on the new
+//         * interface. The method signatures with {@link ISlotAllocation} are all
+//         * deprecated and will be refactor out soon.
+//         */
+//        public ByteBuffer read(long addr, ByteBuffer dst) {
+//
+//            ISlotAllocation slots = asSlots(addr);
+//
+//            int nbytes = Addr.getByteCount(addr);
+//            
+//            if(dst != null) dst.clear();
+//            
+//            dst = delegate.read(slots,dst);
+//            
+//            assert dst.position() == 0;
+//            assert dst.limit() == nbytes;
+//            
+//            dst.position(nbytes);
+//
+//            dst.flip();
+//            
+//            return dst;
+//        }
+//
+//        public void delete(long addr) {
+//            
+//            delegate.delete(asSlots(addr));
+//            
+//        }
+//
+//        public long write(ByteBuffer data) {
+//            
+//            return delegate.write(data).toLong();
+//            
+//        }
+//
+//        public void close() {
+//
+//            delegate.close();
+//            
+//        }
+//
+//        public boolean isOpen() {
+//            
+//            return delegate.isOpen();
+//            
+//        }
+//
+//        public void force(long addr, boolean metadata) {
+//
+//            delegate.force(addr,metadata);
+//            
+////            if(delegate instanceof Journal) {
+////                
+////                ((Journal)delegate).getBufferStrategy().force(metadata);
+////                
+////            }
+//            
+//        }
+//        
+//    }
     
 }

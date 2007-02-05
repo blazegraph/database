@@ -47,101 +47,110 @@
 
 package com.bigdata.journal;
 
-import java.nio.ByteBuffer;
+import com.bigdata.objndx.AbstractBTree;
 
 /**
- * Interface for reading and writing persistent data.
+ * Interface for reading and writing persistent data using one or more named
+ * indices. Persistent data are stored as ordered key-value tuples in indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to reflect direct use of the index into which the data are
- *       being inserted, e.g., the default object index (with int or long keys)
- *       or some other clustered index with arbitrary key type.
  */
 public interface IStore {
 
     /**
-     * Read the current version of the data from the store.
+     * Return a named btree.
      * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param dst
-     *            When non-null and having sufficient bytes remaining, the data
-     *            version will be read into this buffer. If null or if the
-     *            buffer does not have sufficient bytes remaining, then a new
-     *            (non-direct) buffer will be allocated that is right-sized for
-     *            the data version, the data will be read into that buffer, and
-     *            the buffer will be returned to the caller.
+     * @param name The btree name.
      * 
-     * @return The data. The position will always be zero if a new buffer was
-     *         allocated. Otherwise, the position will be invariant across this
-     *         method. The limit - position will be the #of bytes read into the
-     *         buffer, starting at the position. A <code>null</code> return
-     *         indicates that the object was not found in the journal, in which
-     *         case the application MUST attempt to resolve the object against
-     *         the database (i.e., the object MAY have been migrated onto the
-     *         database and the version logically deleted on the journal).
-     * 
-     * @exception DataDeletedException
-     *                if the current version of the identifier data has been
-     *                deleted within the scope visible to the transaction. The
-     *                caller MUST NOT read through to the database if the data
-     *                were deleted.
-     * 
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is non-positive (0 is treated
-     *                as a null).
-     * @exception IllegalStateException
-     *                if the store is not open.
-     * @exception IllegalStateException
-     *                if the interface is transactional and the transaction is
-     *                not active.
+     * @return The named btree or <code>null</code> if no btree was registered
+     *         under that name.
      */
-    public ByteBuffer read(int id, ByteBuffer dst);
-
-    /**
-     * Write a data version. The data version of the data will not be visible
-     * outside of this transaction until the transaction is committed.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     * @param data
-     *            The data to be written. The bytes from
-     *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
-     *            will be written. The position will be advanced to the limit.
-     * 
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is non-positive (0 is treated
-     *                as a null).
-     * @exception DataDeletedException
-     *                if the persistent identifier is deleted.
-     * @exception IllegalStateException
-     *                if the store is not open.
-     * @exception IllegalStateException
-     *                if the interface is transactional and the transaction is
-     *                not active.
-     */
-    public void write(int id, ByteBuffer data);
-
-    /**
-     * Delete the data from the store.
-     * 
-     * @param id
-     *            The int32 within-segment persistent identifier.
-     *            
-     * @exception DataDeletedException
-     *                if the persistent identifier is already deleted.
-     *                
-     * @exception IllegalArgumentException
-     *                if the persistent identifier is non-positive (0 is treated
-     *                as a null).
-     * @exception IllegalStateException
-     *                if the store is not open.
-     * @exception IllegalStateException
-     *                if the interface is transactional and the transaction is
-     *                not active.
-     */
-    public void delete(int id);
+    public AbstractBTree getBTree(String name);
+    
+//    public ITx startTx(long txId);
+    
+//    /**
+//     * Read the current version of the data from the store.
+//     * 
+//     * @param id
+//     *            The int32 within-segment persistent identifier.
+//     * @param dst
+//     *            When non-null and having sufficient bytes remaining, the data
+//     *            version will be read into this buffer. If null or if the
+//     *            buffer does not have sufficient bytes remaining, then a new
+//     *            (non-direct) buffer will be allocated that is right-sized for
+//     *            the data version, the data will be read into that buffer, and
+//     *            the buffer will be returned to the caller.
+//     * 
+//     * @return The data. The position will always be zero if a new buffer was
+//     *         allocated. Otherwise, the position will be invariant across this
+//     *         method. The limit - position will be the #of bytes read into the
+//     *         buffer, starting at the position. A <code>null</code> return
+//     *         indicates that the object was not found in the journal, in which
+//     *         case the application MUST attempt to resolve the object against
+//     *         the database (i.e., the object MAY have been migrated onto the
+//     *         database and the version logically deleted on the journal).
+//     * 
+//     * @exception DataDeletedException
+//     *                if the current version of the identifier data has been
+//     *                deleted within the scope visible to the transaction. The
+//     *                caller MUST NOT read through to the database if the data
+//     *                were deleted.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if the persistent identifier is non-positive (0 is treated
+//     *                as a null).
+//     * @exception IllegalStateException
+//     *                if the store is not open.
+//     * @exception IllegalStateException
+//     *                if the interface is transactional and the transaction is
+//     *                not active.
+//     */
+//    public ByteBuffer read(int id, ByteBuffer dst);
+//
+//    /**
+//     * Write a data version. The data version of the data will not be visible
+//     * outside of this transaction until the transaction is committed.
+//     * 
+//     * @param id
+//     *            The int32 within-segment persistent identifier.
+//     * @param data
+//     *            The data to be written. The bytes from
+//     *            {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}
+//     *            will be written. The position will be advanced to the limit.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if the persistent identifier is non-positive (0 is treated
+//     *                as a null).
+//     * @exception DataDeletedException
+//     *                if the persistent identifier is deleted.
+//     * @exception IllegalStateException
+//     *                if the store is not open.
+//     * @exception IllegalStateException
+//     *                if the interface is transactional and the transaction is
+//     *                not active.
+//     */
+//    public void write(int id, ByteBuffer data);
+//
+//    /**
+//     * Delete the data from the store.
+//     * 
+//     * @param id
+//     *            The int32 within-segment persistent identifier.
+//     *            
+//     * @exception DataDeletedException
+//     *                if the persistent identifier is already deleted.
+//     *                
+//     * @exception IllegalArgumentException
+//     *                if the persistent identifier is non-positive (0 is treated
+//     *                as a null).
+//     * @exception IllegalStateException
+//     *                if the store is not open.
+//     * @exception IllegalStateException
+//     *                if the interface is transactional and the transaction is
+//     *                not active.
+//     */
+//    public void delete(int id);
 
 }

@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import com.bigdata.rawstore.SimpleMemoryRawStore2;
+
 /**
  * Test suite for {@link BTree#touch(AbstractNode)}. None of these tests cause
  * an evicted node to be made persistent, but they do verify the correct
@@ -97,7 +99,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(
-                new SimpleStore(),
+                new SimpleMemoryRawStore2(),
                 branchingFactor,
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
@@ -168,7 +170,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(
-                new SimpleStore(),
+                new SimpleMemoryRawStore2(),
                 branchingFactor,
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
@@ -241,7 +243,7 @@ public class TestTouch extends AbstractBTreeTestCase {
 
         // The btree.
         final BTree btree = new BTree(
-                new SimpleStore(),
+                new SimpleMemoryRawStore2(),
                 branchingFactor,
                 leafQueue,
                 valSer,

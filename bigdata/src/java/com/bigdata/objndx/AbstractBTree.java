@@ -55,8 +55,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IRawStore;
 import com.ibm.icu.text.RuleBasedCollator;
 
 import cutthecrap.utils.striterators.Filter;
@@ -152,7 +153,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     /**
      * The persistence store.
      */
-    final protected IRawStore2 store;
+    final protected IRawStore store;
 
     /**
      * The branching factor for the btree.
@@ -248,7 +249,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      *            reads are against memory which is presumably already parity
      *            checked.
      */
-    protected AbstractBTree(IRawStore2 store,
+    protected AbstractBTree(IRawStore store,
             int branchingFactor,
             int initialBufferCapacity,
             HardReferenceQueue<PO> hardReferenceQueue,
@@ -284,7 +285,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     /**
      * The persistence store.
      */
-    public IRawStore2 getStore() {
+    public IRawStore getStore() {
         
         return store;
         

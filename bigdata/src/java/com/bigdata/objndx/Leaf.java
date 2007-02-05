@@ -52,6 +52,8 @@ import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.rawstore.Addr;
+
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 

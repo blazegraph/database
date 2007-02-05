@@ -50,7 +50,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Bytes;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.TripleStore;
 
@@ -74,6 +74,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     }
     
     protected BufferMode getBufferMode() {
+        
+//        return BufferMode.Disk;
         
         return BufferMode.Transient;
         

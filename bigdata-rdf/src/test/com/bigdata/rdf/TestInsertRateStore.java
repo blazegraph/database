@@ -54,9 +54,10 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
-import com.bigdata.journal.Bytes;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a
@@ -331,7 +332,7 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
 
             final long begin = System.currentTimeMillis();
 
-            final ValueFactory fac = new ValueFactoryImpl();
+            final ValueFactory fac = new OptimizedValueFactory();
             
             log.info( "\nCreating "+nvalues+" values..." );
         
@@ -661,29 +662,29 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
     
         }
 
-        /**
-         * This tests nearly a million triples.
-         * 
-         * <pre>
-         * Sustained insert rate: #statements=880000, elapsed=7422, stmts/sec=118566
-         * </pre>
-         */
-        public void test_moderate() throws IOException {
-
-            int nclass = 200; // @todo at 300 this will force the journal to be extended on commit.
-            int nproperty = 20;
-            int nliteral = 20;
-            int litsize = 100;
-      
-            doTest( nclass, nproperty, nliteral, litsize );
-            
-//          // moderate.
-//          int nclass = 5000;
-//          int nproperty = 20;
-//          int nliteral = 30;
-////          int nliteral = 0;
-//          int litsize = 300;
-
-        }
+//        /**
+//         * This tests nearly a million triples.
+//         * 
+//         * <pre>
+//         * Sustained insert rate: #statements=880000, elapsed=7422, stmts/sec=118566
+//         * </pre>
+//         */
+//        public void test_moderate() throws IOException {
+//
+//            int nclass = 200; // @todo at 300 this will force the journal to be extended on commit.
+//            int nproperty = 20;
+//            int nliteral = 20;
+//            int litsize = 100;
+//      
+//            doTest( nclass, nproperty, nliteral, litsize );
+//            
+////          // moderate.
+////          int nclass = 5000;
+////          int nproperty = 20;
+////          int nliteral = 30;
+//////          int nliteral = 0;
+////          int litsize = 300;
+//
+//        }
 
 }

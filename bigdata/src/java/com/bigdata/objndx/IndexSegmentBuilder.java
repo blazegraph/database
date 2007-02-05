@@ -62,10 +62,13 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleFileRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore2;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -1703,7 +1706,7 @@ public class IndexSegmentBuilder {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static interface Buffer extends IRawStore2 {
+    static interface Buffer extends IRawStore {
 
         /**
          * A block operation that transfers the serialized records en mass from
@@ -1758,15 +1761,6 @@ public class IndexSegmentBuilder {
 //            return super.write(data);
 //            
 //        }
-
-        /**
-         * Disallowed.
-         */
-        public void delete(long addr) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
 
         public long transferTo(RandomAccessFile out) throws IOException {
 
@@ -1875,15 +1869,6 @@ public class IndexSegmentBuilder {
 //            
 //        }
         
-        /**
-         * Disallowed.
-         */
-        public void delete(long addr) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
         public long transferTo(RandomAccessFile out) throws IOException {
             
             long count = 0L;

@@ -57,6 +57,8 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import com.bigdata.io.ByteBufferInputStream;
+
 
 /**
  * Bulk data (de-)compressor used for leaves in {@link IndexSegment}s. The

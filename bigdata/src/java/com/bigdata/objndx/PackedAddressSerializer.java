@@ -53,7 +53,8 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.journal.Bytes;
+import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Packs the addresses using {@link LongPacker}.

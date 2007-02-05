@@ -58,6 +58,9 @@ package com.bigdata.objndx;
  * 
  * FIXME re-define and re-implement this interface using a default
  * {@link KeyBuilder}.
+ * 
+ * @see KeyBuilder, which may be used to encode one or more values into a
+ *      variable length unsigned byte[] key.
  */
 public interface IBTree {
 
@@ -114,6 +117,12 @@ public interface IBTree {
      *            <code>null</code> there is no upper bound.
      * 
      * @see #entryIterator(), which visits all entries in the btree.
+     * 
+     * @see SuccessorUtil, which may be used to compute the successor of a value
+     *      before encoding it as a component of a key.
+     * 
+     * @see BytesUtil#successor(byte[]), which may be used to compute the
+     *      successor of an encoded key.
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
 

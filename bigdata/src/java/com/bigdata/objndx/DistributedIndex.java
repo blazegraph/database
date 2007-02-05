@@ -55,8 +55,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.IRawStore;
 import com.bigdata.journal.Journal;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * An index that is dynamically decomposed into key-range partitions. Each
@@ -285,8 +285,7 @@ public class DistributedIndex implements IBTree {
          */
         public MetadataIndex(IRawStore store, long metadataId, Object NEGINF,
                 Comparator comparator, IKeySerializer keySerializer) {
-            super(store, BTreeMetadata.read(BTree
-                    .getTransitionalRawStore(store), metadataId),
+            super(store, BTreeMetadata.read(store, metadataId),
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                             BTree.DEFAULT_HARD_REF_QUEUE_SCAN));

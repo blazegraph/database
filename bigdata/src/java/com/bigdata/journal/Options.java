@@ -3,6 +3,8 @@ package com.bigdata.journal;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
+import com.bigdata.rawstore.Bytes;
+
 /**
  * Options for the {@link Journal}. Options are specified as property
  * values to the {@link Journal#Journal(Properties)} constructor.
@@ -29,17 +31,17 @@ public class Options {
      * @see BufferMode#Disk
      */
     public static final String BUFFER_MODE = "bufferMode";
-    
-    /**
-     * <code>objectIndexSize</code> - The size of a node in the object
-     * index (aka branching factor). A larger node size correlates with an
-     * object index with less height, and height correlates with access
-     * time. Access time is a concern when the journal is not fully
-     * buffered. The value must be even and is normally a power of two,
-     * e.g., 64, 128, 256, etc.
-     */
-    public static final String OBJECT_INDEX_SIZE = "objectIndexSize";
 
+    /**
+     * <code>useDirectBuffers</code> - A boolean property whose value controls
+     * whether a direct (native) or heap-based {@link ByteBuffer} will be
+     * allocated by the selected {@link BufferMode}. Note that this only
+     * applies to fully buffered modes, e.g., {@link BufferMode#Transient} or
+     * {@link BufferMode#Direct}. This parameter has no effect for the
+     * memory-mapped or disk-only buffer modes.
+     */
+    public static final String USE_DIRECT_BUFFERS = "useDirectBuffers";
+    
     /**
      * <code>initialExtent</code> - The initial extent of the journal
      * (bytes). The initial file size is computed by subtracting off the
@@ -48,11 +50,11 @@ public class Options {
     public static final String INITIAL_EXTENT = "initialExtent";
     
     /**
-     * <code>segment</code> - The unique segment identifier (required
+     * <code>segment</code> - The unique int32 segment identifier (required
      * unless this is a {@link BufferMode#Transient} journal). Segment
-     * identifiers are assigned by a bigdata federation. When using the
-     * journal as part of an embedded database you may safely assign an
-     * arbitrary segment identifier.
+     * identifiers are assigned by a bigdata federation. When using the journal
+     * as part of an embedded database you may safely assign an arbitrary
+     * segment identifier, e.g., zero(0).
      */
     public static final String SEGMENT = "segment";
     
@@ -64,32 +66,7 @@ public class Options {
      * @todo Write tests for this feature.
      */
     public static final String CREATE = "create";
-    
-    /**
-     * <p>
-     * <code>slotSize</code> - The slot size in bytes. The data space of
-     * the journal is divided into equal sized slots. All objects written on
-     * the journal are written onto one or more slots. The journal is
-     * relatively efficient about its use of slots. The main overhead when
-     * slots are two small is the slot allocation index (a bitmap). When
-     * slots are too large, there is a tendency for wasted space. Note that
-     * the journal will reclaim slots as the versions written on those slots
-     * become available for GC.
-     * </p>
-     * <p>
-     * If the journal is being used to absorb writes and provide concurrency
-     * control for small objects, then the slot size should be relatively
-     * small, e.g., 48, 64, 96, or 128 bytes depending on the application.
-     * If an object is either over or under the slot size, then there will
-     * be waste. When the object is under the slot size, the waste is the
-     * space remaining in the slot. When the object is over the slot size,
-     * the waste is the space remaining in the last slot allocated to that
-     * object. If objects tend to be larger, then you can increase the slot
-     * size.
-     * </p>
-     */
-    public static final String SLOT_SIZE = "slotSize";
-    
+        
     /**
      * <code>readOnly</code> - When true, the journal must pre-exist and
      * will be read-only (optional, default is <code>false</code>).
@@ -148,17 +125,17 @@ public class Options {
      */
     public static final String FORCE_ON_COMMIT = "forceOnCommit";
     
-    /**
-     * <code>conflictResolver</code> - The name of a class that implements
-     * the {@link IConflictResolver} interface (optional). When specified,
-     * the class MUST define a public constructor with the signature
-     * <code><i>class</i>( Journal journal )</code>. There is NO
-     * default. Resolution of write-write conflicts is enabled iff a
-     * conflict resolution class is declared with this parameter. If a value
-     * is not provided, the a write-write conflict will result in the
-     * rollback of a transaction.
-     */
-    public static final String CONFLICT_RESOLVER = "conflictResolver";
+//    /**
+//     * <code>conflictResolver</code> - The name of a class that implements
+//     * the {@link IConflictResolver} interface (optional). When specified,
+//     * the class MUST define a public constructor with the signature
+//     * <code><i>class</i>( Journal journal )</code>. There is NO
+//     * default. Resolution of write-write conflicts is enabled iff a
+//     * conflict resolution class is declared with this parameter. If a value
+//     * is not provided, the a write-write conflict will result in the
+//     * rollback of a transaction.
+//     */
+//    public static final String CONFLICT_RESOLVER = "conflictResolver";
     
     /**
      * <code>deleteOnClose</code> - This optional boolean option causes
@@ -170,35 +147,15 @@ public class Options {
     public final static String DELETE_ON_CLOSE = "deleteOnClose";
     
     /**
+     * The default for {@link #USE_DIRECT_BUFFERS}.
+     */
+    public final static boolean DEFAULT_USE_DIRECT_BUFFERS = false;
+    
+    /**
      * The default initial extent for a new journal.
      */
     public final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
     
-    /**
-     * The minimum node size (aka branching factor) for the object index.
-     */
-    public final static int MIN_OBJECT_INDEX_SIZE = 16;
-    
-    /**
-     * The maximum node size (aka branching factor) for the object index.
-     */
-    public final static int MAX_OBJECT_INDEX_SIZE = 2048;
-    
-    /**
-     * The default node size (aka branching factor) for the object index.
-     */
-    public final static int DEFAULT_OBJECT_INDEX_SIZE = 256;
-    
-    /**
-     * The minimum permitted slot size.
-     */
-    public final static int MIN_SLOT_SIZE = 32;
-    
-    /**
-     * The default slot size.
-     */
-    public final static int DEFAULT_SLOT_SIZE = 64;
-
     /**
      * The default for the {@link #CREATE} option.
      */

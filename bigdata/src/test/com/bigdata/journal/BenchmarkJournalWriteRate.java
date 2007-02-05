@@ -53,10 +53,11 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase2;
 import junit.framework.TestSuite;
+
+import com.bigdata.rawstore.Bytes;
 
 /**
  * <p>
@@ -167,8 +168,6 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
-        properties.setProperty(Options.SLOT_SIZE,""+getSlotSize());
-        
         properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
 
         properties.setProperty(Options.SEGMENT, "0");
@@ -249,65 +248,49 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
     }
 
-    /**
-     * FIXME Testing with isolation appears to pose a heavy memory burden during
-     * writes (vs prepare/commit) for some of the buffer modes - track that
-     * down!
-     */
-    public void testWithIsolation() throws IOException {
-
-        Tx tx = new Tx(journal, 0L);
-
-        doJournalWriteRateTest(tx,128);
-
-    }
+//    /**
+//     * FIXME Testing with isolation appears to pose a heavy memory burden during
+//     * writes (vs prepare/commit) for some of the buffer modes - track that
+//     * down!
+//     */
+//    public void testWithIsolation() throws IOException {
+//
+//        Tx tx = new Tx(journal, 0L);
+//
+//        doJournalWriteRateTest(tx,128);
+//
+//    }
 
     public void testNoIsolation() throws IOException {
 
-        doJournalWriteRateTest(journal,128);
+        doJournalWriteRateTest(128);
 
     }
     
     /**
      * Run a test.
      * 
-     * @param store
-     *            The interface on which the writes will be performed. This can
-     *            be either an isolated {@link ITx} or an unisolated
-     *            {@link IStore}.
-     * 
      * @param writeSize
-     *            The size of the object to be written. Objects may be less
-     *            than, equal to, or greater than the size of a slot. Objects
-     *            that span slots will be written onto multiple slots.  When the
-     *            write size is equal to the slot size, the assumption is that
-     *            each object fits in one slot.
+     *            The size of the object to be written.
      * 
      * @return The elapsed time for the test.
      */
-    public long doJournalWriteRateTest(IStore store,int writeSize) {
+    public long doJournalWriteRateTest(int writeSize) {
 
+        Journal store = journal;
+        
         System.err.println("Begin: bufferMode="+journal._bufferStrategy.getBufferMode());
 
         final long begin = System.currentTimeMillis();
         
-        final int slotLimit = journal._bufferStrategy.getSlotLimit();
-
-//        final int dataSize = journal._bufferStrategy.getSlotDataSize();
-
-        final int slotCount = journal.slotMath.getSlotCount(writeSize);
+        final int nwrites = (int) journal._bufferStrategy.getExtent()
+                / writeSize;
         
-        // less one since slot 0 is not writable.
-        final int nwrites = (slotLimit-1) / slotCount;
-        
-        System.err.println("writeSize=" + writeSize + ", slotSize="
-                + journal.getBufferStrategy().getSlotSize() + ", slotLimit="
-                + slotLimit + ", slotCountPerWrite=" + slotCount + ", nwrites="
-                + nwrites);
+        System.err.println("writeSize=" + writeSize + ", nwrites=" + nwrites);
         
         ByteBuffer data = ByteBuffer.allocateDirect(writeSize);
 
-        int id = 1;
+//        int id = 1;
         
         for( int i=0; i<nwrites; i++ ) {
         
@@ -317,50 +300,51 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
             
             data.limit( writeSize );
             
-            store.write(id++, data);
+            store.write(data);
             
         }
 
-        final boolean isTx = store instanceof ITx;
-        
-        if( isTx ) {
-
-            ITx tx = (Tx) store;
-            
-            final long beginPrepare = System.currentTimeMillis();            
-
-            final long elapsedWrite =  beginPrepare - begin;
-
-            tx.prepare();
-
-            final long beginCommit = System.currentTimeMillis();
-            
-            final long elapsedPrepare = beginCommit - beginPrepare;
-
-            tx.commit();
-
-            final long elapsedCommit = System.currentTimeMillis() - beginCommit;
-
-            System.err.println("Write  : "+elapsedWrite+"(ms)");
-            System.err.println("Prepare: "+elapsedPrepare+"(ms)");
-            System.err.println("Commit : "+elapsedCommit+"(ms)");
-
-        } else {
-            
-            /*
-             * Force to stable store when not using isolation (the transaction
-             * does this anyway so this makes things more fair).
-             */
-            
-            journal._bufferStrategy.force(true);
-            
-        }
+//        final boolean isTx = store instanceof ITx;
+//        
+//        if( isTx ) {
+//
+//            ITx tx = (Tx) store;
+//            
+//            final long beginPrepare = System.currentTimeMillis();            
+//
+//            final long elapsedWrite =  beginPrepare - begin;
+//
+//            tx.prepare();
+//
+//            final long beginCommit = System.currentTimeMillis();
+//            
+//            final long elapsedPrepare = beginCommit - beginPrepare;
+//
+//            tx.commit();
+//
+//            final long elapsedCommit = System.currentTimeMillis() - beginCommit;
+//
+//            System.err.println("Write  : "+elapsedWrite+"(ms)");
+//            System.err.println("Prepare: "+elapsedPrepare+"(ms)");
+//            System.err.println("Commit : "+elapsedCommit+"(ms)");
+//
+//        } else {
+//            
+//            /*
+//             * Force to stable store when not using isolation (the transaction
+//             * does this anyway so this makes things more fair).
+//             */
+//            
+//            journal._bufferStrategy.force(0L,true);
+//            
+//        }
         
         final long elapsed = System.currentTimeMillis() - begin;
         
         System.err.println("Elapsed: " + elapsed + "(ms), bufferMode="
-                + journal._bufferStrategy.getBufferMode() + ", isolation="
-                + isTx);
+                + journal._bufferStrategy.getBufferMode()
+//                + ", isolation="+ isTx
+                );
 
         return elapsed;
         
