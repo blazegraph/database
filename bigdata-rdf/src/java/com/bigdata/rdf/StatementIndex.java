@@ -49,12 +49,9 @@ import java.io.IOException;
 
 import org.openrdf.model.Statement;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.PO;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -62,8 +59,6 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo make the keyOrder property persistent.
  */
 public class StatementIndex extends BTree {
 
@@ -77,14 +72,7 @@ public class StatementIndex extends BTree {
      */
     public StatementIndex(IRawStore store,KeyOrder keyOrder) {
         
-        super(store,
-                DEFAULT_BRANCHING_FACTOR,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                        DEFAULT_HARD_REF_QUEUE_SCAN),
-                ValueSerializer.INSTANCE,
-                null // new RecordCompressor() // record compressor
-                );
+        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
         
         assert keyOrder != null;
         
@@ -102,10 +90,7 @@ public class StatementIndex extends BTree {
      */
     public StatementIndex(IRawStore store, long metadataId,KeyOrder keyOrder) {
 
-        super(store, BTreeMetadata.read(store,
-                metadataId), new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                DEFAULT_HARD_REF_QUEUE_SCAN));
+        super(store, BTreeMetadata.read(store, metadataId));
         
         this.keyOrder = keyOrder;
         
@@ -113,17 +98,11 @@ public class StatementIndex extends BTree {
 
     /**
      * Note: There is no additional data serialized with a statement at this
-     * time so the value serializer is essentially a nop. All the
-     * information is in the keys.
+     * time so the value serializer is essentially a nop. All the information is
+     * in the keys.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo could serialize the statement values with the statement to
-     *       avoid reverse lookup indices.
-     *       
-     * @todo could mark inferred vs explicit vs axiom statements.
      */
     public static class ValueSerializer implements IValueSerializer {
 

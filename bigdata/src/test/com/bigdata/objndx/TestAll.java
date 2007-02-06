@@ -1,7 +1,5 @@
 package com.bigdata.objndx;
 
-import com.bigdata.util.TestChecksumUtility;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -104,50 +102,12 @@ public class TestAll extends TestCase {
         
         /*
          * test atomic commit
-         * 
-         * @todo test btree may be reloaded from its metadata record.
-         * 
-         * @todo that failure to commit results in effective rollback of
-         * btree(s) on a journal (writes are ignored since the btree metadata
-         * index is not updated).
-         * 
-         * @todo test atomic commit of btree(s) on a journal.
-         * 
-         * @todo test journal restart semantics w/o shutdown (uncomitted changes
-         * are ignored).
-         * 
-         * @todo test journal transaction isolation using the new object index.
          */
-        // test the commit protocol. @todo expand tests.
+        // test the commit protocol.
         suite.addTestSuite( TestCommit.class );
-        // verify that a store may be re-opened and the data in the btree(s) is preserved.
+        // verify that a store is restart-safe iff it commits.
         suite.addTestSuite( TestRestartSafe.class );
 
-        /*
-         * use of btree to support transactional isolation.
-         *
-         * @todo verify that null is allowed to represent a delted value.
-         * 
-         * @todo test of double-delete.
-         * 
-         * @todo test as simple object store (persistent identifiers) by
-         * refactoring the journal test suites.
-         * 
-         * @todo test on partitioned index.
-         */
-
-        /*
-         * use of btree to support column store.
-         * 
-         * @todo handle column names as part of the key?
-         * 
-         * @todo test version expiration based on age
-         * 
-         * @todo test version expiration based on #of versions.
-         * 
-         * @todo test on paritioned index. 
-         */
-        
         /*
          * index rebuilding.
          */
@@ -175,13 +135,7 @@ public class TestAll extends TestCase {
          */
         
         /*
-         * FIXME partitioned indices.
-         * 
-         * @todo test leaf search rule. The leaf search rule for the index
-         * partitions is the first entry having a key less than or equal to the
-         * search key. This search rule lets us locate the corresponding
-         * partition much as the node search rule lets us direct search to
-         * correct node or leaf in the the next level down of the btree.
+         * management of partitioned indices.
          * 
          * @todo test overflow resulting in parition merge or split.
          * 
@@ -191,7 +145,33 @@ public class TestAll extends TestCase {
          * 
          * @todo test metadata management for index segments.
          */
+        suite.addTestSuite(TestMetadataIndex.class);
        
+        /*
+         * use of btree to support transactional isolation.
+         *
+         * @todo verify that null is allowed to represent a delted value.
+         * 
+         * @todo test of double-delete.
+         * 
+         * @todo test as simple object store (persistent identifiers) by
+         * refactoring the journal test suites.
+         * 
+         * @todo test on partitioned index.
+         */
+
+        /*
+         * use of btree to support column store.
+         * 
+         * @todo handle column names and timestamp as part of the key.
+         * 
+         * @todo test version expiration based on age
+         * 
+         * @todo test version expiration based on #of versions.
+         * 
+         * @todo test on partitioned index. 
+         */
+        
         return suite;
         
     }

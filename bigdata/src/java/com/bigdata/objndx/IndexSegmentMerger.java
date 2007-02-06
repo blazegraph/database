@@ -53,7 +53,9 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.objndx.IndexSegmentBuilder.NOPNodeFactory;
@@ -61,6 +63,9 @@ import com.bigdata.objndx.IndexSegmentBuilder.SimpleLeafData;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Class supporting a compacting merge of two btrees into a series of ordered
@@ -74,16 +79,25 @@ import com.bigdata.rawstore.IRawStore;
  *       markers, merging trees w/ deletion markers, merging trees w/ age-based
  *       version expiration, merging trees with count-based version expiration.
  * 
- * @todo support delete during merge.
+ * @todo Support delete during merge to support transactions (a TimestampValue
+ *       having a greater timestamp and a null value is interpreted as a delete
+ *       marker).
  * 
- * @todo support deletion based on history policy (requires timestamps).
+ * @todo Support deletion based on history policy (requires timestamps in the
+ *       keys and explicit awareness of column store nature).
  * 
- * @todo integrate to allow compacting merges.
+ * @todo factor out the merge rule into the {@link BTreeMetadata}. consider
+ *       whether it should be maintained on the {@link IndexSegmentMetadata} as
+ *       well.
  * 
  * FIXME rewrite to use {@link IRawStore} objects as buffers ala the
- * {@link IndexSegmentBuilder}.
+ * {@link IndexSegmentBuilder} and see if we are better off using memory or disk
+ * to buffer the merge.
  * 
- * @todo reconcile with {@link FusedView}.
+ * @see {@link FusedView}, which provides a dynamic view of two or more btrees.
+ *      However, this class is more efficient when we are going to do a bulk
+ *      merge operation since it performs the merge and computes the #of output
+ *      entries in one pass.
  */
 public class IndexSegmentMerger {
 
@@ -92,6 +106,18 @@ public class IndexSegmentMerger {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentMerger.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * Compacting merge of two btrees, writing the results onto a file. The file
@@ -422,7 +448,7 @@ public class IndexSegmentMerger {
      */
     protected void outputKey(ILeafData src,int srcpos) throws IOException {
 
-        System.err.println("#leavesWritten=" + nleaves + ", src="
+        if(DEBUG) log.debug("#leavesWritten=" + nleaves + ", src="
                 + (src == leaf1 ? "leaf1" : "leaf2") + ", srcpos=" + srcpos);
         
         MutableKeyBuffer keys = (MutableKeyBuffer) leaf.keys;
@@ -455,8 +481,6 @@ public class IndexSegmentMerger {
      * write the leaf onto the output channel.
      */
     protected void writeLeaf(SimpleLeafData leaf) throws IOException {
-        
-//        leaf.keys = new ImmutableKeyBuffer(((MutableKeyBuffer)leaf.keys));
         
         ByteBuffer buf = nodeSer.putNodeOrLeaf( leaf );
 
@@ -528,6 +552,12 @@ public class IndexSegmentMerger {
         private final ByteBuffer buf;
         
         /**
+         * Used to note when the iterator is exhausted and delete the temporary
+         * file.
+         */
+        private boolean exhausted;
+        
+        /**
          * @param file 
          * @param raf
          * @param m
@@ -561,24 +591,54 @@ public class IndexSegmentMerger {
        
         /**
          * Close the channel and delete the merge file.
+         * <p>
+         * This is invoked automatically when the iterator is exhausted. 
          * 
          * @throws IOException
          */
-        public void close() throws IOException {
+        public void close() {
             
-            raf.close();
-            
-            if( file.exists() && ! file.delete() ) {
-                
-                log.warn("Could not delete file: "+file.getAbsoluteFile());
-                
+            if (raf.getChannel().isOpen()) {
+
+                try {
+
+                    raf.close();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            if (file.exists() && !file.delete()) {
+
+                log.warn("Could not delete file: " + file.getAbsoluteFile());
+
             }
             
         }
 
+        /**
+         * Test whether more leaves are available.
+         * <p>
+         * Automatically closes out the backing buffer when all leaves have been
+         * processed.
+         */
         public boolean hasNext() {
         
-            return leafIndex < nleaves;
+            if(exhausted) throw new NoSuchElementException();
+            
+            exhausted = leafIndex >= nleaves;
+
+            if(exhausted) {
+                
+                close();
+                
+            }
+            
+            return ! exhausted;
             
         }
 
@@ -591,8 +651,9 @@ public class IndexSegmentMerger {
 
                 offset += Bytes.SIZEOF_INT;
                 
-                System.err.println("will read " + nbytes + " bytes at offset="
-                        + offset);
+                if (DEBUG)
+                    log.debug("will read " + nbytes + " bytes at offset="
+                            + offset);
 
                 buf.limit(nbytes);
                 buf.position(0);
@@ -661,73 +722,361 @@ public class IndexSegmentMerger {
 
             }
 
-            /**
-             * A class that can be used to (de-)serialize the data for a leaf
-             * without any of the logic for operations on the leaf.
-             * 
-             * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-             *         Thompson</a>
-             * @version $Id$
-             */
-            protected static class LeafData implements ILeafData {
+        }
 
-                final int m;
-                /**
-                 * @todo drop this since maintained by IKeyBuffer?
-                 */
-                final int nkeys;
-                final IKeyBuffer keys;
-                final Object[] vals;
+    }
 
-                public int getBranchingFactor() {
-                    return m;
-                }
+    /**
+     * A class that can be used to (de-)serialize the data for a leaf without
+     * any of the logic for operations on the leaf.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class LeafData implements ILeafData {
 
-                public int getKeyCount() {
-                    return nkeys;
-                }
+        final int m;
+        /**
+         * @todo drop this since maintained by IKeyBuffer?
+         */
+        final int nkeys;
+        final IKeyBuffer keys;
+        final Object[] vals;
 
-                public IKeyBuffer getKeys() {
-                    return keys;
-                }
+        public int getBranchingFactor() {
+            return m;
+        }
 
-                public LeafData(int m, IKeyBuffer keys, Object[] vals) {
+        public int getKeyCount() {
+            return nkeys;
+        }
 
-                    this.m = m;
-                    this.nkeys = keys.getKeyCount();
-                    this.keys = keys;
-                    this.vals = vals;
-                    
-                }
-                
-                public int getValueCount() {
-                    
-                    return nkeys;
-                    
-                }
+        public IKeyBuffer getKeys() {
+            return keys;
+        }
 
-                public Object[] getValues() {
-                    
-                    return vals;
-                    
-                }
+        public LeafData(int m, IKeyBuffer keys, Object[] vals) {
 
-                public boolean isLeaf() {
-                    
-                    return true;
-                    
-                }
+            this.m = m;
+            this.nkeys = keys.getKeyCount();
+            this.keys = keys;
+            this.vals = vals;
+            
+        }
+        
+        public int getValueCount() {
+            
+            return nkeys;
+            
+        }
 
-                public int getEntryCount() {
-                    
-                    return nkeys;
-                    
-                }
- 
-            }
+        public Object[] getValues() {
+            
+            return vals;
+            
+        }
+
+        public boolean isLeaf() {
+            
+            return true;
+            
+        }
+
+        public int getEntryCount() {
+            
+            return nkeys;
             
         }
 
     }
     
+    /**
+     * Exposes a {@link MergedLeafIterator} as an {@link IEntryIterator}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class MergedEntryIterator extends Striterator implements IEntryIterator {
+        
+        /**
+         * The key-value for each entry are set as a side-effect on a private
+         * {@link Tuple} field so that this class can implement
+         * {@link IEntryIterator}.
+         * 
+         * @see EntryIterator#EntryIterator(Leaf, Tuple)
+         */
+        final Tuple tuple = new Tuple();
+        
+        public MergedEntryIterator(MergedLeafIterator postOrderIterator) {
+            
+            super(postOrderIterator);
+            
+            addFilter(new Expander() {
+
+                private static final long serialVersionUID = 1L;
+
+                /**
+                 * Expand the entries in each leaf.
+                 */
+                protected Iterator expand(Object childObj) {
+
+                    LeafData leaf = (LeafData) childObj;
+
+                    if (leaf.nkeys == 0) {
+
+                        return EmptyKeyValueIterator.INSTANCE;
+
+                    }
+                     
+                    return new LeafDataEntryIterator(leaf,tuple);
+
+                }
+
+            });
+        
+        }
+
+        public MergedEntryIterator(MergedLeafIterator postOrderIterator,
+                final byte[] fromKey, final byte[] toKey) {
+            
+            super(postOrderIterator);
+            
+            addFilter(new Expander() {
+
+                private static final long serialVersionUID = 1L;
+
+                /**
+                 * Expand the entries in each leaf.
+                 */
+                protected Iterator expand(Object childObj) {
+
+                    /*
+                     * A child of this node.
+                     */
+                    LeafData leaf = (LeafData) childObj;
+
+                    if (leaf.nkeys == 0) {
+
+                        return EmptyKeyValueIterator.INSTANCE;
+
+                    }
+                     
+                    return new LeafDataEntryIterator(leaf,tuple,fromKey,toKey);
+
+                }
+
+            });
+        
+        }
+
+        public byte[] getKey() {
+            
+            return tuple.key;
+            
+        }
+
+        public Object getValue() {
+            
+            return tuple.val;
+            
+        }
+
+    }
+    
+    /**
+     * Visits the values of a {@link Leaf} in the external key ordering. There is
+     * exactly one value per key for a leaf node.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class LeafDataEntryIterator implements IEntryIterator {
+
+        private final LeafData leaf;
+
+        private final Tuple tuple;
+
+        private int index = 0;
+
+        private int lastVisited = -1;
+
+//        private final byte[] fromKey;
+//        
+//        private final byte[] toKey;
+
+        // first index to visit.
+        private final int fromIndex;
+
+        // first index to NOT visit.
+        private final int toIndex;
+        
+        public LeafDataEntryIterator(LeafData leaf) {
+
+            this( leaf, null );
+            
+        }
+
+        public LeafDataEntryIterator(LeafData leaf, Tuple tuple ) {
+
+            this(leaf,tuple,null,null);
+            
+        }
+        
+        /**
+         * 
+         * @param leaf
+         *            The leaf whose entries will be traversed.
+         * @param tuple
+         *            Used to hold the output values.
+         * @param fromKey
+         *            The first key whose entry will be visited or <code>null</code>
+         *            if the lower bound on the key traversal is not constrained.
+         * @param toKey
+         *            The first key whose entry will NOT be visited or
+         *            <code>null</code> if the upper bound on the key traversal is
+         *            not constrained.
+         * 
+         * @exception IllegalArgumentException
+         *                if fromKey is given and is greater than toKey.
+         */
+        public LeafDataEntryIterator(LeafData leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+
+            assert leaf != null;
+
+            this.leaf = leaf;
+            
+            this.tuple = tuple; // MAY be null.
+
+//            this.fromKey = fromKey; // may be null (no lower bound).
+//            
+//            this.toKey = toKey; // may be null (no upper bound).
+
+            { // figure out the first index to visit.
+
+                int fromIndex;
+
+                if (fromKey != null) {
+
+                    fromIndex = leaf.keys.search(fromKey);
+
+                    if (fromIndex < 0) {
+
+                        fromIndex = -fromIndex - 1;
+
+                    }
+
+                } else {
+
+                    fromIndex = 0;
+
+                }
+
+                this.fromIndex = fromIndex;
+
+            }
+
+            { // figure out the first index to NOT visit.
+
+                int toIndex;
+
+                if (toKey != null) {
+
+                    toIndex = leaf.keys.search(toKey);
+
+                    if (toIndex < 0) {
+
+                        toIndex = -toIndex - 1;
+
+                    }
+
+                } else {
+
+                    toIndex = leaf.nkeys;
+
+                }
+
+                this.toIndex = toIndex;
+
+            }
+
+            if (fromIndex > toIndex) {
+                
+                throw new IllegalArgumentException("fromKey > toKey");
+                
+            }
+            
+            // starting index is the lower bound.
+            index = fromIndex;
+            
+        }
+
+        public boolean hasNext() {
+
+            return index >= fromIndex && index < toIndex;
+
+        }
+
+        public Object next() {
+
+            if (!hasNext()) {
+
+                throw new NoSuchElementException();
+
+            }
+
+            lastVisited = index++;
+            
+            if( tuple != null ) {
+
+                /*
+                 * eagerly set the key/value on the tuple for a side-effect style
+                 * return.
+                 */
+                tuple.key = leaf.keys.getKey(lastVisited);
+                
+                tuple.val = leaf.vals[lastVisited];
+                
+                return tuple.val;
+                
+            }
+            
+            return leaf.vals[lastVisited];
+            
+        }
+
+        public Object getValue() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return leaf.vals[lastVisited];
+            
+        }
+        
+        public byte[] getKey() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return leaf.keys.getKey(lastVisited);
+            
+        }
+        
+        /**
+         * @exception UnsupportedOperationException
+         */
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+    }
+
 }

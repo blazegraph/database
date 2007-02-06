@@ -85,8 +85,8 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
          * @todo use a dataset that we can add to CVS for a performance test and
          * hand-crafted data sets to test the rule implementations.
          */
-        store.loadData(new File("data/alibaba_v41.rdf"));
-//        store.loadData(new File("data/nciOncology.owl"));
+        store.loadData(new File("data/alibaba_v41.rdf"),"");
+//        store.loadData(new File("data/nciOncology.owl"),"");
 
         store.fullForwardClosure();
         

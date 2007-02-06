@@ -59,14 +59,11 @@ import java.util.Properties;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.KeyBuilder;
-import com.bigdata.objndx.PO;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -1417,12 +1414,17 @@ public class Journal implements IRawStore, IAtomicStore, IStore {
      * that method is the address from which the {@link ICommitter} may be
      * reloaded (and its previous address if its state has not changed). That
      * address is saved in the slot of the root block under which that committer
-     * was {@link #registerCommitter(int, ICommitter) registered}. We then force
-     * the data to stable store, update the root block, and force the root block
-     * and the file metadata to stable store.
+     * was {@link #registerCommitter(int, ICommitter) registered}. We then
+     * force the data to stable store, update the root block, and force the root
+     * block and the file metadata to stable store.
      */
     public void commit() {
-        
+
+        /*
+         * First, run each of the committers.  In general, these are btrees and
+         * they may have dirty nodes or leaves that needs to be evicted onto the
+         * store.
+         */
         int ncommitters = 0;
 
         long[] rootAddrs = new long[_committers.length];
@@ -1438,15 +1440,28 @@ public class Journal implements IRawStore, IAtomicStore, IStore {
         }
 
         /*
+         * See if anything has been written on the store since the last commit.
+         */
+        if( _bufferStrategy.getNextOffset() == _rootBlock.getNextOffset() ) {
+            
+            /*
+             * No data was written onto the store so the commit can not achieve
+             * any useful purpose.
+             */
+            
+            return;
+            
+        }
+
+        /*
          * force application data to stable store.
          * 
-         * @todo this is a double sync since writing the root block also does
-         * a snyc.
+         * @todo add Option.doubleSync.
          * 
          * @todo is it true that we only need to sync the file metadata if we
          * are extending the store?
          */
-        _bufferStrategy.force(false);
+//        _bufferStrategy.force(false);
         
         /*
          * update the root block.
@@ -1590,7 +1605,7 @@ public class Journal implements IRawStore, IAtomicStore, IStore {
      * {@link NameAddrBTree} mapping names to {@link BTree}s registered for the
      * store.
      */
-    public final int ROOT_NAME2ADDR = 0;
+    public static transient final int ROOT_NAME2ADDR = 0;
     
     /**
      * The registered committers for each slot in the root block.
@@ -1662,12 +1677,8 @@ public class Journal implements IRawStore, IAtomicStore, IStore {
         private Map<String,BTree> name2BTree = new HashMap<String,BTree>();
 
         public NameAddrBTree(IRawStore store) {
-            super(store, DEFAULT_BRANCHING_FACTOR, new HardReferenceQueue<PO>(
-                    new DefaultEvictionListener(),
-                    DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                    DEFAULT_HARD_REF_QUEUE_SCAN), ValueSerializer.INSTANCE,
-                    null // record compressor.
-            );
+
+            super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
 
         }
 

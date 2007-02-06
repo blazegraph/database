@@ -112,7 +112,20 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         final long rdfType_id = store.getTerm(rdfType);
         final long rdfsSubClassOf_id = store.getTerm(rdfsSubClassOf);
         
+        /*
+         * Fields used to verify restart safety of additional metadata for 
+         * the term:id index.
+         */
+        final short indexId = store.ndx_termId.counter.indexId;
+        final long nextId = store.ndx_termId.counter.nextId;
+
         store.commit();
+        
+        /*
+         * verify that extension metadata for the term:id index was not modified.
+         */
+        assertEquals("termsId.indexId", indexId, store.ndx_termId.counter.indexId);
+        assertEquals("termsId.nextId", nextId, store.ndx_termId.counter.nextId);
 
         assertEquals(x_id,store.getTerm(x));
         assertEquals(y_id,store.getTerm(y));
@@ -149,6 +162,13 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertTrue(store.containsStatement(z, rdfType, A));
         assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
         assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+
+        /*
+         * verify that extension metadata for the term:id index was correctly
+         * restored.
+         */
+        assertEquals("termsId.indexId", indexId, store.ndx_termId.counter.indexId);
+        assertEquals("termsId.nextId", nextId, store.ndx_termId.counter.nextId);
         
     }
 

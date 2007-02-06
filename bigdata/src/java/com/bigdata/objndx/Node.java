@@ -338,6 +338,53 @@ public class Node extends AbstractNode implements INodeData {
          */
         btree.height++;
 
+        final int requiredQueueCapacity = 2 * (btree.height + 2);
+        
+        if ( requiredQueueCapacity > btree.leafQueue.capacity()) {
+            
+            /*
+             * FIXME Automatically extend the hard reference queue capacity such
+             * that (a) this constraint described below is never violated; and
+             * (b) the percentage of distinct nodes (or nodes and leaves) on the
+             * queue compared to the nodes (or nodes and leaves) in the tree
+             * either remains constant or does not degrade overly quickly.
+             * 
+             * Constraint: The capacity of the hard reference queue needs to be
+             * at least the height of the tree + 2 (or twice that if we touch
+             * nodes on the way down and then on the way up again) so that a
+             * split can not cause any dirty node in the path to the leaf or its
+             * sibling to be evicted while we are processing that split. Note
+             * that there is no chance of the nodes being swept by the JVM since
+             * there are hard references to them on the stack, but if the are
+             * evicted then the copy-on-write mechanism could be defeated since
+             * a dirty parent could be evicted, forcing the child to become
+             * immutable right when we are trying to operate on it.
+             * 
+             * Performance: Given a constant capacity for the hard reference
+             * queue the percentage of distinct nodes on the queue out of the
+             * total #of nodes in the tree will drop as the tree grows. This
+             * translates directly into more (de-)serialization of nodes and
+             * more disk seeks (if the store is not fully buffered).
+             * 
+             * However, simply increasing the queue capacity will cause more
+             * data to be buffered pending serialization and therefore will
+             * increase the commit latency. Instead, we should probably
+             * introduce a secondary hard reference retention mechanism based
+             * more directly on the #of nodes that we want to retain in memory.
+             * One approach is to say N-1 or N-2 levels of the tree, and that
+             * might be a good heuristic. However, the select of the specific
+             * nodes that are retained should probably be somewhat dynamic so
+             * that we do not force the JVM to hold onto references for nodes
+             * that we are never or only rarely visiting given the actual access
+             * patterns in the application.
+             */
+            
+            throw new UnsupportedOperationException("leafQueue: capacity="
+                    + btree.leafQueue.capacity() + ", but height="
+                    + btree.height);
+            
+        }
+        
         btree.nnodes++;
 
         btree.counters.rootsSplit++;
@@ -2132,7 +2179,7 @@ public class Node extends AbstractNode implements INodeData {
      */
     public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
 
-        if (dirtyNodesOnly && !isDirty()) {
+        if (dirtyNodesOnly && !dirty) {
 
             return EmptyIterator.DEFAULT;
 
@@ -2205,7 +2252,7 @@ public class Node extends AbstractNode implements INodeData {
 
                 AbstractNode child = (AbstractNode) childObj;
 
-                if (dirtyNodesOnly && !child.isDirty()) {
+                if (dirtyNodesOnly && !child.dirty) {
 
                     return EmptyIterator.DEFAULT;
 

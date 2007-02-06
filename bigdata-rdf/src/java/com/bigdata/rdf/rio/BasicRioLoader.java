@@ -131,11 +131,7 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    /**
-     * @param reader
-     *                  the RDF/XML source
-     */
-    public void loadRdfXml( Reader reader ) throws Exception {
+    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
         
         Parser parser = new RdfXmlParser();
         
@@ -147,7 +143,7 @@ public class BasicRioLoader implements IRioLoader {
     
         insertStart = System.currentTimeMillis();
         
-        parser.parse( reader, "" );
+        parser.parse( reader, baseURI );
         
         insertTime += System.currentTimeMillis() - insertStart;
         

@@ -186,17 +186,24 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             
             try {
                 
-                loader.loadRdfXml( reader );
+                // @todo no baseURI here.
+                loader.loadRdfXml( reader, "" );
                 
                 long nstmts = loader.getStatementsAdded();
                 
                 total_stmts += nstmts;
+
+                // commit the loaded data.
+                final long beginCommit = System.currentTimeMillis();
+                store.commit();
+                final long elapsedCommit = System.currentTimeMillis()-beginCommit;
                 
                 log.info( nstmts + 
                           " stmts added in " + 
                           ((double)loader.getInsertTime()) / 1000d +
                           " secs, rate= " + 
-                          loader.getInsertRate() 
+                          loader.getInsertRate()+
+                          ", commit="+elapsedCommit+"ms"
                           );
                 
             } catch ( Exception ex ) {
@@ -211,14 +218,14 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             
         } // next source to load.
 
-        long elapsed = System.currentTimeMillis() - begin;
-        
-        log.info(total_stmts
-                        + " stmts added in "
-                        + ((double) elapsed)
-                        / 1000d
-                        + " secs, rate= "
-                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
+//        long elapsed = System.currentTimeMillis() - begin;
+//        
+//        log.info(total_stmts
+//                        + " stmts added in "
+//                        + ((double) elapsed)
+//                        / 1000d
+//                        + " secs, rate= "
+//                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
 
     }
 
@@ -262,9 +269,13 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     protected void assertDataLoaded() {
 
-        final int nterms = 223146;
+        // wordnet
+//        final int nterms = 223146;
+//        final int nstatements = 273644;
         
-        final int nstatements = 273644;
+        // nciOncology
+        final int nterms = 289844;
+        final int nstatements = 464841;
         
         assertEquals("#terms",nterms,store.ndx_termId.getEntryCount());
         

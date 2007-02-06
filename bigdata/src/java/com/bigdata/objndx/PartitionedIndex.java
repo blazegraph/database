@@ -47,14 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Comparator;
-
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
 
@@ -173,7 +165,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DistributedIndex implements IBTree {
+public class PartitionedIndex implements IBTree {
 
     /**
      * The metadata index.
@@ -201,7 +193,7 @@ public class DistributedIndex implements IBTree {
      *       #of partitions as two (2) or to handle one partition as a special
      *       case by explicitly storing its reference.
      */
-    public DistributedIndex(IRawStore store, int branchingFactor) {
+    public PartitionedIndex(IRawStore store, int branchingFactor) {
         
         ndx_md = new MetadataIndex(store, branchingFactor);
 
@@ -227,240 +219,6 @@ public class DistributedIndex implements IBTree {
     public Object remove(Object key) {
         // TODO Auto-generated method stub
         return null;
-    }
-
-    /**
-     * A metadata index for the partitions of a distributed index. There is one
-     * metadata index for each distributed index. The keys of the metadata index
-     * are the first key that would be directed into the corresponding index
-     * segment, e.g., a <em>separator key</em> (this is just the standard
-     * btree semantics). Keys in the metadata index are updated as index
-     * partitions are split (or joined). Splits are performed when the fully
-     * compacted partition exceeds ~200M. Joins of index segments are performed
-     * when sibling partitions could be merged to produce a partition of ~100M.
-     * Splitting and joining partitions is atomic and respects transaction
-     * isolation.
-     * 
-     * @todo locator logic on a single host (a journal and zero or more index
-     *       segments).
-     * 
-     * @todo split/join logic.
-     * 
-     * @todo split/join logic respecting transactional isolation.
-     * 
-     * @todo locator logic on a cluster (a socket address in addition to the
-     *       other information).
-     * 
-     * @todo consider multiplexing metadata indices for different distributed
-     *       indices. a good idea or not?
-     * 
-     * @todo the key type, NEGINF, comparator, and key serializer all need to be
-     *       identical for the metadata index and the various index partitions.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class MetadataIndex extends BTree {
-
-        /**
-         * Create a new tree.
-         * 
-         * @param store
-         * @param branchingFactor
-         */
-        public MetadataIndex(IRawStore store, int branchingFactor) {
-            super(store, branchingFactor, new HardReferenceQueue<PO>(
-                    new DefaultEvictionListener(),
-                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                    PartitionMetadata.Serializer.INSTANCE,
-                    new RecordCompressor());
-        }
-
-        /**
-         * Load existing tree.
-         * 
-         * @param store
-         * @param metadataId
-         */
-        public MetadataIndex(IRawStore store, long metadataId, Object NEGINF,
-                Comparator comparator, IKeySerializer keySerializer) {
-            super(store, BTreeMetadata.read(store, metadataId),
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
-        }
-
-        /**
-         * Update the metadata index to reflect the split of one index segment
-         * into two index segments.
-         * 
-         * @param separatorKey
-         *            Requests greater than or equal to the separatorKey (and
-         *            less than the next largest separatorKey in the metadata
-         *            index) are directed into seg2. Requests less than the
-         *            separatorKey (and greated than any proceeding separatorKey
-         *            in the metadata index) are directed into seg1.
-         * @param seg1
-         *            The metadata for the index segment that was split.
-         * @param seg2
-         *            The metadata for the right sibling of the split index
-         *            segment in terms of the key range of the distributed
-         *            index.
-         */
-        public void split(Object separatorKey, PartitionMetadata md1, PartitionMetadata md2) {
-            
-        }
-
-        /**
-         * @todo join of index segment with left or right sibling. unlike the
-         *       nodes of a btree we merge nodes whenever a segment goes under
-         *       capacity rather than trying to redistribute part of the key
-         *       range from one index segment to another.
-         */
-        public void join() {
-            
-        }
-        
-    }
-    
-    /**
-     * The location of the process that will handle requests for some key range
-     * together with some metadata about that {process + key range}. Note that
-     * many key ranges, potentially for different indices, are multiplexed onto
-     * the same process. Each process is backed by a journal providing
-     * transactional isolation. Periodically the journal is frozen, a new
-     * journal is created, and {@link IndexSegment} files are created from the
-     * journal. Those files are incorporated into the view of the index iff they
-     * contain committed state. (Uncommitted state from a transaction that
-     * bridges a journal boundary if permitted must be handled once the
-     * transaction commits.)
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class PartitionMetadata {
-
-        /**
-         * Zero or more files containing {@link IndexSegment}s holding live
-         * data for this partition. The entries in the array reflect the
-         * creation time of the index segments. The earliest segment is listed
-         * first. The most recently created segment is listed last.
-         */
-        ArrayList<File> segs;
-        
-//        /**
-//         * The metadata about an index segment life cycle as served by a
-//         * specific service instance on some host.
-//         * 
-//         * @todo we need to track load information for the service and the host.
-//         *       however that information probably does not need to be restart
-//         *       safe so it is easily maintained within a rather small hashmap
-//         *       indexed by the service address.
-//         * 
-//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//         *         Thompson</a>
-//         * @version $Id$
-//         */
-//        public static class IndexSegmentServiceMetadata {
-//
-//            /**
-//             * The service that is handling this index segment. This service
-//             * typically handles many index segments and multiplexes them on a
-//             * single journal.
-//             * 
-//             * @todo When a client looks up an index segment in the metadata index,
-//             *       what we send them is the set of key-addr entries from the leaf
-//             *       in which the index segment was found. If a request by the
-//             *       client to that service discovers that the service no longer
-//             *       handles a key range, that the service is dead, etc., then the
-//             *       client will have to invalidate its cache entry and lookup the
-//             *       current location of the index segment in the metadata index.
-//             */
-//            public InetSocketAddress addr;
-//            
-//        }
-//
-//        /**
-//         * An array of the services that are registered as handling this index
-//         * segment. One of these services is the master and accepts writes from
-//         * the client. The other services mirror the segment and provide
-//         * redundency for failover and load balancing. The order in which the
-//         * segments are listed in this array could reflect the master (at
-//         * position zero) and the write pipeline from the master to the
-//         * secondaries could be simply the order of the entries in the array.
-//         */
-//        public IndexSegmentServiceMetadata services[];
-//        
-//        /**
-//         * The time that the index segment was started on that service.
-//         */
-//        public long startTime;
-//
-//        /**
-//         * A log of events for the index segment. This could just be a linked
-//         * list of strings that get serialized as a single string. Each event is
-//         * then a semi-structured string, typically generated by a purpose
-//         * specific logging appender.
-//         */
-//        public Vector<Event> eventLog;
-//        
-//        public PartitionMetadata(InetSocketAddress addr) {
-//        }
-//
-//        /**
-//         * An event for an index segment.
-//         * 
-//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//         * @version $Id$
-//         */
-//        public static class Event {
-//        
-////            public long timestamp;
-//            
-//            public String msg;
-//            
-//            /**
-//             * Serialization for an event.
-//             * 
-//             * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//             * @version $Id$
-//             */
-//            public static class Serializer /*implements ...*/{
-//                
-//            }
-//            
-//        }
-        
-        /**
-         * Serialization for an index segment metadata entry.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        public static class Serializer implements IValueSerializer {
-
-            /**
-             * 
-             */
-            private static final long serialVersionUID = 4307076612127034103L;
-            
-            public transient static final Serializer INSTANCE = new Serializer();
-            
-            public Serializer() {}
-            
-            public void getValues(DataInputStream is, Object[] values, int nvals) throws IOException {
-                // TODO Auto-generated method stub
-                
-            }
-
-            public void putValues(DataOutputStream os, Object[] values, int nvals) throws IOException {
-                // TODO Auto-generated method stub
-                
-            }
-            
-        }
-        
     }
 
     public int rangeCount(byte[] fromKey, byte[] toKey) {

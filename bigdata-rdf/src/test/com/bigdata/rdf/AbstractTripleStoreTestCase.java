@@ -96,7 +96,9 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 //            properties.setProperty(Options.FORCE_WRITES,ForceEnum.ForceMetadata.toString());
             
             properties.setProperty(Options.SEGMENT, "0");
-            properties.setProperty(Options.FILE, getName()+".jnl");
+            if(properties.getProperty(Options.FILE)==null) {
+                properties.setProperty(Options.FILE, getName()+".jnl");
+            }
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
         }
@@ -159,7 +161,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
     
     public void tearDown() {
 
-        store.close();
+        if(store.isOpen()) store.close();
         
     }
     

@@ -41,34 +41,47 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Jan 27, 2007
- */
+package com.bigdata.rdf.metrics;
 
-package com.bigdata.rdf.rio;
-
-import java.io.Reader;
-
-import org.apache.log4j.Logger;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRioLoader {
-    
-    public static Logger log = Logger.getLogger(IRioLoader.class);
+public class TestAll extends TestCase {
 
-    public long getStatementsAdded();
-    
-    public long getInsertTime();
-    
-    public long getInsertRate();
+    /**
+     * 
+     */
+    public TestAll() {
+    }
 
-    public void addRioLoaderListener( RioLoaderListener l );
-    
-    public void removeRioLoaderListener( RioLoaderListener l );
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+        super(arg0);
+    }
 
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception;
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("metrics");
+
+        suite.addTestSuite( TestReferenceLoad.class);
+
+        
+        return suite;
+        
+    }
     
 }

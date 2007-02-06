@@ -204,6 +204,29 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      *       memory than nodes (for most trees).
      */
     final protected HardReferenceQueue<PO> leafQueue;
+    
+    /**
+     * The #of distinct nodes and leaves on the {@link #leafQueue}.
+     */
+    protected int ndistinctOnQueue;
+    
+    /**
+     * The #of distinct nodes and leaves on the {@link HardReferenceQueue}.
+     */
+    final public int getNumDistinctOnQueue() {
+        
+        return ndistinctOnQueue;
+        
+    }
+    
+    /**
+     * The capacity of the {@link HardReferenceQueue}.
+     */
+    final public int getHardReferenceQueueCapacity() {
+        
+        return leafQueue.capacity();
+        
+    }
 
     /**
      * The minimum allowed branching factor (3).  The branching factor may be
@@ -389,6 +412,34 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
                     keys, values);
             
             assert nused > 0;
+
+            /*
+             * Note: it is legal to reuse a key iff the data in the key is
+             * unchanged.  Unfortunately it is tricky to do a fast test for
+             * this condition.
+             */
+//            {
+//                /*
+//                 * detect if the caller reuses the same byte[] key from one
+//                 * insert to the next. This is an error since the key needs to
+//                 * be donated to the btree. This problem only exists for
+//                 * insert().
+//                 */
+//                    
+//                byte[] key = keys[tupleIndex];
+//
+//                if (key == lastKey) {
+//
+//                    throw new IllegalArgumentException(
+//                            "keys must not be reused.");
+//
+//                } else {
+//
+//                    lastKey = key;
+//
+//                }
+//
+//            }
             
             counters.ninserts += nused;
             
@@ -397,6 +448,14 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
         }
 
     }
+
+//    /**
+//     * Used to detect when the caller reuses the same byte[] key from one insert
+//     * to the next. This is an error since the key needs to be donated to the
+//     * btree.  This problem only exists for insert().
+//     */
+//    private byte[] lastKey = null;
+
 
     public void lookup(int ntuples, byte[][] keys, Object[] values) {
      
@@ -552,20 +611,6 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
         } else {
             return new byte[][] { (byte[]) key };
         }
-//        throw new UnsupportedOperationException();
-//        if( stride > 1 ) return key;
-//        switch(keyType) {
-//        case BYTE: ((byte[])_keys)[0] = ((Byte)key).byteValue(); break;
-//        case SHORT: ((short[])_keys)[0] = ((Short)key).shortValue(); break;
-//        case CHAR: ((char[])_keys)[0] = ((Character)key).charValue(); break;
-//        case INT: ((int[])_keys)[0] = ((Integer)key).intValue(); break;
-//        case LONG: ((long[])_keys)[0] = ((Long)key).longValue(); break;
-//        case FLOAT: ((float[])_keys)[0] = ((Float)key).floatValue(); break;
-//        case DOUBLE: ((double[])_keys)[0] = ((Double)key).doubleValue(); break;
-//        case OBJECT: ((Object[])_keys)[0] = key; break;
-//        default: throw new UnsupportedOperationException();
-//        }
-//        return _keys;
     }
     
     public Object insert(Object key, Object value) {
@@ -676,7 +721,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      * @param index
      *            The index position of the entry (origin zero).
      * 
-     * @return The key at that index position.
+     * @return The key at that index position (not a copy).
      * 
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
@@ -939,6 +984,9 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
          * the node is selected for eviction, eviction will not cause the node
          * to be made persistent.
          */
+
+        assert ndistinctOnQueue >= 0;
+
         node.referenceCount++;
 
         if( ! leafQueue.append(node) ) {
@@ -953,6 +1001,21 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
              */
             
             node.referenceCount--;
+            
+        } else {
+            
+            /*
+             * Since we just added a node or leaf to the hard reference queue we
+             * now update the #of distinct nodes and leaves on the hard
+             * reference queue.
+             * 
+             * Also see {@link DefaultEvictionListener}.
+             */
+            if(node.referenceCount==1) {
+                
+                ndistinctOnQueue++;
+                
+            }
             
         }
 

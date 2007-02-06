@@ -42,33 +42,45 @@ Modifications:
 
 */
 /*
- * Created on Jan 27, 2007
+ * Created on Feb 5, 2007
  */
 
-package com.bigdata.rdf.rio;
+package com.bigdata.rdf.metrics;
 
-import java.io.Reader;
-
-import org.apache.log4j.Logger;
+import java.io.File;
+import java.io.IOException;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRioLoader {
-    
-    public static Logger log = Logger.getLogger(IRioLoader.class);
+public class TestReferenceLoad extends AbstractMetricsTestCase {
 
-    public long getStatementsAdded();
-    
-    public long getInsertTime();
-    
-    public long getInsertRate();
+    public TestReferenceLoad() {
+    }
 
-    public void addRioLoaderListener( RioLoaderListener l );
-    
-    public void removeRioLoaderListener( RioLoaderListener l );
+    public TestReferenceLoad(String name) {
+        super(name);
+    }
 
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception;
+    public void test_referenceLoad() throws IOException {
+        
+        String[] files = new String[] {
+          
+                "data/APSTARS/ontology-2-5-07/combine-ont.owl",
+                "data/APSTARS/ontology-2-5-07/combine-refload.rdf",
+                "data/APSTARS/ontology-2-5-07/sameas.rdf"
+                
+        };
+        
+        for(int i=0; i<files.length; i++) {
+         
+            store.loadData(new File(files[i]),"");
+            
+        }
+        
+        store.commit();
+        
+    }
     
 }

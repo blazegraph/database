@@ -1549,7 +1549,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assert actual != null;
         
         // The #of entries must agree.
-        assertEquals(expected.getEntryCount(), actual.getEntryCount());
+        assertEquals("entryCount",expected.getEntryCount(), actual.getEntryCount());
         
         // verify the entry iterator.
         doEntryIteratorTest(actual,expected);

@@ -68,34 +68,34 @@ public class RootBlockView implements IRootBlockView {
     /**
      * The #of root ids. Their indices are [0:N-1].
      */
-    static public final short MAX_ROOT_ADDRS       = 50;
+    static public transient final short MAX_ROOT_ADDRS       = 50;
     /**
      * The first root address that may be used for a user-defined object. User
      * defined root addresses begin at index 10. The first 10 root addresses are
      * reserved for use by the bigdata architecture.
      */
-    static public final short FIRST_USER_ROOT      = 10;
+    static public transient final short FIRST_USER_ROOT      = 10;
 
-    static final short SIZEOF_TIMESTAMP  = Bytes.SIZEOF_LONG;
-    static final short SIZEOF_MAGIC      = Bytes.SIZEOF_INT;
-    static final short SIZEOF_SEGMENT_ID = Bytes.SIZEOF_INT;
-    static final short SIZEOF_ADDR       = Bytes.SIZEOF_LONG;
-    static final short SIZEOF_OFFSET     = Bytes.SIZEOF_INT;
-    static final short SIZEOF_UNUSED     = 1024; // Note: a chunk of reserved bytes.
-    static final short SIZEOF_ROOT_ADDRS = SIZEOF_ADDR * MAX_ROOT_ADDRS;
+    static final transient short SIZEOF_TIMESTAMP  = Bytes.SIZEOF_LONG;
+    static final transient short SIZEOF_MAGIC      = Bytes.SIZEOF_INT;
+    static final transient short SIZEOF_SEGMENT_ID = Bytes.SIZEOF_INT;
+    static final transient short SIZEOF_ADDR       = Bytes.SIZEOF_LONG;
+    static final transient short SIZEOF_OFFSET     = Bytes.SIZEOF_INT;
+    static final transient short SIZEOF_UNUSED     = 1024; // Note: a chunk of reserved bytes.
+    static final transient short SIZEOF_ROOT_ADDRS = SIZEOF_ADDR * MAX_ROOT_ADDRS;
     
-//  static final short OFFSET_CHECKSUM   =  
-    static final short OFFSET_TIMESTAMP0 = 0;
-    static final short OFFSET_MAGIC      = OFFSET_TIMESTAMP0 + SIZEOF_TIMESTAMP;
-    static final short OFFSET_SEGMENT_ID = OFFSET_MAGIC      + SIZEOF_MAGIC;
-    static final short OFFSET_NEXT_OFFSET= OFFSET_SEGMENT_ID  + SIZEOF_SEGMENT_ID;
-    static final short OFFSET_FIRST_TX   = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
-    static final short OFFSET_LAST_TX    = OFFSET_FIRST_TX    + SIZEOF_TIMESTAMP;
-    static final short OFFSET_COMMIT_CTR = OFFSET_LAST_TX     + SIZEOF_TIMESTAMP;
-    static final short OFFSET_UNUSED     = OFFSET_COMMIT_CTR  + Bytes.SIZEOF_LONG;
-    static final short OFFSET_ROOT_ADDRS = OFFSET_UNUSED      + SIZEOF_UNUSED;
-    static final short OFFSET_TIMESTAMP1 = OFFSET_ROOT_ADDRS  + SIZEOF_ROOT_ADDRS;
-    static final short SIZEOF_ROOT_BLOCK = OFFSET_TIMESTAMP1  + SIZEOF_TIMESTAMP;
+//  static final transient short OFFSET_CHECKSUM   =  
+    static final transient short OFFSET_TIMESTAMP0 = 0;
+    static final transient short OFFSET_MAGIC      = OFFSET_TIMESTAMP0 + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_SEGMENT_ID = OFFSET_MAGIC      + SIZEOF_MAGIC;
+    static final transient short OFFSET_NEXT_OFFSET= OFFSET_SEGMENT_ID  + SIZEOF_SEGMENT_ID;
+    static final transient short OFFSET_FIRST_TX   = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
+    static final transient short OFFSET_LAST_TX    = OFFSET_FIRST_TX    + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_COMMIT_CTR = OFFSET_LAST_TX     + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_CTR  + Bytes.SIZEOF_LONG;
+    static final transient short OFFSET_ROOT_ADDRS = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_TIMESTAMP1 = OFFSET_ROOT_ADDRS  + SIZEOF_ROOT_ADDRS;
+    static final transient short SIZEOF_ROOT_BLOCK = OFFSET_TIMESTAMP1  + SIZEOF_TIMESTAMP;
 
     /**
      * Magic value for root blocks.

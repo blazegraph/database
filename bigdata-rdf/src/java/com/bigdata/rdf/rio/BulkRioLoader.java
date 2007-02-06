@@ -76,9 +76,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * values and statements into batches and bulk loads those batches into
  * {@link IndexSegment}s.
  * 
- * @todo one hypothesis is that serialization is the main difference in cost
- *       between the old and the new btree code. that might account for the
- *       minor speedup observed using a bulk index build.
+ * @todo mark generated files for deletion in the test suite.
  * 
  * @todo we have to resolve terms against a fused view of the existing btree and
  *       or index segments in order to avoid inconsistent assignments of term
@@ -250,7 +248,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * @param reader
      *                  the RDF/XML source
      */
-    public void loadRdfXml( Reader reader ) throws Exception {
+    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();
         
@@ -277,7 +275,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         try {
 
             // Parse the data.
-            parser.parse(reader, "");
+            parser.parse(reader, baseURI);
 
             // bulk load insert the buffered data into the store.
             if(buffer!=null) {
@@ -299,8 +297,6 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             buffer = null;
 
         }
-
-        store.commit();
 
         insertTime += System.currentTimeMillis() - insertStart;
         

@@ -249,7 +249,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      *                  the RDF/XML source
      */
 
-    public void loadRdfXml( Reader reader ) throws Exception {
+    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();
         
@@ -283,7 +283,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
             consumer.start();
             
             // Parse the data.
-            parser.parse(reader, "");
+            parser.parse(reader, baseURI );
             
             log.info("parse complete: elapsed="
                     + (System.currentTimeMillis() - insertStart) + "ms");
@@ -325,12 +325,6 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
             // check for an error condition.
             checkConsumer();
 
-            // commit the data.
-            store.commit();
-            
-            log.info("data committed: elapsed="
-                    + (System.currentTimeMillis() - insertStart) + "ms");
-            
         } catch (RuntimeException ex) {
 
             log.error("While parsing data: "+ex, ex);

@@ -196,23 +196,25 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     
     /**
      * We need to collect two (three including bnode) term arrays and one
-     * statement array.  These should be buffers of a settable size.
+     * statement array. These should be buffers of a settable size.
      * <p>
-     * Once the term buffers are full (or the data is exhausted), the term 
+     * Once the term buffers are full (or the data is exhausted), the term
      * arrays should be sorted and batch inserted into the TripleStore.
      * <p>
-     * As each term is inserted, its id should be noted in the Value object,
-     * so that the statement array is sortable based on term id.
+     * As each term is inserted, its id should be noted in the Value object, so
+     * that the statement array is sortable based on term id.
      * <p>
-     * Once the statement buffer is full (or the data is exhausted), the 
-     * statement array should be sorted and batch inserted into the
-     * TripleStore.  Also the term buffers should be flushed first.
+     * Once the statement buffer is full (or the data is exhausted), the
+     * statement array should be sorted and batch inserted into the TripleStore.
+     * Also the term buffers should be flushed first.
      * 
      * @param reader
-     *                  the RDF/XML source
+     *            the RDF/XML source
+     * @param baseURI
+     *            The baseURI or "" if none is known.
      */
 
-    public void loadRdfXml( Reader reader ) throws Exception {
+    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();
         
@@ -239,7 +241,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         try {
 
             // Parse the data.
-            parser.parse(reader, "");
+            parser.parse(reader, baseURI);
 
             // bulk insert the buffered data into the store.
             if(buffer != null) {
@@ -260,8 +262,6 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
             buffer = null;
 
         }
-
-        store.commit();
 
         insertTime += System.currentTimeMillis() - insertStart;
         

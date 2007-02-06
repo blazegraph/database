@@ -86,7 +86,8 @@ public class TestBasics extends TestCase {
         properties.setProperty("bufferMode","transient");
 //        properties.setProperty("segmentId","0");
         
-        store = new JournalStore( properties );
+        // FIXME initialize.
+//        store = new JournalStore( properties );
         
     }
 

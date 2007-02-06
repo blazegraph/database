@@ -87,6 +87,12 @@ public class DefaultEvictionListener implements
         
         if (--node.referenceCount == 0) {
 
+            final AbstractBTree btree = node.btree;
+            
+            assert btree.ndistinctOnQueue > 0;
+
+            btree.ndistinctOnQueue--;
+            
             if( node.deleted ) {
                 
                 /*
@@ -100,7 +106,7 @@ public class DefaultEvictionListener implements
             }
             
             if (node.dirty) {
-
+                
                 if (node.isLeaf()) {
 
                     /*
@@ -109,7 +115,7 @@ public class DefaultEvictionListener implements
                     
                     if(INFO) log.info("Evicting dirty leaf: "+node);
                     
-                    node.btree.writeNodeOrLeaf(node);
+                    btree.writeNodeOrLeaf(node);
 
                 } else {
 
@@ -122,7 +128,7 @@ public class DefaultEvictionListener implements
 
                     if(INFO) log.info("Evicting dirty node: "+node);
                     
-                    node.btree.writeNodeRecursive(node);
+                    btree.writeNodeRecursive(node);
 
                 }
 

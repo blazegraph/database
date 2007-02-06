@@ -98,6 +98,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
     }
 
+    public IndexSegment(IndexSegmentFileStore fileStore, IValueSerializer valSer)
+            throws IOException {
+
+        this(fileStore, new HardReferenceQueue<PO>(
+                new DefaultEvictionListener(),
+                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer);
+        
+    }
+    
     /**
      * Open a read-only index segment.
      * 

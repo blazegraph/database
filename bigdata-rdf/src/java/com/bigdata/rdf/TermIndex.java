@@ -46,17 +46,14 @@ package com.bigdata.rdf;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.journal.Journal;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.PO;
 import com.bigdata.objndx.UserDefinedFunction;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.rio.BulkRioLoader;
@@ -76,24 +73,19 @@ public class TermIndex extends BTree {
      * Auto-increment counter.
      * <p>
      * 
-     * FIXME this is not restart safe since it is (a) stateful; and (b) not part
-     * of the persistent metadata record for the btree. Also, it is not safe for
-     * paritioned or distributed indices. In order to maintain state with the
-     * btree the counter needs to be part of the metadata record for the btree,
-     * which is easy enough. <br>
-     * Supporting a partitioned or distributed index is more challenging. The
-     * most obvious approach is change the goal from a globally coherent one up
-     * counter to a globally unique identifier. One approach is to simply assign
-     * a {@link UUID} which is both stateless and simple. However, if there are
-     * dependent indices then merging must be used to reconcile the UUIDs
-     * assigned in different transactions. <br>
+     * Note: In order to be safe for distributed indices concurrent writes on
+     * the terms index on different journals for different partitions of the
+     * terms index MUST NOT assign the same term identifier. This can be
+     * achieved by managing the {@link #indexId} field such that it is really a
+     * {@link Journal} identifier.
+     * <p>
      * Note: changing this to a UUID would have the effect of scattering the
      * term identifiers randomly across index partitions and I am not sure how
      * that would effect index performance when mapping terms to identifiers. It
      * could help if we scatter queries and it could hurt by touching more or
-     * all term index partitions on each query.  Changing to a UUID would also
+     * all term index partitions on each query. Changing to a UUID would also
      * change the datatype from long to UUID and there is a lot of code that
-     * currently assumes a <code>long</code>.  Finally, UUIDs appear to have
+     * currently assumes a <code>long</code>. Finally, UUIDs appear to have
      * fat serialization and are declared as <code>final</code>.
      * 
      * @todo the {@link BulkRioLoader} also uses this counter and that use needs
@@ -110,17 +102,16 @@ public class TermIndex extends BTree {
         private static final long serialVersionUID = -4281749674236461781L;
 
         /**
-         * The next identifier to be assigned to a string inserted into this index.
+         * The next identifier to be assigned to a string inserted into this
+         * index.
          * 
-         * @todo this needs to be (a) shared across all transactional instances of
-         *       this index; (b) restart safe; (c) set into a namespace that is
-         *       unique to the journal so that multiple writers on multiple journals
-         *       for a single distributed database can not collide; and (d) set into
-         *       a namespace that is unique to the index and that is persistent as
-         *       part of the index metadata (which should be extensible for at least
-         *       {@link BTree}).
+         * @todo this needs to be (a) shared across all transactional instances
+         *       of this index; (b) set into a namespace that is unique to the
+         *       journal so that multiple writers on multiple journals for a
+         *       single distributed database can not collide; and (c) set into a
+         *       namespace that is unique to the index.
          */
-        long nextId = 1;
+        long nextId;
         
         /**
          * An int16 value that may be used to multiplex identifier assignments for
@@ -130,20 +121,22 @@ public class TermIndex extends BTree {
          * be stored in the index to 2^48.
          * 
          * @todo for a paritioned index this needs to get into place based on the
-         *       journal to which the request is directed.  frankly, I can not see
-         *       how to do this right now so we may have to support concurrency in
-         *       some other manner.
+         *       journal to which the request is directed.
          */
-        protected final short indexId;
+        final short indexId;
         
         /**
          * The last value assigned by the counter.
          */
         private Object retval;
         
-        public AutoIncCounter(short indexId) {
+        public AutoIncCounter(short indexId,long nextId) {
+
+            assert nextId > 0;
             
             this.indexId = indexId;
+            
+            this.nextId = nextId;
             
         }
         
@@ -209,18 +202,13 @@ public class TermIndex extends BTree {
      *            that can be stored in the index to 2^48.
      */
     public TermIndex(IRawStore store, short indexId) {
-        super(store,
-                DEFAULT_BRANCHING_FACTOR,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                        DEFAULT_HARD_REF_QUEUE_SCAN),
-                ValueSerializer.INSTANCE,
-                null // new RecordCompressor() // record compressor
-                );
 
-        // @todo save with the btree metadata record or make stateless.
-        counter = new AutoIncCounter( indexId );
-        
+        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+
+        counter = new AutoIncCounter( indexId, 1L );
+
+//        System.err.println("TermIndexMetadata(create): indexId="+counter.indexId+", nextId="+counter.nextId);
+
     }
     
     /**
@@ -233,16 +221,59 @@ public class TermIndex extends BTree {
      */
     public TermIndex(IRawStore store, long metadataId) {
     
-        super(store, BTreeMetadata.read(store,
-                metadataId), new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                DEFAULT_HARD_REF_QUEUE_SCAN));
+        super(store, BTreeMetadata.read(store, metadataId));
         
-        // @todo recover from with the btree metadata record or make stateless.
-        counter = new AutoIncCounter( (short) 0x1 );
+        TermIndexMetadata md = (TermIndexMetadata)metadata;
+        
+//        System.err.println("TermIndexMetadata(reload): indexId=" + md.indexId
+//                + ", nextId=" + md.nextId);
+
+        counter = new AutoIncCounter(md.indexId, md.nextId);
 
     }
 
+    protected BTreeMetadata newMetadata() {
+        
+        System.err.println("Creating TermIndexMetadata record.");
+        
+        return new TermIndexMetadata(this);
+        
+    }
+
+    /**
+     * Extends the metadata record to persist the state of the
+     * {@link AutoIncCounter}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TermIndexMetadata extends BTreeMetadata {
+
+        private static final long serialVersionUID = -4489385552740076106L;
+
+        final protected short indexId;
+        final protected long nextId;
+
+//        /**
+//         * De-serialization constructor.
+//         */
+//        public TermIndexMetadata() {
+//            
+//        }
+        
+        protected TermIndexMetadata(TermIndex btree) {
+            
+            super(btree);
+            
+            this.indexId = btree.counter.indexId;
+            this.nextId = btree.counter.nextId;
+            
+//            System.err.println("TermIndexMetadata(ctor): indexId="+indexId+", nextId="+nextId);
+            
+        }
+        
+    }
+    
     /**
      * Lookup the term in the term:id index (non-batch api). if it is there then
      * take its termId. Otherwise, insert the term into the term:id index which

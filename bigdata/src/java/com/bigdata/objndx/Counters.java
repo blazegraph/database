@@ -9,7 +9,7 @@ package com.bigdata.objndx;
  * @todo add nano timers and track storage used by the index. The goal is to
  *       know how much of the time of the server is consumed by the index,
  *       what percentage of the store is dedicated to the index, how
- *       expensive it is to do some scan-based operations (merged down,
+ *       expensive it is to do some scan-based operations (merge down,
  *       delete of transactional isolated persistent index), and evaluate
  *       the buffer strategy by comparing accesses with IOs.
  */

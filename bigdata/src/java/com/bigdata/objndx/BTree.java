@@ -80,10 +80,9 @@ import com.bigdata.rawstore.IRawStore;
  * nodes in the tree.
  * </p>
  * 
- * @todo try changing the default branching factor in spo index to divide by 3
- *       or 6; try routing all arraycopy calls through a final method that
- *       handles small N or strongly typed moderate N locally. run through the
- *       call graph knocking out IO and see what is sucking down the cpu.
+ * @todo modify the values in the tree to be variable length byte[]s.
+ * 
+ * @todo reduce the #of argments on the stack in the batch api.
  * 
  * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
  *       findChild, search, and autobox logic).
@@ -91,50 +90,12 @@ import com.bigdata.rawstore.IRawStore;
  * @todo keep the non-batch as well as the batch api or simplify to just the
  *       batch api?
  * 
- * @todo modify ibtree api to accept int[], etc. and do both single and batch
- *       operations with the same methods. require that the keys are in sorted
- *       order when nkeys in array is greater than one. add wrapper methods to
- *       allow operations with single Integer (for compatibility with the test
- *       cases) and possibly Long, etc. Modify the internals to use int[1] and
- *       not Integer for stride == 1?
- * 
- * @todo Multiple versions will not work unless the timestamp is _part_ of the
- *       key. The reason is that the ordering is defined by { key, timestamp }
- *       or for a column store { key, column, timestamp}. The separator keys
- *       MUST be able to guide search to the correct leaf, so the timestamp (or
- *       timestamp and column name) MUST be part of the separator keys, and
- *       hence they must be part of the full key as observed by the btree. This
- *       suggests using a general purpose key constructed from an application
- *       key, a column name, and a timestamp for a column store.<br>
- *       This means that timestamps may not be required for all leaves and could
- *       be elided when using the btree for a column store (vs for full
- *       transactional isolation). Another way to approach isolation is to make
- *       the timestamp part of the object when used for isolation. that results
- *       in more object creation, less data movement, and requires the wrapper
- *       to be imposed by the user of the btree so that they insert, lookup, and
- *       remove a time-marked application value. Handled this way, the btree is
- *       completely ignorant about timestamps for both column stores and
- *       transactional isolation. If I go this route this I will wind up
- *       dropping the timestamp from the batch API.
- * 
- * @todo Track the #of nodes and leaves on the hard reference queue in touch and
- *       {@link DefaultEvictionListener}. Also track the number that are clean
- *       vs dirty.
- * 
  * @todo Modify to support "stealing" of immutable nodes by wrapping them with a
  *       thin class encapsulating the {parent, btree} references and refactor
  *       the design until it permits an isolated btree to reuse the in memory
  *       nodes and leaves of the base btree in order to minimize the resource
  *       and IO costs of having multiple concurrent transactions running on the
  *       same journal.
- * 
- * @todo support the concept of a "stride" for fixed length arrays of primitive
- *       data keys, e.g., long[4]. This would treat each run of N values in
- *       {@link AbstractNode#keys} as a single key. The advantage is to minimize
- *       object creation for some kinds of keys, e.g., a triple or quad store or
- *       a fixed length byte[] or char[] such as char[64]. Note that long fixed
- *       length arrays are better off doing reference copying as they will be
- *       moving less data (how large is a Java reference anyway, 4 bytes?).
  * 
  * @todo drop the jdbm-based btree implementation in favor of this one and test
  *       out a GOM integration. this will also require an extser service /
@@ -149,20 +110,6 @@ import com.bigdata.rawstore.IRawStore;
  *       could provide the basis for a database that does use extser. The index
  *       needs to map class names to entries. Those entries are a classId and
  *       set of {version : Serializer} entries.
- * 
- * @todo support dictionary order and alternative unicode collation sequences
- *       for char[n], char[*], and String data types. Note that a variable
- *       length char[] requires less space to represent the same data as a
- *       {@link String}.
- * 
- * @todo test object index semantics (clustered index of int32 or int64
- *       identifiers associate with inline objects and time/version stamps).
- *       There is a global index, and then one persistence capable index per
- *       transaction. The time/version stamps are used during validation to
- *       determine if there is a possible write-write conflict. The same kind of
- *       isolation should be provided for object and non-object indices. The
- *       only real difference is that the object index is using an int32 or
- *       int64 key.
  * 
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
@@ -195,11 +142,11 @@ import com.bigdata.rawstore.IRawStore;
  *       managed by the host rather than showing up in the metadata index
  *       directly.
  * 
- * @todo support column store style indices (key, column, timestamp), locality
- *       groups that partition the key space so that we can fully buffer parts
- *       of the index that matter, automated version history policies that
- *       expire old values based on either an external timestamp or write time
- *       on the server.
+ * @todo support column store style indices key := (key, column, timestamp),
+ *       locality groups that partition the key space so that we can fully
+ *       buffer parts of the index that matter, automated version history
+ *       policies that expire old values based on either an external timestamp
+ *       or write time on the server.
  * 
  * @todo support key range iterators that allow concurrent structural
  *       modification. structural mutations in a b+tree are relatively limited.
@@ -211,14 +158,6 @@ import com.bigdata.rawstore.IRawStore;
  *       always set the prior/next reference iff the corresponding leaf is in
  *       memory - this is easily handled by checking the weak references on the
  *       parent node.
- * 
- * @todo support efficient insert of sorted data (batch or bulk insert).
- * 
- * @todo support efficient conditional inserts, e.g., if this key does not exist
- *       then insert this value.
- * 
- * @todo support key compression (prefix and suffix compression and split
- *       interval trickery).
  * 
  * @todo evict subranges by touching the node on the way up so that a node that
  *       is evicted from the hard reference cache will span a subrange that can
@@ -257,7 +196,7 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
- *       
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -266,7 +205,7 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
     /**
      * The default branching factor.
      */
-    static public final int DEFAULT_BRANCHING_FACTOR = 256;
+    static public final int DEFAULT_BRANCHING_FACTOR = 32; //256
     
     /**
      * The minimum hard reference queue capacity is two(2) in order to avoid
@@ -389,6 +328,23 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
     }
 
     /**
+     * Constructor for a new btree with a default hard reference queue policy
+     * and no record compression.
+     * 
+     * @param store
+     * @param branchingFactor
+     * @param valSer
+     */
+    public BTree(IRawStore store, int branchingFactor, IValueSerializer valSer) {
+    
+        this(store, branchingFactor, new HardReferenceQueue<PO>(
+                new DefaultEvictionListener(),
+                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer, null/*recordCompressor*/);
+        
+    }
+    
+    /**
      * Constructor for a new btree.
      * 
      * @param store
@@ -501,8 +457,9 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
      * dirty leaves and then (recursively) their parent nodes. The parent nodes
      * are guarenteed to be dirty if there is a dirty child so the commit never
      * triggers copy-on-write. This is basically a checkpoint -- it is NOT an
-     * atomic commit. The commit protocol is at the store level and involves
-     * validating and merging down onto the corresponding global index.
+     * atomic commit. The commit protocol is at the store level and involves the
+     * use of alternating root blocks and (for transactions) validating and
+     * merging down onto the corresponding global index.
      * 
      * @return The persistent identity of the metadata record for the btree. The
      *         btree can be reloaded from this metadata record. When used as
@@ -521,14 +478,40 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
             
         }
 
-        BTreeMetadata metadata = new BTreeMetadata(this);
+        /*
+         * Note: In order to give users the ability to derive and use subclasses
+         * of the BTreeMetadata class we have to wait until the constructor
+         * chain has finished initialization before writing out the metadata
+         * record. Therefore, the BTree is responsible for writing out the
+         * metadata record. This has a few implications: first, the
+         * [addrMetadata] field on the metadata record is not itself persistent
+         * since we do not have its value until we have written out the record;
+         * second, the [addrMetadata] field is not [final] since we can not
+         * assign its value until we are outside of the constructor.
+         */
+        final BTreeMetadata metadata = newMetadata();
         
-        metadata.write(store);
+        metadata.addrMetadata = metadata.write(store);
         
         this.metadata = metadata;
         
+//        this.metadata = newMetadata();
+        
         return metadata.addrMetadata;
 
+    }
+    
+    /**
+     * Method returns the metadata record persisted by {@link #write()}.  You
+     * MUST override this method to return a subclass of {@link BTreeMetadata}
+     * in order to persist additional metadata with the btree.
+     * 
+     * @return A new metadata object that can be used to restore the btree.
+     */
+    protected BTreeMetadata newMetadata() {
+        
+        return new BTreeMetadata(this);
+        
     }
 
     /**

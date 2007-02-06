@@ -63,7 +63,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.DistributedIndex.PartitionMetadata;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
@@ -233,7 +232,7 @@ public class IndexSegmentBuilder {
 
     /**
      * Tracks the maximum length of any serialized node or leaf.  This is used
-     * to fill in one of the {@link PartitionMetadata} fields.
+     * to fill in one of the {@link IndexSegmentMetadata} fields.
      */
     int maxNodeOrLeafLength = 0;
 
@@ -329,7 +328,7 @@ public class IndexSegmentBuilder {
      * index nodes. While the size of a serialized node can be estimated easily,
      * the size of a serialized leaf depends on the kinds of values stored in
      * that index. The actual sizes are recorded in the
-     * {@link PartitionMetadata} record in the header of the
+     * {@link IndexSegmentMetadata} record in the header of the
      * {@link IndexSegment}.
      * </p>
      * 
@@ -366,7 +365,7 @@ public class IndexSegmentBuilder {
      *       this constructor variant
      * 
      * FIXME test with and without each of these options {fullyBuffer,
-     *       useChecksum, recordCompressor}.
+     * useChecksum, recordCompressor}.
      */
     public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
             int m, double errorRate)

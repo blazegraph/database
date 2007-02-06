@@ -13,19 +13,18 @@ import com.bigdata.rawstore.IRawStore;
 /**
  * Used to persist metadata for a {@link BTree} so that a historical state may
  * be re-loaded from the store.
+ * <p>
+ * Note: the metadata record is extensible since it uses default java
+ * serialization. While that makes it a bit fat, this is probably not much of an
+ * issue.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo the metadata record is extensible since it uses default java
- *       serialization but that makes it a bit fat. this is probably not much of
- *       an issue.
+ * @see BTree#newMetadata(), which you must override if you subclass this class.
  */
 public class BTreeMetadata implements Serializable {
 
-    /**
-     * 
-     */
     private static final long serialVersionUID = 4370669592664382720L;
 
     /**
@@ -51,15 +50,19 @@ public class BTreeMetadata implements Serializable {
     
     /**
      * Address that can be used to read this metadata record from the store.
+     * <p>
+     * Note: This is not persisted since we do not have the address until after
+     * we have written out the state of this record.
      */
-    public final long addrMetadata;
-    
-//    /**
-//     * The #of bytes in the metadata record written by {@link #writeMetadata()}.
-//     */
-//    public static final int SIZEOF_METADATA = Bytes.SIZEOF_LONG
-//            + Bytes.SIZEOF_INT * 6;
+    protected transient /*final*/ long addrMetadata;
 
+//    /**
+//     * De-serialization constructor.
+//     */
+//    public BTreeMetadata() {
+//        
+//    }
+    
     /**
      * Constructor used to write out a metadata record.
      * 
@@ -85,8 +88,13 @@ public class BTreeMetadata implements Serializable {
         this.recordCompressor = btree.nodeSer.recordCompressor;
 
         this.useChecksum = btree.nodeSer.useChecksum;
-        
-        this.addrMetadata = write(btree.store);
+
+        /*
+         * Note: This can not be invoked here since a derived class will not 
+         * have initialized its fields yet.  Therefore the write() is done by
+         * the BTree.
+         */
+//        this.addrMetadata = write(btree.store);
         
     }
     

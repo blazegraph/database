@@ -53,13 +53,10 @@ import java.io.ObjectOutputStream;
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.BytesUtil;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.PO;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -77,32 +74,15 @@ import com.ibm.icu.text.UnicodeDecompressor;
 public class ReverseIndex extends BTree {
 
     /**
-     * The next identifier to be assigned to a string inserted into this
-     * index.
-     * 
-     * @todo this needs to be (a) shared across all transactional instances
-     *       of this index; (b) restart safe; (c) set into a namespace that
-     *       is unique to the journal so that multiple writers on multiple
-     *       journals for a single distributed database can not collide;
-     *       and (d) set into a namespace that is unique to the 
-     */
-    protected long nextId = 1;
-    
-    /**
      * Create a new index.
      * 
      * @param store
      *            The backing store.
      */
     public ReverseIndex(IRawStore store) {
-        super(store,
-                DEFAULT_BRANCHING_FACTOR,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                        DEFAULT_HARD_REF_QUEUE_SCAN),
-                ValueSerializer.INSTANCE,
-                null // new RecordCompressor() // record compressor
-        );
+
+        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+        
     }
     
     /**
@@ -114,11 +94,9 @@ public class ReverseIndex extends BTree {
      *            The metadata record identifier for the index.
      */
     public ReverseIndex(IRawStore store, long metadataId) {
-        super(  store,
-                BTreeMetadata.read(store, metadataId),
-                new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                DEFAULT_HARD_REF_QUEUE_SCAN));
+        
+        super(store, BTreeMetadata.read(store, metadataId));
+        
     }
 
     /**

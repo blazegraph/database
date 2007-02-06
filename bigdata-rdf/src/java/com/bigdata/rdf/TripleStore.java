@@ -65,6 +65,7 @@ import org.openrdf.model.Value;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
@@ -223,17 +224,17 @@ import com.ibm.icu.text.RuleBasedCollator;
  */
 public class TripleStore extends Journal {
     
-    public Logger log = Logger.getLogger(TripleStore.class);
+    static transient public Logger log = Logger.getLogger(TripleStore.class);
 
     /*
      * Declare indices for root addresses for the different indices maintained
      * by the store.
      */
-    protected final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
-    protected final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
-    protected final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
-    protected final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
-    protected final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
+    static public transient final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
+    static public transient final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
+    static public transient final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
+    static public transient final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
+    static public transient final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
     
     public RdfKeyBuilder keyBuilder;
 
@@ -786,11 +787,28 @@ public class TripleStore extends Journal {
      */
     public void usage() {
 
-        System.err.println("#termId="+ndx_termId.getEntryCount());
-        System.err.println("#idTerm="+ndx_idTerm.getEntryCount());
-        System.err.println("#spo="+ndx_spo.getEntryCount());
-        System.err.println("#pos="+ndx_pos.getEntryCount());
-        System.err.println("#osp="+ndx_osp.getEntryCount());
+        usage("termId", ndx_termId);
+        usage("idTerm", ndx_idTerm);
+        usage("spo", ndx_spo);
+        usage("pos", ndx_pos);
+        usage("osp", ndx_osp);
+        
+    }
+
+    private void usage(String name,AbstractBTree btree) {
+        
+        final int nentries = btree.getEntryCount();
+        final int height = btree.getHeight();
+        final int nleaves = btree.getLeafCount();
+        final int nnodes = btree.getNodeCount();
+        final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
+        final int queueCapacity = btree.getHardReferenceQueueCapacity();
+        
+        System.err.println(name + ": #entries=" + nentries + ", height="
+                + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
+                + ", #(nodes+leaves)=" + (nnodes + nleaves)
+                + ", #distinctOnQueue=" + ndistinctOnQueue + ", queueCapacity="
+                + queueCapacity);
         
     }
     
@@ -799,13 +817,48 @@ public class TripleStore extends Journal {
      *
      * @param file The file.
      * 
+     * @param baseURI The baseURI or "" if none is known.
+     * 
      * @throws IOException
      */
-    public void loadData(File file ) throws IOException {
+    public void loadData(File file, String baseURI ) throws IOException {
+        
+        loadData(file,baseURI,true);
+        
+    }
+
+    /**
+     * Used to report statistics when loading data.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class LoadStats {
+
+        public long toldTriples;
+        public long totalTime;
+        public long loadTime;
+        public long commitTime;
+        
+    }
+    
+    /**
+     * Load a file into the triple store.
+     * 
+     * @param file
+     *            The file.
+     * @param baseURI
+     *            The baseURI or "" if none is known.
+     * @param commit
+     *            A {@link #commit()} will be performed IFF true.
+     * @return Statistics about the file load.
+     * @throws IOException
+     */
+    public LoadStats loadData(File file, String baseURI, boolean commit ) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
-        long total_stmts = 0L;
+        LoadStats stats = new LoadStats();
         
         log.debug( "loading: " + file.getAbsolutePath() );
         
@@ -832,22 +885,41 @@ public class TripleStore extends Journal {
         
         try {
             
-            loader.loadRdfXml( reader );
+            loader.loadRdfXml( reader, baseURI );
             
             long nstmts = loader.getStatementsAdded();
             
-            total_stmts += nstmts;
+            stats.toldTriples += nstmts;
+            
+            stats.loadTime = System.currentTimeMillis() - begin;
+            
+            // commit the data.
+            if(commit) {
+                
+                long beginCommit = System.currentTimeMillis();
+                
+                commit();
+
+                stats.commitTime = System.currentTimeMillis() - beginCommit;
+
+                log.info("commit: latency="+stats.commitTime+"ms");
+                
+            }
+            
+            stats.totalTime = System.currentTimeMillis() - begin;
             
             log.info( nstmts + 
-                      " stmts added in " + 
-                      ((double)loader.getInsertTime()) / 1000d +
-                      " secs, rate= " + 
-                      loader.getInsertRate() 
-                      );
+                    " stmts added in " + 
+                    ((double)loader.getInsertTime()) / 1000d +
+                    " secs, rate= " + 
+                    loader.getInsertRate() 
+                    );
+
+            return stats;
             
         } catch ( Exception ex ) {
             
-            ex.printStackTrace();
+            throw new RuntimeException("While loading: "+file, ex);
             
         } finally {
             
@@ -855,15 +927,15 @@ public class TripleStore extends Journal {
             
         }
         
-        long elapsed = System.currentTimeMillis() - begin;
-
-        log
-                .info(total_stmts
-                        + " stmts added in "
-                        + ((double) elapsed)
-                        / 1000d
-                        + " secs, rate= "
-                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
+//        long elapsed = System.currentTimeMillis() - begin;
+//
+//        log
+//                .info(total_stmts
+//                        + " stmts added in "
+//                        + ((double) elapsed)
+//                        / 1000d
+//                        + " secs, rate= "
+//                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
 
     }
     
