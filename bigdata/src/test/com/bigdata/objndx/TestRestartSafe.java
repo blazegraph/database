@@ -88,6 +88,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
 
             properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.FILE, getName()+".jnl");
+            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
 //            properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.megabyte*20);
 
         }
@@ -154,7 +155,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             fail("Could not delete file: "+file.getAbsoluteFile());
             
         }
-        
+
         Journal journal = new Journal(properties);
 
         final int m = 3;

@@ -81,6 +81,9 @@ import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see TestMetadataIndex, which also tests {@link IndexSegmentMerger} in the
+ *      context of validating index partition management.
  */
 public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 

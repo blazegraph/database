@@ -54,6 +54,7 @@ import java.util.Random;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
@@ -61,15 +62,31 @@ import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
 import com.bigdata.objndx.MetadataIndex.PartitionMetadata;
 import com.bigdata.objndx.MetadataIndex.SegmentMetadata;
 import com.bigdata.objndx.MetadataIndex.StateEnum;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore2;
 
 /**
  * A test suite for managing a partitioned index.
  * 
- * @todo debug repeated merges with one partition.
+ * @todo support removal of keys - this might take a flag to mark a deleted
+ *       entry since otherwise how are we to differentiate a key that is not
+ *       present in the source from a key that was simply not written during
+ *       some episode from a key with a null value?  If we disallowed null
+ *       values then that would work as well.
+ * 
+ * @todo write tests for partitioning when segment overflows.
  * 
  * @todo write tests for repeated merges with multiple partitions.
+ * 
+ * @todo test out on rdf store.
+ * 
+ * @todo write tests for generating multiple index segments in a partition
+ *       rather than merging and identify the cost tradeoff point between the
+ *       latency to evict a small tree onto a large segment vs the latency of
+ *       reading from a fused view of a small and a larger segment. is there
+ *       something in this that will make it easier to identify when to split a
+ *       partition?
  * 
  * @todo refactor the control logic until we can use it to support partitioned
  *       indices transparently.
@@ -619,19 +636,21 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
      */
     public void test_evictSegments_onePartition_withMerge_stress() throws IOException {
 
-        Random r = new Random();
+        final Random r = new Random();
         
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
-        File file = new File(getName()+".jnl");
+        final File journalFile = new File(getName()+".jnl");
 
-        if(file.exists() && !file.delete() ) {
+        if(journalFile.exists() && !journalFile.delete() ) {
         
-            fail("Could not delete file: "+file.getAbsoluteFile());
+            fail("Could not delete file: "+journalFile.getAbsoluteFile());
             
         }
         
-        properties.setProperty(Options.FILE,file.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        
+        properties.setProperty(Options.FILE,journalFile.toString());
 
         properties.setProperty(Options.SEGMENT,"0");
 
@@ -654,7 +673,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * must also always agree with the ground truth btree.
          */
         // #of trials.
-        final int ntrials = 2;
+        final int ntrials = 20;
         
         // #of mutation operations per trial (insert, remove).
         final int nops = 10000;
@@ -663,7 +682,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final boolean insertOnly = true;
 
         // The branching factor used on the index segment.
-        final int mseg = 100;
+        final int mseg = 4*Bytes.kilobyte32;
+        
+        // The branching factor used on the index merge process.
+        final int mseg2 = 4*Bytes.kilobyte32;
+
+        // When true, the index segment will be validated in each trial against groundTruth.
+        final boolean validateEachTrial = false;
         
         // ground truth btree.
         BTree groundTruth = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
@@ -679,9 +704,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
             /*
              * Insert / remove random key/values.
              * 
-             * @todo periodically verify the groundTruth against the fused view
-             * of the current testData btree and the last evicted index segment
-             * (once one has been evicted).
+             * FIXME we need a marker for delete operations in case the index
+             * allows null values. If we always interpret a null value as a
+             * delete marker then we will wind up deleting things like the
+             * statements in the statement index during a merge.
              */
             for(int i=0;i<nops; i++) {
             
@@ -691,10 +717,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                      * Note: The more bytes in the key the more likely you are
                      * to update an existing key. Likewise, the large the range
                      * for an [int] key the more likely you are to update that
-                     * key twice.
+                     * key twice. In any case, the maximum #of keys in the
+                     * ground truth tree is directly governed by the choice of
+                     * the key range.  Consequently, the tighter the range the
+                     * more likely it is that a key is updated by each operation.
                      */
-                    byte[] key = new byte[3]; r.nextBytes(key);
-//                    int key = r.nextInt(100000);
+//                    byte[] key = new byte[5]; r.nextBytes(key);
+                    int key = r.nextInt(1000000);
                     
                     // random value object.
                     Object val = new SimpleEntry(r.nextInt(1000));
@@ -723,12 +752,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                     groundTruth.remove(tmp);
 
                     /* remove the key from the test data.
-                     * 
-                     * FIXME we need a marker for delete operations in case the
-                     * index allows null values.  If we always interpret a null
-                     * value as a delete marker then we will wind up deleting
-                     * things like the statements in the statement index during
-                     * a merge.
                      */
                     testData.insert(tmp,null);
                     
@@ -781,7 +804,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 seg = new IndexSegment(new IndexSegmentFileStore(outFile01),
                         testData.nodeSer.valueSerializer);
 
-                assertSameBTree(testData, seg);
+                if(validateEachTrial) assertSameBTree(testData, seg);
 
             } else {
 
@@ -792,6 +815,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 System.err.println("trial="+trial+", evicting and merging with existing segment.");
 
+                // The #of entries that we expected in the segment after the merge.
+                final int expectedEntryCount = groundTruth.getEntryCount();
+                
                 // tmp file for the merge process.
                 File outFile02_tmp = new File(getName() + "-part0."+trial+".tmp");
 
@@ -808,14 +834,26 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 // merge the data from the btree on the journal and the index segment.
                 MergedLeafIterator mergeItr = new IndexSegmentMerger(
-                        outFile02_tmp, mseg, testData, seg).merge();
+                        outFile02_tmp, mseg2, testData, seg).merge();
+
+                // verify #of entries that are passed on by the merge.
+                assertEquals("entryCount",expectedEntryCount,mergeItr.nentries);
                 
                 // build the merged index segment.
-                new IndexSegmentBuilder(outFile02, null, mergeItr.nentries,
+                IndexSegmentBuilder builder = new IndexSegmentBuilder(
+                        outFile02, null, mergeItr.nentries,
                         new MergedEntryIterator(mergeItr), mseg,
                         testData.nodeSer.valueSerializer,
                         true/* fullyBuffer */, false/* useChecksum */,
                         null/* recordCompressor */, 0d/* errorRate */);
+
+                // close the merged leaf iterator (and release its buffer/file).
+                // @todo this should be automatic when the iterator is exhausted but I am not seeing that.
+                mergeItr.close();
+                
+                // verify #of entries in the index segment plan.
+                assertEquals("entryCount", expectedEntryCount,
+                        builder.plan.nentries);
 
                 /*
                  * update the metadata index for this partition.
@@ -838,7 +876,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                         new IndexSegmentFileStore(outFile02),
                         testData.nodeSer.valueSerializer);
 
-                assertSameBTree(groundTruth,seg02);
+                if(validateEachTrial) assertSameBTree(groundTruth,seg02);
                 
                 /*
                  * close and then delete the old index segment.
@@ -859,6 +897,18 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                     
         }
 
+        if (!validateEachTrial) {
+
+            // validate the final answer.
+            
+            System.err
+                    .println("Validating merged segment against ground truth: nentries="
+                            + groundTruth.getEntryCount());
+            
+            assertSameBTree(groundTruth, seg);
+            
+        }
+
         /*
          * close the last index segment and discard its file.
          */
@@ -868,6 +918,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         new File(md.get(new byte[]{}).segs[0].filename).delete();
 
         System.err.println("End of stress test: ntrial="+ntrials+", nops="+nops);
+
+        // delete the journal file afterwards.
+        if(journalFile.exists()) journalFile.delete();
         
     }
     

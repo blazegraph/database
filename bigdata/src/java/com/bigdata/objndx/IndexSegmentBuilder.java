@@ -65,6 +65,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleFileRawStore2;
 import com.bigdata.rawstore.SimpleMemoryRawStore2;
@@ -730,7 +731,7 @@ public class IndexSegmentBuilder {
             final long begin_write = System.currentTimeMillis();
             
             // write everything out on the outFile.
-            writeIndexSegment(outChannel);
+            IndexSegmentMetadata md = writeIndexSegment(outChannel);
             
             /*
              * Flush this channel to disk and close the channel. This also
@@ -751,7 +752,9 @@ public class IndexSegmentBuilder {
 
             System.err.println("index segment build: total=" + elapsed
                     + "ms := setup(" + elapsed_setup + "ms) + build("
-                    + elapsed_build + "ms) +  write(" + elapsed_write+"ms)");
+                    + elapsed_build + "ms) +  write(" + elapsed_write
+                    + "ms); #entries=" + plan.nentries + ", "
+                    + (md.length / Bytes.megabyte32) + "bytes");
 
             log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build
@@ -1278,7 +1281,7 @@ public class IndexSegmentBuilder {
      *       by the index build operation yet be able to begin mutable
      *       operations on the index using copy-on-write.
      */
-    protected void writeIndexSegment(FileChannel outChannel) throws IOException {
+    protected IndexSegmentMetadata writeIndexSegment(FileChannel outChannel) throws IOException {
 
         /*
          * All nodes and leaves have been written. If we wrote any nodes
@@ -1418,7 +1421,10 @@ public class IndexSegmentBuilder {
 
             md.write(out);
             
-            log.info(md.toString());
+            if(INFO)
+                log.info(md.toString());
+            
+            return md;
             
         }
 
@@ -1469,19 +1475,19 @@ public class IndexSegmentBuilder {
             
         }
         
-        public int getBranchingFactor() {
+        final public int getBranchingFactor() {
             
             return m;
             
         }
 
-        public int getKeyCount() {
+        final public int getKeyCount() {
 
             return keys.getKeyCount();
             
         }
 
-        public IKeyBuffer getKeys() {
+        final public IKeyBuffer getKeys() {
 
             return keys;
             
@@ -1519,25 +1525,25 @@ public class IndexSegmentBuilder {
 //            
 //        }
         
-        public int getValueCount() {
+        final public int getValueCount() {
             
             return keys.getKeyCount();
             
         }
 
-        public Object[] getValues() {
+        final public Object[] getValues() {
             
             return vals;
             
         }
 
-        public boolean isLeaf() {
+        final public boolean isLeaf() {
             
             return true;
             
         }
 
-        public int getEntryCount() {
+        final public int getEntryCount() {
             
             return keys.getKeyCount();
             
@@ -1612,13 +1618,13 @@ public class IndexSegmentBuilder {
          */
         int[] childEntryCount;
         
-        public int getEntryCount() {
+        final public int getEntryCount() {
             
             return nentries;
             
         }
 
-        public int[] getChildEntryCounts() {
+        final public int[] getChildEntryCounts() {
             
             return childEntryCount;
             
@@ -1652,19 +1658,19 @@ public class IndexSegmentBuilder {
             
         }
 
-        public long[] getChildAddr() {
+        final public long[] getChildAddr() {
             
             return childAddr;
             
         }
 
-        public int getChildCount() {
+        final public int getChildCount() {
 
             return keys.getKeyCount() + 1;
             
         }
 
-        public boolean isLeaf() {
+        final public boolean isLeaf() {
             
             return false;
             

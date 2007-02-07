@@ -348,10 +348,13 @@ public class IndexSegmentMerger {
     }
 
     /**
-     * A simple merge rule that combines all entries in key order. The inputs to
-     * the merge rule are {@link #leaf1} at {@link #index1} and {@link #leaf2}
-     * at {@link #index2}. The outputs are inserted into {@link #leaf}, which
-     * is written onto the output channel using
+     * A simple merge rule that combines entries in key order and when keys
+     * compare as equal the value choosen is from the <em>first</em> btree
+     * specified to the constructor.
+     * <p>
+     * The inputs to the merge rule are {@link #leaf1} at {@link #index1} and
+     * {@link #leaf2} at {@link #index2}. The outputs are inserted into
+     * {@link #leaf}, which is written onto the output channel using
      * {@link #writeLeaf(SimpleLeafData)} each time it fills up and then
      * {@link SimpleLeafData#reset(int)} to accept more entries.
      * 
@@ -376,8 +379,23 @@ public class IndexSegmentMerger {
         
         byte[] key2 = leaf2.keys.getKey(index2);
         
-        if(BytesUtil.compareBytes(key1,key2)<0) {
+        int ret = BytesUtil.compareBytes(key1,key2);
+        
+        if(ret==0) {
             
+            /* 
+             * prefer source one in case of a tie.
+             */
+            
+            outputKey(leaf1,index1++);
+            
+            index2++;
+            
+            nextLeaf1();
+            nextLeaf2();
+
+        } else if(ret<0) {
+
             outputKey(leaf1,index1++);
             
             nextLeaf1();
@@ -455,7 +473,13 @@ public class IndexSegmentMerger {
         
         assert keys.nkeys < leaf.max;
         
-        // copy source key into next position on the output leaf.
+        /*
+         * copy source key into next position on the output leaf.
+         * 
+         * @todo This makes a copy of the key, but we are also making a copy of
+         * the key to support comparison of keys in applyMergeRule(). Factor out
+         * that redundency.
+         */
         keys.keys[keys.nkeys] = src.getKeys().getKey(srcpos);
         //leaf.copyKey(keys.nkeys, src, srcpos);
         
@@ -601,6 +625,8 @@ public class IndexSegmentMerger {
             if (raf.getChannel().isOpen()) {
 
                 try {
+                    
+                    System.err.println("Closing MergedLeafIterator: file="+file);
 
                     raf.close();
 
@@ -610,14 +636,14 @@ public class IndexSegmentMerger {
 
                 }
 
+                if (file.exists() && !file.delete()) {
+
+                    log.warn("Could not delete file: " + file.getAbsoluteFile());
+
+                }
+                
             }
 
-            if (file.exists() && !file.delete()) {
-
-                log.warn("Could not delete file: " + file.getAbsoluteFile());
-
-            }
-            
         }
 
         /**
@@ -625,10 +651,13 @@ public class IndexSegmentMerger {
          * <p>
          * Automatically closes out the backing buffer when all leaves have been
          * processed.
+         * 
+         * FIXME I am not seeing an automatic close of this iterator when
+         * invoked by {@link MergedEntryIterator}.
          */
         public boolean hasNext() {
         
-            if(exhausted) throw new NoSuchElementException();
+            if(exhausted) return false;
             
             exhausted = leafIndex >= nleaves;
 
@@ -644,6 +673,8 @@ public class IndexSegmentMerger {
 
         public ILeafData next() {
 
+            if(!hasNext()) throw new NoSuchElementException();
+            
             try {
 
                 // #of bytes in the next leaf.
@@ -733,11 +764,12 @@ public class IndexSegmentMerger {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class LeafData implements ILeafData {
+    final private static class LeafData implements ILeafData {
 
         final int m;
         /**
-         * @todo drop this since maintained by IKeyBuffer?
+         * Note: this is redundent with {@link IKeyBuffer#getKeyCount()} but is
+         * final and is initialized in the constructor.
          */
         final int nkeys;
         final IKeyBuffer keys;

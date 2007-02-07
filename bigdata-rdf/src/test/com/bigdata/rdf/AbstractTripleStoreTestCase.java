@@ -100,6 +100,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
                 properties.setProperty(Options.FILE, getName()+".jnl");
             }
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
+//            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
 
         }
 
