@@ -47,6 +47,8 @@ import java.util.Arrays;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.ReverseIndex;
+
 
 public abstract class AbstractRuleRdf extends Rule {
 
@@ -140,11 +142,13 @@ public abstract class AbstractRuleRdf extends Rule {
     
     protected void printStatement( SPO stmt ) {
         
-        URI s = (URI) store.ndx_idTerm.lookup(store.keyBuilder.id2key(stmt.s));
+        ReverseIndex ndx = store.getIdTermIndex();
+        
+        URI s = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.s));
          
-        URI p = (URI) store.ndx_idTerm.lookup(store.keyBuilder.id2key(stmt.p));
+        URI p = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.p));
          
-        URI o = (URI) store.ndx_idTerm.lookup(store.keyBuilder.id2key(stmt.o));
+        URI o = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.o));
          
         System.err.println(abbrev(s)+","+abbrev(p)+","+abbrev(o));
         

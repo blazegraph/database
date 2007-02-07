@@ -116,16 +116,16 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
          * Fields used to verify restart safety of additional metadata for 
          * the term:id index.
          */
-        final short indexId = store.ndx_termId.counter.indexId;
-        final long nextId = store.ndx_termId.counter.nextId;
+        final short indexId = store.getTermIdIndex().counter.indexId;
+        final long nextId = store.getTermIdIndex().counter.nextId;
 
         store.commit();
         
         /*
          * verify that extension metadata for the term:id index was not modified.
          */
-        assertEquals("termsId.indexId", indexId, store.ndx_termId.counter.indexId);
-        assertEquals("termsId.nextId", nextId, store.ndx_termId.counter.nextId);
+        assertEquals("termsId.indexId", indexId, store.getTermIdIndex().counter.indexId);
+        assertEquals("termsId.nextId", nextId, store.getTermIdIndex().counter.nextId);
 
         assertEquals(x_id,store.getTerm(x));
         assertEquals(y_id,store.getTerm(y));
@@ -136,7 +136,9 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals(rdfType_id,store.getTerm(rdfType));
         assertEquals(rdfsSubClassOf_id,store.getTerm(rdfsSubClassOf));
         
-        assertEquals("statementCount", 5, store.ndx_spo.getEntryCount());
+        assertEquals("statementCount", 5, store.getSPOIndex().getEntryCount());
+        assertEquals("statementCount", 5, store.getPOSIndex().getEntryCount());
+        assertEquals("statementCount", 5, store.getOSPIndex().getEntryCount());
         assertTrue(store.containsStatement(x, rdfType, C));
         assertTrue(store.containsStatement(y, rdfType, B));
         assertTrue(store.containsStatement(z, rdfType, A));
@@ -156,7 +158,9 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals(rdfType_id,store.getTerm(rdfType));
         assertEquals(rdfsSubClassOf_id,store.getTerm(rdfsSubClassOf));
 
-        assertEquals("statementCount", 5, store.ndx_spo.getEntryCount());
+        assertEquals("statementCount", 5, store.getSPOIndex().getEntryCount());
+        assertEquals("statementCount", 5, store.getPOSIndex().getEntryCount());
+        assertEquals("statementCount", 5, store.getOSPIndex().getEntryCount());
         assertTrue(store.containsStatement(x, rdfType, C));
         assertTrue(store.containsStatement(y, rdfType, B));
         assertTrue(store.containsStatement(z, rdfType, A));
@@ -167,8 +171,8 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
          * verify that extension metadata for the term:id index was correctly
          * restored.
          */
-        assertEquals("termsId.indexId", indexId, store.ndx_termId.counter.indexId);
-        assertEquals("termsId.nextId", nextId, store.ndx_termId.counter.nextId);
+        assertEquals("termsId.indexId", indexId, store.getTermIdIndex().counter.indexId);
+        assertEquals("termsId.nextId", nextId, store.getTermIdIndex().counter.nextId);
         
     }
 

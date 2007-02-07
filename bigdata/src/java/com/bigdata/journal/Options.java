@@ -119,11 +119,27 @@ public class Options {
      * and hardware specific (some hardware buffers the power for the disk
      * system so that such writes always complete).
      * 
+     * @see #DOUBLE_SYNC
      * @see IBufferStrategy#force(boolean)
      * @see FileChannel#force(boolean)
      * @see ForceEnum
      */
     public static final String FORCE_ON_COMMIT = "forceOnCommit";
+
+    /**
+     * <code>doubleSync</code> - This boolean option causes application data
+     * to be forced to stable storage <em>before</em> we update the root
+     * blocks. This option seeks to guarentee that the application data is
+     * stable on the disk before the atomic commit. Some operating systems
+     * and/or file systems may otherwise choose an ordered write or otherwise
+     * process the writes in a different order. This could have the consequence
+     * that the root blocks are laid down on the disk before the application
+     * data. In this situation a hard failure during the write could result in
+     * the loss of application data since the updated root blocks represent the
+     * atomic commit point but not all application data was successfully made
+     * stable on disk.
+     */
+    public static final String DOUBLE_SYNC = "doubleSync";
     
 //    /**
 //     * <code>conflictResolver</code> - The name of a class that implements
@@ -176,6 +192,12 @@ public class Options {
      * metadata are forced).
      */
     public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.ForceMetadata;
+    
+    /**
+     * The default for the {@link #DOUBLE_SYNC} option (application data is NOT
+     * forced to disk before we write the root blocks).
+     */
+    public final static boolean DEFAULT_DOUBLE_SYNC = false;
     
     /**
      * The default for the {@link #DELETE_ON_CLOSE} option.

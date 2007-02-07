@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.text.NumberFormat;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -69,8 +70,8 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Class supporting a compacting merge of two btrees into a series of ordered
- * leaves on a temporary file in support of merging or splitting
- * {@link IndexSegment}s.
+ * leaves on a temporary file in support of a compacting merge of mutable
+ * {@link BTree}s and/or immutable {@link IndexSegment}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -296,6 +297,8 @@ public class IndexSegmentMerger {
      */
     public MergedLeafIterator merge() throws IOException {
 
+        final long begin = System.currentTimeMillis();
+        
         /*
          * read the first leaf from both source btrees (it is an error if either
          * tree does not define a source leaf). until one tree or the other is
@@ -341,7 +344,25 @@ public class IndexSegmentMerger {
 
 //        // synch to disk (not necessary since file is not reused).
 //        out.getChannel().force(false);
+
+        final long elapsed = System.currentTimeMillis()-begin;
+
+        final long length = out.length();
         
+        NumberFormat cf = NumberFormat.getNumberInstance();
+        
+        cf.setGroupingUsed(true);
+        
+        NumberFormat fpf = NumberFormat.getNumberInstance();
+        
+        fpf.setGroupingUsed(false);
+        
+        fpf.setMaximumFractionDigits(2);
+
+        System.err.println("merge: " + elapsed + "ms, " + cf.format(nentries)
+                + " entries, "
+                + fpf.format(((double) length / Bytes.megabyte32)) + "MB");
+
         return new MergedLeafIterator(outFile, out, leaf.m, nentries, nleaves,
                 maxLeafBytes, nodeSer);
         

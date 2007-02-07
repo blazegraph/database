@@ -242,11 +242,29 @@ public class TripleStore extends Journal {
      * Note: You MUST NOT retain hard references to these indices across
      * operations since they may be discarded and re-loaded.
      */
-    public TermIndex ndx_termId;
-    public ReverseIndex ndx_idTerm;
-    public StatementIndex ndx_spo;
+    private TermIndex ndx_termId;
+    private ReverseIndex ndx_idTerm;
+    public StatementIndex ndx_spo; // FIXME make these indices private.
     public StatementIndex ndx_pos;
     public StatementIndex ndx_osp;
+
+    /*
+     * Note: access to the indices through these methods is required to support
+     * partitioned indices since the latter introduce an indirection to: (a)
+     * periodically replace a mutable btree with a fused view of the btree on
+     * the journal and one or more index segments; (b) periodically split or
+     * join partitions of the index based on the size on disk of that partition.
+     * 
+     * At this time is is valid to hold onto a reference during a given load or
+     * query operation but not across commits.  Eventually we will have to put
+     * a client api into place that hides the routing of btree api operations
+     * to the journals and segments for each index partition.
+     */
+    public TermIndex getTermIdIndex() {return ndx_termId;}
+    public ReverseIndex getIdTermIndex() {return ndx_idTerm;}
+    public StatementIndex getSPOIndex() {return ndx_spo;}
+    public StatementIndex getPOSIndex() {return ndx_pos;}
+    public StatementIndex getOSPIndex() {return ndx_osp;}
 
     /**
      * 

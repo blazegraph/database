@@ -1,9 +1,13 @@
-package com.bigdata.objndx;
+package com.bigdata.scaleup;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IValueSerializer;
+import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
 
 /**

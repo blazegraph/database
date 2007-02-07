@@ -57,6 +57,7 @@ import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.text.NumberFormat;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
@@ -277,7 +278,7 @@ public class IndexSegmentBuilder {
     /**
      * The plan for building the B+-Tree.
      */
-    final IndexSegmentPlan plan;
+    final public IndexSegmentPlan plan;
     
     /**
      * The process runtime in milliseconds.
@@ -750,11 +751,22 @@ public class IndexSegmentBuilder {
             
             elapsed = System.currentTimeMillis() - begin;
 
+            NumberFormat cf = NumberFormat.getNumberInstance();
+            
+            cf.setGroupingUsed(true);
+            
+            NumberFormat fpf = NumberFormat.getNumberInstance();
+            
+            fpf.setGroupingUsed(false);
+            
+            fpf.setMaximumFractionDigits(2);
+
             System.err.println("index segment build: total=" + elapsed
                     + "ms := setup(" + elapsed_setup + "ms) + build("
                     + elapsed_build + "ms) +  write(" + elapsed_write
-                    + "ms); #entries=" + plan.nentries + ", "
-                    + (md.length / Bytes.megabyte32) + "bytes");
+                    + "ms); " + cf.format(plan.nentries) + " entries, "
+                    + fpf.format(((double) md.length / Bytes.megabyte32))
+                    + "MB");
 
             log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build

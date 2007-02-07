@@ -53,8 +53,7 @@ import java.io.IOException;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 
 /**
- * Test suite for compacting merge of index segments (really, of two B+-Trees
- * having the same key type and comparator).
+ * Test suite for compacting merge of index segments (really, of two B+-Trees).
  * 
  * @todo write tests where the keys do not overlap (done).
  * 

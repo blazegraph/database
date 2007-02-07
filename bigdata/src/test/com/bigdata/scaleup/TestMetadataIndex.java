@@ -45,7 +45,7 @@ Modifications:
  * Created on Dec 7, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.scaleup;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,14 +57,23 @@ import org.apache.log4j.Level;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.AbstractBTreeTestCase;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.IndexSegmentBuilder;
+import com.bigdata.objndx.IndexSegmentFileStore;
+import com.bigdata.objndx.IndexSegmentMerger;
+import com.bigdata.objndx.SimpleEntry;
 import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
-import com.bigdata.objndx.MetadataIndex.PartitionMetadata;
-import com.bigdata.objndx.MetadataIndex.SegmentMetadata;
-import com.bigdata.objndx.MetadataIndex.StateEnum;
+import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.scaleup.MetadataIndex.PartitionMetadata;
+import com.bigdata.scaleup.MetadataIndex.SegmentMetadata;
+import com.bigdata.scaleup.MetadataIndex.StateEnum;
 
 /**
  * A test suite for managing a partitioned index.
@@ -445,7 +454,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                btree.nodeSer.valueSerializer);
+                btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg);
         
@@ -550,7 +559,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg01 = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                btree.nodeSer.valueSerializer);
+                btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -591,7 +600,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 100, btree, seg01).merge();
         
         new IndexSegmentBuilder(outFile02, null, mergeItr.nentries, new MergedEntryIterator(mergeItr
-                ), 100, btree.nodeSer.valueSerializer,
+                ), 100, btree.getNodeSerializer().getValueSerializer(),
                 true/* fullyBuffer */, false/* useChecksum */,
                 null/*recordCompressor*/, 0d/*errorRate*/);
 
@@ -610,7 +619,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * data.
          */
         IndexSegment seg02 = new IndexSegment(new IndexSegmentFileStore(
-                outFile02), btree.nodeSer.valueSerializer);
+                outFile02), btree.getNodeSerializer().getValueSerializer());
 
         assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                 seg02.entryIterator());
@@ -652,6 +661,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         properties.setProperty(Options.FILE,journalFile.toString());
 
+        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+
         properties.setProperty(Options.SEGMENT,"0");
 
         Journal store = new Journal(properties);
@@ -676,11 +687,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final int ntrials = 20;
         
         // #of mutation operations per trial (insert, remove).
-        final int nops = 10000;
+        final int nops = 100000;
         
         // @todo when true only insert operations are performed (does not test merge of deleted keys).
         final boolean insertOnly = true;
 
+        // The branching factor used on the mutable ground truth and test data btrees.
+        final int mmut = 100;
+        
         // The branching factor used on the index segment.
         final int mseg = 4*Bytes.kilobyte32;
         
@@ -691,7 +705,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final boolean validateEachTrial = false;
         
         // ground truth btree.
-        BTree groundTruth = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree groundTruth = new BTree(store, mmut, SimpleEntry.Serializer.INSTANCE);
 
         // the current index segment and null if there is none yet.
         IndexSegment seg = null;
@@ -699,7 +713,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         for(int trial=0; trial<ntrials; trial++) {
         
             // test data btree - new tree on each trial!
-            BTree testData = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+            BTree testData = new BTree(store, mmut, SimpleEntry.Serializer.INSTANCE);
 
             /*
              * Insert / remove random key/values.
@@ -709,9 +723,11 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
              * delete marker then we will wind up deleting things like the
              * statements in the statement index during a merge.
              */
+            int key = 0;
             for(int i=0;i<nops; i++) {
             
-                if (insertOnly || groundTruth.nentries == 0 || r.nextInt(100) > 5) {
+                if (insertOnly || groundTruth.getEntryCount() == 0
+                        || r.nextInt(100) > 5) {
 
                     /*
                      * Note: The more bytes in the key the more likely you are
@@ -719,20 +735,30 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                      * for an [int] key the more likely you are to update that
                      * key twice. In any case, the maximum #of keys in the
                      * ground truth tree is directly governed by the choice of
-                     * the key range.  Consequently, the tighter the range the
-                     * more likely it is that a key is updated by each operation.
+                     * the key range. Consequently, the tighter the range the
+                     * more likely it is that a key is updated by each
+                     * operation.
+                     * 
+                     * Note: This assigns mostly increasing keys so that the
+                     * btree will be mostly ordered on insert, which speeds up
+                     * the test quite a bit and makes it convienent to test with
+                     * more data. When keys do appear out of order they are very
+                     * likely to be in the same leaf or its sibling.
                      */
 //                    byte[] key = new byte[5]; r.nextBytes(key);
-                    int key = r.nextInt(1000000);
+                    key = (key + r.nextInt(1000)-mmut/2) % 50000000;
                     
                     // random value object.
                     Object val = new SimpleEntry(r.nextInt(1000));
                     
+                    // convert key to byte[].
+                    byte[] _key = i2k(key);
+                    
                     // insert into ground truth.
-                    groundTruth.insert(key,val);
+                    groundTruth.insert(_key,val);
                     
                     // insert into test data.
-                    testData.insert(key,val);
+                    testData.insert(_key,val);
 
 //                    System.err.println("trial="+trial+", op="+i+", insert( "+BytesUtil.toString(key)+", "+val+")");
 //                    System.err.println("trial="+trial+", op="+i+", insert( "+key+", "+val+")");
@@ -740,7 +766,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 } else {
 
                     // a valid index into the ground truth btree.
-                    int entryIndex = r.nextInt(groundTruth.nentries);
+                    int entryIndex = r.nextInt(groundTruth.getEntryCount());
 
                     // the key at that index.
                     byte[] tmp = groundTruth.keyAt(entryIndex); 
@@ -759,7 +785,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
             
             }
             
-            if(testData.nentries==0) {
+            if(testData.getEntryCount()==0) {
                 
                 /*
                  * Note: You can not build an index segment with an empty input.
@@ -802,7 +828,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * open and verify the index segment against the btree data.
                  */
                 seg = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                        testData.nodeSer.valueSerializer);
+                        testData.getNodeSerializer().getValueSerializer());
 
                 if(validateEachTrial) assertSameBTree(testData, seg);
 
@@ -843,7 +869,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 IndexSegmentBuilder builder = new IndexSegmentBuilder(
                         outFile02, null, mergeItr.nentries,
                         new MergedEntryIterator(mergeItr), mseg,
-                        testData.nodeSer.valueSerializer,
+                        testData.getNodeSerializer().getValueSerializer(),
                         true/* fullyBuffer */, false/* useChecksum */,
                         null/* recordCompressor */, 0d/* errorRate */);
 
@@ -874,7 +900,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  */
                 IndexSegment seg02 = new IndexSegment(
                         new IndexSegmentFileStore(outFile02),
-                        testData.nodeSer.valueSerializer);
+                        testData.getNodeSerializer().getValueSerializer());
 
                 if(validateEachTrial) assertSameBTree(groundTruth,seg02);
                 
@@ -1010,7 +1036,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg01 = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                btree.nodeSer.valueSerializer);
+                btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -1054,7 +1080,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg02 = new IndexSegment(new IndexSegmentFileStore(
-                outFile02), btree.nodeSer.valueSerializer);
+                outFile02), btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree, seg02);
 

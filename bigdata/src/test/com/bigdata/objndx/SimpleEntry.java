@@ -56,7 +56,7 @@ import java.io.IOException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class SimpleEntry {
+public class SimpleEntry {
 
     private static int nextId = 1;
 
@@ -106,7 +106,7 @@ class SimpleEntry {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class Serializer implements IValueSerializer {
+    public static class Serializer implements IValueSerializer {
 
         /**
          * 

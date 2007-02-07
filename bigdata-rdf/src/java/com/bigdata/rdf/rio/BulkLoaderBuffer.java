@@ -281,7 +281,7 @@ public class BulkLoaderBuffer extends Buffer {
          * FIXME verify that bloom filters are enabled and in use for index
          * segments.
          */
-        if(store.ndx_termId.getEntryCount()>0 || ! indices.terms.isEmpty()) {
+        if(store.getTermIdIndex().getEntryCount()>0 || ! indices.terms.isEmpty()) {
             
             /*
              * read against the terms index on the journal and each segment of
@@ -339,7 +339,7 @@ public class BulkLoaderBuffer extends Buffer {
             // FIXME Mark known statements by testing the bloom filter and/or
             // indices.
 
-            if (store.ndx_spo.getEntryCount() > 0
+            if (store.getSPOIndex().getEntryCount() > 0
                     || !indices.spo.isEmpty()) {
 
                 throw new UnsupportedOperationException();

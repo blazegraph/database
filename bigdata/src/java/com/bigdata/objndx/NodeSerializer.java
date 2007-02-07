@@ -314,6 +314,12 @@ public class NodeSerializer {
      */
     private static final ChecksumUtility chk = new ChecksumUtility();
     
+    public IValueSerializer getValueSerializer() {
+        
+        return valueSerializer;
+        
+    }
+    
     /**
      * Constructor is disallowed.
      */

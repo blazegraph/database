@@ -723,7 +723,7 @@ public class Buffer {
             
             if(current.termId == 0L) {
                 
-                current.termId = store.ndx_termId.counter.nextId();
+                current.termId = store.getTermIdIndex().counter.nextId();
                 
             }
             

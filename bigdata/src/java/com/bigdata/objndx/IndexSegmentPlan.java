@@ -12,43 +12,43 @@ public class IndexSegmentPlan {
     /**
      * The branching factor of the output tree (input).
      */
-    final int m;
+    final public int m;
     
     /**
      * The minimum #of values that may be placed into non-root leaf (and
      * also the minimum #of children that may be placed into a non-root
      * node). (the minimum capacity).
      */
-    final int m2; 
+    final public int m2; 
     
     /**
      * The #of entries in the btree (input).
      */
-    final int nentries;
+    final public int nentries;
     
     /**
      * The #of leaves that will exist in the output tree. When nleaves == 1
      * the output tree will consist of a root leaf. In this case we do not
      * open a temporary file for the nodes since there will not be any.
      */
-    final int nleaves; 
+    final public int nleaves; 
 
     /**
      * The #of non-leaf nodes in the output tree.
      */
-    final int nnodes;
+    final public int nnodes;
     
     /**
      * The height of the output tree (#of levels in the output tree).
      */
-    final int height;
+    final public int height;
 
     /**
      * The #of entries to place into each leaf. The array is dimensioned to
      * {@link #nleaves}. This is a convenience reference to the last array in
      * {@link #numInNode}.
      */
-    final int[] numInLeaf;
+    final public int[] numInLeaf;
     
     /**
      * The #of nodes at each level of the tree, including the level containing
@@ -56,7 +56,7 @@ public class IndexSegmentPlan {
      * 
      * @see #nleaves, which is the #of leaves in the output tree.
      */
-    final int[] numInLevel;
+    final public int[] numInLevel;
     
     /**
      * The #of children / values to place into each node in each level of the
@@ -66,7 +66,7 @@ public class IndexSegmentPlan {
      * 
      * @see numInLeaf, which is a reference to the last element of this array.
      */
-    final int[][] numInNode;
+    final public int[][] numInNode;
 
     /**
      * Create a plan for building a B+-Tree. The plan has only these two

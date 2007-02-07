@@ -277,15 +277,15 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         final int nterms = 289844;
         final int nstatements = 464841;
         
-        assertEquals("#terms",nterms,store.ndx_termId.getEntryCount());
+        assertEquals("#terms",nterms,store.getTermIdIndex().getEntryCount());
         
-        assertEquals("#ids",nterms,store.ndx_idTerm.getEntryCount());
+        assertEquals("#ids",nterms,store.getIdTermIndex().getEntryCount());
         
-        assertEquals("#spo",nstatements,store.ndx_spo.getEntryCount());
+        assertEquals("#spo",nstatements,store.getSPOIndex().getEntryCount());
         
-        assertEquals("#pos",nstatements,store.ndx_pos.getEntryCount());
+        assertEquals("#pos",nstatements,store.getPOSIndex().getEntryCount());
         
-        assertEquals("#ops",nstatements,store.ndx_osp.getEntryCount());
+        assertEquals("#ops",nstatements,store.getOSPIndex().getEntryCount());
         
     }
     

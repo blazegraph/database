@@ -123,30 +123,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
         // @todo test compacting merge of two index segments.
         suite.addTestSuite( TestIndexSegmentMerger.class );
-        // @todo test merge that results in enough data to warrent a split.
 
-        /*
-         * journal overflow
-         * 
-         * @todo test overflow triggers near journal capacity
-         * 
-         * @todo test overflow will abort transactions if necessary, e.g., after
-         * a grace period and possible journal extension.
-         */
-        
-        /*
-         * management of partitioned indices.
-         * 
-         * @todo test overflow resulting in parition merge or split.
-         * 
-         * @todo test DistributedBTree (reads through to active index segments
-         * if miss on BTree in the journal). there is a lot to test here
-         * including all of the transactional semantics.
-         * 
-         * @todo test metadata management for index segments.
-         */
-        suite.addTestSuite(TestMetadataIndex.class);
-       
         /*
          * use of btree to support transactional isolation.
          *
