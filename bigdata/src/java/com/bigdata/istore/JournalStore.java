@@ -1,15 +1,6 @@
 package com.bigdata.istore;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Properties;
-
-import org.CognitiveWeb.bigdata.OId;
-
-import com.bigdata.journal.DataDeletedException;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Tx;
-import com.bigdata.util.TimestampFactory;
 
 /**
  * Hacked test class exposing the {@link IOM} interface backed by a
@@ -18,6 +9,11 @@ import com.bigdata.util.TimestampFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo GOM uses per-object indices. Once they span a single journal they will
+ *       have to be registered with the metadata index. However it would be nice
+ *       to avoid that overhead when the index is small and can be kept "near"
+ *       the generic object owing the index.
+ *       
  * @todo Support notion of transactions on {@link IOM}. In fact, the problem is
  *       more like supporting unisolated operations.
  * 
@@ -39,7 +35,7 @@ import com.bigdata.util.TimestampFactory;
  * @todo Hook up and debug the btree integration. Figure out how to handle the
  *       per-link set indices for GOM. One way is to use a single index for all
  *       link sets in a family and generate the keys so as to partition the
- *       indices. There are doubtless other solutions.  Pay attention to both
+ *       indices. There are doubtless other solutions. Pay attention to both
  *       small and large indices.
  * 
  * @todo Hook this up to GOM and test performance with the various _journal

@@ -18,15 +18,22 @@ import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * BTree mapping btree names to the last metadata record committed for the named
- * btree. The keys are Unicode strings using the default {@link Locale}. The
- * values are the last known {@link Addr address} of the named btree.
- * 
- * @todo parameterize the {@link Locale} on the Journal and pass through to this
- *       class. this will make it easier to configure non-default locales.
+ * BTree mapping index names to the last metadata record committed for the named
+ * index. The keys are Unicode strings using the default {@link Locale}. The
+ * values are {@link Entry} objects recording the name of the index and the last
+ * known {@link Addr address} of the {@link BTreeMetadata} record for the named
+ * index.
  */
 public class NameAddrBTree extends BTree {
 
+    /*
+     * @todo parameterize the {@link Locale} on the Journal and pass through to
+     * this class. this will make it easier to configure non-default locales.
+     * 
+     * @todo refactor a default instance of the keybuilder that is wrapped in a
+     * synchonization interface for multi-threaded use or move an instance onto
+     * the store since it already has a single-threaded contract for its api?
+     */  
     private KeyBuilder keyBuilder = new KeyBuilder();
 
     /**
@@ -66,6 +73,13 @@ public class NameAddrBTree extends BTree {
      */
     public long handleCommit() {
 
+        /*
+         * This iterator that visits only the entries for named btree that have
+         * been touched since the journal was last opened. We can get away with
+         * visiting this rather than all named btrees registered with the
+         * journal since only trees that have been touched can have data for the
+         * current commit.
+         */
         Iterator<Map.Entry<String,BTree>> itr = name2BTree.entrySet().iterator();
         
         while(itr.hasNext()) {
@@ -80,7 +94,7 @@ public class NameAddrBTree extends BTree {
             long addr = btree.handleCommit();
             
             // update persistent mapping.
-            insert(name,Long.valueOf(addr));
+            insert(getKey(name),new Entry(name,addr));
             
         }
         
@@ -103,56 +117,80 @@ public class NameAddrBTree extends BTree {
 
     }
 
+    /**
+     * Return the named index - this method tests a cache of the named btrees
+     * and will return the same instance if the index is found in the cache.
+     * 
+     * @param name
+     *            The index name.
+     * 
+     * @return The named index or <code>null</code> iff there is no index with
+     *         that name.
+     */
     public BTree get(String name) {
 
         BTree btree = name2BTree.get(name);
         
-        if(btree!=null) return btree;
-        
-        long addr = lookup(name);
-        
-        if(addr == 0L) return null;
-        
-        btree = new BTree(this.store,BTreeMetadata.read(this.store, addr));
+        if (btree != null)
+            return btree;
+
+        final Entry entry = (Entry) super.lookup(getKey(name));
+
+        if (entry == null) {
+
+            return null;
+            
+        }
+
+        // re-load btree from the store.
+        btree = new BTree(this.store, BTreeMetadata
+                .read(this.store, entry.addr));
         
         // save name -> btree mapping in transient cache.
         name2BTree.put(name,btree);
-        
+
+        // return btree.
         return btree;
 
     }
     
-    protected long lookup(String name) {
-
-        if(name==null) throw new IllegalArgumentException();
-
-        Long addr = (Long) super.lookup(getKey(name));
-
-        if(addr == null) return 0L;
-
-        return addr.longValue();
-        
-    }
-
+    /**
+     * Add an entry for the named index.
+     * 
+     * @param name
+     *            The index name.
+     * 
+     * @param btree
+     *            The index.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>.
+     * @exception IllegalArgumentException
+     *                if <i>btree</i> is <code>null</code>.
+     * @exception IllegalArgumentException
+     *                if there is already an index registered under that name.
+     */
     public void add(String name,BTree btree) {
         
-        if(name==null) throw new IllegalArgumentException();
-        
-        if(btree==null) throw new IllegalArgumentException();
+        if (name == null)
+            throw new IllegalArgumentException();
 
-        byte[] key = getKey(name);
+        if (btree == null)
+            throw new IllegalArgumentException();
+
+        final byte[] key = getKey(name);
         
-        if(contains(key)) {
+        if(super.contains(key)) {
             
             throw new IllegalArgumentException("already registered: "+name);
             
         }
         
         // flush btree to the store to get the metadata record address.
-        long addr = btree.write();
+        final long addr = btree.write();
         
-        // record the address in this tree.
-        insert(key,Long.valueOf(addr));
+        // add an entry to the persistent index.
+        super.insert(key,new Entry(name,addr));
         
         // add name -> btree mapping to the transient cache.
         name2BTree.put(name, btree);
@@ -160,11 +198,38 @@ public class NameAddrBTree extends BTree {
     }
     
     /**
-     * The value is a <code>long</code> integer that is the term
-     * identifier.
+     * An entry in the persistent index.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Entry {
+       
+        /**
+         * The name of the index.
+         */
+        public final String name;
+        
+        /**
+         * The {@link Addr address} of the last known {@link BTreeMetadata}
+         * record for the index with that name.
+         */
+        public final long addr;
+        
+        public Entry(String name,long addr) {
+            
+            this.name = name;
+            
+            this.addr = addr;
+            
+        }
+        
+    }
+    
+    /**
+     * The values are {@link Entry}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static class ValueSerializer implements IValueSerializer {
@@ -182,39 +247,49 @@ public class NameAddrBTree extends BTree {
         public ValueSerializer() {
         }
 
-        public void getValues(DataInputStream is, Object[] values, int n)
-                throws IOException {
-
-            for (int i = 0; i < n; i++) {
-
-                if (packedLongs) {
-
-                    values[i] = Long.valueOf(LongPacker.unpackLong(is));
-
-                } else {
-
-                    values[i] = Long.valueOf(is.readLong());
-
-                }
-
-            }
-
-        }
-
         public void putValues(DataOutputStream os, Object[] values, int n)
                 throws IOException {
 
             for (int i = 0; i < n; i++) {
 
+                Entry entry = (Entry) values[i];
+
+                os.writeUTF(entry.name);
+
                 if (packedLongs) {
 
-                    LongPacker.packLong(os, ((Long) values[i]).longValue());
+                    LongPacker.packLong(os, entry.addr);
 
                 } else {
 
-                    os.writeLong(((Long) values[i]).longValue());
+                    os.writeLong(entry.addr);
 
                 }
+                
+            }
+
+        }
+        
+        public void getValues(DataInputStream is, Object[] values, int n)
+                throws IOException {
+
+            for (int i = 0; i < n; i++) {
+
+                final String name = is.readUTF();
+                
+                final long addr;
+                
+                if (packedLongs) {
+
+                    addr = Long.valueOf(LongPacker.unpackLong(is));
+
+                } else {
+
+                    addr = Long.valueOf(is.readLong());
+
+                }
+                
+                values[i] = new Entry(name,addr);
 
             }
 

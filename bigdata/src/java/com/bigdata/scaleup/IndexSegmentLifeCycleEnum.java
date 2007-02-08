@@ -41,33 +41,39 @@
  Modifications:
 
  */
-/*
- * Created on Oct 25, 2006
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.journal;
-
-import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IndexSegment;
 
 /**
- * Interface for reading and writing persistent data using one or more named
- * indices. Persistent data are stored as ordered key-value tuples in indices.
+ * Enumeration of life-cycle states for {@link IndexSegment}s in a
+ * partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
+public enum IndexSegmentLifeCycleEnum {
 
-    /**
-     * Return a named btree.
-     * 
-     * @param name The btree name.
-     * 
-     * @return The named btree or <code>null</code> if no btree was registered
-     *         under that name.
-     */
-    public BTree getIndex(String name);
+    NEW("New",0),
+    LIVE("Live",1),
+    DEAD("Dead",2);
     
-//    public ITx startTx(long txId);
+    final private String name;
+    final private int id;
+    
+    IndexSegmentLifeCycleEnum(String name,int id) {this.name = name;this.id = id;}
+    
+    public String toString() {return name;}
+    
+    public int valueOf() {return id;}
+    
+    static public IndexSegmentLifeCycleEnum valueOf(int id) {
+        switch(id) {
+        case 0: return NEW;
+        case 1: return LIVE;
+        case 2: return DEAD;
+        default: throw new IllegalArgumentException("Unknown: code="+id);
+        }
+    }
     
 }

@@ -132,9 +132,12 @@ public class TestMappedJournal extends AbstractTestCase {
 
             MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
             
-            assertEquals("file", properties.getProperty(Options.FILE), bufferStrategy.file.toString());
-            assertEquals("initialExtent", Options.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getExtent());
+            assertTrue("isStable",bufferStrategy.isStable());
+            assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
+            assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+                    bufferStrategy.getInitialExtent());
+            assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                    bufferStrategy.getMaximumExtent());
             assertNotNull("raf", bufferStrategy.raf);
             assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
             assertNotNull("directBuffer", bufferStrategy.directBuffer);
@@ -152,7 +155,6 @@ public class TestMappedJournal extends AbstractTestCase {
         }
 
     }
-    
     
     /**
      * Test suite integration for {@link AbstractRestartSafeTestCase}.

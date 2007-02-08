@@ -36,6 +36,8 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("scaleup");
 
+        suite.addTestSuite(TestNameAndExtensionFilter.class);
+
         /*
          * journal overflow
          * 
@@ -50,13 +52,11 @@ public class TestAll extends TestCase {
          * 
          * @todo test overflow resulting in parition merge or split.
          * 
-         * @todo test DistributedBTree (reads through to active index segments
-         * if miss on BTree in the journal). there is a lot to test here
-         * including all of the transactional semantics.
-         * 
          * @todo test metadata management for index segments.
          */
         suite.addTestSuite(TestMetadataIndex.class);
+        suite.addTestSuite(TestPartitionedIndex.class);
+        suite.addTestSuite(TestPartitionedStore.class);
        
         return suite;
         

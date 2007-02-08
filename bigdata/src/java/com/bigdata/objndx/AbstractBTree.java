@@ -101,7 +101,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @see http://icu.sourceforge.net
  * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
  */
-abstract public class AbstractBTree implements IBTree, IBatchBTree {
+abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     /**
      * Log for btree opeations.
@@ -354,7 +354,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
     
     /**
      * The object responsible for (de-)serializing the nodes and leaves of the
-     * {@link IBTree}.
+     * {@link IIndex}.
      */
     public NodeSerializer getNodeSerializer() {
         
@@ -696,7 +696,7 @@ abstract public class AbstractBTree implements IBTree, IBatchBTree {
      *         the key is found. When found the index will be in [0:nentries).
      *         Adding or removing entries in the tree may invalidate the index.
      * 
-     * @todo promote to {@link IBTree}?
+     * @todo promote to {@link IIndex}?
      * 
      * @see #keyAt(int)
      * @see #valueAt(int)

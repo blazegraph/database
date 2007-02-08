@@ -80,9 +80,30 @@ import com.bigdata.rawstore.IRawStore;
  * nodes in the tree.
  * </p>
  * 
- * @todo modify the values in the tree to be variable length byte[]s.
+ * @todo Modify the values in the tree to be variable length byte[]s. This will
+ *       get rid of the {@link IValueSerializer}. It will also speed up leaf
+ *       de-serialization since we can defer object creation until a specific
+ *       value is fetched. Consider introducing an {@link IValueBuffer} to store
+ *       the values and compression techniques useful for data that may not be
+ *       sorted (in contrast to the keys for those values, which will be
+ *       sorted). <br>
+ *       Note: This will have the side-effect of increasing the cost of
+ *       materializing frequently used values when the btree is used as a local
+ *       (in process) data structure. The reason is that the value will need to
+ *       be de-serialized each time. That cost can be offset using a weak-value
+ *       cache to minimize cost for recently used objects, which is how a btree
+ *       would be applied to create a cannonicalizing mapping, e.g., for an
+ *       object store. It may also be worth examining the "fast-btree" branch,
+ *       which supports primitive data type keys and seeing if that branch is a
+ *       good candidiate for an in-process btree. the api for that branch allows
+ *       Object keys and Object values, and that might be worth keeping as its
+ *       own implementation. (I am not sure if there is an opportunity to merge
+ *       those implementations since that gets into indirection about the data
+ *       type of the key again.)
  * 
- * @todo reduce the #of argments on the stack in the batch api.
+ * @todo reduce the #of argments on the stack in the batch api by introducing an
+ *       object that encapsulates the batch parameters. this will reduce stack
+ *       depth while permitting concurrent readers on immutable btrees.
  * 
  * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
  *       findChild, search, and autobox logic).
@@ -200,7 +221,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommitter {
+public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommitter {
     
     /**
      * The default branching factor.
@@ -466,7 +487,7 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
      *         part of an atomic commit protocol, the metadata record address is
      *         written into a slot on the root block or a named root object.
      * 
-     * @todo consider returning a new {@link IBTree} view with the metadata
+     * @todo consider returning a new {@link IIndex} view with the metadata
      *       field set as a means to support isolation rather than just updating
      *       this field.
      */
@@ -499,6 +520,19 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
         
         return metadata.addrMetadata;
 
+    }
+    
+    /**
+     * Returns the most recent metadata record for this btree.
+     * 
+     * @return The most recent metadata record for this btree and
+     *         <code>null</code> if the btree has never written a metadata
+     *         record on the store.
+     */
+    public BTreeMetadata getMetadata() {
+
+        return metadata;
+        
     }
     
     /**
@@ -553,38 +587,31 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
     }
     
     /**
-     * @todo Define the semantics for deleting the btree. If the delete occurs
-     *       during a transaction the isolation means that we have to delete all
-     *       of the keys, causing "delete" entries to spring into existance for
-     *       each key in the tree. When the transaction commits, those delete
-     *       markers will have to validate against the global state of the tree.
-     *       If the transaction validates, then the merge down onto the global
-     *       state will cause the corresponding entries to be removed from the
-     *       global tree.
+     * Not implement yet.
      * 
-     * Note that if there are persistent nodes in the tree, then copy-on-write
-     * is triggered during traversal. In order for us to write an iterator-based
-     * delete of the existing keys (causing them to become "delete" markers) we
-     * need the iterator to handle concurrent modification, at least to the
-     * extent that it can follow the change from the persistent reference for a
-     * node to the new mutable reference for that node.
-     * 
-     * Note that there is probably processing order that is more efficient for
-     * delete, e.g., left-to-right vs right-to-left.
-     * 
-     * @todo There should also be an unisolated DROP INDEX that simply removes
-     *       the index and its resources, including secondary index segment
-     *       files, in the metadata index, and in the various journals that were
-     *       absorbing writes for that index. That operation would require a
-     *       lock on the index, which could be achieved by taking the index
-     *       offline in the metadata index and invalidating all of the clients.
-     *       A similar "ADD INDEX" method would create a distributed index and
-     *       make it available to clients.
-     * 
-     * @todo GOM uses per-object indices. Once they span a single journal they
-     *       will have to be registered with the metadata index. However it
-     *       would be nice to avoid that overhead when the index is small and
-     *       can be kept "near" the generic object owing the index.
+     * @todo Define the semantics for deleting the btree. If the delete is on an
+     *       unisolated btree then all we need to do is replace the root with an
+     *       empty root leaf. Old nodes and leaves will be swept from the store
+     *       eventually when the journal overflows.
+     *       <p>
+     *       If the delete occurs during a transaction the isolation means that
+     *       we have to delete all of the keys, causing "delete" entries to
+     *       spring into existance for each key in the tree. When the
+     *       transaction commits, those delete markers will have to validate
+     *       against the global state of the tree. If the transaction validates,
+     *       then the merge down onto the global state will cause the
+     *       corresponding entries to be removed from the global tree.
+     *       <p>
+     *       Note that if there are persistent nodes in the tree, then
+     *       copy-on-write is triggered during traversal. In order for us to
+     *       write an iterator-based delete of the existing keys (causing them
+     *       to become "delete" markers) we need the iterator to handle
+     *       concurrent modification, at least to the extent that it can follow
+     *       the change from the persistent reference for a node to the new
+     *       mutable reference for that node.
+     *       <p>
+     *       Note that there is probably processing order that is more efficient
+     *       for delete, e.g., left-to-right vs right-to-left.
      */
     public void delete() {
 
@@ -592,6 +619,39 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
         
     }
 
+    /**
+     * Add all entries from the given btree into this btree.
+     * 
+     * @param src
+     *            The given btree.
+     * 
+     * @exception IllegalArgumentException
+     *                if src is null.
+     * @exception IllegalArgumentException
+     *                if src is this btree.
+     * 
+     * @todo this could be optimized further.
+     */
+    public void addAll(AbstractBTree src) {
+        
+        if(src==null) throw new IllegalArgumentException();
+        
+        if(src==this) throw new IllegalArgumentException();
+        
+        IEntryIterator itr = src.entryIterator();
+        
+        while(itr.hasNext()) {
+        
+            Object val = itr.next();
+            
+            byte[] key = itr.getKey();
+            
+            insert(key,val);
+            
+        }
+        
+    }
+    
     /**
      * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
      */
@@ -602,7 +662,7 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
         private NodeFactory() {
         }
 
-        public ILeafData allocLeaf(IBTree btree, long addr,
+        public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, Object[] values) {
 
             return new Leaf((BTree) btree, addr, branchingFactor, keys,
@@ -610,7 +670,7 @@ public class BTree extends AbstractBTree implements IBTree, IBatchBTree, ICommit
 
         }
 
-        public INodeData allocNode(IBTree btree, long addr,
+        public INodeData allocNode(IIndex btree, long addr,
                 int branchingFactor, int nentries, IKeyBuffer keys,
                 long[] childAddr, int[] childEntryCounts) {
 

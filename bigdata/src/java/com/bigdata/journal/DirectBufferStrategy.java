@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.rawstore.Addr;
 
-
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through
  * cache and writes through to disk for persistence.
@@ -22,9 +21,9 @@ import com.bigdata.rawstore.Addr;
  */
 public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
-    DirectBufferStrategy(FileMetadata fileMetadata) {
+    DirectBufferStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
-        super(BufferMode.Direct,fileMetadata);
+        super(maximumExtent, BufferMode.Direct,fileMetadata);
 
     }
 
@@ -43,6 +42,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
          */
         final int remaining = data.remaining();
 
+        // write on the buffer - this also detects and handles overflow.
         final long addr = super.write(data);
 
         // Position the buffer on the current slot.

@@ -1714,7 +1714,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
     
     /**
-     * Tests the performance of random {@link IBTree#lookup(Object)}s on the
+     * Tests the performance of random {@link IIndex#lookup(Object)}s on the
      * btree. This vets the separator keys and the childAddr and/or childRef
      * arrays since those are responsible for lookup.
      * 

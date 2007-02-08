@@ -1274,7 +1274,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (nkeys == 0) {
 
-            return EmptyKeyValueIterator.INSTANCE;
+            return EmptyEntryIterator.INSTANCE;
 
         }
 

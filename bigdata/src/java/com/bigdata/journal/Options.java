@@ -6,8 +6,8 @@ import java.util.Properties;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Options for the {@link Journal}. Options are specified as property
- * values to the {@link Journal#Journal(Properties)} constructor.
+ * Options for the {@link Journal}. Options are specified as property values to
+ * the {@link Journal#Journal(Properties)} constructor.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -16,7 +16,8 @@ public class Options {
 
     /**
      * <code>file</code> - The name of the file. If the file not found and
-     * {@link #CREATE} is true, then a new journal will be created.
+     * {@link #CREATE} is true, then a new journal will be created. The filename
+     * extension <code>.jnl</code> is recommended.
      */
     public static final String FILE = "file";
 
@@ -43,18 +44,29 @@ public class Options {
     public static final String USE_DIRECT_BUFFERS = "useDirectBuffers";
     
     /**
-     * <code>initialExtent</code> - The initial extent of the journal
-     * (bytes). The initial file size is computed by subtracting off the
-     * space required by the root blocks and dividing by the slot size.
+     * <code>initialExtent</code> - The initial extent of the journal (bytes).
+     * When the journal is backed by a file, this is the initial length of that
+     * file.  The initial user extent is typically slightly smaller as the head
+     * of the file contains some metadata outside of the user space (the root
+     * blocks).
      */
     public static final String INITIAL_EXTENT = "initialExtent";
     
     /**
+     * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
+     * Once the journal has reached this extent it will "overflow" on the next
+     * {@link #commit()}. The default implementation ignores overflow events. A
+     * scale up or scale out implementation will use this event as a trigger to
+     * evict data from application btrees into index segments.
+     */
+    public static final String MAXIMUM_EXTENT = "maximumExtent";
+    
+    /**
      * <code>segment</code> - The unique int32 segment identifier (required
      * unless this is a {@link BufferMode#Transient} journal). Segment
-     * identifiers are assigned by a bigdata federation. When using the journal
-     * as part of an embedded database you may safely assign an arbitrary
-     * segment identifier, e.g., zero(0).
+     * identifiers are assigned by a bigdata federation (scale out solution).
+     * When using the journal as part of an embedded or scale up database you
+     * may safely assign an arbitrary segment identifier, e.g., zero(0).
      */
     public static final String SEGMENT = "segment";
     
@@ -171,6 +183,12 @@ public class Options {
      * The default initial extent for a new journal.
      */
     public final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
+    
+    /**
+     * The default maximum extent for a new journal before a commit triggers an
+     * overflow event.
+     */
+    public final static long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
     
     /**
      * The default for the {@link #CREATE} option.

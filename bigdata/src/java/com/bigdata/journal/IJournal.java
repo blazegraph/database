@@ -42,32 +42,48 @@
 
  */
 /*
- * Created on Oct 25, 2006
+ * Created on Feb 8, 2007
  */
 
 package com.bigdata.journal;
 
+import java.util.Properties;
+
 import com.bigdata.objndx.BTree;
+import com.bigdata.rawstore.IRawStore;
 
 /**
- * Interface for reading and writing persistent data using one or more named
- * indices. Persistent data are stored as ordered key-value tuples in indices.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
+public interface IJournal extends IRawStore, IAtomicStore, IStore {
 
     /**
-     * Return a named btree.
-     * 
-     * @param name The btree name.
-     * 
-     * @return The named btree or <code>null</code> if no btree was registered
-     *         under that name.
+     * A copy of the properties used to initialize this journal.
      */
-    public BTree getIndex(String name);
+    public Properties getProperties();
     
-//    public ITx startTx(long txId);
+    /**
+     * An overflow condition arises when the journal is within some declared
+     * percentage of its maximum capacity during a {@link #commit()}. If this
+     * event is not handled then the journal will automatically extent itself
+     * until it either runs out of address space (int32) or other resources.
+     */
+    public void overflow();
     
+    /**
+     * Register a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
+     * 
+     * @param name
+     *            The name that can be used to recover the btree.
+     * 
+     * @param btree
+     *            The btree.
+     */
+    public void registerIndex(String name, BTree btree);
+
 }

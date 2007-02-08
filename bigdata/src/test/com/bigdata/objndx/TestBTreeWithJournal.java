@@ -106,33 +106,23 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
      */
     public BTree getBTree(int branchingFactor) {
 
-        try {
-            
-            Properties properties = getProperties();
+        Properties properties = getProperties();
 
-            Journal journal = new Journal(properties);
+        Journal journal = new Journal(properties);
 
-            // A modest leaf queue capacity.
-            final int leafQueueCapacity = 500;
-            
-            final int nscan = 10;
+        // A modest leaf queue capacity.
+        final int leafQueueCapacity = 500;
 
-            BTree btree = new BTree(journal,
-                    branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                    SimpleEntry.Serializer.INSTANCE,
-                    null // no record compressor
-                    );
+        final int nscan = 10;
 
-            return btree;
+        BTree btree = new BTree(journal, branchingFactor,
+                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                        leafQueueCapacity, nscan),
+                SimpleEntry.Serializer.INSTANCE, null // no record compressor
+        );
 
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
+        return btree;
+
     }
     
     /*

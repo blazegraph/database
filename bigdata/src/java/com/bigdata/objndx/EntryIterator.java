@@ -55,7 +55,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class EntryIterator implements IEntryIterator {
+public class EntryIterator implements IEntryIterator {
 
     private final Leaf leaf;
 
@@ -65,9 +65,9 @@ class EntryIterator implements IEntryIterator {
 
     private int lastVisited = -1;
 
-    private final byte[] fromKey;
-    
-    private final byte[] toKey;
+//    private final byte[] fromKey;
+//    
+//    private final byte[] toKey;
 
     // first index to visit.
     private final int fromIndex;
@@ -112,9 +112,9 @@ class EntryIterator implements IEntryIterator {
         
         this.tuple = tuple; // MAY be null.
 
-        this.fromKey = fromKey; // may be null (no lower bound).
-        
-        this.toKey = toKey; // may be null (no upper bound).
+//        this.fromKey = fromKey; // may be null (no lower bound).
+//        
+//        this.toKey = toKey; // may be null (no upper bound).
 
         { // figure out the first index to visit.
 

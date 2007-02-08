@@ -131,9 +131,12 @@ public class TestDiskJournal extends AbstractTestCase {
             
             DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
             
+            assertTrue("isStable",bufferStrategy.isStable());
             assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
             assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getExtent());
+                    bufferStrategy.getInitialExtent());
+            assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                    bufferStrategy.getMaximumExtent());
             assertNotNull("raf", bufferStrategy.raf);
             assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy.getBufferMode());
 

@@ -1700,14 +1700,14 @@ public class IndexSegmentBuilder {
         private NOPNodeFactory() {
         }
 
-        public ILeafData allocLeaf(IBTree btree, long addr,
+        public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, Object[] values) {
             
             throw new UnsupportedOperationException();
             
         }
 
-        public INodeData allocNode(IBTree btree, long addr,
+        public INodeData allocNode(IIndex btree, long addr,
                 int branchingFactor, int nentries, IKeyBuffer keys,
                 long[] childAddr, int[] childEntryCount) {
 

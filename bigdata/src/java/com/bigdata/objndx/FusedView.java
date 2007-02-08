@@ -59,10 +59,13 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo support N sources for a {@link FusedView} by chaining together multiple
+ *       {@link FusedView} instances if not in a more efficient manner.
+ * 
  * @todo Do a variant that uses TimestampValues and supports a merged view
  *       showing only the most recent data version under any given key.
  */
-public class FusedView implements IBTree, IBatchBTree {
+public class FusedView implements IIndex {
 
     /**
      * Holds the various btrees that are the sources for the view.

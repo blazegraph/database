@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.TimestampFactory;
@@ -319,4 +320,36 @@ public class RootBlockView implements IRootBlockView {
         
     }
 
+    public String toString() {
+    
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("rootBlock");
+        
+        sb.append("{ timestamp="+getTimestamp());
+        sb.append(", segmentId="+getSegmentId());
+        sb.append(", nextOffset="+getNextOffset());
+        sb.append(", firstTxId="+getFirstTxId());
+        sb.append(", lastTxId="+getLastTxId());
+        sb.append(", commitCounter="+getCommitCounter());
+        sb.append(", rootAddrs="+Arrays.toString(getRootAddrs()));
+        
+//        static final transient short OFFSET_TIMESTAMP0 = 0;
+//        static final transient short OFFSET_MAGIC      = OFFSET_TIMESTAMP0 + SIZEOF_TIMESTAMP;
+//        static final transient short OFFSET_SEGMENT_ID = OFFSET_MAGIC      + SIZEOF_MAGIC;
+//        static final transient short OFFSET_NEXT_OFFSET= OFFSET_SEGMENT_ID  + SIZEOF_SEGMENT_ID;
+//        static final transient short OFFSET_FIRST_TX   = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
+//        static final transient short OFFSET_LAST_TX    = OFFSET_FIRST_TX    + SIZEOF_TIMESTAMP;
+//        static final transient short OFFSET_COMMIT_CTR = OFFSET_LAST_TX     + SIZEOF_TIMESTAMP;
+//        static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_CTR  + Bytes.SIZEOF_LONG;
+//        static final transient short OFFSET_ROOT_ADDRS = OFFSET_UNUSED      + SIZEOF_UNUSED;
+//        static final transient short OFFSET_TIMESTAMP1 = OFFSET_ROOT_ADDRS  + SIZEOF_ROOT_ADDRS;
+//        static final transient short SIZEOF_ROOT_BLOCK = OFFSET_TIMESTAMP1  + SIZEOF_TIMESTAMP;
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
 }

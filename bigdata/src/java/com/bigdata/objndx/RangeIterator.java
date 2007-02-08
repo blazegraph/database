@@ -67,7 +67,7 @@ package com.bigdata.objndx;
  */
 public class RangeIterator implements IRangeIterator {
 
-    private final IBTree btree;
+    private final IIndex btree;
     private final Object fromKey;
     private final Object toKey;
     
@@ -80,7 +80,7 @@ public class RangeIterator implements IRangeIterator {
      * @param toKey
      *            The first key that will not be visited by the iterator.
      */
-    public RangeIterator(IBTree btree, byte[] fromKey, byte[] toKey ) {
+    public RangeIterator(IIndex btree, byte[] fromKey, byte[] toKey ) {
         
         this.btree = btree;
         

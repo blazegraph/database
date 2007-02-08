@@ -593,7 +593,7 @@ abstract public class AbstractTestCase
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
      *         random length and having random contents.
      */
-    public ByteBuffer getRandomData(Journal journal) {
+    public ByteBuffer getRandomData(IJournal journal) {
         
         final int nbytes = r.nextInt(1024) + 1;
         

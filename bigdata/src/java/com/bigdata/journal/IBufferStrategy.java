@@ -32,6 +32,10 @@ public interface IBufferStrategy extends IRawStore {
      */
     public BufferMode getBufferMode();
     
+    public long getInitialExtent();
+    
+    public long getMaximumExtent();
+    
     /**
      * The current size of the journal in bytes.  When the journal is backed by
      * a disk file this is the actual size on disk of that file.  The initial

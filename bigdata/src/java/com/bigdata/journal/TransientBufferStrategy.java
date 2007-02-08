@@ -25,20 +25,22 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
      */
     private int currentRootBlock = 0;
     
-    TransientBufferStrategy(boolean useDirectBuffers,long extent) {
+    TransientBufferStrategy(long initialExtent, long maximumExtent,
+            boolean useDirectBuffers) {
         
         /*
          * Note: I have not observed much performance gain from the use of
          * a direct buffer for the transient mode.
          */
-        super(  0/* nextOffset */, //
+        super(  maximumExtent,
+                0/* nextOffset */, //
                 0/*headerSize*/, //
-                extent, //
+                initialExtent, //
                 BufferMode.Transient, //
                 (useDirectBuffers ? ByteBuffer
-                        .allocateDirect((int) assertNonDiskExtent(extent))
+                        .allocateDirect((int) assertNonDiskExtent(initialExtent))
                         : ByteBuffer
-                                .allocate((int) assertNonDiskExtent(extent)))
+                                .allocate((int) assertNonDiskExtent(initialExtent)))
                 );
     
         open = true;
@@ -73,15 +75,15 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
-    public boolean isOpen() {
+    final public boolean isOpen() {
 
         return open;
         
     }
 
-    public boolean isStable() {
+    final public boolean isStable() {
         
-        return true;
+        return false;
         
     }
 

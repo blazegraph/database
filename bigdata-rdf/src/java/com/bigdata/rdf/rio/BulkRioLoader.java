@@ -61,15 +61,12 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.DefaultEvictionListener;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentFileStore;
-import com.bigdata.objndx.PO;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.scaleup.PartitionedJournal;
 
 /**
  * Bulk loader statement handler for the RIO RDF Parser that collects distinct
@@ -349,9 +346,11 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * 
      * @todo store File or String and if String then the absolute or the
      *       relative filename?
-     *       
+     * 
      * @todo and hash lookup of the index segments iff open (isolate as
      *       getTermIndices:Iterator<IndexSegment>?)
+     * 
+     * @deprecated Replace this with the use of a {@link PartitionedJournal}.
      */
     public static class Indices {
     
@@ -386,23 +385,9 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             IndexSegment seg = indices.get(file);
 
             if (seg == null) {
-                
-                try {
-                
-                    seg = new IndexSegment(
-                            new IndexSegmentFileStore(file),
-                            new HardReferenceQueue<PO>(
-                                    new DefaultEvictionListener(),
-                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE);
-                    
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-                
+
+                seg = new IndexSegment(new IndexSegmentFileStore(file),
+                        com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE);
             }
             
             return seg;
@@ -415,23 +400,10 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             IndexSegment seg = indices.get(file);
 
             if (seg == null) {
-                
-                try {
-                
-                    seg = new IndexSegment(
-                            new IndexSegmentFileStore(file),
-                            new HardReferenceQueue<PO>(
-                                    new DefaultEvictionListener(),
-                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE);
-                    
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-                
+
+                seg = new IndexSegment(new IndexSegmentFileStore(file),
+                        com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE);
+
             }
             
             return seg;
@@ -443,23 +415,10 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             IndexSegment seg = indices.get(file);
 
             if (seg == null) {
-                
-                try {
-                
-                    seg = new IndexSegment(
-                            new IndexSegmentFileStore(file),
-                            new HardReferenceQueue<PO>(
-                                    new DefaultEvictionListener(),
-                                    BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                                    BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE);
-                    
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-                
+
+                seg = new IndexSegment(new IndexSegmentFileStore(file),
+                        com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE);
+
             }
             
             return seg;

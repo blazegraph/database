@@ -100,24 +100,4 @@ public class TestJournal extends ProxyTestCase {
         super(arg0);
     }
 
-    /**
-     * @todo write a test that creates a named btree, stores some data, commits
-     *       the store, re-opens the store, and verifies that the named btree
-     *       can be recovered and the data was correctly preserved.
-     * 
-     * @todo do a variant test in which closing the journal without a commit
-     *       causes the named btree to be lost.
-     * 
-     * @todo do a variant test in which we commit the journal after we register
-     *       the named btree, write some data on the named btree, and then
-     *       closing the journal without a commit causes the named btree to be
-     *       lost.
-     * 
-     */
-    public void test_namedBTree() {
-
-        fail("write tests");
-        
-    }
-    
 }

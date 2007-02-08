@@ -42,32 +42,20 @@
 
  */
 /*
- * Created on Oct 25, 2006
+ * Created on Nov 20, 2006
  */
 
-package com.bigdata.journal;
-
-import com.bigdata.objndx.BTree;
+package com.bigdata.objndx;
 
 /**
- * Interface for reading and writing persistent data using one or more named
- * indices. Persistent data are stored as ordered key-value tuples in indices.
+ * <p>
+ * Interface for mutable B+-Tree mapping arbitrary non-null keys to arbitrary
+ * values.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
-
-    /**
-     * Return a named btree.
-     * 
-     * @param name The btree name.
-     * 
-     * @return The named btree or <code>null</code> if no btree was registered
-     *         under that name.
-     */
-    public BTree getIndex(String name);
-    
-//    public ITx startTx(long txId);
+public interface IIndex extends ISimpleBTree, IBatchBTree {
     
 }

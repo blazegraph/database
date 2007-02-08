@@ -9,8 +9,13 @@ import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * A read-only store backed by a file. The section of the file containing
- * the index nodes may be fully buffered.
+ * A read-only store backed by a file. The section of the file containing the
+ * index nodes may be fully buffered.
+ * <p>
+ * Note: An LRU disk cache is a poor choice for the leaves. Since the btree
+ * already maintains a cache of the recently touched leaf objects, a recent read
+ * against the disk is the best indication that we have that we will not want to
+ * read that region again soon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -54,9 +59,8 @@ public class IndexSegmentFileStore implements IRawStore {
      * 
      * @todo make it optional to fully buffer the index nodes?
      * @todo make it optional to fully buffer the entire file.
-     * @todo hide IOException in constructor?
      */
-    public IndexSegmentFileStore(File file) throws IOException {
+    public IndexSegmentFileStore(File file) {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -65,29 +69,38 @@ public class IndexSegmentFileStore implements IRawStore {
 
         if (!file.exists()) {
 
-            throw new IOException("File does not exist: "
+            throw new RuntimeException("File does not exist: "
                     + file.getAbsoluteFile());
 
         }
 
-        // open the file.
-        this.raf = new RandomAccessFile(file, "r");
+        try {
 
-        // read the metadata record from the file.
-        this.metadata = new IndexSegmentMetadata(raf);
+            // open the file.
+            this.raf = new RandomAccessFile(file, "r");
 
-        IndexSegment.log.info(metadata.toString());
+            // read the metadata record from the file.
+            this.metadata = new IndexSegmentMetadata(raf);
 
-        /*
-         * Read the index nodes from the file into a buffer. If there are no
-         * index nodes then we skip this step. Note that we always read in
-         * the root, so if the index is just a root leaf then the root will
-         * be a deserialized object and the file will not be buffered in
-         * memory.
-         */
-        this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf) : null);
+            IndexSegment.log.info(metadata.toString());
 
-        this.open = true;
+            /*
+             * Read the index nodes from the file into a buffer. If there are no
+             * index nodes then we skip this step. Note that we always read in
+             * the root, so if the index is just a root leaf then the root will
+             * be a deserialized object and the file will not be buffered in
+             * memory.
+             */
+            this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf)
+                    : null);
+
+            this.open = true;
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
 
     }
 

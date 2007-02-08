@@ -600,7 +600,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                         
                         if (leaf.nkeys == 0) {
 
-                            return EmptyKeyValueIterator.INSTANCE;
+                            return EmptyEntryIterator.INSTANCE;
 
                         }
 
@@ -610,7 +610,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                     } else {
 
-                        return EmptyKeyValueIterator.INSTANCE;
+                        return EmptyEntryIterator.INSTANCE;
 
                     }
                 }
@@ -643,7 +643,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                         
                         if (leaf.nkeys == 0) {
 
-                            return EmptyKeyValueIterator.INSTANCE;
+                            return EmptyEntryIterator.INSTANCE;
 
                         }
 
@@ -653,7 +653,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                     } else {
 
-                        return EmptyKeyValueIterator.INSTANCE;
+                        return EmptyEntryIterator.INSTANCE;
 
                     }
                 }

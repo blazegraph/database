@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
@@ -105,15 +104,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractRawStore2TestC
 
     protected IRawStore getStore() {
         
-        try {
-
-            return new Journal(getProperties());
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+        return new Journal(getProperties());
         
     }
     
@@ -128,16 +119,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractRawStore2TestC
      */
     protected IRawStore reopenStore() {
         
-        try {
-
-            return new Journal(getProperties());
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
+        return new Journal(getProperties());
+        
     }
 
     /**

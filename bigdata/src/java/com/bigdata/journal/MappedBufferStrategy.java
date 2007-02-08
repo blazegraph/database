@@ -39,9 +39,9 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      */
     final MappedByteBuffer mappedBuffer;
     
-    MappedBufferStrategy(FileMetadata fileMetadata) {
+    MappedBufferStrategy(long maximumExtent, FileMetadata fileMetadata) {
         
-        super(BufferMode.Mapped, fileMetadata);
+        super(maximumExtent, BufferMode.Mapped, fileMetadata);
         
         this.mappedBuffer = (MappedByteBuffer) fileMetadata.buffer;
         

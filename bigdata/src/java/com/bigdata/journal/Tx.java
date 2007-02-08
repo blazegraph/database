@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
 
 /**
@@ -405,7 +404,7 @@ public class Tx implements IStore, ITx {
      * @return The named btree or <code>null</code> if no btree was registered
      *         under that name.
      */
-    public AbstractBTree getBTree(String name) {
+    public BTree getIndex(String name) {
 
         if(name==null) throw new IllegalArgumentException();
         

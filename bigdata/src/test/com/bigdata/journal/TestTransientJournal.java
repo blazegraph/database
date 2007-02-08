@@ -129,8 +129,11 @@ public class TestTransientJournal extends AbstractTestCase {
 
         TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
 
+        assertFalse("isStable",bufferStrategy.isStable());
         assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getExtent());
+        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                bufferStrategy.getMaximumExtent());
         assertEquals(Options.BUFFER_MODE, BufferMode.Transient, bufferStrategy
                 .getBufferMode());
         assertNotNull("directBuffer", bufferStrategy.directBuffer);
@@ -140,8 +143,7 @@ public class TestTransientJournal extends AbstractTestCase {
                 bufferStrategy.directBuffer.capacity());
         
     }
-        
-    
+            
     /**
      * Test suite integration for {@link AbstractRawStore2TestCase}.
      * 
@@ -175,15 +177,7 @@ public class TestTransientJournal extends AbstractTestCase {
 
         protected IRawStore getStore() {
             
-            try {
-
-                return new Journal(getProperties());
-                
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
+            return new Journal(getProperties());
             
         }
 

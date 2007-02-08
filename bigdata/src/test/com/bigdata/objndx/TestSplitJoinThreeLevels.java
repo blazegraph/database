@@ -52,8 +52,8 @@ import java.util.Arrays;
 import org.apache.log4j.Level;
 
 /**
- * Test suite using {@link IBTree#insert(int, Object)} to split a tree to height
- * two (2) (three levels) and then using {@link IBTree#remove(int)} to reduce
+ * Test suite using {@link IIndex#insert(int, Object)} to split a tree to height
+ * two (2) (three levels) and then using {@link IIndex#remove(int)} to reduce
  * the tree back to a single, empty root leaf.  This test suite is focused on 
  * m := 3 since we are capable of excercising all split() and join() code paths
  * with that branching factor.

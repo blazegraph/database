@@ -759,14 +759,14 @@ public class IndexSegmentMerger {
             private SimpleNodeFactory() {
             }
 
-            public ILeafData allocLeaf(IBTree btree, long addr,
+            public ILeafData allocLeaf(IIndex btree, long addr,
                     int branchingFactor, IKeyBuffer keys, Object[] values) {
 
                 return new LeafData(branchingFactor, keys, values);
 
             }
 
-            public INodeData allocNode(IBTree btree, long addr,
+            public INodeData allocNode(IIndex btree, long addr,
                     int branchingFactor, int nentries, IKeyBuffer keys,
                     long[] childAddr, int[] childEntryCounts) {
 
@@ -877,7 +877,7 @@ public class IndexSegmentMerger {
 
                     if (leaf.nkeys == 0) {
 
-                        return EmptyKeyValueIterator.INSTANCE;
+                        return EmptyEntryIterator.INSTANCE;
 
                     }
                      
@@ -910,7 +910,7 @@ public class IndexSegmentMerger {
 
                     if (leaf.nkeys == 0) {
 
-                        return EmptyKeyValueIterator.INSTANCE;
+                        return EmptyEntryIterator.INSTANCE;
 
                     }
                      

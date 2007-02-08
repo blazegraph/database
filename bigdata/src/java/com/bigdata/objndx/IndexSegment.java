@@ -35,7 +35,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegment extends AbstractBTree implements IBTree {
+public class IndexSegment extends AbstractBTree implements IIndex {
 
     /**
      * Type safe reference to the backing store.
@@ -98,8 +98,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
     }
 
-    public IndexSegment(IndexSegmentFileStore fileStore, IValueSerializer valSer)
-            throws IOException {
+    public IndexSegment(IndexSegmentFileStore fileStore, IValueSerializer valSer) {
 
         this(fileStore, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
@@ -127,10 +126,15 @@ public class IndexSegment extends AbstractBTree implements IBTree {
      *       probably be much smaller as the branching factor grows larger.
      * 
      * FIXME move the value serializer into the metadata record.
+     * 
+     * FIXME add a boolean flag to mark index segments that are the final result
+     * of a compacting merge.  This will make it possible to reconstruct from the
+     * file system which index segments are part of the consistent state for a
+     * given restart time.
      */
     public IndexSegment(IndexSegmentFileStore fileStore,
             HardReferenceQueue<PO> hardReferenceQueue,
-            IValueSerializer valSer) throws IOException {
+            IValueSerializer valSer) {
 
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
@@ -160,8 +164,16 @@ public class IndexSegment extends AbstractBTree implements IBTree {
              * Read in the optional bloom filter from its addr.
              */
 
-            this.bloomFilter = readBloomFilter(fileStore.metadata.addrBloom);
-            
+            try {
+
+                this.bloomFilter = readBloomFilter(fileStore.metadata.addrBloom);
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+                        
         }
         
     }
@@ -403,7 +415,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
         
         private ImmutableNodeFactory() {}
         
-        public ILeafData allocLeaf(IBTree btree, long addr,
+        public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, Object[] values) {
 
             return new ImmutableLeaf((AbstractBTree) btree, addr,
@@ -411,7 +423,7 @@ public class IndexSegment extends AbstractBTree implements IBTree {
 
         }
 
-        public INodeData allocNode(IBTree btree, long addr,
+        public INodeData allocNode(IIndex btree, long addr,
                 int branchingFactor, int nentries, IKeyBuffer keys,
                 long[] childAddr, int[] childEntryCount) {
 

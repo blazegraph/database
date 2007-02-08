@@ -116,55 +116,45 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      */
     public BTree getBTree(int branchingFactor) {
 
-        try {
-            
-            Properties properties = getProperties();
+        Properties properties = getProperties();
 
-            String filename = properties.getProperty(Options.FILE);
+        String filename = properties.getProperty(Options.FILE);
 
-            if (filename != null) {
+        if (filename != null) {
 
-                File file = new File(filename);
+            File file = new File(filename);
 
-                if (file.exists() && !file.delete()) {
+            if (file.exists() && !file.delete()) {
 
-                    throw new RuntimeException("Could not delete file: "
-                            + file.getAbsoluteFile());
-
-                }
+                throw new RuntimeException("Could not delete file: "
+                        + file.getAbsoluteFile());
 
             }
 
-            System.err.println("Opening journal: "+filename);
-            Journal journal = new Journal(properties);
-
-            // A modest leaf queue capacity.
-            final int leafQueueCapacity = 500;
-            
-            final int nscan = 10;
-
-            BTree btree = new BTree(journal,
-                    branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                    SimpleEntry.Serializer.INSTANCE,
-                    null // no record compressor
-                    );
-
-            return btree;
-
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
         }
-        
+
+        System.err.println("Opening journal: " + filename);
+        Journal journal = new Journal(properties);
+
+        // A modest leaf queue capacity.
+        final int leafQueueCapacity = 500;
+
+        final int nscan = 10;
+
+        BTree btree = new BTree(journal, branchingFactor,
+                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+                        leafQueueCapacity, nscan),
+                SimpleEntry.Serializer.INSTANCE, null // no record compressor
+        );
+
+        return btree;
+
     }
     
-//    /**
-//     * Test exercises a known problem case.
-//     */
-//    public void test_buildOrder10n3() throws IOException {
+// /**
+// * Test exercises a known problem case.
+// */
+// public void test_buildOrder10n3() throws IOException {
 //        
 //        int[] keys = new int[]{1,3,5};
 //        SimpleEntry[] vals = new SimpleEntry[] {

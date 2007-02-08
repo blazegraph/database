@@ -107,7 +107,7 @@ public interface IRawStore {
      *       it is used to hold the root blocks).
      */
     public long write(ByteBuffer data);
-    
+
 //    /**
 //     * Delete the data (unisolated).
 //     * <p>

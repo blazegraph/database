@@ -1,6 +1,9 @@
 package com.bigdata.journal;
 
+import java.nio.ByteBuffer;
+
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 
 
 /**
@@ -10,6 +13,9 @@ import com.bigdata.rawstore.Addr;
  * @version $Id$
  */
 public abstract class AbstractBufferStrategy implements IBufferStrategy {
+    
+    protected final long initialExtent;
+    protected final long maximumExtent;
     
     /**
      * The buffer strategy implemented by this class.
@@ -32,6 +38,18 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      */
     protected int nextOffset;
 
+    final public long getInitialExtent() {
+        
+        return initialExtent;
+        
+    }
+    
+    final public long getMaximumExtent() {
+        
+        return maximumExtent;
+        
+    }
+    
     final public BufferMode getBufferMode() {
 
         return bufferMode;
@@ -54,11 +72,16 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      * @param bufferMode
      *            The {@link BufferMode}.
      */
-    AbstractBufferStrategy(int nextOffset, BufferMode bufferMode) {
+    AbstractBufferStrategy(long initialExtent, long maximumExtent,
+            int nextOffset, BufferMode bufferMode) {
 
         assert nextOffset >= 0;
         
         if( bufferMode == null ) throw new IllegalArgumentException();
+
+        this.initialExtent = initialExtent;
+        
+        this.maximumExtent = maximumExtent;
         
         this.nextOffset = nextOffset;
         
@@ -66,6 +89,48 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         
     }
 
+    /**
+     * Invoked if the store would overflow on {@link #write(ByteBuffer)}. The
+     * default behavior extends the capacity of the buffer by the maximum of 32M
+     * or the {@link Options#INITIAL_EXTENT} up to a maximum capacity of
+     * {@link Integer#MAX_VALUE} bytes.
+     * 
+     * @return true if the capacity of the store was extended and the write
+     *         operation should be retried.
+     */
+    public boolean overflow(int needed) {
+        
+        if( getUserExtent() +needed > Integer.MAX_VALUE) {
+            
+            // Would overflow int32 bytes.
+            
+            return false;
+            
+        }
+        
+        /*
+         * Increase by the initial extent or by 32M, whichever is greater.
+         */
+        long newExtent = getUserExtent()
+                + Math.max(initialExtent, Bytes.megabyte * 32);
+        
+        if( newExtent > Integer.MAX_VALUE) {
+
+            // Do not allocate more than int32 bytes.
+            newExtent = Integer.MAX_VALUE;
+            
+        }
+
+        /*
+         * Extent the capacity.
+         */
+        truncate( newExtent );
+        
+        // Retry the write operation.
+        return true;
+        
+    }
+    
     /**
      * Throws an exception if the extent is too large for an in-memory buffer.
      * 

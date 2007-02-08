@@ -1588,7 +1588,7 @@ public class Node extends AbstractNode implements INodeData {
 
         if(btree.debug) assertInvariants();
         
-//        assert key > IBTree.NEGINF && key < IBTree.POSINF;
+//        assert key > IIndex.NEGINF && key < IIndex.POSINF;
         assert child != null;
         assert child.isDirty(); // always dirty since it was just created.
         assert isDirty(); // must be dirty to permit mutation.

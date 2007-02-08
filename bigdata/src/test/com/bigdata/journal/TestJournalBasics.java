@@ -89,8 +89,14 @@ public class TestJournalBasics extends TestCase {
 
         TestSuite suite = new TestSuite("Core Journal Test Suite");
 
-        suite.addTestSuite( TestJournal.class );
-        suite.addTestSuite( TestTx.class );
+        // @todo basic journal tests.
+//        suite.addTestSuite( TestJournal.class );
+
+        // tests of creation, loolup, use, commit of named indices.
+        suite.addTestSuite( TestNamedIndices.class );
+        
+        // @todo transactional isolation tests.
+//        suite.addTestSuite( TestTx.class );
 
         return suite;
         

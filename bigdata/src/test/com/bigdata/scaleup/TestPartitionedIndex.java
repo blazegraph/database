@@ -42,43 +42,70 @@ Modifications:
 
 */
 /*
- * Created on Dec 12, 2006
+ * Created on Feb 7, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.scaleup;
 
-import java.util.NoSuchElementException;
+import com.bigdata.objndx.AbstractBTreeTestCase;
 
 /**
- * Empty iterator.
+ * Test suite for {@link PartitionedIndex}.
+ * 
+ * @todo where possible, it would be nice to leverage the unit tests for the
+ *       mutable btree. note that rangeCount does not have the same behavior for
+ *       a view since it reports the sum of the counts across the sources rather
+ *       than computing the exact #of keys in the range. However, most other
+ *       aspects of the view are true to the btree api.
+ * 
+ * @todo also test restart safety.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyKeyValueIterator implements IEntryIterator {
+public class TestPartitionedIndex extends AbstractBTreeTestCase {
+
+    /**
+     * 
+     */
+    public TestPartitionedIndex() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestPartitionedIndex(String name) {
+        super(name);
+    }
+
+    public void test_onePartition_noSegments() {
+        
+        fail("write test");
+        
+    }
     
-    public static final IEntryIterator INSTANCE = new EmptyKeyValueIterator();
-    
-    private EmptyKeyValueIterator() {}
+    public void test_onePartition_evictSegment() {
 
-    public boolean hasNext() {
-        return false;
-    }
-
-    public Object next() {
-        throw new NoSuchElementException();
-    }
-
-    public void remove() {
-        throw new UnsupportedOperationException();
+        fail("write test");
+        
     }
     
-    public byte[] getKey() {
-        throw new IllegalStateException();
-    }
+    public void test_onePartition_evictSegments() {
 
-    public Object getValue() {
-        throw new IllegalStateException();
+        fail("write test");
+        
+    }
+    
+    public void test_multiplePartitions_noSegments() {
+
+        fail("write test");
+        
+    }
+    
+    public void test_multiplePartitions_evictSegments() {
+
+        fail("write test");
+        
     }
     
 }

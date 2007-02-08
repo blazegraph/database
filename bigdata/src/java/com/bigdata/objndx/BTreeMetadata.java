@@ -55,6 +55,16 @@ public class BTreeMetadata implements Serializable {
      * we have written out the state of this record.
      */
     protected transient /*final*/ long addrMetadata;
+    
+    /**
+     * The {@link Addr address} that can be used to read this metadata record
+     * from the store.
+     */
+    public long getMetadataAddr() {
+        
+        return addrMetadata;
+        
+    }
 
 //    /**
 //     * De-serialization constructor.

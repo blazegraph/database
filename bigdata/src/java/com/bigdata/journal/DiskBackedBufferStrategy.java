@@ -97,9 +97,10 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
         
     }
     
-    DiskBackedBufferStrategy(BufferMode bufferMode, FileMetadata fileMetadata) {
+    DiskBackedBufferStrategy(long maximumExtent, BufferMode bufferMode,
+            FileMetadata fileMetadata) {
 
-        super(fileMetadata.nextOffset, fileMetadata.headerSize0,
+        super(maximumExtent, fileMetadata.nextOffset, fileMetadata.headerSize0,
                 fileMetadata.extent, bufferMode, fileMetadata.buffer);
 
         this.file = fileMetadata.file;

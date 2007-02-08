@@ -57,9 +57,10 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
     }
 
-    BasicBufferStrategy(int nextOffset, int headerSize, long extent, BufferMode bufferMode, ByteBuffer buffer) {
+    BasicBufferStrategy(long maximumExtent, int nextOffset, int headerSize,
+            long extent, BufferMode bufferMode, ByteBuffer buffer) {
 
-        super(nextOffset, bufferMode);
+        super(extent, maximumExtent, nextOffset, bufferMode);
 
         this.directBuffer = buffer;
 
@@ -85,9 +86,15 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         // the next offset.
         final int offset = nextOffset;
         
-        if(offset+nbytes>userExtent) {
-            
-            truncate(userExtent*2);
+        final long needed = (offset + nbytes) - userExtent;
+
+        if (needed > 0) {
+
+            if(!overflow((int)needed)) {
+                
+                throw new RuntimeException("overflow");
+                
+            }
             
         }
        

@@ -30,7 +30,7 @@ public interface INodeFactory {
      * 
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(IBTree btree, long addr, int branchingFactor,
+    public INodeData allocNode(IIndex btree, long addr, int branchingFactor,
             int nentries, IKeyBuffer keys, long[] childAddr,
             int[] childEntryCount);
 
@@ -51,7 +51,7 @@ public interface INodeFactory {
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf(IBTree btree, long addr, int branchingFactor,
+    public ILeafData allocLeaf(IIndex btree, long addr, int branchingFactor,
             IKeyBuffer keys, Object[] values);
 
 }

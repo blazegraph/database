@@ -68,7 +68,7 @@ import com.bigdata.util.ChecksumUtility;
 /**
  * <p>
  * An instance of this class is used to serialize and de-serialize the
- * {@link INodeData}s and {@link ILeafData}s of an {@link IBTree}. Leaf and
+ * {@link INodeData}s and {@link ILeafData}s of an {@link IIndex}. Leaf and
  * non-leaf records have different serialization formats, but their leading
  * bytes use the same format so that you can tell by inspection whether a buffer
  * contains a leaf or a non-leaf node. The header of the record uses a fixed
@@ -132,7 +132,7 @@ import com.bigdata.util.ChecksumUtility;
  * @todo make the checksum optional or do not use when using the record
  *       compressor?
  * 
- * @see IBTree
+ * @see IIndex
  * @see INodeData
  * @see ILeafData
  * @see IKeySerializer
@@ -506,7 +506,7 @@ public class NodeSerializer {
      * 
      * @return The de-serialized node.
      */
-    public IAbstractNodeData getNodeOrLeaf( IBTree btree, long addr, ByteBuffer buf) {
+    public IAbstractNodeData getNodeOrLeaf( IIndex btree, long addr, ByteBuffer buf) {
 
 //        assert btree != null;
 //        assert addr != 0L;
@@ -751,7 +751,7 @@ public class NodeSerializer {
                 
     }
 
-    public INodeData getNode(IBTree btree,long addr,ByteBuffer buf) {
+    public INodeData getNode(IIndex btree,long addr,ByteBuffer buf) {
         
         return getNode(btree,addr,buf,false);
         
@@ -772,7 +772,7 @@ public class NodeSerializer {
      * 
      * @return The deserialized node.
      */
-    protected INodeData getNode(IBTree btree,long addr,ByteBuffer buf, boolean decompressed ) {
+    protected INodeData getNode(IIndex btree,long addr,ByteBuffer buf, boolean decompressed ) {
 
 //        assert btree != null;
 //        assert addr != 0L;
@@ -1052,7 +1052,7 @@ public class NodeSerializer {
                 
     }
 
-    protected ILeafData getLeaf(IBTree btree,long addr,ByteBuffer buf) {
+    protected ILeafData getLeaf(IIndex btree,long addr,ByteBuffer buf) {
         
         return getLeaf(btree,addr,buf,false);
         
@@ -1073,7 +1073,7 @@ public class NodeSerializer {
      * 
      * @return The deserialized leaf.
      */
-    protected ILeafData getLeaf(IBTree btree,long addr,ByteBuffer buf,boolean decompressed) {
+    protected ILeafData getLeaf(IIndex btree,long addr,ByteBuffer buf,boolean decompressed) {
         
 //        assert btree != null;
 //        assert addr != 0L;

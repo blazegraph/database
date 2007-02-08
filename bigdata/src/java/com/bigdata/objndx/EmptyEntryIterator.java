@@ -42,51 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Nov 4, 2005
+ * Created on Dec 12, 2006
  */
-package com.bigdata.istore;
 
-import org.CognitiveWeb.extser.AbstractSingleton;
+package com.bigdata.objndx;
 
-import com.bigdata.journal.IJournal;
+import java.util.NoSuchElementException;
 
 /**
- * <p>
- * Stateless singleton seralizer wrapping the semantics of the {@link
- * OMExtensibleSerializer} serializer. The use of this class prevents multiple
- * copies of the state of the extensible serializer from being written into the
- * store.
- * </p>
+ * Empty iterator.
  * 
- * @author thompsonbry
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+public class EmptyEntryIterator implements IEntryIterator {
+    
+    public static final IEntryIterator INSTANCE = new EmptyEntryIterator();
+    
+    private EmptyEntryIterator() {}
 
-public class ExtensibleSerializerSingleton
-    extends AbstractSingleton
-{
-
-    private static final long serialVersionUID = -374435143615477216L;
-
-    public OMExtensibleSerializer getSerializer( IJournal journal )
-        throws IllegalStateException
-    {
-        
-        return (OMExtensibleSerializer) super.getSerializer
-            ( journal
-              );
-        
+    public boolean hasNext() {
+        return false;
     }
 
-    public void setSerializer( IJournal journal, OMExtensibleSerializer ser )
-        throws IllegalStateException
-    {
-
-        super.setSerializer
-            ( journal,
-              ser
-              );
-        
+    public Object next() {
+        throw new NoSuchElementException();
     }
 
+    public void remove() {
+        throw new UnsupportedOperationException();
+    }
+    
+    public byte[] getKey() {
+        throw new IllegalStateException();
+    }
+
+    public Object getValue() {
+        throw new IllegalStateException();
+    }
+    
 }

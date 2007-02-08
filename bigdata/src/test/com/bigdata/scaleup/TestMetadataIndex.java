@@ -71,18 +71,19 @@ import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore2;
-import com.bigdata.scaleup.MetadataIndex.PartitionMetadata;
-import com.bigdata.scaleup.MetadataIndex.SegmentMetadata;
-import com.bigdata.scaleup.MetadataIndex.StateEnum;
 
 /**
  * A test suite for managing a partitioned index.
  * 
+ * @todo The "nextSegId" values were inserted into the code haphazardly after
+ *       the tests were initially written. They are typically just small
+ *       integers (0,1,2,3) without any critical meaning.
+ * 
  * @todo support removal of keys - this might take a flag to mark a deleted
  *       entry since otherwise how are we to differentiate a key that is not
  *       present in the source from a key that was simply not written during
- *       some episode from a key with a null value?  If we disallowed null
- *       values then that would work as well.
+ *       some episode from a key with a null value? If we disallowed null values
+ *       then that would work as well.
  * 
  * @todo write tests for partitioning when segment overflows.
  * 
@@ -157,16 +158,16 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         assertEquals(part1,md.get(key0));
         
-        PartitionMetadata part2 = new PartitionMetadata(partId0,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE) });
+        PartitionMetadata part2 = new PartitionMetadata(partId0,1,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
 
         assertEquals(part1,md.put(key0, part2));
 
         assertEquals(part2,md.get(key0));
         
-        PartitionMetadata part3 = new PartitionMetadata(partId0,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE),
-                        new SegmentMetadata("b", 20L,StateEnum.LIVE) });
+        PartitionMetadata part3 = new PartitionMetadata(partId0,2,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
+                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
 
         assertEquals(part2,md.put(key0, part3));
 
@@ -237,15 +238,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         assertEquals(part0,md.get(key0));
         
         final int partId1 = 1;
-        PartitionMetadata part1 = new PartitionMetadata(partId1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE) });
+        PartitionMetadata part1 = new PartitionMetadata(partId1,1,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
-        PartitionMetadata part2 = new PartitionMetadata(partId2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE),
-                        new SegmentMetadata("b", 20L,StateEnum.LIVE) });
+        PartitionMetadata part2 = new PartitionMetadata(partId2,2,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
+                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2, md.get(key2));
 
@@ -322,15 +323,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         assertEquals(part0,md.get(key0));
         
         final int partId1 = 1;
-        PartitionMetadata part1 = new PartitionMetadata(partId1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE) });
+        PartitionMetadata part1 = new PartitionMetadata(partId1,1,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
-        PartitionMetadata part2 = new PartitionMetadata(partId2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,StateEnum.LIVE),
-                        new SegmentMetadata("b", 20L,StateEnum.LIVE) });
+        PartitionMetadata part2 = new PartitionMetadata(partId2,2,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
+                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2,md.get(key2));
 
@@ -446,9 +447,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,
+        md.put(new byte[] {}, new PartitionMetadata(0,1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile,
-                        outFile.length(),StateEnum.LIVE) }));
+                        outFile.length(),IndexSegmentLifeCycleEnum.LIVE) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -551,9 +552,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,
+        md.put(new byte[] {}, new PartitionMetadata(0,2,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),StateEnum.LIVE) }));
+                        outFile01.length(),IndexSegmentLifeCycleEnum.LIVE) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -610,9 +611,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * Note: We mark index segment 01 as "DEAD" for this partition since it
          * has been replaced by the merged result (index segment 02).
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),StateEnum.DEAD),
-                new SegmentMetadata("" + outFile02, outFile02.length(),StateEnum.LIVE) }));
+        md.put(new byte[] {}, new PartitionMetadata(0, 3, new SegmentMetadata[] {
+                new SegmentMetadata("" + outFile01, outFile01.length(),IndexSegmentLifeCycleEnum.DEAD),
+                new SegmentMetadata("" + outFile02, outFile02.length(),IndexSegmentLifeCycleEnum.LIVE) }));
 
         /*
          * open and verify the merged index segment against the total expected
@@ -709,6 +710,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         // the current index segment and null if there is none yet.
         IndexSegment seg = null;
+        
+        int nextSegId = 0;
         
         for(int trial=0; trial<ntrials; trial++) {
         
@@ -819,10 +822,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * update the metadata index for this partition.
                  */
                 md.put(new byte[] {},
-                        new PartitionMetadata(0,
+                        new PartitionMetadata(0,2,
                                 new SegmentMetadata[] { new SegmentMetadata(""
                                         + outFile01, outFile01.length(),
-                                        StateEnum.LIVE) }));
+                                        IndexSegmentLifeCycleEnum.LIVE) }));
 
                 /*
                  * open and verify the index segment against the btree data.
@@ -889,10 +892,11 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * result.  We could then delete the files for "DEAD" index
                  * segments after a suitable grace period. 
                  */
-                PartitionMetadata oldpart = md.put(new byte[] {}, new PartitionMetadata(0,
+                PartitionMetadata oldpart = md.put(new byte[] {},
+                        new PartitionMetadata(0, nextSegId++,
                         new SegmentMetadata[] {
                                 new SegmentMetadata("" + outFile02, outFile02
-                                        .length(), StateEnum.LIVE) }));
+                                        .length(), IndexSegmentLifeCycleEnum.LIVE) }));
 
                 /*
                  * open and verify the merged index segment against the total
@@ -1028,9 +1032,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,
+        md.put(new byte[] {}, new PartitionMetadata(0,1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),StateEnum.LIVE) }));
+                        outFile01.length(),IndexSegmentLifeCycleEnum.LIVE) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -1072,9 +1076,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),StateEnum.LIVE),
-                new SegmentMetadata("" + outFile02, outFile02.length(),StateEnum.LIVE) }));
+        md.put(new byte[] {}, new PartitionMetadata(0, 1, new SegmentMetadata[] {
+                new SegmentMetadata("" + outFile01, outFile01.length(),IndexSegmentLifeCycleEnum.LIVE),
+                new SegmentMetadata("" + outFile02, outFile02.length(),IndexSegmentLifeCycleEnum.LIVE) }));
 
         /*
          * open and verify the index segment against the btree data.

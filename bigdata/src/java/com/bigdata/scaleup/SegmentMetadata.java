@@ -41,33 +41,54 @@
  Modifications:
 
  */
-/*
- * Created on Oct 25, 2006
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.journal;
-
-import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IndexSegment;
 
 /**
- * Interface for reading and writing persistent data using one or more named
- * indices. Persistent data are stored as ordered key-value tuples in indices.
+ * Metadata for a single {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
+public class SegmentMetadata {
 
     /**
-     * Return a named btree.
-     * 
-     * @param name The btree name.
-     * 
-     * @return The named btree or <code>null</code> if no btree was registered
-     *         under that name.
+     * The name of the file containing the {@link IndexSegment}.
      */
-    public BTree getIndex(String name);
+    final public String filename;
     
-//    public ITx startTx(long txId);
+    /**
+     * The size of that file in bytes.
+     */
+    final public long nbytes;
+    
+    /**
+     * The life-cycle state for that {@link IndexSegment}.
+     */
+    final public IndexSegmentLifeCycleEnum state;
+    
+    public SegmentMetadata(String filename,long nbytes,IndexSegmentLifeCycleEnum state) {
+
+        this.filename = filename;
+        
+        this.nbytes = nbytes;
+        
+        this.state = state;
+        
+    }
+
+    // Note: used by assertEquals in the test cases.
+    public boolean equals(Object o) {
+        
+        if(this == o)return true;
+        
+        SegmentMetadata o2 = (SegmentMetadata)o;
+        
+        if(filename.equals(o2.filename) && nbytes==o2.nbytes && state == o2.state) return true;
+        
+        return false;
+        
+    }
     
 }

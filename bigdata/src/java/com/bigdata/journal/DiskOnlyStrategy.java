@@ -15,6 +15,14 @@ import com.bigdata.rawstore.Addr;
  * @version $Id$
  * 
  * @see BufferMode#Disk
+ * 
+ * @todo modify to support aio (asynchronous io). aio can be supported with a
+ *       cache of recently written buffers and 2nd thread that writes behind
+ *       from the cache to the file. for the disk-only mode, we would have to
+ *       add a hash-based lookup (on the offset) of the recently written buffers
+ *       so that reads test the cache before reading from the disk. force() will
+ *       need to be modified to wait until the aio thread has caught up to the
+ *       nextOffset (i.e., has written all data that is dirty on the buffer).
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
@@ -52,9 +60,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     private boolean open;
 
-    DiskOnlyStrategy(FileMetadata fileMetadata) {
+    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
-        super(fileMetadata.nextOffset, BufferMode.Disk);
+        super(fileMetadata.extent, maximumExtent, fileMetadata.nextOffset,
+                BufferMode.Disk);
 
         this.file = fileMetadata.file;
 
@@ -239,7 +248,20 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
             }
 
-            // the offset at which the record will be written (not adjusted for the root blocks).
+            final long needed = (pos + nbytes) - userExtent;
+
+            if (needed > 0) {
+
+                if (!overflow((int) needed)) {
+
+                    throw new RuntimeException("overflow");
+
+                }
+
+            }
+
+            // the offset at which the record will be written (not adjusted for
+            // the root blocks).
             final int offset = nextOffset;
 
             // write the data onto the end of the file.
