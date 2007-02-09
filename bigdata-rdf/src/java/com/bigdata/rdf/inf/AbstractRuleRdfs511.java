@@ -46,7 +46,7 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Vector;
 
-import org.openrdf.model.URI;
+import com.bigdata.rdf.KeyOrder;
 
 
 public class AbstractRuleRdfs511 extends AbstractRuleRdf {
@@ -84,7 +84,7 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
          */
 
         // in POS order.
-        SPO[] stmts1 = store.getStatements(store.ndx_pos, pkey, pkey1);
+        SPO[] stmts1 = store.getStatements(store.getPOSIndex(), KeyOrder.POS, pkey, pkey1);
         // in SPO order.
         Arrays.sort(stmts1,SPOComparator.INSTANCE);
         // a clone of the answer set

@@ -206,7 +206,7 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
 
         store.commit();
 
-        assertEquals("statementCount", 5, store.getSPOIndex().getEntryCount());
+        assertEquals("statementCount", 5, store.getStatementCount());
         assertTrue(store.containsStatement(x, rdfType, C));
         assertTrue(store.containsStatement(y, rdfType, B));
         assertTrue(store.containsStatement(z, rdfType, A));

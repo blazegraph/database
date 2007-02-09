@@ -41,35 +41,39 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.serializers;
 
-import com.bigdata.rdf.KeyOrder;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
+import com.bigdata.objndx.IValueSerializer;
 
-public class RuleRdfs09 extends AbstractRuleRdfs2379 {
+/**
+ * Note: There is no additional data serialized with a statement at this time so
+ * the value serializer is essentially a nop. All the information is in the
+ * keys.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class StatementSerializer implements IValueSerializer {
 
-    public RuleRdfs09( InferenceEngine store, Var u, Var x, Var v ) {
+    private static final long serialVersionUID = -2174985132435709536L;
 
-        super(store, new Triple(v, store.rdfType, x),
-                new Pred[] {
-                new Triple(u, store.rdfsSubClassOf, x),
-                new Triple(v, store.rdfType, u)
-                });
+    public static transient final IValueSerializer INSTANCE = new StatementSerializer();
 
+    public StatementSerializer() {
     }
-    
-    protected SPO[] getStmts2( SPO stmt1 ) {
-        
-        byte[] fromKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s,0);
-        byte[] toKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s+1,0);
-        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
-    
+
+    public void getValues(DataInputStream is, Object[] values, int n)
+            throws IOException {
+        return;
     }
-    
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        return new SPO( stmt2.s, store.rdfType.id, stmt1.o );
+
+    public void putValues(DataOutputStream os, Object[] values, int n)
+            throws IOException {
+        return;
     }
 
 }

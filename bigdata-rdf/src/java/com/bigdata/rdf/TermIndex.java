@@ -43,20 +43,16 @@ Modifications:
 */
 package com.bigdata.rdf;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.UserDefinedFunction;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.rio.BulkRioLoader;
+import com.bigdata.rdf.serializers.TermIdSerializer;
 
 /**
  * A persistent index mapping variable length byte[] keys formed from an RDF
@@ -203,7 +199,7 @@ public class TermIndex extends BTree {
      */
     public TermIndex(IRawStore store, short indexId) {
 
-        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+        super(store, DEFAULT_BRANCHING_FACTOR, TermIdSerializer.INSTANCE);
 
         counter = new AutoIncCounter( indexId, 1L );
 
@@ -317,67 +313,6 @@ public class TermIndex extends BTree {
         if( id == null ) return 0L;
             
         return id;
-        
-    }
-
-    /**
-     * The value is a <code>long</code> integer that is the term identifier.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    public static class ValueSerializer implements IValueSerializer {
-
-        private static final long serialVersionUID = 8081006629809857019L;
-        
-        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
-        
-        /**
-         * Note: It is faster to use packed longs, at least on write with test
-         * data (bulk load of wordnet nouns).
-         */
-        final static boolean packedLongs = true;
-        
-        public ValueSerializer() {}
-        
-        public void getValues(DataInputStream is, Object[] values, int n)
-                throws IOException {
-
-            for(int i=0; i<n; i++) {
-                
-                if (packedLongs) {
-
-                    values[i] = Long.valueOf(LongPacker.unpackLong(is));
-
-                } else {
-
-                    values[i] = Long.valueOf(is.readLong());
-
-                }
-                
-            }
-            
-        }
-
-        public void putValues(DataOutputStream os, Object[] values, int n)
-                throws IOException {
-
-            for(int i=0; i<n; i++) {
-
-                if(packedLongs) {
-
-                    LongPacker.packLong(os, ((Long) values[i]).longValue());
-                    
-                } else {
-
-                    os.writeLong(((Long) values[i]).longValue());
-                
-                }
-                
-            }
-            
-        }
         
     }
     

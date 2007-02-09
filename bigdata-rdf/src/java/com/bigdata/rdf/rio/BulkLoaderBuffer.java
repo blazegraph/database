@@ -49,10 +49,12 @@ package com.bigdata.rdf.rio;
 
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
+import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.KeyBufferSerializer;
@@ -64,6 +66,9 @@ import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 import com.bigdata.rdf.rio.BulkRioLoader.Indices;
+import com.bigdata.rdf.serializers.RdfValueSerializer;
+import com.bigdata.rdf.serializers.StatementSerializer;
+import com.bigdata.rdf.serializers.TermIdSerializer;
 
 /**
  * Implementation specialized to support bulk index load operations.
@@ -166,7 +171,7 @@ public class BulkLoaderBuffer extends Buffer {
         
         new IndexSegmentBuilder(outFile, null, numTerms,
                 new TermIdIterator(this), branchingFactor,
-                com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE,
+                TermIdSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
                 errorRate);
 
@@ -194,7 +199,7 @@ public class BulkLoaderBuffer extends Buffer {
         new IndexSegmentBuilder(outFile, null,
                 numTerms, new TermIterator(this),
                 branchingFactor,
-                com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE,
+                RdfValueSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
                 errorRate);
 
@@ -219,7 +224,7 @@ public class BulkLoaderBuffer extends Buffer {
         new IndexSegmentBuilder(outFile, null, numStmts,
                 new UnknownStatementIterator(keyOrder,this),
                 branchingFactor,
-                com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE,
+                StatementSerializer.INSTANCE,
                 fullyBuffer, useChecksum, recordCompressor,
                 errorRate);
         
@@ -339,7 +344,7 @@ public class BulkLoaderBuffer extends Buffer {
             // FIXME Mark known statements by testing the bloom filter and/or
             // indices.
 
-            if (store.getSPOIndex().getEntryCount() > 0
+            if (store.getStatementCount() > 0
                     || !indices.spo.isEmpty()) {
 
                 throw new UnsupportedOperationException();

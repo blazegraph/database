@@ -408,8 +408,7 @@ public class RdfKeyBuilder {
      * 
      * @param key
      *            A key as encoded by {@link #statement2Key(long, long, long)}
-     *            and friends or from one of the
-     *            {@link StatementIndex statement indices}.
+     *            and friends or from one of the statement indices.
      * @param ids
      *            The ids. You have to know the {@link KeyOrder} in order to
      *            figure out which is the subject, predicate, or object.

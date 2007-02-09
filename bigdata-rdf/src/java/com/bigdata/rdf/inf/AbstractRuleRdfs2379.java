@@ -46,6 +46,8 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Vector;
 
+import com.bigdata.rdf.KeyOrder;
+
 
 public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
@@ -85,7 +87,7 @@ public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
         // constrained triple
         byte[] fromKey = store.keyBuilder.statement2Key( body[0].p.id, 0, 0 );
         byte[] toKey = store.keyBuilder.statement2Key( body[0].p.id+1, 0, 0 );
-        SPO[] stmts1 = store.getStatements(store.ndx_pos, fromKey, toKey);
+        SPO[] stmts1 = store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
 
         // make sure the statements are in POS order, since we are going to be
         // doing lookups against the POS index in a moment
@@ -101,7 +103,7 @@ public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
         
         byte[] fromKey = store.keyBuilder.statement2Key(stmt1.s, 0, 0);
         byte[] toKey = store.keyBuilder.statement2Key(stmt1.s+1, 0, 0);
-        return store.getStatements(store.ndx_pos, fromKey, toKey);
+        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
     
     }
     

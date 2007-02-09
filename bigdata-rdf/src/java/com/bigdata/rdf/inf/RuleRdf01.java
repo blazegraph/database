@@ -46,6 +46,7 @@ package com.bigdata.rdf.inf;
 import java.util.Vector;
 
 import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.rdf.KeyOrder;
 
 
 public class RuleRdf01 extends AbstractRuleRdf {
@@ -65,14 +66,14 @@ public class RuleRdf01 extends AbstractRuleRdf {
         
         long lastP = -1;
         
-        IEntryIterator it = store.ndx_pos.entryIterator(); 
+        IEntryIterator it = store.getPOSIndex().rangeIterator(null,null); 
         
         while ( it.hasNext() ) {
             
             it.next();
             
             SPO stmt = 
-                new SPO(store.ndx_pos.keyOrder,store.keyBuilder,it.getKey());
+                new SPO(KeyOrder.POS,store.keyBuilder,it.getKey());
             
             if ( stmt.p != lastP ) {
                 

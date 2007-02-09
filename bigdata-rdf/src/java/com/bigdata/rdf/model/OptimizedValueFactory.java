@@ -140,7 +140,7 @@ public class OptimizedValueFactory implements ValueFactory {
         
         /**
          * The sort key under which this value will be placed into the
-         * {@link TripleStore#ndx_termId terms} index. The sort key is a
+         * {@link TripleStore#getTermIdIndex() terms} index. The sort key is a
          * representation of the total term, including any additional attributes
          * such as the language code or the datatype URI.
          * 
@@ -150,8 +150,8 @@ public class OptimizedValueFactory implements ValueFactory {
 
         /**
          * The term identifier assigned to this term by the
-         * {@link TripleStore#ndx_termId terms} index and the identifier under
-         * which the lexical item may be recovered from the
+         * {@link TripleStore#getTermIdIndex() terms} index and the identifier
+         * under which the lexical item may be recovered from the
          * {@link TripleStore#ndx_idTerm term identifiers} index.
          */
         public long termId = 0;
@@ -176,10 +176,10 @@ public class OptimizedValueFactory implements ValueFactory {
          * Initially <code>false</code>, this field is set <code>true</code>
          * if it is determined that a term has already been assigned a term
          * identifier and is therefore in both the
-         * {@link TripleStore#ndx_termId terms} index and the
-         * {@link TripleStore#ndx_idTerm term identifiers} index. This is used
-         * to avoid re-definition of terms in the term identifiers index during
-         * a bulk load operation.
+         * {@link TripleStore#getTermIdIndex() terms} index and the
+         * {@link TripleStore#getIdTermIndex() term identifiers} index. This is
+         * used to avoid re-definition of terms in the term identifiers index
+         * during a bulk load operation.
          */
         public boolean known = false;
         
@@ -663,11 +663,10 @@ public class OptimizedValueFactory implements ValueFactory {
         
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
-         * if it is determined that a statement is known to the
-         * {@link StatementIndex statement indices} maintained by the
-         * {@link TripleStore}. This is used to avoid re-definition of
-         * statements in the during a bulk load operation where duplicate keys
-         * would violate the B+-Tree unique key constraint.
+         * if it is determined that a statement is known to the statement
+         * indices maintained by the {@link TripleStore}. This is used to avoid
+         * re-definition of statements in the during a bulk load operation where
+         * duplicate keys would violate the B+-Tree unique key constraint.
          */
         public boolean known = false;
         

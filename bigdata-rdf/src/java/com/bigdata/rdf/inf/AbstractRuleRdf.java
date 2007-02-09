@@ -47,7 +47,7 @@ import java.util.Arrays;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.ReverseIndex;
+import com.bigdata.objndx.IIndex;
 
 
 public abstract class AbstractRuleRdf extends Rule {
@@ -103,36 +103,39 @@ public abstract class AbstractRuleRdf extends Rule {
         int numAdded = 0;
         
         // deal with the SPO index
+        IIndex spo = store.getSPOIndex();
         Arrays.sort(entailments,SPOComparator.INSTANCE);
         for ( int i = 0; i < entailments.length; i++ ) {
             byte[] key = store.keyBuilder.statement2Key
                 ( entailments[i].s, entailments[i].p, entailments[i].o
                   );
-            if ( !store.ndx_spo.contains(key) ) {
-                store.ndx_spo.insert(key, null);
+            if ( !spo.contains(key) ) {
+                spo.insert(key, null);
                 numAdded++;
             }
         }
 
         // deal with the POS index
+        IIndex pos = store.getPOSIndex();
         Arrays.sort(entailments,POSComparator.INSTANCE);
         for ( int i = 0; i < entailments.length; i++ ) {
             byte[] key = store.keyBuilder.statement2Key
                 ( entailments[i].p, entailments[i].o, entailments[i].s
                   );
-            if ( !store.ndx_pos.contains(key) ) {
-                store.ndx_pos.insert(key, null);
+            if ( !pos.contains(key) ) {
+                pos.insert(key, null);
             }
         }
 
         // deal with the OSP index
+        IIndex osp = store.getOSPIndex();
         Arrays.sort(entailments,OSPComparator.INSTANCE);
         for ( int i = 0; i < entailments.length; i++ ) {
             byte[] key = store.keyBuilder.statement2Key
                 ( entailments[i].o, entailments[i].s, entailments[i].p
                   );
-            if ( !store.ndx_osp.contains(key) ) {
-                store.ndx_osp.insert(key, null);
+            if ( !osp.contains(key) ) {
+                osp.insert(key, null);
             }
         }
 
@@ -142,7 +145,7 @@ public abstract class AbstractRuleRdf extends Rule {
     
     protected void printStatement( SPO stmt ) {
         
-        ReverseIndex ndx = store.getIdTermIndex();
+        IIndex ndx = store.getIdTermIndex();
         
         URI s = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.s));
          

@@ -65,7 +65,9 @@ import org.openrdf.model.Value;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
@@ -79,6 +81,8 @@ import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
+import com.bigdata.rdf.serializers.RdfValueSerializer;
+import com.bigdata.rdf.serializers.StatementSerializer;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -222,7 +226,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends Journal {
+public class TripleStore extends /* Partitioned*/Journal {
     
     static transient public Logger log = Logger.getLogger(TripleStore.class);
 
@@ -243,10 +247,10 @@ public class TripleStore extends Journal {
      * operations since they may be discarded and re-loaded.
      */
     private TermIndex ndx_termId;
-    private ReverseIndex ndx_idTerm;
-    public StatementIndex ndx_spo; // FIXME make these indices private.
-    public StatementIndex ndx_pos;
-    public StatementIndex ndx_osp;
+    private IIndex ndx_idTerm;
+    private IIndex ndx_spo;
+    private IIndex ndx_pos;
+    private IIndex ndx_osp;
 
     /*
      * Note: access to the indices through these methods is required to support
@@ -261,10 +265,10 @@ public class TripleStore extends Journal {
      * to the journals and segments for each index partition.
      */
     public TermIndex getTermIdIndex() {return ndx_termId;}
-    public ReverseIndex getIdTermIndex() {return ndx_idTerm;}
-    public StatementIndex getSPOIndex() {return ndx_spo;}
-    public StatementIndex getPOSIndex() {return ndx_pos;}
-    public StatementIndex getOSPIndex() {return ndx_osp;}
+    public IIndex getIdTermIndex() {return ndx_idTerm;}
+    public IIndex getSPOIndex() {return ndx_spo;}
+    public IIndex getPOSIndex() {return ndx_pos;}
+    public IIndex getOSPIndex() {return ndx_osp;}
 
     /**
      * 
@@ -309,52 +313,56 @@ public class TripleStore extends Journal {
 
         if((addr=getRootBlockView().getRootAddr(ROOT_ID_TERM))==0L) {
 
-            ndx_idTerm = new ReverseIndex(this);
+            ndx_idTerm = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                    RdfValueSerializer.INSTANCE);
             
         } else {
             
-            ndx_idTerm = new ReverseIndex(this, addr);
+            ndx_idTerm = new BTree(this, BTreeMetadata.read(this, addr));
             
         }
         
         if((addr=getRootBlockView().getRootAddr(ROOT_SPO))==0L) {
 
-            ndx_spo = new StatementIndex(this,KeyOrder.SPO);
+            ndx_spo = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                    StatementSerializer.INSTANCE);
             
         } else {
             
-            ndx_spo = new StatementIndex(this, addr, KeyOrder.SPO);
+            ndx_spo = new BTree(this, BTreeMetadata.read(this, addr));
             
         }
         
-        if((addr=getRootBlockView().getRootAddr(ROOT_POS))==0L) {
+        if ((addr = getRootBlockView().getRootAddr(ROOT_POS)) == 0L) {
 
-            ndx_pos = new StatementIndex(this,KeyOrder.POS);
-            
+            ndx_pos = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                    StatementSerializer.INSTANCE);
+
         } else {
-            
-            ndx_pos = new StatementIndex(this, addr, KeyOrder.POS);
-            
+
+            ndx_pos = new BTree(this, BTreeMetadata.read(this, addr));
+
         }
 
-        if((addr=getRootBlockView().getRootAddr(ROOT_OSP))==0L) {
+        if ((addr = getRootBlockView().getRootAddr(ROOT_OSP)) == 0L) {
 
-            ndx_osp = new StatementIndex(this,KeyOrder.OSP);
-            
+            ndx_osp = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                    StatementSerializer.INSTANCE);
+
         } else {
-            
-            ndx_osp = new StatementIndex(this, addr, KeyOrder.OSP);
-            
+
+            ndx_osp = new BTree(this, BTreeMetadata.read(this, addr));
+
         }
 
         /*
          * declare the comitters.
          */
-        setCommitter(ROOT_TERM_ID, ndx_termId);
-        setCommitter(ROOT_ID_TERM, ndx_idTerm);
-        setCommitter(ROOT_SPO, ndx_spo);
-        setCommitter(ROOT_POS, ndx_pos);
-        setCommitter(ROOT_OSP, ndx_osp);
+        setCommitter(ROOT_TERM_ID, (BTree) ndx_termId);
+        setCommitter(ROOT_ID_TERM, (BTree) ndx_idTerm);
+        setCommitter(ROOT_SPO, (BTree) ndx_spo);
+        setCommitter(ROOT_POS, (BTree) ndx_pos);
+        setCommitter(ROOT_OSP, (BTree) ndx_osp);
 
         usage();
         
@@ -413,10 +421,12 @@ public class TripleStore extends Journal {
     
     /**
      * The #of triples in the store.
+     * <p>
+     * This may be an estimate when using partitioned indices.
      */
     public int getStatementCount() {
         
-        return ndx_spo.getEntryCount();
+        return ndx_spo.rangeCount(null,null);
         
     }
     
@@ -715,20 +725,30 @@ public class TripleStore extends Journal {
         {
         
             /*
-             * add terms to the reverse index.  this is what we use to lookup
-             * the RDF value by its termId when we need to serialize some data
-             * as RDF/XML or the like.
+             * add terms to the reverse index. this is what we use to lookup the
+             * RDF value by its termId when we need to serialize some data as
+             * RDF/XML or the like.
              * 
              * @todo use batch api, insert iff not found (else sanity check for
              * equivilence). pre-convert the termId:long to a byte[] using the
              * key encoder so that we can batch this.
+             * 
+             * @todo only insert terms that were reported as "not found" when we
+             * inserted them into the forward mapping.  this will reduce the #of
+             * index tests that we perform.
              */
             
             long _begin = System.currentTimeMillis();
             
             for (int i = 0; i < numTerms; i++) {
 
-                ndx_idTerm.add(keyBuilder.id2key(terms[i].termId), terms[i]);
+                final byte[] idKey = keyBuilder.id2key(terms[i].termId);
+                
+                if(!ndx_termId.contains(idKey)) {
+
+                    ndx_idTerm.insert(idKey, terms[i]);
+                    
+                }
 
             }
 
@@ -754,11 +774,26 @@ public class TripleStore extends Journal {
      */
     public long addTerm(Value value) {
 
-        // forward mapping assigns identifier.
-        final long termId = ndx_termId.add(keyBuilder.value2Key(value));
+        final _Value val = (_Value) value;
+        
+        /*
+         * The forward mapping assigns the identifier.
+         * 
+         * @todo test for existance based on the foward mapping so that we can
+         * avoid the use of the reverse mapping if we know that the term exists.
+         */ 
+        final byte[] termKey = keyBuilder.value2Key(val);
+        
+        final long termId = ndx_termId.add(termKey);
 
         // reverse mapping from identifier to term (non-batch mode).
-        ndx_idTerm.add(keyBuilder.id2key(termId), (_Value) value);
+        final byte[] idKey = keyBuilder.id2key(termId);
+
+        if (!ndx_idTerm.contains(idKey)) {
+
+            ndx_idTerm.insert(idKey, val );
+
+        }
         
         return termId;
 
@@ -813,20 +848,32 @@ public class TripleStore extends Journal {
         
     }
 
-    private void usage(String name,AbstractBTree btree) {
+    private void usage(String name,IIndex ndx) {
         
-        final int nentries = btree.getEntryCount();
-        final int height = btree.getHeight();
-        final int nleaves = btree.getLeafCount();
-        final int nnodes = btree.getNodeCount();
-        final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
-        final int queueCapacity = btree.getHardReferenceQueueCapacity();
-        
-        System.err.println(name + ": #entries=" + nentries + ", height="
-                + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
-                + ", #(nodes+leaves)=" + (nnodes + nleaves)
-                + ", #distinctOnQueue=" + ndistinctOnQueue + ", queueCapacity="
-                + queueCapacity);
+        if (ndx instanceof BTree) {
+
+            BTree btree = (BTree) ndx;
+            
+            final int nentries = btree.getEntryCount();
+            final int height = btree.getHeight();
+            final int nleaves = btree.getLeafCount();
+            final int nnodes = btree.getNodeCount();
+            final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
+            final int queueCapacity = btree.getHardReferenceQueueCapacity();
+
+            System.err.println(name + ": #entries=" + nentries + ", height="
+                    + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
+                    + ", #(nodes+leaves)=" + (nnodes + nleaves)
+                    + ", #distinctOnQueue=" + ndistinctOnQueue
+                    + ", queueCapacity=" + queueCapacity);
+        } else {
+
+            // Note: this is only an estimate if the index is a view.
+            final int nentries = ndx.rangeCount(null, null);
+
+            System.err.println(name+": #entries(est)="+nentries);
+            
+        }
         
     }
     

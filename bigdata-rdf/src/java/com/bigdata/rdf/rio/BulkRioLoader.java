@@ -66,6 +66,9 @@ import com.bigdata.objndx.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.serializers.RdfValueSerializer;
+import com.bigdata.rdf.serializers.StatementSerializer;
+import com.bigdata.rdf.serializers.TermIdSerializer;
 import com.bigdata.scaleup.PartitionedJournal;
 
 /**
@@ -387,7 +390,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             if (seg == null) {
 
                 seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.TermIndex.ValueSerializer.INSTANCE);
+                        com.bigdata.rdf.serializers.TermIdSerializer.INSTANCE);
             }
             
             return seg;
@@ -402,7 +405,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             if (seg == null) {
 
                 seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.ReverseIndex.ValueSerializer.INSTANCE);
+                        com.bigdata.rdf.serializers.RdfValueSerializer.INSTANCE);
 
             }
             
@@ -417,7 +420,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
             if (seg == null) {
 
                 seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.StatementIndex.ValueSerializer.INSTANCE);
+                        com.bigdata.rdf.serializers.StatementSerializer.INSTANCE);
 
             }
             

@@ -43,22 +43,24 @@ Modifications:
 */
 package com.bigdata.rdf;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 
 import org.openrdf.model.Statement;
 
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.serializers.StatementSerializer;
 
 /**
  * A persistent index for RDF {@link Statement}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated There is no special behavior for this class and I am trying to
+ *             reduce the use of the indices as much as possible to unextended
+ *             logic so that I do not have to support prototyped indices for
+ *             both partitioned and non-partitioned indices.
  */
 public class StatementIndex extends BTree {
 
@@ -72,7 +74,7 @@ public class StatementIndex extends BTree {
      */
     public StatementIndex(IRawStore store,KeyOrder keyOrder) {
         
-        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+        super(store, DEFAULT_BRANCHING_FACTOR, StatementSerializer.INSTANCE);
         
         assert keyOrder != null;
         
@@ -85,40 +87,15 @@ public class StatementIndex extends BTree {
      * 
      * @param store
      *            The backing store.
-     * @param metadataId
-     *            The metadata record identifier for the index.
+     * @param metadata
+     *            The metadata record for the index.
      */
-    public StatementIndex(IRawStore store, long metadataId,KeyOrder keyOrder) {
+    public StatementIndex(IRawStore store, BTreeMetadata metadata,
+            KeyOrder keyOrder) {
 
-        super(store, BTreeMetadata.read(store, metadataId));
+        super(store, metadata);
         
         this.keyOrder = keyOrder;
-        
-    }
-
-    /**
-     * Note: There is no additional data serialized with a statement at this
-     * time so the value serializer is essentially a nop. All the information is
-     * in the keys.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ValueSerializer implements IValueSerializer {
-
-        private static final long serialVersionUID = -2174985132435709536L;
-
-        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
-        
-        public ValueSerializer(){}
-        
-        public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
-            return;
-        }
-
-        public void putValues(DataOutputStream os, Object[] values, int n) throws IOException {
-            return;
-        }
         
     }
     

@@ -51,7 +51,10 @@ import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.objndx.IIndex;
+import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.StatementIndex;
 import com.bigdata.rdf.TermIndex;
 import com.bigdata.rdf.TripleStore;
@@ -283,7 +286,7 @@ public class InferenceEngine extends TripleStore {
 
         final int nrules = rules.length;
 
-        int firstStatementCount = ndx_spo.getEntryCount();
+        int firstStatementCount = getStatementCount();
 
         int lastStatementCount = firstStatementCount;
 
@@ -304,7 +307,7 @@ public class InferenceEngine extends TripleStore {
 
             }
 
-            int statementCount = ndx_spo.getEntryCount();
+            int statementCount = getStatementCount();
 
             // testing the #of statement is less prone to error.
             if (lastStatementCount == statementCount) {
@@ -336,7 +339,7 @@ public class InferenceEngine extends TripleStore {
      *            
      * @return The objects visited by that iterator.
      */
-    public SPO[] getStatements(StatementIndex ndx, byte[] fromKey, byte[] toKey) {
+    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
 
         final int n = ndx.rangeCount(fromKey, toKey);
 
@@ -350,7 +353,7 @@ public class InferenceEngine extends TripleStore {
         while (itr1.hasNext()) {
 
             itr1.next();
-            ids[i++] = new SPO(ndx.keyOrder,keyBuilder,itr1.getKey());
+            ids[i++] = new SPO(keyOrder,keyBuilder,itr1.getKey());
 
         }
 
@@ -426,7 +429,7 @@ public class InferenceEngine extends TripleStore {
         
         TripleStore answerSet = new TripleStore(answerSetProperties);
         
-        int lastStatementCount = ndx_spo.getEntryCount();
+        int lastStatementCount = getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
@@ -444,7 +447,7 @@ public class InferenceEngine extends TripleStore {
 
             }
 
-            int statementCount = ndx_spo.getEntryCount();
+            int statementCount = getStatementCount();
 
             // testing the #of statement is less prone to error.
             if (lastStatementCount == statementCount) {
