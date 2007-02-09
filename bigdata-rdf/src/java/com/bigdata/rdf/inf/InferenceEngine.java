@@ -51,12 +51,9 @@ import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.StatementIndex;
-import com.bigdata.rdf.TermIndex;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
@@ -70,7 +67,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * triple(s, p, o)
  * </pre>
  * 
- * where s, p, and or are identifiers for RDF values in the {@link TermIndex}.
+ * where s, p, and or are identifiers for RDF values in the terms index.
  * Facts are stored either in the long-term database or in a per-query answer
  * set.
  * <p>

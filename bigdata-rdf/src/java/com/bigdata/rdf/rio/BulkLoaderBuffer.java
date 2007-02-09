@@ -185,6 +185,10 @@ public class BulkLoaderBuffer extends Buffer {
     /**
      * Bulk loads the reverse mapping for pre-sorted, non-duplicate, non-known
      * terms into a new {@link IndexSegment} written on <i>outFile</i>.
+     * 
+     * @todo only load into the reverse index if the term was unknown when we
+     *       loaded the forward index (this has already been optimized on the
+     *       batch and non-batch apis).
      */
     public void bulkLoadTermIdentifiersIndex(int branchingFactor, File outFile) throws IOException {
 
@@ -286,7 +290,7 @@ public class BulkLoaderBuffer extends Buffer {
          * FIXME verify that bloom filters are enabled and in use for index
          * segments.
          */
-        if(store.getTermIdIndex().getEntryCount()>0 || ! indices.terms.isEmpty()) {
+        if(store.getTermIdIndex().rangeCount(null,null)>0 || ! indices.terms.isEmpty()) {
             
             /*
              * read against the terms index on the journal and each segment of

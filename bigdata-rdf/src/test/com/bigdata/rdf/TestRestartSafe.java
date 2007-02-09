@@ -116,16 +116,14 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
          * Fields used to verify restart safety of additional metadata for 
          * the term:id index.
          */
-        final short indexId = store.getTermIdIndex().counter.indexId;
-        final long nextId = store.getTermIdIndex().counter.nextId;
+        final long lastId = store.getCounter().lastId();
 
         store.commit();
         
         /*
          * verify that extension metadata for the term:id index was not modified.
          */
-        assertEquals("termsId.indexId", indexId, store.getTermIdIndex().counter.indexId);
-        assertEquals("termsId.nextId", nextId, store.getTermIdIndex().counter.nextId);
+        assertEquals("lastId", lastId, store.getCounter().lastId());
 
         assertEquals(x_id,store.getTerm(x));
         assertEquals(y_id,store.getTerm(y));
@@ -171,8 +169,7 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
          * verify that extension metadata for the term:id index was correctly
          * restored.
          */
-        assertEquals("termsId.indexId", indexId, store.getTermIdIndex().counter.indexId);
-        assertEquals("termsId.nextId", nextId, store.getTermIdIndex().counter.nextId);
+        assertEquals("lastId", lastId, store.getCounter().lastId());
         
     }
 
