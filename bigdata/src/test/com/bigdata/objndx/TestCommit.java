@@ -51,7 +51,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Unit tests for commit functionality that do not trigger copy-on-write.
@@ -85,7 +85,7 @@ public class TestCommit extends TestCase2 {
      */
     public void test_commit01() {
 
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
 
         final int branchingFactor = 4;
         

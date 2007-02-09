@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
@@ -89,13 +90,13 @@ import com.bigdata.objndx.IndexSegmentFileStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionedIndex implements IIndex {
+public class PartitionedIndex implements IIndex, ICommitter {
 
     /**
      * The mutable {@link BTree} used to absorb all writes for the
      * {@link PartitionedIndex}.
      */
-    private final BTree btree;
+    protected final BTree btree;
 
     /**
      * The metadata index used to locate the partitions relevant to a given read
@@ -107,6 +108,15 @@ public class PartitionedIndex implements IIndex {
      * A cache of the fused views for in use partitions.
      */
     private final Map<Integer,FusedView> views = new HashMap<Integer,FusedView>();
+
+    /**
+     * The mutable {@link BTree} used to absorb writes.
+     */
+    public BTree getBTree() {
+        
+        return btree;
+        
+    }
     
     /**
      * Opens and returns the live {@link IndexSegment}s for the partition.
@@ -177,6 +187,13 @@ public class PartitionedIndex implements IIndex {
         
         if(view==null) {
             
+            if(pmd.getLiveCount()==0) {
+                
+                // the btree is the view.
+                return btree;
+                
+            }
+            
             /*
              * Open the live index segments for this partition (high latency).
              */
@@ -200,6 +217,12 @@ public class PartitionedIndex implements IIndex {
         }
         
         return view;
+        
+    }
+    
+    public String getName() {
+        
+        return mdi.getName();
         
     }
     
@@ -534,6 +557,12 @@ public class PartitionedIndex implements IIndex {
 
         }
 
+    }
+
+    public long handleCommit() {
+
+        return btree.handleCommit();
+        
     }
 
 }

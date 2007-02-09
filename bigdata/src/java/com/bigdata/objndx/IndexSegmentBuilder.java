@@ -68,8 +68,8 @@ import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleFileRawStore2;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleFileRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -1744,7 +1744,7 @@ public class IndexSegmentBuilder {
 
     /**
      * Note: the comments below really apply to the base
-     * {@link SimpleFileRawStore2} class.
+     * {@link SimpleFileRawStore} class.
      * 
      * @todo consider the file mode and buffering. We should at least buffer
      *       several pages of data per write and can experiment with writing
@@ -1763,7 +1763,7 @@ public class IndexSegmentBuilder {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class FileBuffer extends SimpleFileRawStore2 implements Buffer {
+    static class FileBuffer extends SimpleFileRawStore implements Buffer {
 
         public FileBuffer(File file, String mode) throws IOException {
 
@@ -1876,7 +1876,7 @@ public class IndexSegmentBuilder {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class MemoryBuffer extends SimpleMemoryRawStore2 implements Buffer {
+    static class MemoryBuffer extends SimpleMemoryRawStore implements Buffer {
         
 //        public long write(ByteBuffer data) {
 //        

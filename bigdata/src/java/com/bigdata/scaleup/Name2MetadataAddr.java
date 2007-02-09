@@ -42,54 +42,39 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Feb 9, 2007
  */
 
-package com.bigdata.rawstore;
+package com.bigdata.scaleup;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import com.bigdata.journal.Name2Addr;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
+import com.bigdata.rawstore.IRawStore;
 
 /**
- * Runs all tests for all journal implementations.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class Name2MetadataAddr extends Name2Addr {
 
-    /**
-     * 
-     */
-    public TestAll() {
-    }
+    public Name2MetadataAddr(IRawStore store) {
 
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("raw store");
-
-        // test address encoding and decoding;
-        suite.addTestSuite( TestAddr.class );
-        // test memory-resident implementation of IRawStore.
-        suite.addTestSuite( TestSimpleMemoryRawStore.class );
-        // test file-based implementation of IRawStore.
-        suite.addTestSuite( TestSimpleFileRawStore.class );
-
-        return suite;
+        super(store);
         
     }
     
+    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
+
+        super(store,metadata);
+        
+    }
+    
+    protected IIndex loadBTree(IRawStore store, String name, long addr) {
+        
+        return new MetadataIndex(this.store, BTreeMetadata.read(this.store, addr));
+
+    }
+
 }

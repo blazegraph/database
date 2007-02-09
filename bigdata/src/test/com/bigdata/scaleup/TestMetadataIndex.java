@@ -70,7 +70,8 @@ import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.scaleup.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * A test suite for managing a partitioned index.
@@ -127,10 +128,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
     public void test_crud() {
         
         // setup a store to hold the metadata index.
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3);
+        MetadataIndex md = new MetadataIndex(store,3,"abc");
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -201,7 +202,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Journal store = new Journal(properties);
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3);
+        MetadataIndex md = new MetadataIndex(store,3,"abc");
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -265,7 +266,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         store = new Journal(properties);
         
         // re-load the index.
-        md = new MetadataIndex(store,addr);
+        md = new MetadataIndex(store,MetadataIndexMetadata.read(store, addr));
+        assertEquals("name","abc",md.getName());
         
         assertEquals("#entries",3,md.getEntryCount());
 
@@ -286,10 +288,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
     public void test_leafSearchRule() {
 
         // setup a store to hold the metadata index.
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3);
+        MetadataIndex md = new MetadataIndex(store,3,"abc");
 
         /*
          * the separator key for the first partition (index := 0). this will
@@ -400,7 +402,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Journal store = new Journal(properties);
         
         // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3);
+        MetadataIndex md = new MetadataIndex(store, 3, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
@@ -503,7 +505,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Journal store = new Journal(properties);
         
         // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3);
+        MetadataIndex md = new MetadataIndex(store, 3, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
@@ -646,6 +648,23 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
      */
     public void test_evictSegments_onePartition_withMerge_stress() throws IOException {
 
+        doStressTest_evictSegments_onePartition_withMerge(10, 10000);
+//        doStressTest_evictSegments_onePartition_withMerge(20, 100000);
+        
+    }
+
+    /**
+     * A stress test.
+     * 
+     * @param ntrials #of trials
+     * @param nops #of mutation operations per trial (insert, remove)
+     * @throws IOException
+     */
+    protected void doStressTest_evictSegments_onePartition_withMerge(int ntrials, int nops) throws IOException {
+        
+        // @todo when true only insert operations are performed (does not test merge of deleted keys).
+        final boolean insertOnly = true;
+
         final Random r = new Random();
         
         final Properties properties = new Properties();
@@ -669,7 +688,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Journal store = new Journal(properties);
         
         // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3);
+        MetadataIndex md = new MetadataIndex(store, 3, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
@@ -684,14 +703,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * Note: the fused view of the test btree and the current index segment
          * must also always agree with the ground truth btree.
          */
-        // #of trials.
-        final int ntrials = 20;
-        
-        // #of mutation operations per trial (insert, remove).
-        final int nops = 100000;
-        
-        // @todo when true only insert operations are performed (does not test merge of deleted keys).
-        final boolean insertOnly = true;
 
         // The branching factor used on the mutable ground truth and test data btrees.
         final int mmut = 100;
@@ -983,7 +994,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Journal store = new Journal(properties);
         
         // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3);
+        MetadataIndex md = new MetadataIndex(store, 3, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));

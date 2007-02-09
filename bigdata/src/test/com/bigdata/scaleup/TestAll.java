@@ -36,6 +36,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("scaleup");
 
+        // test suite for locating journal files.
         suite.addTestSuite(TestNameAndExtensionFilter.class);
 
         /*
@@ -56,7 +57,7 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestMetadataIndex.class);
         suite.addTestSuite(TestPartitionedIndex.class);
-        suite.addTestSuite(TestPartitionedStore.class);
+        suite.addTestSuite(TestPartitionedJournal.class);
        
         return suite;
         

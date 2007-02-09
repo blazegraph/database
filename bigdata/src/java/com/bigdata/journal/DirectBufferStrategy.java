@@ -1,3 +1,4 @@
+
 package com.bigdata.journal;
 
 import java.io.IOException;
@@ -88,7 +89,19 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         
         try {
 
+            // extend the file.
             raf.setLength(newExtent);
+            
+            /*
+             * since we just changed the file length we force the data to disk
+             * and update the file metadata. this is a relatively expensive
+             * operation but we want to make sure that we do not loose track of
+             * a change in the length of the file.
+             * 
+             * @todo an alternative would be to set a marker on the buffer such
+             * that the next force() also forced the metadata to disk.
+             */
+            force(true);
             
             System.err.println("Disk file: newLength="+newExtent);
             

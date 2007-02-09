@@ -57,7 +57,7 @@ import org.apache.log4j.Level;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.util.ChecksumError;
 
 /**
@@ -271,7 +271,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
      */
     public BTree getBTree(int branchingFactor,boolean useCompression) {
         
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
 
         final int leafQueueCapacity = 10000;
         

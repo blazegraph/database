@@ -47,7 +47,7 @@
 
 package com.bigdata.journal;
 
-import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IIndex;
 
 /**
  * Interface for reading and writing persistent data using one or more named
@@ -59,14 +59,17 @@ import com.bigdata.objndx.BTree;
 public interface IStore {
 
     /**
-     * Return a named btree.
+     * Return a named index.
      * 
-     * @param name The btree name.
+     * @param name
+     *            The index name.
      * 
-     * @return The named btree or <code>null</code> if no btree was registered
+     * @return The named index or <code>null</code> if no index was registered
      *         under that name.
+     * 
+     * @see IJournal#registerIndex(String, IIndex)
      */
-    public BTree getIndex(String name);
+    public IIndex getIndex(String name);
     
 //    public ITx startTx(long txId);
     

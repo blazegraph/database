@@ -483,14 +483,17 @@ abstract public class AbstractTestCase
             File tmp = File.createTempFile("test-" + bufferMode + "-"
                     + name + "-", ".jnl");
             
-            // Delete the file otherwise the Journal will attempt to open it.
-            if (!tmp.delete()) {
+//            // Delete the file otherwise the Journal will attempt to open it.
+//            if (!tmp.delete()) {
+//
+//                throw new RuntimeException("Unable to remove empty test file: "
+//                        + tmp);
+//
+//            }
 
-                throw new RuntimeException("Unable to remove empty test file: "
-                        + tmp);
-
-            }
-
+            // make sure that the file is eventually removed.
+            tmp.deleteOnExit();
+            
             return tmp.toString();
             
         } catch (IOException ex) {

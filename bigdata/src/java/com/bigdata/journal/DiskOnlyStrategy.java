@@ -49,9 +49,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
      * Extent of the file. This value should be valid since we obtain an
      * exclusive lock on the file when we open it.
      */
-    final long extent;
+    long extent;
 
-    final long userExtent;
+    long userExtent;
     
     /**
      * The backing channel.
@@ -115,7 +115,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
      */
     public void close() {
 
-        if (!isOpen())
+        if (! open )
             throw new IllegalStateException();
 
         try {
@@ -248,7 +248,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
             }
 
-            final long needed = (pos + nbytes) - userExtent;
+            final long needed = (nextOffset + nbytes) - userExtent;
 
             if (needed > 0) {
 
@@ -350,7 +350,19 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
         
         try {
 
+            // extend the file.
             raf.setLength(newExtent);
+            
+            /*
+             * since we just changed the file length we force the data to disk
+             * and update the file metadata. this is a relatively expensive
+             * operation but we want to make sure that we do not loose track of
+             * a change in the length of the file.
+             * 
+             * @todo an alternative would be to set a marker on the buffer such
+             * that the next force() also forced the metadata to disk.
+             */
+            force(true);
 
             System.err.println("Disk file: newLength="+newExtent);
                         
@@ -359,7 +371,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
             throw new RuntimeException(ex);
             
         }
-
+ 
+        this.userExtent = newUserExtent;
+        
+        this.extent = newExtent;
+        
     }
 
 }

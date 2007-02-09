@@ -58,18 +58,18 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRawStore2TestCase extends TestCase2 {
+abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public AbstractRawStore2TestCase() {
+    public AbstractRawStoreTestCase() {
     }
 
     /**
      * @param name
      */
-    public AbstractRawStore2TestCase(String name) {
+    public AbstractRawStoreTestCase(String name) {
         super(name);
     }
 

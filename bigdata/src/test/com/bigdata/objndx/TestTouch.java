@@ -47,7 +47,7 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link BTree#touch(AbstractNode)}. None of these tests cause
@@ -99,7 +99,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(
-                new SimpleMemoryRawStore2(),
+                new SimpleMemoryRawStore(),
                 branchingFactor,
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
@@ -170,7 +170,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         // The btree.
         final BTree btree = new BTree(
-                new SimpleMemoryRawStore2(),
+                new SimpleMemoryRawStore(),
                 branchingFactor,
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
@@ -243,7 +243,7 @@ public class TestTouch extends AbstractBTreeTestCase {
 
         // The btree.
         final BTree btree = new BTree(
-                new SimpleMemoryRawStore2(),
+                new SimpleMemoryRawStore(),
                 branchingFactor,
                 leafQueue,
                 valSer,

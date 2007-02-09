@@ -65,7 +65,7 @@ import java.util.Set;
  * 
  * @todo the commit protocol is not implemented yet.
  */
-public class SimpleFileRawStore2 implements IRawStore {
+public class SimpleFileRawStore implements IRawStore {
 
     private boolean open = true;
     
@@ -89,7 +89,7 @@ public class SimpleFileRawStore2 implements IRawStore {
      *            The file open mode for
      *            {@link RandomAccessFile#RandomAccessFile(File, String)()}.
      */
-    public SimpleFileRawStore2(File file, String mode) throws IOException {
+    public SimpleFileRawStore(File file, String mode) throws IOException {
         
         if (file == null)
             throw new IllegalArgumentException("file is null");

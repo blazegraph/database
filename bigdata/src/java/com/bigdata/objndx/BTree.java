@@ -80,6 +80,14 @@ import com.bigdata.rawstore.IRawStore;
  * nodes in the tree.
  * </p>
  * 
+ * @todo create ring buffers to track the serialized size of the last 50 nodes
+ *       and leaves so that we can estimate the serialized size of the total
+ *       btree based on recent activity.  we could use a moving average and 
+ *       persist it as part of the btree metadata.  this could be used when
+ *       making a decision to evict a btree vs migrate it onto a new journal
+ *       and whether to split or join index segments during a journal overflow
+ *       event.
+ * 
  * @todo Modify the values in the tree to be variable length byte[]s. This will
  *       get rid of the {@link IValueSerializer}. It will also speed up leaf
  *       de-serialization since we can defer object creation until a specific

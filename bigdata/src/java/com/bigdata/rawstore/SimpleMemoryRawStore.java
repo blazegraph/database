@@ -60,7 +60,7 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleMemoryRawStore2 implements IRawStore {
+public class SimpleMemoryRawStore implements IRawStore {
 
     private boolean open = true;
     
@@ -88,7 +88,7 @@ public class SimpleMemoryRawStore2 implements IRawStore {
     /**
      * Uses an initial capacity of 1000 records.
      */
-    public SimpleMemoryRawStore2() {
+    public SimpleMemoryRawStore() {
 
         this(1000);
         
@@ -101,7 +101,7 @@ public class SimpleMemoryRawStore2 implements IRawStore {
      *            the capacity is exceeded then the internal {@link ArrayList}
      *            will be grown as necessary.
      */
-    public SimpleMemoryRawStore2(int capacity) {
+    public SimpleMemoryRawStore(int capacity) {
         
         if (capacity < 0)
             throw new IllegalArgumentException("capacity is negative");

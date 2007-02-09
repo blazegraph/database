@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
-
 /**
  * Interface for low-level operations on a store supporting an atomic commit.
  * Persistent implementations of this interface are restart-safe.

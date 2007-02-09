@@ -189,7 +189,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             
         }
         
-        boolean isDirect = directBuffer.isDirect();
+        final boolean isDirect = directBuffer.isDirect();
 
         final int newCapacity = (int) newUserExtent;
         

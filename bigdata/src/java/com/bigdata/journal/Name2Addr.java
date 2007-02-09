@@ -12,6 +12,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Addr;
@@ -24,7 +25,7 @@ import com.bigdata.rawstore.IRawStore;
  * known {@link Addr address} of the {@link BTreeMetadata} record for the named
  * index.
  */
-public class NameAddrBTree extends BTree {
+public class Name2Addr extends BTree {
 
     /*
      * @todo parameterize the {@link Locale} on the Journal and pass through to
@@ -42,9 +43,9 @@ public class NameAddrBTree extends BTree {
      * the use of the {@link #keyBuilder} and therefore minimizes the relatively
      * expensive operation of encoding unicode names to byte[] keys.
      */
-    private Map<String,BTree> name2BTree = new HashMap<String,BTree>();
+    private Map<String,IIndex> name2BTree = new HashMap<String,IIndex>();
 
-    public NameAddrBTree(IRawStore store) {
+    public Name2Addr(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
 
@@ -56,11 +57,11 @@ public class NameAddrBTree extends BTree {
      * @param store
      *            The backing store.
      * @param metadataId
-     *            The metadata record identifier for the index.
+     *            The metadata record for the index.
      */
-    public NameAddrBTree(IRawStore store, long metadataId) {
+    public Name2Addr(IRawStore store, BTreeMetadata metadata) {
 
-        super(store, BTreeMetadata.read(store, metadataId));
+        super(store, metadata);
 
     }
 
@@ -80,18 +81,18 @@ public class NameAddrBTree extends BTree {
          * journal since only trees that have been touched can have data for the
          * current commit.
          */
-        Iterator<Map.Entry<String,BTree>> itr = name2BTree.entrySet().iterator();
+        Iterator<Map.Entry<String,IIndex>> itr = name2BTree.entrySet().iterator();
         
         while(itr.hasNext()) {
             
-            Map.Entry<String, BTree> entry = itr.next();
+            Map.Entry<String, IIndex> entry = itr.next();
             
             String name = entry.getKey();
             
-            BTree btree = entry.getValue();
+            IIndex btree = entry.getValue();
             
             // request commit.
-            long addr = btree.handleCommit();
+            long addr = ((ICommitter)btree).handleCommit();
             
             // update persistent mapping.
             insert(getKey(name),new Entry(name,addr));
@@ -127,9 +128,9 @@ public class NameAddrBTree extends BTree {
      * @return The named index or <code>null</code> iff there is no index with
      *         that name.
      */
-    public BTree get(String name) {
+    public IIndex get(String name) {
 
-        BTree btree = name2BTree.get(name);
+        IIndex btree = name2BTree.get(name);
         
         if (btree != null)
             return btree;
@@ -142,15 +143,38 @@ public class NameAddrBTree extends BTree {
             
         }
 
-        // re-load btree from the store.
-        btree = new BTree(this.store, BTreeMetadata
-                .read(this.store, entry.addr));
+        /* re-load btree from the store.
+         */
+        btree = loadBTree(store,entry.name,entry.addr);
         
         // save name -> btree mapping in transient cache.
         name2BTree.put(name,btree);
 
         // return btree.
         return btree;
+
+    }
+
+    /**
+     * Re-load a named index from the store.
+     * <p>
+     * The default implementation uses the {@link BTree} constructor. In you
+     * need to return either a subclass of {@link BTree} or another
+     * implementation of {@link IIndex} then you MUST override this method to
+     * use the appropriate constructor.
+     * 
+     * @param store
+     *            The store.
+     * @param name
+     *            The index name.
+     * @param addr
+     *            The address of the metadata record.
+     * 
+     * @return The named index as loaded from the specified address.
+     */
+    protected IIndex loadBTree(IRawStore store, String name, long addr) {
+        
+        return new BTree(this.store, BTreeMetadata.read(this.store, addr));
 
     }
     
@@ -170,13 +194,20 @@ public class NameAddrBTree extends BTree {
      * @exception IllegalArgumentException
      *                if there is already an index registered under that name.
      */
-    public void add(String name,BTree btree) {
+    public void add(String name,IIndex btree) {
         
         if (name == null)
             throw new IllegalArgumentException();
 
         if (btree == null)
             throw new IllegalArgumentException();
+        
+        if( ! (btree instanceof ICommitter) ) {
+            
+            throw new IllegalArgumentException("Index does not implement: "
+                    + ICommitter.class);
+            
+        }
 
         final byte[] key = getKey(name);
         
@@ -187,7 +218,7 @@ public class NameAddrBTree extends BTree {
         }
         
         // flush btree to the store to get the metadata record address.
-        final long addr = btree.write();
+        final long addr = ((ICommitter)btree).handleCommit();
         
         // add an entry to the persistent index.
         super.insert(key,new Entry(name,addr));

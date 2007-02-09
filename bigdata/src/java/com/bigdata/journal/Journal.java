@@ -57,6 +57,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
@@ -464,7 +466,7 @@ public class Journal implements IJournal {
 
     /**
      * The index of the root slot whose value is the address of the persistent
-     * {@link NameAddrBTree} mapping names to {@link BTree}s registered for the
+     * {@link Name2Addr} mapping names to {@link BTree}s registered for the
      * store.
      */
     public static transient final int ROOT_NAME2ADDR = 0;
@@ -474,7 +476,7 @@ public class Journal implements IJournal {
      * named index. The keys are index names (unicode strings). The values are
      * the last known {@link Addr address} of the named btree.
      */
-    private NameAddrBTree name2Addr;
+    private Name2Addr name2Addr;
 
     // private final IConflictResolver conflictResolver;
     //    
@@ -1702,7 +1704,7 @@ public class Journal implements IJournal {
              */
 
             // create btree mapping names to addresses.
-            name2Addr = new NameAddrBTree(this);
+            name2Addr = new Name2Addr(this);
 
         } else {
 
@@ -1710,7 +1712,7 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            name2Addr = new NameAddrBTree(this, addr);
+            name2Addr = new Name2Addr(this, BTreeMetadata.read(this, addr));
 
         }
 
@@ -1719,7 +1721,7 @@ public class Journal implements IJournal {
 
     }
     
-    public void registerIndex(String name, BTree btree) {
+    public IIndex registerIndex(String name, IIndex btree) {
 
         if( getIndex(name) != null ) {
             
@@ -1730,17 +1732,19 @@ public class Journal implements IJournal {
         // add to the persistent name map.
         name2Addr.add(name, btree);
         
+        return btree;
+        
     }
 
 
     /**
-     * Return the named unisolated btree. Writes on the returned btree will be
+     * Return the named index (unisolated). Writes on the returned index will be
      * made restart-safe with the next {@link #commit()} regardless of the
      * success or failure of a transaction. Transactional writes must use the
      * same named method on the {@link Tx} in order to obtain an isolated
      * version of the named btree.
      */
-    public BTree getIndex(String name) {
+    public IIndex getIndex(String name) {
 
         if(name==null) throw new IllegalArgumentException();
         

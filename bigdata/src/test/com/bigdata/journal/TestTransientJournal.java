@@ -53,7 +53,7 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.rawstore.AbstractRawStore2TestCase;
+import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -145,7 +145,7 @@ public class TestTransientJournal extends AbstractTestCase {
     }
             
     /**
-     * Test suite integration for {@link AbstractRawStore2TestCase}.
+     * Test suite integration for {@link AbstractRawStoreTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -155,7 +155,7 @@ public class TestTransientJournal extends AbstractTestCase {
      *       and hence it is not possible to extend
      *       {@link AbstractRestartSafeTestCase}.
      */
-    public static class TestRawStore extends AbstractRawStore2TestCase {
+    public static class TestRawStore extends AbstractBufferStrategyTestCase {
         
         public TestRawStore() {
             super();
@@ -165,21 +165,27 @@ public class TestTransientJournal extends AbstractTestCase {
             super(name);
         }
 
-        public Properties getProperties() {
-
-            Properties properties = super.getProperties();
-
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
-
-            return properties;
-
-        }
-
-        protected IRawStore getStore() {
+        protected BufferMode getBufferMode() {
             
-            return new Journal(getProperties());
+            return BufferMode.Transient;
             
         }
+
+//        public Properties getProperties() {
+//
+//            Properties properties = super.getProperties();
+//
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//
+//            return properties;
+//
+//        }
+//
+//        protected IRawStore getStore() {
+//            
+//            return new Journal(getProperties());
+//            
+//        }
 
     }
 

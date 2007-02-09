@@ -47,70 +47,48 @@ Modifications:
 
 package com.bigdata.rawstore;
 
-import java.io.File;
-import java.io.IOException;
-
-
 /**
- * Test suite for {@link SimpleFileRawStore2}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSimpleFileRawStore2 extends AbstractRawStore2TestCase {
+public class TestSimpleMemoryRawStore extends AbstractRawStoreTestCase {
 
     /**
      * 
      */
-    public TestSimpleFileRawStore2() {
+    public TestSimpleMemoryRawStore() {
     }
 
     /**
      * @param name
      */
-    public TestSimpleFileRawStore2(String name) {
+    public TestSimpleMemoryRawStore(String name) {
         super(name);
     }
 
-    private boolean firstTime = true;
-    private SimpleFileRawStore2 store;
-    
     protected IRawStore getStore() {
-
-        File file = new File(getName()+".raw2");
-
-        if(firstTime && file.exists() && !file.delete()) {
-
-            throw new RuntimeException("Could not delete existing file: "
-                    + file.getAbsoluteFile());
-            
-        }
-                
-        firstTime = false;
         
-        try {
-        
-            store = new SimpleFileRawStore2(file,"rw");
-            
-            return store;
-            
-        }
-        catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
+        return new SimpleMemoryRawStore();
+
     }
     
-    public void tearDown() throws Exception {
+    public void test_ctor() {
         
-        super.tearDown();
+        new SimpleMemoryRawStore();
+
+        new SimpleMemoryRawStore(0);
         
-        if(store != null && store.isOpen()) {
+        new SimpleMemoryRawStore(10);
+        
+        try {
+
+            new SimpleMemoryRawStore(-1);
             
-            // force release of any file handle.
-            store.raf.close();
+            fail("Expecting: "+IllegalArgumentException.class);
+                
+        } catch(IllegalArgumentException ex) {
+            
+            System.err.println("Ignoring expected exception: "+ex);
             
         }
         

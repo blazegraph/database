@@ -56,10 +56,12 @@ import java.util.Properties;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.NameAddrBTree;
-import com.bigdata.journal.NameAddrBTree.Entry;
+import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.IndexSegmentMerger;
@@ -90,10 +92,10 @@ import com.bigdata.rawstore.Bytes;
  * All writes bound for any partition of any index are absorbed on this
  * {@link Journal}. For each {@link PartitionedIndex}, there is a
  * corresponding {@link BTree} that absorbs writes (including deletes) on the
- * journal. On overflow, {@link Journal}, the backing store is frozen and a new
+ * slave. On overflow, {@link Journal}, the backing store is frozen and a new
  * buffer and backing store are deployed to absorb further writes. During this
  * time, reads on the {@link PartitionedJournal} are served by a {@link FusedView}
- * of the data on the new journal and the data on the old journal.
+ * of the data on the new slave and the data on the old slave.
  * </p>
  * <p>
  * While reads and writes proceed in the forground on the new buffer and backing
@@ -106,7 +108,7 @@ import com.bigdata.rawstore.Bytes;
  * If there is an existing {@link IndexSegment} for a partition then a
  * compacting merge MAY be performed. Otherwise a new {@link IndexSegment} is
  * generated, possibly resulting in more than one {@link IndexSegment} for the
- * same partition. Once all data from the journal are stable in the appropriate
+ * same partition. Once all data from the slave are stable in the appropriate
  * {@link IndexSegment}s, the old {@link Journal} is closed and either deleted
  * synchronously or marked for deletion. Each {@link IndexSegment} built in this
  * manner contains a historical snapshot of data written on {@link Journal} for
@@ -152,10 +154,10 @@ public class PartitionedJournal implements IJournal {
     /**
      * The {@link Journal} currently serving requests for the store.
      */
-    private SlaveJournal journal;
+    private SlaveJournal slave;
 
     /**
-     * The name of the directory in which the journal files will be created.
+     * The name of the directory in which the slave files will be created.
      */
     private final File journalDir;
     
@@ -176,37 +178,54 @@ public class PartitionedJournal implements IJournal {
     private final File tmpDir;
     
     /**
-     * The basename for the journal files.
+     * The basename for the slave files.
      * 
-     * @todo On restart, the most recent journal file will be loaded. Is that a
+     * @todo On restart, the most recent slave file will be loaded. Is that a
      *       wise policy?  Do we want to do an atomic rename after overflow?
      */
     private final String basename;
 
     /**
-     * The recommened extension for journal files.
+     * The recommened extension for slave files.
      */
-    private static final String JNL = ".jnl";
+    public static final String JNL = ".jnl";
     
     /**
      * The recommened extension for index segment files.
      */
-    private static final String SEG = ".seg";
-    
+    public static final String SEG = ".seg";
+
+    /**
+     * Until a btree has at least this many entries it will simply be migrated
+     * to the new slave on {@link #overflow()}. After it reaches this
+     * threshold it will be evicted to an {@link IndexSegment} on
+     * {@link #overflow()}.
+     * 
+     * @todo this will probably be restated in terms of estimated bytes required
+     *       to store the serialized btree.
+     */
+    protected final int migrationThreshold;
+
+    /**
+     * Options for the {@link PartitionedJournal}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     public static class Options extends com.bigdata.journal.Options {
 
         /**
          * <code>basename</code> - The property whose value is the basename of
-         * journal files that will be created (no default).
+         * slave files that will be created (no default).
          */
         public static final String BASENAME = "basename";
         
         /**
-         * <code>journal.dir</code> - The property whose value is the name of
-         * the directory in which new journal files will be created. When not
+         * <code>slave.dir</code> - The property whose value is the name of
+         * the directory in which new slave files will be created. When not
          * specified the default is the current directory.
          */
-        public static final String JOURNAL_DIR = "journal.dir";
+        public static final String JOURNAL_DIR = "slave.dir";
 
         /**
          * <code>segment.dir</code> - The property whose value is the name of
@@ -222,17 +241,33 @@ public class PartitionedJournal implements IJournal {
          * property named <code>java.io.tmpdir</code>
          */
         public static final String TMP_DIR = "tmp.dir";
+
+        /**
+         * <code>migrationThreshold</code> - The name of a property whose
+         * value is the minimum #of entries in a btree before the btree will be
+         * evicted to to an {@link IndexSegment} on
+         * {@link PartitionedJournal#overflow()}.  A btree with fewer entries is
+         * simply copied onto the new slave.
+         */
+        public static final String MIGRATION_THRESHOLD = "migrationThreshold";
+        
+    }
+    
+    public SlaveJournal getSlave() {
+        
+        return slave;
         
     }
     
     /**
-     * Create a new journal capable of supporting partitioned indices. 
+     * Create a new slave capable of supporting partitioned indices. 
      */
     public PartitionedJournal(Properties properties) {
         
         String val;
+        int migrationThreshold = 1000; // default.
 
-        // "journal.dir"
+        // "slave.dir"
         val = properties.getProperty(Options.JOURNAL_DIR);
         
         journalDir = val == null?new File("."):new File(val); 
@@ -291,7 +326,7 @@ public class PartitionedJournal implements IJournal {
         }
 
         /*
-         * Scan the journal directory for basename*.jnl. Open the most current
+         * Scan the slave directory for basename*.jnl. Open the most current
          * file found in that directory. If no file is found, then create one.
          */
         
@@ -315,10 +350,29 @@ public class PartitionedJournal implements IJournal {
             
         }
         
+        System.err.println("file: "+file);
         properties.setProperty(Options.FILE, file.toString());
+
+        /*
+         * "migrationThreshold"
+         */
+        val = properties.getProperty(Options.MIGRATION_THRESHOLD);
         
-        // Create the initial slave journal.
-        this.journal = new SlaveJournal(this,properties);
+        if( val != null) {
+
+            migrationThreshold = Integer.parseInt(val);
+            
+            if (migrationThreshold < 0)
+                throw new RuntimeException(Options.MIGRATION_THRESHOLD
+                        + " is negative");
+         
+        }
+        this.migrationThreshold = migrationThreshold;
+        
+        /* 
+         * Create the initial slave slave.
+         */
+        this.slave = new SlaveJournal(this,properties);
         
     }
     
@@ -329,11 +383,11 @@ public class PartitionedJournal implements IJournal {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class SlaveJournal extends Journal {
+    public static class SlaveJournal extends Journal {
         
         /**
          * The index of the root slot whose value is the address of the persistent
-         * {@link NameAddrBTree} mapping names to {@link MetadataIndex}s registered
+         * {@link Name2Addr} mapping names to {@link MetadataIndex}s registered
          * for the store.
          */
         public static transient final int ROOT_NAME_2_METADATA_ADDR = 1;
@@ -344,7 +398,7 @@ public class PartitionedJournal implements IJournal {
          * (unicode strings). The values are the last known {@link Addr address} of
          * the {@link MetadataIndex} for the named btree.
          */
-        protected NameAddrBTree name2MetadataAddr;
+        protected Name2MetadataAddr name2MetadataAddr;
 
         private final IJournal master;
         
@@ -405,7 +459,7 @@ public class PartitionedJournal implements IJournal {
                  */
 
                 // create btree mapping names to addresses.
-                name2MetadataAddr= new NameAddrBTree(this);
+                name2MetadataAddr= new Name2MetadataAddr(this);
 
             } else {
 
@@ -413,7 +467,8 @@ public class PartitionedJournal implements IJournal {
                  * Reload the btree from its root address.
                  */
 
-                name2MetadataAddr = new NameAddrBTree(this, addr);
+                name2MetadataAddr = new Name2MetadataAddr(this, BTreeMetadata
+                        .read(this, addr));
 
             }
 
@@ -423,13 +478,17 @@ public class PartitionedJournal implements IJournal {
         }
         
         /**
-         * Registers a {@link PartitionedIndex} under the given name and assigns
-         * the supplied {@link BTree} to absorb writes for that index.
+         * Registers and returns {@link PartitionedIndex} under the given name
+         * and assigns the supplied {@link BTree} to absorb writes for that
+         * {@link PartitionedIndex}.
          * <p>
          * A {@link MetadataIndex} is also registered under the given name and
          * an initial partition for that index is created using the separator
          * key <code>new byte[]{}</code>. The partition will initially
          * consist of zero {@link IndexSegment}s.
+         * <p>
+         * Note: The returned object is invalid once the
+         * {@link PartitionedJournal} {@link PartitionedJournal#overflow()}s.
          * 
          * @todo There should also be an unisolated DROP INDEX that simply
          *       removes the index and its resources, including secondary index
@@ -439,13 +498,21 @@ public class PartitionedJournal implements IJournal {
          *       achieved by taking the index offline in the metadata index and
          *       invalidating all of the clients. A similar "ADD INDEX" method
          *       would create a distributed index and make it available to
-         *       clients.
+         *       clients. (And a rename index method, but note that names in the
+         *       file system would not change.)
+         * 
+         * @todo use a prototype model so that the registered btree type is
+         *       preserved? (Only the metadata extensions are preserved right
+         *       now).  One way to do this is by putting the constructor on the
+         *       metadata object.  Another is to make the btree Serializable and
+         *       then just declare everything else as transient.
          */
-        public void registerIndex(String name, BTree btree) {
+        public IIndex registerIndex(String name, IIndex btree) {
 
-            if( getIndex(name) != null ) {
+            if( super.getIndex(name) != null ) {
                 
-                throw new IllegalStateException("BTree already registered: name="+name);
+                throw new IllegalStateException("Already registered: name="
+                        + name);
                 
             }
 
@@ -456,27 +523,41 @@ public class PartitionedJournal implements IJournal {
                 
             }
             
+            if (!(btree instanceof BTree)) {
+            
+                throw new IllegalArgumentException("Index must extend: "
+                        + BTree.class);
+                
+            }
+            
             MetadataIndex mdi = new MetadataIndex(this,
-                    BTree.DEFAULT_BRANCHING_FACTOR);
+                    BTree.DEFAULT_BRANCHING_FACTOR, name);
+            
+            // create the initial partition which can accept any key.
+            mdi.put(new byte[]{}, new PartitionMetadata(0));
             
             // add to the persistent name map.
             name2MetadataAddr.add(name, mdi);
 
-            // now register the mutable btree on the index.
-            super.registerIndex(name, btree);
+            /*
+             * Now register the partitioned index on the super class.
+             */
+            return super.registerIndex(name, new PartitionedIndex(
+                    (BTree) btree, mdi));
             
         }
         
-        public BTree getIndex(String name) {
+        public IIndex getIndex(String name) {
+
+            IIndex index = super.getIndex(name);
             
-            /*
-             * FIXME this needs to provide a canonicalizing mapping returning
-             * the PartitionedIndex. We need to change the interface for the return
-             * type to IIndex.  registerIndex needs to wrap the BTree and return 
-             * the object that would be returned by getIndex, so I have to change
-             * its signature.
-             */ 
-            throw new UnsupportedOperationException();
+            if(index instanceof BTree) {
+                
+                index = new PartitionedIndex((BTree)index,getMetadataIndex(name));
+                
+            }
+
+            return index;
             
         }
 
@@ -505,14 +586,14 @@ public class PartitionedJournal implements IJournal {
      * <ol>
      * <li>we need a place to store the metadata index. if this is the same
      * Journal on which we are storing normal writes, then we need to copy the
-     * metadata index into the new journal or evict it to a segment just like
+     * metadata index into the new slave or evict it to a segment just like
      * the data indices. </li>
      * <li> writes on a partitioned btree just go into the corresponding btree
-     * on the journal (assuming one journal for all partitions, e.g., scale up
+     * on the slave (assuming one slave for all partitions, e.g., scale up
      * but not scale out). </li>
      * <li> reads on a partitioned btree must read a fused view over (a) the
      * partitions relevant to the query; and (b) the mutable btree on the
-     * journal and any index segment(s) for that parition.</li>
+     * slave and any index segment(s) for that parition.</li>
      * </ol>
      * </p>
      * <p>
@@ -522,15 +603,15 @@ public class PartitionedJournal implements IJournal {
      * </li>
      * <li>Initialize the metadata index with a single partition for each named
      * btree that is registered on the Journal. </li>
-     * <li> Detect overflow only at commit and extend the journal as necessary
+     * <li> Detect overflow only at commit and extend the slave as necessary
      * until the next commit. </li>
      * <li> On overflow, open a Journal using the same strategy, copy the
-     * metadata index over into the new journal. Synchronously, evict all
-     * partitions written on for all btrees written on in the old journal onto
+     * metadata index over into the new slave. Synchronously, evict all
+     * partitions written on for all btrees written on in the old slave onto
      * index segments. If there is an existing index segment, then use a
      * compacting merge. Finally, update the delegation logic to use a fused
      * view for reads against each partition of each btree. The inputs to that
-     * fused view are the named mutable btree on new journal and the
+     * fused view are the named mutable btree on new slave and the
      * corresponding index segment.</li>
      * </ol>
      * </p>
@@ -552,18 +633,18 @@ public class PartitionedJournal implements IJournal {
      * @todo Support dynamic split/join of partitions.
      * 
      * @todo Regardless of whether one or many partitioned trees are on the
-     *       journal then an export of that tree into an index segment will
+     *       slave then an export of that tree into an index segment will
      *       result in an mostly random read over the address space since the
-     *       order which nodes and leaves are written onto the journal does not
+     *       order which nodes and leaves are written onto the slave does not
      *       correspond directly to the total ordering of the btree. if the
-     *       journal is in disk-only mode then it makes sense to slurp the
+     *       slave is in disk-only mode then it makes sense to slurp the
      *       entire disk file into a buffer during the export process to reduce
      *       multiple disk seeks with a single sequential read. the buffer can
      *       be discarded as soon as the btrees have been exported onto their
      *       various segment(s).
      */
     public void overflow() {
-        
+               
         synchronousOverflow();
         
     }
@@ -574,9 +655,9 @@ public class PartitionedJournal implements IJournal {
          * Create the new buffer.
          */
         
-        Properties properties = journal.getProperties();
+        Properties properties = slave.getProperties();
 
-        if( journal.isStable() ) {
+        if( slave.isStable() ) {
             
             /*
              * Override the filename with a unique filename based on the
@@ -587,17 +668,17 @@ public class PartitionedJournal implements IJournal {
             
         }
         
-        // The new journal.
+        // The new slave.
         SlaveJournal newJournal = new SlaveJournal(this,properties);
 
-        // The journal that overflowed.
-        final SlaveJournal oldJournal = journal;
+        // The slave that overflowed.
+        final SlaveJournal oldJournal = slave;
         
         /*
          * We need to consider each named btree registered on this store. We can
          * not consider only those btrees which have been touched since the
          * store was last opened since there may be multiple restarts before the
-         * journal overflows.
+         * slave overflows.
          */
         Iterator itr = oldJournal.name2MetadataAddr.entryIterator();
         
@@ -609,9 +690,14 @@ public class PartitionedJournal implements IJournal {
             final String name = ((Entry) itr.next()).name;
             
             /*
-             * The mutable btree on the journal for the named PartitionedIndex.
+             * The named PartitionedIndex.
              */
-            final BTree oldBTree = getIndex(name);
+            final PartitionedIndex oldIndex = ((PartitionedIndex) getIndex(name));
+            
+            /*
+             * The mutable btree on the slave for the named PartitionedIndex.
+             */
+            final BTree oldBTree = oldIndex.btree;
 
             /*
              * The metadata index describing the partitions for the named
@@ -625,12 +711,12 @@ public class PartitionedJournal implements IJournal {
             
             final int entryCount = oldBTree.getEntryCount();
 
-            // Create empty btree on the new journal.
+            // Create empty btree on the new slave.
             final BTree newBTree = new BTree(newJournal, oldBTree
                     .getBranchingFactor(), oldBTree.getNodeSerializer()
                     .getValueSerializer());
 
-            // Register the btree under the same name on the new journal.
+            // Register the btree under the same name on the new slave.
             newJournal.registerIndex(name, newBTree);
 
             if (entryCount == 0) {
@@ -640,7 +726,7 @@ public class PartitionedJournal implements IJournal {
                  * buffer.
                  */
                 
-            } else if (entryCount < 1000) {
+            } else if (entryCount < migrationThreshold) {
             
                 /*
                  * There are only a few entries so just copy the btree onto the
@@ -657,7 +743,7 @@ public class PartitionedJournal implements IJournal {
                  */
                 try {
                     
-                    evict(name,oldBTree,mdi);
+                    evict(name,oldIndex,mdi);
                     
                 } catch(IOException ex) {
                     
@@ -685,12 +771,17 @@ public class PartitionedJournal implements IJournal {
          * 
          * @todo consider scheduling the old buffer for deletion instead so that
          * we have some time to verify that the new index segments are good
-         * before deleting the buffered writes.
+         * before deleting the buffered writes.  We are already doing this with
+         * the old segments.
          */
         
-        journal = newJournal;
+        // atomic commit makes these changes restart safe
+        newJournal.commit();
 
-        // immediate shutdown.
+        // Change to the new journal.
+        slave = newJournal;
+
+        // immediate shutdown of the old journal.
         oldJournal.close();
         
         // delete the old backing file (if any).
@@ -703,7 +794,7 @@ public class PartitionedJournal implements IJournal {
      * partitions spanned by the keys in the btree.
      * <p>
      * This implementation assumes a synchronous compacting merge of all btrees
-     * on the journal. All existing index segments are closed as they are
+     * on the slave. All existing index segments are closed as they are
      * processed but the new index segments are NOT opened until they are
      * needed. The old index segments are immediately marked as
      * {@link IndexSegmentLifeCycleEnum#DEAD} in the {@link SegmentMetadata} and
@@ -718,13 +809,13 @@ public class PartitionedJournal implements IJournal {
      * 
      * @param name
      *            The name of the index.
-     * 
-     * @param btree
-     *            The btree.
+     * @param oldIndex
+     *            The partitioned index that is being evicted.
      * @param mdi
      *            The metadata index defining the partitions for the btree.
      */
-    protected void evict(String name,BTree btree, MetadataIndex mdi) throws IOException {
+    protected void evict(String name, PartitionedIndex oldIndex,
+            MetadataIndex mdi) throws IOException {
 
         /*
          * The branching factor for the generated index segments @todo refactor
@@ -760,12 +851,12 @@ public class PartitionedJournal implements IJournal {
              * 
              * This control path is used when there is no pre-existing index
              * segment for a partition and the only data is in the mutable btree
-             * on the journal.
+             * on the slave.
              */
 
             File outFile = getSegmentFile(name,pmd.partId,segId);
 
-            new IndexSegmentBuilder(outFile, null, btree, mseg, 0d);
+            new IndexSegmentBuilder(outFile, null, oldIndex.btree, mseg, 0d);
 
             /*
              * update the metadata index for this partition.
@@ -785,22 +876,16 @@ public class PartitionedJournal implements IJournal {
         } else {
 
             /*
-             * Evict the merge of the mutable btree on the journal and the
+             * Evict the merge of the mutable btree on the slave and the
              * existing index segment into another index segment.
              */
 
             System.err.println("Evicting and merging with existing segment.");
 
-            /*
-             * FIXME get the current index segment for the partition!
-             * 
-             * This needs to be obtained from the PartitionedIndex. getIndex()
-             * needs to be modified on the SlaveJournal to return a partitioned
-             * index. The partitioned index is responsible for maintaining a
-             * canonicalizing mapping and keeping hold of and expiring index
-             * segments based on use.
-             */
-            final IndexSegment seg;
+            final FusedView view = (FusedView)oldIndex.getView(separatorKey);
+            
+            // @todo assumes only one live index segment for the partition.
+            final IndexSegment seg = (IndexSegment)view.srcs[1];
 
             // tmp file for the merge process.
             File tmpFile = File.createTempFile("merge", ".tmp", tmpDir);
@@ -810,17 +895,17 @@ public class PartitionedJournal implements IJournal {
             // output file for the merged segment.
             File outFile = getSegmentFile(name, pmd.partId, segId);
 
-            // merge the data from the btree on the journal and the index
+            // merge the data from the btree on the slave and the index
             // segment.
             MergedLeafIterator mergeItr = new IndexSegmentMerger(tmpFile,
-                    mseg2, btree, seg).merge();
+                    mseg2, oldIndex.btree, seg).merge();
 
             // build the merged index segment.
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
-                    mseg, btree.getNodeSerializer().getValueSerializer(),
-                    true/* fullyBuffer */, false/* useChecksum */,
-                    null/* recordCompressor */, 0d/* errorRate */);
+                    mseg, oldIndex.btree.getNodeSerializer()
+                            .getValueSerializer(), true/* fullyBuffer */,
+                    false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */);
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but
@@ -977,7 +1062,7 @@ public class PartitionedJournal implements IJournal {
     }
     
     /**
-     * Creates the name for the new backing file when the journal
+     * Creates the name for the new backing file when the slave
      * {@link #overflow()}s.
      * 
      * @todo this should be based on a more rigid pattern, on the original
@@ -1021,7 +1106,7 @@ public class PartitionedJournal implements IJournal {
 
         if (!file.delete()) {
 
-            throw new RuntimeException("Unable to delete new journal file");
+            throw new RuntimeException("Unable to delete new slave file");
 
         }
         
@@ -1030,63 +1115,63 @@ public class PartitionedJournal implements IJournal {
     }
 
     /*
-     * delegation to the current journal.
+     * delegation to the current slave.
      */
     
     public Properties getProperties() {
-        return journal.getProperties();
+        return slave.getProperties();
     }
 
     public void close() {
-        journal.close();
+        slave.close();
     }
 
     public void force(boolean metadata) {
-        journal.force(metadata);
+        slave.force(metadata);
     }
 
     public boolean isOpen() {
-        return journal.isOpen();
+        return slave.isOpen();
     }
 
     public boolean isStable() {
-        return journal.isStable();
+        return slave.isStable();
     }
 
     public ByteBuffer read(long addr, ByteBuffer dst) {
-        return journal.read(addr, dst);
+        return slave.read(addr, dst);
     }
 
     public long write(ByteBuffer data) {
-        return journal.write(data);
+        return slave.write(data);
     }
 
     public void commit() {
-        journal.commit();
+        slave.commit();
     }
 
     public long getAddr(int rootSlot) {
-        return journal.getAddr(rootSlot);
+        return slave.getAddr(rootSlot);
     }
 
     public void setCommitter(int rootSlot, ICommitter committer) {
-        journal.setCommitter(rootSlot, committer);
+        slave.setCommitter(rootSlot, committer);
     }
 
-    public BTree getIndex(String name) {
-        return journal.getIndex(name);
+    public IIndex getIndex(String name) {
+        return slave.getIndex(name);
     }
 
-    public void registerIndex(String name, BTree btree) {
-        journal.registerIndex(name, btree);
+    public IIndex registerIndex(String name, IIndex btree) {
+        return slave.registerIndex(name, btree);
     }
 
     public void discardCommitters() {
-        journal.discardCommitters();
+        slave.discardCommitters();
     }
 
     public void setupCommitters() {
-        journal.setupCommitters();
+        slave.setupCommitters();
     }
 
 }

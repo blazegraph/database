@@ -60,7 +60,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -485,7 +485,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public BTree getBTree(int branchingFactor) {
         
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
         
         final int leafQueueCapacity = 10000;
         

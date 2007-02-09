@@ -70,7 +70,7 @@ public class FusedView implements IIndex {
     /**
      * Holds the various btrees that are the sources for the view.
      */
-    private final AbstractBTree[] srcs;
+    public final AbstractBTree[] srcs;
     
     public FusedView(AbstractBTree src1, AbstractBTree src2) {
         

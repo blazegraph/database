@@ -48,10 +48,8 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
-import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.rawstore.AbstractRawStore2TestCase;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -63,49 +61,19 @@ import com.bigdata.rawstore.IRawStore;
  * root blocks.
  * 
  * @todo verify {@link IBufferStrategy#truncate(long)}.  note that you can not
- * extent a mapped file.  note that the Direct mode must extend both the file
+ * extend a mapped file.  note that the Direct mode must extend both the file
  * and the buffer while the Disk mode only extends the file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRestartSafeTestCase extends AbstractRawStore2TestCase {
+abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategyTestCase {
 
     public AbstractRestartSafeTestCase() {
     }
 
     public AbstractRestartSafeTestCase(String name) {
         super(name);
-    }
-    
-    abstract protected BufferMode getBufferMode();
-    
-    public Properties getProperties() {
-
-        if (properties == null) {
-
-            properties = super.getProperties();
-
-            properties.setProperty(Options.BUFFER_MODE, getBufferMode()
-                    .toString());
-
-            properties.setProperty(Options.SEGMENT, "0");
-
-            // Note: also deletes the file before it is used.
-            properties.setProperty(Options.FILE, AbstractTestCase
-                    .getTestJournalFile(getName(), properties));
-        }
-        
-        return properties;
-
-    }
-    
-    private Properties properties;
-
-    protected IRawStore getStore() {
-        
-        return new Journal(getProperties());
-        
     }
     
     /**
@@ -343,6 +311,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractRawStore2TestC
             
         }
 
+        store.close();
+        
     }
     
 }

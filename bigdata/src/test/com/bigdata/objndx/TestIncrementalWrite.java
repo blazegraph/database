@@ -49,7 +49,7 @@ package com.bigdata.objndx;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore2;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for the logic performing incremental writes of nodes and leaves
@@ -78,7 +78,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
        
     public BTree getBTree(int branchingFactor, int queueCapacity, int queueScan) {
         
-        IRawStore store = new SimpleMemoryRawStore2();
+        IRawStore store = new SimpleMemoryRawStore();
         
         BTree btree = new BTree(store,
                 branchingFactor,

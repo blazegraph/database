@@ -86,6 +86,16 @@ public class MetadataIndex extends BTree {
     private final String name;
     
     /**
+     * The name of the metadata index, which is the always the same as the name
+     * under which the corresponding {@link PartitionedIndex} was registered.
+     */
+    final public String getName() {
+        
+        return name;
+        
+    }
+    
+    /**
      * Create a new {@link MetadataIndex}.
      * 
      * @param store
@@ -105,11 +115,17 @@ public class MetadataIndex extends BTree {
         
     }
 
-    public MetadataIndex(IRawStore store, long metadataId) {
+    public MetadataIndex(IRawStore store, BTreeMetadata metadata) {
         
-        super(store, BTreeMetadata.read(store, metadataId));
+        super(store, metadata);
         
         name = ((MetadataIndexMetadata)metadata).name;
+        
+    }
+
+    protected BTreeMetadata newMetadata() {
+        
+        return new MetadataIndexMetadata(this);
         
     }
 
@@ -131,13 +147,13 @@ public class MetadataIndex extends BTree {
         public final String name;
         
         /**
-         * @param btree
+         * @param mdi
          */
-        protected MetadataIndexMetadata(BTree btree) {
+        protected MetadataIndexMetadata(MetadataIndex mdi) {
 
-            super(btree);
+            super(mdi);
             
-            this.name = ((MetadataIndex)btree).name;
+            this.name = mdi.name;
             
         }
 
@@ -207,6 +223,8 @@ public class MetadataIndex extends BTree {
     public PartitionMetadata find(byte[] key) {
         
         final int index = findIndexOf(key);
+        
+        if(index == -1) return null;
         
         return (PartitionMetadata) super.valueAt( index );
         

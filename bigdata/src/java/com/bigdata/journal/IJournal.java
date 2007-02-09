@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import java.util.Properties;
 
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -77,13 +78,30 @@ public interface IJournal extends IRawStore, IAtomicStore, IStore {
      * <p>
      * Note: A named index must be registered outside of any transaction before
      * it may be used inside of a transaction.
+     * <p>
+     * Note: The return object MAY differ from the supplied {@link BTree}. For
+     * example, when using partitioned indices the {@link BTree} is encapsulated
+     * within an abstraction that knows how to managed index partitions.
      * 
      * @param name
-     *            The name that can be used to recover the btree.
+     *            The name that can be used to recover the index.
      * 
      * @param btree
      *            The btree.
+     * 
+     * @return The object that would be returned by {@link #getIndex(String)}.
+     * 
+     * @see IStore#getIndex(String)
+     * 
+     * @todo The provided {@link BTree} must serve as a prototype so that it is
+     * possible to retain additional metadata.
      */
-    public void registerIndex(String name, BTree btree);
+    public IIndex registerIndex(String name, IIndex btree);
+    
+    /**
+     * Return the named index which MAY may be invalidated by a
+     * {@link IAtomicStore#commit()}.
+     */
+    public IIndex getIndex(String name);
 
 }

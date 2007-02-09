@@ -23,10 +23,11 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
     protected final BufferMode bufferMode;
     
     /**
-     * The next offset at which a data item would be written on the store. This
-     * is updated each time a new record is written on the store. On restart,
-     * the value is initialized from the current root block. The current value
-     * is written as part of the new root block during each commit.
+     * The next offset at which a data item would be written on the store as an
+     * offset into the <em>user extent</em>. This is updated each time a new
+     * record is written on the store. On restart, the value is initialized from
+     * the current root block. The current value is written as part of the new
+     * root block during each commit.
      * <p>
      * Note: It is NOT safe to reload the current root block and therefore reset
      * this to an earlier offset unless all transactions are discarded. The
