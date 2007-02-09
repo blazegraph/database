@@ -129,14 +129,19 @@ public class PartitionMetadata {
      */
     public String[] getLiveSegmentFiles() {
 
-        int n = getLiveCount();
+        final int n = getLiveCount();
 
         String[] files = new String[n];
 
+        int k = 0;
+        
         for (int i = 0; i < segs.length; i++) {
 
-            if (segs[i].state == IndexSegmentLifeCycleEnum.LIVE)
-                files[i] = segs[i].filename;
+            if (segs[i].state == IndexSegmentLifeCycleEnum.LIVE) {
+
+                files[k++] = segs[i].filename;
+                
+            }
 
         }
 

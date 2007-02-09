@@ -54,6 +54,12 @@ import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * <p>
+ * An append-only persistence capable data structure supporting atomic commit,
+ * scalable named indices, and transactions. Writes are logically appended to
+ * the journal to minimize disk head movement.
+ * </p>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -91,12 +97,33 @@ public interface IJournal extends IRawStore, IAtomicStore, IStore {
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
      * 
-     * @see IStore#getIndex(String)
-     * 
      * @todo The provided {@link BTree} must serve as a prototype so that it is
-     * possible to retain additional metadata.
+     *       possible to retain additional metadata.
      */
     public IIndex registerIndex(String name, IIndex btree);
+    
+    /**
+     * Drops the named index (unisolated). The index is removed as a
+     * {@link ICommitter} and all resources dedicated to that index are
+     * reclaimed, including secondary index segment files, the metadata index,
+     * etc.
+     * 
+     * @param name
+     *            The name of the index to be dropped.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> does not identify a registered index.
+     * 
+     * @todo add a rename index method, but note that names in the file system
+     *       would not change.
+     * 
+     * @todo declare a method that returns or visits the names of the registered
+     *       indices.
+     * 
+     * @todo consider adding a delete method that releases all resources
+     *       (including indices) and then closes the journal.
+     */
+    public void dropIndex(String name);
     
     /**
      * Return the named index which MAY may be invalidated by a

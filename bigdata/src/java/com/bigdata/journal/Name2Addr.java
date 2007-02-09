@@ -227,6 +227,32 @@ public class Name2Addr extends BTree {
         name2BTree.put(name, btree);
         
     }
+
+    /**
+     * @param name
+     *
+     * @todo mark the index as invalid
+     */
+    public void dropIndex(String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        final byte[] key = getKey(name);
+        
+        if(!super.contains(key)) {
+            
+            throw new IllegalArgumentException("Not registered: "+name);
+            
+        }
+        
+        // remove the name -> btree mapping to the transient cache.
+        name2BTree.remove(name);
+
+        // remove the entry from the persistent index.
+        super.remove(key);
+
+    }
     
     /**
      * An entry in the persistent index.

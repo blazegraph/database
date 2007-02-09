@@ -161,7 +161,7 @@ public class IndexSegmentMerger {
         
         this.outFile = outFile;
         
-        if( outFile.exists() ) {
+        if( outFile.exists() && outFile.length() > 0) {
             
             throw new IOException("output file exists: "
                     + outFile.getAbsoluteFile());

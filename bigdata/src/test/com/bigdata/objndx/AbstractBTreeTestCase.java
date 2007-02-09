@@ -1542,7 +1542,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The btree that is being validated.
      */
-    public void assertSameBTree(AbstractBTree expected, AbstractBTree actual) {
+    static public void assertSameBTree(AbstractBTree expected, AbstractBTree actual) {
 
         assert expected != null;
         
@@ -1595,7 +1595,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     /**
      * Compares the total ordering of a btree against the total ordering of a
      * ground truth btree.
-     * 
+     * <p>
      * Note: This uses the {@link AbstractBTree#entryIterator()} method. Due to
      * the manner in which that iterator is implemented, the iterator does NOT
      * rely on the separator keys. Therefore while this validates the total
@@ -1611,11 +1611,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @see #doRandomLookupTest(String, AbstractBTree, byte[][], Object[])
      * @see #doRandomIndexOfTest(String, AbstractBTree, byte[][], Object[])
      */
-    protected void doEntryIteratorTest(AbstractBTree expected, AbstractBTree actual ) {
+    static public void doEntryIteratorTest(AbstractBTree expected, IIndex actual ) {
 
         IEntryIterator expectedItr = expected.entryIterator();
         
-        IEntryIterator actualItr = actual.entryIterator();
+        IEntryIterator actualItr = actual.rangeIterator(null,null);
         
         int index = 0;
         
@@ -1646,7 +1646,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 /*
                  * Lazily generate message.
                  */
-                fail("index=" + index, ex);
+                fail("Keys differ: index=" + index + ", expected="
+                        + BytesUtil.toString(expectedKey) + ", actual="
+                        + BytesUtil.toString(actualKey), ex);
                 
             }
 
@@ -1658,7 +1660,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 /*
                  * Lazily generate message.
                  */
-                fail("index=" + index + ", key=" + expectedKey, ex);
+                fail("Values differ: index=" + index + ", key="
+                        + BytesUtil.toString(expectedKey) + ", expected="
+                        + expectedVal + ", actual=" + actualVal, ex);
                 
             }
             
@@ -1686,7 +1690,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            The values in key order (out).
      */
-    protected void getKeysAndValues(AbstractBTree btree, byte[][] keys,
+    static public void getKeysAndValues(AbstractBTree btree, byte[][] keys,
             Object[] vals) {
         
         IEntryIterator itr = btree.entryIterator();
@@ -1730,7 +1734,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    protected void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
+    static public void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
         
         int nentries = btree.getEntryCount();
         
@@ -1784,7 +1788,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    protected void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
+    static public void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
         
         int nentries = btree.getEntryCount();
         

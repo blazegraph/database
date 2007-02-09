@@ -49,6 +49,7 @@ package com.bigdata.scaleup;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -151,6 +152,28 @@ public class PartitionedIndex implements IIndex, ICommitter {
         
         return segs;
 
+    }
+
+    /**
+     * Close all open views, including any backing index segments.
+     */
+    protected void closeViews() {
+
+        Iterator<Map.Entry<Integer,FusedView>> itr = views.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            FusedView view = itr.next().getValue();
+            
+            // @todo assumes one open segment per view.
+            IndexSegment seg = (IndexSegment)view.srcs[1];
+            
+            seg.close();
+            
+        }
+
+        views.clear();
+        
     }
     
     /**

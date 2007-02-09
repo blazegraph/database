@@ -59,15 +59,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 
 /**
  * <p>
- * An append-only persistence capable data structure supporting atomic commit
- * and transactions. Writes are logically appended to the journal to minimize
- * disk head movement.
+ * An append-only persistence capable data structure supporting atomic commit,
+ * scalable named indices, and transactions. Writes are logically appended to
+ * the journal to minimize disk head movement.
  * </p>
  * 
  * <p>
@@ -1735,7 +1734,12 @@ public class Journal implements IJournal {
         return btree;
         
     }
-
+    
+    public void dropIndex(String name) {
+        
+        name2Addr.dropIndex(name);
+        
+    }
 
     /**
      * Return the named index (unisolated). Writes on the returned index will be

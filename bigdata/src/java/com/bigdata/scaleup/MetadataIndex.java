@@ -53,13 +53,7 @@ import com.bigdata.rawstore.IRawStore;
  * metadata index for each distributed index. The keys of the metadata index are
  * the first key that would be directed into the corresponding index segment,
  * e.g., a <em>separator key</em> (this is just the standard btree semantics).
- * Keys in the metadata index are updated as index partitions are split (or
- * joined). Splits are performed when the fully compacted partition exceeds
- * ~200M. Joins of index segments are performed when sibling partitions could be
- * merged to produce a partition of ~100M. Splitting and joining partitions is
- * atomic and respects transaction isolation.
- * 
- * @todo split/join logic.
+ * The values are {@link PartitionMetadata} objects.
  * 
  * @todo locator logic on a cluster (a socket address in addition to the other
  *       information).
@@ -72,10 +66,10 @@ import com.bigdata.rawstore.IRawStore;
  *       index and in each index segment generated for that metadata index. we
  *       could also define a partition uuid. finally, each btree and index
  *       segment could have its own uuid. the index segment would also carry the
- *       uuid of the partition and the partitioned index.  This would also make
- *       it possible to determine which index segments belong to which partitions
- *       of which partitioned indices and effectively reconstruct the metadata
- *       index for a partitioned index from the data on the ground. 
+ *       uuid of the partition and the partitioned index. This would also make
+ *       it possible to determine which index segments belong to which
+ *       partitions of which partitioned indices and effectively reconstruct the
+ *       metadata index for a partitioned index from the data on the ground.
  */
 public class MetadataIndex extends BTree {
 
