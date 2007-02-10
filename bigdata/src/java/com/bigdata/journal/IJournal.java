@@ -67,6 +67,15 @@ public interface IJournal extends IRawStore, IAtomicStore, IStore {
 
     /**
      * A copy of the properties used to initialize this journal.
+     * 
+     * @todo consider making the properties restart safe so that they can be
+     *       read from the journal. This will let some properties be specified
+     *       on initialization while letting others default or be overriden on
+     *       restart. This is trivially accomplished by dedicating a root slot
+     *       to a Properties object, or a flattened Properties object serialized
+     *       as key-value pairs, in which case the data could just be loaded
+     *       into a btree and the btree api could be used to change the
+     *       persistent properties as necessary.
      */
     public Properties getProperties();
     

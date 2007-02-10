@@ -50,13 +50,11 @@ package com.bigdata.rdf;
 import java.io.File;
 import java.util.Properties;
 
-import javax.swing.text.html.Option;
-
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
-import com.bigdata.journal.Options;
+import com.bigdata.scaleup.PartitionedJournal.Options;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -98,6 +96,9 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
             properties.setProperty(Options.SEGMENT, "0");
             if(properties.getProperty(Options.FILE)==null) {
                 properties.setProperty(Options.FILE, getName()+".jnl");
+            }
+            if(properties.getProperty(Options.BASENAME)==null) {
+                properties.setProperty(Options.BASENAME, getName());
             }
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 //            properties.setProperty(Options.DELETE_ON_CLOSE,"true");

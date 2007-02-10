@@ -62,9 +62,10 @@ public class AutoIncCounter implements UserDefinedFunction, ICommitter {
     }
     
     /**
-     * The last identifier assigned.
+     * The next identifier that would be assigned (does not increment the
+     * counter).
      */
-    public long lastId() {
+    public long getCounter() {
         
         return nextId;
         

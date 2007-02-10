@@ -84,11 +84,15 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.scaleup.PartitionedJournal;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
 /**
- * A triple store based on bigdata.
+ * A triple store based on the <em>bigdata</em> architecture.
+ * 
+ * @todo refactor to use a delegation mechanism so that we can run with or
+ *       without partitioned indices.
  * 
  * @todo persue some alternative strategies for restart safety and scale: (1)
  *       TripleStore extends Journal and manages its indices directly as
@@ -227,7 +231,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends /* Partitioned*/Journal {
+public class TripleStore extends /*Partitioned*/Journal {
     
     static transient public Logger log = Logger.getLogger(TripleStore.class);
 
@@ -235,11 +239,11 @@ public class TripleStore extends /* Partitioned*/Journal {
      * Declare indices for root addresses for the different indices maintained
      * by the store.
      */
-    static public transient final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
-    static public transient final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
-    static public transient final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
-    static public transient final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
-    static public transient final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
+//    static public transient final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
+//    static public transient final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
+//    static public transient final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
+//    static public transient final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
+//    static public transient final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
     static public transient final int ROOT_COUNTER = RootBlockView.FIRST_USER_ROOT + 5;
     
     public RdfKeyBuilder keyBuilder;
@@ -255,6 +259,13 @@ public class TripleStore extends /* Partitioned*/Journal {
     private IIndex ndx_osp;
     private AutoIncCounter counter;
 
+    final String name_termId = "termId";
+    final String name_idTerm = "idTerm";
+
+    final String name_spo = "spo";
+    final String name_pos = "pos";
+    final String name_osp = "osp";
+
     /*
      * Note: access to the indices through these methods is required to support
      * partitioned indices since the latter introduce an indirection to: (a)
@@ -268,11 +279,80 @@ public class TripleStore extends /* Partitioned*/Journal {
      * place that hides the routing of btree api operations to the journals and
      * segments for each index partition.
      */
-    public IIndex getTermIdIndex() {return ndx_termId;}
-    public IIndex getIdTermIndex() {return ndx_idTerm;}
-    public IIndex getSPOIndex() {return ndx_spo;}
-    public IIndex getPOSIndex() {return ndx_pos;}
-    public IIndex getOSPIndex() {return ndx_osp;}
+    public IIndex getTermIdIndex() {
+
+        if(ndx_termId!=null) return ndx_termId;
+        
+        IIndex ndx = getIndex(name_termId);
+        
+        if(ndx==null) {
+            
+            ndx_termId = ndx = registerIndex(name_termId, new BTree(this,
+                    BTree.DEFAULT_BRANCHING_FACTOR, TermIdSerializer.INSTANCE));
+            
+        }
+        
+        return ndx;
+        
+    }
+    
+    public IIndex getIdTermIndex() {
+
+        if(ndx_idTerm!=null) return ndx_idTerm;
+        
+        IIndex ndx = getIndex(name_idTerm);
+
+        if (ndx == null) {
+
+            ndx_idTerm = ndx = registerIndex(name_idTerm,
+                    new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                            RdfValueSerializer.INSTANCE));
+
+        }
+
+        return ndx;
+
+    }
+
+    protected IIndex getStatementIndex(String name) {
+
+        IIndex ndx = getIndex(name);
+
+        if (ndx == null) {
+
+            ndx = registerIndex(name, new BTree(this,
+                    BTree.DEFAULT_BRANCHING_FACTOR,
+                    StatementSerializer.INSTANCE));
+
+        }
+
+        return ndx;
+
+    }
+
+    public IIndex getSPOIndex() {
+
+        if(ndx_spo!=null) return ndx_spo;
+
+        return ndx_spo = getStatementIndex(name_spo);
+        
+    }
+    
+    public IIndex getPOSIndex() {
+
+        if(ndx_pos!=null) return ndx_pos;
+
+        return ndx_pos = getStatementIndex(name_pos);
+
+    }
+    
+    public IIndex getOSPIndex() {
+        
+        if(ndx_osp!=null) return ndx_osp;
+
+        return ndx_osp = getStatementIndex(name_osp);
+
+    }
 
     /**
      * The counter used to assign term identifiers.
@@ -302,71 +382,71 @@ public class TripleStore extends /* Partitioned*/Journal {
 
         super.setupCommitters();
         
-        assert ndx_termId == null;
-        assert ndx_idTerm == null;
-        assert ndx_spo == null;
-        assert ndx_pos == null;
-        assert ndx_osp == null;
+//        assert ndx_termId == null;
+//        assert ndx_idTerm == null;
+//        assert ndx_spo == null;
+//        assert ndx_pos == null;
+//        assert ndx_osp == null;
         assert counter == null;
-
+//
         long addr;
-        
-        if((addr=getRootBlockView().getRootAddr(ROOT_TERM_ID))==0L) {
+//        
+//        if((addr=getAddr(ROOT_TERM_ID))==0L) {
+//
+//            ndx_termId = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+//                    TermIdSerializer.INSTANCE);
+//            
+//        } else {
+//            
+//            ndx_termId = new BTree(this, BTreeMetadata.read(this, addr));
+//            
+//        }
+//
+//        if((addr=getAddr(ROOT_ID_TERM))==0L) {
+//
+//            ndx_idTerm = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+//                    RdfValueSerializer.INSTANCE);
+//            
+//        } else {
+//            
+//            ndx_idTerm = new BTree(this, BTreeMetadata.read(this, addr));
+//            
+//        }
+//        
+//        if((addr=getAddr(ROOT_SPO))==0L) {
+//
+//            ndx_spo = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+//                    StatementSerializer.INSTANCE);
+//            
+//        } else {
+//            
+//            ndx_spo = new BTree(this, BTreeMetadata.read(this, addr));
+//            
+//        }
+//        
+//        if ((addr = getAddr(ROOT_POS)) == 0L) {
+//
+//            ndx_pos = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+//                    StatementSerializer.INSTANCE);
+//
+//        } else {
+//
+//            ndx_pos = new BTree(this, BTreeMetadata.read(this, addr));
+//
+//        }
+//
+//        if ((addr = getAddr(ROOT_OSP)) == 0L) {
+//
+//            ndx_osp = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+//                    StatementSerializer.INSTANCE);
+//
+//        } else {
+//
+//            ndx_osp = new BTree(this, BTreeMetadata.read(this, addr));
+//
+//        }
 
-            ndx_termId = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-                    TermIdSerializer.INSTANCE);
-            
-        } else {
-            
-            ndx_termId = new BTree(this, BTreeMetadata.read(this, addr));
-            
-        }
-
-        if((addr=getRootBlockView().getRootAddr(ROOT_ID_TERM))==0L) {
-
-            ndx_idTerm = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-                    RdfValueSerializer.INSTANCE);
-            
-        } else {
-            
-            ndx_idTerm = new BTree(this, BTreeMetadata.read(this, addr));
-            
-        }
-        
-        if((addr=getRootBlockView().getRootAddr(ROOT_SPO))==0L) {
-
-            ndx_spo = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-                    StatementSerializer.INSTANCE);
-            
-        } else {
-            
-            ndx_spo = new BTree(this, BTreeMetadata.read(this, addr));
-            
-        }
-        
-        if ((addr = getRootBlockView().getRootAddr(ROOT_POS)) == 0L) {
-
-            ndx_pos = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-                    StatementSerializer.INSTANCE);
-
-        } else {
-
-            ndx_pos = new BTree(this, BTreeMetadata.read(this, addr));
-
-        }
-
-        if ((addr = getRootBlockView().getRootAddr(ROOT_OSP)) == 0L) {
-
-            ndx_osp = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-                    StatementSerializer.INSTANCE);
-
-        } else {
-
-            ndx_osp = new BTree(this, BTreeMetadata.read(this, addr));
-
-        }
-
-        if ((addr = getRootBlockView().getRootAddr(ROOT_COUNTER)) == 0L) {
+        if ((addr = getAddr(ROOT_COUNTER)) == 0L) {
 
             // Note: first termId is ONE (1).  Zero is reserved.
             counter = new AutoIncCounter(this,1L);
@@ -380,15 +460,13 @@ public class TripleStore extends /* Partitioned*/Journal {
         /*
          * declare the comitters.
          */
-        setCommitter(ROOT_TERM_ID, (BTree) ndx_termId);
-        setCommitter(ROOT_ID_TERM, (BTree) ndx_idTerm);
-        setCommitter(ROOT_SPO, (BTree) ndx_spo);
-        setCommitter(ROOT_POS, (BTree) ndx_pos);
-        setCommitter(ROOT_OSP, (BTree) ndx_osp);
+//        setCommitter(ROOT_TERM_ID, (BTree) ndx_termId);
+//        setCommitter(ROOT_ID_TERM, (BTree) ndx_idTerm);
+//        setCommitter(ROOT_SPO, (BTree) ndx_spo);
+//        setCommitter(ROOT_POS, (BTree) ndx_pos);
+//        setCommitter(ROOT_OSP, (BTree) ndx_osp);
         setCommitter(ROOT_COUNTER, counter );
 
-        usage();
-        
     }
     
     /**
@@ -399,11 +477,12 @@ public class TripleStore extends /* Partitioned*/Journal {
         
         super.discardCommitters();
         
-        ndx_termId = null;
-        ndx_idTerm = null;
-        ndx_spo = null;
-        ndx_pos = null;
-        ndx_osp = null;
+//        ndx_termId = null;
+//        ndx_idTerm = null;
+//        ndx_spo = null;
+//        ndx_pos = null;
+//        ndx_osp = null;
+        counter = null;
         
     }
     
@@ -449,7 +528,7 @@ public class TripleStore extends /* Partitioned*/Journal {
      */
     public int getStatementCount() {
         
-        return ndx_spo.rangeCount(null,null);
+        return getSPOIndex().rangeCount(null,null);
         
     }
     
@@ -463,9 +542,9 @@ public class TripleStore extends /* Partitioned*/Journal {
         long _p = addTerm(p);
         long _o = addTerm(o);
 
-        ndx_spo.insert(keyBuilder.statement2Key(_s, _p, _o),null);
-        ndx_pos.insert(keyBuilder.statement2Key(_p, _o, _s),null);
-        ndx_osp.insert(keyBuilder.statement2Key(_p, _s, _p),null);
+        getSPOIndex().insert(keyBuilder.statement2Key(_s, _p, _o),null);
+        getPOSIndex().insert(keyBuilder.statement2Key(_p, _o, _s),null);
+        getOSPIndex().insert(keyBuilder.statement2Key(_p, _s, _p),null);
         
     }
 
@@ -480,7 +559,7 @@ public class TripleStore extends /* Partitioned*/Journal {
         if( (_p = getTerm(p)) == 0L ) return false;
         if( (_o = getTerm(o)) == 0L ) return false;
         
-        return ndx_spo.contains(keyBuilder.statement2Key(_s, _p, _o));
+        return getSPOIndex().contains(keyBuilder.statement2Key(_s, _p, _o));
         
     }
 
@@ -508,7 +587,9 @@ public class TripleStore extends /* Partitioned*/Journal {
 
         System.err.print("Writing " + numStmts + " statements...");
 
-        if (ndx_spo != null) {
+        { // SPO
+            
+            IIndex ndx_spo = getSPOIndex();
 
             { // sort
 
@@ -539,7 +620,9 @@ public class TripleStore extends /* Partitioned*/Journal {
 
         }
 
-        if (ndx_pos != null) {
+        { // POS
+
+            IIndex ndx_pos = getPOSIndex();
 
             { // sort
 
@@ -570,7 +653,9 @@ public class TripleStore extends /* Partitioned*/Journal {
 
         }
 
-        if (ndx_osp != null) {
+        { // OSP
+            
+            IIndex ndx_osp = getOSPIndex();
 
             { // sort
 
@@ -702,16 +787,17 @@ public class TripleStore extends /* Partitioned*/Journal {
             {
             
                 /*
-                 * Lookup the term in the term:id index. if it is there then
-                 * take its termId. Otherwise, insert the term into the term:id
-                 * index which gives us its termId.
+                 * Lookup the term in the term:id index. If it is there then
+                 * take its termId and mark it as 'known' so that we can avoid
+                 * testing the reverse index. Otherwise, insert the term into
+                 * the term:id index which gives us its termId.
                  * 
-                 * @todo modify to use the btree batch api.
+                 * @todo use batch api?
                  */
 
-                long _begin = System.currentTimeMillis();
-                
                 IIndex termId = getTermIdIndex();
+                
+                long _begin = System.currentTimeMillis();
                 
                 for (int i = 0; i < numTerms; i++) {
 
@@ -719,11 +805,31 @@ public class TripleStore extends /* Partitioned*/Journal {
 
                     if (!term.known) {
 
-                        // assign termId.
-                        term.termId = counter.nextId();
+                        assert term.termId==0L;
+                        assert term.key != null;
+
+                        // Lookup in the forward index.
+                        Long tmp = (Long)termId.lookup(term.key);
                         
-                        // insert into index.
-                        termId.insert(term.key, Long.valueOf(term.termId));
+                        if(tmp == null) { // not found.
+
+                            // assign termId.
+                            term.termId = counter.nextId();
+                        
+                            // insert into index.
+                            if(termId.insert(term.key, Long.valueOf(term.termId))!=null) {
+                                
+                                throw new AssertionError();
+                                
+                            }
+                            
+                        } else { // found.
+                        
+                            term.termId = tmp.longValue();
+                            
+                            term.known = true;
+                        
+                        }
                         
                     } else assert term.termId != 0L;
                     
@@ -758,18 +864,18 @@ public class TripleStore extends /* Partitioned*/Journal {
         {
         
             /*
-             * add terms to the reverse index. this is what we use to lookup the
-             * RDF value by its termId when we need to serialize some data as
-             * RDF/XML or the like.
+             * Add unknown terms to the reverse index, which is the index that
+             * we use to lookup the RDF value by its termId to serialize some
+             * data as RDF/XML or the like.
              * 
-             * @todo use batch api, insert iff not found (else sanity check for
-             * equivilence). pre-convert the termId:long to a byte[] using the
-             * key encoder so that we can batch this.
-             * 
-             * Note: We only insert terms that were reported as "not found" when we
-             * inserted them into the forward mapping.  this will reduce the #of
+             * Note: We only insert terms that were reported as "not found" when
+             * we inserted them into the forward mapping. This reduces the #of
              * index tests that we perform.
+             * 
+             * @todo use batch api?
              */
+            
+            IIndex idTerm = getIdTermIndex();
             
             long _begin = System.currentTimeMillis();
             
@@ -777,16 +883,18 @@ public class TripleStore extends /* Partitioned*/Journal {
 
                 _Value term = terms[i];
                 
-                if (term.known) {
-
-                    assert term.termId != 0L;
+                assert term.termId != 0L;
+                
+                if (!term.known) {
                     
                     final byte[] idKey = keyBuilder.id2key(term.termId);
 
-                    if (!ndx_termId.contains(idKey)) {
+                    if(idTerm.insert(idKey, term) != null) {
 
-                        ndx_idTerm.insert(idKey, terms[i]);
-
+                        // term was already in this index.
+                        
+                        throw new AssertionError();
+                        
                     }
                     
                     term.known = true; // now in the fwd and rev indices.
@@ -835,43 +943,51 @@ public class TripleStore extends /* Partitioned*/Journal {
          * term exists.
          */
 
-        final IIndex terms = getTermIdIndex();
+        final IIndex termId = getTermIdIndex();
+        final IIndex idTerm = getIdTermIndex();
 
+        // formulate key from the RDF value.
         final byte[] termKey = keyBuilder.value2Key(val);
 
-        Long tmp = (Long) terms.lookup(termKey);
+        // test the forward index.
+        Long tmp = (Long) termId.lookup(termKey);
 
         if (tmp != null) {
 
-            // the term was found on the forward lookup, so we are done.
+            /*
+             * the term was found on the forward lookup, so we are done.
+             */
+
             val.termId = tmp.longValue();
             
         } else {
             
-            // the term was not in the database.
-            val.termId = counter.nextId(); // next identifier.
-            terms.insert(termKey, val.termId); // insert to database.
+            /*
+             * the term was not in the database.
+             */
 
-            {
-                /*
-                 * and insert into the reverse mapping from identifier to term
-                 * as well.
-                 */
+            // assign the next term identifier from the persistent counter.
+            val.termId = counter.nextId();
+            
+            // insert into the forward mapping.
+            termId.insert(termKey, Long.valueOf(val.termId));
 
-                final byte[] idKey = keyBuilder.id2key(val.termId);
+            /*
+             * Insert into the reverse mapping from identifier to term.
+             */
 
-                if (!ndx_idTerm.contains(idKey)) {
+            final byte[] idKey = keyBuilder.id2key(val.termId);
 
-                    if (ndx_idTerm.insert(idKey, val) != null) {
-                        throw new AssertionError();
-                    }
-
-                }
-
+            if (idTerm.insert(idKey, val) != null) {
+    
+                throw new AssertionError();
+                        
             }
 
         }
 
+        val.known = true;
+        
         return val.termId;
 
     }
@@ -887,11 +1003,17 @@ public class TripleStore extends /* Partitioned*/Journal {
      */
     public long getTerm(Value value) {
 
+        _Value val = (_Value) value;
+        
+        if( val.termId != 0l ) return val.termId; 
+
         Long id = (Long)getTermIdIndex().lookup(keyBuilder.value2Key(value));
         
         if( id == null ) return 0L;
 
-        return id.longValue();
+        val.termId = id.longValue();
+
+        return val.termId;
 
     }
     
@@ -909,16 +1031,30 @@ public class TripleStore extends /* Partitioned*/Journal {
         
     }
 
+    public void overflow() {
+        
+        System.err.println("*** Overflow *** ");
+
+        // the current state.
+        final long counter = getCounter().getCounter();
+        
+        super.overflow();
+        
+        // setup the counter on the new journal.
+        setCommitter( ROOT_COUNTER, new AutoIncCounter(this,counter) );
+        
+    }
+    
     /**
      * Writes out some usage details on System.err.
      */
     public void usage() {
 
-        usage("termId", ndx_termId);
-        usage("idTerm", ndx_idTerm);
-        usage("spo", ndx_spo);
-        usage("pos", ndx_pos);
-        usage("osp", ndx_osp);
+        usage("termId", getTermIdIndex());
+        usage("idTerm", getIdTermIndex());
+        usage("spo", getSPOIndex());
+        usage("pos", getPOSIndex());
+        usage("osp", getOSPIndex());
         
     }
 
