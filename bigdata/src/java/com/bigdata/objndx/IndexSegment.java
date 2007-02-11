@@ -595,7 +595,7 @@ public class IndexSegment extends AbstractBTree implements IIndex {
              */
             this.offsetNodes = (int) offsetNodes;
             
-            System.err.println("offsetNodes="+offsetNodes);
+//            System.err.println("offsetNodes="+offsetNodes);
             
         }
         

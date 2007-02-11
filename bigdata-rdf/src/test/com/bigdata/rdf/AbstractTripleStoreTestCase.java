@@ -100,6 +100,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
             if(properties.getProperty(Options.BASENAME)==null) {
                 properties.setProperty(Options.BASENAME, getName());
             }
+//            properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte32*20);
             properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 //            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
 

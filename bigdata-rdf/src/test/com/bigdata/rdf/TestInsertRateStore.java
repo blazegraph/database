@@ -99,15 +99,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 public class TestInsertRateStore extends AbstractTripleStoreTestCase {
 
     /**
-     * 200M
-     */
-    protected long getInitialExtent() {
-        
-        return Bytes.megabyte*200;
-        
-    }
-
-    /**
      * 
      */
     public TestInsertRateStore() {

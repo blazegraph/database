@@ -329,7 +329,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
         int count = 0;
         int lastCount = 0;
         
-        for( int index = fromIndex; index<toIndex; index++) {
+        for( int index = fromIndex; index<=toIndex; index++) {
 
             // The first key that would enter the nth partition.
             byte[] separatorKey = mdi.keyAt(index);

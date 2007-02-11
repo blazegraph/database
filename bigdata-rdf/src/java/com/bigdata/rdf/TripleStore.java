@@ -62,11 +62,10 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
@@ -84,24 +83,26 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.scaleup.PartitionedIndex;
 import com.bigdata.scaleup.PartitionedJournal;
+import com.bigdata.scaleup.SlaveJournal;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @todo refactor to use a delegation mechanism so that we can run with or
- *       without partitioned indices.
+ * @todo Refactor to use a delegation mechanism so that we can run with or
+ *       without partitioned indices? (All you have to do now is change the
+ *       class that is being extended from Journal to PartitionedJournal and
+ *       handle some different initialization properties.)
  * 
- * @todo persue some alternative strategies for restart safety and scale: (1)
- *       TripleStore extends Journal and manages its indices directly as
- *       {@link ICommitter}s without transaction support. This can be a scale
- *       up solution using a disk-only buffer and the LRUs internal to the
- *       different indices. I would expect fair performance. (2) A partitioned
- *       index variant.; (3) a transactional variant, but see various notes
- *       below about isolation for rdfs stores; and (4) a distributed database
- *       (scale out) variant.
+ * @todo Play with the branching factor again.  Now that we are using overflow
+ *       to evict data onto index segments we can use a higher branching factor
+ *       and simply evict more often.  Is this worth it?  We might want a lower
+ *       branching factor on the journal since we can not tell how large any
+ *       given write will be and then use larger branching factors on the index
+ *       segments.
  * 
  * @todo try loading some very large data sets; try Transient vs Disk vs Direct
  *       modes. If Transient has significantly better performance then it
@@ -136,10 +137,10 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @todo support metadata about the statement, e.g., whether or not it is an
  *       inference.
  * 
- * @todo compute the MB/sec rate at which this test runs and compare it with the
- *       maximum transfer rate for the journal without the btree and the maximum
- *       transfer rate to disk. this will tell us the overhead of the btree
- *       implementation.
+ * @todo compute the MB/sec rate at which the store can load data and compare it
+ *       with the maximum transfer rate for the journal without the btree and
+ *       the maximum transfer rate to disk. this will tell us the overhead of
+ *       the btree implementation.
  * 
  * @todo Try a variant in which we have metadata linking statements and terms
  *       together. In this case we would have to go back to the terms and update
@@ -152,7 +153,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       frequent terms, e.g., the repeated parts of the value. Also note that
  *       there will be no "value" for an rdf statement since existence is all.
  *       The key completely encodes the statement. So, another approach is to
- *       bit code the repeated substrings found within the key in each leaf. *
+ *       bit code the repeated substrings found within the key in each leaf.
  *       This way the serialized key size reflects only the #of distinctions.
  * 
  * @todo I've been thinking about rdfs stores in the light of the work on
@@ -207,31 +208,10 @@ import com.ibm.icu.text.RuleBasedCollator;
  * there are little odd spots in RDF - handling bnodes, typed literals, and the
  * concept of a total sort order for the statement index.
  * 
- * @todo Note that the target platform will use a 200M journal extent and freeze
- *       the extent when it gets full, opening a new extent. Once a frozen
- *       journal contains committed state, we can evict the indices from the
- *       journal into perfect index range files. Reads then read through the
- *       live journal, any frozen journals that have not been evicted yet, and
- *       lastly the perfect index range segments on the disk. For the latter,
- *       the index nodes are buffered so that one read is require to get a leaf
- *       from the disk. Perfect index range segments get compacted from time to
- *       time. A bloom filter in front of an index range (or a segment of an
- *       index range) could reduce IOs further.
- * 
- * @todo test with the expected journal modes, e.g., direct buffered, once the
- *       page buffering feature is in place.
- * 
- * @todo a true bulk loader does not need transactional isolation and this class
- *       does not use transactional isolation. When using isolation there are
- *       two use cases - small documents where the differential indicies will be
- *       small (document sized) and very large loads where we need to use
- *       persistence capable differential indices and the load could even span
- *       more than one journal extent.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends /*Partitioned*/Journal {
+public class TripleStore extends PartitionedJournal {
     
     static transient public Logger log = Logger.getLogger(TripleStore.class);
 
@@ -239,11 +219,6 @@ public class TripleStore extends /*Partitioned*/Journal {
      * Declare indices for root addresses for the different indices maintained
      * by the store.
      */
-//    static public transient final int ROOT_TERM_ID = RootBlockView.FIRST_USER_ROOT;
-//    static public transient final int ROOT_ID_TERM = RootBlockView.FIRST_USER_ROOT + 1;
-//    static public transient final int ROOT_SPO     = RootBlockView.FIRST_USER_ROOT + 2;
-//    static public transient final int ROOT_POS     = RootBlockView.FIRST_USER_ROOT + 3;
-//    static public transient final int ROOT_OSP     = RootBlockView.FIRST_USER_ROOT + 4;
     static public transient final int ROOT_COUNTER = RootBlockView.FIRST_USER_ROOT + 5;
     
     public RdfKeyBuilder keyBuilder;
@@ -314,6 +289,16 @@ public class TripleStore extends /*Partitioned*/Journal {
 
     }
 
+    /**
+     * Returns and creates iff necessary a scalable restart safe index for RDF
+     * {@link _Statement statements}.
+     * @param name The name of the index.
+     * @return The index.
+     * 
+     * @see #name_spo
+     * @see #name_pos
+     * @see #name_osp
+     */
     protected IIndex getStatementIndex(String name) {
 
         IIndex ndx = getIndex(name);
@@ -355,12 +340,40 @@ public class TripleStore extends /*Partitioned*/Journal {
     }
 
     /**
-     * The counter used to assign term identifiers.
+     * The restart-safe counter used to assign term identifiers.
      */
-    public AutoIncCounter getCounter() {return counter;}
+    public AutoIncCounter getCounter() {
+
+        if (counter == null) {
+
+            long addr;
+
+            if ((addr = getAddr(ROOT_COUNTER)) == 0L) {
+
+                // Note: first termId is ONE (1). Zero is reserved.
+                counter = new AutoIncCounter(this, 1L);
+
+            } else {
+
+                counter = AutoIncCounter.read(this, addr);
+
+            }
+
+            setCommitter(ROOT_COUNTER, counter);
+
+        }
+
+        return counter;
+        
+    }
     
     /**
+     * Create or re-open a triple store.
      * 
+     * @todo initialize the locale for the {@link KeyBuilder} from properties or
+     *       use the default locale if none is specified. The locale should be a
+     *       restart safe property since it effects the sort order of the
+     *       term:id index.
      */
     public TripleStore(Properties properties) throws IOException {
 
@@ -377,96 +390,25 @@ public class TripleStore extends /*Partitioned*/Journal {
     /**
      * Extends the default behavior to create/re-load the indices defined by the
      * {@link TripleStore} and to cache hard references to those indices.
+     * 
+     * FIXME setupCommitters and discardCommitters are not invoked when we are
+     * using a {@link PartitionedIndex}.  I need to refactor the apis so that
+     * these methods do not appear on {@link PartitionedIndex} or that they are
+     * correctly invoked by the {@link SlaveJournal}.  I expect that they are
+     * not required on {@link IJournal} but only on {@link Journal}.
      */
     public void setupCommitters() {
 
         super.setupCommitters();
-        
-//        assert ndx_termId == null;
-//        assert ndx_idTerm == null;
-//        assert ndx_spo == null;
-//        assert ndx_pos == null;
-//        assert ndx_osp == null;
+       
         assert counter == null;
-//
-        long addr;
-//        
-//        if((addr=getAddr(ROOT_TERM_ID))==0L) {
-//
-//            ndx_termId = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-//                    TermIdSerializer.INSTANCE);
-//            
-//        } else {
-//            
-//            ndx_termId = new BTree(this, BTreeMetadata.read(this, addr));
-//            
-//        }
-//
-//        if((addr=getAddr(ROOT_ID_TERM))==0L) {
-//
-//            ndx_idTerm = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-//                    RdfValueSerializer.INSTANCE);
-//            
-//        } else {
-//            
-//            ndx_idTerm = new BTree(this, BTreeMetadata.read(this, addr));
-//            
-//        }
-//        
-//        if((addr=getAddr(ROOT_SPO))==0L) {
-//
-//            ndx_spo = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-//                    StatementSerializer.INSTANCE);
-//            
-//        } else {
-//            
-//            ndx_spo = new BTree(this, BTreeMetadata.read(this, addr));
-//            
-//        }
-//        
-//        if ((addr = getAddr(ROOT_POS)) == 0L) {
-//
-//            ndx_pos = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-//                    StatementSerializer.INSTANCE);
-//
-//        } else {
-//
-//            ndx_pos = new BTree(this, BTreeMetadata.read(this, addr));
-//
-//        }
-//
-//        if ((addr = getAddr(ROOT_OSP)) == 0L) {
-//
-//            ndx_osp = new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
-//                    StatementSerializer.INSTANCE);
-//
-//        } else {
-//
-//            ndx_osp = new BTree(this, BTreeMetadata.read(this, addr));
-//
-//        }
 
-        if ((addr = getAddr(ROOT_COUNTER)) == 0L) {
-
-            // Note: first termId is ONE (1).  Zero is reserved.
-            counter = new AutoIncCounter(this,1L);
-
-        } else {
-
-            counter = AutoIncCounter.read(this,addr);
-
-        }
-        
         /*
-         * declare the comitters.
+         * This is here as a work around so that this counter gets initialized
+         * whether or not we are extending Journal vs PartitionedJournal.
          */
-//        setCommitter(ROOT_TERM_ID, (BTree) ndx_termId);
-//        setCommitter(ROOT_ID_TERM, (BTree) ndx_idTerm);
-//        setCommitter(ROOT_SPO, (BTree) ndx_spo);
-//        setCommitter(ROOT_POS, (BTree) ndx_pos);
-//        setCommitter(ROOT_OSP, (BTree) ndx_osp);
-        setCommitter(ROOT_COUNTER, counter );
-
+        getCounter();
+        
     }
     
     /**
@@ -476,12 +418,7 @@ public class TripleStore extends /*Partitioned*/Journal {
     public void discardCommitters() {
         
         super.discardCommitters();
-        
-//        ndx_termId = null;
-//        ndx_idTerm = null;
-//        ndx_spo = null;
-//        ndx_pos = null;
-//        ndx_osp = null;
+
         counter = null;
         
     }
@@ -533,6 +470,59 @@ public class TripleStore extends /*Partitioned*/Journal {
     }
     
     /**
+     * The #of terms in the store.
+     * <p>
+     * This may be an estimate when using partitioned indices.
+     */
+    public int getTermCount() {
+        
+        return getTermIdIndex().rangeCount(null,null);
+        
+    }
+    
+    /**
+     * The #of URIs in the store.
+     * <p>
+     * This may be an estimate when using partitioned indices.
+     */
+    public int getURICount() {
+        
+        byte[] fromKey = keyBuilder.keyBuilder.reset().append(RdfKeyBuilder.CODE_URI).getKey();
+        byte[] toKey = keyBuilder.keyBuilder.reset().append(RdfKeyBuilder.CODE_LIT).getKey();
+        
+        return getTermIdIndex().rangeCount(fromKey,toKey);
+        
+    }
+    
+    /**
+     * The #of Literals in the store.
+     * <p>
+     * This may be an estimate when using partitioned indices.
+     */
+    public int getLiteralCount() {
+        
+        byte[] fromKey = keyBuilder.keyBuilder.reset().append(RdfKeyBuilder.CODE_LIT).getKey();
+        byte[] toKey = keyBuilder.keyBuilder.reset().append(RdfKeyBuilder.CODE_BND).getKey();
+        
+        return getTermIdIndex().rangeCount(fromKey,toKey);
+        
+    }
+    
+    /**
+     * The #of BNodes in the store.
+     * <p>
+     * This may be an estimate when using partitioned indices.
+     */
+    public int getBNodeCount() {
+        
+        byte[] fromKey = keyBuilder.keyBuilder.reset().append(RdfKeyBuilder.CODE_BND).getKey();
+        byte[] toKey = keyBuilder.keyBuilder.reset().append((byte)(RdfKeyBuilder.CODE_BND+1)).getKey();
+        
+        return getTermIdIndex().rangeCount(fromKey,toKey);
+        
+    }
+    
+    /**
      * Add a single statement by lookup and/or insert into the various indices
      * (non-batch api).
      */
@@ -555,9 +545,9 @@ public class TripleStore extends /*Partitioned*/Journal {
 
         long _s, _p, _o;
         
-        if( (_s = getTerm(s)) == 0L ) return false;
-        if( (_p = getTerm(p)) == 0L ) return false;
-        if( (_o = getTerm(o)) == 0L ) return false;
+        if( (_s = getTermId(s)) == 0L ) return false;
+        if( (_p = getTermId(p)) == 0L ) return false;
+        if( (_o = getTermId(o)) == 0L ) return false;
         
         return getSPOIndex().contains(keyBuilder.statement2Key(_s, _p, _o));
         
@@ -796,6 +786,7 @@ public class TripleStore extends /*Partitioned*/Journal {
                  */
 
                 IIndex termId = getTermIdIndex();
+                AutoIncCounter counter = getCounter();
                 
                 long _begin = System.currentTimeMillis();
                 
@@ -805,7 +796,7 @@ public class TripleStore extends /*Partitioned*/Journal {
 
                     if (!term.known) {
 
-                        assert term.termId==0L;
+                        //assert term.termId==0L; FIXME uncomment this and figure out why this assertion is failing.
                         assert term.key != null;
 
                         // Lookup in the forward index.
@@ -967,10 +958,10 @@ public class TripleStore extends /*Partitioned*/Journal {
              */
 
             // assign the next term identifier from the persistent counter.
-            val.termId = counter.nextId();
+            val.termId = getCounter().nextId();
             
             // insert into the forward mapping.
-            termId.insert(termKey, Long.valueOf(val.termId));
+            if(termId.insert(termKey, Long.valueOf(val.termId))!=null) throw new AssertionError();
 
             /*
              * Insert into the reverse mapping from identifier to term.
@@ -993,6 +984,18 @@ public class TripleStore extends /*Partitioned*/Journal {
     }
 
     /**
+     * Return the RDF {@link Value} given a term identifier (non-batch api).
+     *
+     * @return the RDF value or <code>null</code> if there is no term with that
+     * identifier in the index. 
+     */
+    public _Value getTerm(long id) {
+
+        return (_Value)getIdTermIndex().lookup(keyBuilder.id2key(id));
+
+    }
+
+    /**
      * Return the pre-assigned termId for the value (non-batch API).
      * 
      * @param value
@@ -1001,7 +1004,7 @@ public class TripleStore extends /*Partitioned*/Journal {
      * @return The pre-assigned termId -or- 0L iff the term is not known to the
      *         database.
      */
-    public long getTerm(Value value) {
+    public long getTermId(Value value) {
 
         _Value val = (_Value) value;
         
@@ -1038,10 +1041,32 @@ public class TripleStore extends /*Partitioned*/Journal {
         // the current state.
         final long counter = getCounter().getCounter();
         
+        // clear hard references to named indices.
+        ndx_termId = null;
+        ndx_idTerm = null;
+        ndx_spo = null;
+        ndx_pos = null;
+        ndx_osp = null;
+        this.counter = null;
+        
         super.overflow();
         
-        // setup the counter on the new journal.
-        setCommitter( ROOT_COUNTER, new AutoIncCounter(this,counter) );
+        // create a new counter that will be persisted on the new slave journal.
+        this.counter = new AutoIncCounter(this,counter);
+        
+        // setup the counter as a committer on the new slave journal.
+        setCommitter( ROOT_COUNTER, this.counter );
+        
+        /*
+         * @todo this commit is required to make the new counter restart safe by
+         * placing an address for it into its root slot. rather than having
+         * multiple commits during overflow, we should create a method to which
+         * control is handed before and after the overflow event processing in
+         * the base class which provides the opportunity for such maintenance
+         * events. we could then just setup the new counter and let the overflow
+         * handle the commit.
+         */
+        commit();
         
     }
     
@@ -1126,7 +1151,12 @@ public class TripleStore extends /*Partitioned*/Journal {
      *            The baseURI or "" if none is known.
      * @param commit
      *            A {@link #commit()} will be performed IFF true.
-     * @return Statistics about the file load.
+     * 
+     * @return Statistics about the file load operation.
+     * 
+     * @todo add a parameter for the batch size. large buffers for lots of small
+     *       files probably means lots of heap churn.
+     *
      * @throws IOException
      */
     public LoadStats loadData(File file, String baseURI, boolean commit ) throws IOException {

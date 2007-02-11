@@ -713,7 +713,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         /**
          * The #of told triples processed in the file.
          */
-        int toldTriples = 0;
+        long toldTriples = 0;
 
         /**
          * <code>null</code> iff an no error occurred and otherwise the
@@ -837,19 +837,19 @@ public class TestMetrics extends AbstractMetricsTestCase {
             final int inferenceCount0 = 0;
             // proof count.
             final int proofCount0 = 0;
-            // @todo uri count.
-            final int uriCount0 = 0;
-            // @todo bnode count.
-            final int bnodeCount0 = 0;
-            // @todo literal count.
-            final int literalCount0 = 0;
+            // uri count.
+            final int uriCount0 = store.getURICount();
+            // bnode count.
+            final int bnodeCount0 = store.getBNodeCount();
+            // literal count.
+            final int literalCount0 = store.getLiteralCount();
 
 //            final MetricsListener listener = new MetricsListener();
 
             // time before the transaction starts.
             begin = System.currentTimeMillis();
 
-            LoadStats loadStats = new LoadStats();
+            LoadStats loadStats;
             
             try {
                 
@@ -870,7 +870,14 @@ public class TestMetrics extends AbstractMetricsTestCase {
                 
                 error = t;
                 
+                loadStats = new LoadStats();
+                
             }
+
+            /*
+             * #of explicit statements loaded.
+             */
+            toldTriples = loadStats.toldTriples;
             
             /*
              * This is the elapsed time for the entire transaction in which the file
@@ -903,17 +910,17 @@ public class TestMetrics extends AbstractMetricsTestCase {
              */
             
             // total statement count (axioms + inferences + told triples)
-            final int statementCount1 = store.getStatementCount();
+            statementCount1 = store.getStatementCount();
             // @todo inference count.
-            final int inferenceCount1 = 0;
+            inferenceCount1 = 0;
             // proof count.
-            final int proofCount1 = 0;
-            // @todo uri count.
-            final int uriCount1 = 0;
-            // @todo bnode count.
-            final int bnodeCount1 = 0;
-            // @todo literal count.
-            final int literalCount1 = 0;
+            proofCount1 = 0;
+            // uri count.
+            uriCount1 = store.getURICount();
+            // bnode count.
+            bnodeCount1 = store.getBNodeCount();
+            // literal count.
+            literalCount1 = store.getLiteralCount();
 
             statementsAdded = statementCount1 - statementCount0;
             inferencesAdded = inferenceCount1 - inferenceCount0;
@@ -923,29 +930,35 @@ public class TestMetrics extends AbstractMetricsTestCase {
             bnodesAdded     = bnodeCount1 - bnodeCount0;
             literalsAdded   = literalCount1 - literalCount0;
             
-//            System.err.println("Loaded "+toldTriples+" told triples from file: " + file);
-//            System.err
-//                    .println("New   statements="
-//                            + statementsAdded
-//                            + " (told="
-//                            + toldTriples
-//                            + "+inferred="
-//                            + inferencesAdded
-//                            + "), proofs="
-//                            + proofsAdded
-//                            + " in "
-//                            + transactionTime
-//                            + "(ms): stmts/sec="
-//                            + getUnitsPerSecond(statementsAdded, transactionTime)
-////                            + ((statementsAdded == 0 || transactionTime == 0) ? 0
-////                                    : (statementsAdded / ((transactionTime < 1000 ? 1000
-////                                            : transactionTime) / 1000)))
-//                                            );
-//            System.err
-//                    .println("Total statements=" + statementCount1
-//                            + ", inferences=" + inferenceCount1 + ", proofs="
-//                            + proofCount1);
+            if(error!=null) {
+                error.printStackTrace(System.err);
+            } else {
             
+            System.err.println("Loaded "+toldTriples+" told triples from file: " + file);
+            System.err
+                    .println("New   statements="
+                            + statementsAdded
+                            + " (told="
+                            + toldTriples
+                            + "+inferred="
+                            + inferencesAdded
+                            + "), proofs="
+                            + proofsAdded
+                            + " in "
+                            + transactionTime
+                            + "(ms): stmts/sec="
+                            + getUnitsPerSecond(statementsAdded, transactionTime)
+//                            + ((statementsAdded == 0 || transactionTime == 0) ? 0
+//                                    : (statementsAdded / ((transactionTime < 1000 ? 1000
+//                                            : transactionTime) / 1000)))
+                                            );
+            System.err
+                    .println("Total statements=" + statementCount1
+                            + ", inferences=" + inferenceCount1 + ", proofs="
+                            + proofCount1);
+            
+        }
+
         }
         
     }

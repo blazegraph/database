@@ -49,6 +49,8 @@ public class Options {
      * file.  The initial user extent is typically slightly smaller as the head
      * of the file contains some metadata outside of the user space (the root
      * blocks).
+     * 
+     * @see #DEFAULT_INITIAL_EXTENT
      */
     public static final String INITIAL_EXTENT = "initialExtent";
     
@@ -58,6 +60,8 @@ public class Options {
      * {@link #commit()}. The default implementation ignores overflow events. A
      * scale up or scale out implementation will use this event as a trigger to
      * evict data from application btrees into index segments.
+     * 
+     * @see #DEFAULT_MAXIMUM_EXTENT
      */
     public static final String MAXIMUM_EXTENT = "maximumExtent";
     

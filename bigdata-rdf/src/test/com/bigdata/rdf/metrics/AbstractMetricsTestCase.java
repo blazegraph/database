@@ -80,7 +80,9 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
 
     protected BufferMode getBufferMode() {
         
-        return BufferMode.Disk;
+//        return BufferMode.Disk;
+        
+        return BufferMode.Direct;
         
     }
     

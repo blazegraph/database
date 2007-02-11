@@ -15,8 +15,11 @@ import com.bigdata.rdf.rio.BulkRioLoader;
 /**
  * Auto-increment counter.
  * 
- * @todo the {@link BulkRioLoader} also uses this counter and that use needs
- *       to be reconciled for consistency if concurrent writers are allowed.
+ * @todo the {@link BulkRioLoader} also uses this counter and that use needs to
+ *       be reconciled for consistency if concurrent writers are allowed.
+ * 
+ * @todo redefine NULL to an unsigned long zero and start assigning identifiers
+ *       from an unsigned long one?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -145,7 +148,11 @@ public class AutoIncCounter implements UserDefinedFunction, ICommitter {
 
             final long nextId = dis.readLong();
 
-            return new AutoIncCounter(store, nextId);
+            AutoIncCounter counter = new AutoIncCounter(store, nextId);
+            
+            counter.lastAddr = addr;
+            
+            return counter;
 
         } catch (IOException ex) {
             

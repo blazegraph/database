@@ -53,8 +53,8 @@ import java.util.Properties;
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.journal.Journal;
+import com.bigdata.scaleup.PartitionedJournal.Options;
 
 /**
  * Base class for test suites for inference engine and the magic sets
@@ -91,8 +91,13 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
 //                    .toString());
 //            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
             properties.setProperty(Options.SEGMENT, "0");
-            properties.setProperty(Options.FILE, getName()+".jnl");
-            properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
+            if(properties.getProperty(Options.FILE)==null) {
+                properties.setProperty(Options.FILE, getName()+".jnl");
+            }
+            if(properties.getProperty(Options.BASENAME)==null) {
+                properties.setProperty(Options.BASENAME, getName());
+            }
+//            properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
         }
 
@@ -101,19 +106,6 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
     }
 
     private Properties properties;
-
-    /**
-     * Invoked the first time {@link #getProperties()} is called for each test
-     * to set the initial extent of the journal.
-     * 
-     * @return The initial extent for the journal (default is 10M). Some tests
-     *         need significantly larger journals.
-     */
-    protected long getInitialExtent() {
-        
-        return Bytes.megabyte*10;
-        
-    }
 
     /**
      * Invoked the first time {@link #getProperties()} is called for each test
