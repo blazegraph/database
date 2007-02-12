@@ -243,7 +243,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          * The parent is allowed to be null iff this is the root of the
          * btree.
          */
-        assert (this == btree.getRoot() && p == null) || p != null;
+        assert (this == btree.root && p == null) || p != null;
 
         return p;
 
@@ -335,7 +335,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          * is only changed by the VM, not by the application).
          */
 
-        assert src == btree.getRoot()
+        assert src == btree.root
                 || (src.parent != null && src.parent.get() != null);
         
         this.parent = src.parent;
@@ -720,7 +720,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             /*
              * either the root or the parent is reachable.
              */
-            IAbstractNode root = btree.getRoot();
+            IAbstractNode root = btree.root;
             
             assert root == this
                     || (this.parent != null && this.parent.get() != null);
@@ -1054,42 +1054,41 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * This operation can be very efficient if the tuples are presented in key
      * order.
      * 
-     * @param ntuples
-     *            The #of tuples that are being inserted(in).
-     * @param tupleIndex
-     *            The index of the tuple to be inserted (in)
-     * @param searchKeys
-     *            The array of keys (one key per tuple) (in).
-     * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
-     * 
      * @return The #of tuples processed.
      */
-    abstract public int insert(int ntuples, int tupleIndex,
-            byte[][] searchKeys, Object[] values);
+    abstract public int batchInsert(BatchInsert op);
 
     /**
      * Batch lookup of one or more tuples.
      * 
-     * @param ntuples
-     *            The #of tuples that are being looked up (in).
-     * @param tupleIndex
-     *            The index of the tuple to be looked up (in)
-     * @param searchKeys
-     *            The array of keys (one key per tuple) (in).
-     * @param values
-     *            Values (one element per key) (out). On output, each element is
-     *            either null (if there was no entry for that key) or the old
-     *            value stored under that key (which may be null).
-     * 
      * @return The #of tuples processed.
      */
-    abstract public int lookup(int ntuples, int tupleIndex,
-            byte[][] searchKeys, Object[] values);
+    abstract public int batchLookup(BatchLookup op);
 
+    /**
+     * Insert or update a value.
+     * 
+     * @param key
+     *            The key (non-null).
+     * @param val
+     *            The value (may be null).
+     * 
+     * @return The old value (may be null) or null if there was no entry for
+     *         that key.
+     */
+    abstract public Object insert(byte[] key,Object val);
+    
+    /**
+     * Lookup a single key.
+     * 
+     * @param key
+     *            The key.
+     *            
+     * @return The value associated with that key (which may be null) or null if
+     *         there is no entry for that key.
+     */
+    abstract public Object lookup(byte[] key);
+    
     /**
      * Batch existence testing for one or more keys.
      * 
@@ -1107,9 +1106,20 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * 
      * @return The #of tuples processed.
      */
-    abstract public int contains(int ntuples, int tupleIndex,
+    abstract public int batchContains(int ntuples, int tupleIndex,
             byte[][] searchKeys, boolean[] contains);
 
+    /**
+     * Return true iff there is an entry for the search key (this method should
+     * be used in place of lookup if null keys are allowed for an index).
+     * 
+     * @param searchKey
+     *            The search key.
+     * 
+     * @return True iff the search key is found in the index.
+     */
+    abstract public boolean contains(byte[] searchKey);
+    
     /**
      * Batch removal of one or more tuples, returning their existing values and
      * timestamps.

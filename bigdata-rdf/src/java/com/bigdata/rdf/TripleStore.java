@@ -211,7 +211,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends PartitionedJournal {
+public class TripleStore extends /*Partitioned*/Journal {
     
     static transient public Logger log = Logger.getLogger(TripleStore.class);
 

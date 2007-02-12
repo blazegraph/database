@@ -53,6 +53,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.TripleStore;
+import com.bigdata.scaleup.PartitionedJournal.Options;
 
 /**
  * A test of the RIO integration.
@@ -70,6 +71,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     protected long getInitialExtent() {
         
         return Bytes.megabyte*200;
+//        return Options.DEFAULT_INITIAL_EXTENT;
         
     }
     
@@ -244,6 +246,16 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
         assertDataLoaded();
         
+    }
+
+    public void test_load_file_wikipedia() throws IOException {
+
+        String[] testData = new String[]{"data/wikipedia/enwiki/20060306.rdf"};
+        
+        doTest(new PresortRioLoader(store,
+                PresortRioLoader.DEFAULT_BUFFER_SIZE, true), testData);
+        
+
     }
     
     public void test_loadFile_multiThreadedPresortRioLoader() throws IOException {

@@ -1,46 +1,46 @@
 /**
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+ The Notice below must appear in each file of the Source Code of any
+ copy you distribute of the Licensed Product.  Contributors to any
+ Modifications may add their own copyright notices to identify their
+ own contributions.
 
-License:
+ License:
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+ The contents of this file are subject to the CognitiveWeb Open Source
+ License Version 1.1 (the License).  You may not copy or use this file,
+ in either source code or executable form, except in compliance with
+ the License.  You may obtain a copy of the License from
 
-  http://www.CognitiveWeb.org/legal/license/
+ http://www.CognitiveWeb.org/legal/license/
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
+ Software distributed under the License is distributed on an AS IS
+ basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+ the License for the specific language governing rights and limitations
+ under the License.
 
-Copyrights:
+ Copyrights:
 
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
+ Portions created by or assigned to CognitiveWeb are Copyright
+ (c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+ information for CognitiveWeb is available at
 
-  http://www.CognitiveWeb.org
+ http://www.CognitiveWeb.org
 
-Portions Copyright (c) 2002-2003 Bryan Thompson.
+ Portions Copyright (c) 2002-2003 Bryan Thompson.
 
-Acknowledgements:
+ Acknowledgements:
 
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
+ Special thanks to the developers of the Jabber Open Source License 1.0
+ (JOSL), from which this License was derived.  This License contains
+ terms that differ from JOSL.
 
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
+ Special thanks to the CognitiveWeb Open Source Contributors for their
+ suggestions and support of the Cognitive Web.
 
-Modifications:
+ Modifications:
 
-*/
+ */
 /*
  * Created on Dec 19, 2006
  */
@@ -109,7 +109,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * @todo consider renaming the logger.
      */
     protected static final Logger log = Logger.getLogger(BTree.class);
-    
+
     /**
      * Log for {@link BTree#dump(PrintStream)} and friends.
      */
@@ -132,18 +132,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
     /**
      * flag turns on some more expensive assertions.
      */
-    final protected boolean debug = false; 
-    
-    /*
-     * Error messages.
-     * 
-     * @todo add error codes; localize.
-     */
-    private static final transient String ERR_NTUPLES_NON_POSITIVE = "ntuples is non-positive";
-    private static final transient String ERR_KEYS_NULL = "keys is null";
-    private static final transient String ERR_VALS_NULL = "values is null";
-    private static final transient String ERR_NOT_ENOUGH_KEYS= "not enough keys";
-    private static final transient String ERR_NOT_ENOUGH_VALS= "not enough values";
+    final protected boolean debug = false;
 
     /**
      * Counters tracking various aspects of the btree.
@@ -159,6 +148,13 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * The branching factor for the btree.
      */
     final protected int branchingFactor;
+
+    /**
+     * The root of the btree. This is initially a leaf until the leaf is split,
+     * at which point it is replaced by a node. The root is also replaced each
+     * time copy-on-write triggers a cascade of updates.
+     */
+    protected AbstractNode root;
 
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree.
@@ -204,36 +200,36 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *       memory than nodes (for most trees).
      */
     final protected HardReferenceQueue<PO> leafQueue;
-    
+
     /**
      * The #of distinct nodes and leaves on the {@link #leafQueue}.
      */
     protected int ndistinctOnQueue;
-    
+
     /**
      * The #of distinct nodes and leaves on the {@link HardReferenceQueue}.
      */
     final public int getNumDistinctOnQueue() {
-        
+
         return ndistinctOnQueue;
-        
+
     }
-    
+
     /**
      * The capacity of the {@link HardReferenceQueue}.
      */
     final public int getHardReferenceQueueCapacity() {
-        
+
         return leafQueue.capacity();
-        
+
     }
 
     /**
-     * The minimum allowed branching factor (3).  The branching factor may be
-     * odd or even.
+     * The minimum allowed branching factor (3). The branching factor may be odd
+     * or even.
      */
     static public final int MIN_BRANCHING_FACTOR = 3;
-    
+
     /**
      * @param store
      *            The persistence store.
@@ -272,57 +268,55 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *            reads are against memory which is presumably already parity
      *            checked.
      */
-    protected AbstractBTree(IRawStore store,
-            int branchingFactor,
+    protected AbstractBTree(IRawStore store, int branchingFactor,
             int initialBufferCapacity,
             HardReferenceQueue<PO> hardReferenceQueue,
             IAddressSerializer addrSer, IValueSerializer valueSer,
             INodeFactory nodeFactory, RecordCompressor recordCompressor,
             boolean useChecksum) {
-        
+
         assert store != null;
-        
+
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
 
         assert hardReferenceQueue != null;
-        
+
         assert addrSer != null;
-        
+
         assert valueSer != null;
 
         assert nodeFactory != null;
-        
+
         this.store = store;
 
         this.branchingFactor = branchingFactor;
 
         this.leafQueue = hardReferenceQueue;
-        
+
         this.nodeSer = new NodeSerializer(nodeFactory, branchingFactor,
-                initialBufferCapacity, addrSer,
-                KeyBufferSerializer.INSTANCE, valueSer,
-                recordCompressor, useChecksum);
-        
+                initialBufferCapacity, addrSer, KeyBufferSerializer.INSTANCE,
+                valueSer, recordCompressor, useChecksum);
+
     }
-    
+
     /**
      * The persistence store.
      */
     public IRawStore getStore() {
-        
+
         return store;
-        
+
     }
-    
+
     /**
      * The branching factor for the btree.
      */
     public int getBranchingFactor() {
-        
+
         return branchingFactor;
-        
+
     }
-    
+
     /**
      * The height of the btree. The height is the #of levels minus one. A btree
      * with only a root leaf has <code>height := 0</code>. A btree with a
@@ -333,7 +327,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * growing and shrinking in levels from the top rather than the leaves).
      */
     abstract public int getHeight();
-    
+
     /**
      * The #of non-leaf nodes in the {@link AbstractBTree}. This is zero (0)
      * for a new btree.
@@ -351,24 +345,28 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * (0) for a new btree.
      */
     abstract public int getEntryCount();
-    
+
     /**
      * The object responsible for (de-)serializing the nodes and leaves of the
      * {@link IIndex}.
      */
     public NodeSerializer getNodeSerializer() {
-        
+
         return nodeSer;
-        
+
     }
-    
+
     /**
-     * The root of the btree. This is initially a leaf until the leaf is
-     * split, at which point it is replaced by a node. The root is also
-     * replaced each time copy-on-write triggers a cascade of updates.
+     * The root of the btree. This is initially a leaf until the leaf is split,
+     * at which point it is replaced by a node. The root is also replaced each
+     * time copy-on-write triggers a cascade of updates.
      */
-    abstract public IAbstractNode getRoot();
-    
+    final public AbstractNode getRoot() {
+
+        return root;
+
+    }
+
     /**
      * @todo handle isolation using a TimestampValue(long,Object). This properly
      *       encapsulates the timestamp with the value so that the timestamp is
@@ -383,113 +381,86 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * @todo disallow null value? it was allowed for isolation to indicate a
      *       removed value, but we can do that with a null value inside of a
      *       TimestampEntry object.
-     * 
-     * @todo factor out error messages into constants.
-     */    
+     */
     public void insert(int ntuples, byte[][] keys, Object[] values) {
 
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
-            
-        if (keys == null)
-            throw new IllegalArgumentException(ERR_KEYS_NULL);
+        BatchInsert op = new BatchInsert(ntuples, keys, values);
 
-        if( keys.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
+    }
 
-        if (values == null)
-            throw new IllegalArgumentException(ERR_VALS_NULL);
+    public void insert(BatchInsert op) {
 
-        if( values.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
+        final int ntuples = op.ntuples;
 
-        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+        while (op.tupleIndex < ntuples) {
 
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = ((AbstractNode) getRoot()).insert(ntuples, tupleIndex,
-                    keys, values);
-            
+            int nused = root.batchInsert(op);
+
             assert nused > 0;
 
             /*
              * Note: it is legal to reuse a key iff the data in the key is
-             * unchanged.  Unfortunately it is tricky to do a fast test for
-             * this condition.
+             * unchanged. Unfortunately it is tricky to do a fast test for this
+             * condition.
              */
-//            {
-//                /*
-//                 * detect if the caller reuses the same byte[] key from one
-//                 * insert to the next. This is an error since the key needs to
-//                 * be donated to the btree. This problem only exists for
-//                 * insert().
-//                 */
-//                    
-//                byte[] key = keys[tupleIndex];
-//
-//                if (key == lastKey) {
-//
-//                    throw new IllegalArgumentException(
-//                            "keys must not be reused.");
-//
-//                } else {
-//
-//                    lastKey = key;
-//
-//                }
-//
-//            }
-            
+            // {
+            // /*
+            // * detect if the caller reuses the same byte[] key from one
+            // * insert to the next. This is an error since the key needs to
+            // * be donated to the btree. This problem only exists for
+            // * insert().
+            // */
+            //                    
+            // byte[] key = keys[tupleIndex];
+            //
+            // if (key == lastKey) {
+            //
+            // throw new IllegalArgumentException(
+            // "keys must not be reused.");
+            //
+            // } else {
+            //
+            // lastKey = key;
+            //
+            // }
+            //
+            // }
             counters.ninserts += nused;
-            
-            tupleIndex += nused;
+
+            op.tupleIndex += nused;
 
         }
 
     }
 
-//    /**
-//     * Used to detect when the caller reuses the same byte[] key from one insert
-//     * to the next. This is an error since the key needs to be donated to the
-//     * btree.  This problem only exists for insert().
-//     */
-//    private byte[] lastKey = null;
-
-
     public void lookup(int ntuples, byte[][] keys, Object[] values) {
-     
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
-            
-        if (keys == null)
-            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
-        if( keys.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
+        lookup(new BatchLookup(ntuples, keys, values));
 
-        if (values == null)
-            throw new IllegalArgumentException(ERR_VALS_NULL);
+    }
 
-        if( values.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
+    public void lookup(BatchLookup op) {
 
-        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+        final int ntuples = op.ntuples;
+
+        while (op.tupleIndex < ntuples) {
 
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = ((AbstractNode) getRoot()).lookup(ntuples, tupleIndex,
-                    keys, values);
-            
+            int nused = root.batchLookup(op);
+
             assert nused > 0;
-            
+
             counters.nfinds += nused;
-            
-            tupleIndex += nused;
+
+            op.tupleIndex += nused;
 
         }
-        
+
     }
 
     /**
@@ -497,78 +468,76 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *       work but there it no test suite for contains() at this time.
      */
     public void contains(int ntuples, byte[][] keys, boolean[] contains) {
-     
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
-            
-        if (keys == null)
-            throw new IllegalArgumentException(ERR_KEYS_NULL);
 
-        if( keys.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
+        if (ntuples <= 0)
+            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
+
+        if (keys == null)
+            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
+
+        if (keys.length < ntuples)
+            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
 
         if (contains == null)
-            throw new IllegalArgumentException(ERR_VALS_NULL);
-        
-        if( contains.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
-        
-        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
+
+        if (contains.length < ntuples)
+            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
+
+        for (int tupleIndex = 0; tupleIndex < ntuples;) {
 
             // skip tuples already marked as true.
             if (contains[tupleIndex]) {
-                
+
                 tupleIndex++;
-                
+
                 continue;
-                
+
             }
-                
+
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = ((AbstractNode) getRoot()).contains(ntuples, tupleIndex,
-                    keys, contains);
-            
+            int nused = root.batchContains(ntuples, tupleIndex, keys, contains);
+
             assert nused > 0;
-            
+
             counters.nfinds += nused;
-                
+
             tupleIndex += nused;
-                
+
         }
-        
+
     }
 
-    public void remove(int ntuples, byte[][] keys, Object[] values ) {
+    public void remove(int ntuples, byte[][] keys, Object[] values) {
 
         if (ntuples <= 0)
-            throw new IllegalArgumentException(ERR_NTUPLES_NON_POSITIVE);
-            
-        if (keys == null)
-            throw new IllegalArgumentException(ERR_KEYS_NULL);
+            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
 
-        if( keys.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_KEYS);
+        if (keys == null)
+            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
+
+        if (keys.length < ntuples)
+            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
 
         if (values == null)
-            throw new IllegalArgumentException(ERR_VALS_NULL);
+            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
 
-        if( values.length < ntuples )
-            throw new IllegalArgumentException(ERR_NOT_ENOUGH_VALS);
+        if (values.length < ntuples)
+            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
 
-        for( int tupleIndex=0; tupleIndex<ntuples; ) {
+        for (int tupleIndex = 0; tupleIndex < ntuples;) {
 
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = ((AbstractNode) getRoot()).remove(ntuples, tupleIndex,
-                    keys, values);
-            
+            int nused = root.remove(ntuples, tupleIndex, keys, values);
+
             assert nused > 0;
-            
+
             counters.ninserts += nused;
-            
+
             tupleIndex += nused;
 
         }
@@ -576,24 +545,25 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
     }
 
     /*
-     * buffers used to convert non-batch operations into batch api
-     * calls.
+     * buffers used to convert non-batch operations into batch api calls.
      * 
-     * @todo we could also avoid autoboxing by exposing a type safe api
-     * with appropriate key types, but that would multiple the #of methods
-     * on the api several times.  derived classes could provide typesafe
-     * direct use of the batch api easily if we exposed these objects as
-     * protected arrays.
+     * @todo we could also avoid autoboxing by exposing a type safe api with
+     * appropriate key types, but that would multiple the #of methods on the api
+     * several times. derived classes could provide typesafe direct use of the
+     * batch api easily if we exposed these objects as protected arrays.
      */
     /** @deprecated */
     private final byte[][] _keys = new byte[1][];
+
     /** @deprecated */
     private final Object[] _values = new Object[1];
+
     /** @deprecated */
     private final boolean[] _contains = new boolean[1];
+
     /** @deprecated */
     private final KeyBuilder keyBuilder = new KeyBuilder();
-    
+
     /**
      * Used to unbox an application key into a shared instance buffer
      * {@link #_keys}. This is NOT safe for concurrent operations, but the
@@ -604,81 +574,127 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *             as soon as I update the test suites.
      */
     final private byte[][] unbox(Object key) {
-        if(key instanceof Integer) {
-            return new byte[][]{
-                keyBuilder.reset().append(((Integer)key).intValue()).getKey()
-            };
+        if (key instanceof Integer) {
+            return new byte[][] { keyBuilder.reset().append(
+                    ((Integer) key).intValue()).getKey() };
         } else {
             return new byte[][] { (byte[]) key };
         }
     }
-    
+
+    private final BatchInsert _insertOp = new BatchInsert(1, new byte[1][],
+            new Object[1]);
+
     public Object insert(Object key, Object value) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        _values[0] = value;
+        if (key instanceof byte[]) {
+            return root.insert((byte[]) key,value);
+        } else {
+            return root.insert( keyBuilder.reset().append(
+                    ((Integer) key).intValue()).getKey(), value );
+        }
         
-        insert(1,unbox(key),_values);
-        
-        return _values[0];
-        
-//
-//        counters.ninserts++;
-//        
-//        if(INFO) {
-//            log.info("key="+key+", entry="+entry);
+//        _insertOp.tupleIndex = 0;
+//        if (key instanceof byte[]) {
+//            _insertOp.keys[0] = (byte[]) key;
+//        } else {
+//            _insertOp.keys[0] = keyBuilder.reset().append(
+//                    ((Integer) key).intValue()).getKey();
 //        }
+//        _insertOp.values[0] = value;
+//        insert(_insertOp);
 //
-//        return getRoot().insert(key, entry);
+//        return _insertOp.values[0];
+
+        // _values[0] = value;
+
+        // insert(1,unbox(key),_values);
+        
+        // return _values[0];
+
+        //
+        // counters.ninserts++;
+        //        
+        // if(INFO) {
+        // log.info("key="+key+", entry="+entry);
+        // }
+        //
+        // return getRoot().insert(key, entry);
 
     }
+
+    private final BatchLookup _lookupOp = new BatchLookup(1, new byte[1][],
+            new Object[1]);
 
     public Object lookup(Object key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        lookup(1,unbox(key),_values);
-        
-        return _values[0];
-        
-//        counters.nfinds++;
+        if (key instanceof byte[]) {
+            return root.lookup((byte[])key);
+        } else {
+            return root.lookup(keyBuilder.reset().append(
+                    ((Integer) key).intValue()).getKey());
+        }
+
+// _lookupOp.tupleIndex = 0;
+// if (key instanceof byte[]) {
+// _lookupOp.keys[0] = (byte[]) key;
+// } else {
+// _lookupOp.keys[0] = keyBuilder.reset().append(
+// ((Integer) key).intValue()).getKey();
+// }
+// _lookupOp.values[0] = null;
+//
+// lookup(_lookupOp);
 //        
-//        return getRoot().lookup(key);
+// return _lookupOp.values[0];
+        
+// lookup(1,unbox(key),_values);
+//        
+// return _values[0];
+        
+// counters.nfinds++;
+//        
+// return getRoot().lookup(key);
 
     }
 
     public boolean contains(byte[] key) {
 
-        if( key == null )
+        if (key == null)
             throw new IllegalArgumentException();
 
-        _contains[0] = false; // otherwise the request is ignored!
+        return root.contains((byte[])key);
         
-        contains(1,unbox(key),_contains);
-        
-        return _contains[0];
-        
+//        _contains[0] = false; // otherwise the request is ignored!
+//
+//        contains(1, unbox(key), _contains);
+//
+//        return _contains[0];
+
     }
-    
+
     public Object remove(Object key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        remove(1,unbox(key),_values);
-        
+        remove(1, unbox(key), _values);
+
         return _values[0];
-        
-//        counters.nremoves++;
-//
-//        if(INFO) {
-//            log.info("key="+key);
-//        }
-//
-//        return getRoot().remove(key);
+
+        // counters.nremoves++;
+        //
+        // if(INFO) {
+        // log.info("key="+key);
+        // }
+        //
+        // return getRoot().remove(key);
 
     }
 
@@ -702,16 +718,16 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * @see #valueAt(int)
      */
     public int indexOf(byte[] key) {
-        
+
         if (key == null)
             throw new IllegalArgumentException();
 
         counters.nindexOf++;
-        
-        int index = ((AbstractNode)getRoot()).indexOf(key);
-        
+
+        int index = root.indexOf(key);
+
         return index;
-        
+
     }
 
     /**
@@ -740,13 +756,13 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
             throw new IndexOutOfBoundsException("too large");
 
         counters.ngetKey++;
-        
-        return ((AbstractNode)getRoot()).keyAt(index);
+
+        return root.keyAt(index);
 
     }
-    
+
     /**
-     * Return the value for the identified entry. This performs an efficient 
+     * Return the value for the identified entry. This performs an efficient
      * search whose cost is essentially the same as {@link #lookup(Object)}.
      * 
      * @param index
@@ -758,7 +774,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *                if index is less than zero.
      * @exception IndexOutOfBoundsException
      *                if index is greater than the #of entries.
-     *                
+     * 
      * @see #indexOf(Object)
      * @see #keyAt(int)
      */
@@ -771,11 +787,11 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
             throw new IndexOutOfBoundsException("too large");
 
         counters.ngetKey++;
-        
-        return ((AbstractNode)getRoot()).valueAt(index);
+
+        return root.valueAt(index);
 
     }
-    
+
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         /*
@@ -784,8 +800,8 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
          * parameters is desired then invoke compareBytes on the keys (if both
          * are non-null) before calling rangeIterator on the root node.
          */
-        return ((AbstractNode)getRoot()).rangeIterator(fromKey,toKey);
-        
+        return root.rangeIterator(fromKey, toKey);
+
     }
 
     /**
@@ -794,41 +810,41 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
-        final AbstractNode root = (AbstractNode)getRoot();
-        
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
         int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
-        
+
         // Handle case when fromKey is not found.
-        if( fromIndex < 0 ) fromIndex = -fromIndex - 1;
-        
+        if (fromIndex < 0)
+            fromIndex = -fromIndex - 1;
+
         // Handle case when toKey is not found.
-        if( toIndex < 0 ) toIndex = -toIndex - 1;
-        
-        if( toIndex <= fromIndex ) {
-            
+        if (toIndex < 0)
+            toIndex = -toIndex - 1;
+
+        if (toIndex <= fromIndex) {
+
             return 0;
-            
+
         }
-        
+
         int ret = toIndex - fromIndex;
-        
+
         return ret;
-        
+
     }
-    
+
     /**
      * Visits all entries in key order.
      * 
      * @return An iterator that will visit all entries in key order.
      */
     public IEntryIterator entryIterator() {
-    
-        return getRoot().entryIterator();
-        
+
+        return root.entryIterator();
+
     }
-    
+
     /**
      * Iterator visits the leaves of the tree.
      * 
@@ -838,8 +854,8 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *       for an {@link IndexSegment}.
      */
     protected Iterator leafIterator() {
-        
-        return new Striterator(getRoot().postOrderIterator())
+
+        return new Striterator(root.postOrderIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -850,9 +866,9 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
                     }
                 });
-        
+
     }
-        
+
     /**
      * Computes and returns the utilization of the tree. The utilization figures
      * do not factor in the space requirements of nodes and leaves.
@@ -871,7 +887,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *         </ul>
      */
     public int[] getUtilization() {
-        
+
         final int nnodes = getNodeCount();
 
         final int nleaves = getLeafCount();
@@ -891,7 +907,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
         final int utilization = (nodeUtilization + leafUtilization) / 2;
 
         return new int[] { nodeUtilization, leafUtilization, utilization };
-        
+
     }
 
     /**
@@ -906,21 +922,21 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      */
     public boolean dump(PrintStream out) {
 
-        return dump(BTree.dumpLog.getEffectiveLevel(), out );
+        return dump(BTree.dumpLog.getEffectiveLevel(), out);
 
     }
-        
+
     public boolean dump(Level level, PrintStream out) {
-            
+
         // True iff we will write out the node structure.
         final boolean info = level.toInt() <= Level.INFO.toInt();
 
         int[] utils = getUtilization();
-        
+
         if (info) {
-            
+
             final int height = getHeight();
-            
+
             final int nnodes = getNodeCount();
 
             final int nleaves = getLeafCount();
@@ -928,7 +944,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
             final int nentries = getEntryCount();
 
             final int branchingFactor = getBranchingFactor();
-            
+
             log.info("height=" + height + ", branchingFactor="
                     + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
                     + nleaves + ", #entries=" + nentries + ", nodeUtil="
@@ -936,9 +952,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
                     + utils[2] + "%");
         }
 
-        boolean ok = ((AbstractNode)getRoot()).dump(level, out, 0, true);
-
-        return ok;
+        return root.dump(level, out, 0, true);
 
     }
 
@@ -989,21 +1003,21 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
         node.referenceCount++;
 
-        if( ! leafQueue.append(node) ) {
-            
+        if (!leafQueue.append(node)) {
+
             /*
              * A false return indicates that the node was found on a scan of the
              * tail of the queue. In this case we do NOT want the reference
              * counter to be incremented since we have not actually added
-             * another reference to this node onto the queue.  Therefore we 
+             * another reference to this node onto the queue. Therefore we
              * decrement the counter (since we incremented it above) for a net
              * change of zero(0) across this method.
              */
-            
+
             node.referenceCount--;
-            
+
         } else {
-            
+
             /*
              * Since we just added a node or leaf to the hard reference queue we
              * now update the #of distinct nodes and leaves on the hard
@@ -1011,16 +1025,16 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
              * 
              * Also see {@link DefaultEvictionListener}.
              */
-            if(node.referenceCount==1) {
-                
+            if (node.referenceCount == 1) {
+
                 ndistinctOnQueue++;
-                
+
             }
-            
+
         }
 
     }
-    
+
     /**
      * Write a dirty node and its children using a post-order traversal that
      * first writes any dirty leaves and then (recursively) their parent nodes.
@@ -1036,25 +1050,25 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *            MUST be dirty. The node this does NOT have to be the root of
      *            the tree and it does NOT have to be a {@link Node}.
      */
-    protected void writeNodeRecursive( AbstractNode node ) {
+    protected void writeNodeRecursive(AbstractNode node) {
 
         assert node != null;
         assert node.dirty;
-        assert ! node.deleted;
-        assert ! node.isPersistent();
-        
+        assert !node.deleted;
+        assert !node.isPersistent();
+
         /*
          * Note we have to permit the reference counter to be positive and not
          * just zero here since during a commit there will typically still be
          * references on the hard reference queue but we need to write out the
-         * nodes and leaves anyway.  If we were to evict everything from the
-         * hard reference queue before a commit then the counters would be zero
-         * but the queue would no longer be holding our nodes and leaves and
-         * they would be GC'd soon as since they would no longer be strongly
+         * nodes and leaves anyway. If we were to evict everything from the hard
+         * reference queue before a commit then the counters would be zero but
+         * the queue would no longer be holding our nodes and leaves and they
+         * would be GC'd soon as since they would no longer be strongly
          * reachable.
          */
         assert node.referenceCount >= 0;
-        
+
         // #of dirty nodes written (nodes or leaves)
         int ndirty = 0;
 
@@ -1062,8 +1076,8 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
         int nleaves = 0;
 
         /*
-         * Post-order traversal of children and this node itself.  Dirty
-         * nodes get written onto the store.
+         * Post-order traversal of children and this node itself. Dirty nodes
+         * get written onto the store.
          * 
          * Note: This iterator only visits dirty nodes.
          */
@@ -1075,7 +1089,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
             assert t.isDirty();
 
-            if (t != getRoot()) {
+            if (t != root) {
 
                 /*
                  * The parent MUST be defined unless this is the root node.
@@ -1098,9 +1112,9 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
         log.info("write: " + ndirty + " dirty nodes (" + nleaves
                 + " leaves), addrRoot=" + node.getIdentity());
-        
+
     }
-    
+
     /**
      * Writes the node on the store (non-recursive). The node MUST be dirty. If
      * the node has a parent, then the parent is notified of the persistent
@@ -1111,7 +1125,7 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * 
      * @return The persistent identity assigned by the store.
      */
-    protected long writeNodeOrLeaf( AbstractNode node ) {
+    protected long writeNodeOrLeaf(AbstractNode node) {
 
         assert node != null;
         assert node.btree == this;
@@ -1123,10 +1137,10 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
          * Note we have to permit the reference counter to be positive and not
          * just zero here since during a commit there will typically still be
          * references on the hard reference queue but we need to write out the
-         * nodes and leaves anyway.  If we were to evict everything from the
-         * hard reference queue before a commit then the counters would be zero
-         * but the queue would no longer be holding our nodes and leaves and
-         * they would be GC'd soon as since they would no longer be strongly
+         * nodes and leaves anyway. If we were to evict everything from the hard
+         * reference queue before a commit then the counters would be zero but
+         * the queue would no longer be holding our nodes and leaves and they
+         * would be GC'd soon as since they would no longer be strongly
          * reachable.
          */
         assert node.referenceCount >= 0;
@@ -1141,8 +1155,8 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
         Node parent = node.getParent();
 
         if (parent == null) {
-            
-            assert node == getRoot();
+
+            assert node == root;
 
         } else {
 
@@ -1151,33 +1165,34 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
             // parent must not be persistent if it is dirty.
             assert !parent.isPersistent();
-            
+
         }
-        
-//        /*
-//         * Convert the keys buffer to an immutable keys buffer.  The immutable
-//         * keys buffer is potentially much more compact.
-//         */
-//        if( node.keys instanceof MutableKeyBuffer ) {
-//
-//            node.keys = new ImmutableKeyBuffer((MutableKeyBuffer)node.keys);
-//                
-//        }
-        
+
+        // /*
+        // * Convert the keys buffer to an immutable keys buffer. The immutable
+        // * keys buffer is potentially much more compact.
+        // */
+        // if( node.keys instanceof MutableKeyBuffer ) {
+        //
+        // node.keys = new ImmutableKeyBuffer((MutableKeyBuffer)node.keys);
+        //                
+        // }
+
         /*
          * Serialize the node or leaf onto a shared buffer.
          */
-        
-        if(debug) node.assertInvariants();
-        
+
+        if (debug)
+            node.assertInvariants();
+
         final ByteBuffer buf;
-        
-        if( node.isLeaf() ) {
-        
-            buf = nodeSer.putLeaf((Leaf)node);
+
+        if (node.isLeaf()) {
+
+            buf = nodeSer.putLeaf((Leaf) node);
 
             counters.leavesWritten++;
-            
+
         } else {
 
             buf = nodeSer.putNode((Node) node);
@@ -1185,13 +1200,13 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
             counters.nodesWritten++;
 
         }
-        
+
         // write the serialized node or leaf onto the store.
-        
+
         final long addr = store.write(buf);
-        
+
         counters.bytesWritten += Addr.getByteCount(addr);
-        
+
         /*
          * The node or leaf now has a persistent identity and is marked as
          * clean. At this point is MUST be treated as being immutable. Any
@@ -1199,16 +1214,16 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
          */
 
         node.setIdentity(addr);
-        
+
         node.setDirty(false);
 
-        if( parent != null ) {
-            
+        if (parent != null) {
+
             // Set the persistent identity of the child on the parent.
             parent.setChildKey(node);
 
-//            // Remove from the dirty list on the parent.
-//            parent.dirtyChildren.remove(node);
+            // // Remove from the dirty list on the parent.
+            // parent.dirtyChildren.remove(node);
 
         }
 
@@ -1224,42 +1239,42 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      * 
      * @return The node or leaf.
      */
-    protected AbstractNode readNodeOrLeaf( long addr ) {
+    protected AbstractNode readNodeOrLeaf(long addr) {
 
         /*
-         * offer the node serializer's buffer to the IRawStore.  it will be used
+         * offer the node serializer's buffer to the IRawStore. it will be used
          * iff it is large enough and the store does not prefer to return a
          * read-only slice.
          */
-//        nodeSer.buf.clear();
-        
-        ByteBuffer tmp = store.read(addr,nodeSer._buf);
+        // nodeSer.buf.clear();
+        ByteBuffer tmp = store.read(addr, nodeSer._buf);
         assert tmp.position() == 0;
         assert tmp.limit() == Addr.getByteCount(addr);
-        
+
         final int bytesRead = tmp.limit();
-                
+
         counters.bytesRead += bytesRead;
 
         // extract the node from the buffer.
-        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
-        
+        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr,
+                tmp);
+
         node.setDirty(false);
-        
+
         if (node instanceof Leaf) {
-            
+
             counters.leavesRead++;
 
         } else {
-            
+
             counters.nodesRead++;
-            
+
         }
-                
+
         touch(node);
 
         return node;
-        
+
     }
-    
+
 }

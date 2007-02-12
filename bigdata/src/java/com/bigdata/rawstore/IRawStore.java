@@ -75,6 +75,17 @@ import com.bigdata.objndx.BTree;
  * @see Addr
  * @see Journal
  * @see BTree
+ * 
+ * @todo It is possible to implement this interface using an int64 address space
+ *       without embedding the record length into the address. this will require
+ *       a means to translate from logical addresses to physical addresses. we
+ *       could use a copy-on-write btree for that purpose. delete() should be
+ *       defined so that we can release storage that is no longer required for
+ *       data versions that can be accessed by any current transaction
+ *       (supporting gc). a free list should offer fast best-fit or good fit
+ *       access to chunks in the store that are available for reuse. this would
+ *       make it possible for us to implement a scale up store based on a single
+ *       monolithic file.
  */
 public interface IRawStore {
 

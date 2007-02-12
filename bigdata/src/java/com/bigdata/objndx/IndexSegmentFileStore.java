@@ -228,12 +228,6 @@ public class IndexSegmentFileStore implements IRawStore {
      * Reads the index nodes into a buffer.
      * 
      * @return A read-only view of a buffer containing the index nodes.
-     * 
-     * @todo compare use of direct vs heap ByteBuffer for performance. The
-     *       direct buffer imposes a higher burden on the JVM and all operations
-     *       after we read the data from the disk should be faster with a heap
-     *       buffer, so my expectation is that a heap buffer is the correct
-     *       choice here.
      */
     protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
@@ -248,6 +242,12 @@ public class IndexSegmentFileStore implements IRawStore {
 
         final int nbytes = Addr.getByteCount(metadata.addrLeaves);
 
+        /*
+         * Note: The direct buffer imposes a higher burden on the JVM and all
+         * operations after we read the data from the disk should be faster with
+         * a heap buffer, so my expectation is that a heap buffer is the correct
+         * choice here.
+         */
 //        ByteBuffer buf = ByteBuffer.allocateDirect(nbytes);
         ByteBuffer buf = ByteBuffer.allocate(nbytes);
 

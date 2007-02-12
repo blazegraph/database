@@ -655,8 +655,7 @@ public class Node extends AbstractNode implements INodeData {
      * 
      * @return The #of tuples processed.
      */
-    public int insert(int ntuples, int tupleIndex, byte[][] searchKeys,
-            Object[] values) {
+    public int batchInsert(BatchInsert op) {
 
         assert !deleted;
         
@@ -664,11 +663,27 @@ public class Node extends AbstractNode implements INodeData {
 
         btree.touch(this);
 
-        int childIndex = findChild(searchKeys[tupleIndex]);
+        int childIndex = findChild(op.keys[op.tupleIndex]);
 
-        AbstractNode child = (AbstractNode)getChild(childIndex);
+        AbstractNode child = (AbstractNode) getChild(childIndex);
 
-        return child.insert(ntuples, tupleIndex, searchKeys, values);
+        return child.batchInsert(op);
+
+    }
+
+    public Object insert(byte[] key,Object value) {
+
+        assert !deleted;
+        
+        if(btree.debug) assertInvariants();
+
+        btree.touch(this);
+
+        int childIndex = findChild(key);
+
+        AbstractNode child = (AbstractNode) getChild(childIndex);
+
+        return child.insert(key,value);
 
     }
 
@@ -680,8 +695,7 @@ public class Node extends AbstractNode implements INodeData {
      * 
      * @return The #of tuples processed.
      */
-    public int lookup(int ntuples, int tupleIndex, byte[][] searchKeys,
-            Object[] values) {
+    public int batchLookup(BatchLookup op) {
 
         assert !deleted;
         
@@ -689,11 +703,27 @@ public class Node extends AbstractNode implements INodeData {
 
         btree.touch(this);
 
-        final int childIndex = findChild(searchKeys[tupleIndex]);
+        final int childIndex = findChild(op.keys[op.tupleIndex]);
 
         AbstractNode child = (AbstractNode)getChild(childIndex);
 
-        return child.lookup(ntuples, tupleIndex, searchKeys, values);
+        return child.batchLookup(op);
+        
+    }
+    
+    public Object lookup(byte[] key) {
+
+        assert !deleted;
+        
+        if(btree.debug) assertInvariants();
+
+        btree.touch(this);
+
+        final int childIndex = findChild(key);
+
+        AbstractNode child = (AbstractNode)getChild(childIndex);
+
+        return child.lookup(key);
         
     }
     
@@ -706,7 +736,7 @@ public class Node extends AbstractNode implements INodeData {
      * 
      * @return The #of tuples processed.
      */
-    public int contains(int ntuples, int tupleIndex, byte[][] searchKeys,
+    public int batchContains(int ntuples, int tupleIndex, byte[][] searchKeys,
             boolean[] contains) {
 
         assert !deleted;
@@ -719,7 +749,23 @@ public class Node extends AbstractNode implements INodeData {
 
         AbstractNode child = (AbstractNode)getChild(childIndex);
 
-        return child.contains(ntuples, tupleIndex, searchKeys, contains);
+        return child.batchContains(ntuples, tupleIndex, searchKeys, contains);
+        
+    }
+    
+    public boolean contains(byte[] searchKey) {
+
+        assert !deleted;
+        
+        if(btree.debug) assertInvariants();
+
+        btree.touch(this);
+
+        final int childIndex = findChild(searchKey);
+
+        AbstractNode child = (AbstractNode)getChild(childIndex);
+
+        return child.contains(searchKey);
         
     }
     

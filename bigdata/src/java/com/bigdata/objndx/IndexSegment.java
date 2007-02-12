@@ -42,11 +42,11 @@ public class IndexSegment extends AbstractBTree implements IIndex {
      */
     final protected IndexSegmentFileStore fileStore;
     
-    /**
-     * The root of the btree. Since this is a read-only index the root can never
-     * be replaced.
-     */
-    final protected AbstractNode root;
+//    /**
+//     * The root of the btree. Since this is a read-only index the root can never
+//     * be replaced.
+//     */
+//    final protected AbstractNode root;
 
     /**
      * An optional bloom filter that will be used to filter point tests. Since
@@ -86,11 +86,11 @@ public class IndexSegment extends AbstractBTree implements IIndex {
         
     }
 
-    public AbstractNode getRoot() {
-        
-        return root;
-        
-    }
+//    public AbstractNode getRoot() {
+//        
+//        return root;
+//        
+//    }
     
     public int getEntryCount() {
 

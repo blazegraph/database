@@ -46,9 +46,12 @@ public class Options {
     /**
      * <code>initialExtent</code> - The initial extent of the journal (bytes).
      * When the journal is backed by a file, this is the initial length of that
-     * file.  The initial user extent is typically slightly smaller as the head
+     * file. The initial user extent is typically slightly smaller as the head
      * of the file contains some metadata outside of the user space (the root
-     * blocks).
+     * blocks). The initial extent will be transparently extended as necessary
+     * when the user space becomes full. When using a partitioned index strategy
+     * the initial extent and the maximum extent should be the same so that the
+     * cost of extending the journal buffer may be avoided as much as possible.
      * 
      * @see #DEFAULT_INITIAL_EXTENT
      */
@@ -56,7 +59,7 @@ public class Options {
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * Once the journal has reached this extent it will "overflow" on the next
+     * Once journal will "overflow" once it approaches this limit during a
      * {@link #commit()}. The default implementation ignores overflow events. A
      * scale up or scale out implementation will use this event as a trigger to
      * evict data from application btrees into index segments.

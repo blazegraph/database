@@ -1,12 +1,9 @@
 package com.bigdata.objndx;
 
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -116,23 +113,7 @@ public class BTreeMetadata implements Serializable {
      */
     protected long write(IRawStore store) {
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        try {
-
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-
-            oos.writeObject(this);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        ByteBuffer buf = ByteBuffer.wrap(baos.toByteArray());
-
-        return store.write(buf);
+        return store.write(ByteBuffer.wrap(SerializerUtil.serialize(this)));
 
     }
 
@@ -148,23 +129,8 @@ public class BTreeMetadata implements Serializable {
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
-        ByteBuffer buf = store.read(addr,null);
-        
-        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
-        
-        try {
-
-            ObjectInputStream ois = new ObjectInputStream(bais);
-
-            BTreeMetadata metadata = (BTreeMetadata) ois.readObject();
-
-            return metadata;
-            
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-            
-        }
+        return (BTreeMetadata) SerializerUtil.deserialize(store
+                .read(addr, null));
         
     }
     

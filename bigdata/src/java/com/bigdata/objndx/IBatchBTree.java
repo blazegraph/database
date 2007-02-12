@@ -50,7 +50,12 @@ package com.bigdata.objndx;
 /**
  * <p>
  * Interface for batch operations a B+-Tree mapping variable length unsigned
- * byte[] keys to arbitrary values.
+ * byte[] keys to arbitrary values. All mutation operations on a {@link BTree}
+ * are executed in a single threaded context and are therefore atomic. A batch
+ * api operation that does NOT span more than one index partition is therefore
+ * atomic. However, if an operation spans multiple partitions of an index then
+ * NO GUARENTEE is made that the operation is atomic over the set of index
+ * partitions.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -58,7 +63,7 @@ package com.bigdata.objndx;
  * 
  * @see KeyBuilder, which may be used to encode one or more values into a
  *      variable length unsigned byte[] key.
- *      
+ * 
  * @todo add batch api for rangeCount and rangeQuery.
  * 
  * @todo support batch api for indexOf(), keyAt(), valueAt()?

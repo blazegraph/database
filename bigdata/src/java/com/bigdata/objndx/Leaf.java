@@ -351,10 +351,11 @@ public class Leaf extends AbstractNode implements ILeafData {
      * @todo optimize batch insertion by testing whether subsequent tuples fit
      *       into the same leaf
      */
-    public int insert(int ntuples, int tupleIndex, byte[][] searchKeys,
-            Object[] values) {
+    public int batchInsert(BatchInsert op) {
+
+        final int tupleIndex = op.tupleIndex;
         
-        assert tupleIndex < ntuples;
+        assert tupleIndex < op.ntuples;
         
         if(btree.debug) assertInvariants();
         
@@ -370,7 +371,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.insert(ntuples, tupleIndex, searchKeys, values);
+            return copy.batchInsert(op);
             
         }
 
@@ -382,18 +383,21 @@ public class Leaf extends AbstractNode implements ILeafData {
          * 
          * @todo This logic should optimized when the newval is a UDF such that
          * we defer copy-on-write until we know that we will change the leaf in
-         * order to get a performance benefit from conditional inserts.  However
-         * the code will still benefit by performing 1/2 of the #of searches when
-         * compared to {if(!contains(key)) insert(key,val);}
+         * order to get a performance benefit from conditional inserts (it is
+         * apparent from some testing that there is a performance benefit to be
+         * had here). However the code will still benefit by performing 1/2 of
+         * the #of searches when compared to {if(!contains(key))
+         * insert(key,val);}
          * 
-         * @todo Consider the interaction between UDFs and transaction isolation. 
+         * @todo Consider the interaction between UDFs and transaction
+         * isolation.
          */
 
         // the search key.
-        final byte[] searchKey = searchKeys[tupleIndex];
+        final byte[] searchKey = op.keys[tupleIndex];
 
         // the value to be inserted into the leaf.
-        Object newval = values[tupleIndex];
+        Object newval = op.values[tupleIndex];
 
         // look for the search key in the leaf.
         int entryIndex = this.keys.search(searchKey);
@@ -421,9 +425,9 @@ public class Leaf extends AbstractNode implements ILeafData {
             }
 
             // return old value by side-effect.
-            values[tupleIndex] = oldval;
+            op.values[tupleIndex] = oldval;
 
-            // update the entry.
+            // update the entry on the leaf.
             this.values[entryIndex] = newval;
             
             return 1;
@@ -450,7 +454,7 @@ public class Leaf extends AbstractNode implements ILeafData {
                 // The state of the entry was NOT modified.
 
                 // return old value by side-effect.
-                values[tupleIndex] = oldval;
+                op.values[tupleIndex] = oldval;
 
                 return 1;
                 
@@ -468,7 +472,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         }
 
         // return old value by side-effect.
-        values[tupleIndex] = oldval;
+        op.values[tupleIndex] = oldval;
 
         // Convert the position to obtain the insertion point.
         entryIndex = -entryIndex - 1;
@@ -529,15 +533,204 @@ public class Leaf extends AbstractNode implements ILeafData {
             Leaf rightSibling = (Leaf) split();
 
             // assert additional invarients post-split.
-            rightSibling.assertInvariants();
-            getParent().assertInvariants();
+            if (btree.debug) {
+                rightSibling.assertInvariants();
+                getParent().assertInvariants();
+            }
 
         }
 
         // assert invarients post-split.
-        assertInvariants();
+        if(btree.debug) assertInvariants();
 
         return 1;
+        
+    }
+    
+    /**
+     * Insert or update an entry in the leaf. The caller MUST ensure by
+     * appropriate navigation of parent nodes that the key for the next tuple
+     * either exists in or belongs in this leaf. If the leaf overflows then it
+     * is split after the insert.
+     * 
+     * @return The old value or null if there was no entry for that key.
+     */
+    public Object insert(byte[] searchKey, Object newval) {
+
+        if(btree.debug) assertInvariants();
+        
+        btree.touch(this);
+
+        /*
+         * Note: This is one of the few gateways for mutation of a leaf via the
+         * main btree API (insert, lookup, delete). By ensuring that we have a
+         * mutable leaf here, we can assert that the leaf must be mutable in
+         * other methods.
+         */
+        Leaf copy = (Leaf) copyOnWrite();
+
+        if (copy != this) {
+
+            return copy.insert(searchKey,newval);
+            
+        }
+
+        /*
+         * Search for the key.
+         * 
+         * Note: We do NOT search before triggering copy-on-write for an object
+         * index since an insert/update always triggers a mutation.
+         * 
+         * @todo This logic should optimized when the newval is a UDF such that
+         * we defer copy-on-write until we know that we will change the leaf in
+         * order to get a performance benefit from conditional inserts (it is
+         * apparent from some testing that there is a performance benefit to be
+         * had here). However the code will still benefit by performing 1/2 of
+         * the #of searches when compared to {if(!contains(key))
+         * insert(key,val);}
+         * 
+         * @todo Consider the interaction between UDFs and transaction
+         * isolation.
+         */
+
+        // look for the search key in the leaf.
+        int entryIndex = this.keys.search(searchKey);
+
+        if (entryIndex >= 0) {
+
+            /*
+             * The key is already present in the leaf, so we are updating an
+             * existing entry.
+             */
+            
+            // the old value for the search key.
+            Object oldval = this.values[entryIndex];            
+            
+            if(newval instanceof UserDefinedFunction) {
+
+                UserDefinedFunction udf = ((UserDefinedFunction) newval);
+                
+                // apply the UDF.
+                newval = udf.found(searchKey, oldval);
+
+                // allow UDF to override the return value.
+                oldval = udf.returnValue(searchKey, oldval);
+                
+            }
+
+            // update the entry on the leaf.
+            this.values[entryIndex] = newval;
+
+            // return the old value.
+            return oldval;
+
+        }
+
+        /*
+         * The insert goes into this leaf.
+         */
+        
+        Object oldval = null;
+        
+        if(newval instanceof UserDefinedFunction) {
+
+            UserDefinedFunction udf = ((UserDefinedFunction) newval);
+            
+            // apply UDF
+            newval = udf.notFound(searchKey);
+
+            oldval = udf.returnValue(searchKey, oldval);
+            
+            if(newval == null) {
+                
+                // The state of the entry was NOT modified.
+
+                // return old value
+                return oldval;
+                
+            }
+            
+            if(newval == UserDefinedFunction.INSERT_NULL) {
+                
+                // Force insert of a null value.
+                newval = null;
+                
+            }
+            
+            // fall through and do insert.
+            
+        }
+
+        // Convert the position to obtain the insertion point.
+        entryIndex = -entryIndex - 1;
+
+        // insert an entry under that key.
+        {
+
+            if (entryIndex < nkeys) {
+
+                /* index = 2;
+                 * nkeys = 6;
+                 * 
+                 * [ 0 1 2 3 4 5 ]
+                 *       ^ index
+                 * 
+                 * count = keys - index = 4;
+                 */
+                final int count = nkeys - entryIndex;
+                
+                assert count >= 1;
+
+                copyDown(entryIndex, count);
+
+            }
+
+            // Insert at index.
+            MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
+//            copyKey(entryIndex, searchKeys, tupleIndex);
+            keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
+            this.values[entryIndex] = newval;
+
+            nkeys++; keys.nkeys++;
+
+        }
+
+        // one more entry in the btree.
+        ((BTree)btree).nentries++;
+
+        if( parent != null ) {
+            
+            parent.get().updateEntryCount(this,1);
+            
+        }
+
+//        if (INFO) {
+//            log.info("this="+this+", key="+key+", value="+entry);
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//            }
+//        }
+
+        if (nkeys == maxKeys+1) {
+
+            /*
+             * The insert caused the leaf to overflow, so now we split the leaf.
+             */
+
+            Leaf rightSibling = (Leaf) split();
+
+            // assert additional invarients post-split.
+            if(btree.debug) {
+                rightSibling.assertInvariants();
+                getParent().assertInvariants();
+            }
+
+        }
+
+        // assert invarients post-split.
+        if(btree.debug) assertInvariants();
+
+        return oldval;
         
     }
     
@@ -550,20 +743,21 @@ public class Leaf extends AbstractNode implements ILeafData {
      * @todo optimize batch lookup here (also when bloom filter is available on
      *       an IndexSegment).
      */
-    public int lookup(int ntuples, int tupleIndex, byte[][] searchKeys,
-            Object[] values) {
+    public int batchLookup(BatchLookup op) {
 
-        assert tupleIndex < ntuples;
+        final int tupleIndex = op.tupleIndex;
+        
+        assert tupleIndex < op.ntuples;
         
         btree.touch(this);
         
-        final int entryIndex = this.keys.search(searchKeys[tupleIndex]);
+        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
 
         if (entryIndex < 0) {
 
             // Not found.
 
-            values[tupleIndex] = null;
+            op.values[tupleIndex] = null;
             
             return 1;
 
@@ -571,21 +765,41 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         // Found.
         
-        values[tupleIndex] = this.values[entryIndex];
+        op.values[tupleIndex] = this.values[entryIndex];
         
         return 1;
 
     }
 
+    public Object lookup(byte[] searchKey) {
+
+        btree.touch(this);
+        
+        final int entryIndex = keys.search(searchKey);
+
+        if (entryIndex < 0) {
+
+            // Not found.
+
+            return null;
+
+        }
+
+        // Found.
+        
+        return values[entryIndex];
+        
+    }
+
     /**
      * Looks up one or more tuples and reports whether or not they exist.
      * 
-     * @return The #of tuples processed.
+-     * @return The #of tuples processed.
      * 
      * @todo optimize batch lookup here (also when bloom filter is available on
      *       an IndexSegment).
      */
-    public int contains(int ntuples, int tupleIndex, byte[][] searchKeys,
+    public int batchContains(int ntuples, int tupleIndex, byte[][] searchKeys,
             boolean[] contains) {
 
         assert tupleIndex < ntuples;
@@ -609,6 +823,26 @@ public class Leaf extends AbstractNode implements ILeafData {
         contains[tupleIndex] = true;
         
         return 1;
+
+    }
+
+    public boolean contains(byte[] searchKey) {
+
+        btree.touch(this);
+        
+        final int entryIndex = this.keys.search(searchKey);
+
+        if (entryIndex < 0) {
+
+            // Not found.
+
+            return false;
+            
+        }
+
+        // Found.
+        
+        return true;
 
     }
 
@@ -1038,7 +1272,7 @@ public class Leaf extends AbstractNode implements ILeafData {
             // reallocate spanned entries from the sibling to this node.
             p.childEntryCounts[index] += s.getEntryCount();
 
-            assertInvariants();
+            if(btree.debug) assertInvariants();
             
         }
         
@@ -1197,7 +1431,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         // One less key in the leaf.
         nkeys--; keys.nkeys--;
                 
-        if( btree.getRoot() != this ) {
+        if( btree.root != this ) {
 
             /*
              * this is not the root leaf.

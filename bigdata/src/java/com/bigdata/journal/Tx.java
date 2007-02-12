@@ -129,8 +129,59 @@ public class Tx implements IStore, ITx {
 
     /**
      * BTrees isolated by this transactions.
+     * 
+     * @todo in order to survive overflow this mapping must be persistent.
      */
     private Map<String,BTree> btrees = new HashMap<String,BTree>();
+    
+    /**
+     * Return a named btree. The btree will be isolated at the same level as
+     * this transaction. Changes on the btree will be made restart-safe iff the
+     * transaction successfully commits.
+     * 
+     * @param name
+     *            The name of the btree.
+     * 
+     * @return The named btree or <code>null</code> if no btree was registered
+     *         under that name.
+     * 
+     * @todo modify to use
+     */
+    public BTree getIndex(String name) {
+
+        if(name==null) throw new IllegalArgumentException();
+        
+        /*
+         * store the btrees in hash map so that we can recover the same instance
+         * on each call within the same transaction.
+         */
+        BTree btree = btrees.get(name);
+        
+        if(btree == null) {
+            
+            /*
+             * FIXME isolate the same named btree in the global scope and store
+             * it in the map.
+             */
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        return btree;
+        
+    }
+
+    /**
+     * This method must be invoked any time a transaction completes (aborts or
+     * commits) in order to release the hard references to any named btrees
+     * isolated within this transaction so that the JVM may reclaim the space
+     * allocated to them on the heap.
+     */
+    private void releaseBTrees() {
+
+        btrees.clear();
+        
+    }
     
     /**
      * Create a transaction starting the last committed state of the journal as
@@ -232,6 +283,9 @@ public class Tx implements IStore, ITx {
      *                if the transaction has not been
      *                {@link #prepare() prepared}. If the transaction is not
      *                already complete, then it is aborted.
+     * 
+     * @todo modify to automatically prepare the transaction if it has not been
+     *       prepared and update the javadoc and the unit tests.
      */
     public void commit() {
 
@@ -250,7 +304,7 @@ public class Tx implements IStore, ITx {
         journal.completedTx(this);
 
         /*
-         * Merge the object index into the global scope. This also marks the
+         * Merge each isolated index into the global scope. This also marks the
          * slots used by the versions written by the transaction as 'committed'.
          * This operation MUST succeed since we have already validated.
          * 
@@ -393,51 +447,5 @@ public class Tx implements IStore, ITx {
     private void mergeOntoGlobalState() {
         throw new UnsupportedOperationException();
     }
-    
-    /**
-     * Return a named btree. The btree will be isolated at the same level as
-     * this transaction. Changes on the btree will be made restart-safe iff the
-     * transaction successfully commits.
-     * 
-     * @param name The name of the btree.
-     * 
-     * @return The named btree or <code>null</code> if no btree was registered
-     *         under that name.
-     */
-    public BTree getIndex(String name) {
 
-        if(name==null) throw new IllegalArgumentException();
-        
-        /*
-         * store the btrees in hash map so that we can recover the same instance
-         * on each call within the same transaction.
-         */
-        BTree btree = btrees.get(name);
-        
-        if(btree == null) {
-            
-            /*
-             * FIXME isolate the same named btree in the global scope and store
-             * it in the map.
-             */
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        return btree;
-        
-    }
-
-    /**
-     * This method must be invoked any time a transaction completes (aborts or
-     * commits) in order to release the hard references to any named btrees
-     * isolated within this transaction so that the JVM may reclaim the space
-     * allocated to them on the heap.
-     */
-    private void releaseBTrees() {
-
-        btrees.clear();
-        
-    }
-    
 }

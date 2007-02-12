@@ -41,61 +41,35 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.io;
+/*
+ * Created on Feb 12, 2007
+ */
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
+package com.bigdata.objndx;
 
 /**
- * Reads bytes from a {@link ByteBuffer}.
+ * A {@link FusedView} that understands how to process delete markers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo override {@link InputStream#read(byte[], int, int)} for better
- *       performance.
- * 
- * @todo document that this reads the remaining() bytes and has a side effect on
- *       the position. if that is not the desired behavior then either modify
- *       this class or invoke {@link ByteBuffer#asReadOnlyBuffer()} and pass the
- *       result into the constructor instead.
+ * @todo refactor to isolate and override the merge rule.
  */
-public class ByteBufferInputStream extends InputStream {
+public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
 
-    final ByteBuffer buf;
-
-    public ByteBufferInputStream(ByteBuffer buf) {
-
-        assert buf != null;
-
-        this.buf = buf;
-
+    /**
+     * @param src1
+     * @param src2
+     */
+    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
+        super(src1, src2);
     }
 
     /**
-     * Read the next byte from the buffer.
-     * 
-     * @return The byte as a value in [0:255].
+     * @param srcs
      */
-    public int read() throws IOException {
-
-        if (buf.remaining() == 0) {
-
-            return -1;
-
-        }
-
-        // A byte whose value is in [-128:127].
-        byte b = buf.get();
-
-        return (0xff & b);
-        //            return ((int) b) + 128;
-        //            int v = ((int)b) + 128;
-        //            assert v>=0 && v<=255;
-        //            return v;
-        //            return b;
-
+    public IsolatableFusedView(AbstractBTree[] srcs) {
+        super(srcs);
     }
 
 }

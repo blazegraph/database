@@ -115,13 +115,14 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
     /**
      * Invoked the first time {@link #getProperties()} is called for each test
      * to set the initial extent of the journal.
-     * 
-     * @return The initial extent for the journal (default is 10M). Some tests
-     *         need significantly larger journals.
      */
+//  * 
+//  * @return The initial extent for the journal (default is 10M). Some tests
+//  *         need significantly larger journals.
     protected long getInitialExtent() {
         
-        return Bytes.megabyte*10;
+//        return Bytes.megabyte*10;
+        return Options.DEFAULT_INITIAL_EXTENT;
         
     }
 

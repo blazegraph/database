@@ -521,7 +521,10 @@ public class Journal implements IJournal {
 
     /**
      * The maximum extent before a {@link #commit()} will trigger an
-     * {@link #overflow()} event.
+     * {@link #overflow()} event (overflow tries to trigger before this
+     * point in order to avoid extending the journal).
+     * 
+     * @see Options#MAXIMUM_EXTENT
      */
     private final long maximumExtent;
 
@@ -1605,7 +1608,7 @@ public class Journal implements IJournal {
 
             final int nextOffset = _bufferStrategy.getNextOffset();
 
-            if (nextOffset > maximumExtent) {
+            if (nextOffset > .9 * maximumExtent) {
 
                 overflow();
 
