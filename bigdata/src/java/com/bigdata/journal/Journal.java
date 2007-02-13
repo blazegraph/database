@@ -628,6 +628,9 @@ public class Journal implements IJournal {
      */
     void completedTx(ITx tx) throws IllegalStateException {
 
+        assert tx != null;
+        assert tx.isCommitted();
+        
         Long id = tx.getId();
 
         ITx txActive = activeTx.remove(id);

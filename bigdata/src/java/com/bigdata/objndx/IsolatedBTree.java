@@ -53,31 +53,40 @@ import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * <p>
  * A B+-Tree that has been isolated by a transaction.
+ * </p>
+ * Writes will be applied to the isolated btree. Reads will read first on the
+ * isolated btree and then read through to the immutable {@link UnisolatedBTree}
+ * specified in the constructor if no entry is found under the key. Deletes
+ * leave "delete markers".
+ * <p>
+ * In order to commit the changes on the {@link UnisolatedBTree} the writes must
+ * be {@link #validate(UnisolatedBTree) validated},
+ * {@link #mergeDown(UnisolatedBTree) merged down}, and the and dirty nodes and
+ * leaves in the {@link UnisolatedBTree} must be flushed onto the store.
+ * Finally, the store must record the new metadata record for the source btree
+ * in a root block and commit. This protocol can be generalized to allow
+ * multiple btrees to be isolated and commit atomically within the same
+ * transaction. On abort, it is possible that nodes and leaves were written on
+ * the store for the isolated btree. Those data are unreachable and MAY be
+ * recovered depending on the nature of the store and its abort protocol.
+ * <p>
+ * The {@link #rangeCount(byte[], byte[])} method MAY report more entries in a
+ * key range that would actually be visited - this is due to both the presence
+ * of "delete marker" entries in the {@link IsolatedBTree} and the requirement
+ * to read on a fused view of the writes on the {@link IsolatedBTree} and the
+ * read-only {@link UnisolatedBTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IsolatedBTree extends BTree implements IIsolatableIndex {
+public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIndex {
 
     private final UnisolatedBTree src;
 
     /**
      * Returns a fully isolated btree suitable for use within a transaction.
-     * Writes will be applied to the isolated btree. Reads will read first on
-     * the isolated btree and then read through to the unisolated btree iff no
-     * entry is found for a key in the outer btere.
-     * <p>
-     * In order to commit the changes on the source btree, the changes must
-     * first be {@link #validate() validated}, {@link #mergeDown() merged down}
-     * onto the source btree, and dirty nodes and leaves in the source btree
-     * must be written onto the store. Finally, the store must record the new
-     * metadata record for the source btree in a root block and commit. This
-     * protocol can be generalized to allow multiple btrees to be isolated and
-     * atomically committed within the same transaction. On abort, it is
-     * possible that nodes and leaves were written on the store for the isolated
-     * btree. Those data are unreachable and MAY be recovered depending on the
-     * nature of the store and its abort protocol.
      * 
      * @param store
      *            The backing store.

@@ -48,57 +48,54 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.IsolatedBTree;
+import com.bigdata.objndx.UnisolatedBTree;
+import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionedIndex;
 
 /**
  * <p>
- * A transaction. An instance of this class corresponds to a transaction.
- * </p>
- * <p>
- * A transaction is a context in which the application can access named btrees.
- * btrees returned within the transaction will be isolated according to the
- * isolation level of the transaction. transactions may be requested that are
- * read-only for some historical timestamp, that are read-committed (data
- * committed by _other_ transactions during the transaction will be visible
- * within that transaction), or that are fully isolated (changes made in other
- * transactions are not visible within the transaction).
- * 
- * When using an isolated transaction, changes are accumulated in an isolated
- * btree. The update set must then be validated and finally merged down onto the
- * global state when the transaction commits.
- * </p>
- * <p>
- * Transaction isolation is accomplished as follows. Within a transaction, the
- * most recently written data version is visible. This is accomplished using
- * copy on write semantics for the object index nodes. Originally the
- * transaction executes with a clean view of the last committed object index at
- * of the time that the transaction began. Each time an update is made within
- * the transaction to the object index, a test is performed to see whether the
- * target object index node is clean (same state as when the transaction
- * started). If it is clean, then the node and its ancenstors are cloned (copy
- * on write) and the change is applied to the copy. WRITE operations simply
- * update the first slot on which the current version (within the transaction
- * scope) is written. DELETE operations write a flag into the object index, but
- * do NOT remove the entry for the data from the index. READ operations are
- * performed against this view of the object index, and therefore always read
- * the most recent version (but note that an object not found in the journal
- * MUST be resolved against the corresponding database segment).
- * </p>
- * <p>
- * In a PREPARE operation, dirty index nodes in the transaction scope are merged
- * with the most recent committed state of the object index (backward
- * validation). This merge is used to detect write-write conflicts, which are
- * then resolved by state-based conflict resolution (e.g., merge rules). All
- * dirty object index nodes are flushed to disk during the prepare, but the root
- * block is not updated until the COMMIT.
+ * A transaction. A transaction is a context in which the application can access
+ * named indices, and perform operations on those indices, and the operations
+ * will be isolated according to the isolation level of the transaction. When
+ * using an isolated transaction, writes are accumulated in an
+ * {@link IsolatedBTree}. The write set is validated when the transaction
+ * {@link #prepare()}s and finally merged down onto the global state when the
+ * transaction commits.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo update javadoc.
+ * @todo Transactions may be requested that are read-only for some historical
+ *       timestamp, that are read-committed (data committed by _other_
+ *       transactions during the transaction will be visible within that
+ *       transaction), or that are fully isolated (changes made in other
+ *       transactions are not visible within the transaction).
+ * 
+ * @todo support {@link PartitionedIndex}es.
+ * 
+ * @todo Make the {@link IsolatedBTree}s safe across {@link Journal#overflow()}
+ *       events. When {@link PartitionedIndex}es are used this adds a
+ *       requirement for tracking which {@link IndexSegment}s and
+ *       {@link Journal}s are required to support the {@link IsolatedBTree}.
+ *       Deletes of old journals and index segments must be deferred until no
+ *       transaction remains which can read those data. This metadata must be
+ *       restart-safe so that resources are eventually deleted. On restart,
+ *       active transactions will abort and their resources may be released.
+ *       There is also a requirement for quickly locating the specific journal
+ *       and index segments required to support isolation of an index. This
+ *       probably means an index into the history of the {@link MetadataIndex}
+ *       (so we don't throw it away until no transactions can reach back that
+ *       far) as well as an index into the named indices index -- perhaps simply
+ *       an index by timestamp into the root addresses (or whole root block
+ *       views).
  * 
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
@@ -122,8 +119,21 @@ public class Tx implements IStore, ITx {
     final static String NOT_COMMITTED = "Transaction is not committed";
     final static String IS_COMPLETE = "Transaction is complete";
     
+    /*
+     * 
+     */
     final private Journal journal;
+    
+    /**
+     * The timestamp assigned to this transaction. 
+     */
     final private long timestamp;
+    
+    /**
+     * The commit counter on the journal as of the time that this transaction
+     * object was created.
+     */
+    final private long commitCounter;
 
     private RunState runState;
 
@@ -132,22 +142,20 @@ public class Tx implements IStore, ITx {
      * 
      * @todo in order to survive overflow this mapping must be persistent.
      */
-    private Map<String,BTree> btrees = new HashMap<String,BTree>();
+    private Map<String,IsolatedBTree> btrees = new HashMap<String,IsolatedBTree>();
     
     /**
-     * Return a named btree. The btree will be isolated at the same level as
-     * this transaction. Changes on the btree will be made restart-safe iff the
+     * Return a named index. The index will be isolated at the same level as
+     * this transaction. Changes on the index will be made restart-safe iff the
      * transaction successfully commits.
      * 
      * @param name
-     *            The name of the btree.
+     *            The name of the index.
      * 
-     * @return The named btree or <code>null</code> if no btree was registered
+     * @return The named index or <code>null</code> if no index is registered
      *         under that name.
-     * 
-     * @todo modify to use
      */
-    public BTree getIndex(String name) {
+    public IIndex getIndex(String name) {
 
         if(name==null) throw new IllegalArgumentException();
         
@@ -160,10 +168,24 @@ public class Tx implements IStore, ITx {
         if(btree == null) {
             
             /*
-             * FIXME isolate the same named btree in the global scope and store
-             * it in the map.
+             * see if the index was registered.
+             * 
+             * FIXME this gets the last committed unisolated index. We need to
+             * add a timestamp parameter and look up the appropriate metadata
+             * record based on both the name and the timestamp (first metadata
+             * record for the named index having a timestamp LT the transaction
+             * timestamp).  since this is always a request for historical and
+             * read-only data, this method should not register a committer and
+             * the returned btree should not participate in the commit protocol.
              */
-            throw new UnsupportedOperationException();
+            UnisolatedBTree src = (UnisolatedBTree)journal.getIndex(name);
+            
+            // the named index was never registered.
+            if(name==null) return null;
+            
+            // Isolate the named btree.
+            return new IsolatedBTree(journal,src);
+            
             
         }
         
@@ -206,6 +228,8 @@ public class Tx implements IStore, ITx {
 
         journal.activateTx(this);
         
+        this.commitCounter = journal.getRootBlockView().getCommitCounter();
+        
         this.runState = RunState.ACTIVE;
 
     }
@@ -215,7 +239,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return The transaction identifier (aka timestamp).
      */
-    public long getId() {
+    final public long getId() {
         
         return timestamp;
         
@@ -277,15 +301,20 @@ public class Tx implements IStore, ITx {
     }
     
     /**
+     * <p>
      * Commit the transaction.
+     * </p>
+     * <p>
+     * Note: You MUST {@link #prepare()} a transaction before you
+     * {@link #commit()} that transaction. This requirement exists as a
+     * placeholder for a 2-phase commit protocol for use with distributed
+     * transactions.
+     * </p>
      * 
      * @exception IllegalStateException
      *                if the transaction has not been
      *                {@link #prepare() prepared}. If the transaction is not
      *                already complete, then it is aborted.
-     * 
-     * @todo modify to automatically prepare the transaction if it has not been
-     *       prepared and update the javadoc and the unit tests.
      */
     public void commit() {
 
@@ -301,17 +330,20 @@ public class Tx implements IStore, ITx {
             
         }
 
-        journal.completedTx(this);
-
         /*
          * Merge each isolated index into the global scope. This also marks the
          * slots used by the versions written by the transaction as 'committed'.
-         * This operation MUST succeed since we have already validated.
+         * This operation MUST succeed (at a logical level) since we have
+         * already validated (neither read-write nor write-write conflicts
+         * exist).
          * 
-         * Note: non-transactional operations on the global scope should be
-         * disallowed when using transactions since they (a) could invalidate
-         * the pre-condition for the merge; and (b) uncommitted changes would be
-         * discarded if the merge operation fails.
+         * @todo Non-transactional operations on the global scope should be
+         * either disallowed entirely or locked out during the prepare-commit
+         * protocol when using transactions since they (a) could invalidate the
+         * pre-condition for the merge; and (b) uncommitted changes would be
+         * discarded if the merge operation fails.  One solution is to use
+         * batch operations or group commit mechanism to dynamically create
+         * transactions from unisolated operations.
          */
         try {
 
@@ -319,6 +351,10 @@ public class Tx implements IStore, ITx {
             
             // Atomic commit.
             journal.commit();
+            
+            runState = RunState.COMMITTED;
+
+            journal.completedTx(this);
             
         } catch( Throwable t) {
 
@@ -328,27 +364,30 @@ public class Tx implements IStore, ITx {
              * will result in those changes becoming restart-safe when the next
              * transaction commits!
              * 
-             * This will be legal if we are observing serializability; that is,
-             * in no one writes on the global state for a restart-safe btree
-             * except mergeOntoGlobalState(). When this constraint is observed
-             * it is impossible for there to be uncommitted changes when we
-             * begin to merge down onto the store and any changes may simply be
-             * discarded.
+             * Discarding registered committers is legal if we are observing
+             * serializability; that is, if no one writes on the global state
+             * for a restart-safe btree except mergeOntoGlobalState(). When this
+             * constraint is observed it is impossible for there to be
+             * uncommitted changes when we begin to merge down onto the store
+             * and any changes may simply be discarded.
              * 
              * Note: we can not simply reload the current root block (or reset
              * the nextOffset to be assigned) since concurrent transactions may
              * be writing non-restart safe data on the store in their own
              * isolated btrees.
              */
+
             journal._discardCommitters(); 
 
-            releaseBTrees();
+            abort();
             
             throw new RuntimeException( t );
             
+        } finally {
+
+            releaseBTrees();
+            
         }
-        
-        runState = RunState.COMMITTED;
         
     }
 
@@ -363,12 +402,18 @@ public class Tx implements IStore, ITx {
         if (isComplete())
             throw new IllegalStateException(IS_COMPLETE);
 
-        releaseBTrees();
-        
-        journal.completedTx(this);
+        try {
 
-        runState = RunState.ABORTED;
-        
+            runState = RunState.ABORTED;
+
+            journal.completedTx(this);
+            
+        } finally {
+            
+            releaseBTrees();
+
+        }
+
     }
 
     /**
@@ -378,7 +423,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return True iff the transaction is active.
      */
-    public boolean isActive() {
+    final public boolean isActive() {
         
         return runState == RunState.ACTIVE;
         
@@ -391,7 +436,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return True iff the transaction is prepared to commit.
      */
-    public boolean isPrepared() {
+    final public boolean isPrepared() {
         
         return runState == RunState.PREPARED;
         
@@ -403,7 +448,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return True iff the transaction is completed.
      */
-    public boolean isComplete() {
+    final public boolean isComplete() {
         
         return runState == RunState.COMMITTED || runState == RunState.ABORTED;
         
@@ -415,7 +460,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return True iff the transaction is committed.
      */
-    public boolean isCommitted() {
+    final public boolean isCommitted() {
         
         return runState == RunState.COMMITTED;
         
@@ -427,7 +472,7 @@ public class Tx implements IStore, ITx {
      * 
      * @return True iff the transaction is aborted.
      */
-    public boolean isAborted() {
+    final public boolean isAborted() {
         
         return runState == RunState.ABORTED;
         
@@ -437,7 +482,42 @@ public class Tx implements IStore, ITx {
      * Validate all isolated btrees written on by this transaction.
      */
     private boolean validate() {
-        throw new UnsupportedOperationException();
+        
+        if(journal.getRootBlockView().getCommitCounter() != commitCounter) {
+            
+            /*
+             * This compares the timestamp of the last transaction committed on
+             * the journal with the timestamp of the last transaction committed
+             * on the journal as of the time that this transaction object was
+             * created. In a centralized database archicture this is a sufficient
+             * test to determine that no intevening commits have occured.
+             */
+            
+            return true;
+            
+        }
+        
+        /*
+         * for all isolated btrees, if(!validate()) return false;
+         */
+        Iterator<Map.Entry<String,IsolatedBTree>> itr = btrees.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            Map.Entry<String, IsolatedBTree> entry = itr.next();
+            
+            String name = entry.getKey();
+            
+            IsolatedBTree isolated = entry.getValue();
+            
+            UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
+            
+            if(!isolated.validate(groundState)) return false;
+            
+        }
+         
+        return true;
+
     }
     
     /**
@@ -445,7 +525,23 @@ public class Tx implements IStore, ITx {
      * transactions into the corresponding btrees in the global state.
      */
     private void mergeOntoGlobalState() {
-        throw new UnsupportedOperationException();
+    
+        Iterator<Map.Entry<String,IsolatedBTree>> itr = btrees.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            Map.Entry<String, IsolatedBTree> entry = itr.next();
+            
+            String name = entry.getKey();
+            
+            IsolatedBTree isolated = entry.getValue();
+            
+            UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
+            
+            isolated.mergeDown(groundState);
+            
+        }
+
     }
 
 }
