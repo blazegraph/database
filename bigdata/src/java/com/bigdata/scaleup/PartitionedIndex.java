@@ -57,6 +57,10 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BatchContains;
+import com.bigdata.objndx.BatchInsert;
+import com.bigdata.objndx.BatchLookup;
+import com.bigdata.objndx.BatchRemove;
 import com.bigdata.objndx.EmptyEntryIterator;
 import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IEntryIterator;
@@ -384,27 +388,27 @@ public class PartitionedIndex implements IIndex, ICommitter {
      * non-batch api.
      */
 
-    public void insert(int ntuples, byte[][] keys, Object[] values) {
+    public void insert(BatchInsert op) {
 
-        btree.insert(ntuples, keys, values);
+        btree.insert(op);
 
     }
 
-    public void remove(int ntuples, byte[][] keys, Object[] values) {
+    public void remove(BatchRemove op) {
 
-        btree.remove(ntuples, keys, values);
+        btree.remove(op);
 
     }
 
     // FIXME contains(batch)
-    public void contains(int ntuples, byte[][] keys, boolean[] contains) {
+    public void contains(BatchContains op) {
 
         throw new UnsupportedOperationException();
 
     }
 
     // FIXME lookup(batch)
-    public void lookup(int ntuples, byte[][] keys, Object[] values) {
+    public void lookup(BatchLookup op) {
 
         throw new UnsupportedOperationException();
 

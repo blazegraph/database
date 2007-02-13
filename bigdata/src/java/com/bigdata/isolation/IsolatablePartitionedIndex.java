@@ -45,8 +45,9 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
+import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 

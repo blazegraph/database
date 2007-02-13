@@ -60,6 +60,7 @@ import com.bigdata.journal.Options;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
@@ -427,7 +428,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         SimpleEntry v8 = new SimpleEntry(8);
         Object[] values = new Object[]{v5,v6,v7,v8,v3,v4,v2,v1};
 
-        btree.insert(values.length, keys, values);
+        btree.insert(new BatchInsert(values.length, keys, values));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -533,7 +534,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Object[] values1 = new Object[] { v1, v3, v5, v7 }; // Note: modified by insert!
         Object[] values2 = new Object[] { v2, v4, v6, v8 }; // Note: modified by insert!
         
-        btree.insert(values1.length, keys1, values1);
+        btree.insert(new BatchInsert(values1.length, keys1, values1));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -577,7 +578,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         btree = new BTree(store,3,SimpleEntry.Serializer.INSTANCE);
         
-        btree.insert(values2.length, keys2, values2);
+        btree.insert(new BatchInsert(values2.length, keys2, values2));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -1022,7 +1023,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Object[] values1 = new Object[] { v1, v3, v5, v7 }; // Note: modified by insert!
         Object[] values2 = new Object[] { v2, v4, v6, v8 }; // Note: modified by insert!
         
-        btree.insert(values1.length, keys1, values1);
+        btree.insert(new BatchInsert(values1.length, keys1, values1));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -1066,7 +1067,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         btree = new BTree(store,3,SimpleEntry.Serializer.INSTANCE);
         
-        btree.insert(values2.length, keys2, values2);
+        btree.insert(new BatchInsert(values2.length, keys2, values2));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 

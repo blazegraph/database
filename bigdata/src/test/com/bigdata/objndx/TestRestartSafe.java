@@ -179,7 +179,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
                     new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
                     new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
             
-            btree.insert(values.length, keys, values);
+            btree.insert(new BatchInsert(values.length, keys, values));
             
             assertTrue(btree.dump(Level.DEBUG,System.err));
     

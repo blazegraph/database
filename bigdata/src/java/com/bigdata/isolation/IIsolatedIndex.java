@@ -45,7 +45,7 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
 /**
  * A marker interface for an index that has been isolated within a transaction.
@@ -53,6 +53,6 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IsolatedIndex extends IIsolatableIndex {
+public interface IIsolatedIndex extends IIsolatableIndex {
 
 }

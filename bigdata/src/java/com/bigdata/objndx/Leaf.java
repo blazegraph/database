@@ -799,20 +799,21 @@ public class Leaf extends AbstractNode implements ILeafData {
      * @todo optimize batch lookup here (also when bloom filter is available on
      *       an IndexSegment).
      */
-    public int batchContains(int ntuples, int tupleIndex, byte[][] searchKeys,
-            boolean[] contains) {
+    public int batchContains(BatchContains op) {
 
-        assert tupleIndex < ntuples;
+        final int tupleIndex = op.tupleIndex;
+        
+        assert tupleIndex < op.ntuples;
         
         btree.touch(this);
         
-        final int entryIndex = this.keys.search(searchKeys[tupleIndex]);
+        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
 
         if (entryIndex < 0) {
 
             // Not found.
 
-            contains[tupleIndex] = false;
+            op.contains[tupleIndex] = false;
             
             return 1;
 
@@ -820,7 +821,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         // Found.
         
-        contains[tupleIndex] = true;
+        op.contains[tupleIndex] = true;
         
         return 1;
 
@@ -1327,20 +1328,23 @@ public class Leaf extends AbstractNode implements ILeafData {
      * 
      * @todo optimize batch remove.
      */
-    public int remove(int ntuples, int tupleIndex, byte[][] searchKeys,
-            Object[] values) {
+    public int batchRemove(BatchRemove op) {
+        
+        final int tupleIndex = op.tupleIndex;
+        
+        assert tupleIndex < op.ntuples;
         
         if(btree.debug) assertInvariants();
         
         btree.touch(this);
 
-        final int entryIndex = this.keys.search(searchKeys[tupleIndex]);
+        final int entryIndex = keys.search(op.keys[tupleIndex]);
 
         if (entryIndex < 0) {
 
             // Not found.
 
-            values[tupleIndex] = null;
+            op.values[tupleIndex] = null;
             
             return 1;
 
@@ -1357,12 +1361,12 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.remove(ntuples, tupleIndex, searchKeys, values);
+            return copy.batchRemove(op);
 
         }
 
         // The value that is being removed.
-        values[tupleIndex] = this.values[entryIndex];
+        op.values[tupleIndex] = this.values[entryIndex];
 
 //        if (INFO) {
 //            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
@@ -1478,6 +1482,163 @@ public class Leaf extends AbstractNode implements ILeafData {
         if(btree.debug) assertInvariants();
         
         return 1;
+        
+    }
+
+    /**
+     * Removes the entry from the leaf if found.
+     * 
+     * @return The old value for the key (may be null) or null if the key was
+     *         not found.
+     */
+    public Object remove(byte[] key) {
+        
+        if(btree.debug) assertInvariants();
+        
+        btree.touch(this);
+
+        final int entryIndex = keys.search(key);
+
+        if (entryIndex < 0) {
+
+            // Not found.
+
+            return null;
+
+        }
+
+        /*
+         * Note: This is one of the few gateways for mutation of a leaf via
+         * the main btree API (insert, lookup, delete). By ensuring that we
+         * have a mutable leaf here, we can assert that the leaf must be
+         * mutable in other methods.
+         */
+
+        Leaf copy = (Leaf) copyOnWrite();
+
+        if (copy != this) {
+
+            return copy.remove(key);
+
+        }
+
+        // The value that is being removed.
+        final Object oldval = this.values[entryIndex];
+
+//        if (INFO) {
+//            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//            }
+//        }
+
+        /*
+         * Copy over the hole created when the key and value were removed
+         * from the leaf.
+         * 
+         * Given: 
+         * keys : [ 1 2 3 4 ]
+         * vals : [ a b c d ]
+         * 
+         * Remove(1):
+         * index := 0
+         * length = nkeys(4) - index(0) - 1 = 3;
+         * 
+         * Remove(3):
+         * index := 2;
+         * length = nkeys(4) - index(2) - 1 = 1;
+         * 
+         * Remove(4):
+         * index := 3
+         * length = nkeys(4) - index(3) - 1 = 0;
+         * 
+         * Given: 
+         * keys : [ 1      ]
+         * vals : [ a      ]
+         * 
+         * Remove(1):
+         * index := 0
+         * length = nkeys(1) - index(0) - 1 = 0;
+         */
+
+        /*
+         * Copy down to cover up the hole.
+         */
+        final int length = nkeys - entryIndex - 1;
+
+        // Tunnel through to the mutable keys object.
+        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
+
+        if (length > 0) {
+
+            System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
+                    length);
+
+            System.arraycopy(this.values, entryIndex + 1, this.values,
+                    entryIndex, length);
+
+        }
+
+        /* 
+         * Erase the key/value that was exposed by this operation.
+         */
+        keys.zeroKey(nkeys - 1);
+        this.values[nkeys - 1] = null;
+
+        // One less entry in the tree.
+        ((BTree)btree).nentries--;
+        assert ((BTree)btree).nentries >= 0;
+
+        // One less key in the leaf.
+        nkeys--; keys.nkeys--;
+                
+        if( btree.root != this ) {
+
+            /*
+             * this is not the root leaf.
+             */
+        
+            // update entry count on ancestors.
+            
+            parent.get().updateEntryCount(this,-1);
+            
+            if( nkeys < minKeys ) {
+                
+                /*
+                 * The leaf is deficient. Join it with a sibling, causing their
+                 * keys to be redistributed such that neither leaf is deficient.
+                 * If there is only one other sibling and it has only the
+                 * minimum #of values then the two siblings will be merged into
+                 * a single leaf and their parent will have only a single child.
+                 * Since the minimum #of children is two (2), having a single
+                 * child makes the parent of this node deficient and it will be
+                 * joined with one of its siblings. If necessary, this process
+                 * will continue recursively up the tree. The root leaf never
+                 * has any siblings and never experiences underflow so it may be
+                 * legally reduced to zero values.
+                 * 
+                 * Note that the minmum branching factor (3) and the invariants
+                 * together guarentee that there is at least one sibling. Also
+                 * note that the minimum #of children for a node with the
+                 * minimum branching factor is two (2) so a valid tree never has
+                 * a node with a single sibling.
+                 * 
+                 * Note that we must invoked copy-on-write before modifying a
+                 * sibling.  However, the parent of the leave MUST already be
+                 * mutable (aka dirty) since that is a precondition for removing
+                 * a key from the leaf.  This means that copy-on-write will not
+                 * force the parent to be cloned.
+                 */
+                
+                join();
+                
+            }
+            
+        }
+            
+        if(btree.debug) assertInvariants();
+        
+        return oldval;
         
     }
 

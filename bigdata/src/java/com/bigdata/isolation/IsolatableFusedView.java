@@ -42,42 +42,37 @@ Modifications:
 
 */
 /*
- * Created on Oct 25, 2006
+ * Created on Feb 12, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.isolation;
+
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.FusedView;
 
 /**
- * Interface encapsulates allocation operations on a persistence store.
+ * A {@link FusedView} that understands how to process delete markers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @deprecated This is being removed shortly. It is basically replaced by
- *             {@link IOM} and some low level operations in {@link BTree}.
+ * @todo refactor to isolate and override the merge rule.
  */
-public interface RecordManager {
+public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
 
     /**
-     * FIXME This assumption is not valid for the journal, which permits slot 0
-     * as valid.  We can restrict the journal to deny slot zero, which might be
-     * wise.  There really needs to be an oid for null.  (Also, the journal is
-     * using int32 identifiers and long's are actually encoding contiguous slot
-     * allocations formed from the firstSlot offset and the #of bytes in the
-     * allocation).
+     * @param src1
+     * @param src2
      */
-    long NULL_RECID = 0L;
+    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
+        super(src1, src2);
+    }
 
-//    long insert(Object obj);
-//    
-//    Object fetch(long id);
-//    
-//    void update(long id,Object obj);
-//    
-//    void delete(long id);
+    /**
+     * @param srcs
+     */
+    public IsolatableFusedView(AbstractBTree[] srcs) {
+        super(srcs);
+    }
 
-//    // @todo remove these two methods from this API once the tests are in line.
-//    void close();
-//    void commit();
-    
 }

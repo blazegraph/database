@@ -45,23 +45,20 @@ Modifications:
  * Created on Oct 23, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.isolation;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
+import java.io.Serializable;
+
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Tx;
 
 /**
  * <p>
  * An interface invoked during backward validation when a write-write conflict
- * has been detected. The interface must either resolve the write-write conflict
- * by returning a new version in which the conflict is resolved or report an
- * unresolvable conflict, in which case backward validation will force the
- * transaction to abort.
- * </p>
- * <p>
- * Note: You MUST provide a public constructor with the signature: <code>
- * <i>class</i>( Journal journal )</code>
+ * has been detected. The implementation must either resolve the write-write
+ * conflict by returning a new version in which the conflict is resolved or
+ * report an unresolvable conflict, in which case backward validation will force
+ * the transaction to abort.
  * </p>
  * 
  * @see http://www.cs.brown.edu/~mph/Herlihy90a/p96-herlihy.pdf for an excellent
@@ -72,30 +69,25 @@ import java.util.concurrent.ConcurrentHashMap;
  *       bank account examplres in Herlihy and the examples that we will find in
  *       race conditions for the lexical terms and statements in an RDF model.
  * 
- * @todo Will object deserialization be buffered by a cache? Cache integrity is
- *       tricky here since the objects being reconciled belong to different
- *       transactional states. I can see a situation in which conflict
- *       resolution requires multiple changes in a graph structure, and could
- *       require simultaneous traversal of both a read-only view of the last
- *       committed state on the journal and a read-write view of the
- *       transaction. Resolution would then proceed by WRITE or DELETE
- *       operations on the transaction. The method signature would be changed
- *       to:
+ * @todo How to handle cascading dependencies. For example, if there is a
+ *       write-write conflict on the terms index of an RDF store then the
+ *       reverse index and any statements written in the transaction for the
+ *       term with which the write-write conflict exists must also be updated.
+ *       This will require lots of application knowledge and access to the
+ *       {@link Tx} object itself?
  * 
- * <pre>
- * resolveConflict(int32 id,Tx readOnly,Tx readWrite)
- * </pre>
+ * @todo The burden of deserialization is on the application and its
+ *       implementation of this interface at present. Will object
+ *       deserialization be buffered by a cache? Cache integrity is tricky here
+ *       since the objects being reconciled belong to different transactional
+ *       states. I can see a situation in which conflict resolution requires
+ *       multiple changes in a graph structure, and could require simultaneous
+ *       traversal of both a read-only view of the last committed state on the
+ *       journal and a read-write view of the transaction. Resolution would then
+ *       proceed by WRITE or DELETE operations on the transaction. The method
+ *       signature would be changed to:
  * 
  * This would have to allow READ,WRITE,and DELETE operations during PREPARE.<br>
- * 
- * This is nice, but is does require that we handle concurrent modification of
- * the object index during traversal (and concurrent traversal) since validation
- * is traversing the index while it is being used by the conflict resolver to
- * READ, WRITE, and DELETE objects. This can be handled with a non-persistence
- * capable object index simply by changing from {@link HashMap}
- * {@link ConcurrentHashMap}. Handling this for a persistence capable data
- * structure will require significantly more effort (but will provide a
- * worthwhile feature for btree support).<br>
  * 
  * Handling distributed conflicts could also require awareness of the int64
  * identifier. That is accessible to the caller if they have saved a reference
@@ -109,7 +101,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IConflictResolver {
+public interface IConflictResolver extends Serializable {
 
     /**
      * <p>
@@ -117,26 +109,22 @@ public interface IConflictResolver {
      * and the current version within a transaction that is validating.
      * </p>
      * 
-     * @param id
-     *            The int32 within segment persistent identifier.
+     * @param key
+     *            The key for which the write-write conflict occurred.
      * 
-     * @param readOnlyTx
-     *            A read-only transactional view from which the committed
-     *            version may be read.
+     * @param comittedValue
+     *            The historical value committed in the global state with which
+     *            the write-write conflict exists.
      * 
-     * @param tx
-     *            The transaction that is being validated.
+     * @param txEntry
+     *            The value written by the transaction that is being validated.
      * 
-     * @exception RuntimeException
-     *                if you are not able to resolve the conflict.
-     * 
-     * @todo DELETE operations are a special case of WRITE operations. However,
-     *       there is no way to overwrite a committed delete at this time using
-     *       {@link Tx#write(int, ByteBuffer)} or
-     *       {@link Journal#write(Tx, int, ByteBuffer)}
+     * @return A {@link Value} in which the conflict has been resolved or
+     *         <code>null</code> if the value could not be resolved. This may
+     *         be either of the provided values or a new one constructed based
+     *         on an examination of the provided values.
      */
-
-    public void resolveConflict(int id, ITx readOnlyTx, ITx readWriteTx)
+    public Value resolveConflict(byte[] key, Value comittedValue, Value txEntry)
             throws RuntimeException;
 
 }

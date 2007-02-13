@@ -45,11 +45,18 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.ValueSerializer;
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.IBatchBTree;
+import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.IndexSegmentMerger;
+import com.bigdata.objndx.Leaf;
 
 /**
  * <p>

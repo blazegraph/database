@@ -45,7 +45,7 @@ Modifications:
  * Created on Oct 24, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.isolation;
 
 import junit.framework.TestCase;
 

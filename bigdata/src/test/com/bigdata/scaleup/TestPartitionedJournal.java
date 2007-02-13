@@ -56,6 +56,7 @@ import junit.framework.TestCase2;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.objndx.SimpleEntry;
@@ -495,7 +496,7 @@ public class TestPartitionedJournal extends TestCase2 {
         public void insertInto(IIndex ndx) {
             
             // note: clones values to avoid side effect.
-            ndx.insert(nrecords,keys,vals.clone());
+            ndx.insert(new BatchInsert(nrecords,keys,vals.clone()));
             
         }
         

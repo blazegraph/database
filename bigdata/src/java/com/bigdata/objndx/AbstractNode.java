@@ -1092,22 +1092,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     /**
      * Batch existence testing for one or more keys.
      * 
-     * @param ntuples
-     *            The #of tuples that are being looked up (in).
-     * @param tupleIndex
-     *            The index of the tuple to be looked up (in)
-     * @param searchKeys
-     *            The array of keys (one key per tuple) (in).
-     * @param contains
-     *            Flags (one element per key) (in,out). On input, the key will
-     *            be searched for iff the element is <code>false</code>. On
-     *            output, each element is true iff the corresponding search key
-     *            was found.
-     * 
      * @return The #of tuples processed.
      */
-    abstract public int batchContains(int ntuples, int tupleIndex,
-            byte[][] searchKeys, boolean[] contains);
+    abstract public int batchContains(BatchContains op);
 
     /**
      * Return true iff there is an entry for the search key (this method should
@@ -1121,25 +1108,26 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     abstract public boolean contains(byte[] searchKey);
     
     /**
-     * Batch removal of one or more tuples, returning their existing values and
-     * timestamps.
-     * 
-     * @param ntuples
-     *            The #of tuples that are being removed (in).
-     * @param tupleIndex
-     *            The index of the tuple to be removed (in).
-     * @param searchKeys
-     *            The array of keys (one key per tuple) (in).
-     * @param values
-     *            Values (one element per key) (out). On output, each element is
-     *            either null (if there was no entry for that key) or the old
-     *            value stored under that key (which may be null).
+     * Batch removal of one or more tuples, returning their existing values by
+     * side-effect.
      * 
      * @return The #of tuples processed.
      */
-    abstract public int remove(int ntuples, int tupleIndex,
-            byte[][] searchKeys, Object[] values);
+    abstract public int batchRemove(BatchRemove op);
 
+    /**
+     * Recursive search locates the appropriate leaf and removes the entry for
+     * the key (if any) returning the old value for that entry or null if the
+     * key was not found.
+     * 
+     * @param searchKey
+     *            The search key.
+     * 
+     * @return The old value for the search key (may be null) or null if the key
+     *         was not found.
+     */
+    abstract public Object remove(byte[] searchKey);
+    
     /**
      * Recursive search locates the appropriate leaf and returns the index
      * position of the entry.

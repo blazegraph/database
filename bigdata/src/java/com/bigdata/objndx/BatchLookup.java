@@ -76,15 +76,25 @@ public class BatchLookup implements IBatchOp {
     public int tupleIndex = 0;
     
     /**
+     * Create a batch lookup operation.
      * 
      * @param ntuples
-     *            The #of tuples that are being looked up (in).
+     *            The #of tuples in the operation (in).
      * @param keys
      *            The array of keys (one key per tuple) (in).
      * @param values
      *            Values (one element per key) (out). On output, each element is
      *            either null (if there was no entry for that key) or the old
      *            value stored under that key (which may be null).
+     * 
+     * @todo consider returning the #of keys that were found in the btree. this
+     *       either requires passing an additional counter through the
+     *       implementation of defining the value as always being non-null
+     *       (which is too restrictive).
+     * 
+     * @exception IllegalArgumentException
+     *                if the dimensions of the arrays are not sufficient for the
+     *                #of tuples declared.
      */
     public BatchLookup(int ntuples, byte[][] keys, Object[] values) {
         

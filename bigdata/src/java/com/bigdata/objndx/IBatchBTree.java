@@ -50,12 +50,15 @@ package com.bigdata.objndx;
 /**
  * <p>
  * Interface for batch operations a B+-Tree mapping variable length unsigned
- * byte[] keys to arbitrary values. All mutation operations on a {@link BTree}
- * are executed in a single threaded context and are therefore atomic. A batch
- * api operation that does NOT span more than one index partition is therefore
- * atomic. However, if an operation spans multiple partitions of an index then
- * NO GUARENTEE is made that the operation is atomic over the set of index
- * partitions.
+ * byte[] keys to arbitrary values. Batch operations can be very efficient if
+ * the keys are presented in sorted order.
+ * </p>
+ * <p>
+ * All mutation operations on a {@link BTree} are executed in a single threaded
+ * context and are therefore atomic. A batch api operation that does NOT span
+ * more than one index partition is therefore atomic. However, if an operation
+ * spans multiple partitions of an index then NO GUARENTEE is made that the
+ * operation is atomic over the set of index partitions.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -67,116 +70,33 @@ package com.bigdata.objndx;
  * @todo add batch api for rangeCount and rangeQuery.
  * 
  * @todo support batch api for indexOf(), keyAt(), valueAt()?
+ * 
+ * @todo add extensible operation defined by an vector
+ *       {@link UserDefinedFunction}. Use this to move application logic to the
+ *       indices as an alternative to scalar {@link UserDefinedFunction}s.  For
+ *       example, the logic that tests an index for a key, increments a counter
+ *       if the key is not found, and inserts the counter under the key.
  */
 public interface IBatchBTree {
 
     /**
-     * Batch insert operation of N tuples presented in sorted order. This
-     * operation can be very efficient if the tuples are presented sorted by key
-     * order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in). Additional elements of
-     *            the parameter arrays will be ignored.
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.<br>
-     *            The individual byte[] keys provided to this method MUST be
-     *            immutable - if the content of a given byte[] in <i>keys</i>
-     *            is changed after the method is invoked then the change MAY
-     *            have a side-effect on the keys stored in leaves of the tree.
-     *            While this constraint applies to the individual byte[] keys,
-     *            the <i>keys</i> byte[][] itself may be reused from invocation
-     *            to invocation without side-effect.
-     * 
-     * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
-     * 
-     * @param values
-     *            An array of values, one per tuple (in/out).
-     * 
-     * @exception IllegalArgumentException
-     *                if the dimensions of the arrays are not sufficient for the
-     *                #of tuples declared.
+     * Apply a batch insert operation.
      */
-    public void insert(int ntuples, byte[][] keys, Object[] values);
+    public void insert(BatchInsert op);
 
     /**
-     * Batch lookup operation for N tuples returns the most recent timestamp and
-     * value for each key. This operation can be very efficient if the keys are
-     * presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param values
-     *            An array of values, one per tuple (out). The array element
-     *            corresponding to a tuple will be null if the key does not
-     *            exist -or- if the key exists with a null value.
-     * 
-     * @todo consider returning the #of keys that were found in the btree. this
-     *       either requires passing an additional counter through the
-     *       implementation of defining the value as always being non-null
-     *       (which is too restrictive).
+     * Apply a batch lookup operation.
      */
-    public void lookup(int ntuples, byte[][] keys, Object[] values);
+    public void lookup(BatchLookup op);
 
     /**
-     * Batch lookup operation for N tuples returns the most recent timestamp and
-     * value for each key. This operation can be very efficient if the keys are
-     * presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param contains
-     *            An array of boolean flags, one per tuple (in,out). On input,
-     *            the tuple will be tested iff the corresponding element is
-     *            <code>false</code> (this supports chaining of this operation
-     *            on a view over multiple btrees). On output, the array element
-     *            corresponding to a tuple will be true iff the key exists.
-     * 
-     * @todo consider returning the #of keys that were found in the btree.
+     * Apply a batch existence test operation.
      */
-    public void contains(int ntuples, byte[][] keys, boolean[] contains);
+    public void contains(BatchContains op);
 
     /**
-     * Batch remove of N tuples. This operation can be very efficient if the
-     * keys are presented in sorted order.
-     * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * 
-     * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param values
-     *            An array of values, one per tuple (out). The array element
-     *            corresponding to a tuple will be null if the key did not exist
-     *            -or- if the key existed with a null value (null values are
-     *            used to mark deleted keys in an isolated btree).
+     * Apply a batch remove operation.
      */
-    public void remove(int ntuples, byte[][] keys, Object[] values);
+    public void remove(BatchRemove op);
 
 }

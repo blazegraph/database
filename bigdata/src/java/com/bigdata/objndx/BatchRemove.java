@@ -48,12 +48,13 @@ Modifications:
 package com.bigdata.objndx;
 
 /**
- * Data for a batch insert operation.
+ * Batch removal of one or more tuples, returning their existing values by
+ * side-effect.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchInsert implements IBatchOp {
+public class BatchRemove implements IBatchOp {
 
     /**
      * The #of tuples to be processed.
@@ -76,53 +77,46 @@ public class BatchInsert implements IBatchOp {
     public int tupleIndex = 0;
     
     /**
-     * Create a batch insert operation.
-     * 
-     * Batch insert operation of N tuples presented in sorted order. This
-     * operation can be very efficient if the tuples are presented sorted by key
-     * order.
+     * Create batch remove operation.
      * 
      * @param ntuples
-     *            The #of tuples that are being inserted(in).
+     *            The #of tuples in the operation (in).
      * @param keys
      *            A series of keys paired to values (in). Each key is an
      *            variable length unsigned byte[]. The keys must be presented in
      *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.<br>
-     *            The individual byte[] keys provided to this method MUST be
-     *            immutable - if the content of a given byte[] in <i>keys</i>
-     *            is changed after the method is invoked then the change MAY
-     *            have a side-effect on the keys stored in leaves of the tree.
-     *            While this constraint applies to the individual byte[] keys,
-     *            the <i>keys</i> byte[][] itself may be reused from invocation
-     *            to invocation without side-effect.
+     *            batch operation.
      * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
+     *            An array of values, one per tuple (out). The array element
+     *            corresponding to a tuple will be null if the key did not exist
+     *            -or- if the key existed with a null value (null values are
+     *            used to mark deleted keys in an isolated btree).
+     * 
+     * @exception IllegalArgumentException
+     *                if the dimensions of the arrays are not sufficient for the
+     *                #of tuples declared.
      */
-    public BatchInsert(int ntuples, byte[][] keys, Object[] values) {
-
+    public BatchRemove(int ntuples, byte[][] keys, Object[] values) {
+        
         if (ntuples <= 0)
             throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-            
+
         if (keys == null)
             throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
 
-        if( keys.length < ntuples )
+        if (keys.length < ntuples)
             throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
 
         if (values == null)
             throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
 
-        if( values.length < ntuples )
+        if (values.length < ntuples)
             throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
 
         this.ntuples = ntuples;
         this.keys = keys;
         this.values = values;
-        
+
     }
-    
+
 }

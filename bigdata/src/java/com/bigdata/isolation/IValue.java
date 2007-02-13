@@ -41,7 +41,9 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.objndx;
+package com.bigdata.isolation;
+
+import com.bigdata.objndx.AbstractBTree;
 
 /**
  * Interface for values in an {@link AbstractBTree} supporting deletion markers
@@ -98,6 +100,12 @@ public interface IValue {
     public static short FIRST_VERSION_ISOLATED = (short) 0;
 
     /**
+     * The value of the version counter that is used when the version counter
+     * overflows: TWO(2).
+     */
+    public static short ROLLOVER_VERSION_COUNTER = (short) 2;
+
+    /**
      * A counter that is updated to detect write-write conflicts.
      * <p>
      * The counter is always incremented when a new version is written in an
@@ -120,14 +128,15 @@ public interface IValue {
      * <p>
      * Note that version counters do rollover. A version counter is only a short
      * integer and one bit is reserved to flag a deleted key. When the counter
-     * overflows it is reset to ONE (1) since that the value ZERO (0) is
-     * reserved to indicate a key that has never been written on the unisolated
-     * index. However, since the rule for detecting a write-write conflict is
-     * that the version counters do not agree it would require exactly 32k-1 (
-     * 32,767 ) <em>concurrent</em> overwrites of a value to create a
-     * situation in which a write-write conflict would be missed. It is not
-     * envisioned that any transaction will live long enough for there to be at
-     * least this many intervening concurrent transactions. However, to be
+     * overflows it is reset to {@link #ROLLOVER_VERSION_COUNTER} (2) since the
+     * value ZERO (0) is reserved to indicate a key that has never been written
+     * on the unisolated index and the value ONE (1) is only used the first time
+     * a version is written. However, since the rule for detecting a write-write
+     * conflict is that the version counters do not agree it would require
+     * exactly 32k-2 ( 32,766 ) <em>concurrent</em> overwrites of a value to
+     * create a situation in which a write-write conflict would be missed. It is
+     * not envisioned that any transaction will live long enough for there to be
+     * at least this many intervening concurrent transactions. However, to be
      * absolutely safe, a transaction should be aborted if at least this many
      * intervening transactions have successfully committed. This seems a
      * reasonable limit on long-running transactions.

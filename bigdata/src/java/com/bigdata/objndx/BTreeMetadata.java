@@ -1,19 +1,24 @@
 package com.bigdata.objndx;
 
+import java.io.Externalizable;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * <p>
  * Used to persist metadata for a {@link BTree} so that a historical state may
  * be re-loaded from the store.
- * <p>
- * Note: the metadata record is extensible since it uses default java
- * serialization. While that makes it a bit fat, this is probably not much of an
- * issue.
+ * </p>
+ * 
+ * @todo The metadata record is extensible since it uses default java
+ *       serialization. That makes it a bit fat, which we could address by
+ *       implementing {@link Externalizable} but this is probably not much of an
+ *       issue.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -44,7 +49,7 @@ public class BTreeMetadata implements Serializable {
     public final RecordCompressor recordCompressor;
 
     public final boolean useChecksum;
-    
+   
     /**
      * Address that can be used to read this metadata record from the store.
      * <p>

@@ -1,0 +1,19 @@
+<html>
+<head>
+<title>B+Tree Isolation Support</title>
+</head>
+<body>
+
+<p>
+A B+-Tree designed to support transactional isolation.  This builds on the features
+of the base B+-Tree package, which already supports copy-on-write semantics, and on
+the Journal package, which already supports a policy in which valid data are never
+overwritten.  The primary contribution of this package is a set of extensions and
+wrapper classes that manage {@link IValue} objects wrapping application data values.
+Each {@link IValue} encapsulates a version counter, which is used to detect write-write
+conflicts, and a deleted flag, which is used to mark keys that have been deleted until
+a full compacting merge can be performed.
+</p>
+
+</body>
+</html>

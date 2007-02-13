@@ -48,12 +48,15 @@ Modifications:
 package com.bigdata.objndx;
 
 /**
- * Data for a batch insert operation.
+ * Batch existence test operation. Existence tests SHOULD be used in place of
+ * lookup tests to determine key existence if null values are allowed in an
+ * index (lookup will return a null for both a null value and the absence of a
+ * key in the index).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchInsert implements IBatchOp {
+public class BatchContains implements IBatchOp {
 
     /**
      * The #of tuples to be processed.
@@ -68,7 +71,7 @@ public class BatchInsert implements IBatchOp {
     /**
      * The value corresponding to each key.
      */
-    public final Object[] values;
+    public final boolean[] contains;
     
     /**
      * The index of the tuple that is currently being processed.
@@ -76,53 +79,51 @@ public class BatchInsert implements IBatchOp {
     public int tupleIndex = 0;
     
     /**
-     * Create a batch insert operation.
-     * 
-     * Batch insert operation of N tuples presented in sorted order. This
-     * operation can be very efficient if the tuples are presented sorted by key
-     * order.
+     * Create a batch existance test operation.
      * 
      * @param ntuples
-     *            The #of tuples that are being inserted(in).
+     *            The #of tuples in the operation (in).
+     * 
      * @param keys
      *            A series of keys paired to values (in). Each key is an
      *            variable length unsigned byte[]. The keys must be presented in
      *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.<br>
-     *            The individual byte[] keys provided to this method MUST be
-     *            immutable - if the content of a given byte[] in <i>keys</i>
-     *            is changed after the method is invoked then the change MAY
-     *            have a side-effect on the keys stored in leaves of the tree.
-     *            While this constraint applies to the individual byte[] keys,
-     *            the <i>keys</i> byte[][] itself may be reused from invocation
-     *            to invocation without side-effect.
-     * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
+     *            batch operation.
+     * 
+     * @param contains
+     *            An array of boolean flags, one per tuple (in,out). On input,
+     *            the tuple will be tested iff the corresponding element is
+     *            <code>false</code> (this supports chaining of this operation
+     *            on a view over multiple btrees). On output, the array element
+     *            corresponding to a tuple will be true iff the key exists.
+     * 
+     * @exception IllegalArgumentException
+     *                if the dimensions of the arrays are not sufficient for the
+     *                #of tuples declared.
+     *                
+     * @todo consider returning the #of keys that were found in the btree.
      */
-    public BatchInsert(int ntuples, byte[][] keys, Object[] values) {
-
+    public BatchContains(int ntuples, byte[][] keys, boolean[] contains) {
+        
         if (ntuples <= 0)
             throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-            
+
         if (keys == null)
             throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
 
-        if( keys.length < ntuples )
+        if (keys.length < ntuples)
             throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
 
-        if (values == null)
+        if (contains == null)
             throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
 
-        if( values.length < ntuples )
+        if (contains.length < ntuples)
             throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
 
         this.ntuples = ntuples;
         this.keys = keys;
-        this.values = values;
-        
+        this.contains = contains;
+
     }
-    
+
 }

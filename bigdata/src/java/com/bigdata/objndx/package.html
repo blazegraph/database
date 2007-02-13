@@ -1,56 +1,46 @@
 <html>
 <head>
-<title>Persistent Object Index</title>
+<title>B+-Tree</title>
 </head>
 <body>
 
 <p>
-A b+tree designed to provide a persistence capable object index.  The object
-index has the task of mapping int32 persistent object identifiers onto a slot
-allocation from which the current version of the object may be read.  The object
-index is also the mechanism by which transaction isolation is provided.  Within
-a transaction, operations are isolated by the transaction's object index.  If an
-object identifier is not found in the transactions object index then it reads
-through to an read-only object index.  However, changes are made within the
-transaction's object index.  After a transaction has validated, the changes
-isolated within its object index are merged down onto the then current object
-index, producing a new object index whose root is stored in the root block of
-the store.
+A scalable B+-Tree with copy-on-write semantics mapping variable
+length unsigned byte[] keys to arbitrary objects.
 </p>
 
 <p>
-Since the object index maps object identifiers to slots, it can not use persistent
-identifies itself when storing its state.  Further, since isolation requires that
-historical states of the object index are immutable (until they can be discarded),
-the object index uses copy-on-write semantics when bringing an immutable index node
-into a writable context.  There are exactly two contexts in which this occurs.  First,
-when performing otherwise unisolated changes on the store.  Second, when merging down
-a transactions changes into the global object index.  In either case, the result is a
-new object index root that saved in the root block of the store.
+The B+-Tree uses a fixed branching factor( aka fan-out) but supports
+variable length keys and values and does not directly constrain the
+serialized size of a node or leaf.  The branching factor is determined
+when the B+Tree is created.  Bulk index builds are supported from a
+variety of sources, including a merge of mutable and immutable
+B+-Trees.  Bulk index builds result in immutable {@link IndexSegment}s
+which may have a branching distinct from that of their source
+B+Tree(s).
+</p>
+<p>
+Nodes (and leaves) are either dirty or immutable and persistent.  If
+the node is dirty, then it is always mutable.  If a node is clean,
+then it is always immutable and persistent.  An attempt to write on a
+clean node forces copy on write of the node and its ancenstors up to
+the root of the tree.  In any case where the node has already been
+copied and is dirty, the mutable node is always used.  Therefore
+mutations never overwrite the historical state of the B+-Tree and
+always produce a new well-formed tree.  The root of the new tree is
+recorded in the root block of the store during a commit, at which
+point there is an atomic change in the addressable objects when
+restarting from that root block (this is handled by the {@link
+com.bigdata.Journal}.
 </p>
 
 <p>
-The object index uses fixed size read-only or mutable views for its nodes.  The size
-of a node is determined when the object index is created and is a fixed function of the 
-branching factor of the b+tree.  The node views are backed by a ByteBuffer containing
-the node data.  If the node is dirty in the context, then it is always mutable.  If a
-node is clean in the context, then it is always immutable.  An attempt to write on a
-clean node forces copy on write of the node and its ancenstors up to the root of the
-tree.  In any case where the node has already been copied and is dirty within the
-context, the mutable node is always used.  Therefore mutations of the object index 
-never overwrite its historical state and always produce a new well-formed tree.  The
-root of the new tree is recorded in the root block of the store during a commit, at
-which point there is an atomic change in the addressable objects when restarting from
-that root block.
-</p>
-
-<p>
-
-A "reference" for a node of the object index is always an int64 value encoding a
-allocation of contiguous slots on the journal.  The data in those slots are the
-raw node contents.  Those slots are read and written as ByteBuffers.  The object
-index node class knows how to access and interpret the contents of a ByteBuffer
-as an index node with a given branching factor.
+A "reference" for a node of the object index is always an int64 value
+encoding an address in a {@link com.bigdata.rawstore.IRawStore}.
+Those slots are read and written as ByteBuffers.  The {@link
+NodeSerializer} knows how to access and interpret the contents of a
+ByteBuffer as an index node with a given branching factor and provides
+for extensible serialization semantics for leaves and values.
 </p>
 
 </body>

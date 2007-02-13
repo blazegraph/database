@@ -45,21 +45,26 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
-import com.bigdata.journal.IConflictResolver;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.rawstore.IRawStore;
 
 /**
  * <p>
  * A B+-Tree that has been isolated by a transaction.
  * </p>
+ * <p>
  * Writes will be applied to the isolated btree. Reads will read first on the
  * isolated btree and then read through to the immutable {@link UnisolatedBTree}
  * specified in the constructor if no entry is found under the key. Deletes
  * leave "delete markers".
+ * </p>
  * <p>
  * In order to commit the changes on the {@link UnisolatedBTree} the writes must
  * be {@link #validate(UnisolatedBTree) validated},
@@ -71,17 +76,19 @@ import com.bigdata.rawstore.IRawStore;
  * transaction. On abort, it is possible that nodes and leaves were written on
  * the store for the isolated btree. Those data are unreachable and MAY be
  * recovered depending on the nature of the store and its abort protocol.
+ * </p>
  * <p>
  * The {@link #rangeCount(byte[], byte[])} method MAY report more entries in a
  * key range that would actually be visited - this is due to both the presence
  * of "delete marker" entries in the {@link IsolatedBTree} and the requirement
  * to read on a fused view of the writes on the {@link IsolatedBTree} and the
  * read-only {@link UnisolatedBTree}.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIndex {
+public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedIndex {
 
     private final UnisolatedBTree src;
 
@@ -127,7 +134,7 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
      */
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
-        super(store, src.branchingFactor, Value.Serializer.INSTANCE);
+        super(store, src.getBranchingFactor(), Value.Serializer.INSTANCE);
         
         this.src = src;
         
@@ -234,6 +241,19 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
         return value.value;
         
     }
+    
+    public void addAll(AbstractBTree src) {
+
+        if (!(src instanceof UnisolatedBTree)) {
+
+            throw new IllegalArgumentException("Expecting: "
+                    + UnisolatedBTree.class);
+
+        }
+
+        super.addAll(src);
+        
+    }
 
     /**
      * <p>
@@ -244,7 +264,11 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
      * (an MVCC style strategy). Write-write conflicts are detected by backward
      * validation against the last committed state of the journal. A write-write
      * conflict exists IFF the version counter on the transaction index entry
-     * differs from the version counter in the global index scope.
+     * differs from the version counter in the global index scope. Once
+     * detected, the resolution of a write-write conflict is delegated to a
+     * {@link IConflictResolver conflict resolver}. If a write-write conflict
+     * can not be validated, then validation will fail and the transaction must
+     * abort.
      * </p>
      * <p>
      * Validation occurs as part of the prepare/commit protocol. Concurrent
@@ -252,6 +276,12 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
      * (if permitted) would force re-validation since the transaction MUST now
      * be validated against the new baseline. (It is possible that this
      * validation could be optimized.)
+     * </p>
+     * <p>
+     * The version counters used to detect write-write conflicts are incremented
+     * during the commit as part of the {@link #mergeDown()} of the
+     * {@link IsolatedBTree} onto the corresponding {@link UnisolatedBTree} in
+     * the global scope.
      * </p>
      * 
      * @param current
@@ -266,27 +296,10 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
      * 
      * @return True iff validation succeeds.
      * 
-     * @todo Once detected, the resolution of a write-write conflict is
-     *       delegated to a {@link IConflictResolver conflict resolver}. If a
-     *       write-write conflict can not be validated, then validation will
-     *       fail and the transaction must abort. The version counters are
-     *       incremented during commit as part of the {@link #mergeDown()} of
-     *       the transaction scope index onto the global scope index. (The
-     *       commit resolver should be part of the {@link UnisolatedBTree}
-     *       metadata record.)
-     * 
-     * FIXME As a trivial case, if no intervening commits have occurred on the
-     * journal then this transaction MUST be valid regardless of its write (or
-     * delete) set. This test probably needs to examine the current root block
-     * and the transaction to determine if there has been an intervening commit.
-     * (This should be handled by the {@link Tx} since no writes need to be
-     * validated under this condition.
-     * 
-     * FIXME Make validation efficient by a streaming pass over the write set of
-     * this transaction that detects when the transaction identifier for the
-     * global object index has been modified since the transaction identifier
-     * that serves as the basis for this transaction (the committed state whose
-     * object index this transaction uses as its inner read-only context).
+     * @todo Validation of an object index MUST specifically disallow any scheme
+     *       which generates opaque object identifiers that are NOT primary keys
+     *       MUST NOT allow concurrent transactions to assign the same object
+     *       identifier. If this case is handled then all is well.
      */
     public boolean validate(UnisolatedBTree globalScope /*current*/) {
 
@@ -294,16 +307,41 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
          * Note: Write-write conflicts can be validated iff a conflict resolver
          * was declared when the Journal object was instantiated.
          */
-        final IConflictResolver conflictResolver = null; /*@todo globalScope.getConflictResolver();*/
+        final IConflictResolver conflictResolver = globalScope.getConflictResolver();
 
+        /*
+         * The versions returned by the conflict resolver must be written on the
+         * isolated index so that they will overwrite the committed version when
+         * we mergeDown() onto the unisolated index. However, we have to take
+         * care since this can result in a concurrent modification of the
+         * IsolatedBTree that we are currently traversing.
+         * 
+         * We handle this by inserting the results from the conflict resolver
+         * into an temporary UnisolatedBTree and then writing them on the
+         * IsolatedBTree once we finish the validation pass.
+         * 
+         * @todo Once we create this temporary IsolatedBTree we need to read
+         * from a fused view of it and the primary IsolatedBTree if we are going
+         * to support conflict resolution that spans more than a single
+         * key-value at a time.
+         * 
+         * @todo It is NOT safe to update the value on the IsolatedBTree during
+         * traversal since it might trigger copy-on-write which would cause 
+         * structural modifications that would break the iterator.
+         */
+        UnisolatedBTree tmp = null;
+        
         /*
          * Scan the write set of the transaction.
          * 
          * Note: Both indices have the same total ordering so we are essentially
          * scanning both indices in order.
+         * 
+         * Note: we must use the implementation of this method on the super
+         * class in order to visit the IValue objects and see both deleted and
+         * undeleted entries.
          */
-
-        final IEntryIterator itr = entryIterator();
+        final IEntryIterator itr = super.entryIterator();
 
         while (itr.hasNext()) {
 
@@ -330,67 +368,43 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
 
                     if (conflictResolver == null) {
 
-                        System.err
-                                .println("Could not validate write-write conflict: id="
-                                        + key);
-
-                        // validation failed.
+                        // no conflict resolver - validation fails.
 
                         return false;
 
-                    } else {
+                    }
 
-                        try {
+                    /*
+                     * Apply the conflict resolver in an attempt to resolve the
+                     * conflict.
+                     */
 
-                            throw new UnsupportedOperationException(
-                                    "FIXME conflict resolution");
-                            //                          conflictResolver.resolveConflict(id,readOnlyTx,tx);
+                    Value newValue = conflictResolver.resolveConflict(key,
+                            baseEntry, txEntry);
 
-                        } catch (Throwable t) {
+                    if (newValue == null) {
 
-                            System.err
-                                    .println("Could not resolve write-write conflict: key="
-                                            + key);
+                        // could not validate the conflict.
+                        return false;
 
-                            return false;
+                    }
 
-                        }
+                    if (newValue == baseEntry) {
 
                         /*
-                         * FIXME (Actually, I believe that this has become a
-                         * non-issue.) We need to write the resolved version on
-                         * the journal. However, we have to take care since this
-                         * can result in a concurrent modification of the
-                         * transaction's object index, which we are currently
-                         * traversing.
-                         * 
-                         * The simple way to handle this is to accumulate
-                         * updates from conflict resolution during validation
-                         * and write them afterwards when we are no longer
-                         * traversing the transaction's object index.
-                         * 
-                         * A better way would operate at a lower level and avoid
-                         * the memory allocation and heap overhead for those
-                         * temporary structures - this works well if we know
-                         * that only the current entry will be updated by
-                         * conflict resolution.
-                         * 
-                         * Finally, if more than one entry can be updated when
-                         * we MUST use an object index data structure for the
-                         * transaction that is safe for concurrent modification
-                         * and we MUST track whether each entry has been
-                         * resolved and scan until all entries resolve or a
-                         * conflict is reported. Ideally cycles will be small
-                         * and terminate quickly (ideally validation itself will
-                         * terminate quickly), in which case we could use a
-                         * transient data structure to buffer concurrent
-                         * modifications to the object index. In that case, we
-                         * only need to buffer records that are actually
-                         * overwritten during validation - but that change would
-                         * need to be manifest throughout the object index
-                         * support since it is essentially stateful (or by
-                         * further wrapping of the transaction's object index
-                         * with a buffer!).
+                         * In this case the version written by the transaction
+                         * will take precedence and we do not have to do
+                         * anything.
+                         */
+                        continue;
+
+                    } else {
+
+                        /*
+                         * Otherwise, the version returned by the conflict
+                         * resolver must be written on the isolated index so
+                         * that it will overwrite the committed version when we
+                         * mergeDown() onto the unisolated index.
                          */
 
                     }
@@ -401,6 +415,18 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
 
         }
 
+        if(tmp!=null) {
+            
+            /*
+             * Copy in any updates resulting from conflict validation. It is
+             * safe to apply those updates now that we are no longer traversing
+             * the index.
+             */
+            
+            addAll(tmp);
+            
+        }
+        
         // validation suceeded.
 
         return true;
@@ -413,69 +439,22 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IsolatedIn
      * </p>
      * <p>
      * Note: This method is invoked by a transaction during commit processing to
-     * merge the write set of an index into the global scope. This operation
-     * does NOT check for conflicts. The pre-condition is that the transaction
-     * has already been validated (hence, there will be no conflicts). This
-     * method is also responsible for incrementing the version counters in the
-     * {@link UnisolatedBTree} that are used to detect write-write conflicts
-     * during validation.
+     * merge the write set of an {@link IsolatedBTree} into the global scope.
+     * This operation does NOT check for conflicts. The pre-condition is that
+     * the transaction has already been validated (hence, there will be no
+     * conflicts). This method is also responsible for incrementing the version
+     * counters in the {@link UnisolatedBTree} that are used to detect
+     * write-write conflicts during validation.
      * </p>
-     * 
-     * @todo For a persistence capable implementation of the object index we
-     *       could clear currentVersionSlots during this operation since there
-     *       should be no further access to that field. The only time that we
-     *       will go re-visit the committed object index for the transaction is
-     *       when we GC the pre-existing historical versions overwritten during
-     *       that transaction. Given that, we do not even need to store the
-     *       object index root for a committed transaction (unless we want to
-     *       provide a feature for reading historical states, which is NOT part
-     *       of the journal design). So another option is to just write a chain
-     *       of {@link ISlotAllocation} objects. (Note, per the item below GC
-     *       also needs to remove entries from the global object index so this
-     *       optimization may not be practical). This could be a single long
-     *       run-encoded slot allocation spit out onto a series of slots during
-     *       PREPARE. When we GC the transaction, we just read the chain,
-     *       deallocate the slots found on that chain, and then release the
-     *       chain itself (it could have its own slots added to the end so that
-     *       it is self-consuming). Just pay attention to ACID deallocation so
-     *       that a partial operation does not have side-effects (at least, side
-     *       effects that we do not want). This might require a 3-bit slot
-     *       allocation index so that we can encode the conditional transition
-     *       from (allocated + committed) to (deallocated + uncommitted) and
-     *       know that on restart the state should be reset to (allocated +
-     *       committed).
-     * 
-     * @todo GC should remove the 'deleted' entries from the global object index
-     *       so that the index size does not grow without limit simply due to
-     *       deleted versions. This makes it theoretically possible to reuse a
-     *       persistent identifier once it has been deleted, is no longer
-     *       visible to any active transaction, and has had the slots
-     *       deallocated for its last valid version. However, in practice this
-     *       would require that the logic minting new persistent identifiers
-     *       received notice as old identifiers were expired and available for
-     *       reuse. (Note that applications SHOULD use names to recover root
-     *       objects from the store rather than their persistent identifiers.)
-     * 
-     * FIXME Validation of the object index MUST specifically treat the case
-     * when no version for a persistent identifier exists in the ground state
-     * for a tx, another tx begins and commits having written a version for that
-     * identifier, and then this tx attempts to commit having written (or
-     * written and deleted) a version for that identifier. Failure to treat this
-     * case will cause problems during the merge since there will be an entry in
-     * the global scope that was NOT visible to this transaction (which executed
-     * against a distinct historical global scope). My take is the persistent
-     * identifier assignment does not tend to have semantics (they are not
-     * primary keys, but opaque identifiers) therefore we MUST NOT consider them
-     * to be the same "object" and an unreconcilable write-write conflict MUST
-     * be reported during validation. (Essentially, two transactions were handed
-     * the same identifier for new objects.)
-     * 
-     * FIXME Think up sneaky test cases for this method and verify its operation
-     * in some detail.
      */
     public void mergeDown(UnisolatedBTree globalScope) {
 
-        final IEntryIterator itr = entryIterator();
+        /*
+         * Note: we must use the implementation of this method on the super
+         * class in order to visit the IValue objects and see both deleted
+         * and undeleted entries.
+         */
+        final IEntryIterator itr = super.entryIterator();
 
         while (itr.hasNext()) {
 

@@ -1139,21 +1139,8 @@ public class TestKeyBuilder extends TestCase2 {
         
         /*
          * batch insert operation - no outputs.
-         * 
-         * @todo if this was a batch lookup or batch remove operation then
-         * the values:Object[] would be the output and we would assign them
-         * to the corresponding tuple in a loop so as to pair the output
-         * values with the input data.
-         * 
-         * @todo do I need to allow a [null] value on insert if I refactor
-         * the timestamp into a wrapper object put into place by the btree
-         * class? frankly, it is all the same thing... one approach has more
-         * object creation (the wrapper objects) while the other has more
-         * data copying (the timestamps in addition to the values). using
-         * wrapper objects is more general if I want to minimize the inpact
-         * of the isolation mechanism on the code.
          */
-        btree.insert(ntuples, keys, values);
+        btree.insert(new BatchInsert(ntuples, keys, values));
         
     }
     

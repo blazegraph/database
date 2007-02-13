@@ -73,8 +73,7 @@ public class TestAll extends TestCase {
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * Aggregates the tests in increasing dependency order.
      */
     public static Test suite()
     {
@@ -91,7 +90,9 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.util.TestAll.suite() );
         suite.addTest( com.bigdata.rawstore.TestAll.suite() );
         suite.addTest( com.bigdata.objndx.TestAll.suite() );
+        suite.addTest( com.bigdata.isolation.TestAll.suite() );
         suite.addTest( com.bigdata.journal.TestAll.suite() );
+        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
 
         return suite;
         

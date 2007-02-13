@@ -96,7 +96,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
         
         // invalid keys (null)
         try {
-            btree.insert(1, null, values);
+            btree.insert(new BatchInsert(1, null, values));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -104,7 +104,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // invalid keys (length)
         try {
-            btree.insert(2, new byte[1][], values);
+            btree.insert(new BatchInsert(2, new byte[1][], values));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -112,7 +112,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // invalid values (null)
         try {
-            btree.insert(1, keys, null);
+            btree.insert(new BatchInsert(1, keys, null));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -120,7 +120,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // invalid values (length)
         try {
-            btree.insert(2, keys, new Object[]{"x"});
+            btree.insert(new BatchInsert(2, keys, new Object[]{"x"}));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -128,7 +128,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // invalid tuple count (negative)
         try {
-            btree.insert(-1, keys, values);
+            btree.insert(new BatchInsert(-1, keys, values));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -136,7 +136,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // invalid tuple count (zero)
         try {
-            btree.insert(0, keys, values);
+            btree.insert(new BatchInsert(0, keys, values));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -144,7 +144,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
 
         // tuple count too large.
         try {
-            btree.insert(4, keys, values);
+            btree.insert(new BatchInsert(4, keys, values));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -170,7 +170,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
         
         byte[][] keys = new byte[][] { new byte[]{3}, new byte[]{5}, new byte[]{7} };
         Object[] values = new Object[] { v3, v5, v7 };        
-        btree.insert(3, keys, values);
+        btree.insert(new BatchInsert(3, keys, values));
         assertTrue( root.dump(Level.DEBUG,System.err));
 
         // check effect on the leaf.
@@ -189,7 +189,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
         final Object v7a = new SimpleEntry(700);
         keys = new byte[][]{new byte[]{5},new byte[]{7}};
         values = new Object[] { v5a, v7a };
-        btree.insert(2, keys, values);
+        btree.insert(new BatchInsert(2, keys, values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
 
         // check effect on the leaf.
@@ -205,7 +205,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{3},new byte[]{5}, new byte[]{7}};
         values = new Object[3];
-        btree.lookup(3,keys,values);
+        btree.lookup(new BatchLookup(3,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
         
         // verify the value of the existing tuples are returned.
@@ -216,7 +216,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{3},new byte[]{7}};
         values = new Object[2];
-        btree.lookup(2,keys,values);
+        btree.lookup(new BatchLookup(2,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
         
         // verify the value of the existing tuples are returned.
@@ -227,7 +227,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{3},new byte[]{4}, new byte[]{7}};
         values = new Object[3];
-        btree.lookup(3,keys,values);
+        btree.lookup(new BatchLookup(3,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
         
         // verify the value of the existing tuples are returned.
@@ -238,7 +238,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{3},new byte[]{7}};
         values = new Object[2];
-        btree.remove(2,keys,values);
+        btree.remove(new BatchRemove(2,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
 
         // check effect on the leaf.
@@ -253,7 +253,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{3},new byte[]{5}, new byte[]{7}};
         values = new Object[3];
-        btree.remove(3,keys,values);
+        btree.remove(new BatchRemove(3,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
 
         // check effect on the leaf.
@@ -268,7 +268,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
          */
         keys = new byte[][]{new byte[]{4}};
         values = new Object[]{null};
-        btree.insert(1,keys,values);
+        btree.insert(new BatchInsert(1,keys,values));
         assertTrue( root.dump(Level.DEBUG,System.err) );
         
         // check effect on the leaf.
@@ -308,7 +308,7 @@ public class TestInsertLookupRemoveOnRootLeafWithBatchApi extends
         SimpleEntry v8 = new SimpleEntry(8);
         Object[] values = new Object[]{v5,v6,v7,v8,v3,v4,v2,v1};
 
-        btree.insert(values.length, keys, values);
+        btree.insert(new BatchInsert(values.length, keys, values));
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 

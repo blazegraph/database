@@ -368,26 +368,38 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
     }
 
     /**
-     * @todo handle isolation using a TimestampValue(long,Object). This properly
-     *       encapsulates the timestamp with the value so that the timestamp is
-     *       returned with the value by the api. It also allows the isolated
-     *       btree to set the timestamp to the timestamp associated with the tx
-     *       or to treat it as an update counter. using a null value in a
-     *       TimestampValue instead of remove when using the btree to support
-     *       isolation. this will result in an entry with an updated timestamp
-     *       and a null value and would leave the semantics of remove() removing
-     *       the entry from the tree.
+     * Add all entries from the given btree into this btree.
      * 
-     * @todo disallow null value? it was allowed for isolation to indicate a
-     *       removed value, but we can do that with a null value inside of a
-     *       TimestampEntry object.
+     * @param src
+     *            The given btree.
+     * 
+     * @exception IllegalArgumentException
+     *                if src is null.
+     * @exception IllegalArgumentException
+     *                if src is this btree.
+     * 
+     * @todo this could be optimized further.
      */
-    public void insert(int ntuples, byte[][] keys, Object[] values) {
-
-        BatchInsert op = new BatchInsert(ntuples, keys, values);
-
+    public void addAll(AbstractBTree src) {
+        
+        if(src==null) throw new IllegalArgumentException();
+        
+        if(src==this) throw new IllegalArgumentException();
+        
+        IEntryIterator itr = src.entryIterator();
+        
+        while(itr.hasNext()) {
+        
+            Object val = itr.next();
+            
+            byte[] key = itr.getKey();
+            
+            insert(key,val);
+            
+        }
+        
     }
-
+    
     public void insert(BatchInsert op) {
 
         final int ntuples = op.ntuples;
@@ -436,12 +448,6 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     }
 
-    public void lookup(int ntuples, byte[][] keys, Object[] values) {
-
-        lookup(new BatchLookup(ntuples, keys, values));
-
-    }
-
     public void lookup(BatchLookup op) {
 
         final int ntuples = op.ntuples;
@@ -463,33 +469,16 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     }
 
-    /**
-     * @todo write tests for this - the code was cloned from lookup so it should
-     *       work but there it no test suite for contains() at this time.
-     */
-    public void contains(int ntuples, byte[][] keys, boolean[] contains) {
-
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
-        if (keys == null)
-            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
-
-        if (keys.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-
-        if (contains == null)
-            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
-
-        if (contains.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
-
-        for (int tupleIndex = 0; tupleIndex < ntuples;) {
+    public void contains(BatchContains op) {
+        
+        final int ntuples = op.ntuples;
+        
+        while( op.tupleIndex < ntuples ) {
 
             // skip tuples already marked as true.
-            if (contains[tupleIndex]) {
+            if (op.contains[op.tupleIndex]) {
 
-                tupleIndex++;
+                op.tupleIndex++;
 
                 continue;
 
@@ -498,169 +487,100 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.batchContains(ntuples, tupleIndex, keys, contains);
+            int nused = root.batchContains(op);
 
             assert nused > 0;
 
             counters.nfinds += nused;
 
-            tupleIndex += nused;
+            op.tupleIndex += nused;
 
         }
 
     }
 
-    public void remove(int ntuples, byte[][] keys, Object[] values) {
-
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
-        if (keys == null)
-            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
-
-        if (keys.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-
-        if (values == null)
-            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
-
-        if (values.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
-
-        for (int tupleIndex = 0; tupleIndex < ntuples;) {
+    public void remove(BatchRemove op) {
+        
+        final int ntuples = op.ntuples;
+        
+        while( op.tupleIndex < ntuples) {
 
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.remove(ntuples, tupleIndex, keys, values);
+            int nused = root.batchRemove(op);
 
             assert nused > 0;
 
-            counters.ninserts += nused;
+            counters.nremoves += nused;
 
-            tupleIndex += nused;
+            op.tupleIndex += nused;
 
         }
 
     }
 
-    /*
-     * buffers used to convert non-batch operations into batch api calls.
-     * 
-     * @todo we could also avoid autoboxing by exposing a type safe api with
-     * appropriate key types, but that would multiple the #of methods on the api
-     * several times. derived classes could provide typesafe direct use of the
-     * batch api easily if we exposed these objects as protected arrays.
-     */
-    /** @deprecated */
-    private final byte[][] _keys = new byte[1][];
-
-    /** @deprecated */
-    private final Object[] _values = new Object[1];
-
-    /** @deprecated */
-    private final boolean[] _contains = new boolean[1];
-
-    /** @deprecated */
-    private final KeyBuilder keyBuilder = new KeyBuilder();
-
     /**
-     * Used to unbox an application key into a shared instance buffer
-     * {@link #_keys}. This is NOT safe for concurrent operations, but the
-     * mutable b+tree is only safe (and designed for) a single-threaded context.
+     * Used to unbox an application key. This is NOT safe for concurrent
+     * operations, but the mutable b+tree is only safe (and designed for) a
+     * single-threaded context.
      * 
      * @deprecated This is preserved solely to provide backward compatibility
      *             for int keys passed into the non-batch api. It will disappear
      *             as soon as I update the test suites.
      */
-    final private byte[][] unbox(Object key) {
-        if (key instanceof Integer) {
-            return new byte[][] { keyBuilder.reset().append(
-                    ((Integer) key).intValue()).getKey() };
-        } else {
-            return new byte[][] { (byte[]) key };
-        }
-    }
+    private final KeyBuilder keyBuilder = new KeyBuilder();
 
-    private final BatchInsert _insertOp = new BatchInsert(1, new byte[1][],
-            new Object[1]);
+    /**
+     * Used to unbox an application key. This is NOT safe for concurrent
+     * operations, but the mutable b+tree is only safe (and designed for) a
+     * single-threaded context.
+     * 
+     * @deprecated This is preserved solely to provide backward compatibility
+     *             for int keys passed into the non-batch api. It will disappear
+     *             as soon as I update the test suites.
+     */
+    final private byte[] unbox(Object key) {
+     
+        return keyBuilder.reset().append(((Integer) key).intValue()).getKey();
+        
+    }
 
     public Object insert(Object key, Object value) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
+        counters.ninserts++;
+
         if (key instanceof byte[]) {
+        
             return root.insert((byte[]) key,value);
+            
         } else {
-            return root.insert( keyBuilder.reset().append(
-                    ((Integer) key).intValue()).getKey(), value );
+            
+            return root.insert( unbox(key), value );
+            
         }
         
-//        _insertOp.tupleIndex = 0;
-//        if (key instanceof byte[]) {
-//            _insertOp.keys[0] = (byte[]) key;
-//        } else {
-//            _insertOp.keys[0] = keyBuilder.reset().append(
-//                    ((Integer) key).intValue()).getKey();
-//        }
-//        _insertOp.values[0] = value;
-//        insert(_insertOp);
-//
-//        return _insertOp.values[0];
-
-        // _values[0] = value;
-
-        // insert(1,unbox(key),_values);
-        
-        // return _values[0];
-
-        //
-        // counters.ninserts++;
-        //        
-        // if(INFO) {
-        // log.info("key="+key+", entry="+entry);
-        // }
-        //
-        // return getRoot().insert(key, entry);
-
     }
-
-    private final BatchLookup _lookupOp = new BatchLookup(1, new byte[1][],
-            new Object[1]);
 
     public Object lookup(Object key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        if (key instanceof byte[]) {
-            return root.lookup((byte[])key);
-        } else {
-            return root.lookup(keyBuilder.reset().append(
-                    ((Integer) key).intValue()).getKey());
-        }
+        counters.nfinds++;
 
-// _lookupOp.tupleIndex = 0;
-// if (key instanceof byte[]) {
-// _lookupOp.keys[0] = (byte[]) key;
-// } else {
-// _lookupOp.keys[0] = keyBuilder.reset().append(
-// ((Integer) key).intValue()).getKey();
-// }
-// _lookupOp.values[0] = null;
-//
-// lookup(_lookupOp);
-//        
-// return _lookupOp.values[0];
-        
-// lookup(1,unbox(key),_values);
-//        
-// return _values[0];
-        
-// counters.nfinds++;
-//        
-// return getRoot().lookup(key);
+        if (key instanceof byte[]) {
+
+            return root.lookup((byte[])key);
+            
+        } else {
+            
+            return root.lookup(unbox(key));
+            
+        }
 
     }
 
@@ -669,13 +589,9 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
-        return root.contains((byte[])key);
+        counters.nfinds++;
         
-//        _contains[0] = false; // otherwise the request is ignored!
-//
-//        contains(1, unbox(key), _contains);
-//
-//        return _contains[0];
+        return root.contains((byte[])key);
 
     }
 
@@ -684,17 +600,17 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
-        remove(1, unbox(key), _values);
+        counters.nremoves++;
 
-        return _values[0];
-
-        // counters.nremoves++;
-        //
-        // if(INFO) {
-        // log.info("key="+key);
-        // }
-        //
-        // return getRoot().remove(key);
+        if (key instanceof byte[]) {
+        
+            return root.remove((byte[])key);
+            
+        } else {
+            
+            return root.remove(unbox(key));
+            
+        }
 
     }
 

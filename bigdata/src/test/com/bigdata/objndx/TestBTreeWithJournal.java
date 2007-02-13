@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.IOException;
 import java.util.Properties;
 
 import com.bigdata.cache.HardReferenceQueue;

@@ -45,14 +45,16 @@ Modifications:
  * Created on Oct 14, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.isolation;
+
+import com.bigdata.io.TestByteBufferStreams;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Runs all tests for all journal implementations.
+ * Aggregates test suites in increasing dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,20 +75,47 @@ public class TestAll extends TestCase {
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * Aggregates test suites in increasing dependency order.
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("journal");
+        TestSuite suite = new TestSuite("isolation");
 
-        suite.addTestSuite( TestRootBlockView.class );
+        // test for state-based validation _concept_
+        suite.addTestSuite(TestAccount.class);
         
-        suite.addTest( TestTransientJournal.suite() );
-        suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
-        suite.addTest( TestDiskJournal.suite() );
+        // test version counter and delete marker implementation class.
+        suite.addTestSuite(TestValue.class);
+
+        // test serialization for Value class.
+        suite.addTestSuite(TestValueSerializer.class);
+
+        // @todo test various compression schemes for the Value[]s here.
+        
+        // @todo test btree with IValue values.
+        suite.addTestSuite(TestUnisolatedBTree.class);
+        
+        // @todo test fully isolated btree for use with transactions.
+//        suite.addTestSuite(TestIsolatedBTree.class);
+
+        // @todo test conflict resolution.
+
+        // @todo test isolatable fused view (handles delete markers).
+//        suite.addTestSuite(TestIsolatableFusedView.class);
+
+        /*
+         * @todo test index segment builder (must indicate whether full
+         * compacting merge or not), or maybe that is use in the metadataindex
+         */
+        /*
+         * test index merge code (merge rule must recognize and handle
+         * deletion markers).
+         */
+//        suite.addTestSuite(TestIndexSegmentMerger.class); 
+        
+        // @todo test isolatable partitioned index.
+//        suite.addTestSuite(TestIsolatablePartitionedIndex.class);
 
         return suite;
         

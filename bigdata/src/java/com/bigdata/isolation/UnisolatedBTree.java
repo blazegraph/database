@@ -45,29 +45,33 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.Leaf;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * <p>
  * A scalable mutable B+-Tree mapping variable length unsigned byte[] keys to
- * byte[] values and supporting transactions and deletion markers. All read
- * operations implemented by this class read through on a miss to an unisolated
- * index specified to the constructor. All write operations write solely on the
- * isolated index.
+ * byte[] values that is capable of being isolated by a transaction and supports
+ * deletion markers. Application values are transparently encapsulated in
+ * {@link IValue} object which keep track of version counters (in support of
+ * transactions) and deletion markers (in support of both transactions and
+ * partitioned indices). Users of this interface will only see application
+ * values, not {@link IValue} objects.
+ * </p>
  * <p>
  * Note that {@link #rangeCount(byte[], byte[])} MAY report more entries than
- * would actually be visited. Since it because it depends on
- * {@link #indexOf(byte[])} and the latter does not differentiate between
- * entries which have and have not been {@link IValue#isDeleted() deleted}.
+ * would actually be visited. This is because it depends on
+ * {@link #indexOf(byte[])} and the internal counts of the #of spanned entries
+ * for a node do not differentiate between entries which have and have not been
+ * {@link IValue#isDeleted() deleted}.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME I need to differentiate between a class than knows about delete markers
- * and a class that knows about delete markers and is providing isolation by
- * reading through to a read-only historical btree containing Value objects and
- * writing Value objects in the isolated btree.
  * 
  * FIXME Some methods need to be overriden for this api. The most obvious are
  * remove() (must be an insert that sets a delete markers and clears the old
@@ -86,19 +90,120 @@ import com.bigdata.rawstore.IRawStore;
  *       (stealing children vs wrapping them with a flyweight wrapper; reuse of
  *       the same btree instance for reading from the same historical state).
  * 
- * @see IsolatedBTree
+ * @see IsolatedBTree, a {@link BTree} that has been isolated by a transaction.
  */
 public class UnisolatedBTree extends BTree implements IIsolatableIndex {
+
+    protected final IConflictResolver conflictResolver;
+    
+    /**
+     * The delegate that handles write-write conflict resolution during backward
+     * validation. The conflict resolver is expected to make a best attempt
+     * using data type specific rules to reconcile the state for two versions of
+     * the same persistent identifier. If the conflict can not be resolved, then
+     * validation will fail. State-based conflict resolution when combined with
+     * validation (aka optimistic locking) is capable of validating the greatest
+     * number of interleavings of transactions (aka serialization orders).
+     * 
+     * @return The conflict resolver to be applied during validation or
+     *         <code>null</code> iff no conflict resolution will be performed.
+     */
+    public IConflictResolver getConflictResolver() {
+            
+        return conflictResolver;
+    
+    }
+
+    /*
+     * Note: this is some old code that was used by the Journal when it was
+     * responsible for instantiating a conflict resolver based on a property
+     * that specified the name of the implementation class.
+     */
+    // Class conflictResolverClass = null;
+    //
+    // /*
+    // * "conflictResolver"
+    // */
+    //
+    // val = properties.getProperty(Options.CONFLICT_RESOLVER);
+    //        
+    // if( val != null ) {
+    //
+    // try {
+    //
+    // conflictResolverClass = getClass().getClassLoader().loadClass(val);
+    //
+    // if (!IConflictResolver.class
+    // .isAssignableFrom(conflictResolverClass)) {
+    //
+    // throw new RuntimeException(
+    // "Conflict resolver does not implement: "
+    // + IConflictResolver.class
+    // + ", name=" + val);
+    //
+    // }
+    //
+    // } catch (ClassNotFoundException ex) {
+    //
+    // throw new RuntimeException(
+    // "Could not load conflict resolver class: name=" + val
+    // + ", " + ex, ex);
+    //                
+    // }
+    //
+    // /*
+    // * Initialize the conflict resolver.
+    // */
+    //        
+    // if( conflictResolverClass != null ) {
+    //
+    // try {
+    //
+    // Constructor ctor = conflictResolverClass
+    // .getConstructor(new Class[] { Journal.class });
+    //
+    // this.conflictResolver = (IConflictResolver) ctor
+    // .newInstance(new Object[] { this });
+    //                
+    // }
+    //
+    // catch (Exception ex) {
+    //
+    // throw new RuntimeException("Conflict resolver: " + ex, ex);
+    //
+    // }
+    //            
+    // } else {
+    //            
+    // /*
+    // * The journal will not attempt to resolve write-write conflicts.
+    // */
+    //            
+    // this.conflictResolver = null;
+    //            
+    // }
 
     /**
      * Create an isolated btree.
      * 
      * @param store
      * @param branchingFactor
+     * @param conflictResolver
+     *            An optional object that handles write-write conflict
+     *            resolution during backward validation. The conflict resolver
+     *            is expected to make a best attempt using data type specific
+     *            rules to reconcile the state for two versions of the same
+     *            persistent identifier. If the conflict can not be resolved,
+     *            then validation will fail. State-based conflict resolution
+     *            when combined with validation (aka optimistic locking) is
+     *            capable of validating the greatest number of interleavings of
+     *            transactions (aka serialization orders).
      */
-    public UnisolatedBTree(IRawStore store, int branchingFactor) {
+    public UnisolatedBTree(IRawStore store, int branchingFactor, IConflictResolver conflictResolver ) {
        
         super(store, branchingFactor, Value.Serializer.INSTANCE );
+        
+        this.conflictResolver = conflictResolver;
         
     }
 
@@ -113,8 +218,41 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
         super(store,metadata);
         
+        this.conflictResolver = ((UnisolatedBTreeMetadata) metadata).conflictResolver;
+        
     }
 
+    public BTreeMetadata newMetadata() {
+        
+        return new UnisolatedBTreeMetadata(this);
+        
+    }
+    
+    /**
+     * Extends {@link BTreeMetadata} to also store the {@link IConflictResolver}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class UnisolatedBTreeMetadata extends BTreeMetadata {
+
+        private static final long serialVersionUID = -4938674944860230200L;
+
+        public final IConflictResolver conflictResolver;
+        
+        /**
+         * @param btree
+         */
+        protected UnisolatedBTreeMetadata(UnisolatedBTree btree) {
+            
+            super(btree);
+            
+            this.conflictResolver = btree.conflictResolver;
+            
+        }
+
+    }
+    
     /**
      * True iff the key does not exist or if it exists but is marked as
      * {@link IValue#isDeleted()}.
@@ -169,7 +307,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      */
     public Object remove(byte[] key) {
 
-        Value value = (Value)lookup(key);
+        Value value = (Value)super.lookup(key);
         
         if(value==null||value.deleted) return null;
         
@@ -198,7 +336,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         if (value == null || value.deleted) {
 
             super.insert(key, new Value(IValue.FIRST_VERSION_UNISOLATED, false,
-                    null));
+                    (byte[]) val));
 
             return null;
 

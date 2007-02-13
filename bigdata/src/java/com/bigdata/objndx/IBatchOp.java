@@ -48,7 +48,9 @@ Modifications:
 package com.bigdata.objndx;
 
 /**
- * A common interface for batch operations.
+ * A common interface for batch operations. Batch operations can be very
+ * efficient if the keys are presented in sorted order and should be used
+ * to minimize network traffic.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

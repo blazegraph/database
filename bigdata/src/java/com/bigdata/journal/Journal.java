@@ -477,31 +477,6 @@ public class Journal implements IJournal {
      */
     private Name2Addr name2Addr;
 
-    // private final IConflictResolver conflictResolver;
-    //    
-    // /**
-    // * The delegate that handles write-write conflict resolution during
-    // backward
-    // * validation. The conflict resolver is expected to make a best attempt
-    // * using data type specific rules to reconcile the state for two versions
-    // of
-    // * the same persistent identifier. If the conflict can not be resolved,
-    // then
-    // * validation will fail. State-based conflict resolution when combined
-    // with
-    // * validation (aka optimistic locking) is capable of validating the
-    // greatest
-    // * number of interleavings of transactions (aka serialization orders).
-    // *
-    // * @return The conflict resolver to be applied during validation or
-    // * <code>null</code> iff no conflict resolution will be performed.
-    // */
-    // public IConflictResolver getConflictResolver() {
-    //        
-    // return conflictResolver;
-    //        
-    // }
-
     /**
      * Option controls whether the journal forces application data to disk
      * before updating the root blocks.
@@ -629,7 +604,7 @@ public class Journal implements IJournal {
     void completedTx(ITx tx) throws IllegalStateException {
 
         assert tx != null;
-        assert tx.isCommitted();
+        assert tx.isComplete();
         
         Long id = tx.getId();
 
@@ -895,7 +870,6 @@ public class Journal implements IJournal {
         ForceEnum forceOnCommit = Options.DEFAULT_FORCE_ON_COMMIT;
         boolean doubleSync = Options.DEFAULT_DOUBLE_SYNC;
 
-        // Class conflictResolverClass = null;
         String val;
 
         if (properties == null)
@@ -1057,43 +1031,6 @@ public class Journal implements IJournal {
 
         this.deleteOnClose = deleteOnClose;
 
-        // /*
-        // * "conflictResolver"
-        // */
-        //
-        // val = properties.getProperty(Options.CONFLICT_RESOLVER);
-        //        
-        // if( val != null ) {
-        //
-        // try {
-        //
-        // conflictResolverClass = getClass().getClassLoader().loadClass(val);
-        //
-        // if (!IConflictResolver.class
-        // .isAssignableFrom(conflictResolverClass)) {
-        //
-        // throw new RuntimeException(
-        // "Conflict resolver does not implement: "
-        // + IConflictResolver.class
-        // + ", name=" + val);
-        //
-        // }
-        //
-        // } catch (ClassNotFoundException ex) {
-        //
-        // throw new RuntimeException(
-        // "Could not load conflict resolver class: name=" + val
-        // + ", " + ex, ex);
-        //                
-        // }
-        //
-        // /*
-        // * Note: initialization of the conflict resolver is delayed until
-        // * the journal is fully initialized.
-        // */
-        //            
-        // }
-
         /*
          * Create the appropriate IBufferStrategy object.
          */
@@ -1248,38 +1185,6 @@ public class Journal implements IJournal {
          * Give the store a chance to set any committers that it defines.
          */
         setupCommitters();
-
-        // /*
-        // * Initialize the conflict resolver.
-        // */
-        //        
-        // if( conflictResolverClass != null ) {
-        //
-        // try {
-        //
-        // Constructor ctor = conflictResolverClass
-        // .getConstructor(new Class[] { Journal.class });
-        //
-        // this.conflictResolver = (IConflictResolver) ctor
-        // .newInstance(new Object[] { this });
-        //                
-        // }
-        //
-        // catch (Exception ex) {
-        //
-        // throw new RuntimeException("Conflict resolver: " + ex, ex);
-        //
-        // }
-        //            
-        // } else {
-        //            
-        // /*
-        // * The journal will not attempt to resolve write-write conflicts.
-        // */
-        //            
-        // this.conflictResolver = null;
-        //            
-        // }
 
     }
 

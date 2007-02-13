@@ -41,7 +41,7 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -51,6 +51,8 @@ import java.util.Arrays;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+
+import com.bigdata.objndx.IValueSerializer;
 
 /**
  * A non-persistence capable implementation of {@link IObjectIndexEntry}.
@@ -68,8 +70,18 @@ public class Value implements IValue {
 
     Value(short versionCounter, boolean deleted, byte[] value) {
 
-        assert versionCounter >= 0;
+        if (versionCounter < 0) {
+            
+            throw new IllegalArgumentException("versionCounter is negative");
+            
+        }
 
+        if(deleted && value != null) {
+            
+            throw new IllegalArgumentException("deleted, but value is non-null");
+
+        }
+        
         this.versionCounter = versionCounter;
 
         this.deleted = deleted;
@@ -90,7 +102,7 @@ public class Value implements IValue {
 
         if (nextVersionCounter > Short.MAX_VALUE) {
 
-            return (short) 1;
+            return ROLLOVER_VERSION_COUNTER;
 
         }
 
@@ -162,22 +174,30 @@ public class Value implements IValue {
 
             for (int i = 0; i < n; i++) {
 
-                short versionCounter = is.readShort();
+                final short versionCounter = ShortPacker.unpackShort(is);
                 
-                final int len = (int)LongPacker.unpackLong(is);
+                // Note: substract (2) to get the true length. -1 is a null
+                // value. -2 is a deleted value.
+                final long len = LongPacker.unpackLong(is) - 2;
                 
-                boolean deleted = false;
+                final boolean deleted = len == -2;
                 
-                if(versionCounter<0) {
+                // we fill in the byte[] value below.
+                if(deleted) {
+
+                    values[i] = new Value(versionCounter,true,null);
                     
-                    versionCounter = (short)-versionCounter;
+                } else if (len == -1) {
+
+                    // the value is null vs an empty byte[].
+                    values[i] = new Value(versionCounter,deleted,null);
                     
-                    deleted = true;
+                } else {
+
+                    // The value is a byte[] of any length, including zero.
+                    values[i] = new Value(versionCounter,deleted,new byte[(int)len]);
                     
                 }
-
-                // we fill in the byte[] value below.
-                values[i] = new Value(versionCounter,deleted,new byte[len]);
 
             }
 
@@ -186,9 +206,11 @@ public class Value implements IValue {
              */
             for( int i=0; i<n; i++) {
             
-                final byte[] value = ((Value) values[i]).value;
+                Value value = (Value)values[i];
                 
-                is.read(value, 0, value.length);
+                if( value.deleted || value.value==null) continue;
+                
+                is.read(value.value, 0, value.value.length);
                 
             }
             
@@ -201,8 +223,9 @@ public class Value implements IValue {
 
             /*
              * Buffer lots of single byte operations. Estimate #of bytes in the
-             * buffer as 2 bytes for the version counters plus at most 4 bytes
-             * for each byte count.
+             * buffer as at most 2 bytes for the version counters plus at most 4
+             * bytes for each byte count. This will always be an overestimate
+             * but it means that we never grow [baos].
              */
             {
 
@@ -216,20 +239,26 @@ public class Value implements IValue {
 
                     Value value = (Value) values[i];
 
-                    short versionCounter = value.versionCounter;
+                    ShortPacker.packShort(dbaos,value.versionCounter);
+                    
+                    final long len;
                     
                     if(value.deleted) {
+
+                        // A deleted value is indicated by a len of -2. 
+                        len = -2;
                         
-                        versionCounter = (short)-versionCounter;
+                    } else {
                         
+                        // Note: a null value is indicated by -1 length.
+                        len = (value.value==null?-1:value.value.length);
+                       
                     }
-                    
-                    dbaos.writeShort(versionCounter);
 
-                    final int len = (value.value==null?0:value.value.length);
+                    // Note: we add (2) so that the length is always
+                    // non-negative so that we can pack it.
+                    LongPacker.packLong(dbaos,len+2);
                     
-                    LongPacker.packLong(dbaos,len);
-
                 }
 
                 dbaos.flush();

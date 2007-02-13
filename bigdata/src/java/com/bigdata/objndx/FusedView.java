@@ -50,6 +50,8 @@ package com.bigdata.objndx;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
+import com.bigdata.isolation.Value;
+
 /**
  * <p>
  * A fused view providing read-only operations on multiple B+-Trees mapping
@@ -62,8 +64,8 @@ import java.util.NoSuchElementException;
  * @todo support N sources for a {@link FusedView} by chaining together multiple
  *       {@link FusedView} instances if not in a more efficient manner.
  * 
- * @todo Do a variant that uses TimestampValues and supports a merged view
- *       showing only the most recent data version under any given key.
+ * @todo Do a variant that uses {@link Value}s and supports a merged view
+ *       showing only the most recent data version under any given key.gb 
  */
 public class FusedView implements IIndex {
 
@@ -121,13 +123,19 @@ public class FusedView implements IIndex {
         
     }
     
-    public void insert(int ntuples, byte[][] keys, Object[] values) {
+    /**
+     * Write operations are not supported on the view.
+     */
+    public void insert(BatchInsert op) {
         
         throw new UnsupportedOperationException();
         
     }
 
-    public void remove(int ntuples, byte[][] keys, Object[] values) {
+    /**
+     * Write operations are not supported on the view.
+     */
+    public void remove(BatchRemove op) {
 
         throw new UnsupportedOperationException();
         
@@ -188,23 +196,22 @@ public class FusedView implements IIndex {
      *       get into the batch api.  the contains() method already has
      *       been modified to finesse this.
      */
-    public void lookup(int ntuples, byte[][] keys, Object[] values) {
+    public void lookup(BatchLookup op) {
         
         throw new UnsupportedOperationException();
         
     }
 
-    public void contains(int ntuples, byte[][] keys, boolean[] contains) {
+    public void contains( BatchContains op ) {
 
         for( int i=0; i<srcs.length; i++) {
 
             AbstractBTree src = srcs[i];
             
-            for( int tuple=0; tuple<ntuples; i++) {
-
-                src.contains(ntuples,keys,contains);
-                
-            }
+            // reset the first tuple index for each pass.
+            op.tupleIndex = 0;
+            
+            src.contains(op);
             
         }
 

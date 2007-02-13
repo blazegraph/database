@@ -48,6 +48,7 @@ package com.bigdata.objndx;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -492,12 +493,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      * 
      * @return The persistent identity of the metadata record for the btree. The
      *         btree can be reloaded from this metadata record. When used as
-     *         part of an atomic commit protocol, the metadata record address is
-     *         written into a slot on the root block or a named root object.
-     * 
-     * @todo consider returning a new {@link IIndex} view with the metadata
-     *       field set as a means to support isolation rather than just updating
-     *       this field.
+     *         part of an atomic commit protocol, the metadata record address
+     *         must be written into a slot on the root block or a named root
+     *         object.
      */
     public long write() {
 
@@ -627,39 +625,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         
     }
 
-    /**
-     * Add all entries from the given btree into this btree.
-     * 
-     * @param src
-     *            The given btree.
-     * 
-     * @exception IllegalArgumentException
-     *                if src is null.
-     * @exception IllegalArgumentException
-     *                if src is this btree.
-     * 
-     * @todo this could be optimized further.
-     */
-    public void addAll(AbstractBTree src) {
-        
-        if(src==null) throw new IllegalArgumentException();
-        
-        if(src==this) throw new IllegalArgumentException();
-        
-        IEntryIterator itr = src.entryIterator();
-        
-        while(itr.hasNext()) {
-        
-            Object val = itr.next();
-            
-            byte[] key = itr.getKey();
-            
-            insert(key,val);
-            
-        }
-        
-    }
-    
     /**
      * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
      */

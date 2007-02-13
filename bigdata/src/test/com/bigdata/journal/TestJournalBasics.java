@@ -96,7 +96,8 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestNamedIndices.class );
         
         // @todo transactional isolation tests.
-//        suite.addTestSuite( TestTx.class );
+        suite.addTestSuite( TestTxRunState.class );
+        suite.addTestSuite( TestTx.class );
 
         return suite;
         

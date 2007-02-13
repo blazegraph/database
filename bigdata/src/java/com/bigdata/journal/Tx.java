@@ -51,11 +51,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IsolatedBTree;
-import com.bigdata.objndx.UnisolatedBTree;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 
