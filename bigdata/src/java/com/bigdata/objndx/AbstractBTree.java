@@ -101,7 +101,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @see http://icu.sourceforge.net
  * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
  */
-abstract public class AbstractBTree implements IIndex, IBatchBTree {
+abstract public class AbstractBTree implements IIndex, ILinearList {
 
     /**
      * Log for btree opeations.
@@ -377,8 +377,6 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
      *                if src is null.
      * @exception IllegalArgumentException
      *                if src is this btree.
-     * 
-     * @todo this could be optimized further.
      */
     public void addAll(AbstractBTree src) {
         
@@ -614,25 +612,6 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     }
 
-    /**
-     * Lookup the index position of the key.
-     * 
-     * @param key
-     *            The key.
-     * 
-     * @return The index of the search key, if found; otherwise,
-     *         <code>(-(insertion point) - 1)</code>. The insertion point is
-     *         defined as the point at which the key would be found it it were
-     *         inserted into the btree without intervening mutations. Note that
-     *         this guarantees that the return value will be >= 0 if and only if
-     *         the key is found. When found the index will be in [0:nentries).
-     *         Adding or removing entries in the tree may invalidate the index.
-     * 
-     * @todo promote to {@link IIndex}?
-     * 
-     * @see #keyAt(int)
-     * @see #valueAt(int)
-     */
     public int indexOf(byte[] key) {
 
         if (key == null)
@@ -646,23 +625,6 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     }
 
-    /**
-     * Return the key for the identified entry. This performs an efficient
-     * search whose cost is essentially the same as {@link #lookup(Object)}.
-     * 
-     * @param index
-     *            The index position of the entry (origin zero).
-     * 
-     * @return The key at that index position (not a copy).
-     * 
-     * @exception IndexOutOfBoundsException
-     *                if index is less than zero.
-     * @exception IndexOutOfBoundsException
-     *                if index is greater than the #of entries.
-     * 
-     * @see #indexOf(Object)
-     * @see #getValue(int)
-     */
     public byte[] keyAt(int index) {
 
         if (index < 0)
@@ -677,23 +639,6 @@ abstract public class AbstractBTree implements IIndex, IBatchBTree {
 
     }
 
-    /**
-     * Return the value for the identified entry. This performs an efficient
-     * search whose cost is essentially the same as {@link #lookup(Object)}.
-     * 
-     * @param index
-     *            The index position of the entry (origin zero).
-     * 
-     * @return The value at that index position.
-     * 
-     * @exception IndexOutOfBoundsException
-     *                if index is less than zero.
-     * @exception IndexOutOfBoundsException
-     *                if index is greater than the #of entries.
-     * 
-     * @see #indexOf(Object)
-     * @see #keyAt(int)
-     */
     public Object valueAt(int index) {
 
         if (index < 0)

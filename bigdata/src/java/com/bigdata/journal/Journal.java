@@ -1407,7 +1407,7 @@ public class Journal implements IJournal {
      * objects (btrees) used for isolated by concurrent transactions to lose
      * their write sets.
      */
-    final protected void _discardCommitters() {
+    public void abort() {
 
         // clear the array of committers.
         _committers = new ICommitter[_committers.length];

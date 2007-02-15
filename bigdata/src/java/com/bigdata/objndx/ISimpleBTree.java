@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.objndx;
 
-
 /**
  * <p>
  * Interface for non-batch operations on a B+-Tree mapping arbitrary non-null
@@ -57,16 +56,19 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME re-define and re-implement this interface using a default
- * {@link KeyBuilder}.
+ * FIXME re-define this interface for byte[] keys
  * 
- * @see KeyBuilder, which may be used to encode one or more values into a
- *      variable length unsigned byte[] key.
- *      
+ * @todo implement a strongly typed subclass of BTree using a default
+ *       {@link KeyBuilder} and use that to run the various test suites that
+ *       have a dependency on int keys.
+ * 
+ * @see KeyBuilder, which may be used to encode one or more primitive data type
+ *      values or Unicode strings into a variable length unsigned byte[] key.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISimpleBTree {
+public interface ISimpleBTree extends IRangeQuery {
 
     /**
      * Insert or update a value under the key.
@@ -109,56 +111,5 @@ public interface ISimpleBTree {
      *         was not found.
      */
     public Object remove(Object key);
-    
-    /**
-     * Return an iterator that visits the entries in a half-open key range.
-     * 
-     * @param fromKey
-     *            The first key that will be visited (inclusive). When
-     *            <code>null</code> there is no lower bound.
-     * @param toKey
-     *            The first key that will NOT be visited (exclusive). When
-     *            <code>null</code> there is no upper bound.
-     * 
-     * @see #entryIterator(), which visits all entries in the btree.
-     * 
-     * @see SuccessorUtil, which may be used to compute the successor of a value
-     *      before encoding it as a component of a key.
-     * 
-     * @see BytesUtil#successor(byte[]), which may be used to compute the
-     *      successor of an encoded key.
-     * 
-     * @todo define behavior when the toKey is less than the fromKey.
-     * 
-     * @todo While the IEntryIterator offers tightly coupled code an opportunity
-     *       to choose on an entry by entry basis whether or not it also wants
-     *       the key for a value, this will not work for the network-based api
-     *       (it would require an RPC to get the key, which would have long
-     *       since disappeared from the stream window). Instead, applications
-     *       will have to declare whether they want keys, values, or both up
-     *       front.
-     */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
-
-    /**
-     * Return the #of entries in a half-open key range. The fromKey and toKey
-     * need not be defined in the btree. This method computes the #of entries in
-     * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
-     * The cost is equal to the cost of lookup of the both keys.
-     * 
-     * @param fromKey
-     *            The lowest key that will be counted (inclusive). When
-     *            <code>null</code> there is no lower bound.
-     * @param toKey
-     *            The first key that will not be counted (exclusive). When
-     *            <code>null</code> there is no upper bound.
-     * 
-     * @return The #of entries in the half-open key range. This will be zero if
-     *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
-     *         total ordering.
-     * 
-     * @todo this could overflow an int32 for a scale out database.
-     */
-    public int rangeCount(byte[] fromKey, byte[] toKey);
 
 }

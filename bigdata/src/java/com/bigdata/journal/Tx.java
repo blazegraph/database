@@ -56,6 +56,8 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 
@@ -138,6 +140,21 @@ public class Tx implements IStore, ITx {
     private RunState runState;
 
     /**
+     * A store used to hold write sets for the transaction.  The same store can
+     * be used to buffer resolved write-write conflicts.
+     * 
+     * @todo This uses a memory-based store to avoid issues with maintaining
+     *       transactions across journal boundaries. This could be improved on
+     *       trivially by transparently promoting the store from memory-based to
+     *       disk-based if it overflows some set maximum capacity. In such a
+     *       scenario, the file backing the on disk store would be flagged for
+     *       deletion on exit of the JVM and allocated in a temporary directory.<br>
+     *       A further improvement would allow transactions to use partitioned
+     *       indices.
+     */
+    final private IRawStore tmpStore = new SimpleMemoryRawStore();
+    
+    /**
      * BTrees isolated by this transactions.
      * 
      * @todo in order to survive overflow this mapping must be persistent.
@@ -183,8 +200,10 @@ public class Tx implements IStore, ITx {
             // the named index was never registered.
             if(name==null) return null;
             
-            // Isolate the named btree.
-            return new IsolatedBTree(journal,src);
+            /*
+             * Isolate the named btree.
+             */
+            return new IsolatedBTree(tmpStore,src);
             
             
         }
@@ -220,14 +239,20 @@ public class Tx implements IStore, ITx {
      */
     public Tx(Journal journal, long timestamp ) {
         
-        if( journal == null ) throw new IllegalArgumentException();
+        if (journal == null)
+            throw new IllegalArgumentException();
         
         this.journal = journal;
         
         this.timestamp = timestamp;
 
         journal.activateTx(this);
-        
+
+        /*
+         * Stash the commit counter so that we can figure out if there were
+         * concurrent transactions and therefore whether or not we need to
+         * validate the write set.
+         */
         this.commitCounter = journal.getRootBlockView().getCommitCounter();
         
         this.runState = RunState.ACTIVE;
@@ -377,7 +402,7 @@ public class Tx implements IStore, ITx {
              * isolated btrees.
              */
 
-            journal._discardCommitters(); 
+            journal.abort(); 
 
             abort();
             

@@ -42,29 +42,51 @@ Modifications:
 
 */
 /*
- * Created on Feb 12, 2007
+ * Created on Feb 14, 2007
  */
 
-package com.bigdata.objndx;
+package com.bigdata.isolation;
 
 /**
- * A common interface for batch operations. Batch operations can be very
- * efficient if the keys are presented in sorted order and should be used
- * to minimize network traffic.
+ * An instance of this class should be thrown by an {@link IConflictResolver} if
+ * it is unable to resolve a write-write conflict.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBatchOp {
-    
+public class WriteWriteConflictException extends RuntimeException {
+
     /**
-     * Apply the operation - this method may be used both to define extensible
-     * batch operations and to provide default (un-optimized) implementations of
-     * the batch api that are useful for derived btree implementations with
-     * modified semantics.
      * 
-     * @param btree
      */
-    public void apply(ISimpleBTree btree);
+    private static final long serialVersionUID = 7148598373790053847L;
+
+    /**
+     * 
+     */
+    public WriteWriteConflictException() {
+    }
+
+    /**
+     * @param message
+     */
+    public WriteWriteConflictException(String message) {
+        super(message);
+    }
+
+    /**
+     * @param cause
+     */
+    public WriteWriteConflictException(Throwable cause) {
+        super(cause);
+    }
+
+    /**
+     * @param message
+     * @param cause
+     */
+    public WriteWriteConflictException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
 }

@@ -66,7 +66,7 @@ public class Value implements IValue {
 
     final short versionCounter;
 
-    final byte[] value;
+    final byte[] datum;
 
     Value(short versionCounter, boolean deleted, byte[] value) {
 
@@ -78,7 +78,7 @@ public class Value implements IValue {
 
         if(deleted && value != null) {
             
-            throw new IllegalArgumentException("deleted, but value is non-null");
+            throw new IllegalArgumentException("deleted, but datum is non-null");
 
         }
         
@@ -86,17 +86,17 @@ public class Value implements IValue {
 
         this.deleted = deleted;
 
-        this.value = value;
+        this.datum = value;
 
     }
 
-    public short getVersionCounter() {
+    final public short getVersionCounter() {
 
         return versionCounter;
 
     }
 
-    public short nextVersionCounter() {
+    final public short nextVersionCounter() {
 
         int nextVersionCounter = versionCounter + 1;
 
@@ -110,7 +110,7 @@ public class Value implements IValue {
 
     }
 
-    public boolean isDeleted() {
+    final public boolean isDeleted() {
 
         return deleted;
 
@@ -123,9 +123,9 @@ public class Value implements IValue {
     //
     //        }
 
-    public byte[] getValue() {
+    final public byte[] getValue() {
 
-        return value;
+        return datum;
 
     }
 
@@ -135,7 +135,7 @@ public class Value implements IValue {
     public String toString() {
 
         return "{versionCounter=" + getVersionCounter() + ", deleted="
-                + isDeleted() + ", value=" + Arrays.toString(value) + "}";
+                + isDeleted() + ", datum=" + Arrays.toString(datum) + "}";
 
     }
 
@@ -146,13 +146,8 @@ public class Value implements IValue {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo write a test suite.
-     * 
-     * @todo Is it worth refactoring such that the deleted flags could be
-     *       migrated into a run-length encoding and we could then use the
-     *       {@link ShortPacker} on the version counter?
-     * 
-     * @todo explore compression techniques.
+     * @todo explore compression techniques, most likely dictionary encodings or
+     *       hamming encodings.
      */
     public static class Serializer implements IValueSerializer {
 
@@ -167,7 +162,7 @@ public class Value implements IValue {
         public void getValues(DataInputStream is, Object[] values, int n)
         throws IOException {
 
-            final int version = is.readInt();
+            final int version = (int)LongPacker.unpackLong(is);
 
             if (version != VERSION0)
                 throw new IOException("Unknown version=" + version);
@@ -177,24 +172,24 @@ public class Value implements IValue {
                 final short versionCounter = ShortPacker.unpackShort(is);
                 
                 // Note: substract (2) to get the true length. -1 is a null
-                // value. -2 is a deleted value.
+                // datum. -2 is a deleted datum.
                 final long len = LongPacker.unpackLong(is) - 2;
                 
                 final boolean deleted = len == -2;
                 
-                // we fill in the byte[] value below.
+                // we fill in the byte[] datum below.
                 if(deleted) {
 
                     values[i] = new Value(versionCounter,true,null);
                     
                 } else if (len == -1) {
 
-                    // the value is null vs an empty byte[].
+                    // the datum is null vs an empty byte[].
                     values[i] = new Value(versionCounter,deleted,null);
                     
                 } else {
 
-                    // The value is a byte[] of any length, including zero.
+                    // The datum is a byte[] of any length, including zero.
                     values[i] = new Value(versionCounter,deleted,new byte[(int)len]);
                     
                 }
@@ -202,15 +197,15 @@ public class Value implements IValue {
             }
 
             /*
-             * Read in the byte[] for each value.
+             * Read in the byte[] for each datum.
              */
             for( int i=0; i<n; i++) {
             
                 Value value = (Value)values[i];
                 
-                if( value.deleted || value.value==null) continue;
+                if( value.deleted || value.datum==null) continue;
                 
-                is.read(value.value, 0, value.value.length);
+                is.read(value.datum, 0, value.datum.length);
                 
             }
             
@@ -218,8 +213,6 @@ public class Value implements IValue {
 
         public void putValues(DataOutputStream os, Object[] values, int n)
                 throws IOException {
-
-            os.writeInt(VERSION0);
 
             /*
              * Buffer lots of single byte operations. Estimate #of bytes in the
@@ -229,11 +222,13 @@ public class Value implements IValue {
              */
             {
 
-                final int size = n * 2 + n * 4; // est of buffer capacity.
+                final int size = 2 + n * 2 + n * 4; // est of buffer capacity.
                 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
 
                 DataOutputStream dbaos = new DataOutputStream(baos);
+
+                LongPacker.packLong(dbaos, VERSION0);
 
                 for (int i = 0; i < n; i++) {
 
@@ -245,13 +240,13 @@ public class Value implements IValue {
                     
                     if(value.deleted) {
 
-                        // A deleted value is indicated by a len of -2. 
+                        // A deleted datum is indicated by a len of -2. 
                         len = -2;
                         
                     } else {
                         
-                        // Note: a null value is indicated by -1 length.
-                        len = (value.value==null?-1:value.value.length);
+                        // Note: a null datum is indicated by -1 length.
+                        len = (value.datum==null?-1:value.datum.length);
                        
                     }
 
@@ -272,7 +267,7 @@ public class Value implements IValue {
              */
             for (int i = 0; i < n; i++) {
 
-                final byte[] value = ((Value) values[i]).value;
+                final byte[] value = ((Value) values[i]).datum;
 
                 if(value!= null) {
 

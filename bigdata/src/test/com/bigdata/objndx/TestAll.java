@@ -53,6 +53,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestKeyBufferSerializer.class );
         
         /*
+         * test value serializers and compression methods.
+         */
+        // test serialization of byte[] values.
+        suite.addTestSuite( TestByteArrayValueSerializer.class );
+        
+        /*
          * test record compression support.
          */
         // test bulk data compression.

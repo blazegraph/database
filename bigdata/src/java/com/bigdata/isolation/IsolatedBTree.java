@@ -49,47 +49,78 @@ package com.bigdata.isolation;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
-import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.ByteArrayValueSerializer;
+import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IBatchBTree;
 import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.objndx.ILinearList;
+import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.rawstore.IRawStore;
 
 /**
  * <p>
- * A B+-Tree that has been isolated by a transaction.
+ * A B+-Tree that has been isolated by a transaction (a write set for an index
+ * isolated by that transactions). In general, this class inherits the
+ * observable semantics of an {@link UnisolatedBTree} with the addition of
+ * read-through on a miss to the backing btree and the interpretation of delete
+ * markers in the write set.
  * </p>
  * <p>
- * Writes will be applied to the isolated btree. Reads will read first on the
- * isolated btree and then read through to the immutable {@link UnisolatedBTree}
- * specified in the constructor if no entry is found under the key. Deletes
- * leave "delete markers".
+ * {@link ISimpleBTree#insert(Object, Object) Writes} will be applied to this
+ * {@link IsolatedBtree}. Reads ({@link ISimpleBTree#contains(byte[])) or {@link ISimpleBTree#lookup(Object)}
+ * will read first on the {@link IsolatedBtree} and then read through to the
+ * immutable {@link UnisolatedBTree} specified in the constructor iff no entry
+ * is found under the key. {@link ISimpleBTree#remove(Object) Deletes} leave
+ * "delete markers" in the write set.
  * </p>
  * <p>
- * In order to commit the changes on the {@link UnisolatedBTree} the writes must
- * be {@link #validate(UnisolatedBTree) validated},
- * {@link #mergeDown(UnisolatedBTree) merged down}, and the and dirty nodes and
- * leaves in the {@link UnisolatedBTree} must be flushed onto the store.
- * Finally, the store must record the new metadata record for the source btree
- * in a root block and commit. This protocol can be generalized to allow
- * multiple btrees to be isolated and commit atomically within the same
- * transaction. On abort, it is possible that nodes and leaves were written on
- * the store for the isolated btree. Those data are unreachable and MAY be
- * recovered depending on the nature of the store and its abort protocol.
+ * The {@link IBatchBTree} interface provides a convenience for iterative
+ * operations using the corresponding {@link ISimpleBTree} method and shares the
+ * semantics for that interface.
  * </p>
  * <p>
  * The {@link #rangeCount(byte[], byte[])} method MAY report more entries in a
- * key range that would actually be visited - this is due to both the presence
- * of "delete marker" entries in the {@link IsolatedBTree} and the requirement
- * to read on a fused view of the writes on the {@link IsolatedBTree} and the
+ * key range that would actually be visited by
+ * {@link #rangeIterator(byte[], byte[])} - this is due to both the presence of
+ * "delete marker" entries in the {@link IsolatedBTree} and the requirement to
+ * read on a fused view of the writes on the {@link IsolatedBTree} and the
  * read-only {@link UnisolatedBTree}.
+ * </p>
+ * <p>
+ * The {@link ILinearList} interface implemented by this class applies solely to
+ * the entries in the write set. The interface specifically does NOT support a
+ * fused view on the entry set of both the write set and the isolated index.
+ * </p>
+ * <p>
+ * In order to commit the changes in an {@link IsolatedBTree} onto the backing
+ * {@link UnisolatedBTree} the writes must be
+ * {@link #validate(UnisolatedBTree) validated},
+ * {@link #mergeDown(UnisolatedBTree) merged down}, and the dirty nodes and
+ * leaves in the {@link UnisolatedBTree} must be {@link BTree#write() written}
+ * onto the store. Finally, the store must record the new metadata record for
+ * the source btree in a root block and commit. This protocol can be generalized
+ * to allow multiple btrees to be isolated and commit atomically within the same
+ * transaction. On abort, it is possible that nodes and leaves were written on
+ * the store for the {@link IsolatedBtree}. Those data are unreachable and the
+ * storage allocated to them MAY be reclaimed as part of the abort processing.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider disabling the {@link ILinearList} interface for this class
+ *       since its behavior might surprise people. Alternatively, is there some
+ *       slick way to realize the proper semantics for this interface on a fused
+ *       view of the write set and the immutable index isolated by this class?
  */
-public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedIndex {
+public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
+        IIsolatedIndex {
 
+    /**
+     * The index that is being isolated by the {@link IsolatedBTree}.
+     */
     private final UnisolatedBTree src;
 
     /**
@@ -104,155 +135,191 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedI
      *            Typically, it is the unisolated btree from the last committed
      *            state on the {@link Journal} before the {@link Tx} starts.
      * 
-     * @todo we need a means to have active transactions span instances of a
-     *       journal (as each journal fills up it is eventually frozen, a new
-     *       journal is opened, and the indices from the old journal are rebuilt
-     *       in perfect read-only index segments on disk; those segments are
-     *       periodically compacted and segments that grow too large are split).
-     *       when we use a transient map to isolate writes then a journal
-     *       contains only committed state.
-     * 
-     * @todo The isolated btree needs to start from the committed stable state
-     *       of another btree (a possible exception is the first transaction to
-     *       create a given btree). In order to verify that the source btree
-     *       meets those requirements we need to know that it was loaded from a
-     *       historical metadata record, e.g., as found in a root block or a
-     *       read-only root names index found in a root block. Merely having a
-     *       persistent root is NOT enough since just writing the tree onto the
-     *       store does not make it restart safe.
+     * FIXME The isolated btree needs to start from the committed stable state
+     * of another btree (a possible exception is the first transaction to create
+     * a given btree). In order to verify that the source btree meets those
+     * requirements we need to know that it was loaded from a historical
+     * metadata record, e.g., as found in a root block or a read-only root names
+     * index found in a root block. Merely having a persistent root is NOT
+     * enough since just writing the tree onto the store does not make it
+     * restart safe.  The {@link Tx} class needs to handle this.
      * 
      * @todo It would be very nice if we could reuse immutable nodes from the
      *       last committed state of a given btree. However, we can not simply
      *       use the BTree instance from the global state since intervening
      *       writes will show up inside of its node set and the view MUST be of
      *       a historical ground state.
-     * 
-     * @todo We need to be able to validate against and write on the then
-     *       current {@link UnisolatedBTree}. Therefore, in order to support
-     *       transactions for unnamed btrees we need to pass that into the
-     *       validate() and mergeDown() operations as a parameter.
      */
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
-        super(store, src.getBranchingFactor(), Value.Serializer.INSTANCE);
+        super(store, src.getBranchingFactor(), src.getConflictResolver());
         
         this.src = src;
         
     }
 
     /**
+     * The constructor will re-open the {@link IsolatedBTree} isolating some
+     * index, however there is probably no use case for this constructor since
+     * any failure during transaction processing typically leads to an abort of
+     * the transaction and the discarding of any {@link IsolatedBTree}s that
+     * were used by that transaction. Further, there is no expectation that an
+     * {@link IsolatedBTree} would ever have a metadata record written since
+     * there is never any reason to call {@link #write()} since we never need to
+     * recover the isolated write set from persistent storage - it is either
+     * applied and discarded during the commit or simply discarded by an abort.
+     * <p>
+     * A possible use case would be in support of a restart-safe 2-phase commit
+     * protocol.
+     * 
      * @param store
      * @param metadata
      * @param src
      */
     public IsolatedBTree(IRawStore store, BTreeMetadata metadata, UnisolatedBTree src) {
+
         super(store, metadata);
         
         assert src != null;
         
         this.src = src;
+        
     }
-    
+
     /**
-     * True iff the key does not exist or if it exists but is marked as
-     * {@link IValue#isDeleted()}.
-     * 
-     * @param key
-     *            The search key.
-     * 
-     * @return True iff there is an non-deleted entry for the search key.
+     * If the key is not in the write set, then delegate to
+     * {@link UnisolatedBTree#contains(byte[])} on the isolated index. If the
+     * key is in the write set but the entry is deleted then return
+     * <code>false</code>. Otherwise return <code>true</code>.
      */
     public boolean contains(byte[] key) {
         
-        Value value = (Value)lookup(key);
-        
-        if(value==null) {
-            
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        Value value = (Value) super.lookup(key);
+
+        if (value == null) {
+
             return src.contains(key);
+
+        }
+
+        if (value.deleted) {
+
+            return false;
             
         }
-        
-        if (value.deleted)
-            return false;
-        
+
         return true;
         
     }
 
     /**
-     * Return the {@link IValue#getValue()} associated with the key or
-     * <code>null</code> if the key is not found or if the key was found by
-     * the entry is flagged as {@link IValue#isDeleted()}.
-     * 
-     * @param key
-     *            The search key.
-     * 
-     * @return The application value stored under that search key (may be null)
-     *         or null if the key was not found or if they entry was marked as
-     *         deleted.
+     * If the key is not in the write set, then delegate to
+     * {@link UnisolatedBTree#lookup(Object)} on the isolated index. If the key
+     * is in the write set but the entry is deleted then return
+     * <code>null</code>. Otherwise return the
+     * {@link IValue#getValue() application value} for that key.
      */
-    public Object lookup(byte[] key) {
+    public Object lookup(Object key) {
         
-        Value value = (Value)lookup(key);
-        
-        if(value==null) {
-            
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        Value value = (Value) super.lookup(key);
+
+        if (value == null) {
+
             return src.lookup(key);
+
+        }
+
+        if (value.deleted) {
+
+            return null;
             
         }
 
-        if(value.deleted) return null;
-        
-        return value.value;
+        return value.datum;
         
     }
 
     /**
-     * Remove the 
-     * 
-     * @param key
-     * @return
-     * 
-     * FIXME re-write this and write insert().
+     * Remove the key from the write set (does not write through to the isolated
+     * index). 
      */
-    public Object remove(byte[] key) {
+    public Object remove(Object key) {
 
-        // try
-        Value value = (Value)remove(key);
-        
-        if(value==null) {
-            
-            value = (Value) src.lookup(key);
-            
-            if(value.deleted) return null;
-            
-            if(value==null) {
-                
-                return null;
-                
-            }
-            
-            super.insert(key, new Value(value.versionCounter, true, null));
-            
-        }
-
-        if(value.deleted) return null;
-        
-        return value.value;
+        return super.remove(key);
         
     }
-    
-    public void addAll(AbstractBTree src) {
 
-        if (!(src instanceof UnisolatedBTree)) {
-
-            throw new IllegalArgumentException("Expecting: "
-                    + UnisolatedBTree.class);
-
-        }
-
-        super.addAll(src);
+    /**
+     * Adds an entry for the key under the value to the write set (does not
+     * write through to the isolated index).
+     */
+    public Object insert(Object key,Object value) {
         
+        return super.insert(key,value);
+        
+    }
+
+    /**
+     * Returns the entry index in the write set at which the key occurs (does
+     * NOT read through to a fused view containing the write set and the
+     * isolated index).
+     */
+    public int indexOf(byte[] key) {
+        return super.indexOf(key);
+    }
+
+    /**
+     * Returns the key at the specified entry index in the write set (does NOT
+     * read through to a fused view containing the write set and the isolated
+     * index).
+     */
+    public byte[] keyAt(int index) {
+        return super.keyAt(index);
+    }
+
+    /**
+     * Returns the value at the specified entry index in the write set (does NOT
+     * read through to a fused view containing the write set and the isolated
+     * index).
+     */
+    public Object valueAt(int index) {
+        return super.valueAt(index);
+    }
+
+    /**
+     * Returns the sum of the entries in the key range in this write set plus
+     * those in the key range in the isolated index.
+     */
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
+
+        return super.rangeCount(fromKey, toKey)
+                + src.rangeCount(fromKey, toKey);
+        
+    }
+
+    /**
+     * Returns an ordered fused view of the entries in the key range in this
+     * write set merged with those in the key range in the isolated index.
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+        // FIXME we need a version of FusedView that is aware of delete markers
+        // and that applies them such that a key deleted in the write set will
+        // not have a value reported from the isolated index.
+        return new FusedView(this,src).rangeIterator(fromKey, toKey);
+        
+    }
+
+    @Override
+    public IEntryIterator entryIterator() {
+        // TODO Auto-generated method stub
+        return super.entryIterator();
     }
 
     /**
@@ -317,19 +384,20 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedI
          * IsolatedBTree that we are currently traversing.
          * 
          * We handle this by inserting the results from the conflict resolver
-         * into an temporary UnisolatedBTree and then writing them on the
-         * IsolatedBTree once we finish the validation pass.
+         * into an temporary tree and then writing them on the IsolatedBTree
+         * once we finish the validation pass.
          * 
-         * @todo Once we create this temporary IsolatedBTree we need to read
-         * from a fused view of it and the primary IsolatedBTree if we are going
-         * to support conflict resolution that spans more than a single
-         * key-value at a time.
-         * 
-         * @todo It is NOT safe to update the value on the IsolatedBTree during
-         * traversal since it might trigger copy-on-write which would cause 
+         * Note: It is NOT safe to update the value on the IsolatedBTree during
+         * traversal since it might trigger copy-on-write which would cause
          * structural modifications that would break the iterator.
+         * 
+         * @todo Once we create this temporary tree we need to read from a fused
+         * view of it and the primary IsolatedBTree if we are going to support
+         * conflict resolution that spans more than a single key-value at a
+         * time.  However, we also need to expose the Tx to the conflict resolver
+         * for that to work.
          */
-        UnisolatedBTree tmp = null;
+        BTree tmp = null;
         
         /*
          * Scan the write set of the transaction.
@@ -379,33 +447,38 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedI
                      * conflict.
                      */
 
-                    Value newValue = conflictResolver.resolveConflict(key,
+                    byte[] newValue;
+                    
+                    try {
+                        
+                        newValue = conflictResolver.resolveConflict(key,
                             baseEntry, txEntry);
+                        
+                    } catch(WriteWriteConflictException ex){
 
-                    if (newValue == null) {
-
-                        // could not validate the conflict.
                         return false;
-
+                        
                     }
 
-                    if (newValue == baseEntry) {
+                    /*
+                     * Otherwise, the version returned by the conflict resolver
+                     * must be written on the isolated index so that it will
+                     * overwrite the committed version when we mergeDown() onto
+                     * the unisolated index.
+                     * 
+                     * Note: This uses the same store as the IsolatedBTree. This
+                     * makes it easy to leverage whatever strategy the
+                     * transaction is using to buffer its write set.
+                     */
 
-                        /*
-                         * In this case the version written by the transaction
-                         * will take precedence and we do not have to do
-                         * anything.
-                         */
-                        continue;
+                    if (tmp == null) {
 
-                    } else {
+                        tmp = new BTree(getStore(), // same store.
+                                getBranchingFactor(), // same branching factor
+                                ByteArrayValueSerializer.INSTANCE // byte[] values.
+                                );
 
-                        /*
-                         * Otherwise, the version returned by the conflict
-                         * resolver must be written on the isolated index so
-                         * that it will overwrite the committed version when we
-                         * mergeDown() onto the unisolated index.
-                         */
+                        tmp.insert(key, newValue);
 
                     }
 
@@ -421,6 +494,9 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedI
              * Copy in any updates resulting from conflict validation. It is
              * safe to apply those updates now that we are no longer traversing
              * the index.
+             * 
+             * Note that this will increment version numbers as we add in the
+             * resolved key/value pairs.
              */
             
             addAll(tmp);
@@ -496,12 +572,12 @@ public class IsolatedBTree extends BTree implements IIsolatableIndex, IIsolatedI
                  * Copy the entry down onto the global scope.
                  */
                 globalScope.insert(id, new Value(entry.nextVersionCounter(),
-                        false, entry.value));
+                        false, entry.datum));
 
             }
 
         }
 
     }
-
+    
 }

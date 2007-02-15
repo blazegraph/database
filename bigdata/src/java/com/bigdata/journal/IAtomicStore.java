@@ -60,6 +60,11 @@ import com.bigdata.rawstore.IRawStore;
 public interface IAtomicStore extends IRawStore {
 
     /**
+     * Abandon the current write set.
+     */
+    public void abort();
+    
+    /**
      * Request an atomic commit.
      * 
      * @exception IllegalStateException

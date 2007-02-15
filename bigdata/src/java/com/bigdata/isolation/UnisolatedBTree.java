@@ -49,7 +49,13 @@ package com.bigdata.isolation;
 
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.Leaf;
+import com.bigdata.objndx.BatchContains;
+import com.bigdata.objndx.BatchInsert;
+import com.bigdata.objndx.BatchLookup;
+import com.bigdata.objndx.BatchRemove;
+import com.bigdata.objndx.IBatchOp;
+import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -73,24 +79,38 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Some methods need to be overriden for this api. The most obvious are
- * remove() (must be an insert that sets a delete markers and clears the old
- * value), contains() (must return true iff the value is not marked as deleted),
- * lookup() (must return null if the value is marked as deleted), and insert
- * (must insert a Value object wrapping the application value and what to do if
- * the value is marked as deleted?)
- * 
- * @todo the batch api also needs to be overriden for this btree so that it has
- *       the correct semantics. unfortunately, this either needs to be done
- *       inside of the methods implemented on the {@link Leaf} or (more simply)
- *       by a simple loop over the batch operation implemented in this class and
- *       leaving optimized batch operations to an unisolated index.
- * 
  * @todo efficient sharing of nodes and leaves for concurrent read-only views
  *       (stealing children vs wrapping them with a flyweight wrapper; reuse of
  *       the same btree instance for reading from the same historical state).
  * 
  * @see IsolatedBTree, a {@link BTree} that has been isolated by a transaction.
+ *
+ * The following is an ad-hoc summary of the behavior of some methods exposed by
+ * this class:
+<pre>
+
+contains() - done.
+insert() - done.
+remove() - done.
+lookup() - done.
+
+addAll() - ok as implemented.  values will be wrapped in {@link IValue} objects
+as they are inserted.  if the source is also an {@link UnisolatedBTree} then the
+application values will be inserted into this tree, not the {@link IValue} objects.
+
+indexOf() - ok as implemented (counts deleted entries).
+keyAt() - ok as implemented, but will return keys for deleted entries.
+valueAt() - overriden to return null for a deleted entry.
+
+rangeCount - ok as implemented (counts deleted entries).
+rangeIterator - must filter out deleted entries.
+
+entryIterator() - only non-deleted entries.
+
+IBatchBTree - all methods are overriden to use {@link IBatchOp#apply(ISimpleBTree)}
+so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
+
+</pre>
  */
 public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
@@ -113,75 +133,6 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         return conflictResolver;
     
     }
-
-    /*
-     * Note: this is some old code that was used by the Journal when it was
-     * responsible for instantiating a conflict resolver based on a property
-     * that specified the name of the implementation class.
-     */
-    // Class conflictResolverClass = null;
-    //
-    // /*
-    // * "conflictResolver"
-    // */
-    //
-    // val = properties.getProperty(Options.CONFLICT_RESOLVER);
-    //        
-    // if( val != null ) {
-    //
-    // try {
-    //
-    // conflictResolverClass = getClass().getClassLoader().loadClass(val);
-    //
-    // if (!IConflictResolver.class
-    // .isAssignableFrom(conflictResolverClass)) {
-    //
-    // throw new RuntimeException(
-    // "Conflict resolver does not implement: "
-    // + IConflictResolver.class
-    // + ", name=" + val);
-    //
-    // }
-    //
-    // } catch (ClassNotFoundException ex) {
-    //
-    // throw new RuntimeException(
-    // "Could not load conflict resolver class: name=" + val
-    // + ", " + ex, ex);
-    //                
-    // }
-    //
-    // /*
-    // * Initialize the conflict resolver.
-    // */
-    //        
-    // if( conflictResolverClass != null ) {
-    //
-    // try {
-    //
-    // Constructor ctor = conflictResolverClass
-    // .getConstructor(new Class[] { Journal.class });
-    //
-    // this.conflictResolver = (IConflictResolver) ctor
-    // .newInstance(new Object[] { this });
-    //                
-    // }
-    //
-    // catch (Exception ex) {
-    //
-    // throw new RuntimeException("Conflict resolver: " + ex, ex);
-    //
-    // }
-    //            
-    // } else {
-    //            
-    // /*
-    // * The journal will not attempt to resolve write-write conflicts.
-    // */
-    //            
-    // this.conflictResolver = null;
-    //            
-    // }
 
     /**
      * Create an isolated btree.
@@ -264,6 +215,9 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      */
     public boolean contains(byte[] key) {
         
+        if (key == null)
+            throw new IllegalArgumentException();
+
         Value value = (Value)super.lookup(key);
         
         if(value==null||value.deleted) return false;
@@ -284,13 +238,16 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      *         or null if the key was not found or if they entry was marked as
      *         deleted.
      */
-    public Object lookup(byte[] key) {
+    public Object lookup(Object key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
         
         Value value = (Value)super.lookup(key);
         
         if(value==null||value.deleted) return null;
         
-        return value.value;
+        return value.datum;
         
     }
 
@@ -305,21 +262,26 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * @return The old value (may be null) and null if the key did not exist or
      *         if the entry was marked as deleted.
      */
-    public Object remove(byte[] key) {
+    public Object remove(Object key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
 
         Value value = (Value)super.lookup(key);
         
         if(value==null||value.deleted) return null;
         
-        return super.insert(key, new Value(value.versionCounter, true, null));
+        super.insert(key, new Value(value.nextVersionCounter(), true, null));
+        
+        return value.datum; // may be null.
         
     }
 
     /**
-     * If the key does not exists or if the key exists and the entry is deleted,
-     * then insert/update an entry under that key with a new version counter.
-     * Otherwise, update the entry under that key in order to increment the
-     * version counter.
+     * If the key does not exists or if the key exists, then insert/update an
+     * entry under that key with a new version counter. Otherwise, update the
+     * entry under that key in order to increment the version counter (this
+     * includes the case where the key is paired with a deletion marker).
      * 
      * @param key
      *            The search key.
@@ -329,11 +291,14 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * @return The old value under that key (may be null) and null if the key
      *         was marked as deleted or if the key was not found.
      */
-    public Object insert(byte[]key, Object val) {
+    public Object insert(Object key, Object val) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
  
         Value value = (Value)super.lookup(key);
         
-        if (value == null || value.deleted) {
+        if (value == null) {
 
             super.insert(key, new Value(IValue.FIRST_VERSION_UNISOLATED, false,
                     (byte[]) val));
@@ -343,10 +308,70 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         }
 
         super.insert(key, new Value(value.nextVersionCounter(), false,
-                value.value));
+                (byte[]) val));
         
-        return value.value;
+        return value.datum;
+        
+    }
+
+    /**
+     * Overriden to return <code>null</code> if the entry at that index is
+     * deleted.
+     */
+    public Object valueAt(int index) {
+        
+        Value value = (Value)super.valueAt(index);
+        
+        if(value==null||value.deleted) return null;
+        
+        return value.datum;
         
     }
     
+    /**
+     * This method will include deleted entries in the key range in the returned
+     * count.
+     */
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
+        
+        return super.rangeCount(fromKey, toKey);
+        
+    }
+
+    @Override
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        // TODO Auto-generated method stub
+        return super.rangeIterator(fromKey, toKey);
+    }
+
+    @Override
+    public IEntryIterator entryIterator() {
+        // TODO Auto-generated method stub
+        return super.entryIterator();
+    }
+
+    public void contains(BatchContains op) {
+
+        op.apply(this);
+        
+    }
+
+    public void insert(BatchInsert op) {
+        
+        op.apply(this);
+        
+    }
+
+    public void lookup(BatchLookup op) {
+        
+        op.apply(this);
+        
+    }
+
+    public void remove(BatchRemove op) {
+        
+        op.apply(this);
+        
+    }
+
 }

@@ -45,7 +45,7 @@ Modifications:
  * Created on Feb 13, 2007
  */
 
-package com.bigdata.isolation;
+package com.bigdata.objndx;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,39 +57,30 @@ import java.util.Random;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+import com.bigdata.objndx.IValueSerializer;
+
 /**
- * Test suite for {@link Value.Serializer}.
+ * Test suite for {@link ByteArrayValueSerializer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestValueSerializer extends TestCase2 {
+public class TestByteArrayValueSerializer extends TestCase2 {
 
     /**
      * 
      */
-    public TestValueSerializer() {
+    public TestByteArrayValueSerializer() {
     }
 
     /**
      * @param arg0
      */
-    public TestValueSerializer(String arg0) {
+    public TestByteArrayValueSerializer(String arg0) {
         super(arg0);
     }
     
-    public void assertEquals(Value expected, Value actual) {
-        
-        assertEquals("versionCounter", expected.versionCounter,
-                actual.versionCounter);
-
-        assertEquals("deleted", expected.deleted, actual.deleted);
-
-        assertEquals("datum", expected.datum, actual.datum);
-   
-    }
-    
-    public void assertEquals(Value[] expected, Value[] actual) {
+    public void assertEquals(byte[][] expected, byte[][] actual) {
         
         assertEquals("length",expected.length, actual.length);
         
@@ -111,45 +102,37 @@ public class TestValueSerializer extends TestCase2 {
 
     public void test_zeroValues() {
         
-        doRoundTripTest(new Value[]{});
+        doRoundTripTest(new byte[][]{});
         
     }
     
     public void test_oneValue_nonNull() {
         
-        doRoundTripTest(new Value[]{new Value((short)2,false,new byte[]{12})});
+        doRoundTripTest(new byte[][]{new byte[]{1}});
         
     }
     
     public void test_oneValue_null() {
         
-        doRoundTripTest(new Value[]{new Value((short)3,false,null)});
+        doRoundTripTest(new byte[][]{null});
         
     }
     
-    public void test_oneValue_deleted() {
-        
-        doRoundTripTest(new Value[]{new Value((short)4,true,null)});
-        
-    }
-
     Random r = new Random();
     
-    public Value getRandomValue() {
+    public byte[] getRandomValue() {
         
-        short versionCounter = (short)r.nextInt(Short.MAX_VALUE+1);
+        boolean nullValue = r.nextBoolean();
         
-        boolean deleted = r.nextBoolean();
+        byte[] data = (nullValue?null:new byte[r.nextInt(255)]);
         
-        byte[] data = (deleted?null:new byte[r.nextInt(255)]);
-        
-        if(!deleted) {
+        if(!nullValue) {
            
             r.nextBytes(data);
             
         }
         
-        return new Value(versionCounter,deleted,data);
+        return data;
         
     }
     
@@ -161,7 +144,7 @@ public class TestValueSerializer extends TestCase2 {
             
             final int n = r.nextInt(1000);
             
-            Value[] expected = new Value[n];
+            byte[][] expected = new byte[n][];
             
             for(int i=0; i<n; i++) {
                
@@ -175,9 +158,9 @@ public class TestValueSerializer extends TestCase2 {
         
     }
     
-    public void doRoundTripTest(Value[] values) {
+    public void doRoundTripTest(byte[][] values) {
         
-        Value.Serializer ser = Value.Serializer.INSTANCE;
+        IValueSerializer ser = ByteArrayValueSerializer.INSTANCE;
 
         try {
             
@@ -194,7 +177,7 @@ public class TestValueSerializer extends TestCase2 {
             data = baos.toByteArray();
             }
 
-            Value[] actual = new Value[values.length];
+            byte[][] actual = new byte[values.length][];
             
             {
             

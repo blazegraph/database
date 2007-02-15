@@ -1063,6 +1063,10 @@ public class PartitionedJournal implements IJournal {
         return slave.write(data);
     }
 
+    public void abort() {
+        slave.abort();
+    }
+    
     public void commit() {
         slave.commit();
     }

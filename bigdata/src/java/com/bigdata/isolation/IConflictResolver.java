@@ -119,12 +119,12 @@ public interface IConflictResolver extends Serializable {
      * @param txEntry
      *            The value written by the transaction that is being validated.
      * 
-     * @return A {@link Value} in which the conflict has been resolved or
-     *         <code>null</code> if the value could not be resolved. This may
-     *         be either of the provided values or a new one constructed based
-     *         on an examination of the provided values.
+     * @return A datum in which the conflict has been resolved.
+     * 
+     * @exception WriteWriteConflictException
+     *                if the conflict could not be resolved.
      */
-    public Value resolveConflict(byte[] key, Value comittedValue, Value txEntry)
+    public byte[] resolveConflict(byte[] key, Value comittedValue, Value txEntry)
             throws RuntimeException;
-
+    
 }

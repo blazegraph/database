@@ -523,12 +523,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            The first key that will NOT be visited (exclusive). When
      *            <code>null</code> there is no upper bound.
      * 
-     * FIXME constrain first and last Node/Leaf visited. right now this will
-     * visit the entire tree, just filtering for only the entries in the key
-     * range. the logic for visiting the children needs to pay attention to the
-     * fromKey and toKey so that the post-order node traversal will be
-     * appropriately constrained.
-     * 
      * FIXME when using an {@link IndexSegment} provide for direct leaf
      * successor scans.
      * 

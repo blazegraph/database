@@ -125,4 +125,22 @@ public class BatchInsert implements IBatchOp {
         
     }
     
+    /**
+     * Applies the operator using {@link ISimpleBTree#insert(Object, Object)}
+     * 
+     * @param btree
+     */
+    public void apply(ISimpleBTree btree) {
+        
+        while (tupleIndex < ntuples) {
+
+            values[tupleIndex] = btree.insert(keys[tupleIndex],
+                    values[tupleIndex]);
+            
+            tupleIndex ++;
+
+        }
+
+    }
+    
 }

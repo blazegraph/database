@@ -119,4 +119,21 @@ public class BatchRemove implements IBatchOp {
 
     }
 
+    /**
+     * Applies the operation using {@link ISimpleBTree#remove(Object)}.
+     * 
+     * @param btree
+     */
+    public void apply(ISimpleBTree btree) {
+
+        while( tupleIndex < ntuples) {
+
+            values[tupleIndex] = btree.remove(keys[tupleIndex]);
+
+            tupleIndex ++;
+
+        }
+
+    }
+    
 }

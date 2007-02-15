@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.isolation;
 
-import com.bigdata.io.TestByteBufferStreams;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -96,10 +94,11 @@ public class TestAll extends TestCase {
         // @todo test btree with IValue values.
         suite.addTestSuite(TestUnisolatedBTree.class);
         
-        // @todo test fully isolated btree for use with transactions.
-//        suite.addTestSuite(TestIsolatedBTree.class);
+        // test fully isolated btree for use with transactions.
+        suite.addTestSuite(TestIsolatedBTree.class);
 
-        // @todo test conflict resolution.
+        // @todo test conflict resolution, including on the Account problem and
+        // on the TripleStore.
 
         // @todo test isolatable fused view (handles delete markers).
 //        suite.addTestSuite(TestIsolatableFusedView.class);

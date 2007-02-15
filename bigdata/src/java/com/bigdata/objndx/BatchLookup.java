@@ -119,4 +119,16 @@ public class BatchLookup implements IBatchOp {
 
     }
 
+    public void apply(ISimpleBTree btree) {
+
+        while (tupleIndex < ntuples) {
+
+            values[tupleIndex] = btree.lookup(keys[tupleIndex]);
+
+            tupleIndex ++;
+
+        }
+
+    }
+    
 }

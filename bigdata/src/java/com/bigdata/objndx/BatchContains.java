@@ -126,4 +126,30 @@ public class BatchContains implements IBatchOp {
 
     }
 
+    /**
+     * Applies the operation using {@link ISimpleBTree#contains(byte[])}.
+     * 
+     * @param btree
+     */
+    public void apply(ISimpleBTree btree) {
+        
+        while( tupleIndex < ntuples ) {
+
+            // skip tuples already marked as true.
+            if (contains[tupleIndex]) {
+
+                tupleIndex++;
+
+                continue;
+
+            }
+
+            contains[tupleIndex] = btree.contains(keys[tupleIndex]);
+
+            tupleIndex ++;
+
+        }
+
+    }
+    
 }
