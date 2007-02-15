@@ -54,11 +54,17 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.bigdata.journal.TemporaryStore;
+
 
 /**
  * A simple persistent unbuffered implementation backed by a file. The maximum
  * size of the file is restricted to {@link Integer#MAX_VALUE} bytes since we
  * must code the offset into the file using {@link Addr#toLong(int, int)}.
+ * 
+ * @see {@link TemporaryStore}, which provides a more solution for temporary
+ *      data that begins with the benefits of a memory-resident buffer and then
+ *      converts to a disk-based store on overflow.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

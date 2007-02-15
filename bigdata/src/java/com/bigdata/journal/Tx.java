@@ -57,7 +57,6 @@ import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 
@@ -146,19 +145,18 @@ public class Tx implements IStore, ITx {
     private RunState runState;
 
     /**
-     * A store used to hold write sets for the transaction.  The same store can
-     * be used to buffer resolved write-write conflicts.
-     * 
-     * @todo This uses a memory-based store to avoid issues with maintaining
-     *       transactions across journal boundaries. This could be improved on
-     *       trivially by transparently promoting the store from memory-based to
-     *       disk-based if it overflows some set maximum capacity. In such a
-     *       scenario, the file backing the on disk store would be flagged for
-     *       deletion on exit of the JVM and allocated in a temporary directory.<br>
-     *       A further improvement would allow transactions to use partitioned
-     *       indices.
+     * A store used to hold write sets for the transaction. The same store can
+     * be used to buffer resolved write-write conflicts. This uses a
+     * {@link TemporaryStore} to avoid issues with maintaining transactions
+     * across journal boundaries. This places a limit on transactions of 2G in
+     * their serialized write set. Since the indices use a copy-on-write model,
+     * the amount of user data can be significantly less due to multiple
+     * versions of the same btree nodes. Using smaller branching factors in the
+     * isolated index helps significantly to increase the effective utilization
+     * of the store since copy-on-write causes fewer bytes to be copied each
+     * time it is invoked.
      */
-    final private IRawStore tmpStore = new SimpleMemoryRawStore();
+    final private IRawStore tmpStore = new TemporaryStore();
     
     /**
      * BTrees isolated by this transactions.

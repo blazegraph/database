@@ -100,10 +100,22 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      *         operation should be retried.
      */
     public boolean overflow(int needed) {
+
+        final long userExtent = getUserExtent();
         
-        if( getUserExtent() +needed > Integer.MAX_VALUE) {
+        final long required = userExtent + needed;
+        
+        if ( required > Integer.MAX_VALUE) {
             
             // Would overflow int32 bytes.
+            
+            return false;
+            
+        }
+        
+        if( required > maximumExtent ) {
+            
+            // Would exceed the maximum extent.
             
             return false;
             
@@ -112,7 +124,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         /*
          * Increase by the initial extent or by 32M, whichever is greater.
          */
-        long newExtent = getUserExtent()
+        long newExtent = userExtent
                 + Math.max(initialExtent, Bytes.megabyte * 32);
         
         if( newExtent > Integer.MAX_VALUE) {
@@ -123,7 +135,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         }
 
         /*
-         * Extent the capacity.
+         * Extend the capacity.
          */
         truncate( newExtent );
         

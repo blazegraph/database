@@ -90,9 +90,9 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         if (needed > 0) {
 
-            if(!overflow((int)needed)) {
+            if (!overflow((int) needed)) {
                 
-                throw new RuntimeException("overflow");
+                throw new OverflowException();
                 
             }
             
@@ -163,9 +163,6 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
                 
     }
 
-    /**
-     * FIXME write tests of this method.
-     */
     public void truncate(long newExtent) {
 
         long newUserExtent =  newExtent - headerSize;

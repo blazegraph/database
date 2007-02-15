@@ -52,10 +52,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.bigdata.journal.TemporaryStore;
 
 /**
  * A purely transient append-only implementation useful when data need to be
  * buffered in memory. The writes are stored in an {@link ArrayList}.
+ * 
+ * @see {@link TemporaryStore}, which provides a more scalable solution for temporary
+ *      data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

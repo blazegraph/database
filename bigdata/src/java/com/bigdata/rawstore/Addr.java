@@ -53,20 +53,21 @@ import com.bigdata.objndx.IndexSegmentBuilder;
 
 /**
  * An address encodes both an int32 length and an int32 offset into a single
- * long integer. This limits the addressable size of a file to int32 bytes, but
- * that limit far exceeds the envisoned capacity of a single file in the bigdata
- * architecture. Note that the long integer ZERO (0L) is reserved and always has
- * the semantics of a <em>null</em> reference. Writes at offset zero are
- * allowed, depending on the store, by writes of zero length are disallowed and
- * hence no address will ever be ZERO (0L).
- *  
+ * long integer. This limits the addressable size of a file to int32 bytes
+ * (actually, only 2^31 bytes, e.g., 2G, since Java is using signed integers),
+ * but that limit far exceeds the envisoned capacity of a single file in the
+ * bigdata architecture. Note that the long integer ZERO (0L) is reserved and
+ * always has the semantics of a <em>null</em> reference. Writes at offset
+ * zero are allowed, depending on the store, by writes of zero length are
+ * disallowed and hence no address will ever be ZERO (0L).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @todo consider address segments to support fast combination of buffers each
  *       containing its own address space. A prime candidate for this is the
  *       {@link IndexSegmentBuilder} which currently jumps through hoops in
- *       order to make the nodes resolvable.  When considering segments, note
+ *       order to make the nodes resolvable. When considering segments, note
  *       that addresses may currently be directly tested for order since the
  *       offset is in the high int32 word.
  */

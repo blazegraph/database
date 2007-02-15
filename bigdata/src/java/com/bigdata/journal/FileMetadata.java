@@ -90,7 +90,7 @@ public class FileMetadata {
      * blocks. This is as an offset when computing the index of a slot on the
      * journal.
      */
-    final int headerSize0  = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
+    static final int headerSize0 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
     
     /**
      * Depending on the mode, this will be either a direct buffer, a mapped
@@ -115,7 +115,9 @@ public class FileMetadata {
      * @param segmentId
      *            The unique segment identifier.
      * @param file
-     *            The name of the file to be opened.
+     *            The name of the file to be opened - when null, a file with a
+     *            unique name will be created in the default temporary
+     *            directory.
      * @param bufferMode
      *            The {@link BufferMode}.
      * @param useDirectBuffers
@@ -139,12 +141,12 @@ public class FileMetadata {
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
-    FileMetadata(int segmentId, File file, BufferMode bufferMode, boolean useDirectBuffers,
-            long initialExtent, boolean create, boolean readOnly,
-            ForceEnum forceWrites) throws RuntimeException {
+    FileMetadata(int segmentId, File file, BufferMode bufferMode,
+            boolean useDirectBuffers, long initialExtent, boolean create,
+            boolean readOnly, ForceEnum forceWrites) throws RuntimeException {
 
-        if (file == null)
-            throw new IllegalArgumentException();
+//        if (file == null)
+//            throw new IllegalArgumentException();
 
         if (bufferMode == null)
             throw new IllegalArgumentException();
@@ -174,15 +176,13 @@ public class FileMetadata {
 
         this.segment = segmentId;
         
-        this.file = file;
-        
         this.bufferMode = bufferMode;
 
         final String fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
         this.readOnly = readOnly;
         
-        exists = file.exists();
+        this.exists = file != null && file.exists();
 
         if (exists) {
 
@@ -207,10 +207,26 @@ public class FileMetadata {
 
             }
 
+            if (file == null) {
+                
+                try {
+
+                    file = File.createTempFile("bigdata", ".store");
+                    
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+                
+            }
+
             System.err.println("Will create file: " + file.getAbsoluteFile());
 
         }
-
+        
+        this.file = file;
+        
         try {
             
             /*

@@ -42,56 +42,51 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Feb 15, 2007
  */
 
 package com.bigdata.journal;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
- * Runs all tests for all journal implementations.
+ * An instance of this class is thrown if an
+ * {@link AbstractBufferStrategy#overflow(int)} request is denied.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class OverflowException extends RuntimeException {
 
     /**
      * 
      */
-    public TestAll() {
+    private static final long serialVersionUID = -8511505622215579950L;
+
+    /**
+     * 
+     */
+    public OverflowException() {
     }
 
     /**
-     * @param arg0
+     * @param message
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public OverflowException(String message) {
+        super(message);
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * @param cause
      */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("journal");
-
-        suite.addTestSuite( TestRootBlockView.class );
-       
-        suite.addTestSuite( TestTemporaryStore.class );
-        
-        suite.addTest( TestTransientJournal.suite() );
-        suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
-        suite.addTest( TestDiskJournal.suite() );
-
-        return suite;
-        
+    public OverflowException(Throwable cause) {
+        super(cause);
     }
-    
+
+    /**
+     * @param message
+     * @param cause
+     */
+    public OverflowException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
 }

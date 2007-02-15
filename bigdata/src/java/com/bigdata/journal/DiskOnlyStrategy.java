@@ -60,6 +60,18 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     private boolean open;
 
+    public File getFile() {
+        
+        return file;
+        
+    }
+    
+//    public FileChannel getFileChannel() {
+//        
+//        return channel;
+//        
+//    }
+    
     DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.nextOffset,
@@ -254,7 +266,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
                 if (!overflow((int) needed)) {
 
-                    throw new RuntimeException("overflow");
+                    throw new OverflowException();
 
                 }
 
