@@ -378,7 +378,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
     }
 
     /**
-     * @todo Test restart-safety of data, including deletion markers.
+     * Tests restart-safety of data, including deletion markers.
      */
     public void test_restartSafe() {
         

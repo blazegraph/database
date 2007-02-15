@@ -103,7 +103,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              */
             force(true);
             
-            System.err.println("Disk file: newLength="+newExtent);
+            System.err.println("Disk file: newLength="+cf.format(newExtent));
             
         } catch(IOException ex) {
             

@@ -1,6 +1,11 @@
 package com.bigdata.journal;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.text.Format;
+import java.text.NumberFormat;
 
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
@@ -39,6 +44,16 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      */
     protected int nextOffset;
 
+    static final NumberFormat cf;
+    
+    static {
+        
+        cf = NumberFormat.getIntegerInstance();
+        
+        cf.setGroupingUsed(true);
+        
+    }
+    
     final public long getInitialExtent() {
         
         return initialExtent;
@@ -178,4 +193,109 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         
     }
 
+    /**
+     * Helper method used by {@link DiskBackedBufferStrategy} and
+     * {@link DiskOnlyStrategy} to implement
+     * {@link IBufferStrategy#transferTo(RandomAccessFile)}
+     * 
+     * @param src
+     *            The source.
+     * @param out
+     *            The output file.
+     *            
+     * @return The #of bytes transferred.
+     * 
+     * @throws IOException
+     */
+    protected long transferFromDiskTo(IDiskBasedStrategy src,RandomAccessFile out) throws IOException {
+
+        final long begin = System.currentTimeMillis();
+        
+        // #of bytes to transfer.
+        final long count = src.getNextOffset();
+
+        // the output channel.
+        final FileChannel outChannel = out.getChannel();
+        
+        // current position on the output channel.
+        final long toPosition = outChannel.position();
+        
+        if(toPosition + count > Integer.MAX_VALUE) {
+            
+            throw new IOException("Index segment exceeds int32 bytes.");
+            
+        }
+
+        /* 
+         * Transfer data from channel to channel.
+         */
+        
+        final FileChannel tmpChannel = src.getRandomAccessFile().getChannel();
+        
+        /*
+         * Set the fromPosition on source channel. We want everything after the
+         * file header.
+         */
+        tmpChannel.position(src.getHeaderSize());
+
+        /*
+         * Extend the output file. This is required at least for some
+         * circumstances.
+         */
+        out.setLength(toPosition+count);
+                    
+        /*
+         * Transfer the data. It is possible that this will take multiple
+         * writes for at least some implementations.
+         */
+
+//        System.err.println("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
+
+        int nwrites = 0; // #of write operations.
+
+        {
+            
+            long n = count;
+            
+            long to = toPosition;
+            
+            while (n > 0) {
+
+                long nxfer = outChannel.transferFrom(tmpChannel, to, n);
+                
+                to += nxfer;
+                
+                n -= nxfer;
+                
+                nwrites++;
+        
+//        // Verify transfer is complete.
+//            if (nxfer != count) {
+//
+//                throw new IOException("Expected to transfer " + count
+//                        + ", but transferred " + nxfer);
+//
+//            }
+
+            }
+            
+        }
+        
+        /*
+         * Update the position on the output channel since transferFrom does
+         * NOT do this itself.
+         */
+        outChannel.position(toPosition+count);
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println("\nTransferred " + count
+                + " bytes from disk channel to disk channel (offset="
+                + toPosition + ") in " + nwrites + " writes and " + elapsed
+                + "ms");
+
+        return count;
+        
+    }
+    
 }

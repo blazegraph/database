@@ -143,12 +143,6 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
      * index found in a root block. Merely having a persistent root is NOT
      * enough since just writing the tree onto the store does not make it
      * restart safe.  The {@link Tx} class needs to handle this.
-     * 
-     * @todo It would be very nice if we could reuse immutable nodes from the
-     *       last committed state of a given btree. However, we can not simply
-     *       use the BTree instance from the global state since intervening
-     *       writes will show up inside of its node set and the view MUST be of
-     *       a historical ground state.
      */
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
@@ -312,14 +306,19 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
         // FIXME we need a version of FusedView that is aware of delete markers
         // and that applies them such that a key deleted in the write set will
         // not have a value reported from the isolated index.
+        
         return new FusedView(this,src).rangeIterator(fromKey, toKey);
         
     }
 
-    @Override
+    /**
+     * Returns an ordered fused view of the entries in the key range in this
+     * write set merged with those in the key range in the isolated index.
+     */
     public IEntryIterator entryIterator() {
-        // TODO Auto-generated method stub
-        return super.entryIterator();
+
+        return new FusedView(this,src).rangeIterator(null,null);
+        
     }
 
     /**
@@ -395,7 +394,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
          * view of it and the primary IsolatedBTree if we are going to support
          * conflict resolution that spans more than a single key-value at a
          * time.  However, we also need to expose the Tx to the conflict resolver
-         * for that to work.
+         * for that to work (which is why we have not exposed the tx yet).
          */
         BTree tmp = null;
         

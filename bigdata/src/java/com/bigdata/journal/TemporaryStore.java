@@ -279,28 +279,4 @@ public class TemporaryStore implements IRawStore {
         
     }
     
-    /**
-     * Return a temporary file for use by the store. The file will be
-     * automatically deleted if the JVM exits.
-     * 
-     * @return A temporary file for use by the store.
-     */
-    protected File getTempFile() {
-        
-        try {
-
-            File file = File.createTempFile("transientOverflow", ".store");
-            
-            file.deleteOnExit();
-            
-            return file;
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
-    }
-    
 }

@@ -52,11 +52,17 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
+import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * 
+ * @todo write tests for
+ *       {@link IBufferStrategy#transferTo(java.io.RandomAccessFile)}.  This
+ *       code is currently getting "checked" by the {@link IndexSegmentBuilder}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

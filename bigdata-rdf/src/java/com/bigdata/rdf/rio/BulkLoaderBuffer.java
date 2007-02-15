@@ -92,22 +92,6 @@ public class BulkLoaderBuffer extends Buffer {
     int numKnownStmts = 0;
     
     /**
-     * When true, the {@link IndexSegment}s will be built in memory rather than
-     * using disk to buffer the nodes.
-     * 
-     * @todo try modifying the {@link NodeSerializer} to use a
-     *       {@link ByteArrayOutputStream} and see if that is any faster the the
-     *       {@link ByteBufferOutputStream}. Be sure to undo the hack in
-     *       {@link KeyBufferSerializer}.
-     * 
-     * @todo fully buffered is now marginally faster, but the disk buffer
-     *       version winds up writing the leaves on disk and then transfering
-     *       them to another disk file. fix that and then compare performance
-     *       again.
-     */
-    boolean fullyBuffer = true;
-    
-    /**
      * @todo experiment with and without checksum computation.
      */
     boolean useChecksum = false;
@@ -172,7 +156,7 @@ public class BulkLoaderBuffer extends Buffer {
         new IndexSegmentBuilder(outFile, null, numTerms,
                 new TermIdIterator(this), branchingFactor,
                 TermIdSerializer.INSTANCE,
-                fullyBuffer, useChecksum, recordCompressor,
+                useChecksum, recordCompressor,
                 errorRate);
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -204,7 +188,7 @@ public class BulkLoaderBuffer extends Buffer {
                 numTerms, new TermIterator(this),
                 branchingFactor,
                 RdfValueSerializer.INSTANCE,
-                fullyBuffer, useChecksum, recordCompressor,
+                useChecksum, recordCompressor,
                 errorRate);
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -229,7 +213,7 @@ public class BulkLoaderBuffer extends Buffer {
                 new UnknownStatementIterator(keyOrder,this),
                 branchingFactor,
                 StatementSerializer.INSTANCE,
-                fullyBuffer, useChecksum, recordCompressor,
+                useChecksum, recordCompressor,
                 errorRate);
         
         final long elapsed = System.currentTimeMillis() - begin;

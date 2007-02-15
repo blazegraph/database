@@ -603,10 +603,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         MergedLeafIterator mergeItr = new IndexSegmentMerger(outFile02_tmp,
                 100, btree, seg01).merge();
         
-        new IndexSegmentBuilder(outFile02, null, mergeItr.nentries, new MergedEntryIterator(mergeItr
-                ), 100, btree.getNodeSerializer().getValueSerializer(),
-                true/* fullyBuffer */, false/* useChecksum */,
-                null/*recordCompressor*/, 0d/*errorRate*/);
+        new IndexSegmentBuilder(outFile02, null, mergeItr.nentries,
+                new MergedEntryIterator(mergeItr), 100, btree
+                        .getNodeSerializer().getValueSerializer(),
+                false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */);
 
         /*
          * update the metadata index for this partition.
@@ -883,10 +883,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 // build the merged index segment.
                 IndexSegmentBuilder builder = new IndexSegmentBuilder(
                         outFile02, null, mergeItr.nentries,
-                        new MergedEntryIterator(mergeItr), mseg,
-                        testData.getNodeSerializer().getValueSerializer(),
-                        true/* fullyBuffer */, false/* useChecksum */,
-                        null/* recordCompressor */, 0d/* errorRate */);
+                        new MergedEntryIterator(mergeItr), mseg, testData
+                                .getNodeSerializer().getValueSerializer(),
+                        false/* useChecksum */, null/* recordCompressor */,
+                        0d/* errorRate */);
 
                 // close the merged leaf iterator (and release its buffer/file).
                 // @todo this should be automatic when the iterator is exhausted but I am not seeing that.

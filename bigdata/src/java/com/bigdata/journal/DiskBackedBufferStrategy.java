@@ -17,7 +17,8 @@ import java.nio.channels.FileChannel;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
+abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
+        implements IDiskBasedStrategy {
 
     /**
      * The name of the backing file.
@@ -34,13 +35,31 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
      */
     private boolean open = false;
 
-    public boolean isOpen() {
+    final public int getHeaderSize() {
+        
+        return headerSize;
+        
+    }
+
+    final public File getFile() {
+        
+        return file;
+        
+    }
+    
+    final public RandomAccessFile getRandomAccessFile() {
+        
+        return raf;
+        
+    }
+    
+    final public boolean isOpen() {
         
         return open;
         
     }
 
-    public boolean isStable() {
+    final public boolean isStable() {
         
         return true;
         
@@ -145,6 +164,12 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy {
 
         }
 
+    }
+
+    public long transferTo(RandomAccessFile out) throws IOException {
+        
+        return super.transferFromDiskTo(this, out);
+        
     }
 
 }

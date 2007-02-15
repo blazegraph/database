@@ -1,5 +1,8 @@
 package com.bigdata.journal;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
+
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -90,5 +93,20 @@ public interface IBufferStrategy extends IRawStore {
      */
     public void writeRootBlock(IRootBlockView rootBlock,
             ForceEnum forceOnCommitEnum);
+    
+    /**
+     * A block operation that transfers the serialized records (aka the written
+     * on portion of the user extent) en mass from the buffer onto an output
+     * file. The buffered records are written "in order" starting at the current
+     * position on the output file. The file is grown if necessary.
+     * 
+     * @param out
+     *            The file to which the buffer contents will be transferred.
+     * 
+     * @return The #of bytes written.
+     * 
+     * @throws IOException
+     */
+    public long transferTo(RandomAccessFile out) throws IOException;
     
 }

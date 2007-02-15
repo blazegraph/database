@@ -24,7 +24,8 @@ import com.bigdata.rawstore.Addr;
  *       need to be modified to wait until the aio thread has caught up to the
  *       nextOffset (i.e., has written all data that is dirty on the buffer).
  */
-public class DiskOnlyStrategy extends AbstractBufferStrategy {
+public class DiskOnlyStrategy extends AbstractBufferStrategy implements
+        IDiskBasedStrategy {
 
     /**
      * The file.
@@ -60,18 +61,24 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
 
     private boolean open;
 
-    public File getFile() {
+    final public int getHeaderSize() {
+        
+        return headerSize;
+        
+    }
+    
+    final public File getFile() {
         
         return file;
         
     }
     
-//    public FileChannel getFileChannel() {
-//        
-//        return channel;
-//        
-//    }
-    
+    final public RandomAccessFile getRandomAccessFile() {
+
+        return raf;
+        
+    }
+
     DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.nextOffset,
@@ -376,7 +383,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
              */
             force(true);
 
-            System.err.println("Disk file: newLength="+newExtent);
+            System.err.println("Disk file: newLength="+cf.format(newExtent));
                         
         } catch(IOException ex) {
             
@@ -390,4 +397,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy {
         
     }
 
+    public long transferTo(RandomAccessFile out) throws IOException {
+        
+        return super.transferFromDiskTo(this, out);
+        
+    }
+    
 }

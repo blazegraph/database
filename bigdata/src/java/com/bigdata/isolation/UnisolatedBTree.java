@@ -80,10 +80,6 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo efficient sharing of nodes and leaves for concurrent read-only views
- *       (stealing children vs wrapping them with a flyweight wrapper; reuse of
- *       the same btree instance for reading from the same historical state).
- * 
  * @see IsolatedBTree, a {@link BTree} that has been isolated by a transaction.
  *
  * The following is an ad-hoc summary of the behavior of some methods exposed by

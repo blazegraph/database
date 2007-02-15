@@ -910,8 +910,8 @@ public class PartitionedJournal implements IJournal {
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
                     mseg, oldIndex.btree.getNodeSerializer()
-                            .getValueSerializer(), true/* fullyBuffer */,
-                    false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */);
+                            .getValueSerializer(), false/* useChecksum */,
+                    null/* recordCompressor */, 0d/* errorRate */);
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but
