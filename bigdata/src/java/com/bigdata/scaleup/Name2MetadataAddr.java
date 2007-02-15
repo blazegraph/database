@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.scaleup;
 
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.IRawStore;

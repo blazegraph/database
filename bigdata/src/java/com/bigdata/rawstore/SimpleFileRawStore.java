@@ -62,8 +62,6 @@ import java.util.Set;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo the commit protocol is not implemented yet.
  */
 public class SimpleFileRawStore implements IRawStore {
 

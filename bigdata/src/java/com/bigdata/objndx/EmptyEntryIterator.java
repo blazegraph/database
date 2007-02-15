@@ -57,7 +57,7 @@ import java.util.NoSuchElementException;
  */
 public class EmptyEntryIterator implements IEntryIterator {
     
-    public static final IEntryIterator INSTANCE = new EmptyEntryIterator();
+    public static final transient IEntryIterator INSTANCE = new EmptyEntryIterator();
     
     private EmptyEntryIterator() {}
 

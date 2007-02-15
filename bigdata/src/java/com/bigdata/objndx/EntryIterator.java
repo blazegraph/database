@@ -46,7 +46,10 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.io.Serializable;
 import java.util.NoSuchElementException;
+
+import com.bigdata.isolation.IValue;
 
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
@@ -61,6 +64,8 @@ public class EntryIterator implements IEntryIterator {
 
     private final Tuple tuple;
 
+    private final EntryFilter filter;
+    
     private int index = 0;
 
     private int lastVisited = -1;
@@ -77,14 +82,20 @@ public class EntryIterator implements IEntryIterator {
     
     public EntryIterator(Leaf leaf) {
 
-        this( leaf, null );
-        
+        this(leaf, null, null, null, null);
+
     }
 
-    public EntryIterator(Leaf leaf, Tuple tuple ) {
+    public EntryIterator(Leaf leaf, Tuple tuple) {
 
-        this(leaf,tuple,null,null);
-        
+        this(leaf, tuple, null, null, null);
+
+    }
+
+    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+
+        this(leaf, tuple, fromKey, toKey, null);
+
     }
     
     /**
@@ -100,11 +111,15 @@ public class EntryIterator implements IEntryIterator {
      *            The first key whose entry will NOT be visited or
      *            <code>null</code> if the upper bound on the key traversal is
      *            not constrained.
+     * @param filter
+     *            An optional filter used to test and exclude elements from the
+     *            iteration.
      * 
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
+            EntryFilter filter) {
 
         assert leaf != null;
 
@@ -116,6 +131,8 @@ public class EntryIterator implements IEntryIterator {
 //        
 //        this.toKey = toKey; // may be null (no upper bound).
 
+        this.filter = filter; // MAY be null.
+        
         { // figure out the first index to visit.
 
             int fromIndex;
@@ -177,8 +194,26 @@ public class EntryIterator implements IEntryIterator {
 
     public boolean hasNext() {
 
-        return index >= fromIndex && index < toIndex;
+        if(filter == null) {
+            
+            return index >= fromIndex && index < toIndex;
+            
+        }
 
+        while(index >= fromIndex && index < toIndex) {
+         
+            if (filter.isValid(leaf.values[index])) {
+                
+                return true;
+                
+            }
+            
+            index++;
+
+        }
+        
+        return false;
+        
     }
 
     public Object next() {
@@ -199,13 +234,15 @@ public class EntryIterator implements IEntryIterator {
              */
             tuple.key = leaf.keys.getKey(lastVisited);
             
-            tuple.val = leaf.values[lastVisited];
+            tuple.val = filter == null ? leaf.values[lastVisited] : filter
+                    .resolve(leaf.values[lastVisited]);
             
             return tuple.val;
             
         }
         
-        return leaf.values[lastVisited];
+        return filter == null ? leaf.values[lastVisited] : filter
+                .resolve(leaf.values[lastVisited]);
         
     }
 
@@ -217,7 +254,8 @@ public class EntryIterator implements IEntryIterator {
             
         }
         
-        return leaf.values[lastVisited];
+        return filter == null ? leaf.values[lastVisited] : filter
+                .resolve(leaf.values[lastVisited]);
         
     }
     
@@ -240,6 +278,60 @@ public class EntryIterator implements IEntryIterator {
 
         throw new UnsupportedOperationException();
 
+    }
+
+    /**
+     * Base class used to filter objects in an {@link EntryIterator}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public abstract static class EntryFilter implements Serializable {
+
+        protected final Object state;
+
+        public EntryFilter() {
+            this.state = null;
+        }
+
+        /**
+         * Constructor initializes a user-defined object that will be available
+         * during {@link #isValid()} tests.
+         * 
+         * @param state
+         *            The user defined object.
+         */
+        public EntryFilter(Object state) {
+            this.state = state;
+        }
+
+        /**
+         * Return true iff the value should be visited.
+         * 
+         * @param value
+         *            A value that is being considered by the iterator for
+         *            visitation. 
+         * @return
+         */
+        abstract public boolean isValid(Object value);
+        
+        /**
+         * Resolve the value that the iterator would visit This can be used to
+         * return an application value encapsulated by an {@link IValue}, to
+         * de-serialize application values, etc. The default implementation is a
+         * NOP. This method is applied <em>after</em> {@link #isValid(Object)}.
+         * 
+         * @param value
+         *            The value that would be visited.
+         * 
+         * @return The value that will be visited.
+         */
+        public Object resolve(Object value) {
+            
+            return value;
+            
+        }
+        
     }
 
 }

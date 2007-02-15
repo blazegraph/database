@@ -1,8 +1,52 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
 package com.bigdata.journal;
 
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
+import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -59,10 +103,11 @@ public class Options {
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * Once journal will "overflow" once it approaches this limit during a
-     * {@link #commit()}. The default implementation ignores overflow events. A
-     * scale up or scale out implementation will use this event as a trigger to
-     * evict data from application btrees into index segments.
+     * The journal will {@link Journal#overflow()} once it approaches this limit
+     * during a {@link Journal#commit()}. The default implementation ignores
+     * overflow events. A scale up or scale out implementation uses this event
+     * as a trigger to evict data from btrees that absorb writes on the journal
+     * into partitioned {@link IndexSegment}s.
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */
@@ -81,16 +126,12 @@ public class Options {
      * <code>create</code> - An optional boolean property (default is
      * <code>true</code>). When true and the named file is not found, a new
      * journal will be created.
-     * 
-     * @todo Write tests for this feature.
      */
     public static final String CREATE = "create";
         
     /**
      * <code>readOnly</code> - When true, the journal must pre-exist and
      * will be read-only (optional, default is <code>false</code>).
-     * 
-     * @todo Write tests for this feature.
      */
     public static final String READ_ONLY = "readOnly";
     
@@ -159,18 +200,6 @@ public class Options {
      * stable on disk.
      */
     public static final String DOUBLE_SYNC = "doubleSync";
-    
-//    /**
-//     * <code>conflictResolver</code> - The name of a class that implements
-//     * the {@link IConflictResolver} interface (optional). When specified,
-//     * the class MUST define a public constructor with the signature
-//     * <code><i>class</i>( Journal journal )</code>. There is NO
-//     * default. Resolution of write-write conflicts is enabled iff a
-//     * conflict resolution class is declared with this parameter. If a value
-//     * is not provided, the a write-write conflict will result in the
-//     * rollback of a transaction.
-//     */
-//    public static final String CONFLICT_RESOLVER = "conflictResolver";
     
     /**
      * <code>deleteOnClose</code> - This optional boolean option causes

@@ -81,6 +81,12 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       transaction), or that are fully isolated (changes made in other
  *       transactions are not visible within the transaction).
  * 
+ * @todo The write set of a transaction is currently written onto an independent
+ *       store. This means that concurrent transactions can actually execute
+ *       concurrently. We do not even need a read-lock on the indices isolated
+ *       by the transaction since they are read-only. This might prove to be a
+ *       nice way to leverage multiple processors / cores on a data server.
+ * 
  * @todo support {@link PartitionedIndex}es.
  * 
  * @todo Make the {@link IsolatedBTree}s safe across {@link Journal#overflow()}
@@ -375,7 +381,7 @@ public class Tx implements IStore, ITx {
             mergeOntoGlobalState();
             
             // Atomic commit.
-            journal.commit();
+            journal.commit(this);
             
             runState = RunState.COMMITTED;
 

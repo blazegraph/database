@@ -665,10 +665,6 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    /**
-     * @todo perhaps place the count of entries or entries remaining on the
-     *       {@link IRangeIterator}?
-     */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
@@ -948,7 +944,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
             AbstractNode t = (AbstractNode) itr.next();
 
-            assert t.isDirty();
+            assert t.dirty;
 
             if (t != root) {
 

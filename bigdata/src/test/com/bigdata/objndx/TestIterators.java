@@ -49,6 +49,8 @@ package com.bigdata.objndx;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.objndx.EntryIterator.EntryFilter;
+
 /**
  * Test suite for iterators. The tests are presented from the least dependencies
  * to the most dependencies ((traversal of the entries for a single leaf, then
@@ -466,4 +468,76 @@ public class TestIterators extends AbstractBTreeTestCase {
 
     }
 
+    /**
+     * Test the use of an {@link EntryFilter} to visit only certain values.
+     */
+    public void test_entryFilter() {
+        
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k7 = i2k(7);
+
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+
+        BTree btree = getBTree(3);
+
+        btree.insert(k3,v3);
+        btree.insert(k5,v5);
+        btree.insert(k7,v7);
+        
+        final Leaf a = (Leaf) btree.root;
+        
+        // visit everything in the root leaf.
+        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+
+        // visit everything in the root leaf.
+        assertSameIterator(new Object[]{v3,v5,v7},btree.rangeIterator(null,null));
+
+        // visit everything in the root leaf using an explicit EntryIterator ctor.
+        assertSameIterator(new Object[]{v3,v5,v7},new EntryIterator(a,null,null,null,null));
+        
+        // visit everything exception v3.
+        assertSameIterator(new Object[]{v5,v7},new EntryIterator(a,null,null,null,new EntryFilter() {
+            private static final long serialVersionUID = 1L;
+            public boolean isValid(Object value) {
+                        if (value.equals(v3))
+                            return false;
+                        return true;
+                    }
+        }));
+        
+        // visit everything exception v5.
+        assertSameIterator(new Object[]{v3,v7},new EntryIterator(a,null,null,null,new EntryFilter() {
+            private static final long serialVersionUID = 1L;
+            public boolean isValid(Object value) {
+                        if (value.equals(v5))
+                            return false;
+                        return true;
+                    }
+        }));
+        
+        // visit everything exception v7.
+        assertSameIterator(new Object[]{v3,v5},new EntryIterator(a,null,null,null,new EntryFilter() {
+            private static final long serialVersionUID = 1L;
+            public boolean isValid(Object value) {
+                        if (value.equals(v7))
+                            return false;
+                        return true;
+                    }
+        }));
+
+        // visit everything exception v7 using a rangeIterator.
+        assertSameIterator(new Object[]{v3,v5},a.rangeIterator(null,null,new EntryFilter() {
+            private static final long serialVersionUID = 1L;
+            public boolean isValid(Object value) {
+                        if (value.equals(v7))
+                            return false;
+                        return true;
+                    }
+        }));
+
+    }
+    
 }

@@ -47,9 +47,11 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IBatchOp;
+import com.bigdata.objndx.IRangeQuery;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -58,19 +60,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test the batch apis. all methods must work with {@link Value}s (the
- *       test for this could be a test of the
- *       {@link IBatchOp#apply(com.bigdata.objndx.ISimpleBTree)} implementations
- *       in the btree package since we apply that method in a trivial manner to
- *       support the batch api.
- * 
- * @todo test the rangeCount and rangeIterator api. the former will over
- *       estimate if there are deleted entries while the latter must not visit
- *       deleted entries (or may it -- we will need to see them for mergeDown()
- *       and validate())?
- * 
- * @todo test entryIterator() - it visits only those that are not deleted.
  */
 public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
@@ -275,15 +264,200 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         assertEquals(v7,btree.valueAt(2));
 
     }
-    
+
+    /**
+     * Tests the {@link IRangeQuery} interface and
+     * {@link AbstractBTree#entryIterator()}.
+     * {@link IRangeQuery#rangeCount(byte[], byte[])} will over estimate if
+     * there are deleted entries while the iterators MUST NOT visit deleted
+     * entries.
+     */
+    public void test_rangeQueryApi() {
+
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+
+        final byte[] v5a = new byte[]{5,1};
+
+        UnisolatedBTree btree = new UnisolatedBTree(new SimpleMemoryRawStore(),
+                3, null);
+        
+        /*
+         * fill the root leaf.
+         */
+        btree.insert(k3,v3);
+        btree.insert(k5,v5);
+        btree.insert(k7,v7);
+
+        assertEquals(3,btree.getEntryCount());
+        assertEquals(3,btree.rangeCount(null, null));
+        assertEquals(2,btree.rangeCount(k3, k7));
+        assertEquals(1,btree.rangeCount(k3, k5));
+        assertEquals(1,btree.rangeCount(null, k5));
+        assertEquals(0,btree.rangeCount(null, k3));
+        assertEquals(0,btree.rangeCount(k5, k5));
+        assertEquals(1,btree.rangeCount(k5, k7));
+        assertEquals(2,btree.rangeCount(k5, null));
+        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+        assertSameIterator(new Object[]{v3,v5,v7},btree.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3,v5},btree.rangeIterator(k3,k7));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,k5));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(null,k5));
+        assertSameIterator(new Object[]{},btree.rangeIterator(null,k3));
+        assertSameIterator(new Object[]{},btree.rangeIterator(k5,k5));
+        assertSameIterator(new Object[]{v5},btree.rangeIterator(k5,k7));
+        assertSameIterator(new Object[]{v5,v7},btree.rangeIterator(k5,null));
+
+        /*
+         * delete one entry. this will not change the rangeCounts, but it does
+         * effect the iterators which MUST NOT visit the deleted value.
+         */
+        btree.remove(k5);
+
+        assertEquals(3,btree.getEntryCount());
+        assertEquals(3,btree.rangeCount(null, null));
+        assertEquals(2,btree.rangeCount(k3, k7));
+        assertEquals(1,btree.rangeCount(k3, k5));
+        assertEquals(1,btree.rangeCount(null, k5));
+        assertEquals(0,btree.rangeCount(null, k3));
+        assertEquals(0,btree.rangeCount(k5, k5));
+        assertEquals(1,btree.rangeCount(k5, k7));
+        assertEquals(2,btree.rangeCount(k5, null));
+        assertSameIterator(new Object[]{v3,v7},btree.entryIterator());
+        assertSameIterator(new Object[]{v3,v7},btree.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,k7));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,k5));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(null,k5));
+        assertSameIterator(new Object[]{},btree.rangeIterator(null,k3));
+        assertSameIterator(new Object[]{},btree.rangeIterator(k5,k5));
+        assertSameIterator(new Object[]{},btree.rangeIterator(k5,k7));
+        assertSameIterator(new Object[]{v7},btree.rangeIterator(k5,null));
+
+        /*
+         * re-insert the deleted value.
+         */
+        btree.insert(k5,v5a);
+
+        assertEquals(3,btree.getEntryCount());
+        assertEquals(3,btree.rangeCount(null, null));
+        assertEquals(2,btree.rangeCount(k3, k7));
+        assertEquals(1,btree.rangeCount(k3, k5));
+        assertEquals(1,btree.rangeCount(null, k5));
+        assertEquals(0,btree.rangeCount(null, k3));
+        assertEquals(0,btree.rangeCount(k5, k5));
+        assertEquals(1,btree.rangeCount(k5, k7));
+        assertEquals(2,btree.rangeCount(k5, null));
+        assertSameIterator(new Object[]{v3,v5a,v7},btree.entryIterator());
+        assertSameIterator(new Object[]{v3,v5a,v7},btree.rangeIterator(null,null));
+        assertSameIterator(new Object[]{v3,v5a},btree.rangeIterator(k3,k7));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(k3,k5));
+        assertSameIterator(new Object[]{v3},btree.rangeIterator(null,k5));
+        assertSameIterator(new Object[]{},btree.rangeIterator(null,k3));
+        assertSameIterator(new Object[]{},btree.rangeIterator(k5,k5));
+        assertSameIterator(new Object[]{v5a},btree.rangeIterator(k5,k7));
+        assertSameIterator(new Object[]{v5a,v7},btree.rangeIterator(k5,null));
+
+    }
+
+    /**
+     * @todo test the batch apis. all methods must work with {@link Value}s
+     *       (the test for this could be a test of the
+     *       {@link IBatchOp#apply(com.bigdata.objndx.ISimpleBTree)}
+     *       implementations in the btree package since we apply that method in
+     *       a trivial manner to support the batch api.
+     */
     public void test_crud_batchApi() {
         
         fail("write test");
+        
     }
 
+    /**
+     * @todo Test restart-safety of data, including deletion markers.
+     */
     public void test_restartSafe() {
         
-        fail("write test");
+        IRawStore store = new SimpleMemoryRawStore();
+
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+
+        final byte[] v5a = new byte[]{5,1};
+        final byte[] v7a = new byte[]{7,1};
+
+        UnisolatedBTree btree = new UnisolatedBTree(store, 3, null);
+        
+        /*
+         * fill the root leaf.
+         */
+        btree.insert(k3,v3);
+        btree.insert(k5,v5);
+        btree.insert(k7,v7);
+
+        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+
+        /*
+         * write out the btree and re-load it.
+         */
+        final long addr1 = btree.write();
+        
+        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr1));
+        
+        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+
+        /*
+         * delete a key, verify, write out the btree, re-load it and re-verify.
+         */
+        
+        btree.remove(k5);
+        
+        assertSameIterator(new Object[]{v3,v7},btree.entryIterator());
+
+        final long addr2 = btree.write();
+        
+        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr2));
+        
+        assertSameIterator(new Object[]{v3,v7},btree.entryIterator());
+
+        /*
+         * update a key, verify, write out the btree, re-load it and re-verify. 
+         */
+        
+        btree.insert(k7,v7a);
+        
+        assertSameIterator(new Object[]{v3,v7a},btree.entryIterator());
+
+        final long addr3 = btree.write();
+        
+        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr3));
+        
+        assertSameIterator(new Object[]{v3,v7a},btree.entryIterator());
+        
+        /*
+         * update a deleted key, verify, write out the btree, re-load it and
+         * re-verify.
+         */
+        
+        btree.insert(k5,v5a);
+        
+        assertSameIterator(new Object[]{v3,v5a,v7a},btree.entryIterator());
+
+        final long addr4 = btree.write();
+        
+        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr4));
+        
+        assertSameIterator(new Object[]{v3,v5a,v7a},btree.entryIterator());
+        
     }
     
     /**

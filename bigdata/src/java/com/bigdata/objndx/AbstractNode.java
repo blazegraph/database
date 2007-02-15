@@ -54,6 +54,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.objndx.EntryIterator.EntryFilter;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
@@ -522,16 +523,32 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param toKey
      *            The first key that will NOT be visited (exclusive). When
      *            <code>null</code> there is no upper bound.
-     * 
-     * FIXME when using an {@link IndexSegment} provide for direct leaf
-     * successor scans.
-     * 
-     * @todo add leaf or node counter to this iterator?
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
-                fromKey, toKey);
+                fromKey, toKey, null);
+
+    }
+
+    /**
+     * Return an iterator that visits the entries in a half-open key range but
+     * filters the values.
+     * 
+     * @param fromKey
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * @param filter
+     *            An optional filter that will be applied to the values before
+     *            they are visited by the returned iterator.
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, EntryFilter filter) {
+
+        return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
+                fromKey, toKey, filter);
 
     }
 
@@ -558,6 +575,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * FIXME when using an {@link IndexSegment} provide for direct leaf
+     * successor scans.
      */
     private static class PostOrderEntryIterator extends Striterator implements IEntryIterator {
         
@@ -613,7 +633,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         }
 
-        public PostOrderEntryIterator(Iterator postOrderIterator, final byte[] fromKey, final byte[] toKey) {
+        public PostOrderEntryIterator(Iterator postOrderIterator,
+                final byte[] fromKey, final byte[] toKey,
+                final EntryFilter filter) {
             
             super(postOrderIterator);
             
@@ -641,7 +663,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                         }
 
-                        return new EntryIterator(leaf, tuple, fromKey, toKey);
+                        return new EntryIterator(leaf, tuple, fromKey, toKey, filter );
 
 //                        return ((Leaf)child).entryIterator();
 

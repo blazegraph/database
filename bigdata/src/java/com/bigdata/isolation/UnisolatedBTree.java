@@ -56,6 +56,7 @@ import com.bigdata.objndx.BatchRemove;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.ISimpleBTree;
+import com.bigdata.objndx.EntryIterator.EntryFilter;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -338,16 +339,48 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
     }
 
-    @Override
+    /**
+     * Visits only the non-deleted entries in the key range.
+     */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        // TODO Auto-generated method stub
-        return super.rangeIterator(fromKey, toKey);
+
+        return root.rangeIterator(fromKey, toKey, DeletedEntryFilter.INSTANCE);
+        
     }
 
-    @Override
     public IEntryIterator entryIterator() {
-        // TODO Auto-generated method stub
-        return super.entryIterator();
+
+        return root.rangeIterator(null, null, DeletedEntryFilter.INSTANCE);
+        
+    }
+    
+    /**
+     * A filter that hides deleted entries.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class DeletedEntryFilter extends EntryFilter {
+
+        static public final transient EntryFilter INSTANCE = new DeletedEntryFilter();
+        
+        private static final long serialVersionUID = 2783761261078831116L;
+
+        public boolean isValid(Object value) {
+
+            return ! ((Value)value).deleted;
+            
+        }
+        
+        /**
+         * Resolve the {@link Value} to its {@link Value#datum}.
+         */
+        public Object resolve(Object value) {
+            
+            return ((Value)value).datum;
+            
+        }
+        
     }
 
     public void contains(BatchContains op) {

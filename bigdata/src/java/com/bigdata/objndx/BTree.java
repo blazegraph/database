@@ -499,7 +499,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      */
     public long write() {
 
-        if (root.isDirty()) {
+        if (root.dirty) {
 
             writeNodeRecursive( root );
             
