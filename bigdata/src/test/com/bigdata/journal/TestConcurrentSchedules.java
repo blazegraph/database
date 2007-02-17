@@ -42,38 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 17, 2007
  */
 
-package com.bigdata.scaleup;
-
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+package com.bigdata.journal;
 
 /**
+ * Tests of concurrent transactions schedules designed to look for correct
+ * execution of non-conflicting concurrent schedules and correct detection of
+ * conflicts. This is the first test suite that considers concurrent schedules.
+ * <p>
+ * Note that only write-write conflicts may occur since the {@link Journal} uses
+ * an MVCC style concurrency control algorithm.
+ * 
+ * @todo refactor test and schedule support from dbcache.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class TestConcurrentSchedules extends ProxyTestCase {
 
-    public Name2MetadataAddr(IRawStore store) {
+    /**
+     * 
+     */
+    public TestConcurrentSchedules() {
+    }
 
-        super(store);
-        
+    /**
+     * @param name
+     */
+    public TestConcurrentSchedules(String name) {
+        super(name);
     }
     
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
-
-        super(store,metadata);
+    public void test_something() {
         
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
+        fail("write tests");
         
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
-
     }
 
 }

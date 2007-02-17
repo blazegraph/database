@@ -42,72 +42,58 @@ Modifications:
 
 */
 /*
- * Created on Feb 3, 2007
+ * Created on Feb 16, 2007
  */
 
 package com.bigdata.journal;
 
 import com.bigdata.rawstore.Addr;
-import com.bigdata.rawstore.IRawStore;
 
 /**
- * Interface for low-level operations on a store supporting an atomic commit.
- * Persistent implementations of this interface are restart-safe.
+ * An interface providing a read-only view of a commit record. A commit record
+ * is written on each commit. The basic metadata in the commit record are the
+ * root addresses from which various critical resources may be loaded, e.g.,
+ * data structures for mapping index names to their addresses on the
+ * {@link Journal}, etc. The {@link Journal} maintains an
+ * {@link Journal#getCommitRecord()} index over the commits records so that
+ * {@link Tx transactions} can rapidly recover the commit record corresponding
+ * to their historical, read-only ground state.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider modifying to allow named root addresses for a small #of root
+ *       names. E.g., an set of {name,addr} pairs that is either scanned as an
+ *       array list or lookup using a hash table.
  */
-public interface IAtomicStore extends IRawStore {
+public interface ICommitRecord {
 
     /**
-     * Abandon the current write set.
+     * The #of root ids. Their indices are [0:N-1].
      */
-    public void abort();
+    static public final int MAX_ROOT_ADDRS       = 50;
+
+    /**
+     * The first root address that may be used for a user-defined object. User
+     * defined root addresses begin at index 10. The first 10 root addresses are
+     * reserved for use by the bigdata architecture.
+     */
+    static public final int FIRST_USER_ROOT      = 10;
+
+    /**
+     * The timestamp assigned to this commit record -or- <code>0L</code> iff
+     * there is no {@link ICommitRecord} written on the {@link Journal}.
+     */
+    public long getTimestamp();
+   
+    /**
+     * The #of allowed root addresses.
+     */
+    public int getRootAddrCount();
     
     /**
-     * Request an atomic commit.
-     * 
-     * @return The timestamp assigned to the {@link ICommitRecord} -or- 0L if
-     *         there were no data to commit.
-     * 
-     * @exception IllegalStateException
-     *                if the store is not open.
-     * @exception IllegalStateException
-     *                if the store is not writable.
-     */
-    public long commit();
-
-    /**
-     * Invoked when a journal is first created, re-opened, or when the
-     * committers have been {@link #discardCommitters() discarded}.
-     */
-    public void setupCommitters();
-
-    /**
-     * This method is invoked whenever the store must discard any hard
-     * references that it may be holding to objects registered as
-     * {@link ICommitter}s.
-     */
-    public void discardCommitters();
-    
-    /**
-     * Set a persistence capable data structure for callback during the commit
-     * protocol.
-     * <p>
-     * Note: the committers must be reset after restart or whenever 
-     * 
-     * @param rootSlot
-     *            The slot in the root block where the {@link Addr address} of
-     *            the {@link ICommitter} will be recorded.
-     * 
-     * @param committer
-     *            The commiter.
-     */
-    public void setCommitter(int rootSlot, ICommitter committer);
-
-    /**
-     * The last address stored in the specified root slot as of the last
-     * committed state of the store.
+     * The last address stored in the specified root address in this
+     * commit record.
      * 
      * @param index
      *            The index of the root {@link Addr address}.
@@ -118,5 +104,5 @@ public interface IAtomicStore extends IRawStore {
      *                if the index is negative or too large.
      */
     public long getRootAddr(int index);
-
+    
 }

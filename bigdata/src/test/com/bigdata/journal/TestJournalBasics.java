@@ -83,21 +83,37 @@ public class TestJournalBasics extends TestCase {
      * 
      * @see ProxyTestSuite
      */
-
     public static Test suite()
     {
 
         TestSuite suite = new TestSuite("Core Journal Test Suite");
 
-        // @todo basic journal tests.
-//        suite.addTestSuite( TestJournal.class );
+        // @todo basic journal tests (none are defined yet).
+        suite.addTestSuite( TestJournal.class );
 
-        // tests of creation, loolup, use, commit of named indices.
+        // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite( TestNamedIndices.class );
         
-        // @todo transactional isolation tests.
+        // tests the ability to recover and find historical commit records.
+        suite.addTestSuite( TestCommitHistory.class );
+        
+        /*
+         * tests of transaction support.
+         */
+        // tests of transitions in the transaction RunState state machine.
         suite.addTestSuite( TestTxRunState.class );
+        // @todo update these tests of the tx-journal integration.
+        suite.addTestSuite( TestTxJournalProtocol.class );
+        // @todo tests of read-write transactions.
         suite.addTestSuite( TestTx.class );
+        // @todo tests of read-only transactions.
+        suite.addTestSuite( TestReadOnlyTx.class );
+        // @todo tests of read-committed transactions.
+        suite.addTestSuite( TestReadCommittedTx.class );
+        // @todo tests of concurrent schedules and conflict detection.
+        suite.addTestSuite( TestConcurrentSchedules.class );
+        // @todo tests of write-write conflict resolution.
+        suite.addTestSuite(TestConflictResolution.class);
 
         return suite;
         

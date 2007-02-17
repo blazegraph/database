@@ -71,24 +71,9 @@ import junit.framework.TestCase2;
  * test.
  * </p>
  */
-
 abstract public class AbstractTestCase
     extends TestCase2
 {
-
-//    /**
-//     * The name of the optional property whose boolean value indicates whether
-//     * or not {@link #dropStore()} should be invoked before each test
-//     * (default is "false").
-//     */
-//    public static final String dropBeforeTest = "dropBeforeTest";
-//
-//    /**
-//     * The name of the optional property whose boolean value indicates whether
-//     * or not {@link #dropStore()} should be invoked before each test
-//     * (default is "false" ).
-//     */
-//    public static final String dropAfterTest = "dropAfterTest";
 
     //
     // Constructors.
@@ -98,53 +83,6 @@ abstract public class AbstractTestCase
     
     public AbstractTestCase(String name) {super(name);}
 
-//    //
-//    // Test suite.
-//    //
-//    
-//    /**
-//     * <p>
-//     * Appends to the <i>suite</i> the tests defined by this module.
-//     * </p>
-//     * 
-//     * @param suite
-//     *            A suite - may be empty.
-//     */
-//
-//    public static void addGenericSuite(ProxyTestSuite suite) {
-//
-//        if (suite == null) {
-//
-//            throw new IllegalArgumentException(
-//                    "The ProxyTestSuite may not be null.");
-//
-//        }
-//
-//        /*
-//         * Create sub-suites (proxy suites) for each package defined in this
-//         * module.
-//         */
-////        ProxyTestSuite suite2 = new ProxyTestSuite(suite.getDelegate(),"org.CognitiveWeb.generic");
-////        ProxyTestSuite suite3 = new ProxyTestSuite(suite.getDelegate(),"org.CognitiveWeb.generic.gql");
-////        ProxyTestSuite suite4 = new ProxyTestSuite(suite.getDelegate(),"org.CognitiveWeb.generic.isomorph");
-//        
-//        /*
-//         * Test suites for the core generic apis.
-//         */
-//
-////        suite2.addTestSuite(IGenericProxyTestCase.class);
-//
-//        /*
-//         * Combine into the parent test suite using a structure that mirrors the
-//         * package structure.
-//         */
-//        
-////        suite2.addTest(suite3);
-////        suite2.addTest(suite4);
-////        suite.addTest(suite2);
-//        
-//    }
-
     //************************************************************
     //************************************************************
     //************************************************************
@@ -152,62 +90,17 @@ abstract public class AbstractTestCase
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-//  * This
-//  * method writes a test header into the log and is responsible for invoking
-//  * {@link #dropStore()} if the optional boolean property
-//  * {@link #dropBeforeTest} was specified and has the value "true".
-
     public void setUp(ProxyTestCase testCase) throws Exception {
 
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
-
-//        if (new Boolean(getProperties().getProperty(dropBeforeTest,
-//                "false")).booleanValue()) {
-//
-//            try {
-//                dropStore();
-//            } catch (Throwable ex) {
-//                log.error("Could not drop store.", ex);
-//            }
-//
-//        }
 
     }
 
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-//    * This
-//    * method writes a test trailer into the log and is responsible for invoking
-//    * {@link #dropStore()} if the optional boolean property
-//    * {@link #dropAfterTest} was specified and has the value "true".
-
     public void tearDown(ProxyTestCase testCase) throws Exception {
-
-//        if (isStoreOpen()) {
-//
-//            log.warn("object manager not closed: test=" + testCase.getName()
-//                    + ", closing now.");
-//
-//            try {
-//                closeStore();
-//            } catch (Throwable ex) {
-//                log.error("Could not close object manager.", ex);
-//            }
-//
-//        }
-//
-//        if (new Boolean(getProperties().getProperty(dropAfterTest,
-//                "false")).booleanValue()) {
-//
-//            try {
-//                dropStore();
-//            } catch (Throwable ex) {
-//                log.error("Could not drop store.", ex);
-//            }
-//
-//        }
 
         log.info("\n================:END:" + testCase.getName()
                 + ":END:====================\n");
@@ -235,7 +128,6 @@ abstract public class AbstractTestCase
      * 
      * @return A new properties object.
      */
-    
     public Properties getProperties() {
         
         if( m_properties == null ) {
@@ -290,146 +182,6 @@ abstract public class AbstractTestCase
         }
         
     }
-    
-//    //
-//    // ObjectManager
-//    //
-//    
-//    private IObjectManager m_om;
-//    
-//    /**
-//     * <p>
-//     * Return the configured object manager. A new object manager will be
-//     * created if there is not one that is currently configured.
-//     * </p>
-//     * 
-//     * @return The configured object manager.
-//     */
-//    public IObjectManager getObjectManager() {
-//        checkIfProxy();
-//        if( m_om == null ) {
-//            m_om = openStore();
-//        }
-//        return m_om;
-//    }
-//    
-//    /**
-//     * <p>
-//     * Closes the current object manager and then opens a new object manager.
-//     * onto the configured store.
-//     * </p>
-//     * 
-//     * @return A new object manager.
-//     */
-//    public IObjectManager reopenStore() {
-//        checkIfProxy();
-//        closeStore();
-//        m_om = null; // make sure that this is cleared.
-//        m_om = openStore(); // make sure that this is re-assigned.
-//        return m_om;
-//    }
-//
-//    /**
-//     * <p>
-//     * Opens and returns an object manager instance for the configured
-//     * persistence layer and store.  The object manager is configured
-//     * using the properties returned by {@link #getProperties()}.
-//     * </p>
-//     * 
-//     * @return A new object manager instance.
-//     * 
-//     * @exception IllegalStateException
-//     *                if there is a current object manager.
-//     */
-//    protected IObjectManager openStore() {
-//        checkIfProxy();
-//        if( m_om != null ) {
-//            throw new IllegalStateException("ObjectManager exists.");
-//        }
-//        m_om = ObjectManagerFactory.INSTANCE.newInstance(getProperties());
-//        return m_om;
-//    }
-//
-//    /**
-//     * <p>
-//     * Closes the current object manager.
-//     * </p>
-//     * 
-//     * @exception IllegalStateException
-//     *                if the object manager is not configured.
-//     */
-//    protected void closeStore() {
-//        checkIfProxy();
-//        if( m_om == null ) {
-//            throw new IllegalStateException("ObjectManager does not exist.");
-//        }
-//        m_om.close();
-//        m_om = null;
-//    }
-//    
-//    /**
-//     * <p>
-//     * Return true iff the object manager exists.
-//     * </p>
-//     * 
-//     * @return True if there is a configured object manager.
-//     */
-//    protected boolean isStoreOpen() {
-//        checkIfProxy();
-//        return m_om != null;
-//    }
-//
-//    /**
-//     * <p>
-//     * Drop the configured database in use for the tests. This method may be
-//     * automatically invoked before and/or after each test by declaring the
-//     * appropriate property.
-//     * </p>
-//     * <p>
-//     * The semantics of "drop" depend on the GOM implementation and persistence
-//     * layer under test and can range from clearing a transient object manager,
-//     * to deleting the files corresponding to the store on disk, to dropping a
-//     * test database in a federation. As a rule, the object manager must be
-//     * closed when this method is invoked.
-//     * </p>
-//     * 
-//     * @see #dropBeforeTest
-//     * @see #dropAfterTest
-//     */
-//    abstract protected void dropStore();
-//    
-//    //
-//    // Unique property name factory.
-//    //
-//    
-//    private Random r = new Random();
-//    
-//    /**
-//     * <p>
-//     * A property name is derived from the test name plus a random integer to
-//     * avoid side effects. The store is NOT tested to verify that this property
-//     * name is unique, so it is possible that tests will occasionally fail
-//     * through rare collisions with existing property names.
-//     * </p>
-//     * <p>
-//     * Note: This method also gets used to generate unique association names and
-//     * object names.
-//     * </p>
-//     */
-//    protected String getUniquePropertyName() {
-//        return getName()+"-"+r.nextInt();
-//    }
-//    
-//    /**
-//     * Similar to {@link #getUniquePropertyName()} but embeds <i>name</i> in
-//     * the returned value.
-//     * 
-//     * @see #getUniquePropertyName()
-//     */
-//    protected String getUniquePropertyName(String name) {
-//        return getName()+"-"+name+"-"+r.nextInt();
-//    }
-
 
     //************************************************************
     //************************************************************
@@ -607,183 +359,5 @@ abstract public class AbstractTestCase
         return ByteBuffer.wrap(bytes);
         
     }
-    
-//    /**
-//     * Test helper verifies that the data is deleted.
-//     */
-//    public void assertDeleted(IStore store, int id) {
-//
-//        try {
-//
-//            store.read(id, null);
-//
-//            fail("Expecting " + DataDeletedException.class);
-//
-//        } catch (DataDeletedException ex) {
-//
-//            System.err.println("Ignoring expected exception: " + ex);
-//
-//        }
-//        
-//    }
-
-//    /**
-//     * Test helper checks for the parameter for the semantics of "not found" as
-//     * defined by {@link IStore#read(int, ByteBuffer)}.
-//     * 
-//     * @param actual
-//     *            The value returned by either of those methods.
-//     */
-//    public void assertNotFound(ByteBuffer actual) {
-//        
-//        assertNull("Expecting 'not found'", actual);
-//        
-//    }
-
-//    /**
-//     * Test the version counter for a persistent identifier in the global scope.
-//     * 
-//     * @param journal
-//     *            The journal.
-//     * @param id
-//     *            The int32 within segment persistent identifier.
-//     * @param expectedVersionCounter
-//     *            The expected value of the version counter.
-//     * 
-//     * @exception AssertionFailedError
-//     *                if the persistent identifier is not found in the global
-//     *                object index.
-//     * @exception AssertionFailedError
-//     *                if the identifer is found, but the version counter value
-//     *                differs from the expected version counter.
-//     */
-//    protected void assertVersionCounter(Journal journal, int id, long expectedVersionCounter ) {
-//
-//        // FIXME hardwired to SimpleObjectIndex.
-//        IObjectIndexEntry entry = ((SimpleObjectIndex)journal.objectIndex).objectIndex.get(id);
-//        
-//        if( entry == null ) fail("No entry in journal: id="+id);
-//        
-//        assertEquals("versionCounter", expectedVersionCounter, entry.getVersionCounter() );
-//        
-//    }
-//
-//    /**
-//     * Test the version counter for a persistent identifier in the transaction
-//     * scope.
-//     * 
-//     * @param tx
-//     *            The transaction.
-//     * @param id
-//     *            The int32 within segment persistent identifier.
-//     * @param expectedVersionCounter
-//     *            The expected value of the version counter.
-//     * @exception AssertionFailedError
-//     *                if the persistent identifier is not found in the
-//     *                transaction's outer object index (this test does NOT read
-//     *                through to the inner index so you MUST NOT invoke it
-//     *                before the version has been overwritten by the
-//     *                transaction).
-//     * @exception AssertionFailedError
-//     *                if the identifer is found, but the version counter value
-//     *                differs from the expected version counter.
-//     */
-//    protected void assertVersionCounter(Tx tx, int id, int expectedVersionCounter ) {
-//        
-//        // FIXME hardwired to SimpleObjectIndex.
-//        IObjectIndexEntry entry = ((SimpleObjectIndex)tx.getObjectIndex()).objectIndex.get(id);
-//        
-////        IObjectIndexEntry entry = tx.getObjectIndex().objectIndex.get(id);
-//        
-//        if( entry == null ) fail("No entry in transaction: tx="+tx+", id="+id);
-//        
-//        assertEquals("versionCounter", (short) expectedVersionCounter, entry.getVersionCounter() );
-//        
-//    }
-    
-//    /**
-//     * Write a data version consisting of N random bytes and verify that we can
-//     * read it back out again.
-//     * 
-//     * @param store
-//     *            The store.
-//     * @param id
-//     *            The int32 within-segment persistent identifier.
-//     * @param nbytes
-//     *            The data version length.
-//     * 
-//     * @return The data written. This can be used to re-verify the write after
-//     *         intervening reads.
-//     */
-//    
-//    protected byte[] doWriteRoundTripTest(IStore store, int id, int nbytes) {
-//
-//        System.err.println("Test writing: id="+id+", nbytes="+nbytes);
-//        
-//        byte[] expected = new byte[nbytes];
-//        
-//        r.nextBytes(expected);
-//        
-//        ByteBuffer data = ByteBuffer.wrap(expected);
-//        
-////        assertNull((tx == null ? journal.objectIndex.getSlots(id)
-////                : tx.getObjectIndex().getSlots(id)));
-//        
-//        store.write(id,data);
-//        assertEquals("limit() != #bytes", expected.length, data.limit());
-//        assertEquals("position() != limit()",data.limit(),data.position());
-//
-////        ISlotAllocation slots = (tx == null ? journal.objectIndex.getSlots(id)
-////                : tx.getObjectIndex().getSlots(id));
-////        assertEquals("#bytes",nbytes,slots.getByteCount());
-////        assertEquals("#slots",journal.slotMath.getSlotCount(nbytes),slots.getSlotCount());
-////        assertEquals(firstSlot,tx.objectIndex.getFirstSlot(id));
-//        
-//        /*
-//         * Read into a buffer allocated by the Journal.
-//         */
-//        ByteBuffer actual = store.read(id, null);
-//
-//        assertEquals("acutal.position()",0,actual.position());
-//        assertEquals("acutal.limit()",expected.length,actual.limit());
-//        assertEquals("limit() - position() == #bytes",expected.length,actual.limit() - actual.position());
-//        assertEquals(expected,actual);
-//
-//        /*
-//         * Read multiple copies into a buffer that we allocate ourselves.
-//         */
-//        final int ncopies = 7;
-//        int pos = 0;
-//        actual = ByteBuffer.allocate(expected.length * ncopies);
-//        for( int i=0; i<ncopies; i++ ) {
-//
-//            /*
-//             * Setup to read into the next slice of our buffer.
-//             */
-////            System.err.println("reading @ i="+i+" of "+ncopies);
-//            pos = i * expected.length;
-//            actual.limit( actual.capacity() );
-//            actual.position( pos );
-//            
-//            ByteBuffer tmp = store.read(id, actual);
-//            assertTrue("Did not read into the provided buffer", tmp == actual);
-//            assertEquals("position()", pos, actual.position() );
-//            assertEquals("limit() - position()", expected.length, actual.limit() - actual.position());
-//            assertEquals(expected,actual);
-//
-//            /*
-//             * Attempt to read with insufficient remaining bytes in the buffer
-//             * and verify that the data are read into a new buffer.
-//             */
-//            actual.limit(pos+expected.length-1);
-//            tmp = store.read(id, actual);
-//            assertFalse("Read failed to allocate a new buffer", tmp == actual);
-//            assertEquals(expected,tmp);
-//
-//        }
-//        
-//        return expected;
-//        
-//    }
     
 }

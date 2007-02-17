@@ -51,8 +51,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
@@ -72,7 +70,7 @@ import com.bigdata.rawstore.IRawStore;
  * @todo The {@link TemporaryStore} would benefit from any caching or AIO
  *       solutions developed for the {@link DiskOnlyStrategy}.
  */
-public class TemporaryStore implements IRawStore {
+public class TemporaryStore implements IRawStore, IStore {
 
     /**
      * The initial size of the in-memory buffer. This buffer will grow as
@@ -307,7 +305,7 @@ public class TemporaryStore implements IRawStore {
 
         if( getIndex(name) != null ) {
             
-            throw new IllegalStateException("BTree already registered: name="+name);
+            throw new IllegalStateException("Index already registered: name="+name);
             
         }
         
@@ -338,6 +336,5 @@ public class TemporaryStore implements IRawStore {
         return name2Addr.get(name);
 
     }
-
     
 }

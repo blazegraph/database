@@ -50,16 +50,22 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 import com.bigdata.rawstore.Addr;
+import com.bigdata.scaleup.PartitionedJournal;
 
 /**
  * Interface for a root block on the journal. The root block provides metadata
- * about the journal, e.g., slot size, the #of slots, the head of the slot index
- * allocation chain and the object index map, etc. The journal has two root
- * blocks. The root blocks are written in an alternating order and include
- * timestamps at the head and tail of each block (i.e., according to the Challis
- * algorithm). On restart, the root block is choosen whose (a) timestamps agree;
- * and (b) whose timestamps are greater. This protected against both crashes and
- * partial writes of the root block itself.
+ * about the journal. The journal has two root blocks. The root blocks are
+ * written in an alternating order and include timestamps at the head and tail
+ * of each block (i.e., according to the Challis algorithm). On restart, the
+ * root block is choosen whose (a) timestamps agree; and (b) whose timestamps
+ * are greater. This protected against both crashes and partial writes of the
+ * root block itself.
+ * <p>
+ * Note that some file systems or disks can re-order writes of by the
+ * application and write the data in a more efficient order. This can cause the
+ * root blocks to be written before the application data is stable on disk. The
+ * {@link Options#DOUBLE_SYNC} option exists to defeat this behavior and ensure
+ * restart-safety for such systems.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,10 +87,13 @@ public interface IRootBlockView {
      * to the constructor (the distinction is not persistent on disk).
      * 
      * @return True iff the root block view was constructed from "rootBlock0".
-     * 
-     * @todo Should this distinction be persistent on disk?
      */
     public boolean isRootBlock0();
+
+    /**
+     * The root block version number.
+     */
+    public int getVersion();
     
     /**
      * The segment identifier.
@@ -114,14 +123,29 @@ public interface IRootBlockView {
     public long getLastTxId();
     
     /**
-     * The timestamp at which the root block was last modified.
+     * The timestamp at which the root block was last modified - this is a
+     * purely local timestamp assigned internally when the root block is written
+     * as part of the Challis algorithm. It is NOT the same as the
+     * {@link #getCommitTimestamp() commit timestamp}.
      * 
      * @return The timestamp.
      * 
      * @throws RootBlockException
      *             if the timestamps on the root block do not agree.
+     * 
+     * @see #getCommitTimestamp()
      */
-    public long getTimestamp() throws RootBlockException;
+    public long getRootBlockTimestamp() throws RootBlockException;
+
+    /**
+     * The timestamp assigned to the commit by the commit protocol. This may be
+     * assigned by a centralized time server in a distributed database. This
+     * timestamp is NOT the same as the
+     * {@link #getRootBlockTimestamp() root block timestamp}.
+     * 
+     * @return The commit timestamp.
+     */
+    public long getCommitTimestamp();
 
     /**
      * A commit counter. This commit counter is used to avoid problems with
@@ -133,44 +157,35 @@ public interface IRootBlockView {
      */
     public long getCommitCounter();
     
-//    /**
-//     * Return the slot index of the head of the slot index chain.
-//     * 
-//     * @see ISlotAllocationIndex
-//     */
-//    public int getSlotIndexChainHead();
-//
-//    /**
-//     * Return the slot index of the root of the object index.
-//     * 
-//     * @see IObjectIndex
-//     */
-//    public int getObjectIndexRoot();
+    /**
+     * Return the {@link Addr} at which the {@link ICommitRecord} for this root
+     * block is stored. The {@link ICommitRecord}s are stored separately from
+     * the root block so that the may be indexed by the
+     * {@link #getCommitTimestamp()}. This is necessary in order to be able to
+     * quickly recover the root addresses for a given commit timestamp, which is
+     * a featured used to support transactional isolation.
+     * <p>
+     * Note: When using a {@link PartitionedJournal} the {@link Addr address} of
+     * the {@link ICommitRecord} MAY refer to a historical {@link SlaveJournal}
+     * and care MUST be exercised to resolve the address against the appropriate
+     * {@link SlaveJournal}.
+     * 
+     * @return The {@link Addr address} at which the {@link ICommitRecord} for
+     *         this root block is stored.
+     */
+    public long getCommitRecordAddr();
 
     /**
-     * Return the value of the indicated root {@link Addr address}.  A root
-     * address is the only restart-safe mechanism for loading a persistence
-     * capable data structure from the store.
-     * 
-     * @param index
-     *            The index of the root {@link Addr address}.
-     * 
-     * @return The {@link Addr address} stored at that index.
-     * 
-     * @exception IndexOutOfBoundsException
-     *                if the index is negative or too large.
+     * The {@link Addr address} of the root of the {@link CommitRecordIndex}.
+     * The {@link CommitRecordIndex} contains the ordered {@link Addr addresses}
+     * of the historical {@link ICommitRecord}s on the {@link Journal}. The
+     * address of the {@link CommitRecordIndex} is stored directly in the root
+     * block rather than the {@link ICommitRecord} since we can not obtain this
+     * address until after we have formatted and written the
+     * {@link ICommitRecord}.
      */
-    public long getRootAddr(int index);
-
-    /**
-     * Returns a read-only view of the root {@link Addr addresses}. The caller
-     * may modify the returned array without changing the state of the
-     * {@link RootBlockView}.
-     * 
-     * @return The root {@link Addr addresses}.
-     */
-    public long[] getRootAddrs();
-
+    public long getCommitRecordIndexAddr();
+    
     /**
      * A read-only buffer whose contents are the root block.
      */

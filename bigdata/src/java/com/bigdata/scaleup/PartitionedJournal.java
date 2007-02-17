@@ -53,6 +53,7 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Properties;
 
+import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
@@ -606,6 +607,11 @@ public class PartitionedJournal implements IJournal {
      * 200M the choose a separator key from keyAt(indexOf(nentries/2)) on either
      * the mutable btree or the index segment, which ever has more data.
      * </p>
+     * 
+     * FIXME handle the {@link CommitRecordIndex} during overflow. This can
+     * either be handled like the metadata indices (with a secondary index) or
+     * by extending the {@link CommitRecordIndex} so as to carry more
+     * information about {@link SlaveJournal} locations for commit records.
      * 
      * @todo implement asynchronous overflow.
      * @todo implement using compacting merges only.
@@ -1162,12 +1168,12 @@ public class PartitionedJournal implements IJournal {
         slave.abort();
     }
     
-    public void commit() {
-        slave.commit();
+    public long commit() {
+        return slave.commit();
     }
 
-    public long getAddr(int rootSlot) {
-        return slave.getAddr(rootSlot);
+    public long getRootAddr(int rootSlot) {
+        return slave.getRootAddr(rootSlot);
     }
 
     public void setCommitter(int rootSlot, ICommitter committer) {

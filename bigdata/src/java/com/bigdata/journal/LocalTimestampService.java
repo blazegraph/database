@@ -42,37 +42,27 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 16, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.journal;
 
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.TimestampFactory;
 
 /**
+ * A purely local implementation of an {@link ITimestampService} using a
+ * {@link TimestampFactory} to assign distinct timestamps.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class LocalTimestampService implements ITimestampService {
 
-    public Name2MetadataAddr(IRawStore store) {
+    public static final transient ITimestampService INSTANCE = new LocalTimestampService();
 
-        super(store);
-        
-    }
-    
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
+    public long nextTimestamp() {
 
-        super(store,metadata);
-        
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
+        return TimestampFactory.nextNanoTime();
 
     }
 

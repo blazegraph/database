@@ -437,7 +437,12 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      * @param hardReferenceQueue
      *            The hard reference queue for {@link Leaf}s.
      * 
-     * @see BTreeMetadata#read(IRawStore, long)
+     * @see BTreeMetadata#load(IRawStore, long), which will re-load a
+     *      {@link BTree} or derived class from its {@link BTreeMetadata}
+     *      record.
+     * 
+     * @see #newMetadata(), which must be overriden if you subclass
+     *      {@link BTreeMetadata}
      */
     public BTree(IRawStore store, BTreeMetadata metadata,
             HardReferenceQueue<PO> hardReferenceQueue) {

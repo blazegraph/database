@@ -42,38 +42,39 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 16, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.journal;
 
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+import junit.framework.TestCase;
 
 /**
+ * Test suite for the {@link Name2Addr index} used to name index names to the
+ * named indices.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class TestName2Addr extends TestCase {
 
-    public Name2MetadataAddr(IRawStore store) {
+    /**
+     * 
+     */
+    public TestName2Addr() {
+    }
 
-        super(store);
+    /**
+     * @param arg0
+     */
+    public TestName2Addr(String arg0) {
+        super(arg0);
+    }
+
+    public void test_something() {
+        
+        fail("write tests");
         
     }
     
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
-
-        super(store,metadata);
-        
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
-
-    }
-
 }

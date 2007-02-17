@@ -100,4 +100,10 @@ public class TestJournal extends ProxyTestCase {
         super(arg0);
     }
 
+    public void test_something() {
+        
+        fail("write tests");
+        
+    }
+    
 }

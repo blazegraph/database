@@ -50,8 +50,6 @@ package com.bigdata.objndx;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-import com.bigdata.isolation.Value;
-
 /**
  * <p>
  * A fused view providing read-only operations on multiple B+-Trees mapping
@@ -63,9 +61,6 @@ import com.bigdata.isolation.Value;
  * 
  * @todo support N sources for a {@link FusedView} by chaining together multiple
  *       {@link FusedView} instances if not in a more efficient manner.
- * 
- * @todo Do a variant that uses {@link Value}s and supports a merged view
- *       showing only the most recent data version under any given key.gb 
  */
 public class FusedView implements IIndex {
 
@@ -250,6 +245,12 @@ public class FusedView implements IIndex {
         
     }
 
+    /**
+     * Helper class merges entries from the sources in the view.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     protected static class FusedEntryIterator implements IEntryIterator {
 
         private final AbstractBTree[] srcs;

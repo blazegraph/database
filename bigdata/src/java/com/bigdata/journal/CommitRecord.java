@@ -42,70 +42,84 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Feb 16, 2007
  */
 
 package com.bigdata.journal;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
- * Runs all tests for all journal implementations.
+ * A read-only view of an {@link ICommitRecord}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo can I make the roots named in some less scalable manner? E.g., an array
+ *       list or hash table?
  */
-public class TestAll extends TestCase {
+public class CommitRecord implements ICommitRecord {
 
-    /**
-     * 
-     */
-    public TestAll() {
+    private final long timestamp;
+    private final long[] roots;
+    
+    public CommitRecord(long timestamp) {
+
+        this(timestamp,new long[ICommitRecord.MAX_ROOT_ADDRS]);
+        
     }
 
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
+    public CommitRecord(long timestamp, long[] roots) {
+        
+//        assert timestamp != 0L; // @todo what constraint?
+        
+        assert roots != null;
+        
+        assert roots.length == ICommitRecord.MAX_ROOT_ADDRS;
+        
+        this.timestamp = timestamp;
+        
+        this.roots = roots;
+        
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("journal");
-
-        // test the ability to (de-)serialize the root addreses.
-        suite.addTestSuite( TestCommitRecordSerializer.class );
+    final public long getTimestamp() {
         
-        // test the root block api.
-        suite.addTestSuite( TestRootBlockView.class );
-       
-        // @todo tests of the index used map index names to indices.
-        suite.addTestSuite( TestName2Addr.class );
-
-        // tests of the index used to access historical commit records
-        suite.addTestSuite( TestCommitRecordIndex.class );
+        return timestamp;
         
-        /*
-         * Test a scalable temporary store (uses the transient and disk-only
-         * buffer modes).
-         */
-        suite.addTestSuite( TestTemporaryStore.class );
-        
-        // test the different journal modes.
-        suite.addTest( TestTransientJournal.suite() );
-        suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
-        suite.addTest( TestDiskJournal.suite() );
+    }
 
-        return suite;
+    final public int getRootAddrCount() {
+        
+        return roots.length;
+        
+    }
+    
+    final public long getRootAddr(int index) {
+        
+        return roots[index];
+        
+    }
+
+    public String toString() {
+        
+        StringBuffer sb = new StringBuffer();
+        
+        sb.append("CommitRecord");
+        
+        sb.append("{timestamp="+timestamp);
+        
+        sb.append(", roots=[");
+        
+        for( int i=0; i< roots.length; i++) {
+            
+            if(i>0) sb.append(", ");
+            
+            sb.append(roots[i]);
+            
+        }
+        
+        sb.append("]}");
+        
+        return sb.toString();
         
     }
     

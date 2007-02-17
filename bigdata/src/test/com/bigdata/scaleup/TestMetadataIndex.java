@@ -60,6 +60,7 @@ import com.bigdata.journal.Options;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IndexSegment;
@@ -267,7 +268,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         store = new Journal(properties);
         
         // re-load the index.
-        md = new MetadataIndex(store,MetadataIndexMetadata.read(store, addr));
+        md = (MetadataIndex)BTreeMetadata.load(store, addr);
         assertEquals("name","abc",md.getName());
         
         assertEquals("#entries",3,md.getEntryCount());

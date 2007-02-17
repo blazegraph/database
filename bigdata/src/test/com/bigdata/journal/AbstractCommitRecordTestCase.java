@@ -42,38 +42,73 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 16, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.journal;
 
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+import java.util.Random;
+
+import junit.framework.TestCase;
 
 /**
+ * Defines some helper methods for testing {@link ICommitRecord}s.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+abstract public class AbstractCommitRecordTestCase extends TestCase {
 
-    public Name2MetadataAddr(IRawStore store) {
+    public AbstractCommitRecordTestCase() {
+    }
 
-        super(store);
+    public AbstractCommitRecordTestCase(String name) {
+        super(name);
+    }
+
+    Random r = new Random();
+
+    /**
+     * Compare two {@link ICommitRecord}s for equality in their data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals(ICommitRecord expected, ICommitRecord actual) {
+        
+        assertEquals("timestamp", expected.getTimestamp(), actual.getTimestamp());
+
+        assertEquals("#roots", expected.getRootAddrCount(), actual.getRootAddrCount());
+        
+        final int n = expected.getRootAddrCount();
+        
+        for(int i=0; i<n; i++) {
+        
+            assertEquals("rootAddrs", expected.getRootAddr(i), actual.getRootAddr(i));
+            
+        }
+        
+    }
+
+    public ICommitRecord getRandomCommitRecord() {
+
+        final long timestamp = System.currentTimeMillis();
+        
+        final int n = ICommitRecord.MAX_ROOT_ADDRS;
+        
+        long[] roots = new long[n];
+        
+        for(int i=0; i<n; i++) {
+
+            boolean empty = r.nextInt(100)<30;
+        
+            roots[i] = empty ? 0L : r.nextInt(Integer.MAX_VALUE);
+            
+        }
+
+        return new CommitRecord(timestamp,roots);
         
     }
     
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
-
-        super(store,metadata);
-        
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
-
-    }
 
 }

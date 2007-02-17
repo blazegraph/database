@@ -42,38 +42,68 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 16, 2007
  */
 
-package com.bigdata.scaleup;
-
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+package com.bigdata.objndx;
 
 /**
+ * A fly-weight wrapper that does not permit write operations and reads
+ * through onto an underlying {@link IIndex}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class ReadOnlyIndex implements IIndex, IRangeQuery {
 
-    public Name2MetadataAddr(IRawStore store) {
-
-        super(store);
+    private final IIndex src;
+    
+    public ReadOnlyIndex(IIndex src) {
+        
+        if(src==null) throw new IllegalArgumentException();
+        
+        this.src = src;
         
     }
     
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
-
-        super(store,metadata);
-        
+    public boolean contains(byte[] key) {
+        return src.contains(key);
     }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
 
+    public Object insert(Object key, Object value) {
+        throw new UnsupportedOperationException();
+    }
+
+    public Object lookup(Object key) {
+        return src.lookup(key);
+    }
+
+    public Object remove(Object key) {
+        throw new UnsupportedOperationException();
+    }
+
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
+        return src.rangeCount(fromKey, toKey);
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        return src.rangeIterator(fromKey, toKey);
+    }
+
+    public void contains(BatchContains op) {
+        src.contains(op);
+    }
+
+    public void insert(BatchInsert op) {
+        throw new UnsupportedOperationException();
+    }
+
+    public void lookup(BatchLookup op) {
+        src.lookup(op);
+    }
+
+    public void remove(BatchRemove op) {
+        throw new UnsupportedOperationException();
     }
 
 }

@@ -111,8 +111,19 @@ so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
  */
 public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
+    /**
+     * The optional conflict resolver.
+     */
     protected final IConflictResolver conflictResolver;
-    
+
+    /**
+     * True iff this is an instanceof {@link IIsolatedIndex}. This effects
+     * which value we use for the version counter in
+     * {@link #insert(Object, Object)} when there is no pre-existing entry for a
+     * key.
+     */
+    final boolean isIsolated = this instanceof IsolatedBTree;
+
     /**
      * The delegate that handles write-write conflict resolution during backward
      * validation. The conflict resolver is expected to make a best attempt
@@ -131,6 +142,18 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     
     }
 
+    /**
+     * Create an isolated btree.
+     * 
+     * @param store
+     * @param branchingFactor
+     */
+    public UnisolatedBTree(IRawStore store, int branchingFactor) {
+        
+        this(store,branchingFactor, null);
+        
+    }
+        
     /**
      * Create an isolated btree.
      * 
@@ -202,6 +225,22 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     }
     
     /**
+     * This method breaks isolatation to return the {@link Value} for a key. It
+     * is used by {@link IsolatedBTree#validate(UnisolatedBTree)} to test
+     * version counters when a key already exists in the global scope.
+     * 
+     * @todo make protected and refactor tests so that we do not need public
+     *       access to this method. there should be tests in this package that
+     *       examine the specific version counters that are assigned such that
+     *       we do not need to expose this method as public.
+     */
+    final public Value getValue(byte[] key) {
+        
+        return (Value) super.lookup(key);
+        
+    }
+    
+    /**
      * True iff the key does not exist or if it exists but is marked as
      * {@link IValue#isDeleted()}.
      * 
@@ -215,9 +254,10 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         if (key == null)
             throw new IllegalArgumentException();
 
-        Value value = (Value)super.lookup(key);
-        
-        if(value==null||value.deleted) return false;
+        Value value = (Value) super.lookup(key);
+
+        if (value == null || value.deleted)
+            return false;
         
         return true;
         
@@ -240,9 +280,10 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         if (key == null)
             throw new IllegalArgumentException();
         
-        Value value = (Value)super.lookup(key);
+        Value value = (Value) super.lookup(key);
         
-        if(value==null||value.deleted) return null;
+        if (value == null || value.deleted)
+            return null;
         
         return value.datum;
         
@@ -275,10 +316,11 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     }
 
     /**
-     * If the key does not exists or if the key exists, then insert/update an
-     * entry under that key with a new version counter. Otherwise, update the
-     * entry under that key in order to increment the version counter (this
-     * includes the case where the key is paired with a deletion marker).
+     * If the key does not exists or if the key exists but the entry is marked
+     * as deleted, then insert/update an entry under that key with a new version
+     * counter. Otherwise, update the entry under that key in order to increment
+     * the version counter (this includes the case where the key is paired with
+     * a deletion marker).
      * 
      * @param key
      *            The search key.
@@ -297,13 +339,25 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
         if (value == null) {
 
-            super.insert(key, new Value(IValue.FIRST_VERSION_UNISOLATED, false,
-                    (byte[]) val));
+            /*
+             * No entry exists for that key (not even a deleted entry).
+             */
+            
+            short versionCounter = isIsolated ? IValue.FIRST_VERSION_ISOLATED
+                    : IValue.FIRST_VERSION_UNISOLATED;
+
+            super.insert(key, new Value(versionCounter, false, (byte[]) val));
 
             return null;
 
         }
 
+        /*
+         * An entry exists for that key (the entry may be marked as deleted, but
+         * that does not effect the behavior of insert). We assign the next
+         * version counter to the entry, clear the deleted flag, and set the new
+         * value on the entry.
+         */
         super.insert(key, new Value(value.nextVersionCounter(), false,
                 (byte[]) val));
         

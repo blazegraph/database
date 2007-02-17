@@ -49,8 +49,8 @@ import com.bigdata.objndx.AbstractBTree;
  * Interface for values in an {@link AbstractBTree} supporting deletion markers
  * and version counters.
  * <p>
- * Deletion markers are required by both transactions (so that the entry may be
- * removed from the unisolated tree when the transaction commits) and
+ * Deletion markers are required both by transactions (so that the entry may be
+ * removed from the unisolated tree when the transaction commits) and by
  * partitioned indices (so that a key deleted in an unisolated index may be
  * removed during a compacting merge with existing index segments).
  * <p>
@@ -58,16 +58,17 @@ import com.bigdata.objndx.AbstractBTree;
  * an index. The version counter is incremented on each write on the unisolated
  * tree. When a transaction isolates an index it does so by creating a fused
  * view that reads from a historical committed state of the corresponding
- * unisolated index and writes on an isolated index. When a value is written on
- * in the isolated index, the version counter from the unisolated index is
- * copied into the isolated index. When the transaction commits, it validates
- * the writes by testing the version counter in the then current unisolated
- * index. If the version counter for an entry in the isolated index does not
- * agree with the version counter on the unisolated index then an intervening
- * commit has already overwritten that entry and a write-write conflict exists.
- * Either the write-write conflict can be resolved or the transaction must
- * abort. In the special case where there are no intervening commits since the
- * transaction began validation is unecessary and should be skipped.
+ * unisolated index and writes on an isolated index. The first time a value is
+ * written on the isolated index for which there is a pre-existing value in the
+ * unisolated index, the version counter from the unisolated index is copied
+ * into the isolated index. When the transaction commits, it validates writes by
+ * testing the version counter in the <em>then current</em> unisolated index.
+ * If the version counter for an entry in the isolated index does not agree with
+ * the version counter on the unisolated index then an intervening commit has
+ * already overwritten that entry and a write-write conflict exists. Either the
+ * write-write conflict can be resolved or the transaction must abort. In the
+ * special case where there are no intervening commits since the transaction
+ * began validation is unecessary and should be skipped.
  * <p>
  * A delete is handled as a write that sets a "deleted" flag. Eventually the
  * keys for deleted entries are removed from the index. When a partitioned index
@@ -89,6 +90,30 @@ public interface IValue {
     /**
      * The value of the version counter that is used the first time a data
      * version is written for a key in an unisolated index: ONE (1).
+     * <p>
+     * Note: The first version counter written on the unisolated index (1) is
+     * larger than the {@link #FIRST_VERSION_ISOLATED first version counter}
+     * written on an isolated index (0). The reason is that this approach
+     * essentially presumes a version counter of zero (0) if a key does not
+     * exist in the unisolated index, which is then copied into the isolated
+     * index as a zero(0) version counter.
+     * <p>
+     * If the transaction validates and the isolated write is copied onto the
+     * unisolated index then the version counter is handled in one of the
+     * following ways.
+     * <ol>
+     * <li> If there is still no key for the entry, then the
+     * {@link #FIRST_VERSION_UNISOLATED} version counter (1) is used and we have
+     * effectively incremented from a zero (0) version counter for a
+     * non-existing key to an one (1) version counter on the first write.</li>
+     * <li> If another transaction has committed, then the version counter in
+     * the global scope will now be GTE one (1). This will cause a write-write
+     * conflict to be detected during validation. If the write-write conflict is
+     * resolved, then the copy down onto the global scope will assign the next
+     * version counter, e.g., the new version counter will be two (2) (if there
+     * was only one intervening commit) or greater (if there was more than one
+     * intervening commit).</li>
+     * </ol>
      */
     public static short FIRST_VERSION_UNISOLATED = (short) 1;
 

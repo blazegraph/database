@@ -134,15 +134,6 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
      *            consistently for all indices isolated by a transaction.
      *            Typically, it is the unisolated btree from the last committed
      *            state on the {@link Journal} before the {@link Tx} starts.
-     * 
-     * FIXME The isolated btree needs to start from the committed stable state
-     * of another btree (a possible exception is the first transaction to create
-     * a given btree). In order to verify that the source btree meets those
-     * requirements we need to know that it was loaded from a historical
-     * metadata record, e.g., as found in a root block or a read-only root names
-     * index found in a root block. Merely having a persistent root is NOT
-     * enough since just writing the tree onto the store does not make it
-     * restart safe.  The {@link Tx} class needs to handle this.
      */
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
@@ -169,6 +160,11 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
      * @param store
      * @param metadata
      * @param src
+     * 
+     * @todo This constructor is somewhat different since it requires access to
+     *       a persistence capable parameter in order to reconstruct the view.
+     *       Consider whether or not this can be refactored per
+     *       {@link BTreeMetadata#load(IRawStore, long)}.
      */
     public IsolatedBTree(IRawStore store, BTreeMetadata metadata, UnisolatedBTree src) {
 
@@ -253,10 +249,8 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
      * Adds an entry for the key under the value to the write set (does not
      * write through to the isolated index).
      */
-    public Object insert(Object key,Object value) {
-        
-        return super.insert(key,value);
-        
+    public Object insert(Object key, Object val) {
+        return super.insert(key,val);
     }
 
     /**
@@ -404,11 +398,10 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
          * Note: Both indices have the same total ordering so we are essentially
          * scanning both indices in order.
          * 
-         * Note: we must use the implementation of this method on the super
-         * class in order to visit the IValue objects and see both deleted and
-         * undeleted entries.
+         * Note: the iterator is chosen carefully in order to visit the IValue
+         * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = super.entryIterator();
+        final IEntryIterator itr = root.rangeIterator(null, null, null);
 
         while (itr.hasNext()) {
 
@@ -419,7 +412,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
             final byte[] key = (byte[]) itr.getKey();
 
             // Lookup the entry in the global scope.
-            Value baseEntry = (Value) globalScope.lookup(key);
+            Value baseEntry = (Value) globalScope.getValue(key);
 
             /*
              * If there is an entry in the global scope, then we MUST compare the
@@ -487,7 +480,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
 
         }
 
-        if(tmp!=null) {
+        if (tmp != null) {
             
             /*
              * Copy in any updates resulting from conflict validation. It is
@@ -525,11 +518,10 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
     public void mergeDown(UnisolatedBTree globalScope) {
 
         /*
-         * Note: we must use the implementation of this method on the super
-         * class in order to visit the IValue objects and see both deleted
-         * and undeleted entries.
+         * Note: the iterator is chosen carefully in order to visit the IValue
+         * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = super.entryIterator();
+        final IEntryIterator itr = root.rangeIterator(null, null, null);
 
         while (itr.hasNext()) {
 
@@ -537,7 +529,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
             Value entry = (Value) itr.next();
 
             // The corresponding key.
-            final byte[] id = (byte[]) itr.getKey();
+            final byte[] key = (byte[]) itr.getKey();
 
             if (entry.deleted) {
 
@@ -548,13 +540,14 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
                  * will now recognized the persistent identifier as 'deleted'.
                  */
 
-                if (globalScope.contains(id)) {
+                if (globalScope.contains(key)) {
 
                     /*
                      * Mark the entry in the unisolated index as deleted.
                      */
-                    globalScope.insert(id, new Value(
-                            entry.nextVersionCounter(), true, null));
+//                    globalScope.insert(key, new Value(
+//                            entry.nextVersionCounter(), true, null));
+                    globalScope.remove(key);
 
                 } else {
 
@@ -570,8 +563,9 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
                 /*
                  * Copy the entry down onto the global scope.
                  */
-                globalScope.insert(id, new Value(entry.nextVersionCounter(),
-                        false, entry.datum));
+//                globalScope.insert(key, new Value(entry.nextVersionCounter(),
+//                        false, entry.datum));
+                globalScope.insert(key,entry.datum);
 
             }
 

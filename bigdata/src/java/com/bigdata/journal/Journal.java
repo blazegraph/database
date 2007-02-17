@@ -128,7 +128,9 @@ import com.bigdata.rawstore.Bytes;
  * API. The journal server may be either embedded (in which case objects are
  * migrated to the server using FIFO queues) or networked (in which case the
  * journal server exposes a non-blocking service with a single thread for reads,
- * writes and deletes on the journal).
+ * writes and deletes on the journal). (However, note transaction processing MAY
+ * be concurrent since the write set of a transaction is written on a
+ * {@link TemporaryStore}.)
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -137,6 +139,7 @@ import com.bigdata.rawstore.Bytes;
  * FIXME Priority items are:
  * <ol>
  * <li> Transaction isolation.</li>
+ * <li> Scale out database (automatic re-partitioning of indices).</li>
  * <li> Distributed database protocols.</li>
  * <li> Segment server (mixture of journal server and read-optimized database
  * server).</li>
@@ -145,8 +148,8 @@ import com.bigdata.rawstore.Bytes;
  * layer.</li>
  * <li>Support primary key (clustered) indices in GPO/PO layer.</li>
  * <li>Implement backward validation and state-based conflict resolution with
- * custom merge rules for persistent objects, generic objects, and primary key
- * indices, and secondary indexes.</li>
+ * custom merge rules for RDFS, persistent objects, generic objects, and primary
+ * key indices, and secondary indexes.</li>
  * <li> Architecture using queues from GOM to journal/database segment server
  * supporting both embedded and remote scenarios.</li>
  * <li>Expand on latency and decision criteria for notifying clients when pages
@@ -180,7 +183,8 @@ import com.bigdata.rawstore.Bytes;
  *       transaction begin time. A very long running transaction could force the
  *       journal to hold onto historical states. If a decision is made to
  *       discard those states and the transaction begins to read from the
- *       journal then the transaction must be rolled back.
+ *       journal then the transaction must be rolled back. This should be worked
+ *       out with the resource deallocation for old journals and segments.
  * 
  * @todo Define distributed transaction protocol.
  * 
@@ -197,17 +201,9 @@ import com.bigdata.rawstore.Bytes;
  *       be deserialized during state-based validation if a conflict is
  *       detected.
  * 
- * @todo Flushing to disk on commit could be optional, e.g., if there are
- *       redundent journals then this is not required.
- * 
- * @todo Add feature to return the transient journal buffer so that we can do
- *       interesting things with it, including write it to disk with the
- *       appropriate file header and root blocks so that it becomes restartable.
- * 
- * FIXME Implement a read only transaction and write test suites for its
- * semantics, including both the inability to write (or delete) on the
- * transaction, the handling of pre-existing versions, and the non-duplication
- * of per-tx data structures.
+ * FIXME Write tests for writable and read-only fully isolated transactions,
+ * including the non-duplication of per-tx data structures (e.g., you always get
+ * the same object back when you ask for an isolated named index).
  * 
  * FIXME Write test suites for the {@link TransactionServer}.
  * 
@@ -237,6 +233,13 @@ public class Journal implements IJournal {
             .toInt();
 
     /**
+     * The index of the root address containing the address of the persistent
+     * {@link Name2Addr} mapping names to {@link BTree}s registered for the
+     * store.
+     */
+    public static transient final int ROOT_NAME2ADDR = 0;
+    
+    /**
      * A clone of the properties used to initialize the {@link Journal}.
      */
     final protected Properties properties;
@@ -245,6 +248,15 @@ public class Journal implements IJournal {
      * The implementation logic for the current {@link BufferMode}.
      */
     final IBufferStrategy _bufferStrategy;
+    
+    /**
+     * The service used to generate commit timestamps.
+     * 
+     * @todo paramterize using {@link Options} so that we can resolve a
+     *       low-latency service for use with a distributed database commit
+     *       protocol.
+     */
+    protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
 
     /**
      * The current root block. This is updated each time a new root block is
@@ -255,14 +267,13 @@ public class Journal implements IJournal {
     /**
      * The registered committers for each slot in the root block.
      */
-    private ICommitter[] _committers = new ICommitter[RootBlockView.MAX_ROOT_ADDRS];
-
+    private ICommitter[] _committers = new ICommitter[ICommitRecord.MAX_ROOT_ADDRS];
+    
     /**
-     * The index of the root slot whose value is the address of the persistent
-     * {@link Name2Addr} mapping names to {@link BTree}s registered for the
-     * store.
+     * Used to cache the most recent {@link ICommitRecord} -- discarded on
+     * {@link #abort()}.
      */
-    public static transient final int ROOT_NAME2ADDR = 0;
+    private ICommitRecord _commitRecord;
 
     /**
      * BTree mapping index names to the last metadata record committed for the
@@ -270,6 +281,14 @@ public class Journal implements IJournal {
      * the last known {@link Addr address} of the named btree.
      */
     private Name2Addr name2Addr;
+
+    /**
+     * BTree mapping commit timestamps to the address of the corresponding
+     * {@link ICommitRecord}. The keys are timestamps (long integers). The
+     * values are the {@link Addr address} of the {@link ICommitRecord} 
+     * with that commit timestamp.
+     */
+    private CommitRecordIndex _commitRecordIndex;
 
     /**
      * Option controls whether the journal forces application data to disk
@@ -528,14 +547,18 @@ public class Journal implements IJournal {
              * setup the root blocks.
              */
             final int nextOffset = 0;
+            final long commitTimestamp = 0L;
             final long firstTxId = 0L;
             final long lastTxId = 0L;
             final long commitCounter = 0L;
-            final long[] rootIds = new long[RootBlockView.MAX_ROOT_ADDRS];
+            final long commitRecordAddr = 0L;
+            final long commitRecordIndexAddr = 0L;
             IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
-                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
+                    nextOffset, firstTxId, lastTxId, commitTimestamp,
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr );
             IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
-                    nextOffset, firstTxId, lastTxId, commitCounter, rootIds);
+                    nextOffset, firstTxId, lastTxId, commitTimestamp,
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr );
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -652,6 +675,12 @@ public class Journal implements IJournal {
 
         }
 
+        /*
+         * Create or re-load the index of commit records.
+         */
+        this._commitRecordIndex = getCommitRecordIndex(this._rootBlock
+                .getCommitRecordIndexAddr());
+        
         /*
          * Give the store a chance to set any committers that it defines.
          */
@@ -802,6 +831,34 @@ public class Journal implements IJournal {
     }
 
     /**
+     * Notify all registered committers and collect their reported root
+     * addresses in an array.
+     * 
+     * @return The array of collected root addresses for the registered
+     *         committers.
+     */
+    final private long[] notifyCommitters() {
+        
+        int ncommitters = 0;
+
+        long[] rootAddrs = new long[_committers.length];
+
+        for (int i = 0; i < _committers.length; i++) {
+
+            if (_committers[i] == null)
+                continue;
+
+            rootAddrs[i] = _committers[i].handleCommit();
+
+            ncommitters++;
+
+        }
+
+        return rootAddrs;
+        
+    }
+    
+    /**
      * Invoked iff a transaction fails after it has begun writing data onto the
      * global state from its isolated state. Once the transaction has begun this
      * process it has modified the global (unisolated) state and the next commit
@@ -827,9 +884,24 @@ public class Journal implements IJournal {
      */
     public void abort() {
 
+        // clear the root addresses - the will be reloaded.
+        _commitRecord = null;
+        
         // clear the array of committers.
         _committers = new ICommitter[_committers.length];
 
+        /*
+         * Re-load the commit record index from the address in the current root
+         * block.
+         * 
+         * Note: This may not be strictly necessary since the only time we write
+         * on this index is a single record during each commit. So, it should be
+         * valid to simply catch an error during a commit and discard this index
+         * forcing its reload. However, doing this here is definately safer.
+         */
+        _commitRecordIndex = getCommitRecordIndex(_rootBlock
+                .getCommitRecordIndexAddr());
+        
         // discard any hard references that might be cached.
         discardCommitters();
 
@@ -849,9 +921,9 @@ public class Journal implements IJournal {
      * force the data to stable store, update the root block, and force the root
      * block and the file metadata to stable store.
      */
-    public void commit() {
+    public long commit() {
 
-        commit(null);
+        return commit(null);
 
     }
     
@@ -863,30 +935,30 @@ public class Journal implements IJournal {
      * @param tx
      *            The transaction that is committing or <code>null</code> if
      *            the commit is not transactional.
+     * 
+     * @return The timestamp assigned to the commit record -or- 0L if there were
+     *         no data to commit.
      */
-    void commit(Tx tx) {
+    protected long commit(Tx tx) {
 
         assertOpen();
+
+        final long commitTimestamp = (tx == null
+                ? timestampFactory.nextTimestamp()
+                        : tx.getCommitTimestamp()
+                        );
         
         /*
-         * First, run each of the committers. In general, these are btrees and
-         * they may have dirty nodes or leaves that needs to be evicted onto the
-         * store.
+         * First, run each of the committers accumulating the updated root
+         * addresses in an array. In general, these are btrees and they may have
+         * dirty nodes or leaves that needs to be evicted onto the store. The
+         * first time through, any newly created btrees will have dirty empty
+         * roots (the btree code does not optimize away an empty root at this
+         * time). However, subsequent commits without intervening data written
+         * on the store should not cause any committers to update their root
+         * address.
          */
-        int ncommitters = 0;
-
-        long[] rootAddrs = new long[_committers.length];
-
-        for (int i = 0; i < _committers.length; i++) {
-
-            if (_committers[i] == null)
-                continue;
-
-            rootAddrs[i] = _committers[i].handleCommit();
-
-            ncommitters++;
-
-        }
+        final long[] rootAddrs = notifyCommitters();
 
         /*
          * See if anything has been written on the store since the last commit.
@@ -898,10 +970,38 @@ public class Journal implements IJournal {
              * any useful purpose.
              */
 
-            return;
+            return 0L;
 
         }
 
+        /*
+         * Write the commit record onto the store.
+         */
+
+        final ICommitRecord commitRecord = new CommitRecord(commitTimestamp,
+                rootAddrs);
+
+        final long commitRecordAddr = write(ByteBuffer
+                .wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
+        
+        /*
+         * Add the comment record to an index so that we can recover historical
+         * states efficiently.
+         */
+        _commitRecordIndex.add(commitRecordAddr, commitRecord);
+
+        /*
+         * Flush the commit record index to the store and stash the address of
+         * its metadata record in the root block.
+         * 
+         * Note: The address of the root of the CommitRecordIndex itself needs
+         * to go right into the root block. We are unable to place it into the
+         * commit record since we need to serialize the commit record, get its
+         * address, and add the entry to the CommitRecordIndex before we can
+         * flush the CommitRecordIndex to the store.
+         */
+        final long commitRecordIndexAddr = _commitRecordIndex.write();
+        
         /*
          * Force application data to stable storage _before_ we update the root
          * blocks. This option guarentees that the application data is stable on
@@ -941,11 +1041,11 @@ public class Journal implements IJournal {
 
                     assert lastTxId == 0L;
 
-                    firstTxId = lastTxId = tx.getId();
+                    firstTxId = lastTxId = tx.getStartTimestamp();
 
-                } else if (lastTxId == 0L) {
+                } else {
 
-                    lastTxId = tx.getId();
+                    lastTxId = tx.getStartTimestamp();
 
                 }
                 
@@ -954,12 +1054,15 @@ public class Journal implements IJournal {
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getSegmentId(), _bufferStrategy
-                            .getNextOffset(), firstTxId, lastTxId, old
-                            .getCommitCounter() + 1, rootAddrs);
+                            .getNextOffset(), firstTxId, lastTxId,
+                    commitTimestamp, old.getCommitCounter() + 1,
+                    commitRecordAddr, commitRecordIndexAddr);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
             _rootBlock = newRootBlock;
+            
+            _commitRecord = commitRecord;
 
         }
 
@@ -978,6 +1081,8 @@ public class Journal implements IJournal {
 
         }
 
+        return commitTimestamp;
+        
     }
 
     /**
@@ -1015,12 +1120,50 @@ public class Journal implements IJournal {
 
     }
 
-    final public long getAddr(int rootSlot) {
+    final public long getRootAddr(int index) {
 
-        return _rootBlock.getRootAddr(rootSlot);
+        if(_commitRecord == null) {
+        
+            return getCommitRecord().getRootAddr(index);
+            
+        } else {
+            
+            return _commitRecord.getRootAddr(index);
+            
+        }
 
     }
 
+    /**
+     * Returns a read-only view of the root {@link Addr addresses}. The caller
+     * may modify the returned array without changing the effective state of
+     * those addresses as used by the store.
+     * 
+     * @return The root {@link Addr addresses}.
+     */
+    public ICommitRecord getCommitRecord() {
+        
+        if (_commitRecord == null) {
+
+            long commitRecordAddr = _rootBlock.getCommitRecordAddr();
+
+            if (commitRecordAddr == 0L) {
+
+                _commitRecord = new CommitRecord(0L);
+                
+            } else {
+                
+                _commitRecord = CommitRecordSerializer.INSTANCE
+                        .deserialize(_bufferStrategy.read(commitRecordAddr, null));
+
+            }
+
+        }
+        
+        return _commitRecord;
+        
+    }
+     
     /**
      * The default implementation discards the btree mapping names to named
      * btrees.
@@ -1044,8 +1187,8 @@ public class Journal implements IJournal {
      */
     public void setupCommitters() {
 
-        setupName2AddrBTree();
-
+        setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
+        
     }
 
     /*
@@ -1054,14 +1197,15 @@ public class Journal implements IJournal {
     
     /**
      * Setup the btree that resolved named btrees.
+     * 
+     * @param addr
+     *            The root address of the btree -or- 0L iff the btree has not
+     *            been defined yet.
      */
-    private void setupName2AddrBTree() {
+    private void setupName2AddrBTree(long addr) {
 
         assert name2Addr == null;
         
-        // the root address of the btree.
-        long addr = getAddr(ROOT_NAME2ADDR);
-
         if (addr == 0L) {
 
             /*
@@ -1079,7 +1223,7 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            name2Addr = new Name2Addr(this, BTreeMetadata.read(this, addr));
+            name2Addr = (Name2Addr)BTreeMetadata.load(this, addr);
 
         }
 
@@ -1088,11 +1232,54 @@ public class Journal implements IJournal {
 
     }
     
+    /**
+     * Create or re-load the index that resolves timestamps to
+     * {@link ICommitRecord}s.
+     * 
+     * @param addr
+     *            The root address of the index -or- 0L if the index has not
+     *            been created yet.
+     * 
+     * @return The {@link CommitRecordIndex} for that address or a new index if
+     *         0L was specified as the address.
+     * 
+     * @see #_commitRecordIndex, which hold the current commit record index.
+     */
+    private CommitRecordIndex getCommitRecordIndex(long addr) {
+
+        CommitRecordIndex ndx;
+        
+        if (addr == 0L) {
+
+            /*
+             * The btree has either never been created or if it had been created
+             * then the store was never committed and the btree had since been
+             * discarded.  In any case we create a new btree now.
+             */
+
+            // create btree mapping names to addresses.
+            ndx = new CommitRecordIndex(this);
+
+        } else {
+
+            /*
+             * Reload the btree from its root address.
+             */
+
+            ndx = (CommitRecordIndex)BTreeMetadata.load(this, addr);
+
+        }
+
+        return ndx;
+        
+    }
+    
     public IIndex registerIndex(String name, IIndex btree) {
 
         if( getIndex(name) != null ) {
             
-            throw new IllegalStateException("BTree already registered: name="+name);
+            throw new IllegalStateException("Index already registered: name="
+                    + name);
             
         }
         
@@ -1124,9 +1311,99 @@ public class Journal implements IJournal {
 
     }
 
+    /**
+     * Return the {@link ICommitRecord} for the most recent committed state
+     * whose commit timestamp is less than or equal to <i>timestamp</i>. This
+     * is used by a {@link Tx transaction} to locate the committed state that is
+     * the basis for its operations.
+     * 
+     * @param timestamp
+     *            Typically, the timestamp assigned to a transaction.
+     * 
+     * @return The {@link ICommitRecord} for the most recent committed state
+     *         whose commit timestamp is less than or equal to <i>timestamp</i>
+     *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
+     *         that satisify the probe.
+     * 
+     * @todo this implies that timestamps for all commits are generated by a
+     *       global timestamp service.
+     */
+    public ICommitRecord getCommitRecord(long timestamp) {
+
+        return _commitRecordIndex.find(timestamp);
+        
+    }
+
+    /**
+     * Returns a read-only named index loaded from the given root block. Writes
+     * on the index will NOT be made persistent and the index will NOT
+     * participate in commits.
+     */
+    public IIndex getIndex(String name,ICommitRecord commitRecord) {
+        
+        /*
+         * Note: since this is always a request for historical read-only data,
+         * this method MUST NOT register a committer and the returned btree MUST
+         * NOT participate in the commit protocol.
+         * 
+         * @todo cache these results in a weak value cache.
+         */
+    
+        return ((Name2Addr) BTreeMetadata.load(this, commitRecord
+                .getRootAddr(ROOT_NAME2ADDR))).get(name);
+        
+    }
+
     /*
      * transaction support.
      */
+    
+    /**
+     * Create a new fully-isolated read-write transaction.
+     * 
+     * @see #newTx(boolean), to which this method delegates its implementation.
+     */
+    public ITx newTx() {
+    
+        return newTx(false);
+        
+    }
+    
+    /**
+     * Create a new fully-isolated transaction.
+     * 
+     * @param readOnly
+     *            When true, the transaction will reject writes.
+     * 
+     * @todo This method supports transactions in a non-distributed database in
+     *       which there is a centralized {@link Journal} that handles all
+     *       concurrency control. There needs to be a {@link TransactionServer}
+     *       that starts transactions. The {@link JournalServer} should summon a
+     *       transaction object them into being on a {@link Journal} iff
+     *       operations isolated by that transaction are required on that
+     *       {@link Journal}.
+     */
+    public ITx newTx(boolean readOnly) {
+        
+        return new Tx(this,timestampFactory.nextTimestamp(),readOnly);
+        
+    }
+    
+    /**
+     * Create a new read-committed transaction.
+     * 
+     * @return A transaction that will reject writes. Any committed data will be
+     *         visible to indices isolated by this transaction.
+     * 
+     * @todo implement read-committed transaction support.
+     * 
+     * @see #newTx(boolean)
+     */
+    public ITx newReadCommittedTx() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
     
     /**
      * Notify the journal that a new transaction is being activated (starting on
@@ -1136,36 +1413,18 @@ public class Journal implements IJournal {
      *            The transaction.
      * 
      * @throws IllegalStateException
-     * 
-     * FIXME Detect transaction identifiers that go backwards? For example tx0
-     * starts on one segment A while tx1 starts on segment B. Tx0 later starts
-     * on segment B. From the perspective of segment B, tx0 begins after tx1.
-     * This does not look like a problem unless there is an intevening commit,
-     * at which point tx0 and tx1 will have starting contexts that differ by the
-     * write set of the commit.<br>
-     * What exactly is the impact when transactions start out of sequence? Do we
-     * need to negotiated a distributed start time among all segments on which
-     * the transaction starts? That would be a potential source of latency and
-     * other kinds of pain. Look at how this is handled in the literature. One
-     * way to handle it is essentially to declare the intention of the
-     * transaction and pre-notify segments that will be written. This requires
-     * some means of figuring out that intention and is probably relevant (and
-     * solvable) only for very large row or key scans.
-     * 
-     * @todo What exactly is the impact when transactions end out of sequence? I
-     *       presume that this is absolutely Ok.
      */
     void activateTx(ITx tx) throws IllegalStateException {
 
-        Long id = tx.getId();
+        Long timestamp = tx.getStartTimestamp();
 
-        if (activeTx.containsKey(id))
+        if (activeTx.containsKey(timestamp))
             throw new IllegalStateException("Already active: tx=" + tx);
 
-        if (preparedTx.containsKey(id))
+        if (preparedTx.containsKey(timestamp))
             throw new IllegalStateException("Already prepared: tx=" + tx);
 
-        activeTx.put(id, tx);
+        activeTx.put(timestamp, tx);
 
     }
 
@@ -1180,7 +1439,7 @@ public class Journal implements IJournal {
      */
     void prepared(ITx tx) throws IllegalStateException {
 
-        Long id = tx.getId();
+        Long id = tx.getStartTimestamp();
 
         ITx tx2 = activeTx.remove(id);
 
@@ -1204,17 +1463,13 @@ public class Journal implements IJournal {
      *            The transaction.
      * 
      * @throws IllegalStateException
-     * 
-     * @todo Keep around complete transaction identifiers as a sanity check for
-     *       repeated identifiers? This is definately not something to do for a
-     *       deployed system since it will cause a memory leak.
      */
     void completedTx(ITx tx) throws IllegalStateException {
 
         assert tx != null;
         assert tx.isComplete();
         
-        Long id = tx.getId();
+        Long id = tx.getStartTimestamp();
 
         ITx txActive = activeTx.remove(id);
 
@@ -1252,222 +1507,5 @@ public class Journal implements IJournal {
         return null;
 
     }
-
-    // /**
-    // * <p>
-    // * Deallocate slots for versions having a transaction timestamp less than
-    // or
-    // * equal to <i>timestamp</i> that have since been overwritten (or deleted)
-    // * by a committed transaction having a timestamp greater than
-    // <i>timestamp</i>.
-    // * </p>
-    // * <p>
-    // * The criteria for deallocating historical versions is that (a) there is
-    // a
-    // * more recent version; and (b) there is no ACTIVE (vs PENDING or
-    // COMPLETED)
-    // * transaction which could read from that historical version. The journal
-    // * does NOT locally have enough information to decide when it can swept
-    // * historical versions written by a given transaction. This notice MUST
-    // come
-    // * from a transaction service which has global knowledge of which
-    // * transactions have PREPARED or ABORTED and can generate notices when all
-    // * transactions before a given timestamp have been PREPARED or ABORTED.
-    // For
-    // * example, a long running transaction can cause notice to be delayed for
-    // * many short lived transactions that have since completed. Once the long
-    // * running transaction completes, the transaction server can compute the
-    // * largest timestamp value below which there are no active transactions
-    // and
-    // * generate a single notice with that timestamp.
-    // * </p>
-    // *
-    // * @param timestamp
-    // * The timestamp.
-    // *
-    // * @todo This operation MUST be extremely efficient.
-    // *
-    // * @todo This method is exposed suposing a transaction service that will
-    // * deliver notice when the operation should be conducted based on
-    // * total knowledge of the state of all transactions running against
-    // * the distributed database. As such, it may have to scan the journal
-    // * to locate the commit record for transactions satisifying the
-    // * timestamp criteria.
-    // */
-    // void gcTx( long timestamp ) {
-
-    // // * <p>
-    // // * Note: Migration to the read-optimized database is NOT a
-    // pre-condition for
-    // // * deallocation of historical versions - rather it enables us to remove
-    // the
-    // // * <em>current</em> committed version from the journal.
-    // // * </p>
-
-    // /*
-    // * FIXME Implement garbage collection of overwritten and unreachable
-    // * versions. Without migration to a read-optimized database, GC by
-    // * itself is NOT sufficient to allow us to deallocate versions that have
-    // * NOT been overwritten and hence is NOT sufficient to allow us to
-    // * discard historical transactions in their entirety.
-    // *
-    // * Given a transaction Tn that overwrites one or more pre-existing
-    // * versions, the criteria for deallocation of the overwritten versions
-    // * are:
-    // *
-    // * (A) Tn commits, hence its intention has been made persistent; and
-    // *
-    // * (B) There are no active transactions remaining that started from a
-    // * committed state before the commit state resulting from Tn, hence the
-    // * versions overwritten by Tn are not visible to any active transaction.
-    // * Any new transaction will read through the committed state produced by
-    // * Tn and will perceive the new versions rather than the overwritten
-    // * versions.
-    // *
-    // * Therefore, once Tn commits (assuming it has overwritten at least one
-    // * pre-existing version), we can add each concurrent transaction Ti that
-    // * is still active when Tn commits to a set of transactions that must
-    // * either validate or abort before we may GC(Tn). Since Tn has committed
-    // * it is not possible for new transactions to be created that would have
-    // * to be included in this set since any new transaction would start from
-    // * the committed state of Tn or its successors in the serialization
-    // * order. As transactions validate or abort they are removed from
-    // * GC(Tn). When this set is empty, we garbage collect the pre-existing
-    // * versions that were overwritten by Tn.
-    // *
-    // * The sets GC(T) must be restart safe. Changes to the set can only
-    // * occur when a transaction commits or aborts. However, even the abort
-    // * of a transaction MUST be noticable on restart.
-    // *
-    // * A summary may be used that is the highest transaction timestamp for
-    // * which Tn must wait before running GC(Tn). That can be written once
-    // *
-    // *
-    // * Note that multiple transactions may have committed, so we may find
-    // * that Tn has successors in the commit/serialization order that also
-    // * meet the above criteria. All such committed transactions may be
-    // * processed at once, but they MUST be processed in their commit order.
-    // *
-    // * Once those pre-conditions have been met the following algorithm is
-    // * applied to GC the historical versions that were overwritten by Tn:
-    // *
-    // * 1. For each write by Ti where n < i <= m that overwrote a historical
-    // * version, deallocate the slots for that historical version. This is
-    // * valid since there are no active transactions that can read from that
-    // * historical state. The processing order for Ti probably does not
-    // * matter, but in practice there may be a reason to choose the
-    // * serialization or reverse serialization order
-    // *
-    // * ---- this is getting closed but is not yet correct ----
-    // *
-    // * All versions written by a given transaction have the timestamp of
-    // * that transaction.
-    // *
-    // * The committed transactions are linked by their commit records into a
-    // * reverse serialization sequence.
-    // *
-    // * Each committed transaction has an object index that is accessible
-    // * from its commit record. The entries in this index are versions that
-    // * were written (or deleted) by that transaction. This index reads
-    // * through into the object index for the committed state of the journal
-    // * from which the transaction was minted.
-    // *
-    // * We could maintain in the entry information about the historical
-    // * version that was overwritten. For example, its firstSlot or a run
-    // * length encoding of the slots allocated to the historical version.
-    // *
-    // * We could maintain an index for all overwritten versions from
-    // * [timestamp + dataId] to [slotId] (or a run-length encoding of the
-    // * slots on which the version was written). Given a timestamp, we would
-    // * then do a key scan from the start of the index for all entries whose
-    // * timestamp was less than or equal to the given timestamp. For each
-    // * such entry, we would deallocate the version and delete the entry from
-    // * the index.
-    // *
-    // * tx0 : begin tx0 : write id0 (v0) tx0 : commit journal : deallocate <=
-    // * tx0 (NOP since no overwritten versions)
-    // *
-    // * tx1 : begin tx2 : begin tx1 : write id0 (v1) tx1 : commit journal :
-    // * deallocate <= tx1 (MUST NOT BE GENERATED since dependencies exist :
-    // * tx1 and tx0 both depend on the committed state of tx0 -- sounds like
-    // * lock style dependencies for deallocation !) tx2 : commit journal :
-    // * deallocate <= tx2
-    // *
-    // * index:: [ tx0 : id0 ] : v0 [ tx1 : id1 ] : v1
-    // *
-    // * keyscan <= tx2
-    // */
-
-    // }
-
-    // /**
-    // * The transaction identifier of the last transaction begun on this
-    // journal.
-    // * In order to avoid extra IO this value survives restart IFF there is an
-    // * intervening commit by any active transaction. This value is used to
-    // * reject transactions whose identifier arrives out of sequence at the
-    // * journal.
-    // *
-    // * @return The transaction identifier or <code>-1</code> if no
-    // * transactions have begun on the journal (or if no transactions
-    // * have ever committed and no transaction has begun since restart).
-    // */
-    // public long getLastBegunTx() {
-    //        
-    // return lastBegunTx;
-    //        
-    // }
-    // private long lastBegunTx = -1;
-
-    // /**
-    // * Return the first commit record whose transaction timestamp is less than
-    // * or equal to the given timestamp.
-    // *
-    // * @param timestamp
-    // * The timestamp.
-    // *
-    // * @param exact
-    // * When true, only an exact match is accepted.
-    // *
-    // * @return The commit record.
-    // *
-    // * @todo Define ICommitRecord.
-    // *
-    // * @todo A transaction may not begin if a transaction with a later
-    // timestamp
-    // * has already committed. Use this method to verify that. Since the
-    // * commit records are cached, this probably needs to be moved back
-    // * into the Journal.
-    // *
-    // * @todo Read the commit records into memory on startup.
-    // *
-    // * @todo The commit records are chained together by a "pointer" to the
-    // prior
-    // * commit record together with the timestamp of that record. The root
-    // * block contains the timestamp of the earliest commit record that is
-    // * still on the journal. Traversal of the prior pointers stops when
-    // * the referenced record has a timestamp before the earliest versions
-    // * still on hand.
-    // */
-    // protected Object getCommitRecord(long timestamp, boolean exact) {
-    // 
-    // /*
-    // * @todo Search backwards from the current {@link IRootBlockView}.
-    // */
-    // throw new UnsupportedOperationException();
-    //        
-    // }
-    //
-    // /**
-    // * FIXME Write commit record, including: the transaction identifier, the
-    // * location of the object index and the slot allocation index, the
-    // location
-    // * of a run length encoded representation of slots allocated by this
-    // * transaction, and the identifier and location of the prior transaction
-    // * serialized on this journal.
-    // */
-    // protected void writeCommitRecord(IStore tx) {
-    //        
-    // }
 
 }

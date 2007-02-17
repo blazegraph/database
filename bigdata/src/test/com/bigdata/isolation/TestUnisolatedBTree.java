@@ -105,7 +105,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
             
-            btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr));
+            btree = (UnisolatedBTree)BTreeMetadata.load(store, addr);
 
             assertTrue(store==btree.getStore());
             assertEquals(branchingFactor,btree.getBranchingFactor());
@@ -123,7 +123,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
 
-            btree = new UnisolatedBTree(store, BTreeMetadata.read(store, addr));
+            btree = (UnisolatedBTree)BTreeMetadata.load(store, addr);
 
             assertTrue(store == btree.getStore());
             assertEquals(branchingFactor, btree.getBranchingFactor());
@@ -411,7 +411,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
          */
         final long addr1 = btree.write();
         
-        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr1));
+        btree = (UnisolatedBTree)BTreeMetadata.load(store, addr1);
         
         assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
 
@@ -425,7 +425,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
         final long addr2 = btree.write();
         
-        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr2));
+        btree = (UnisolatedBTree)BTreeMetadata.load(store, addr2);
         
         assertSameIterator(new Object[]{v3,v7},btree.entryIterator());
 
@@ -439,7 +439,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
         final long addr3 = btree.write();
         
-        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr3));
+        btree = (UnisolatedBTree)BTreeMetadata.load(store, addr3);
         
         assertSameIterator(new Object[]{v3,v7a},btree.entryIterator());
         
@@ -454,7 +454,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
 
         final long addr4 = btree.write();
         
-        btree = new UnisolatedBTree(store,BTreeMetadata.read(store, addr4));
+        btree = (UnisolatedBTree)BTreeMetadata.load(store, addr4);
         
         assertSameIterator(new Object[]{v3,v5a,v7a},btree.entryIterator());
         

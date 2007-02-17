@@ -47,6 +47,9 @@
 
 package com.bigdata.journal;
 
+import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.objndx.IIndex;
+
 /**
  * Interface for transactional reading and writing of persistent data.
  *
@@ -60,13 +63,13 @@ public interface ITx extends IStore {
      * 
      * @return The transaction identifier (aka timestamp).
      */
-    public long getId();
+    public long getStartTimestamp();
 
     /**
      * Prepare the transaction for a {@link #commit()}.
      * 
      * @exception IllegalStateException
-     *                if the transaction is not active.  If the transaction is
+     *                If the transaction is not active.  If the transaction is
      *                not complete, then it will be aborted.
      */
     public void prepare();
@@ -74,12 +77,14 @@ public interface ITx extends IStore {
     /**
      * Commit the transaction.
      * 
+     * @return The commit time assigned to the transactions.
+     * 
      * @exception IllegalStateException
-     *                if the transaction has not been
-     *                {@link #prepare() prepared}. If the transaction is not
-     *                already complete, then it is aborted.
+     *                If the transaction has not {@link #prepare() prepared}.
+     *                If the transaction is not already complete, then it is
+     *                aborted.
      */
-    public void commit();
+    public long commit();
 
     /**
      * Abort the transaction.
@@ -89,6 +94,11 @@ public interface ITx extends IStore {
      */
     public void abort();
 
+    /**
+     * When true, the transaction will reject writes.
+     */
+    public boolean isReadOnly();
+    
     /**
      * A transaction is "active" when it is created and remains active until it
      * prepares or aborts.  An active transaction accepts READ, WRITE, DELETE,
@@ -131,4 +141,19 @@ public interface ITx extends IStore {
      */
     public boolean isAborted();
 
+    /**
+     * Return an isolated view onto a named index. Writes on the returned index
+     * will be isolated in an {@link IsolatedBTree}. Reads that miss on the
+     * {@link IsolatedBTree} will read through named index as of the ground
+     * state of this transaction.
+     * <p>
+     * During {@link #prepare()}, the write set of each {@link IsolatedBTree}
+     * will be validated against the then current commited state of the named
+     * index.
+     * <p>
+     * During {@link #commit()}, the validated write sets will be merged down
+     * onto the then current committed state of the named index.
+     */
+    public IIndex getIndex(String name);
+    
 }

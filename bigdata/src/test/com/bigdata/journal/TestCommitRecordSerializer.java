@@ -42,37 +42,55 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 13, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.journal;
 
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+import java.nio.ByteBuffer;
+import java.util.Random;
+
+import junit.framework.TestCase2;
 
 /**
+ * Test suite for {@link CommitRecordSerializer}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class TestCommitRecordSerializer extends AbstractCommitRecordTestCase {
 
-    public Name2MetadataAddr(IRawStore store) {
+    /**
+     * 
+     */
+    public TestCommitRecordSerializer() {
+    }
 
-        super(store);
+    /**
+     * @param arg0
+     */
+    public TestCommitRecordSerializer(String arg0) {
+        super(arg0);
+    }
+    
+    public void test_stress() {
+
+        final int ntrials = 1000;
+        
+        for(int trial=0;trial<ntrials; trial++) {
+            
+            doRoundTripTest(getRandomCommitRecord());
+            
+        }
         
     }
     
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
+    public void doRoundTripTest(ICommitRecord roots) {
+        
+        CommitRecordSerializer ser = CommitRecordSerializer.INSTANCE;
 
-        super(store,metadata);
-        
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
+        assertEquals(roots, ser.deserialize(ByteBuffer.wrap(ser
+                .serialize(roots))));
 
     }
 

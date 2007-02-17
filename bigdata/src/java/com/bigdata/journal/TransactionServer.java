@@ -88,7 +88,7 @@ import com.bigdata.util.TimestampFactory;
  *       transactions could be the limit, and should certainly be an internal
  *       target. Achieving higher concurrency will require more localized
  *       mechanisms, e.g., single row atomic updates. There is also a use case
- *       for read uncommitted transactions in order to permit earlier GC with
+ *       for read committed transactions in order to permit earlier GC with
  *       very very long running transactions, which would otherwise defer GC
  *       until their completion.
  * 
@@ -513,3 +513,190 @@ public class TransactionServer {
     }
 
 }
+
+//* 
+//* FIXME Detect transaction identifiers that go backwards? For example tx0
+//* starts on one segment A while tx1 starts on segment B. Tx0 later starts
+//* on segment B. From the perspective of segment B, tx0 begins after tx1.
+//* This does not look like a problem unless there is an intevening commit,
+//* at which point tx0 and tx1 will have starting contexts that differ by the
+//* write set of the commit.<br>
+//* What exactly is the impact when transactions start out of sequence? Do we
+//* need to negotiated a distributed start time among all segments on which
+//* the transaction starts? That would be a potential source of latency and
+//* other kinds of pain. Look at how this is handled in the literature. One
+//* way to handle it is essentially to declare the intention of the
+//* transaction and pre-notify segments that will be written. This requires
+//* some means of figuring out that intention and is probably relevant (and
+//* solvable) only for very large row or key scans.
+//* 
+//* @todo What exactly is the impact when transactions end out of sequence? I
+//*       presume that this is absolutely Ok.
+
+
+// /**
+// * <p>
+// * Deallocate slots for versions having a transaction timestamp less than
+// or
+// * equal to <i>timestamp</i> that have since been overwritten (or deleted)
+// * by a committed transaction having a timestamp greater than
+// <i>timestamp</i>.
+// * </p>
+// * <p>
+// * The criteria for deallocating historical versions is that (a) there is
+// a
+// * more recent version; and (b) there is no ACTIVE (vs PENDING or
+// COMPLETED)
+// * transaction which could read from that historical version. The journal
+// * does NOT locally have enough information to decide when it can swept
+// * historical versions written by a given transaction. This notice MUST
+// come
+// * from a transaction service which has global knowledge of which
+// * transactions have PREPARED or ABORTED and can generate notices when all
+// * transactions before a given timestamp have been PREPARED or ABORTED.
+// For
+// * example, a long running transaction can cause notice to be delayed for
+// * many short lived transactions that have since completed. Once the long
+// * running transaction completes, the transaction server can compute the
+// * largest timestamp value below which there are no active transactions
+// and
+// * generate a single notice with that timestamp.
+// * </p>
+// *
+// * @param timestamp
+// * The timestamp.
+// *
+// * @todo This operation MUST be extremely efficient.
+// *
+// * @todo This method is exposed suposing a transaction service that will
+// * deliver notice when the operation should be conducted based on
+// * total knowledge of the state of all transactions running against
+// * the distributed database. As such, it may have to scan the journal
+// * to locate the commit record for transactions satisifying the
+// * timestamp criteria.
+// */
+// void gcTx( long timestamp ) {
+
+// // * <p>
+// // * Note: Migration to the read-optimized database is NOT a
+// pre-condition for
+// // * deallocation of historical versions - rather it enables us to remove
+// the
+// // * <em>current</em> committed version from the journal.
+// // * </p>
+
+// /*
+// * FIXME Implement garbage collection of overwritten and unreachable
+// * versions. Without migration to a read-optimized database, GC by
+// * itself is NOT sufficient to allow us to deallocate versions that have
+// * NOT been overwritten and hence is NOT sufficient to allow us to
+// * discard historical transactions in their entirety.
+// *
+// * Given a transaction Tn that overwrites one or more pre-existing
+// * versions, the criteria for deallocation of the overwritten versions
+// * are:
+// *
+// * (A) Tn commits, hence its intention has been made persistent; and
+// *
+// * (B) There are no active transactions remaining that started from a
+// * committed state before the commit state resulting from Tn, hence the
+// * versions overwritten by Tn are not visible to any active transaction.
+// * Any new transaction will read through the committed state produced by
+// * Tn and will perceive the new versions rather than the overwritten
+// * versions.
+// *
+// * Therefore, once Tn commits (assuming it has overwritten at least one
+// * pre-existing version), we can add each concurrent transaction Ti that
+// * is still active when Tn commits to a set of transactions that must
+// * either validate or abort before we may GC(Tn). Since Tn has committed
+// * it is not possible for new transactions to be created that would have
+// * to be included in this set since any new transaction would start from
+// * the committed state of Tn or its successors in the serialization
+// * order. As transactions validate or abort they are removed from
+// * GC(Tn). When this set is empty, we garbage collect the pre-existing
+// * versions that were overwritten by Tn.
+// *
+// * The sets GC(T) must be restart safe. Changes to the set can only
+// * occur when a transaction commits or aborts. However, even the abort
+// * of a transaction MUST be noticable on restart.
+// *
+// * A summary may be used that is the highest transaction timestamp for
+// * which Tn must wait before running GC(Tn). That can be written once
+// *
+// *
+// * Note that multiple transactions may have committed, so we may find
+// * that Tn has successors in the commit/serialization order that also
+// * meet the above criteria. All such committed transactions may be
+// * processed at once, but they MUST be processed in their commit order.
+// *
+// * Once those pre-conditions have been met the following algorithm is
+// * applied to GC the historical versions that were overwritten by Tn:
+// *
+// * 1. For each write by Ti where n < i <= m that overwrote a historical
+// * version, deallocate the slots for that historical version. This is
+// * valid since there are no active transactions that can read from that
+// * historical state. The processing order for Ti probably does not
+// * matter, but in practice there may be a reason to choose the
+// * serialization or reverse serialization order
+// *
+// * ---- this is getting closed but is not yet correct ----
+// *
+// * All versions written by a given transaction have the timestamp of
+// * that transaction.
+// *
+// * The committed transactions are linked by their commit records into a
+// * reverse serialization sequence.
+// *
+// * Each committed transaction has an object index that is accessible
+// * from its commit record. The entries in this index are versions that
+// * were written (or deleted) by that transaction. This index reads
+// * through into the object index for the committed state of the journal
+// * from which the transaction was minted.
+// *
+// * We could maintain in the entry information about the historical
+// * version that was overwritten. For example, its firstSlot or a run
+// * length encoding of the slots allocated to the historical version.
+// *
+// * We could maintain an index for all overwritten versions from
+// * [timestamp + dataId] to [slotId] (or a run-length encoding of the
+// * slots on which the version was written). Given a timestamp, we would
+// * then do a key scan from the start of the index for all entries whose
+// * timestamp was less than or equal to the given timestamp. For each
+// * such entry, we would deallocate the version and delete the entry from
+// * the index.
+// *
+// * tx0 : begin tx0 : write id0 (v0) tx0 : commit journal : deallocate <=
+// * tx0 (NOP since no overwritten versions)
+// *
+// * tx1 : begin tx2 : begin tx1 : write id0 (v1) tx1 : commit journal :
+// * deallocate <= tx1 (MUST NOT BE GENERATED since dependencies exist :
+// * tx1 and tx0 both depend on the committed state of tx0 -- sounds like
+// * lock style dependencies for deallocation !) tx2 : commit journal :
+// * deallocate <= tx2
+// *
+// * index:: [ tx0 : id0 ] : v0 [ tx1 : id1 ] : v1
+// *
+// * keyscan <= tx2
+// */
+
+// }
+
+// /**
+// * The transaction identifier of the last transaction begun on this
+// journal.
+// * In order to avoid extra IO this value survives restart IFF there is an
+// * intervening commit by any active transaction. This value is used to
+// * reject transactions whose identifier arrives out of sequence at the
+// * journal.
+// *
+// * @return The transaction identifier or <code>-1</code> if no
+// * transactions have begun on the journal (or if no transactions
+// * have ever committed and no transaction has begun since restart).
+// */
+// public long getLastBegunTx() {
+//        
+// return lastBegunTx;
+//        
+// }
+// private long lastBegunTx = -1;
+

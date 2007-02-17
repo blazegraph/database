@@ -145,7 +145,7 @@ public class Name2Addr extends BTree {
 
         /* re-load btree from the store.
          */
-        btree = loadBTree(store,entry.name,entry.addr);
+        btree = BTreeMetadata.load(this.store, entry.addr);
         
         // save name -> btree mapping in transient cache.
         name2BTree.put(name,btree);
@@ -155,29 +155,6 @@ public class Name2Addr extends BTree {
 
     }
 
-    /**
-     * Re-load a named index from the store.
-     * <p>
-     * The default implementation uses the {@link BTree} constructor. In you
-     * need to return either a subclass of {@link BTree} or another
-     * implementation of {@link IIndex} then you MUST override this method to
-     * use the appropriate constructor.
-     * 
-     * @param store
-     *            The store.
-     * @param name
-     *            The index name.
-     * @param addr
-     *            The address of the metadata record.
-     * 
-     * @return The named index as loaded from the specified address.
-     */
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return new BTree(this.store, BTreeMetadata.read(this.store, addr));
-
-    }
-    
     /**
      * Add an entry for the named index.
      * 

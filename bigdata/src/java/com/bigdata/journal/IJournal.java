@@ -63,7 +63,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IRawStore, IAtomicStore, IStore {
+public interface IJournal extends IRawStore, IAtomicStore, IIndexManager {
 
     /**
      * A copy of the properties used to initialize this journal.
@@ -86,53 +86,6 @@ public interface IJournal extends IRawStore, IAtomicStore, IStore {
      * until it either runs out of address space (int32) or other resources.
      */
     public void overflow();
-    
-    /**
-     * Register a named index. Once registered the index will participate in
-     * atomic commits.
-     * <p>
-     * Note: A named index must be registered outside of any transaction before
-     * it may be used inside of a transaction.
-     * <p>
-     * Note: The return object MAY differ from the supplied {@link BTree}. For
-     * example, when using partitioned indices the {@link BTree} is encapsulated
-     * within an abstraction that knows how to managed index partitions.
-     * 
-     * @param name
-     *            The name that can be used to recover the index.
-     * 
-     * @param btree
-     *            The btree.
-     * 
-     * @return The object that would be returned by {@link #getIndex(String)}.
-     * 
-     * @todo The provided {@link BTree} must serve as a prototype so that it is
-     *       possible to retain additional metadata.
-     */
-    public IIndex registerIndex(String name, IIndex btree);
-    
-    /**
-     * Drops the named index (unisolated). The index is removed as a
-     * {@link ICommitter} and all resources dedicated to that index are
-     * reclaimed, including secondary index segment files, the metadata index,
-     * etc.
-     * 
-     * @param name
-     *            The name of the index to be dropped.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> does not identify a registered index.
-     * 
-     * @todo add a rename index method, but note that names in the file system
-     *       would not change.
-     * 
-     * @todo declare a method that returns or visits the names of the registered
-     *       indices.
-     * 
-     * @todo consider adding a delete method that releases all resources
-     *       (including indices) and then closes the journal.
-     */
-    public void dropIndex(String name);
     
     /**
      * Return the named index which MAY may be invalidated by a

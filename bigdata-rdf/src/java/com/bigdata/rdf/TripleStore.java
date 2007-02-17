@@ -62,9 +62,9 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.RootBlockView;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
@@ -84,7 +84,6 @@ import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
 import com.bigdata.scaleup.PartitionedIndex;
-import com.bigdata.scaleup.PartitionedJournal;
 import com.bigdata.scaleup.SlaveJournal;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -219,7 +218,7 @@ public class TripleStore extends /*Partitioned*/Journal {
      * Declare indices for root addresses for the different indices maintained
      * by the store.
      */
-    static public transient final int ROOT_COUNTER = RootBlockView.FIRST_USER_ROOT + 5;
+    static public transient final int ROOT_COUNTER = ICommitRecord.FIRST_USER_ROOT;
     
     public RdfKeyBuilder keyBuilder;
 
@@ -348,7 +347,7 @@ public class TripleStore extends /*Partitioned*/Journal {
 
             long addr;
 
-            if ((addr = getAddr(ROOT_COUNTER)) == 0L) {
+            if ((addr = getRootAddr(ROOT_COUNTER)) == 0L) {
 
                 // Note: first termId is ONE (1). Zero is reserved.
                 counter = new AutoIncCounter(this, 1L);
@@ -1020,17 +1019,19 @@ public class TripleStore extends /*Partitioned*/Journal {
 
     }
     
-    public void commit() {
+    public long commit() {
 
         final long begin = System.currentTimeMillis();
 
-        super.commit();
+        final long commitTime = super.commit();
 
         final long elapsed = System.currentTimeMillis() - begin;
         
         System.err.println("commit: commit latency="+elapsed+"ms");
 
         usage();
+        
+        return commitTime;
         
     }
 

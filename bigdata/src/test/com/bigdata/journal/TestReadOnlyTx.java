@@ -42,38 +42,36 @@ Modifications:
 
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Feb 16, 2007
  */
 
-package com.bigdata.scaleup;
-
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
+package com.bigdata.journal;
 
 /**
+ * Test suite for fully isolated read-only transactions.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class TestReadOnlyTx extends ProxyTestCase {
 
-    public Name2MetadataAddr(IRawStore store) {
-
-        super(store);
-        
+    /**
+     * 
+     */
+    public TestReadOnlyTx() {
     }
-    
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
 
-        super(store,metadata);
-        
+    /**
+     * @param name
+     */
+    public TestReadOnlyTx(String name) {
+        super(name);
     }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
 
+    public void test_something() {
+
+        fail("write tests");
+        
     }
 
 }

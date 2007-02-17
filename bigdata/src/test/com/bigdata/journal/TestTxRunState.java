@@ -51,6 +51,9 @@ import java.io.IOException;
 import java.util.Properties;
 
 /**
+ * Test suite for the state machine governing the transaction {@link RunState}
+ * transitions.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -90,7 +93,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -139,7 +142,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -199,7 +202,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -261,7 +264,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -329,7 +332,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -397,7 +400,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.preparedTx.containsKey(ts0));
 
             ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getId());
+            assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );

@@ -53,9 +53,9 @@ import java.util.Map;
 
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.ReadOnlyIndex;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
@@ -65,20 +65,32 @@ import com.bigdata.scaleup.PartitionedIndex;
  * A transaction. A transaction is a context in which the application can access
  * named indices, and perform operations on those indices, and the operations
  * will be isolated according to the isolation level of the transaction. When
- * using an isolated transaction, writes are accumulated in an
+ * using a writable isolated transaction, writes are accumulated in an
  * {@link IsolatedBTree}. The write set is validated when the transaction
  * {@link #prepare()}s and finally merged down onto the global state when the
- * transaction commits.
+ * transaction commits. When the transaction is read-only, writes will be
+ * rejected and {@link #prepare()} and {@link #commit()} are NOPs.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Transactions may be requested that are read-only for some historical
- *       timestamp, that are read-committed (data committed by _other_
+ * @todo Support read-committed transactions (data committed by _other_
  *       transactions during the transaction will be visible within that
- *       transaction), or that are fully isolated (changes made in other
- *       transactions are not visible within the transaction).
+ *       transaction). Read-committed transactions do NOT permit writes (they
+ *       are read-only). Prepare and commit are NOPs. This might be a distinct
+ *       implementation sharing a common base class for handling the run state
+ *       stuff, or just a distinct implementation altogether. The read-committed
+ *       transaction is implemented by just reading against the named indices on
+ *       the journal. However, since commits or overflows of the journal might
+ *       invalidate the index objects we may have to setup a delegation
+ *       mechanism that resolves the named index either on each operation or
+ *       whenever the transaction receives notice that the index must be
+ *       discarded. In order to NOT see in-progress writes, the read-committed
+ *       transaction actually needs to dynamically resolve the most recent
+ *       {@link ICommitRecord} and then use the named indices resolved from
+ *       that. This suggests an event notification mechanism for commits so that
+ *       we can get the commit record more cheaply.
  * 
  * @todo The write set of a transaction is currently written onto an independent
  *       store. This means that concurrent transactions can actually execute
@@ -104,7 +116,7 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       probably means an index into the history of the {@link MetadataIndex}
  *       (so we don't throw it away until no transactions can reach back that
  *       far) as well as an index into the named indices index -- perhaps simply
- *       an index by timestamp into the root addresses (or whole root block
+ *       an index by startTimestamp into the root addresses (or whole root block
  *       views, or moving the root addresses out of the root block and into the
  *       store with only the address of the root addresses in the root block).
  * 
@@ -137,9 +149,24 @@ public class Tx implements IStore, ITx {
     final protected Journal journal;
     
     /**
-     * The timestamp assigned to this transaction. 
+     * The start startTimestamp assigned to this transaction.
+     * <p>
+     * Note: Transaction {@link #startTimestamp} and {@link #commitTimestamp}s
+     * are assigned by a global time service. The time service must provide
+     * unique times for transaction start and commit timestamps and for commit
+     * times for unisolated {@link Journal#commit()}s.
      */
-    final protected long timestamp;
+    final protected long startTimestamp;
+    
+    /**
+     * The commit startTimestamp assigned to this transaction.
+     */
+    private long commitTimestamp;
+    
+    /**
+     * True iff the transaction is read only and will reject writes.
+     */
+    final protected boolean readOnly;
     
     /**
      * The commit counter on the journal as of the time that this transaction
@@ -147,6 +174,13 @@ public class Tx implements IStore, ITx {
      */
     final protected long commitCounter;
 
+    /**
+     * The historical {@link ICommitRecord} choosen as the ground state for this
+     * transaction. All indices isolated by this transaction are isolated as of
+     * the discoverable root address based on this commit record.
+     */
+    final private ICommitRecord commitRecord;
+    
     private RunState runState;
 
     /**
@@ -164,61 +198,124 @@ public class Tx implements IStore, ITx {
     final protected IRawStore tmpStore = new TemporaryStore();
     
     /**
-     * BTrees isolated by this transactions.
+     * Indices isolated by this transactions.
      */
-    private Map<String, IsolatedBTree> btrees = new HashMap<String, IsolatedBTree>();
+    private Map<String, IIndex> btrees = new HashMap<String, IIndex>();
     
     /**
-     * Return a named index. The index will be isolated at the same level as
-     * this transaction. Changes on the index will be made restart-safe iff the
-     * transaction successfully commits.
-     * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @return The named index or <code>null</code> if no index is registered
-     *         under that name.
+     * Create a fully isolated read-write transaction.
      */
-    public IIndex getIndex(String name) {
-
-        if(name==null) throw new IllegalArgumentException();
+    public Tx(Journal journal,long timestamp) {
         
-        /*
-         * store the btrees in hash map so that we can recover the same instance
-         * on each call within the same transaction.
-         */
-        BTree btree = btrees.get(name);
-        
-        if(btree == null) {
-            
-            /*
-             * see if the index was registered.
-             * 
-             * FIXME this gets the last committed unisolated index. We need to
-             * add a timestamp parameter and look up the appropriate metadata
-             * record based on both the name and the timestamp (first metadata
-             * record for the named index having a timestamp LT the transaction
-             * timestamp).  since this is always a request for historical and
-             * read-only data, this method should not register a committer and
-             * the returned btree should not participate in the commit protocol.
-             */
-            UnisolatedBTree src = (UnisolatedBTree)journal.getIndex(name);
-            
-            // the named index was never registered.
-            if(name==null) return null;
-            
-            /*
-             * Isolate the named btree.
-             */
-            return new IsolatedBTree(tmpStore,src);
-            
-            
-        }
-        
-        return btree;
+        this(journal,timestamp,false);
         
     }
+    
+    /**
+     * Create a transaction starting the last committed state of the journal as
+     * of the specified startTimestamp.
+     * 
+     * @param journal
+     *            The journal.
+     * 
+     * @param startTimestamp
+     *            The startTimestamp, which MUST be assigned consistently based on a
+     *            {@link ITimestampService}. Note that a transaction does not
+     *            start up on all {@link Journal}s at the same time. Instead,
+     *            the transaction start startTimestamp is assigned by a centralized
+     *            time service and then provided each time a transaction object
+     *            must be created for isolated on some {@link Journal}.
+     * 
+     * @param readOnly
+     *            When true the transaction will reject writes and
+     *            {@link #prepare()} and {@link #commit()} will be NOPs.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction state has been garbage collected.
+     */
+    public Tx(Journal journal, long timestamp, boolean readOnly) {
+        
+        if (journal == null)
+            throw new IllegalArgumentException();
+        
+        this.journal = journal;
+        
+        this.startTimestamp = timestamp;
 
+        this.readOnly = readOnly;
+        
+        journal.activateTx(this);
+
+        /*
+         * Stash the commit counter so that we can figure out if there were
+         * concurrent transactions and therefore whether or not we need to
+         * validate the write set.
+         */
+        this.commitCounter = journal.getRootBlockView().getCommitCounter();
+
+        /*
+         * The commit record serving as the ground state for the indices
+         * isolated by this transaction (MAY be null, in which case the
+         * transaction will be unable to isolate any indices).
+         */
+        this.commitRecord = journal.getCommitRecord(timestamp);
+        
+        this.runState = RunState.ACTIVE;
+
+    }
+    
+    /**
+     * The transaction identifier.
+     * 
+     * @return The transaction identifier.
+     * 
+     * @todo verify that this has the semantics of the transaction start time
+     *       and that the startTimestamp is (must be) assigned by the same service
+     *       that assigns the {@link #getCommitTimestamp()}.
+     */
+    final public long getStartTimestamp() {
+        
+        return startTimestamp;
+        
+    }
+    
+    /**
+     * Return the commit startTimestamp assigned to this transaction.
+     * 
+     * @return The commit startTimestamp assigned to this transaction.
+     * 
+     * @exception IllegalStateException
+     *                unless the transaction writable and {@link #isPrepared()}
+     *                or {@link #isCommitted()}.
+     */
+    final public long getCommitTimestamp() {
+
+        if(readOnly) {
+
+            throw new IllegalStateException();
+
+        }
+        
+        switch(runState) {
+        case ACTIVE:
+        case ABORTED:
+            throw new IllegalStateException();
+        case PREPARED:
+        case COMMITTED:
+            if(commitTimestamp == 0L) throw new AssertionError();
+            return commitTimestamp;
+        }
+        
+        throw new AssertionError();
+        
+    }
+    
+    public String toString() {
+        
+        return ""+startTimestamp;
+        
+    }
+    
     /**
      * This method must be invoked any time a transaction completes (aborts or
      * commits) in order to release the hard references to any named btrees
@@ -228,58 +325,6 @@ public class Tx implements IStore, ITx {
     private void releaseBTrees() {
 
         btrees.clear();
-        
-    }
-    
-    /**
-     * Create a transaction starting the last committed state of the journal as
-     * of the specified timestamp.
-     * 
-     * @param journal
-     *            The journal.
-     * 
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @exception IllegalStateException
-     *                if the transaction state has been garbage collected.
-     */
-    public Tx(Journal journal, long timestamp ) {
-        
-        if (journal == null)
-            throw new IllegalArgumentException();
-        
-        this.journal = journal;
-        
-        this.timestamp = timestamp;
-
-        journal.activateTx(this);
-
-        /*
-         * Stash the commit counter so that we can figure out if there were
-         * concurrent transactions and therefore whether or not we need to
-         * validate the write set.
-         */
-        this.commitCounter = journal.getRootBlockView().getCommitCounter();
-        
-        this.runState = RunState.ACTIVE;
-
-    }
-    
-    /**
-     * The transaction identifier (aka timestamp).
-     * 
-     * @return The transaction identifier (aka timestamp).
-     */
-    final public long getId() {
-        
-        return timestamp;
-        
-    }
-    
-    public String toString() {
-        
-        return ""+timestamp;
         
     }
     
@@ -299,31 +344,50 @@ public class Tx implements IStore, ITx {
                 abort();
                 
             }
-            
+
             throw new IllegalStateException(NOT_ACTIVE);
-            
+
         }
 
-        try {
+        if (!readOnly) {
 
             /*
-             * Validate against the current state of the journal's object index.
+             * The commit startTimestamp is assigned when we prepare the transaction
+             * since the the commit protocol does not permit unisolated writes
+             * once a transaction begins to prepar until the transaction has
+             * either committed or aborted (if such writes were allowed then we
+             * would have to re-validate the transaction in order to enforce
+             * serializability).
+             * 
+             * @todo resolve this against a service in a manner that will
+             * support a distributed database commit protocol.
              */
+            commitTimestamp = journal.timestampFactory.nextTimestamp();
 
-            if( ! validate() ) {
-                
+            try {
+
+                /*
+                 * Validate against the current state of the journal's object
+                 * index.
+                 */
+
+                if (!validate()) {
+
+                    abort();
+
+                    throw new RuntimeException(
+                            "Validation failed: write-write conflict");
+
+                }
+
+            } catch (Throwable t) {
+
                 abort();
-                
-                throw new RuntimeException("Validation failed: write-write conflict");
-                
+
+                throw new RuntimeException("Unexpected error: " + t, t);
+
             }
-            
-        } catch( Throwable t ) {
-            
-            abort();
-            
-            throw new RuntimeException("Unexpected error: "+t, t);
-            
+
         }
 
         journal.prepared(this);
@@ -348,7 +412,7 @@ public class Tx implements IStore, ITx {
      *                {@link #prepare() prepared}. If the transaction is not
      *                already complete, then it is aborted.
      */
-    public void commit() {
+    public long commit() {
 
         if( ! isPrepared() ) {
             
@@ -362,27 +426,33 @@ public class Tx implements IStore, ITx {
             
         }
 
-        /*
-         * Merge each isolated index into the global scope. This also marks the
-         * slots used by the versions written by the transaction as 'committed'.
-         * This operation MUST succeed (at a logical level) since we have
-         * already validated (neither read-write nor write-write conflicts
-         * exist).
-         * 
-         * @todo Non-transactional operations on the global scope should be
-         * either disallowed entirely or locked out during the prepare-commit
-         * protocol when using transactions since they (a) could invalidate the
-         * pre-condition for the merge; and (b) uncommitted changes would be
-         * discarded if the merge operation fails.  One solution is to use
-         * batch operations or group commit mechanism to dynamically create
-         * transactions from unisolated operations.
-         */
         try {
 
-            mergeOntoGlobalState();
+            if(!readOnly) {
+
+                /*
+                 * Merge each isolated index into the global scope. This also
+                 * marks the slots used by the versions written by the
+                 * transaction as 'committed'. This operation MUST succeed (at a
+                 * logical level) since we have already validated (neither
+                 * read-write nor write-write conflicts exist).
+                 * 
+                 * @todo Non-transactional operations on the global scope should
+                 * be either disallowed entirely or locked out during the
+                 * prepare-commit protocol when using transactions since they
+                 * (a) could invalidate the pre-condition for the merge; and (b)
+                 * uncommitted changes would be discarded if the merge operation
+                 * fails. One solution is to use batch operations or group
+                 * commit mechanism to dynamically create transactions from
+                 * unisolated operations.
+                 */
+
+                mergeOntoGlobalState();
             
-            // Atomic commit.
-            journal.commit(this);
+                // Atomic commit.
+                journal.commit(this);
+                
+            }
             
             runState = RunState.COMMITTED;
 
@@ -420,6 +490,8 @@ public class Tx implements IStore, ITx {
             releaseBTrees();
             
         }
+
+        return getCommitTimestamp();
         
     }
 
@@ -448,6 +520,12 @@ public class Tx implements IStore, ITx {
 
     }
 
+    final public boolean isReadOnly() {
+        
+        return readOnly;
+        
+    }
+    
     /**
      * A transaction is "active" when it is created and remains active until it
      * prepares or aborts.  An active transaction accepts READ, WRITE, DELETE,
@@ -514,16 +592,17 @@ public class Tx implements IStore, ITx {
      * Validate all isolated btrees written on by this transaction.
      */
     private boolean validate() {
+ 
+        assert ! readOnly;
         
-        if(journal.getRootBlockView().getCommitCounter() != commitCounter) {
-            
-            /*
-             * This compares the timestamp of the last transaction committed on
-             * the journal with the timestamp of the last transaction committed
-             * on the journal as of the time that this transaction object was
-             * created. In a centralized database archicture this is a sufficient
-             * test to determine that no intevening commits have occured.
-             */
+        /*
+         * This compares the current commit counter on the journal with the
+         * commit counter at the time that this transaction was started. If they
+         * are the same, then no intervening commits have occurred on the
+         * journal and there is nothing to validate.
+         */
+        
+        if(journal.getRootBlockView().getCommitCounter() == commitCounter) {
             
             return true;
             
@@ -532,16 +611,22 @@ public class Tx implements IStore, ITx {
         /*
          * for all isolated btrees, if(!validate()) return false;
          */
-        Iterator<Map.Entry<String,IsolatedBTree>> itr = btrees.entrySet().iterator();
+
+        Iterator<Map.Entry<String,IIndex>> itr = btrees.entrySet().iterator();
         
         while(itr.hasNext()) {
             
-            Map.Entry<String, IsolatedBTree> entry = itr.next();
+            Map.Entry<String, IIndex> entry = itr.next();
             
             String name = entry.getKey();
             
-            IsolatedBTree isolated = entry.getValue();
+            IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
             
+            /*
+             * Note: this is the _current_ committed state for the named index.
+             * We need to validate against the current state, not against some
+             * historical state.
+             */
             UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
             
             if(!isolated.validate(groundState)) return false;
@@ -557,23 +642,95 @@ public class Tx implements IStore, ITx {
      * transactions into the corresponding btrees in the global state.
      */
     private void mergeOntoGlobalState() {
-    
-        Iterator<Map.Entry<String,IsolatedBTree>> itr = btrees.entrySet().iterator();
+
+        assert ! readOnly;
+
+        Iterator<Map.Entry<String,IIndex>> itr = btrees.entrySet().iterator();
         
         while(itr.hasNext()) {
             
-            Map.Entry<String, IsolatedBTree> entry = itr.next();
+            Map.Entry<String, IIndex> entry = itr.next();
             
             String name = entry.getKey();
             
-            IsolatedBTree isolated = entry.getValue();
+            IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
             
+            /*
+             * Note: this is the _current_ committed state for the named index.
+             * We need to merge down onto the current state, not onto some
+             * historical state.
+             */
             UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
             
             isolated.mergeDown(groundState);
             
         }
 
+    }
+
+    /**
+     * Return a named index. The index will be isolated at the same level as
+     * this transaction. Changes on the index will be made restart-safe iff the
+     * transaction successfully commits.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @return The named index or <code>null</code> if no index is registered
+     *         under that name.
+     */
+    public IIndex getIndex(String name) {
+
+        if(name==null) throw new IllegalArgumentException();
+        
+        /*
+         * Store the btrees in hash map so that we can recover the same instance
+         * on each call within the same transaction.
+         */
+        IIndex index = btrees.get(name);
+        
+        if(commitRecord==null) {
+            
+            /*
+             * This occurs when there are either no commit records or no
+             * commit records before the start time for the transaction.
+             */
+            
+            return null;
+            
+        }
+        
+        if(index == null) {
+            
+            /*
+             * See if the index was registered as of the ground state used by
+             * this transaction to isolated indices.
+             */
+            UnisolatedBTree src = (UnisolatedBTree) journal.getIndex(name,
+                    commitRecord);
+            
+            // the named index was never registered.
+            if(name==null) return null;
+            
+            /*
+             * Isolate the named btree.
+             */
+            if(readOnly) {
+
+                index = new ReadOnlyIndex(src);
+                
+            } else {
+                
+                index = new IsolatedBTree(tmpStore,src);
+                
+            }
+
+            btrees.put(name, index);
+            
+        }
+        
+        return index;
+        
     }
 
 }

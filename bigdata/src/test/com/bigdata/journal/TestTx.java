@@ -47,15 +47,21 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.IOException;
 import java.util.Properties;
 
+import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.objndx.IIndex;
+
 /**
- * Test suite for transaction isolation with respect to the underlying journal.
- * The tests in this suite are designed to verify isolation of changes within
- * the scope of the transaction when compared to the last committed state of the
- * journal. This basically amounts to verifying that operations read through the
- * transaction scope object index into the journal scope object index.
+ * Test suite for fully-isolated read-write transactions.
+ * 
+ * @todo Test suite for transaction isolation with respect to the underlying
+ *       journal. The tests in this suite are designed to verify isolation of
+ *       changes within the scope of the transaction when compared to the last
+ *       committed state of the journal. This basically amounts to verifying
+ *       that operations read through the transaction scope object index into
+ *       the journal scope object index.
  * 
  * @todo Do stress test with writes, reads, and deletes.
  * 
@@ -107,8 +113,8 @@ import java.util.Properties;
  *       validation rules to the database, perhaps as a parameter when a
  *       transaction starts or - to enforce the data type specificity at the
  *       risk of tighter integration of components - as part of the schema
- *       declaration.  Declare IConflictResolver that either merges
- *       state into object in the transaction or causes the tx to abort.
+ *       declaration. Declare IConflictResolver that either merges state into
+ *       object in the transaction or causes the tx to abort.
  * 
  * @todo Verify correct abort after 'prepare'.
  * 
@@ -122,9 +128,6 @@ import java.util.Properties;
  */
 public class TestTx extends ProxyTestCase {
     
-    /**
-     * 
-     */
     public TestTx() {
     }
 
@@ -133,96 +136,300 @@ public class TestTx extends ProxyTestCase {
     }
 
     /**
-     * Test verifiers that duplicate transaction identifiers are detected in the
-     * case where the first transaction is active.
+     * Test verifies that a transaction may start when there are (a) no commits
+     * on the journal; and (b) no indices have been registered.
+     * 
+     * @todo In the current implementation the transaction will be unable to
+     *       isolate an index if the index has not been registered already by an
+     *       unisolated transaction.
      */
-    public void test_duplicateTransactionIdentifiers01() throws IOException {
+    public void test_noIndicesRegistered() {
+
+        Properties properties = getProperties();
+
+        Journal journal = new Journal(properties);
+
+        journal.commit();
         
-        final Properties properties = getProperties();
+        ITx tx = journal.newTx();
+        
+        /*
+         * nothing written on this transaction.
+         */
+        
+        tx.prepare();
+        
+        // commit.
+        assertTrue(tx.commit()!=0L);
 
-        try {
+        journal.close();
+        
+    }
 
-            Journal journal = new Journal(properties);
+    /**
+     * Verify that an index is not visible in the tx until the native
+     * transaction in which it is registered has already committed before
+     * the tx starts. 
+     */
+    public void test_indexNotVisibleUnlessCommitted() {
+       
+        Properties properties = getProperties();
 
-            Tx tx0 = new Tx(journal,0);
+        Journal journal = new Journal(properties);
 
-            try {
+        String name = "abc";
+        
+        // register index in unisolated scope, but do not commit yet.
+        journal.registerIndex(name, new UnisolatedBTree(journal, 3));
+        
+        // start tx1.
+        ITx tx1 = journal.newTx();
 
-                // Try to create another transaction with the same identifier.
-                new Tx(journal,0);
-                
-                fail( "Expecting: "+IllegalStateException.class);
-                
-            }
-            
-            catch( IllegalStateException ex ) {
-             
-                System.err.println("Ignoring expected exception: "+ex);
-                
-            }
-            
-            tx0.abort();
-            
-            journal.close();
+        // the index is not visible in tx1.
+        assertNull(tx1.getIndex(name));
+        
+        // do unisolated commit.
+        assertTrue(journal.commit()!=0L);
+        
+        // start tx2.
+        ITx tx2 = journal.newTx();
 
-        } finally {
+        // the index still is not visible in tx1.
+        assertNull(tx1.getIndex(name));
 
-            deleteTestJournalFile();
-
-        }       
+        // the index is visible in tx2.
+        assertNotNull(tx2.getIndex(name));
+        
+        tx1.abort();
+        
+        tx2.abort();
+        
+        journal.close();
         
     }
     
     /**
-     * Test verifiers that duplicate transaction identifiers are detected in the
-     * case where the first transaction has already prepared.
-     * 
-     * @todo The {@link Journal} does not maintain a collection of committed
-     *       transaction identifier for transactions that have already
-     *       committed. However, it might make sense to maintain a transient
-     *       collection that is rebuilt on restart of those transactions that
-     *       are waiting for GC. Also, it may be possible to summarily reject
-     *       transaction identifiers if they are before a timestamp when a
-     *       transaction service has notified the journal that no active
-     *       transactions remain before that timestamp.  If those modifications
-     *       are made, then add the appropriate tests here.
+     * Create a journal, setup an index, write an entry on that index, and
+     * commit the store. Setup a transaction and verify that we can isolated
+     * that index and read the written value. Write a value on the unisolated
+     * index and verify that it is not visible within the transaction.
      */
-    public void test_duplicateTransactionIdentifiers02() throws IOException {
+    public void test_readIsolation() {
         
-        final Properties properties = getProperties();
+        Properties properties = getProperties();
 
-        try {
+        Journal journal = new Journal(properties);
+        
+        final String name = "abc";
+        
+        final int branchingFactor = 3;
+        
+        final byte[] k1 = new byte[]{1};
+        final byte[] k2 = new byte[]{2};
 
-            Journal journal = new Journal(properties);
+        final byte[] v1 = new byte[]{1};
+        final byte[] v2 = new byte[]{2};
+        
+        {
 
-            ITx tx0 = new Tx(journal,0);
-
-            tx0.prepare();
+            /*
+             * register the index, write an entry on the unisolated index,
+             * and commit the journal. 
+             */
             
+            IIndex index = journal.registerIndex(name, new UnisolatedBTree(
+                    journal, branchingFactor));
+        
+            assertNull(index.insert(k1, v1));
+            
+            assert(journal.commit()!=0L);
+            
+        }
+        
+        ITx tx1 = journal.newTx();
+    
+        {
+
+            /*
+             * verify that the write is visible in a transaction that starts
+             * after the commit.
+             */
+            
+            IIndex index  = tx1.getIndex(name);
+            
+            assertTrue(index.contains(k1));
+            
+            assertEquals(v1,(byte[])index.lookup(k1));
+            
+        }
+
+        {
+    
+            /*
+             * obtain the unisolated index and write another entry and commit
+             * the journal. 
+             */
+            
+            IIndex index  = journal.getIndex(name);
+            
+            assertNull(index.insert(k2, v2));
+            
+            assertTrue(journal.commit()!=0L);
+            
+        }
+        
+        {
+            
+            /*
+             * verify that the entry written on the unisolated index is not
+             * visible to the transaction that started before that write.
+             */
+
+            IIndex index = tx1.getIndex(name);
+            
+            assertTrue(index.contains(k1));
+            assertFalse(index.contains(k2));
+
+        }
+        
+        ITx tx2 = journal.newTx();
+        
+        {
+
+            /*
+             * start another transaction and verify that the 2nd committed
+             * write is now visible to that transaction.
+             */
+            
+            IIndex index = tx2.getIndex(name);
+            
+            assertTrue(index.contains(k1));
+            assertTrue(index.contains(k2));
+
+        }
+        
+        tx1.abort();
+
+        journal.close();
+        
+    }
+
+    /**
+     * Test verifies that an isolated write is visible inside of a transaction
+     * (tx1) but not in a concurrent transaction (tx2) and not in the unisolated
+     * index until the tx1 commits. Once the tx1 commits, the write is visible
+     * in the unisolated index. The write never becomes visible in tx2.  If tx2
+     * attempts to write a value under the same key then a write-write conflict
+     * is reported and validation fails.
+     */
+    public void test_writeIsolation() {
+        
+        Properties properties = getProperties();
+
+        Journal journal = new Journal(properties);
+        
+        final String name = "abc";
+        
+        final int branchingFactor = 3;
+        
+        final byte[] k1 = new byte[]{1};
+
+        final byte[] v1 = new byte[]{1};
+        final byte[] v1a = new byte[]{1,1};
+        
+        {
+
+            /*
+             * register an index and commit the journal. 
+             */
+            
+            journal.registerIndex(name, new UnisolatedBTree(journal,
+                    branchingFactor));
+            
+            assert(journal.commit()!=0L);
+            
+        }
+
+        /*
+         * create two transactions.
+         */
+        
+        ITx tx1 = journal.newTx();
+        
+        ITx tx2 = journal.newTx();
+
+        {
+            
+            /*
+             * write an entry in tx1.  verify that the entry is not visible
+             * in the unisolated index or in the index as isolated by tx2.
+             */
+            
+            IsolatedBTree ndx1 = (IsolatedBTree)tx1.getIndex(name);
+            
+            assertFalse(ndx1.contains(k1));
+            
+            assertNull(ndx1.insert(k1,v1));
+            
+            // check the version counter in tx1.
+            assertEquals("versionCounter", 0, ndx1.getValue(k1)
+                    .getVersionCounter());
+            
+            // not visible in the other tx.
+            assertFalse(tx2.getIndex(name).contains(k1));
+
+            // not visible in the unisolated index.
+            assertFalse(journal.getIndex(name).contains(k1));
+
+            /*
+             * commit tx1. verify that the write is still not visible in tx2 but
+             * that it is now visible in the unisolated index.
+             */
+            
+            // prepare tx1.
+            tx1.prepare();
+
+            // commit tx1.
+            assertTrue(tx1.commit()!=0L);
+            
+            // still not visible in the other tx.
+            assertFalse(tx2.getIndex(name).contains(k1));
+
+            // but now visible in the unisolated index.
+            assertTrue(journal.getIndex(name).contains(k1));
+
+            // check the version counter in the unisolated index.
+            assertEquals("versionCounter", 1, ((UnisolatedBTree) journal
+                    .getIndex(name)).getValue(k1).getVersionCounter());
+
+            /*
+             * write a conflicting entry in tx2 and verify that validation of
+             * tx2 fails.
+             */
+
+            assertNull(tx2.getIndex(name).insert(k1,v1a));
+
+            // check the version counter in tx2.
+            assertEquals("versionCounter", 0, ((IsolatedBTree) tx2
+                    .getIndex(name)).getValue(k1).getVersionCounter());
+
             try {
 
-                // Try to create another transaction with the same identifier.
-                new Tx(journal,0);
+                tx2.prepare();
                 
-                fail( "Expecting: "+IllegalStateException.class);
+                fail("Expecting: "+IllegalStateException.class);
                 
-            }
-            
-            catch( IllegalStateException ex ) {
-             
+            } catch(IllegalStateException ex) {
+                
                 System.err.println("Ignoring expected exception: "+ex);
                 
             }
-
-            tx0.abort();
             
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-
-        }       
+            assertTrue(tx2.isAborted());
+            
+        }
+        
+        journal.close();
         
     }
     

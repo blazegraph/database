@@ -70,7 +70,7 @@ public class SlaveJournal extends Journal {
      * {@link Name2Addr} mapping names to {@link MetadataIndex}s registered
      * for the store.
      */
-    public static transient final int ROOT_NAME_2_METADATA_ADDR = 1;
+    public static transient final int ROOT_NAME_2_METADATA_ADDR = 2;
     
     /**
      * BTree mapping btree names to the last metadata record committed for the
@@ -128,7 +128,7 @@ public class SlaveJournal extends Journal {
         assert name2MetadataAddr == null;
         
         // the root address of the btree.
-        long addr = getAddr(ROOT_NAME_2_METADATA_ADDR);
+        long addr = getRootAddr(ROOT_NAME_2_METADATA_ADDR);
 
         if (addr == 0L) {
 
@@ -147,8 +147,8 @@ public class SlaveJournal extends Journal {
              * Reload the btree from its root address.
              */
 
-            name2MetadataAddr = new Name2MetadataAddr(this, BTreeMetadata
-                    .read(this, addr));
+            name2MetadataAddr = (Name2MetadataAddr)BTreeMetadata
+                    .load(this, addr);
 
         }
 

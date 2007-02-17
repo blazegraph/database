@@ -2,6 +2,7 @@ package com.bigdata.objndx;
 
 import java.io.Externalizable;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 
 import com.bigdata.io.SerializerUtil;
@@ -45,6 +46,11 @@ public class BTreeMetadata implements Serializable {
     public final int nentries;
     
     public final IValueSerializer valueSer;
+    
+    /**
+     * The name of the class that will be used to re-load the index.
+     */
+    public final String className;
     
     public final RecordCompressor recordCompressor;
 
@@ -94,13 +100,15 @@ public class BTreeMetadata implements Serializable {
         this.nleaves = btree.nleaves;
 
         this.nentries = btree.nentries;
-        
+
         this.valueSer = btree.nodeSer.valueSerializer;
+        
+        this.className = btree.getClass().getName();
         
         this.recordCompressor = btree.nodeSer.recordCompressor;
 
         this.useChecksum = btree.nodeSer.useChecksum;
-
+        
         /*
          * Note: This can not be invoked here since a derived class will not 
          * have initialized its fields yet.  Therefore the write() is done by
@@ -129,13 +137,64 @@ public class BTreeMetadata implements Serializable {
      *            the store.
      * @param addr
      *            the address of the metadata record.
-     *            
+     * 
      * @return the metadata record.
+     * 
+     * @see #load(IRawStore, long), which will load the btree not just the
+     *      {@link BTreeMetadata}.
+     * 
+     * @todo review remaining uses of this method vs
+     *       {@link #load(IRawStore, long)}.
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
         return (BTreeMetadata) SerializerUtil.deserialize(store
                 .read(addr, null));
+        
+    }
+
+    /**
+     * Re-load the {@link BTree} or derived class from the store. The
+     * {@link BTree} or derived class MUST provide a public construct with the
+     * following signature: <code>
+     * 
+     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * 
+     * </code>
+     * 
+     * @param store
+     *            The store.
+     * @param addr
+     *            The address of the {@link BTreeMetadata} record for that
+     *            class.
+     * 
+     * @return The {@link BTree} or derived class loaded from that
+     *         {@link BTreeMetadata} record.
+     * 
+     * @see BTree#newMetadata(), which MUST be overloaded if you subclass extend
+     *      {@link BTreeMetadata}.
+     */
+    public static BTree load(IRawStore store, long addr) {
+        
+        BTreeMetadata metadata = read(store, addr);
+        
+        try {
+            
+            Class cl = Class.forName(metadata.className);
+            
+            Constructor ctor = cl.getConstructor(new Class[] {
+                    IRawStore.class, BTreeMetadata.class });
+            
+            BTree btree = (BTree) ctor.newInstance(new Object[] { store,
+                    metadata });
+            
+            return btree;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
     
