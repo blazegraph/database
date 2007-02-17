@@ -47,6 +47,7 @@ import java.util.Vector;
 
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.TempTripleStore;
 
 
 public class RuleRdf01 extends AbstractRuleRdf {
@@ -60,9 +61,13 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
     }
 
-    protected SPO[] collectEntailments() {
+    public Stats apply( TempTripleStore btree ) {
         
-        Vector<SPO> entailments = new Vector<SPO>();
+        Stats stats = new Stats();
+        
+        long computeStart = System.currentTimeMillis();
+        
+        Vector<SPO> entailments = new Vector<SPO>(BUFFER_SIZE);
         
         long lastP = -1;
         
@@ -79,14 +84,25 @@ public class RuleRdf01 extends AbstractRuleRdf {
                 
                 lastP = stmt.p;
                 
+                if (entailments.size() == BUFFER_SIZE) {
+                    dumpBuffer
+                        ( entailments.toArray( new SPO[entailments.size()] ),
+                          btree
+                          );
+                    entailments.clear();
+                }
                 entailments.add
                     ( new SPO(stmt.p, store.rdfType.id, store.rdfProperty.id) );
+                stats.numComputed++;
                 
             }
             
         }
+        dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
         
-        return entailments.toArray( new SPO[entailments.size()] );
+        stats.computeTime = System.currentTimeMillis() - computeStart;
+        
+        return stats;
         
     }
 /*

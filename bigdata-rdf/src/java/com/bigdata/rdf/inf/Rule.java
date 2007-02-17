@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.TempTripleStore;
+
 
 /**
  * 
@@ -99,10 +101,10 @@ abstract public class Rule {
     /**
      * Apply the rule to the statement in the store.
      * 
-     * @param store
-     *            The triple store.
+     * @param entailments
+     *            The temporary triple store used to hold entailments.
      * 
-     * @return The #of statements added to the store.
+     * @return Statistics related to what the rule did.
      * 
      * @todo support conditional insert in the btree so that we do not have
      *       to do a lookup/insert combination.
@@ -115,6 +117,20 @@ abstract public class Rule {
      *       traversal so implementations of this method need to bufferQueue the
      *       statements that they will insert.
      */
-    abstract public int apply();
+    abstract public Stats apply( TempTripleStore entailments );
+    
+    
+    /**
+     * Statistics about what the Rule did during {@link Rule#apply()}.
+     * 
+     * @author mikep
+     */
+    public static class Stats {
+
+        public int numComputed;
+        
+        long computeTime;
+        
+    }
 
 }

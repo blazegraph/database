@@ -54,6 +54,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.TripleStore;
 
 /**
@@ -158,15 +159,15 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /**
          * Applies the base rule iff the {@link Magic} is matched.
          */
-        public int apply() {
+        public Rule.Stats apply( TempTripleStore entailments ) {
 
             if(match()) { 
             
-                return rule.apply();
+                return rule.apply( entailments );
             
             }
             
-            return 0;
+            return null;
             
         }
         

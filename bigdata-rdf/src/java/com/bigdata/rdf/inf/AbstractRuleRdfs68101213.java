@@ -47,6 +47,7 @@ import java.util.Vector;
 
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.TempTripleStore;
 
 
 public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
@@ -61,9 +62,13 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
 
     }
     
-    protected SPO[] collectEntailments() {
+    public Stats apply( TempTripleStore btree ) {
         
-        Vector<SPO> entailments = new Vector<SPO>();
+        Stats stats = new Stats();
+        
+        long computeStart = System.currentTimeMillis();
+        
+        Vector<SPO> entailments = new Vector<SPO>(BUFFER_SIZE);
         
         byte[] startKey = store.keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id, 0
@@ -84,12 +89,23 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
             long _s = head.s.isVar() ? stmt.s : head.s.id;
             long _p = head.p.isVar() ? stmt.s : head.p.id;
             long _o = head.o.isVar() ? stmt.s : head.o.id;
-            
+        
+            if (entailments.size() == BUFFER_SIZE) {
+                dumpBuffer
+                    ( entailments.toArray( new SPO[entailments.size()] ),
+                      btree
+                      );
+                entailments.clear();
+            }
             entailments.add( new SPO(_s, _p, _o) );
+            stats.numComputed++;
             
         }
+        dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
         
-        return entailments.toArray( new SPO[entailments.size()] );
+        stats.computeTime = System.currentTimeMillis() - computeStart;
+        
+        return stats;
         
     }
 

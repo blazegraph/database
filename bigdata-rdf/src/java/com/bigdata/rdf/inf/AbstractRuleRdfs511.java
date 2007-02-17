@@ -47,6 +47,8 @@ import java.util.Arrays;
 import java.util.Vector;
 
 import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.TempTripleStore;
+import com.bigdata.rdf.inf.Rule.Stats;
 
 
 public class AbstractRuleRdfs511 extends AbstractRuleRdf {
@@ -61,9 +63,13 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
 
     }
     
-    protected SPO[] collectEntailments() {
+    public Stats apply( TempTripleStore entailments ) {
         
-                // the predicate is fixed for all parts of the rule.
+        Stats stats = new Stats();
+        
+        long computeStart = System.currentTimeMillis();
+        
+        // the predicate is fixed for all parts of the rule.
         final long p = head.p.id;
         
         // the key for that predicate.
@@ -90,18 +96,29 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
         // a clone of the answer set
         SPO[] stmts2 = stmts1.clone();
 
-        Vector<SPO> v = new Vector<SPO>();
+        Vector<SPO> stmts3 = new Vector<SPO>(BUFFER_SIZE);
         // the simplest n^2 algorithm
         for( int i = 0; i < stmts1.length; i++ ) {
             // printStatement(stmts1[i]);
             for ( int j = 0; j < stmts2.length; j++ ) {
                 if ( stmts1[i].o == stmts2[j].s ) {
-                    v.add( new SPO(stmts1[i].s, p, stmts2[j].o) );
+                    if (stmts3.size() == BUFFER_SIZE) {
+                        dumpBuffer
+                            ( stmts3.toArray( new SPO[stmts3.size()] ), 
+                              entailments
+                              );
+                        stmts3.clear();
+                    }
+                    stmts3.add( new SPO(stmts1[i].s, p, stmts2[j].o) );
+                    stats.numComputed++;
                 }
             }
         }
+        dumpBuffer( stmts3.toArray( new SPO[stmts3.size()] ), entailments );
         
-        return v.toArray( new SPO[v.size()] );
+        stats.computeTime = System.currentTimeMillis() - computeStart;
+
+        return stats;
         
     }
 

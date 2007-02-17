@@ -118,7 +118,7 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
      */
     protected BufferMode getBufferMode() {
         
-        return BufferMode.Transient;
+        return BufferMode.Direct;
         
     }
     
@@ -132,6 +132,8 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
             
             File file = new File(filename);
             
+            System.err.println( "store file: " + file.getAbsolutePath() );
+        
             if(file.exists() && ! file.delete() ) {
                 
                 throw new RuntimeException("Could not delete file: "+file.getAbsoluteFile());

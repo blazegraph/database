@@ -47,57 +47,65 @@ import java.util.Arrays;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
+import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.TempTripleStore;
 
 
 public abstract class AbstractRuleRdf extends Rule {
 
+    protected final int BUFFER_SIZE = 10*1024*1024;
+    
+    
     public AbstractRuleRdf(InferenceEngine store, Triple head, Pred[] body) {
 
         super(store, head, body);
 
     }
     
-    public int apply() {
+    public abstract Stats apply( TempTripleStore entailments );
 
-        // long startTime = System.currentTimeMillis();
+    protected void dumpBuffer( SPO[] stmts, TempTripleStore btree ) {
         
-        SPO[] entailments = collectEntailments();
-/*        
-        long collectionTime = System.currentTimeMillis() - startTime;
-        
-        System.out.println( getClass().getName() + " collected " + 
-                            entailments.length + " entailments in " + 
-                            collectionTime + " millis" );
+        // deal with the SPO index
+        IIndex spo = btree.getSPOIndex();
+        Arrays.sort(stmts,SPOComparator.INSTANCE);
+        for ( int i = 0; i < stmts.length; i++ ) {
+            byte[] key = btree.keyBuilder.statement2Key
+                ( stmts[i].s, stmts[i].p, stmts[i].o
+                  );
+            if ( !spo.contains(key) ) {
+                spo.insert(key, null);
+            }
+        }
 
-        int numStmtsBefore = store.ndx_spo.getEntryCount(); 
-        
-        System.out.println( getClass().getName() + 
-                            " number of statements before: " + 
-                            numStmtsBefore);
-        
-        startTime = System.currentTimeMillis();
-*/        
-        int numAdded = insertEntailments( entailments );
-/*
-        long insertionTime = System.currentTimeMillis() - startTime;
-        
-        int numStmtsAfter = store.ndx_spo.getEntryCount();
-        
-        System.out.println( getClass().getName() + 
-                            " number of statements after: " + 
-                            numStmtsAfter);
-        
-        System.out.println( getClass().getName() + 
-                            " inserted " + ( numStmtsAfter - numStmtsBefore ) +
-                            " statements in " + insertionTime + " millis");
-*/        
-        return numAdded;
+        // deal with the POS index
+        IIndex pos = btree.getPOSIndex();
+        Arrays.sort(stmts,POSComparator.INSTANCE);
+        for ( int i = 0; i < stmts.length; i++ ) {
+            byte[] key = btree.keyBuilder.statement2Key
+                ( stmts[i].p, stmts[i].o, stmts[i].s
+                  );
+            if ( !pos.contains(key) ) {
+                pos.insert(key, null);
+            }
+        }
+
+        // deal with the OSP index
+        IIndex osp = btree.getOSPIndex();
+        Arrays.sort(stmts,OSPComparator.INSTANCE);
+        for ( int i = 0; i < stmts.length; i++ ) {
+            byte[] key = btree.keyBuilder.statement2Key
+                ( stmts[i].o, stmts[i].s, stmts[i].p
+                  );
+            if ( !osp.contains(key) ) {
+                osp.insert(key, null);
+            }
+        }
         
     }
-
-    protected abstract SPO[] collectEntailments();
-        
+    
     protected int insertEntailments( SPO[] entailments ) {
         
         int numAdded = 0;
@@ -143,6 +151,12 @@ public abstract class AbstractRuleRdf extends Rule {
         
     }
     
+    protected int insertEntailments2( TempTripleStore entailments ) {
+        
+        return insertEntailments( convert( entailments ) );
+        
+    }
+        
     protected void printStatement( SPO stmt ) {
         
         IIndex ndx = store.getIdTermIndex();
@@ -160,6 +174,42 @@ public abstract class AbstractRuleRdf extends Rule {
     protected String abbrev( URI uri ) {
         
         return uri.getURI().substring(uri.getURI().lastIndexOf('#'));
+        
+    }
+    
+    protected TempTripleStore convert( SPO[] stmts ) {
+        
+        TempTripleStore tts = new TempTripleStore();
+        
+        for ( int i = 0; i < stmts.length; i++ ) {
+            
+            tts.addStatement( stmts[i].s, stmts[i].p, stmts[i].o );
+            
+        }
+        
+        return tts;
+        
+    }
+    
+    protected SPO[] convert( TempTripleStore tts ) {
+        
+        SPO[] stmts = new SPO[tts.getStatementCount()];
+        
+        int i = 0;
+        
+        IIndex ndx_spo = tts.getSPOIndex();
+        
+        IEntryIterator it = ndx_spo.rangeIterator(null, null);
+        
+        while ( it.hasNext() ) {
+            
+            it.next();
+            
+            stmts[i++] = new SPO(KeyOrder.SPO, tts.keyBuilder, it.getKey());
+            
+        }
+        
+        return stmts;
         
     }
     

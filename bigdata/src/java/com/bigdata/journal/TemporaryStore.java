@@ -51,6 +51,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -134,6 +137,8 @@ public class TemporaryStore implements IRawStore {
         this.maximumInMemoryExtent = maximumInMemoryExtent;
         
         this.useDirectBuffers = useDirectBuffers;
+        
+        setupName2AddrBTree();
         
     }
 
@@ -278,5 +283,61 @@ public class TemporaryStore implements IRawStore {
         this.buf = diskBuf;
         
     }
+
+    
+    /**
+     * BTree mapping index names to the last metadata record committed for the
+     * named index. The keys are index names (unicode strings). The values are
+     * the last known {@link Addr address} of the named btree.
+     */
+    private Name2Addr name2Addr;
+
+    /**
+     * Setup the btree that resolved named btrees.
+     */
+    private void setupName2AddrBTree() {
+
+        assert name2Addr == null;
+        
+        name2Addr = new Name2Addr(this);
+
+    }
+    
+    public IIndex registerIndex(String name, IIndex btree) {
+
+        if( getIndex(name) != null ) {
+            
+            throw new IllegalStateException("BTree already registered: name="+name);
+            
+        }
+        
+        // add to the persistent name map.
+        name2Addr.add(name, btree);
+        
+        return btree;
+        
+    }
+    
+    public void dropIndex(String name) {
+        
+        name2Addr.dropIndex(name);
+        
+    }
+
+    /**
+     * Return the named index (unisolated). Writes on the returned index will be
+     * made restart-safe with the next {@link #commit()} regardless of the
+     * success or failure of a transaction. Transactional writes must use the
+     * same named method on the {@link Tx} in order to obtain an isolated
+     * version of the named btree.
+     */
+    public IIndex getIndex(String name) {
+
+        if(name==null) throw new IllegalArgumentException();
+        
+        return name2Addr.get(name);
+
+    }
+
     
 }

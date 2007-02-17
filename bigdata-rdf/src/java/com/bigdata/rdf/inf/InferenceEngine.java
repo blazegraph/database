@@ -54,6 +54,7 @@ import com.bigdata.journal.Options;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
@@ -283,49 +284,106 @@ public class InferenceEngine extends TripleStore {
 
         final int nrules = rules.length;
 
-        int firstStatementCount = getStatementCount();
-
-        int lastStatementCount = firstStatementCount;
+        final int firstStatementCount = getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
-        System.err.println("Closing kb with " + lastStatementCount
+        log.debug("Closing kb with " + firstStatementCount
                 + " statements");
 
-        int nadded = 0;
+        int round = 0;
+        
+        TempTripleStore entailments = new TempTripleStore(); 
 
         while (true) {
 
+            int numComputed = 0;
+            
+            long computeTime = 0;
+            
+            int numEntailmentsBefore = entailments.getStatementCount();
+            
             for (int i = 0; i < nrules; i++) {
 
                 Rule rule = rules[i];
 
-                nadded += rule.apply();
+                Rule.Stats stats = rule.apply( entailments );
+                
+                numComputed += stats.numComputed;
 
-            }
-
-            int statementCount = getStatementCount();
-
-            // testing the #of statement is less prone to error.
-            if (lastStatementCount == statementCount) {
-
-                //                if( nadded == 0 ) { // should also work.
-
-                // This is the fixed point.
-                break;
-
+                computeTime += stats.computeTime;
+                
             }
             
-            lastStatementCount = statementCount;
+            int numEntailmentsAfter = entailments.getStatementCount();
+            
+            if ( numEntailmentsBefore == numEntailmentsAfter ) {
+                
+                // This is the fixed point.
+                break;
+                
+            }
+            
+            long insertStart = System.currentTimeMillis();
+            
+            int numInserted = transferBTrees( entailments );
+            
+            long insertTime = System.currentTimeMillis() - insertStart;
+            
+            StringBuilder debug = new StringBuilder();
+            debug.append( "round #" ).append( round++ ).append( ": " );
+            debug.append( numComputed ).append( " computed in " );
+            debug.append( computeTime ).append( " millis, " );
+            debug.append( numInserted ).append( " inserted in " );
+            debug.append( insertTime ).append( " millis " );
+            log.debug( debug.toString() );
 
         }
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("Closed store in " + elapsed + "ms yeilding "
+        final int lastStatementCount = getStatementCount();
+        
+        log.debug("Closed store in " + elapsed + "ms yeilding "
                 + lastStatementCount + " statements total, " + 
                 (lastStatementCount - firstStatementCount) + " inferences");
 
+    }
+    
+    private int transferBTrees( TempTripleStore entailments ) {
+        
+        int numInserted = 0;
+        
+        IEntryIterator it = entailments.getSPOIndex().rangeIterator(null, null);
+        while (it.hasNext()) {
+            it.next();
+            byte[] key = it.getKey();
+            if (!getSPOIndex().contains(key)) {
+                numInserted++;
+                getSPOIndex().insert(key, null);
+            }
+        }
+        
+        it = entailments.getPOSIndex().rangeIterator(null, null);
+        while (it.hasNext()) {
+            it.next();
+            byte[] key = it.getKey();
+            if (!getPOSIndex().contains(key)) {
+                getPOSIndex().insert(key, null);
+            }
+        }
+        
+        it = entailments.getOSPIndex().rangeIterator(null, null);
+        while (it.hasNext()) {
+            it.next();
+            byte[] key = it.getKey();
+            if (!getOSPIndex().contains(key)) {
+                getOSPIndex().insert(key, null);
+            }
+        }
+        
+        return numInserted;
+        
     }
 
     /**
@@ -440,7 +498,8 @@ public class InferenceEngine extends TripleStore {
 
                 Rule rule = rules[i];
 
-                nadded += rule.apply();
+                // nadded += rule.apply();
+                // rule.apply();
 
             }
 
