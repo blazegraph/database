@@ -57,6 +57,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -212,7 +213,23 @@ import com.ibm.icu.text.RuleBasedCollator;
  */
 public class TripleStore extends /*Partitioned*/Journal {
     
+    /**
+     * The logger for the {@link TripleStore} (shadows the logger for the
+     * journal).
+     */
     static transient public Logger log = Logger.getLogger(TripleStore.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /*
      * Declare indices for root addresses for the different indices maintained

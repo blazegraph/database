@@ -330,6 +330,7 @@ public class InferenceEngine extends TripleStore {
             
             long insertTime = System.currentTimeMillis() - insertStart;
             
+            if(DEBUG){
             StringBuilder debug = new StringBuilder();
             debug.append( "round #" ).append( round++ ).append( ": " );
             debug.append( numComputed ).append( " computed in " );
@@ -337,16 +338,19 @@ public class InferenceEngine extends TripleStore {
             debug.append( numInserted ).append( " inserted in " );
             debug.append( insertTime ).append( " millis " );
             log.debug( debug.toString() );
+            }
 
         }
 
         final long elapsed = System.currentTimeMillis() - begin;
 
         final int lastStatementCount = getStatementCount();
-        
-        log.debug("Closed store in " + elapsed + "ms yeilding "
+
+        if(INFO) {
+        log.info("Closed store in " + elapsed + "ms yeilding "
                 + lastStatementCount + " statements total, " + 
                 (lastStatementCount - firstStatementCount) + " inferences");
+        }
 
     }
     
