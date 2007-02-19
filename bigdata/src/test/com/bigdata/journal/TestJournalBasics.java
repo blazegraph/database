@@ -100,20 +100,48 @@ public class TestJournalBasics extends TestCase {
         /*
          * tests of transaction support.
          */
+        
         // tests of transitions in the transaction RunState state machine.
         suite.addTestSuite( TestTxRunState.class );
         // @todo update these tests of the tx-journal integration.
         suite.addTestSuite( TestTxJournalProtocol.class );
-        // @todo tests of read-write transactions.
+        // tests of read-write transactions and isolation.
         suite.addTestSuite( TestTx.class );
-        // @todo tests of read-only transactions.
+        // tests of read-only transactions.
         suite.addTestSuite( TestReadOnlyTx.class );
         // @todo tests of read-committed transactions.
         suite.addTestSuite( TestReadCommittedTx.class );
         // @todo tests of concurrent schedules and conflict detection.
         suite.addTestSuite( TestConcurrentSchedules.class );
-        // @todo tests of write-write conflict resolution.
+        // todo tests of write-write conflict resolution.
         suite.addTestSuite(TestConflictResolution.class);
+        
+        /*
+         * @todo tests of batch api and group commit mechanisms for very high
+         * volume updates. These tests might be more relevent to the data server
+         * since group commit can be achieved by transparently collecting small
+         * non-conflicting updates into a transaction that succeeds or fails all
+         * updates in the group. in this model transactions are local and
+         * updates do not have atomicity across journals. another alternative is
+         * to use a pulse to commit a global group update transaction with a
+         * frequency that trades off the size of the commit groups against
+         * latency. the advantage of the latter approach is that it can be
+         * combined with normal transaction processing in a trivial manner and I
+         * am not sure whether or not that is true of the former approach.
+         */
+        
+        /*
+         * @todo stress tests of concurrent transactions parameterized so that
+         * we can also test overflow handling and scale up. Scale out testing
+         * may require a refactor of the clients to lookup services. This could
+         * be moved out of the per-journal strategy test suite and performed
+         * only for the target strategy, e.g., Direct. Measure throughput rates
+         * and compare TPS and write/read rates with other systems.
+         * 
+         * @todo we could add tests based on known transaction processing
+         * benchmarks here as well.
+         */
+        suite.addTestSuite(StressTestConcurrent.class);
 
         return suite;
         

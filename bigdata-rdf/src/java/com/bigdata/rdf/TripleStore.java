@@ -66,6 +66,7 @@ import org.openrdf.model.Value;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
@@ -92,14 +93,54 @@ import com.ibm.icu.text.RuleBasedCollator;
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
+ * @todo Refactor to support transactions and concurrent load/query
+ *       <p>
+ *       Conflicts arise in the bigdata-RDF store when concurrent transactions
+ *       attempt to define the same term. The problem arises because on index is
+ *       used to map the term to an unique identifier and another to map the
+ *       identifiers back to terms. Further, the statement indices use term
+ *       identifiers directly in their keys. Therefore, resolving concurrent
+ *       definition of the same term requires that we either do NOT isolate the
+ *       writes on the term indices (which is probably an acceptable strategy)
+ *       or that we let the application order the pass over the isolated indices
+ *       and give the conflict resolver access to the {@link Tx} so that it can
+ *       update the dependent indices if a conflict is discovered on the terms
+ *       index.
+ *       <p>
+ *       The simplest approach appears to be NOT isolating the terms and ids
+ *       indices. As long as the logic resides at the index, e.g., a lambda
+ *       expression/method, to assign the identifier and create the entry in the
+ *       ids index we can get buy with less isolation. If concurrent processes
+ *       attempt to define the same term, then one or the other will wind up
+ *       executing first (writes on indices are single threaded) and the result
+ *       will be coherent as long as the write is committed before the ids are
+ *       returned to the application. It simply does not matter which process
+ *       defines the term since all that we care about is atomic, consistent,
+ *       and durable. This is a case where group commit would work well (updates
+ *       are blocked together on the server automatically to improve
+ *       throughput).
+ *       <p>
+ *       Concurrent assertions of the same statement cause write-write
+ *       conflicts, but they are trivially resolved -- we simply ignore the
+ *       write-write conflict since both transactions agree on the statement
+ *       data. Unlike the term indices, isolation is important for statements
+ *       since we want to guarentee that a set of statements either is or is not
+ *       asserted atomically. (With the terms index, we could care less as long
+ *       as the indices are coherent.)
+ *       <p>
+ *       The only concern with the statement indices occurs when one transaction
+ *       asserts a statement and a concurrent transaction deletes a statement. I
+ *       need to go back and think this one through some more and figure out
+ *       whether or not we need to abort a transaction in this case.
+ * 
  * @todo Refactor to use a delegation mechanism so that we can run with or
  *       without partitioned indices? (All you have to do now is change the
  *       class that is being extended from Journal to PartitionedJournal and
  *       handle some different initialization properties.)
  * 
- * @todo Play with the branching factor again.  Now that we are using overflow
- *       to evict data onto index segments we can use a higher branching factor
- *       and simply evict more often.  Is this worth it?  We might want a lower
+ * @todo Play with the branching factor again. Now that we are using overflow to
+ *       evict data onto index segments we can use a higher branching factor and
+ *       simply evict more often. Is this worth it? We might want a lower
  *       branching factor on the journal since we can not tell how large any
  *       given write will be and then use larger branching factors on the index
  *       segments.

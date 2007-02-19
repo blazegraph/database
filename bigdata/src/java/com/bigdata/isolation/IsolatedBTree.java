@@ -217,7 +217,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
         if (key == null)
             throw new IllegalArgumentException();
 
-        Value value = (Value) super.lookup(key);
+        Value value = (Value) super.getValue((byte[])key);
 
         if (value == null) {
 

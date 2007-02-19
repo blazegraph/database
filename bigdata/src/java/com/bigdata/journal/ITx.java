@@ -69,8 +69,12 @@ public interface ITx extends IStore {
      * Prepare the transaction for a {@link #commit()}.
      * 
      * @exception IllegalStateException
-     *                If the transaction is not active.  If the transaction is
+     *                If the transaction is not active. If the transaction is
      *                not complete, then it will be aborted.
+     * 
+     * @exception ValidationError
+     *                If the transaction can not be validated. If this exception
+     *                is thrown, then the transaction was aborted.
      */
     public void prepare();
 

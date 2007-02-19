@@ -47,6 +47,11 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.Properties;
+
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.objndx.IIndex;
+
 /**
  * Test suite for fully isolated read-only transactions.
  * 
@@ -68,10 +73,90 @@ public class TestReadOnlyTx extends ProxyTestCase {
         super(name);
     }
 
-    public void test_something() {
+    /**
+     * Test verifies that you can not write on a read-only transaction.
+     */
+    public void test_isReadOnly() {
 
-        fail("write tests");
+        Properties properties = getProperties();
         
+        Journal journal = new Journal(properties);
+        
+        String name = "abc";
+        
+        final byte[] k1 = new byte[]{1};
+
+        final byte[] v1 = new byte[]{1};
+
+        {
+            
+            /*
+             * register an index, write on the index, and commit the journal.
+             */
+            IIndex ndx = journal.registerIndex(name, new UnisolatedBTree(
+                    journal));
+            
+            ndx.insert(k1, v1);
+
+            journal.commit();
+            
+        }
+        
+        {
+            
+            /*
+             * create a read-only transaction, verify that we can read the
+             * value written on the index but that we can not write on the
+             * index.
+             */
+            
+            ITx tx1 = journal.newTx(true);
+            
+            IIndex ndx = tx1.getIndex(name);
+
+            assertNotNull(ndx);
+            
+            assertEquals((byte[])v1,(byte[])ndx.lookup(k1));
+         
+            try {
+                ndx.insert(k1,new byte[]{1,2,3});
+                fail("Expecting: "+UnsupportedOperationException.class);
+                } catch( UnsupportedOperationException ex) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            tx1.prepare();
+            
+            tx1.commit();
+            
+        }
+        
+        {
+            
+            /*
+             * do it again, but this time we will abort the read-only
+             * transaction.
+             */
+            
+            ITx tx1 = journal.newTx(true);
+            
+            IIndex ndx = tx1.getIndex(name);
+
+            assertNotNull(ndx);
+            
+            assertEquals((byte[])v1,(byte[])ndx.lookup(k1));
+         
+            try {
+                ndx.insert(k1,new byte[]{1,2,3});
+                fail("Expecting: "+UnsupportedOperationException.class);
+                } catch( UnsupportedOperationException ex) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+            tx1.abort();
+            
+        }
+
     }
 
 }

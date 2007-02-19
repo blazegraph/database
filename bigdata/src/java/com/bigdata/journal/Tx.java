@@ -56,7 +56,6 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.ReadOnlyIndex;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 
@@ -70,6 +69,21 @@ import com.bigdata.scaleup.PartitionedIndex;
  * {@link #prepare()}s and finally merged down onto the global state when the
  * transaction commits. When the transaction is read-only, writes will be
  * rejected and {@link #prepare()} and {@link #commit()} are NOPs.
+ * </p>
+ * <p>
+ * The write set of a transaction is written onto a {@link TemporaryStore}.
+ * Therefore the size limit on the transaction write set is currently 2G, but
+ * the transaction will run in memory up to 100M. The {@link TemporaryStore} is
+ * closed and any backing file is deleted as soon as the transaction completes.
+ * </p>
+ * <p>
+ * Each {@link IsolatedBTree} is local to a transaction and is backed by its own
+ * store. This means that concurrent transactions can execute without
+ * synchronization (real concurrency) up to the point where they
+ * {@link #prepare()}. We do not need a read-lock on the indices isolated by
+ * the transaction since they are <em>historical</em> states that will not
+ * receive concurrent updates. This might prove to be a nice way to leverage
+ * multiple processors / cores on a data server.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -91,14 +105,6 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       {@link ICommitRecord} and then use the named indices resolved from
  *       that. This suggests an event notification mechanism for commits so that
  *       we can get the commit record more cheaply.
- * 
- * @todo The write set of a transaction is currently written onto an independent
- *       store. This means that concurrent transactions can actually execute
- *       concurrently. We do not even need a read-lock on the indices isolated
- *       by the transaction since they are read-only. This might prove to be a
- *       nice way to leverage multiple processors / cores on a data server. The
- *       size limit on the transaction write set is currently 2G, but the
- *       transaction will run in memory up to 100M.
  * 
  * @todo Support transactions where the indices isolated by the transactions are
  *       {@link PartitionedIndex}es.
@@ -129,8 +135,9 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       pre-conditions itself and exceptions being thrown from here if the
  *       server failed to test the pre-conditions and they were not met
  * 
- * @todo Is it possible to have more than one transaction PREPARE must
- *       concurrent PREPARE operations be serialized?
+ * @todo PREPARE operations must be serialized unless they are provably
+ *       non-overlapping. This will require a handshake with either the
+ *       {@link Journal} or (more likely) the {@link TransactionServer}.
  */
 public class Tx implements IStore, ITx {
 
@@ -195,7 +202,7 @@ public class Tx implements IStore, ITx {
      * of the store since copy-on-write causes fewer bytes to be copied each
      * time it is invoked.
      */
-    final protected IRawStore tmpStore = new TemporaryStore();
+    final protected TemporaryStore tmpStore = new TemporaryStore();
     
     /**
      * Indices isolated by this transactions.
@@ -280,9 +287,9 @@ public class Tx implements IStore, ITx {
     }
     
     /**
-     * Return the commit startTimestamp assigned to this transaction.
+     * Return the commit timestamp assigned to this transaction.
      * 
-     * @return The commit startTimestamp assigned to this transaction.
+     * @return The commit timestamp assigned to this transaction. 
      * 
      * @exception IllegalStateException
      *                unless the transaction writable and {@link #isPrepared()}
@@ -317,14 +324,23 @@ public class Tx implements IStore, ITx {
     }
     
     /**
-     * This method must be invoked any time a transaction completes (aborts or
-     * commits) in order to release the hard references to any named btrees
-     * isolated within this transaction so that the JVM may reclaim the space
-     * allocated to them on the heap.
+     * This method must be invoked any time a transaction completes ({@link #abort()}s
+     * or {@link #commit()}s) in order to release resources held by that
+     * transaction.
      */
-    private void releaseBTrees() {
+    protected void releaseResources() {
 
+        /*
+         * Release hard references to any named btrees isolated within this
+         * transaction so that the JVM may reclaim the space allocated to them
+         * on the heap.
+         */
         btrees.clear();
+        
+        /*
+         * Delete the TemporaryStore.
+         */
+        tmpStore.close();
         
     }
     
@@ -367,19 +383,22 @@ public class Tx implements IStore, ITx {
             try {
 
                 /*
-                 * Validate against the current state of the journal's object
-                 * index.
+                 * Validate against the current state of the various indices
+                 * on write the transaction has written.
                  */
 
                 if (!validate()) {
 
                     abort();
 
-                    throw new RuntimeException(
-                            "Validation failed: write-write conflict");
+                    throw new ValidationError();
 
                 }
 
+            } catch( ValidationError ex) {
+                
+                throw ex;
+                
             } catch (Throwable t) {
 
                 abort();
@@ -406,6 +425,9 @@ public class Tx implements IStore, ITx {
      * placeholder for a 2-phase commit protocol for use with distributed
      * transactions.
      * </p>
+     * 
+     * @return The commit timestamp or <code>0L</code> if the transaction was
+     *         read-only.
      * 
      * @exception IllegalStateException
      *                if the transaction has not been
@@ -487,11 +509,11 @@ public class Tx implements IStore, ITx {
             
         } finally {
 
-            releaseBTrees();
+            releaseResources();
             
         }
 
-        return getCommitTimestamp();
+        return readOnly ? 0L : getCommitTimestamp();
         
     }
 
@@ -514,7 +536,7 @@ public class Tx implements IStore, ITx {
             
         } finally {
             
-            releaseBTrees();
+            releaseResources();
 
         }
 
@@ -661,7 +683,12 @@ public class Tx implements IStore, ITx {
              * historical state.
              */
             UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
-            
+
+            /*
+             * Copy the validated write set for this index down onto the
+             * corresponding unisolated index, updating version counters, delete
+             * markers, and values as necessary in the unisolated index.
+             */
             isolated.mergeDown(groundState);
             
         }

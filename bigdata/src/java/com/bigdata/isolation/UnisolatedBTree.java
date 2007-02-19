@@ -112,6 +112,13 @@ so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
 public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
     /**
+     * The default branching factor is choosen to be relatively small since that
+     * will cause less growth in the store without sacrificing too much
+     * performance.
+     */
+    public static final int DEFAULT_BRANCHING_FACTOR = 32;
+    
+    /**
      * The optional conflict resolver.
      */
     protected final IConflictResolver conflictResolver;
@@ -141,21 +148,45 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         return conflictResolver;
     
     }
+    
+    /**
+     * Create an isolatable btree using a default branching factor.
+     * 
+     * @param store
+     */
+    public UnisolatedBTree(IRawStore store) {
+        
+        this(store, DEFAULT_BRANCHING_FACTOR, null);
+        
+    }
 
     /**
-     * Create an isolated btree.
+     * Create an isolatable btree using a default branching factor and the
+     * specified {@link IConflictResolver}.
+     * 
+     * @param store
+     * @param conflictResolver
+     */
+    public UnisolatedBTree(IRawStore store, IConflictResolver conflictResolver) {
+        
+        this(store, DEFAULT_BRANCHING_FACTOR, conflictResolver);
+        
+    }
+
+    /**
+     * Create an isolatable btree.
      * 
      * @param store
      * @param branchingFactor
      */
     public UnisolatedBTree(IRawStore store, int branchingFactor) {
         
-        this(store,branchingFactor, null);
+        this(store, branchingFactor, null);
         
     }
         
     /**
-     * Create an isolated btree.
+     * Create an isolatable btree.
      * 
      * @param store
      * @param branchingFactor

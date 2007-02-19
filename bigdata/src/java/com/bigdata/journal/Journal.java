@@ -1507,5 +1507,19 @@ public class Journal implements IJournal {
         return null;
 
     }
+    
+    /**
+     * True iff there is a transaction that has prepared and not yet committed
+     * or aborted.
+     * <p>
+     * Note: It is illegal for more than one transaction to prepare at a time
+     * if they have write sets that overlap.  Serializability depends on each
+     * transaction validating against the last committed ground state.
+     */
+    public boolean isPreparedTx() {
+        
+        return ! preparedTx.isEmpty();
+        
+    }
 
 }
