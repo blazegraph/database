@@ -55,6 +55,49 @@ import com.bigdata.isolation.Value;
 
 /**
  * Tests of write-write conflict resolution.
+ * <p>
+ * Write-write conflicts either result in successful reconcilation via
+ * state-based conflict resolution or an abort of the transaction that is
+ * validating. The tests in this suite verify that write-write conflicts can be
+ * detected and provide versions of those tests where the conflict can and can
+ * not be validated and verify the end state in each case.
+ * <p>
+ * State-based validation requires transparency at the object level, including
+ * the ability to deserialize versions into objects, to compare objects for
+ * consistency, to merge data into the most recent version where possible and
+ * according to data type specific rules, and to destructively merge objects
+ * when the conflict arises on <em>identity</em> rather than state.
+ * <p>
+ * An example of an identity based conflict is when two objects are created that
+ * represent URIs in an RDF graph. Since the lexicon for an RDF graph generally
+ * requires uniqueness those objects must be merged into a single object since
+ * they have the same identity. For an RDFS store validation on the lexicon or
+ * statements ALWAYS succeeds since they are always consistent.
+ * 
+ * @todo Verify that we can handle the bank account example (this is state-based
+ *       conflict resolution altogether requiring that we carry a richer
+ *       representation of state in the objects and then use that additional
+ *       state to validate and resolve some kinds of data type specific
+ *       conflicts).
+ * 
+ * @todo Do tests that verify that multiple conflicts are correctly detected and
+ *       resolved.
+ * 
+ * @todo Verify that we can handle examples in which we have to traverse an
+ *       object graph during conflict resolution. (Really, two object graphs: a
+ *       readOnly view of the ground state for the transaction and the
+ *       readWriteTx that we are trying to validate.) This last issue is by far
+ *       the trickyest and may require support for concurrent modification of
+ *       the transaction indices during traveral (or more simply of reading from
+ *       a fused view of the resolved and unconflicting entries in the
+ *       read-write tx index views).
+ * 
+ * @todo Destructive merging of objects in a graph can propagate changes other
+ *       objects. Unless the data structures provide for encapsulation, e.g., by
+ *       defining objects that serve as collectors for the link set members in a
+ *       given segment, that change could propagate beyond the segment in which
+ *       it is detected. If changes can propagate in that manner then care MUST
+ *       be taken to ensure that validation terminates.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -110,22 +153,20 @@ public class TestConflictResolution extends ProxyTestCase {
          * Create two transactions.
          */
         
-        ITx tx1 = journal.newTx();
+        final long tx1 = journal.newTx();
         
-        ITx tx2 = journal.newTx();
+        final long tx2 = journal.newTx();
         
         /*
          * Write a value under the same key on the same index in both
          * transactions.
          */
         
-        tx1.getIndex(name).insert(k1, v1a);
+        journal.getIndex(name,tx1).insert(k1, v1a);
 
-        tx2.getIndex(name).insert(k1, v1b);
+        journal.getIndex(name,tx2).insert(k1, v1b);
 
-        tx1.prepare();
-        
-        tx1.commit();
+        journal.commit(tx1);
         
         /*
          * verify that the value from tx1 is found under the key on the
@@ -133,12 +174,14 @@ public class TestConflictResolution extends ProxyTestCase {
          */
         assertEquals(v1a,(byte[])journal.getIndex(name).lookup(k1));
 
+        final ITx tmp = journal.getTx(tx2);
+
         try {
-            tx2.prepare();
+            journal.commit(tx2);
             fail("Expecting: "+ValidationError.class);
         } catch(ValidationError ex) {
             System.err.println("Ignoring expected exception: "+ex);
-            assertTrue(tx2.isAborted());
+            assertTrue(tmp.isAborted());
         }
         
         journal.close();
@@ -187,22 +230,20 @@ public class TestConflictResolution extends ProxyTestCase {
          * Create two transactions.
          */
         
-        ITx tx1 = journal.newTx();
+        final long tx1 = journal.newTx();
         
-        ITx tx2 = journal.newTx();
+        final long tx2 = journal.newTx();
         
         /*
          * Write a value under the same key on the same index in both
          * transactions.
          */
         
-        tx1.getIndex(name).insert(k1, v1a);
+        journal.getIndex(name,tx1).insert(k1, v1a);
 
-        tx2.getIndex(name).insert(k1, v1b);
+        journal.getIndex(name,tx2).insert(k1, v1b);
 
-        tx1.prepare();
-        
-        tx1.commit();
+        journal.commit(tx1);
 
         /*
          * verify that the value from tx1 is found under the key on the
@@ -210,12 +251,7 @@ public class TestConflictResolution extends ProxyTestCase {
          */
         assertEquals(v1a,(byte[])journal.getIndex(name).lookup(k1));
 
-        tx2.prepare();
-        
-        // @todo the indices should probably become read only at this point.
-        assertEquals(v1c,(byte[])tx2.getIndex(name).lookup(k1));
-        
-        tx2.commit();
+        journal.commit(tx2);
         
         /*
          * verify that the resolved value is found under the key on the
@@ -227,68 +263,68 @@ public class TestConflictResolution extends ProxyTestCase {
 
     }
     
-    /**
-     * The concurrency control algorithm must not permit two transactions to
-     * prepare at the same time since that violates the basic rules of
-     * serializability.
-     * 
-     * @todo javadoc and move into schedules test suite or its own test suite.
-     */
-    public void test_serializability() {
-
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
-
-        String name = "abc";
-
-        final byte[] k1 = new byte[] { 1 };
-
-        final byte[] v1a = new byte[] { 1 };
-        final byte[] v1b = new byte[] { 2 };
-
-        {
-
-            /*
-             * register an index and commit the journal.
-             */
-            
-            journal.registerIndex(name, new UnisolatedBTree(journal));
-
-            journal.commit();
-
-        }
-
-        /*
-         * Create two transactions.
-         */
-        
-        ITx tx1 = journal.newTx();
-        
-        ITx tx2 = journal.newTx();
-        
-        /*
-         * Write a value under the same key on the same index in both
-         * transactions.
-         */
-        
-        tx1.getIndex(name).insert(k1, v1a);
-
-        tx2.getIndex(name).insert(k1, v1b);
-
-        tx1.prepare();
-        
-        try {
-            tx2.prepare();
-            fail("Expecting: "+IllegalStateException.class);
-        } catch(IllegalStateException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }
-        
-        journal.close();
-        
-    }
- 
+//    /**
+//     * The concurrency control algorithm must not permit two transactions to
+//     * prepare at the same time since that violates the basic rules of
+//     * serializability.
+//     * 
+//     * @todo javadoc and move into schedules test suite or its own test suite.
+//     */
+//    public void test_serializability() {
+//
+//        Properties properties = getProperties();
+//
+//        Journal journal = new Journal(properties);
+//
+//        String name = "abc";
+//
+//        final byte[] k1 = new byte[] { 1 };
+//
+//        final byte[] v1a = new byte[] { 1 };
+//        final byte[] v1b = new byte[] { 2 };
+//
+//        {
+//
+//            /*
+//             * register an index and commit the journal.
+//             */
+//            
+//            journal.registerIndex(name, new UnisolatedBTree(journal));
+//
+//            journal.commit();
+//
+//        }
+//
+//        /*
+//         * Create two transactions.
+//         */
+//        
+//        final long tx1 = journal.newTx();
+//        
+//        final long tx2 = journal.newTx();
+//        
+//        /*
+//         * Write a value under the same key on the same index in both
+//         * transactions.
+//         */
+//        
+//        journal.getIndex(name,tx1).insert(k1, v1a);
+//
+//        journal.getIndex(name,tx2).insert(k1, v1b);
+//
+//        tx1.prepare();
+//        
+//        try {
+//            tx2.prepare();
+//            fail("Expecting: "+IllegalStateException.class);
+//        } catch(IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: "+ex);
+//        }
+//        
+//        journal.close();
+//        
+//    }
+//
     /**
      * Helper class used to resolve a predicted conflict to a known value.
      * 

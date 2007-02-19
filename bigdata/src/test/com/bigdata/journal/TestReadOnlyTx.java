@@ -110,9 +110,9 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * index.
              */
             
-            ITx tx1 = journal.newTx(true);
+            final long tx1 = journal.newTx(true);
             
-            IIndex ndx = tx1.getIndex(name);
+            IIndex ndx = journal.getIndex(name,tx1);
 
             assertNotNull(ndx);
             
@@ -125,9 +125,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
                 System.err.println("Ignoring expected exception: "+ex);
             }
             
-            tx1.prepare();
-            
-            tx1.commit();
+            journal.commit(tx1);
             
         }
         
@@ -138,9 +136,9 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * transaction.
              */
             
-            ITx tx1 = journal.newTx(true);
+            final long tx1 = journal.newTx(true);
             
-            IIndex ndx = tx1.getIndex(name);
+            IIndex ndx = journal.getIndex(name,tx1);
 
             assertNotNull(ndx);
             
@@ -153,7 +151,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
                 System.err.println("Ignoring expected exception: "+ex);
             }
             
-            tx1.abort();
+            journal.abort(tx1);
             
         }
 

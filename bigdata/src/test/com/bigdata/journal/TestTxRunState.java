@@ -50,9 +50,16 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.objndx.IIndex;
+
 /**
  * Test suite for the state machine governing the transaction {@link RunState}
  * transitions.
+ * 
+ * @todo refactor to test both {@link Tx} and the as yet to be written
+ *       read-committed transaction class (ideally they will share a base class
+ *       which encapsulates the state transaction mechanisms).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -437,5 +444,263 @@ public class TestTxRunState extends ProxyTestCase {
         }
 
     }
+
+    /**
+     * Verifies that access to, and operations on, a named indices is denied
+     * after a PREPARE.
+     * 
+     * @throws IOException
+     */
+    public void test_runStateMachine_prepared_correctRejection()
+            throws IOException {
+
+        final Properties properties = getProperties();
+
+        Journal journal = new Journal(properties);
+
+        String name = "abc";
+
+        {
+
+            journal.registerIndex(name, new UnisolatedBTree(journal));
+        
+            journal.commit();
+            
+        }
+
+        final long tx0 = journal.newTx();
+
+        ITx tmp = journal.getTx(tx0);
+
+        assertNotNull(tmp);
+        
+        IIndex ndx = journal.getIndex(name,tx0);
+        
+        assertNotNull(ndx);
+
+        // commit the journal.
+        journal.commit(tx0);
+
+        /*
+         * Verify that you can not access a named index after 'prepare'.
+         */
+        try {
+            journal.getIndex(name,tx0);
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+
+        /*
+         * Verify that operations on an pre-existing index reference are now
+         * denied.
+         */
+        try {
+            ndx.lookup(new byte[] { 1 });
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            ndx.contains(new byte[] { 1 });
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            ndx.remove(new byte[] { 1 });
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            ndx.insert(new byte[] { 1 }, new byte[] { 2 });
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+
+        assertFalse(tmp.isActive());
+        assertTrue(tmp.isPrepared());
+        assertFalse(tmp.isAborted());
+        assertFalse(tmp.isCommitted());
+        assertFalse(tmp.isComplete());
+
+        assertFalse(journal.activeTx.containsKey(tmp.getStartTimestamp()));
+        assertFalse(journal.preparedTx.containsKey(tmp.getStartTimestamp()));
+        assertNull(journal.getTx(tmp.getStartTimestamp()));
+        
+        journal.close();
+
+    }
+
+//    /**
+//     * Verifies that access to, and operations on, a named indices is denied
+//     * after an ABORT.
+//     * 
+//     * @throws IOException
+//     */
+//    public void test_runStateMachine_aborted_correctRejection()
+//            throws IOException {
+//
+//        final Properties properties = getProperties();
+//
+//        Journal journal = new Journal(properties);
+//
+//        String name = "abc";
+//
+//        {
+//
+//            journal.registerIndex(name, new UnisolatedBTree(journal));
+//        
+//            journal.commit();
+//            
+//        }
+//
+//        ITx tx0 = journal.newTx();
+//
+//        IIndex ndx = tx0.getIndex(name);
+//        
+//        assertNotNull(ndx);
+//        
+//        tx0.abort();
+//
+//        /*
+//         * Verify that you can not access a named index.
+//         */
+//        try {
+//            tx0.getIndex(name);
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//
+//        /*
+//         * Verify that operations on an pre-existing index reference are now
+//         * denied.
+//         */
+//        try {
+//            ndx.lookup(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.contains(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.remove(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.insert(new byte[] { 1 }, new byte[] { 2 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//
+//        assertFalse(tx0.isActive());
+//        assertFalse(tx0.isPrepared());
+//        assertTrue (tx0.isAborted());
+//        assertFalse(tx0.isCommitted());
+//        assertTrue (tx0.isComplete());
+//
+//        assertFalse(journal.activeTx.containsKey(tx0.getStartTimestamp()));
+//        assertFalse(journal.preparedTx.containsKey(tx0.getStartTimestamp()));
+//        assertNull(journal.getTx(tx0.getStartTimestamp()));
+//        
+//        journal.close();
+//
+//    }
+//
+//    /**
+//     * Verifies that access to, and operations on, a named indices is denied
+//     * after a COMMIT.
+//     * 
+//     * @throws IOException
+//     */
+//    public void test_runStateMachine_commit_correctRejection()
+//            throws IOException {
+//
+//        final Properties properties = getProperties();
+//
+//        Journal journal = new Journal(properties);
+//
+//        String name = "abc";
+//
+//        {
+//
+//            journal.registerIndex(name, new UnisolatedBTree(journal));
+//        
+//            journal.commit();
+//            
+//        }
+//
+//        ITx tx0 = journal.newTx();
+//
+//        IIndex ndx = tx0.getIndex(name);
+//        
+//        assertNotNull(ndx);
+//        
+//        tx0.prepare();
+//        tx0.commit();
+//
+//        /*
+//         * Verify that you can not access a named index.
+//         */
+//        try {
+//            tx0.getIndex(name);
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//
+//        /*
+//         * Verify that operations on an pre-existing index reference are now
+//         * denied.
+//         */
+//        try {
+//            ndx.lookup(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.contains(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.remove(new byte[] { 1 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//        try {
+//            ndx.insert(new byte[] { 1 }, new byte[] { 2 });
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            System.err.println("Ignoring expected exception: " + ex);
+//        }
+//
+//        assertFalse(tx0.isActive());
+//        assertFalse(tx0.isPrepared());
+//        assertFalse(tx0.isAborted());
+//        assertTrue(tx0.isCommitted());
+//        assertTrue(tx0.isComplete());
+//
+//        assertFalse(journal.activeTx.containsKey(tx0.getStartTimestamp()));
+//        assertFalse(journal.preparedTx.containsKey(tx0.getStartTimestamp()));
+//        assertNull(journal.getTx(tx0.getStartTimestamp()));
+//        
+//        journal.close();
+//
+//    }
 
 }

@@ -331,7 +331,8 @@ public class TemporaryStore implements IRawStore, IStore {
      */
     public IIndex getIndex(String name) {
 
-        if(name==null) throw new IllegalArgumentException();
+        if (name == null)
+            throw new IllegalArgumentException();
         
         return name2Addr.get(name);
 

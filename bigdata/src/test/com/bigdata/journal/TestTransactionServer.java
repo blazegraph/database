@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import com.bigdata.journal.TransactionServer.IsolationEnum;
+
 import junit.framework.TestCase;
 
 /**
@@ -83,8 +85,6 @@ public class TestTransactionServer extends TestCase {
         
     }
 
-    final int segment1 = 1;
-
     /**
      * Test verifies some correctness for determination of transaction ground
      * states and garbage collection of committed transactions for a ground
@@ -105,15 +105,15 @@ public class TestTransactionServer extends TestCase {
          * 
          * @todo This is bootstrapping a ground state, which is a bit kludgy.
          */
-        final long t0 = server.startTx(segment1, false, false);
+        final long t0 = server.startTx(IsolationEnum.ReadWrite);
         server.commitTx(t0);
 
         // @todo verify groundState for new transactions is t0.
-        final long t1 = server.startTx(segment1, false, false);
-        final long t2 = server.startTx(segment1, false, false);
+        final long t1 = server.startTx(IsolationEnum.ReadWrite);
+        final long t2 = server.startTx(IsolationEnum.ReadWrite);
         server.commitTx(t1);
         // @todo verify groundState for new transactions is t1.
-        final long t3 = server.startTx(segment1, false, false);
+        final long t3 = server.startTx(IsolationEnum.ReadWrite);
         server.commitTx(t2);
         /*
          * @todo verify groundState for new transactions is t2.
@@ -121,7 +121,7 @@ public class TestTransactionServer extends TestCase {
          * @todo verify that we receive GC notice for {t1,t2} and that t0 is
          * no longer an active groundState.
          */
-        final long t4 = server.startTx(segment1, false, false);
+        final long t4 = server.startTx(IsolationEnum.ReadWrite);
         server.commitTx(t3);
         /*
          * @todo verify groundState for new transactions is t4.

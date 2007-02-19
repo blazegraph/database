@@ -277,13 +277,13 @@ public class RootBlockView implements IRootBlockView {
         
     }
 
-    public long getFirstTxId() {
+    public long getFirstTxCommitTime() {
         
         return buf.getLong(OFFSET_FIRST_TX);
         
     }
     
-    public long getLastTxId() {
+    public long getLastTxCommitTime() {
         
         return buf.getLong(OFFSET_LAST_TX);
         
@@ -368,8 +368,8 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", version="+getVersion());
         sb.append(", segmentId="+getSegmentId());
         sb.append(", nextOffset="+getNextOffset());
-        sb.append(", firstTxId="+getFirstTxId());
-        sb.append(", lastTxId="+getLastTxId());
+        sb.append(", firstTxId="+getFirstTxCommitTime());
+        sb.append(", lastTxId="+getLastTxCommitTime());
         sb.append(", commitTimestamp="+getCommitTimestamp());
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+Addr.toString(getCommitRecordAddr()));

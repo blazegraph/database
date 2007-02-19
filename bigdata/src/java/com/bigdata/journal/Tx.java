@@ -270,6 +270,29 @@ public class Tx implements IStore, ITx {
         this.runState = RunState.ACTIVE;
 
     }
+
+    /**
+     * The hash code is based on the {@link #getStartTimestamp()}.
+     * 
+     * @todo pre-compute this value if it is used much.
+     */
+    final public int hashCode() {
+        
+        return Long.valueOf(startTimestamp).hashCode();
+        
+    }
+
+    /**
+     * True iff they are the same object or have the same start timestamp.
+     * 
+     * @param o
+     *            Another transaction object.
+     */
+    final public boolean equals(ITx o) {
+        
+        return this == o || startTimestamp == o.getStartTimestamp();
+        
+    }
     
     /**
      * The transaction identifier.
@@ -338,9 +361,13 @@ public class Tx implements IStore, ITx {
         btrees.clear();
         
         /*
-         * Delete the TemporaryStore.
+         * Close and delete the TemporaryStore.
          */
-        tmpStore.close();
+        if (tmpStore.isOpen()) {
+
+            tmpStore.close();
+            
+        }
         
     }
     
@@ -705,11 +732,21 @@ public class Tx implements IStore, ITx {
      * 
      * @return The named index or <code>null</code> if no index is registered
      *         under that name.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction is not active.
      */
     public IIndex getIndex(String name) {
 
-        if(name==null) throw new IllegalArgumentException();
-        
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (!isActive()) {
+
+            throw new IllegalStateException();
+
+        }
+
         /*
          * Store the btrees in hash map so that we can recover the same instance
          * on each call within the same transaction.

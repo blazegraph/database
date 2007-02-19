@@ -1,46 +1,46 @@
 /**
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+ The Notice below must appear in each file of the Source Code of any
+ copy you distribute of the Licensed Product.  Contributors to any
+ Modifications may add their own copyright notices to identify their
+ own contributions.
 
-License:
+ License:
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+ The contents of this file are subject to the CognitiveWeb Open Source
+ License Version 1.1 (the License).  You may not copy or use this file,
+ in either source code or executable form, except in compliance with
+ the License.  You may obtain a copy of the License from
 
-  http://www.CognitiveWeb.org/legal/license/
+ http://www.CognitiveWeb.org/legal/license/
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
+ Software distributed under the License is distributed on an AS IS
+ basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+ the License for the specific language governing rights and limitations
+ under the License.
 
-Copyrights:
+ Copyrights:
 
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
+ Portions created by or assigned to CognitiveWeb are Copyright
+ (c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+ information for CognitiveWeb is available at
 
-  http://www.CognitiveWeb.org
+ http://www.CognitiveWeb.org
 
-Portions Copyright (c) 2002-2003 Bryan Thompson.
+ Portions Copyright (c) 2002-2003 Bryan Thompson.
 
-Acknowledgements:
+ Acknowledgements:
 
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
+ Special thanks to the developers of the Jabber Open Source License 1.0
+ (JOSL), from which this License was derived.  This License contains
+ terms that differ from JOSL.
 
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
+ Special thanks to the CognitiveWeb Open Source Contributors for their
+ suggestions and support of the Cognitive Web.
 
-Modifications:
+ Modifications:
 
-*/
+ */
 /*
  * Created on Oct 8, 2006
  */
@@ -238,7 +238,7 @@ public class Journal implements IJournal {
      * store.
      */
     public static transient final int ROOT_NAME2ADDR = 0;
-    
+
     /**
      * A clone of the properties used to initialize the {@link Journal}.
      */
@@ -248,7 +248,7 @@ public class Journal implements IJournal {
      * The implementation logic for the current {@link BufferMode}.
      */
     final IBufferStrategy _bufferStrategy;
-    
+
     /**
      * The service used to generate commit timestamps.
      * 
@@ -268,7 +268,7 @@ public class Journal implements IJournal {
      * The registered committers for each slot in the root block.
      */
     private ICommitter[] _committers = new ICommitter[ICommitRecord.MAX_ROOT_ADDRS];
-    
+
     /**
      * Used to cache the most recent {@link ICommitRecord} -- discarded on
      * {@link #abort()}.
@@ -285,8 +285,8 @@ public class Journal implements IJournal {
     /**
      * BTree mapping commit timestamps to the address of the corresponding
      * {@link ICommitRecord}. The keys are timestamps (long integers). The
-     * values are the {@link Addr address} of the {@link ICommitRecord} 
-     * with that commit timestamp.
+     * values are the {@link Addr address} of the {@link ICommitRecord} with
+     * that commit timestamp.
      */
     private CommitRecordIndex _commitRecordIndex;
 
@@ -555,10 +555,10 @@ public class Journal implements IJournal {
             final long commitRecordIndexAddr = 0L;
             IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
                     nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr );
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr);
             IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
                     nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr );
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr);
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -680,7 +680,7 @@ public class Journal implements IJournal {
          */
         this._commitRecordIndex = getCommitRecordIndex(this._rootBlock
                 .getCommitRecordIndexAddr());
-        
+
         /*
          * Give the store a chance to set any committers that it defines.
          */
@@ -689,11 +689,11 @@ public class Journal implements IJournal {
     }
 
     final public Properties getProperties() {
-        
-        return (Properties)properties.clone();
-        
+
+        return (Properties) properties.clone();
+
     }
-    
+
     /**
      * The delegate that implements the {@link BufferMode}.
      * <p>
@@ -825,7 +825,7 @@ public class Journal implements IJournal {
     final public void setCommitter(int rootSlot, ICommitter committer) {
 
         assertOpen();
-        
+
         _committers[rootSlot] = committer;
 
     }
@@ -838,7 +838,7 @@ public class Journal implements IJournal {
      *         committers.
      */
     final private long[] notifyCommitters() {
-        
+
         int ncommitters = 0;
 
         long[] rootAddrs = new long[_committers.length];
@@ -855,9 +855,9 @@ public class Journal implements IJournal {
         }
 
         return rootAddrs;
-        
+
     }
-    
+
     /**
      * Invoked iff a transaction fails after it has begun writing data onto the
      * global state from its isolated state. Once the transaction has begun this
@@ -886,7 +886,7 @@ public class Journal implements IJournal {
 
         // clear the root addresses - the will be reloaded.
         _commitRecord = null;
-        
+
         // clear the array of committers.
         _committers = new ICommitter[_committers.length];
 
@@ -901,7 +901,7 @@ public class Journal implements IJournal {
          */
         _commitRecordIndex = getCommitRecordIndex(_rootBlock
                 .getCommitRecordIndexAddr());
-        
+
         // discard any hard references that might be cached.
         discardCommitters();
 
@@ -926,7 +926,7 @@ public class Journal implements IJournal {
         return commit(null);
 
     }
-    
+
     /**
      * Handle the {@link #commit()} and integrations with transaction support so
      * that we can update the first and last transaction identifiers on the root
@@ -943,11 +943,9 @@ public class Journal implements IJournal {
 
         assertOpen();
 
-        final long commitTimestamp = (tx == null
-                ? timestampFactory.nextTimestamp()
-                        : tx.getCommitTimestamp()
-                        );
-        
+        final long commitTimestamp = (tx == null ? timestampFactory
+                .nextTimestamp() : tx.getCommitTimestamp());
+
         /*
          * First, run each of the committers accumulating the updated root
          * addresses in an array. In general, these are btrees and they may have
@@ -983,7 +981,7 @@ public class Journal implements IJournal {
 
         final long commitRecordAddr = write(ByteBuffer
                 .wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
-        
+
         /*
          * Add the comment record to an index so that we can recover historical
          * states efficiently.
@@ -1001,7 +999,7 @@ public class Journal implements IJournal {
          * flush the CommitRecordIndex to the store.
          */
         final long commitRecordIndexAddr = _commitRecordIndex.write();
-        
+
         /*
          * Force application data to stable storage _before_ we update the root
          * blocks. This option guarentees that the application data is stable on
@@ -1029,28 +1027,30 @@ public class Journal implements IJournal {
             /*
              * Update the firstTxId the first time a transaction commits and the
              * lastTxId each time a transaction commits.
+             * 
+             * Note: These are commit time timestamps.
              */
-            
-            long firstTxId = old.getFirstTxId();
-            
-            long lastTxId = old.getLastTxId();
-            
-            if (tx != null) {
+
+            long firstTxId = old.getFirstTxCommitTime();
+
+            long lastTxId = old.getLastTxCommitTime();
+
+            if (tx != null && !tx.isReadOnly()) {
 
                 if (firstTxId == 0L) {
 
                     assert lastTxId == 0L;
 
-                    firstTxId = lastTxId = tx.getStartTimestamp();
+                    firstTxId = lastTxId = tx.getCommitTimestamp();
 
                 } else {
 
-                    lastTxId = tx.getStartTimestamp();
+                    lastTxId = tx.getCommitTimestamp();
 
                 }
-                
+
             }
-            
+
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getSegmentId(), _bufferStrategy
@@ -1061,7 +1061,7 @@ public class Journal implements IJournal {
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
             _rootBlock = newRootBlock;
-            
+
             _commitRecord = commitRecord;
 
         }
@@ -1082,7 +1082,7 @@ public class Journal implements IJournal {
         }
 
         return commitTimestamp;
-        
+
     }
 
     /**
@@ -1093,9 +1093,9 @@ public class Journal implements IJournal {
     public void overflow() {
 
         // NOP.
-        
+
     }
-    
+
     public void force(boolean metadata) {
 
         assertOpen();
@@ -1122,14 +1122,14 @@ public class Journal implements IJournal {
 
     final public long getRootAddr(int index) {
 
-        if(_commitRecord == null) {
-        
+        if (_commitRecord == null) {
+
             return getCommitRecord().getRootAddr(index);
-            
+
         } else {
-            
+
             return _commitRecord.getRootAddr(index);
-            
+
         }
 
     }
@@ -1142,7 +1142,7 @@ public class Journal implements IJournal {
      * @return The root {@link Addr addresses}.
      */
     public ICommitRecord getCommitRecord() {
-        
+
         if (_commitRecord == null) {
 
             long commitRecordAddr = _rootBlock.getCommitRecordAddr();
@@ -1150,20 +1150,21 @@ public class Journal implements IJournal {
             if (commitRecordAddr == 0L) {
 
                 _commitRecord = new CommitRecord(0L);
-                
+
             } else {
-                
+
                 _commitRecord = CommitRecordSerializer.INSTANCE
-                        .deserialize(_bufferStrategy.read(commitRecordAddr, null));
+                        .deserialize(_bufferStrategy.read(commitRecordAddr,
+                                null));
 
             }
 
         }
-        
+
         return _commitRecord;
-        
+
     }
-     
+
     /**
      * The default implementation discards the btree mapping names to named
      * btrees.
@@ -1172,12 +1173,12 @@ public class Journal implements IJournal {
      * MUST NOT override it completely.
      */
     public void discardCommitters() {
-        
+
         // discard.
         name2Addr = null;
-        
+
     }
-    
+
     /**
      * The basic implementation sets up the btree that is responsible for
      * resolving named btrees.
@@ -1188,13 +1189,13 @@ public class Journal implements IJournal {
     public void setupCommitters() {
 
         setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
-        
+
     }
 
     /*
      * named indices.
      */
-    
+
     /**
      * Setup the btree that resolved named btrees.
      * 
@@ -1205,13 +1206,13 @@ public class Journal implements IJournal {
     private void setupName2AddrBTree(long addr) {
 
         assert name2Addr == null;
-        
+
         if (addr == 0L) {
 
             /*
              * The btree has either never been created or if it had been created
              * then the store was never committed and the btree had since been
-             * discarded.  In any case we create a new btree now.
+             * discarded. In any case we create a new btree now.
              */
 
             // create btree mapping names to addresses.
@@ -1223,7 +1224,7 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            name2Addr = (Name2Addr)BTreeMetadata.load(this, addr);
+            name2Addr = (Name2Addr) BTreeMetadata.load(this, addr);
 
         }
 
@@ -1231,7 +1232,7 @@ public class Journal implements IJournal {
         setCommitter(ROOT_NAME2ADDR, name2Addr);
 
     }
-    
+
     /**
      * Create or re-load the index that resolves timestamps to
      * {@link ICommitRecord}s.
@@ -1248,13 +1249,13 @@ public class Journal implements IJournal {
     private CommitRecordIndex getCommitRecordIndex(long addr) {
 
         CommitRecordIndex ndx;
-        
+
         if (addr == 0L) {
 
             /*
              * The btree has either never been created or if it had been created
              * then the store was never committed and the btree had since been
-             * discarded.  In any case we create a new btree now.
+             * discarded. In any case we create a new btree now.
              */
 
             // create btree mapping names to addresses.
@@ -1266,34 +1267,38 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            ndx = (CommitRecordIndex)BTreeMetadata.load(this, addr);
+            ndx = (CommitRecordIndex) BTreeMetadata.load(this, addr);
 
         }
 
         return ndx;
-        
+
     }
-    
+
+    /**
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
     public IIndex registerIndex(String name, IIndex btree) {
 
-        if( getIndex(name) != null ) {
-            
+        if (getIndex(name) != null) {
+
             throw new IllegalStateException("Index already registered: name="
                     + name);
-            
+
         }
-        
+
         // add to the persistent name map.
         name2Addr.add(name, btree);
-        
+
         return btree;
-        
+
     }
-    
+
     public void dropIndex(String name) {
-        
+
         name2Addr.dropIndex(name);
-        
+
     }
 
     /**
@@ -1305,8 +1310,9 @@ public class Journal implements IJournal {
      */
     public IIndex getIndex(String name) {
 
-        if(name==null) throw new IllegalArgumentException();
-        
+        if (name == null)
+            throw new IllegalArgumentException();
+
         return name2Addr.get(name);
 
     }
@@ -1331,7 +1337,7 @@ public class Journal implements IJournal {
     public ICommitRecord getCommitRecord(long timestamp) {
 
         return _commitRecordIndex.find(timestamp);
-        
+
     }
 
     /**
@@ -1339,8 +1345,8 @@ public class Journal implements IJournal {
      * on the index will NOT be made persistent and the index will NOT
      * participate in commits.
      */
-    public IIndex getIndex(String name,ICommitRecord commitRecord) {
-        
+    public IIndex getIndex(String name, ICommitRecord commitRecord) {
+
         /*
          * Note: since this is always a request for historical read-only data,
          * this method MUST NOT register a committer and the returned btree MUST
@@ -1348,27 +1354,27 @@ public class Journal implements IJournal {
          * 
          * @todo cache these results in a weak value cache.
          */
-    
+
         return ((Name2Addr) BTreeMetadata.load(this, commitRecord
                 .getRootAddr(ROOT_NAME2ADDR))).get(name);
-        
+
     }
 
     /*
      * transaction support.
      */
-    
+
     /**
      * Create a new fully-isolated read-write transaction.
      * 
      * @see #newTx(boolean), to which this method delegates its implementation.
      */
-    public ITx newTx() {
-    
+    public long newTx() {
+
         return newTx(false);
-        
+
     }
-    
+
     /**
      * Create a new fully-isolated transaction.
      * 
@@ -1383,12 +1389,13 @@ public class Journal implements IJournal {
      *       operations isolated by that transaction are required on that
      *       {@link Journal}.
      */
-    public ITx newTx(boolean readOnly) {
-        
-        return new Tx(this,timestampFactory.nextTimestamp(),readOnly);
-        
+    public long newTx(boolean readOnly) {
+
+        return new Tx(this, timestampFactory.nextTimestamp(), readOnly)
+                .getStartTimestamp();
+
     }
-    
+
     /**
      * Create a new read-committed transaction.
      * 
@@ -1399,9 +1406,68 @@ public class Journal implements IJournal {
      * 
      * @see #newTx(boolean)
      */
-    public ITx newReadCommittedTx() {
-        
+    public long newReadCommittedTx() {
+
         throw new UnsupportedOperationException();
+
+    }
+
+    /**
+     * Return the named index as isolated by the transaction.
+     * 
+     * @param name
+     *            The index name.
+     * @param ts
+     *            The start time of the transaction.
+     * 
+     * @return The isolated index.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>
+     * 
+     * @exception IllegalStateException
+     *                if there is no active transaction with that timestamp.
+     */
+    public IIndex getIndex(String name, long ts) {
+        
+        if(name == null) throw new IllegalArgumentException();
+        
+        ITx tx = activeTx.get(ts);
+        
+        if(tx==null) throw new IllegalStateException();
+        
+        return tx.getIndex(name);
+        
+    }
+    
+    public void abort(long ts) {
+
+        ITx tx = getTx(ts);
+        
+        if (tx == null)
+            throw new IllegalArgumentException("No such tx: " + ts);
+        
+        tx.abort();
+        
+    }
+
+    /**
+     * Commit the transaction on the journal.
+     * 
+     * @param ts The transaction start time.
+     * 
+     * @return The commit timestamp assigned to the transaction. 
+     */
+    public long commit(long ts) {
+
+        ITx tx = getTx(ts);
+        
+        if (tx == null)
+            throw new IllegalArgumentException("No such tx: " + ts);
+        
+        tx.prepare();
+
+        return tx.commit();
         
     }
     
@@ -1414,7 +1480,7 @@ public class Journal implements IJournal {
      * 
      * @throws IllegalStateException
      */
-    void activateTx(ITx tx) throws IllegalStateException {
+    protected void activateTx(ITx tx) throws IllegalStateException {
 
         Long timestamp = tx.getStartTimestamp();
 
@@ -1437,7 +1503,7 @@ public class Journal implements IJournal {
      * 
      * @throws IllegalStateException
      */
-    void prepared(ITx tx) throws IllegalStateException {
+    protected void prepared(ITx tx) throws IllegalStateException {
 
         Long id = tx.getStartTimestamp();
 
@@ -1464,11 +1530,11 @@ public class Journal implements IJournal {
      * 
      * @throws IllegalStateException
      */
-    void completedTx(ITx tx) throws IllegalStateException {
+    protected void completedTx(ITx tx) throws IllegalStateException {
 
         assert tx != null;
         assert tx.isComplete();
-        
+
         Long id = tx.getStartTimestamp();
 
         ITx txActive = activeTx.remove(id);
@@ -1485,41 +1551,27 @@ public class Journal implements IJournal {
     }
 
     /**
-     * Lookup an active or prepared transaction.
+     * Lookup an active or prepared transaction (exact match).
      * 
-     * @param txId
-     *            The transaction identifier.
+     * @param startTimestamp
+     *            The start timestamp for the transaction.
      * 
-     * @return The identified transaction or <code>null</code> if the
-     *         transaction identifier is not mapped to either an active or
-     *         prepared transaction.
+     * @return The transaction with that start time or <code>null</code> if
+     *         the start time is not mapped to either an active or prepared
+     *         transaction.
      */
-    public ITx getTx(long txId) {
+    public ITx getTx(long startTimestamp) {
 
-        ITx tx = activeTx.get(txId);
+        ITx tx = activeTx.get(startTimestamp);
 
         if (tx == null) {
 
-            tx = preparedTx.get(txId);
+            tx = preparedTx.get(startTimestamp);
 
         }
 
-        return null;
+        return tx;
 
     }
     
-    /**
-     * True iff there is a transaction that has prepared and not yet committed
-     * or aborted.
-     * <p>
-     * Note: It is illegal for more than one transaction to prepare at a time
-     * if they have write sets that overlap.  Serializability depends on each
-     * transaction validating against the last committed ground state.
-     */
-    public boolean isPreparedTx() {
-        
-        return ! preparedTx.isEmpty();
-        
-    }
-
 }

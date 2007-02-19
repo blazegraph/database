@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import com.bigdata.journal.TestTx;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IBatchOp;
@@ -64,7 +65,10 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo review tests of the point apis.
+ * @todo review tests of the point apis, especially with respect to
+ *       {@link TestTx}. all of the nitty gritty should be first tested in this
+ *       suite, including the specific values of the version counters and the
+ *       presence / absence of deletion markers, since those data are protected.
  * 
  * @todo test the batch apis. all methods must work with {@link Value}s (the
  *       test for this could be a test of the
@@ -79,7 +83,9 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * 
  * @todo test entryIterator() - it visits only those that are not deleted.
  * 
- * @todo write tests of validate() and mergeDown()
+ * @todo write tests of validate() and mergeDown(). note that these are also
+ *       tested by {@link TestTx} and friends. However, we can verify the
+ *       version counters and delete flags in this package.
  */
 public class TestIsolatedBTree extends AbstractBTreeTestCase {
 

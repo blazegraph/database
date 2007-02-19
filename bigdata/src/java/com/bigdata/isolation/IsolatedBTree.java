@@ -114,6 +114,9 @@ import com.bigdata.rawstore.IRawStore;
  *       since its behavior might surprise people. Alternatively, is there some
  *       slick way to realize the proper semantics for this interface on a fused
  *       view of the write set and the immutable index isolated by this class?
+ * 
+ * FIXME I have not finished working through the fused view support for this
+ * class.
  */
 public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
         IIsolatedIndex {
@@ -187,7 +190,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
         if (key == null)
             throw new IllegalArgumentException();
 
-        Value value = (Value) super.lookup(key);
+        Value value = super.getValue(key);
 
         if (value == null) {
 
@@ -217,7 +220,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
         if (key == null)
             throw new IllegalArgumentException();
 
-        Value value = (Value) super.getValue((byte[])key);
+        Value value = super.getValue((byte[])key);
 
         if (value == null) {
 
@@ -236,10 +239,45 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
     }
 
     /**
-     * Remove the key from the write set (does not write through to the isolated
-     * index). 
+     * Remove the key from the write set (does not write through to the
+     * unisolated index). If the key is not in the write set, then we check the
+     * unisolated index. If the key is found there, then we add a delete marker
+     * to the isolated index.
      */
     public Object remove(Object key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        // check the isolated index.
+        Value value = super.getValue((byte[])key);
+
+        if (value == null) {
+
+            /*
+             * The key does not exist in the isolated index, so now we test to
+             * see if the key exists in the unisolated index. if it does then we
+             * need to write a delete marker in the isolated index.
+             */
+            value = src.getValue((byte[]) key);
+            
+            if(value==null||value.deleted) return null;
+
+            super.remove(key);
+            
+            /*
+             * return the value from the unisolated index since that is what was
+             * deleted.
+             */
+            return value.datum;
+
+        }
+
+        if (value.deleted) {
+
+            return null;
+            
+        }
 
         return super.remove(key);
         
@@ -535,18 +573,12 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
 
                 /*
                  * IFF there was a pre-existing version in the global scope then
-                 * we clear the 'currentVersionSlots' in the entry in the global
-                 * scope and mark the index entry as dirty. The global scope
-                 * will now recognized the persistent identifier as 'deleted'.
+                 * we remove the key from the global scope so that it will now
+                 * have a "delete marker" for this key.
                  */
 
                 if (globalScope.contains(key)) {
 
-                    /*
-                     * Mark the entry in the unisolated index as deleted.
-                     */
-//                    globalScope.insert(key, new Value(
-//                            entry.nextVersionCounter(), true, null));
                     globalScope.remove(key);
 
                 } else {
@@ -563,8 +595,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
                 /*
                  * Copy the entry down onto the global scope.
                  */
-//                globalScope.insert(key, new Value(entry.nextVersionCounter(),
-//                        false, entry.datum));
+
                 globalScope.insert(key,entry.datum);
 
             }
