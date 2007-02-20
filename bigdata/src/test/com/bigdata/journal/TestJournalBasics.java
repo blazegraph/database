@@ -111,10 +111,10 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestReadOnlyTx.class );
         // @todo tests of read-committed transactions.
         suite.addTestSuite( TestReadCommittedTx.class );
-        // @todo tests of concurrent schedules and conflict detection.
-        suite.addTestSuite( TestConcurrentSchedules.class );
         // todo tests of write-write conflict resolution.
         suite.addTestSuite(TestConflictResolution.class);
+        // @todo tests of concurrent schedules and conflict detection.
+        suite.addTestSuite( TestConcurrentSchedules.class );
         
         /*
          * @todo tests of batch api and group commit mechanisms for very high

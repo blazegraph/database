@@ -52,6 +52,10 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -158,27 +162,6 @@ import com.bigdata.rawstore.Bytes;
  * peers).</li>
  * </ol>
  * 
- * FIXME The notion of a committed state needs to be captured by a persistent
- * structure in the journal until (a) there are no longer any active
- * transactions that can read from that committed state; and (b) the slots
- * allocated to that committed state have been released on the journal. Those
- * commit states need to be locatable on the journal, suggesting a record
- * written by PREPARE and finalized by COMMIT.
- * 
- * @todo Work out protocol for shutdown with the single-threaded journal server.
- * 
- * @todo Normal transaction operations need to be interleaved with operations to
- *       migrate committed data to the read-optimized database; with operations
- *       to logically delete data versions (and their slots) on the journal once
- *       those version are no longer readable by any active transaction; and
- *       with operations to compact the journal (extending can occur during
- *       normal transaction operations). One approach is to implement
- *       thread-checking using thread local variables or the ability to assign
- *       the journal to a thread and then hand off the journal to the thread for
- *       the activity that needs to be run, returning control to the normal
- *       transaction thread on (or shortly after) interrupt or when the
- *       operation is finished.
- * 
  * @todo There is a dependency in a distributed database architecture on
  *       transaction begin time. A very long running transaction could force the
  *       journal to hold onto historical states. If a decision is made to
@@ -205,15 +188,13 @@ import com.bigdata.rawstore.Bytes;
  * including the non-duplication of per-tx data structures (e.g., you always get
  * the same object back when you ask for an isolated named index).
  * 
- * FIXME Write test suites for the {@link TransactionServer}.
- * 
  * @todo I need to revisit the assumptions for very large objects in the face of
  *       the recent / planned redesign. I expect that using an index with a key
  *       formed as [URI][chuck#] would work just fine. Chunks would then be
  *       limited to 32k or so. Writes on such indices should probably be
  *       directed to a journal using a disk-only mode.
  */
-public class Journal implements IJournal {
+public class Journal implements IJournal, ITransactionManager {
 
     /**
      * Logger.
@@ -252,7 +233,7 @@ public class Journal implements IJournal {
     /**
      * The service used to generate commit timestamps.
      * 
-     * @todo paramterize using {@link Options} so that we can resolve a
+     * @todo parameterize using {@link Options} so that we can resolve a
      *       low-latency service for use with a distributed database commit
      *       protocol.
      */
@@ -315,19 +296,6 @@ public class Journal implements IJournal {
      * @see Options#MAXIMUM_EXTENT
      */
     private final long maximumExtent;
-
-    /**
-     * A hash map containing all active transactions. A transaction that is
-     * preparing will be in this collection until it has either successfully
-     * prepared or aborted.
-     */
-    final Map<Long, ITx> activeTx = new HashMap<Long, ITx>();
-
-    /**
-     * A hash map containing all transactions that have prepared but not yet
-     * either committed or aborted.
-     */
-    final Map<Long, ITx> preparedTx = new HashMap<Long, ITx>();
 
     /**
      * Create or open a journal.
@@ -709,46 +677,30 @@ public class Journal implements IJournal {
     }
 
     /**
-     * Shutdown the journal politely.
-     * 
-     * @exception IllegalStateException
-     *                if there are active transactions.
-     * @exception IllegalStateException
-     *                if there are prepared transactions.
-     * 
-     * @todo Workout protocol for shutdown of the journal, including forced
-     *       shutdown when there are active or prepar(ed|ing) transactions,
-     *       timeouts on transactions during shutdown, notification of abort for
-     *       transactions that do not complete in a timely manner, and
-     *       survivability of prepared transactions across restart. Reconcile
-     *       the semantics of this method with those declared by the raw store
-     *       interface, probably by declaring a variant that accepts parameters
-     *       specifying how to handle the shutdown (immediate vs wait).
+     * Shutdown the journal politely. Active transactions and transactions
+     * pending commit will run to completion, but no new transactions will be
+     * accepted.
      */
     public void shutdown() {
 
         assertOpen();
 
-        final int nactive = activeTx.size();
-
-        if (nactive > 0) {
-
-            throw new IllegalStateException("There are " + nactive
-                    + " active transactions");
-
-        }
-
-        final int nprepare = preparedTx.size();
-
-        if (nprepare > 0) {
-
-            throw new IllegalStateException("There are " + nprepare
-                    + " prepared transactions.");
-
-        }
+        final long begin = System.currentTimeMillis();
+        
+        log.warn("#active="+activeTx.size()+", shutting down...");
+        
+        /*
+         * allow all pending tasks to complete, but no new tasks will be
+         * accepted.
+         */
+        commitService.shutdown();
 
         // close immediately.
         close();
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.warn("Journal is shutdown: elapsed="+elapsed);
 
     }
 
@@ -759,6 +711,9 @@ public class Journal implements IJournal {
 
         assertOpen();
 
+        // force the commit thread to quit immediately.
+        commitService.shutdownNow();
+        
         _bufferStrategy.close();
 
         if (deleteOnClose) {
@@ -1361,34 +1316,46 @@ public class Journal implements IJournal {
     }
 
     /*
-     * transaction support.
+     * ITransactionManager and friends.
+     * 
+     * @todo refactor into a service. provide an implementation that supports
+     * only a single Journal resource and an implementation that supports a
+     * scale up/out architecture. the journal should resolve the service using
+     * JINI.  the timestamp service should probably be co-located with the
+     * transaction service.
      */
 
     /**
-     * Create a new fully-isolated read-write transaction.
-     * 
-     * @see #newTx(boolean), to which this method delegates its implementation.
+     * A hash map containing all active transactions. A transaction that is
+     * preparing will be in this collection until it has either successfully
+     * prepared or aborted.
      */
+    final Map<Long, ITx> activeTx = new HashMap<Long, ITx>();
+
+    /**
+     * A hash map containing all transactions that have prepared but not yet
+     * either committed or aborted.
+     * 
+     * @todo this is probably useless. A transaction will be in this map only
+     *       while it is actively committing.
+     */
+    final Map<Long, ITx> preparedTx = new HashMap<Long, ITx>();
+
+    /**
+     * A thread that imposes serializability on transactions. A writable
+     * transaction that attempts to {@link #commit()} is added as a
+     * {@link CommitTask} and queued for execution by this thread. When its turn
+     * comes, it will validate its write set and commit iff validation succeeds.
+     */
+    final ExecutorService commitService = Executors
+            .newSingleThreadExecutor(Executors.defaultThreadFactory());
+
     public long newTx() {
 
         return newTx(false);
 
     }
 
-    /**
-     * Create a new fully-isolated transaction.
-     * 
-     * @param readOnly
-     *            When true, the transaction will reject writes.
-     * 
-     * @todo This method supports transactions in a non-distributed database in
-     *       which there is a centralized {@link Journal} that handles all
-     *       concurrency control. There needs to be a {@link TransactionServer}
-     *       that starts transactions. The {@link JournalServer} should summon a
-     *       transaction object them into being on a {@link Journal} iff
-     *       operations isolated by that transaction are required on that
-     *       {@link Journal}.
-     */
     public long newTx(boolean readOnly) {
 
         return new Tx(this, timestampFactory.nextTimestamp(), readOnly)
@@ -1396,38 +1363,12 @@ public class Journal implements IJournal {
 
     }
 
-    /**
-     * Create a new read-committed transaction.
-     * 
-     * @return A transaction that will reject writes. Any committed data will be
-     *         visible to indices isolated by this transaction.
-     * 
-     * @todo implement read-committed transaction support.
-     * 
-     * @see #newTx(boolean)
-     */
     public long newReadCommittedTx() {
 
         throw new UnsupportedOperationException();
 
     }
 
-    /**
-     * Return the named index as isolated by the transaction.
-     * 
-     * @param name
-     *            The index name.
-     * @param ts
-     *            The start time of the transaction.
-     * 
-     * @return The isolated index.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> is <code>null</code>
-     * 
-     * @exception IllegalStateException
-     *                if there is no active transaction with that timestamp.
-     */
     public IIndex getIndex(String name, long ts) {
         
         if(name == null) throw new IllegalArgumentException();
@@ -1451,23 +1392,81 @@ public class Journal implements IJournal {
         
     }
 
-    /**
-     * Commit the transaction on the journal.
-     * 
-     * @param ts The transaction start time.
-     * 
-     * @return The commit timestamp assigned to the transaction. 
-     */
     public long commit(long ts) {
 
         ITx tx = getTx(ts);
         
         if (tx == null)
             throw new IllegalArgumentException("No such tx: " + ts);
-        
-        tx.prepare();
 
-        return tx.commit();
+        if(tx.isReadOnly()) {
+        
+            tx.prepare();
+
+            return tx.commit();
+            
+        }
+        
+        try {
+
+            long commitTime = commitService.submit(new CommitTask(tx)).get();
+            
+            if(DEBUG) {
+                
+                log.debug("committed: startTime="+tx.getStartTimestamp()+", commitTime="+commitTime);
+                
+            }
+            
+            return commitTime;
+            
+        } catch(InterruptedException ex) {
+            
+            // interrupted, perhaps during shutdown.
+            throw new RuntimeException(ex);
+            
+        } catch(ExecutionException ex) {
+            
+            Throwable cause = ex.getCause();
+            
+            if(cause instanceof ValidationError) {
+                
+                throw (ValidationError) cause;
+                
+            }
+
+            // this is an unexpected error.
+            throw new RuntimeException(cause);
+            
+        }
+        
+    }
+    
+    /**
+     * Task validates and commits a transaction when it is run by the
+     * {@link Journal#commitService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class CommitTask implements Callable<Long> {
+        
+        private final ITx tx;
+        
+        public CommitTask(ITx tx) {
+            
+            assert tx != null;
+            
+            this.tx = tx;
+            
+        }
+
+        public Long call() throws Exception {
+            
+            tx.prepare();
+            
+            return tx.commit();
+            
+        }
         
     }
     
@@ -1479,6 +1478,9 @@ public class Journal implements IJournal {
      *            The transaction.
      * 
      * @throws IllegalStateException
+     * 
+     * @todo test for transactions that have already been completed? that would
+     *       represent a protocol error in the transaction manager service.
      */
     protected void activateTx(ITx tx) throws IllegalStateException {
 

@@ -248,30 +248,6 @@ public class TransactionServer {
     }
     
     /**
-     * A blocking queue that imposes serializability on transactions. A writable
-     * transaction that attempts to {@link ITx#prepare()} is placed onto this
-     * queue. When its turn comes, it will validate its write set.
-     * 
-     * FIXME this really belongs in the {@link TransactionServer} rather than
-     * the {@link Journal}. The {@link TransactionServer} is responsible for
-     * serializing transactions and coordinating 2-phase commits. It should
-     * accomplish this by placing transactions that issue COMMIT requests onto a
-     * queue that imposes serial execution of the commit protocol. The
-     * transaction on the head of the queue will first prepare and then commit
-     * as soon as it is prepared. If the transaction fails validation, then it
-     * must be aborted, but it could be retried by the client. The application
-     * should only request a COMMIT. The {@link TransactionServer} is
-     * responsible for issuing PREPARE requests to all resources on which writes
-     * have been made during the transaction and then issuing COMMIT requests to
-     * those resources once they have all suceessfully prepared.
-     * 
-     * @todo a concurrent hash map for the preparing/committing transactions
-     *       could be kept locally on the journal in order to detect violations
-     *       of serializability by the {@link TransactionServer}.
-     */
-    final BlockingQueue<ITx> commitQueue = new LinkedBlockingQueue<ITx>();
-    
-    /**
      * Map containing metadata for active transactions.
      */
     private Map<Long, TxMetadata> transactions = new ConcurrentHashMap<Long, TxMetadata>(

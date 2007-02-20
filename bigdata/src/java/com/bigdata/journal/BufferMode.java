@@ -27,7 +27,7 @@ public enum BufferMode {
      * etc.
      * </p>
      */
-    Transient("transient"),
+    Transient("Transient"),
     
     /**
      * <p>
@@ -45,7 +45,7 @@ public enum BufferMode {
      * allows the journal to optimize IO operations.
      * </p>
      */
-    Direct("direct"),
+    Direct("Direct"),
     
     /**
      * <p>
@@ -64,7 +64,7 @@ public enum BufferMode {
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      */
-    Mapped("mapped"),
+    Mapped("Mapped"),
     
     /**
      * <p>
@@ -76,7 +76,7 @@ public enum BufferMode {
      * grow and the journal is NOT optimized for random reads (poor locality).
      * </p>
      */
-    Disk("disk");
+    Disk("Disk");
     
     private final String name;
     
@@ -93,8 +93,8 @@ public enum BufferMode {
     }
 
     /**
-     * Parse a string whose contents must be "transient", "direct", "mapped", or
-     * "disk".
+     * Parse a string whose contents must be "Transient", "Direct", "Mapped", or
+     * "Disk".
      * 
      * @param s
      *            The string.

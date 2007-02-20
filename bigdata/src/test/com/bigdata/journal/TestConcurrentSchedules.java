@@ -50,12 +50,15 @@ package com.bigdata.journal;
 /**
  * Tests of concurrent transactions schedules designed to look for correct
  * execution of non-conflicting concurrent schedules and correct detection of
- * conflicts. This is the first test suite that considers concurrent schedules.
+ * conflicts.
  * <p>
  * Note that only write-write conflicts may occur since the {@link Journal} uses
  * an MVCC style concurrency control algorithm.
  * 
- * @todo refactor test and schedule support from dbcache.
+ * @todo refactor test and schedule support from dbcache. there is perhaps no
+ *       need for the kinds of tests that I developed for dbcache since I had to
+ *       put into place infrastructure there designed to test locking mechanism
+ *       that is simply not needed here.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,6 +88,18 @@ public class StressTestConcurrent extends ProxyTestCase {
         Properties properties = getProperties();
         
         Journal journal = new Journal(properties);
+
+        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
+            
+            /*
+             * @todo the mapped buffer strategy has become cpu bound w/o
+             * termination when used with concurrent clients - this needs to be
+             * looked into further.
+             */
+            
+            fail("Mapped buffer strategy has problem with concurrency");
+            
+        }
         
         final String name = "abc";
         
@@ -110,7 +124,7 @@ public class StressTestConcurrent extends ProxyTestCase {
              * transactions with empty write sets (no touched indices) and
              * shortcut the prepare/commit for those transactions as well.
              */
-            doConcurrentClientTest(journal,name,1,100);
+            doConcurrentClientTest(journal,name,20,100);
         
         } finally {
         
@@ -140,7 +154,8 @@ public class StressTestConcurrent extends ProxyTestCase {
      *       read/write/delete operations carefully and maintain a ground truth
      *       index?
      */
-    public void doConcurrentClientTest(Journal journal, String name, int nclients, int ntx) 
+    static public void doConcurrentClientTest(Journal journal, String name,
+            int nclients, int ntx) 
         throws InterruptedException
     {
         
@@ -158,40 +173,62 @@ public class StressTestConcurrent extends ProxyTestCase {
         }
 
         /*
-         * @todo this will fail since we are not serializing transactions in
-         * prepare->commit.
+         * Run the M transactions on N clients.
          */
-        List<Future<Long>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
         
-        /*
-         * @todo validate results - all execute, valid commit times, no errors.
-         * 
-         * @todo if write-write conflicts can result, then those should be
-         * acceptable errors and the task could just be retried.
-         */
+        final long begin = System.currentTimeMillis();
+        
+        List<Future<Long>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
 
+        final long elapsed = System.currentTimeMillis() - begin;
+        
         Iterator<Future<Long>> itr = results.iterator();
+        
+        int nfailed = 0; // #of transactions that failed validation. 
+        int ncommitted = 0; // #of transactions that successfully committed.
+        int nuncommitted = 0; // #of transactions that did not complete in time.
         
         while(itr.hasNext()) {
 
             Future<Long> future = itr.next();
             
-            assertFalse(future.isCancelled());
+            if(future.isCancelled()) {
+                
+                nuncommitted++;
+                
+                continue;
+                
+            }
 
             try {
 
                 assertNotSame(0L,future.get());
                 
+                ncommitted++;
+                
             } catch(ExecutionException ex ) {
                 
-                // @todo validation errors should be allowed here.
+                // Validation errors are allowed and counted as aborted txs.
                 
-                fail("Not expecting: "+ex, ex);
+                if(ex.getCause() instanceof ValidationError) {
+                
+                    nfailed++;
+                    
+                } else {
+                
+                    fail("Not expecting: "+ex, ex);
+                    
+                }
                 
             }
             
         }
         
+        System.err.println("#clients=" + nclients + ", ntx=" + ntx
+                + ", ncomitted=" + ncommitted + ", nfailed=" + nfailed
+                + ", nuncommitted=" + nuncommitted + " in " + elapsed + "ms ("
+                + ncommitted * 1000 / elapsed + "tps)");
+       
     }
     
     // @todo change to IJournal
@@ -247,6 +284,53 @@ public class StressTestConcurrent extends ProxyTestCase {
             return journal.commit(tx);
             
         }
+        
+    }
+
+    /**
+     * FIXME work through tps rates for each of the buffer modes
+     * 
+     * FIXME make sure that the stress test terminates properly and that the
+     * journal shutsdown smoothly.
+     */
+    public static void main(String[] args) throws IOException, InterruptedException {
+        
+        Properties properties = new Properties();
+        
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        properties.setProperty(Options.SEGMENT, "0");
+        
+        File file = File.createTempFile("bigdata", ".jnl");
+        
+        file.deleteOnExit();
+        
+        if(!file.delete()) fail("Could not remove temp file before test");
+        
+        properties.setProperty(Options.FILE, file.toString());
+        
+        Journal journal = new Journal(properties);
+        
+        final String name = "abc";
+        
+        {
+            
+            journal.registerIndex(name, new UnisolatedBTree(journal));
+            
+            journal.commit();
+            
+        }
+        
+        final int nclients = 20;
+        
+        final int ntx = 100;
+        
+        doConcurrentClientTest(journal, name, nclients, ntx);
+        
+        journal.shutdown();
         
     }
     
