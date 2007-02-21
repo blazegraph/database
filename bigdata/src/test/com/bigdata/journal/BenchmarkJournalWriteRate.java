@@ -100,14 +100,7 @@ import com.bigdata.rawstore.Bytes;
  * IO).
  * </p>
  * 
- * FIXME Implement and test the impact of the {@link PageCommitList}, which is
- * designed to buffer writes into blocks for better IO throughput. Since the
- * journal is now providing contiguous slots in a slot allocation, the
- * {@link IBufferStrategy} interface should also be modified to support reads
- * and writes that cover an entire contiguous allocation. This is relatively
- * minor tweak that will provide greater efficiency w/o a page buffer. With a
- * page buffer, the efficiency gain is minor since it only removes an in-memory
- * loop vs reducing IOs.
+ * FIXME Implement and test the impact of an AIO strategy.
  * 
  * @todo Monitor the heap, IO, and CPU using this benchmark : profile as well.
  *       Try on linux with top and vmstat and on Windows with "perfmon".

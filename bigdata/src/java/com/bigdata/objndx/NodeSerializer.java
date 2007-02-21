@@ -309,10 +309,11 @@ public class NodeSerializer {
     public static final byte TYPE_LINKED_LEAF= (byte)2;
     
     /**
-     * The object index is used in a single threaded context. Therefore a
-     * single private instance is used to compute checksums.
+     * A private instance is used to compute checksums for each
+     * {@link AbstractBTree}. This makes is possible to have concurrent reads
+     * or writes on multiple btrees that are backed by different stores.
      */
-    private static final ChecksumUtility chk = new ChecksumUtility();
+    private final ChecksumUtility chk;
     
     public IValueSerializer getValueSerializer() {
         
@@ -404,6 +405,8 @@ public class NodeSerializer {
         this.recordCompressor = recordCompressor;
 
         this.useChecksum = useChecksum;
+
+        this.chk = useChecksum ? new ChecksumUtility() : null;
         
         if (initialBufferCapacity == 0) {
 
@@ -419,14 +422,18 @@ public class NodeSerializer {
          * 
          * FIXME The capacity of this buffer is a SWAG. If it is too small then
          * an EOFException will be thrown. This needs to be modified start with
-         * a smaller buffer and grow as required.  An alternative would be to
+         * a smaller buffer and grow as required. An alternative would be to
          * re-allocate this whenever _buf is resize since the compressed data
          * should never be larger than the original data.
+         * 
+         * @todo consider discarding [buf] and [cbuf] if the node serializer
+         * becomes inactive in order to minimize memory use. they can be
+         * reallocated as necesssary.
          */
     
         cbuf = recordCompressor != null //
-//                ? ByteBuffer.allocate(Bytes.megabyte32) //
-                ? ByteBuffer.allocateDirect(Bytes.megabyte32*2) //
+                ? ByteBuffer.allocate(Bytes.megabyte32) //
+//                ? ByteBuffer.allocateDirect(Bytes.megabyte32*2) //
                 : null;
         
     }
@@ -541,7 +548,7 @@ public class NodeSerializer {
 
             /*
              * @todo it is extremely weird, but this assertion (and the parallel
-             * one below) trips during the TestBTreeWithJournal stress tests.
+             * one below) trips during the AbstractBTreeWithJournalTestCase stress tests.
              * this is odd because the code explicitly resets the position of
              * the buffer that it is manipulating as its last step in getNode()
              * and getLeaf().  there must be some odd interaction with _buf but

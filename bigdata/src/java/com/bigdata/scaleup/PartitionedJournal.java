@@ -1152,12 +1152,24 @@ public class PartitionedJournal implements IJournal {
         return slave.isOpen();
     }
 
+    /**
+     * A partitioned journal always reports and does not allow the use
+     * of non-stable backing stored for the {@link SlaveJournal}.
+     */
     public boolean isStable() {
         return slave.isStable();
     }
 
-    public ByteBuffer read(long addr, ByteBuffer dst) {
-        return slave.read(addr, dst);
+    /**
+     * true iff the {@link SlaveJournal} is fully buffered (this does not
+     * consider the index segments).
+     */
+    public boolean isFullyBuffered() {
+        return slave.isFullyBuffered();
+    }
+    
+    public ByteBuffer read(long addr) {
+        return slave.read(addr);
     }
 
     public long write(ByteBuffer data) {
@@ -1198,6 +1210,30 @@ public class PartitionedJournal implements IJournal {
 
     public void setupCommitters() {
         slave.setupCommitters();
+    }
+
+    public void abort(long ts) {
+        slave.abort(ts);
+    }
+
+    public long commit(long ts) {
+        return slave.commit(ts);
+    }
+
+    public IIndex getIndex(String name, long ts) {
+        return slave.getIndex(name, ts);
+    }
+
+    public long newReadCommittedTx() {
+        return slave.newReadCommittedTx();
+    }
+
+    public long newTx() {
+        return slave.newTx();
+    }
+
+    public long newTx(boolean readOnly) {
+        return slave.newTx(readOnly);
     }
 
 }

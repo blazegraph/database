@@ -148,8 +148,7 @@ public class BTreeMetadata implements Serializable {
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
-        return (BTreeMetadata) SerializerUtil.deserialize(store
-                .read(addr, null));
+        return (BTreeMetadata) SerializerUtil.deserialize(store.read(addr));
         
     }
 

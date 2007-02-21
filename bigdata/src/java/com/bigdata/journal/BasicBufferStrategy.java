@@ -116,7 +116,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     }
 
-    public ByteBuffer read(long addr, ByteBuffer dst) {
+    public ByteBuffer read(long addr) {
         
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
@@ -138,32 +138,21 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         }
         
-        if(dst != null && dst.remaining()>=nbytes) {
+        /*
+         * Create a view onto the same buffer with distinct position, limit and
+         * mark. This allows us to perform concurrent reads on the buffer which
+         * in turn supports concurrent execution of concurrent transactions
+         * reading from various historical states.
+         */
+        ByteBuffer view = directBuffer.asReadOnlyBuffer();
 
-            // copy into the caller's buffer.
-            directBuffer.limit(offset+nbytes);
-            directBuffer.position(offset);
-            dst.put(directBuffer);
-            
-            // flip for reading.
-            
-            dst.flip();
-            
-            // the caller's buffer.
-            
-            return dst;
-            
-        } else {
+        // return a read-only view onto the data in the store.
 
-            // return a read-only view onto the data in the store.
-            
-            directBuffer.limit(offset + nbytes);
-            directBuffer.position(offset);
+        view.limit(offset + nbytes);
+        view.position(offset);
 
-            return directBuffer.slice().asReadOnlyBuffer();
-            
-        }
-                
+        return view.slice();
+
     }
 
     public void truncate(long newExtent) {

@@ -64,21 +64,21 @@ public enum ForceEnum {
     /**
      * The file is not forced to stable storage.
      */
-    No("no"),
+    No("No"),
     
     /**
      * The file data, but NOT the file metadata, are forced to stable storage.
      * 
      * @see FileChannel#force(boolean)
      */
-    Force("force"),
+    Force("Force"),
     
     /**
      * The file data and the file metadata are forced to stable storage.
      * 
      * @see FileChannel#force(boolean)
      */
-    ForceMetadata("metadata");
+    ForceMetadata("ForceMetadata");
     
     private String name;
     
@@ -93,7 +93,7 @@ public enum ForceEnum {
     }
 
     /**
-     * Parse a string whose contents must be "no", "force", "forceMetadata".
+     * Parse a string whose contents must be "No", "Force", "ForceMetadata".
      * 
      * @param s
      *            The string.

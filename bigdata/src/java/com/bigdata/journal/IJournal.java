@@ -63,7 +63,8 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IRawStore, IAtomicStore, IIndexManager {
+public interface IJournal extends IMROW, IRawStore, IAtomicStore,
+        IIndexManager, ITransactionManager {
 
     /**
      * A copy of the properties used to initialize this journal.

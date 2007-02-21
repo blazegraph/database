@@ -4,6 +4,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
 import com.bigdata.rawstore.Addr;
+import com.bigdata.scaleup.PartitionedJournal;
 
 /**
  * <p>
@@ -25,6 +26,14 @@ import com.bigdata.rawstore.Addr;
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
  * @see BufferMode#Mapped
+ * 
+ * @todo since the mapped file can not be extended or truncated, use of mapped
+ *       files pretty much suggests that we pre-extend to the maximum allowable
+ *       extent. it something can not be committed due to overflow, then a tx
+ *       could be re-committed after a rollover of a {@link PartitionedJournal}.
+ *       Note that the use of mapped files might not prove worth the candle due
+ *       to the difficulties with resource deallocation for this strategy and
+ *       the good performance of some alternative strategies.
  */
 public class MappedBufferStrategy extends DiskBackedBufferStrategy {
 
@@ -38,6 +47,12 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      * onto the buffer.
      */
     final MappedByteBuffer mappedBuffer;
+
+    public boolean isFullyBuffered() {
+        
+        return false;
+        
+    }
     
     MappedBufferStrategy(long maximumExtent, FileMetadata fileMetadata) {
         

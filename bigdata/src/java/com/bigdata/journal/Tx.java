@@ -56,6 +56,7 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.ReadOnlyIndex;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndex;
 
@@ -71,10 +72,11 @@ import com.bigdata.scaleup.PartitionedIndex;
  * rejected and {@link #prepare()} and {@link #commit()} are NOPs.
  * </p>
  * <p>
- * The write set of a transaction is written onto a {@link TemporaryStore}.
+ * The write set of a transaction is written onto a {@link TemporaryRawStore}.
  * Therefore the size limit on the transaction write set is currently 2G, but
- * the transaction will run in memory up to 100M. The {@link TemporaryStore} is
- * closed and any backing file is deleted as soon as the transaction completes.
+ * the transaction will run in memory up to 100M. The {@link TemporaryRawStore}
+ * is closed and any backing file is deleted as soon as the transaction
+ * completes.
  * </p>
  * <p>
  * Each {@link IsolatedBTree} is local to a transaction and is backed by its own
@@ -88,6 +90,12 @@ import com.bigdata.scaleup.PartitionedIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo track whether or not the transaction has written any isolated data. do
+ *       this at the same time that I modify the isolated indices use a
+ *       delegation strategy so that I can trap attempts to access an isolated
+ *       index once the transaction is no longer active.  define "active" as
+ *       up to the point where a "commit" or "abort" is _requested_ for the tx.
  * 
  * @todo Support read-committed transactions (data committed by _other_
  *       transactions during the transaction will be visible within that
@@ -122,7 +130,7 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       probably means an index into the history of the {@link MetadataIndex}
  *       (so we don't throw it away until no transactions can reach back that
  *       far) as well as an index into the named indices index -- perhaps simply
- *       an index by startTimestamp into the root addresses (or whole root block
+ *       an index by startTime into the root addresses (or whole root block
  *       views, or moving the root addresses out of the root block and into the
  *       store with only the address of the root addresses in the root block).
  * 
@@ -156,17 +164,17 @@ public class Tx implements IStore, ITx {
     final protected Journal journal;
     
     /**
-     * The start startTimestamp assigned to this transaction.
+     * The start startTime assigned to this transaction.
      * <p>
-     * Note: Transaction {@link #startTimestamp} and {@link #commitTimestamp}s
+     * Note: Transaction {@link #startTime} and {@link #commitTimestamp}s
      * are assigned by a global time service. The time service must provide
      * unique times for transaction start and commit timestamps and for commit
      * times for unisolated {@link Journal#commit()}s.
      */
-    final protected long startTimestamp;
+    final protected long startTime;
     
     /**
-     * The commit startTimestamp assigned to this transaction.
+     * The commit startTime assigned to this transaction.
      */
     private long commitTimestamp;
     
@@ -175,12 +183,6 @@ public class Tx implements IStore, ITx {
      */
     final protected boolean readOnly;
     
-    /**
-     * The commit counter on the journal as of the time that this transaction
-     * object was created.
-     */
-    final protected long commitCounter;
-
     /**
      * The historical {@link ICommitRecord} choosen as the ground state for this
      * transaction. All indices isolated by this transaction are isolated as of
@@ -191,18 +193,19 @@ public class Tx implements IStore, ITx {
     private RunState runState;
 
     /**
-     * A store used to hold write sets for the transaction. The same store can
-     * be used to buffer resolved write-write conflicts. This uses a
-     * {@link TemporaryStore} to avoid issues with maintaining transactions
-     * across journal boundaries. This places a limit on transactions of 2G in
-     * their serialized write set. Since the indices use a copy-on-write model,
-     * the amount of user data can be significantly less due to multiple
-     * versions of the same btree nodes. Using smaller branching factors in the
-     * isolated index helps significantly to increase the effective utilization
-     * of the store since copy-on-write causes fewer bytes to be copied each
-     * time it is invoked.
+     * A store used to hold write sets for read-write transactions (it is null
+     * iff the transaction is read-only). The same store can be used to buffer
+     * resolved write-write conflicts. This uses a {@link TemporaryRawStore} to
+     * avoid issues with maintaining transactions across journal boundaries.
+     * This places a limit on transactions of 2G in their serialized write set.
+     * <p>
+     * Since the indices use a copy-on-write model, the amount of user data can
+     * be significantly less due to multiple versions of the same btree nodes.
+     * Using smaller branching factors in the isolated index helps significantly
+     * to increase the effective utilization of the store since copy-on-write
+     * causes fewer bytes to be copied each time it is invoked.
      */
-    final protected TemporaryStore tmpStore = new TemporaryStore();
+    final protected TemporaryRawStore tmpStore;
     
     /**
      * Indices isolated by this transactions.
@@ -214,22 +217,22 @@ public class Tx implements IStore, ITx {
      */
     public Tx(Journal journal,long timestamp) {
         
-        this(journal,timestamp,false);
+        this(journal, timestamp, false);
         
     }
     
     /**
      * Create a transaction starting the last committed state of the journal as
-     * of the specified startTimestamp.
+     * of the specified startTime.
      * 
      * @param journal
      *            The journal.
      * 
-     * @param startTimestamp
-     *            The startTimestamp, which MUST be assigned consistently based on a
+     * @param startTime
+     *            The startTime, which MUST be assigned consistently based on a
      *            {@link ITimestampService}. Note that a transaction does not
      *            start up on all {@link Journal}s at the same time. Instead,
-     *            the transaction start startTimestamp is assigned by a centralized
+     *            the transaction start startTime is assigned by a centralized
      *            time service and then provided each time a transaction object
      *            must be created for isolated on some {@link Journal}.
      * 
@@ -247,18 +250,17 @@ public class Tx implements IStore, ITx {
         
         this.journal = journal;
         
-        this.startTimestamp = timestamp;
+        this.startTime = timestamp;
 
         this.readOnly = readOnly;
+
+        this.tmpStore = readOnly ? null : new TemporaryRawStore(
+                Bytes.megabyte * 1, // initial in-memory size.
+                Bytes.megabyte * 10, // maximum in-memory size.
+                false // do NOT use direct buffers.
+                );
         
         journal.activateTx(this);
-
-        /*
-         * Stash the commit counter so that we can figure out if there were
-         * concurrent transactions and therefore whether or not we need to
-         * validate the write set.
-         */
-        this.commitCounter = journal.getRootBlockView().getCommitCounter();
 
         /*
          * The commit record serving as the ground state for the indices
@@ -278,7 +280,7 @@ public class Tx implements IStore, ITx {
      */
     final public int hashCode() {
         
-        return Long.valueOf(startTimestamp).hashCode();
+        return Long.valueOf(startTime).hashCode();
         
     }
 
@@ -290,7 +292,7 @@ public class Tx implements IStore, ITx {
      */
     final public boolean equals(ITx o) {
         
-        return this == o || startTimestamp == o.getStartTimestamp();
+        return this == o || startTime == o.getStartTimestamp();
         
     }
     
@@ -300,12 +302,12 @@ public class Tx implements IStore, ITx {
      * @return The transaction identifier.
      * 
      * @todo verify that this has the semantics of the transaction start time
-     *       and that the startTimestamp is (must be) assigned by the same service
+     *       and that the startTime is (must be) assigned by the same service
      *       that assigns the {@link #getCommitTimestamp()}.
      */
     final public long getStartTimestamp() {
         
-        return startTimestamp;
+        return startTime;
         
     }
     
@@ -342,7 +344,7 @@ public class Tx implements IStore, ITx {
     
     public String toString() {
         
-        return ""+startTimestamp;
+        return ""+startTime;
         
     }
     
@@ -361,12 +363,12 @@ public class Tx implements IStore, ITx {
         btrees.clear();
         
         /*
-         * Close and delete the TemporaryStore.
+         * Close and delete the TemporaryRawStore.
          */
-        if (tmpStore.isOpen()) {
+        if (tmpStore != null && tmpStore.isOpen()) {
 
             tmpStore.close();
-            
+
         }
         
     }
@@ -395,7 +397,7 @@ public class Tx implements IStore, ITx {
         if (!readOnly) {
 
             /*
-             * The commit startTimestamp is assigned when we prepare the transaction
+             * The commit startTime is assigned when we prepare the transaction
              * since the the commit protocol does not permit unisolated writes
              * once a transaction begins to prepar until the transaction has
              * either committed or aborted (if such writes were allowed then we
@@ -414,7 +416,7 @@ public class Tx implements IStore, ITx {
                  * on write the transaction has written.
                  */
 
-                if (!validate()) {
+                if (!validateWriteSets()) {
 
                     abort();
 
@@ -640,18 +642,20 @@ public class Tx implements IStore, ITx {
     /**
      * Validate all isolated btrees written on by this transaction.
      */
-    private boolean validate() {
+    private boolean validateWriteSets() {
  
         assert ! readOnly;
         
         /*
          * This compares the current commit counter on the journal with the
-         * commit counter at the time that this transaction was started. If they
-         * are the same, then no intervening commits have occurred on the
-         * journal and there is nothing to validate.
+         * commit counter as of the start time for the transaction. If they are
+         * the same, then no intervening commits have occurred on the journal
+         * and there is nothing to validate.
          */
         
-        if(journal.getRootBlockView().getCommitCounter() == commitCounter) {
+        if (commitRecord == null
+                || (journal.getRootBlockView().getCommitCounter() == commitRecord
+                        .getCommitCounter())) {
             
             return true;
             

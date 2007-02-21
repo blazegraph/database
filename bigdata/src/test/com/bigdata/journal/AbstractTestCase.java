@@ -315,11 +315,19 @@ abstract public class AbstractTestCase
      * @param actual
      *            Buffer.
      */
-    public void assertEquals(byte[] expected, ByteBuffer actual ) {
+    public static void assertEquals(byte[] expected, ByteBuffer actual ) {
 
         if( expected == null ) throw new IllegalArgumentException();
         
         if( actual == null ) fail("actual is null");
+        
+        if( actual.hasArray() && actual.arrayOffset() == 0 ) {
+            
+            assertEquals(expected,actual.array());
+            
+            return;
+            
+        }
         
         /* Create a read-only view on the buffer so that we do not mess with
          * its position, mark, or limit.
@@ -348,7 +356,7 @@ abstract public class AbstractTestCase
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
      *         random length and having random contents.
      */
-    public ByteBuffer getRandomData(IJournal journal) {
+    public ByteBuffer getRandomData() {
         
         final int nbytes = r.nextInt(1024) + 1;
         

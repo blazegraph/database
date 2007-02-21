@@ -90,6 +90,12 @@ public class TestDiskJournal extends AbstractTestCase {
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
 
+        // test suite for MROW correctness.
+        suite.addTestSuite( TestMROW.class );
+
+        // test suite for btree on the journal.
+        suite.addTestSuite( TestBTree.class );
+
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
          * all the tests will run with the configuration specified in this test
@@ -132,6 +138,7 @@ public class TestDiskJournal extends AbstractTestCase {
             DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
             
             assertTrue("isStable",bufferStrategy.isStable());
+            assertFalse("isFullyBuffered",bufferStrategy.isFullyBuffered());
             assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
             assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                     bufferStrategy.getInitialExtent());
@@ -174,4 +181,52 @@ public class TestDiskJournal extends AbstractTestCase {
 
     }
     
+    /**
+     * Test suite integration for {@link AbstractMROWTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestMROW extends AbstractMROWTestCase {
+        
+        public TestMROW() {
+            super();
+        }
+
+        public TestMROW(String name) {
+            super(name);
+        }
+
+        protected BufferMode getBufferMode() {
+            
+            return BufferMode.Disk;
+            
+        }
+        
+    }
+
+    /**
+     * Test suite integration for {@link AbstractBTreeWithJournalTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestBTree extends AbstractBTreeWithJournalTestCase {
+        
+        public TestBTree() {
+            super();
+        }
+
+        public TestBTree(String name) {
+            super(name);
+        }
+        
+        public BufferMode getBufferMode() {
+            
+            return BufferMode.Disk;
+            
+        }
+        
+    }
+
 }

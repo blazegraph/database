@@ -116,6 +116,12 @@ public class IndexSegmentFileStore implements IRawStore {
         
     }
     
+    public boolean isFullyBuffered() {
+        
+        return false;
+        
+    }
+    
     public void close() {
 
         if (!open)
@@ -152,7 +158,7 @@ public class IndexSegmentFileStore implements IRawStore {
      * the nodes have been buffered then this uses a slice on the node
      * buffer. Otherwise this reads through to the backing file.
      */
-    public ByteBuffer read(long addr, ByteBuffer dst) {
+    public ByteBuffer read(long addr) {
 
         if (!open)
             throw new IllegalStateException();
@@ -162,6 +168,8 @@ public class IndexSegmentFileStore implements IRawStore {
         final int length = Addr.getByteCount(addr);
         
         final int offsetNodes = Addr.getOffset(metadata.addrNodes);
+
+        ByteBuffer dst;
 
         if (offset >= offsetNodes && buf_nodes != null) {
 
@@ -188,14 +196,8 @@ public class IndexSegmentFileStore implements IRawStore {
 
         } else {
 
-            /*
-             *  Allocate if not provided by the caller.
-             */
-            if (dst == null) {
-
-                dst = ByteBuffer.allocate(length);
-
-            }
+            // Allocate buffer.
+            dst = ByteBuffer.allocate(length);
 
             /*
              * the data need to be read from the file.

@@ -165,7 +165,7 @@ public class TestChecksumUtility extends TestCase {
         assertEquals(expectedChecksum, chk.checksum(ByteBuffer.wrap(data), 0,
                 data.length));
         
-        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
+        ByteBuffer direct = ByteBuffer.allocate(data.length);
         direct.put(data);
         assertEquals(expectedChecksum, chk.checksum(direct, 0,
                 data.length));
@@ -189,7 +189,7 @@ public class TestChecksumUtility extends TestCase {
         assertEquals(expectedChecksum, chk.checksum(ByteBuffer.wrap(data), 20,
                 data.length-10));
         
-        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
+        ByteBuffer direct = ByteBuffer.allocate(data.length);
         direct.put(data);
         assertEquals(expectedChecksum, chk.checksum(direct, 20,
                 data.length-10));

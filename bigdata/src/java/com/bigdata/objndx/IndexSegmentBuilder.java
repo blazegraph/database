@@ -63,7 +63,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
@@ -163,13 +163,13 @@ public class IndexSegmentBuilder {
      * The buffer used to hold leaves so that they can be evicted en mass onto
      * a region of the {@link #outFile}.
      */
-    protected TemporaryStore leafBuffer;
+    protected TemporaryRawStore leafBuffer;
     
     /**
      * The buffer used to hold nodes so that they can be evicted en mass onto
      * a region of the {@link #outFile}.
      */
-    protected TemporaryStore nodeBuffer;
+    protected TemporaryRawStore nodeBuffer;
     
     /**
      * True iff checksums are used for the serialized node and leaf records.
@@ -347,7 +347,7 @@ public class IndexSegmentBuilder {
      * @throws IOException
      * 
      * @todo make checksum, and record compression parameters in this
-     *       constructor variant
+     *       constructor variant.
      * 
      * FIXME test with and without each of these options { useChecksum,
      * recordCompressor}.
@@ -357,7 +357,7 @@ public class IndexSegmentBuilder {
             throws IOException {
     
         this(outFile, tmpDir, btree.getEntryCount(), btree.entryIterator(), m,
-                btree.nodeSer.valueSerializer, false/* useChecksum */,
+                btree.nodeSer.valueSerializer, true/* useChecksum */,
                 null/* new RecordCompressor() */, errorRate);
         
     }
@@ -386,7 +386,10 @@ public class IndexSegmentBuilder {
      * @param valueSerializer
      *            Used to serialize values in the new {@link IndexSegment}.
      * @param useChecksum
-     *            whether or not checksums are computed for nodes and leaves.
+     *            Whether or not checksums are computed for nodes and leaves.
+     *            The use of checksums on the read-only indices provides a check
+     *            for corrupt media and definately makes the database more
+     *            robust.
      * @param recordCompressor
      *            An object to compress leaves and nodes or <code>null</code>
      *            if compression is not desired.
@@ -548,7 +551,7 @@ public class IndexSegmentBuilder {
              * the disk we can realize a substantial decrease in latency for the
              * index build operation.
              */
-            leafBuffer = new TemporaryStore();
+            leafBuffer = new TemporaryRawStore();
             
             /*
              * Open the node buffer. We only do this if there will be at least
@@ -558,7 +561,7 @@ public class IndexSegmentBuilder {
              * we use a memory-based buffer, otherwise the buffer is an
              * abstraction for a disk file.
              */
-            nodeBuffer = plan.nnodes > 0 ? new TemporaryStore() : null;
+            nodeBuffer = plan.nnodes > 0 ? new TemporaryRawStore() : null;
 
             /*
              * Scan the source btree leaves in key order writing output leaves

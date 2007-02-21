@@ -93,7 +93,8 @@ import com.ibm.icu.text.RuleBasedCollator;
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @todo Refactor to support transactions and concurrent load/query
+ * @todo Refactor to support transactions and concurrent load/query and test
+ *       same.
  *       <p>
  *       Conflicts arise in the bigdata-RDF store when concurrent transactions
  *       attempt to define the same term. The problem arises because on index is

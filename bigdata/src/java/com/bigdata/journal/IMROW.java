@@ -42,54 +42,19 @@ Modifications:
 
 */
 /*
- * Created on Feb 4, 2007
+ * Created on Feb 20, 2007
  */
 
-package com.bigdata;
+package com.bigdata.journal;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import com.bigdata.rawstore.IRawStore;
 
 /**
- * Aggregates test suites in increase dependency order.
+ * A marker interface for a store that supports Multiple Readers, One Writer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
-
-    /**
-     * 
-     */
-    public TestAll() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Aggregates the tests in increasing dependency order.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("bigdata");
-
-        suite.addTest( com.bigdata.io.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
-        suite.addTest( com.bigdata.rawstore.TestAll.suite() );
-        suite.addTest( com.bigdata.objndx.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
-        suite.addTest( com.bigdata.journal.TestAll.suite() );
-        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
-
-        return suite;
-        
-    }
+public interface IMROW extends IRawStore {
 
 }

@@ -65,6 +65,9 @@ public class CommitRecordIndex extends BTree {
      */
     protected byte[] getKey(long commitTime) {
 
+        /*
+         * Note: The {@link KeyBuilder} is NOT thread-safe
+         */
         return keyBuilder.reset().append(commitTime).getKey();
 
     }
@@ -77,7 +80,7 @@ public class CommitRecordIndex extends BTree {
      * @return true iff such an {@link ICommitRecord} exists in the index with
      *         that commit timestamp.
      */
-    public boolean hasTimestamp(long commitTime) {
+    synchronized public boolean hasTimestamp(long commitTime) {
         
         return super.contains(getKey(commitTime));
         
@@ -94,7 +97,7 @@ public class CommitRecordIndex extends BTree {
      * @return The {@link ICommitRecord} index or <code>null</code> iff there
      *         is no {@link ICommitTimestamp} for that commit time.
      */
-    public ICommitRecord get(long commitTime) {
+    synchronized public ICommitRecord get(long commitTime) {
 
         ICommitRecord commitRecord;
         
@@ -140,7 +143,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @see #get(long)
      */
-    public ICommitRecord find(long timestamp) {
+    synchronized public ICommitRecord find(long timestamp) {
 
         final int index = findIndexOf(timestamp);
         
@@ -169,7 +172,7 @@ public class CommitRecordIndex extends BTree {
      *         <code>-1</code> iff there are no {@link ICommitRecord}s
      *         defined.
      */
-    public int findIndexOf(long timestamp) {
+    synchronized public int findIndexOf(long timestamp) {
         
         int pos = super.indexOf(getKey(timestamp));
         
@@ -220,8 +223,7 @@ public class CommitRecordIndex extends BTree {
      */
     protected ICommitRecord loadCommitRecord(IRawStore store, long addr) {
         
-        return CommitRecordSerializer.INSTANCE.deserialize(store.read(addr,
-                null));
+        return CommitRecordSerializer.INSTANCE.deserialize(store.read(addr));
 
     }
     
@@ -243,7 +245,7 @@ public class CommitRecordIndex extends BTree {
      * @exception IllegalArgumentException
      *                if <i>addr</i> is invalid.
      */
-    public void add(long commitRecordAddr, ICommitRecord commitRecord) {
+    synchronized public void add(long commitRecordAddr, ICommitRecord commitRecord) {
         
         if (commitRecord == null)
             throw new IllegalArgumentException();

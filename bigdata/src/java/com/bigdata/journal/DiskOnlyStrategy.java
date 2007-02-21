@@ -5,8 +5,15 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Disk-based journal strategy.
@@ -15,18 +22,10 @@ import com.bigdata.rawstore.Addr;
  * @version $Id$
  * 
  * @see BufferMode#Disk
- * 
- * @todo modify to support aio (asynchronous io). aio can be supported with a
- *       cache of recently written buffers and 2nd thread that writes behind
- *       from the cache to the file. for the disk-only mode, we would have to
- *       add a hash-based lookup (on the offset) of the recently written buffers
- *       so that reads test the cache before reading from the disk. force() will
- *       need to be modified to wait until the aio thread has caught up to the
- *       nextOffset (i.e., has written all data that is dirty on the buffer).
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         IDiskBasedStrategy {
-
+    
     /**
      * The file.
      */
@@ -61,6 +60,25 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     private boolean open;
 
+    /**
+     * Enable or disabled use of Asynchronous IO.
+     * 
+     * FIXME aio support is not working yet.
+     */
+    private static final boolean aio = false;
+    
+    /**
+     * A single-threaded service for writing data onto the disk that is
+     * used iff {@link #aio} is enabled.
+     */
+    private ExecutorService writerExecutor;
+
+    /**
+     * A write cache used iff {@link #aio} is enabled. The keys are the long
+     * offsets into the file. The values are the buffered writes.
+     */
+    private Map<Long,ByteBuffer> writeCache;
+    
     final public int getHeaderSize() {
         
         return headerSize;
@@ -95,11 +113,141 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         this.userExtent = extent - headerSize;
         
         this.channel = raf.getChannel();
-        
+
+        startWriter();
+
         open = true;
 
     }
 
+    /**
+     * Starts a single-threaded writer iff {@link #aio} is in use.
+     */
+    private final void startWriter() {
+
+        if(!aio) return;
+
+        if(writeCache==null) {
+            
+            writeCache = new ConcurrentHashMap<Long, ByteBuffer>();
+            
+        }
+        
+        /*
+         * @todo javadoc based on the text below.
+         * 
+         * @todo modify to support aio (asynchronous io). aio can be supported
+         * with a cache of recently written buffers and 2nd thread that writes
+         * behind from the cache to the file. for the disk-only mode, we would
+         * have to add a hash-based lookup (on the offset) of the recently
+         * written buffers so that reads test the cache before reading from the
+         * disk. force() will need to be modified to wait until the aio thread
+         * has caught up to the nextOffset (i.e., has written all data that is
+         * dirty on the buffer).
+         * 
+         * @todo modify to do better than synchronized on read/write in support
+         * or MROW, e.g., by using AIO in conjunction with a set of write
+         * buffers and a hash map into those based on addresses. E.g., a ring
+         * buffer over an array of ByteBuffers. Data are copied into the next
+         * slot in the ring buffer on write and flushed through to the disk
+         * periodically or by force(). The buffers are also inserted into a hash
+         * map for lookup by address for higher read concurrency. (We could also
+         * buffer recent reads using a similar mechanism which would help to
+         * remove any hotspots in the disk, but the disk cache might already
+         * cover those so test that both ways).
+         */
+
+        // Start a single-threaded writer.
+        writerExecutor = Executors.newSingleThreadExecutor(DaemonThreadFactory
+                .defaultThreadFactory());
+
+    }
+    
+    /**
+     * Forces the writer to shutdown normally which has the effect of causing
+     * all pending writes to execute while not allowing new writes.  This is
+     * used by {@link #force(boolean)} to force pending writes through to disk.
+     */
+    private final void closeWriter() {
+        
+        if(!aio) return;
+
+        // force the writer to terminate.
+        writerExecutor.shutdown();
+        
+        assert writeCache.isEmpty();
+        
+    }
+
+    /**
+     * Task writes a record onto the disk.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo modify to aggregate writes and use a single NIO operation for
+     *       several writes.
+     */
+    private class WriterTask implements Callable<Void> {
+
+        private final long pos;
+        private final ByteBuffer data;
+        
+        /**
+         * 
+         * @param pos
+         *            The offset into the file at which the data will be
+         *            written.
+         * @param data
+         *            The data are cloned to prevent concurrent modification by
+         *            the application (this is per the general contract for
+         *            {@link IRawStore#write(ByteBuffer)}.
+         */
+        public WriterTask(long pos, ByteBuffer data) {
+            
+            this.pos = pos;
+            
+            this.data = ByteBuffer.allocate(data.remaining());
+            
+            this.data.put(data);
+            
+            writeCache.put(pos, this.data);
+            
+        }
+        
+        public Void call() throws Exception {
+
+            final int nbytes = data.remaining();
+
+            if(data != writeCache.remove(pos)) {
+
+                throw new AssertionError();
+
+            }
+
+            /*
+             * Write the buffer on the disk.
+             * 
+             * Note: This duplicates the buffer for the operation so that
+             * concurrent read operations can not effect its state (position and
+             * limit).
+             */ 
+            final int count = raf.getChannel().write(data.asReadOnlyBuffer(),
+                    pos);
+        
+            if(count != nbytes) {
+                
+                throw new IOException("Expecting to write " + nbytes
+                        + " bytes, but wrote " + count + " bytes.");
+                
+            }
+            
+            return null;
+            
+        }
+        
+    }
+    
     final public boolean isOpen() {
 
         return open;
@@ -112,31 +260,49 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
+    public boolean isFullyBuffered() {
+        
+        return false;
+        
+    }
+    
     /**
      * Forces the data to disk.
      */
     public void force(boolean metadata) {
 
+        // flush all pending writes to disk.
+        closeWriter();
+        
         try {
 
-            raf.getChannel().force(metadata);
+            try {
 
-        } catch (IOException ex) {
+                raf.getChannel().force(metadata);
 
-            throw new RuntimeException(ex);
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        } finally {
+
+            // restart the writer.
+            startWriter();
 
         }
-
+        
     }
 
     /**
-     * Closes the file.
+     * Closes the file immediately (without flushing any pending writes).
      */
     public void close() {
 
         if (! open )
             throw new IllegalStateException();
-
+        
         try {
 
             raf.close();
@@ -175,8 +341,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         return userExtent;
         
     }
-    
-    public ByteBuffer read(long addr, ByteBuffer dst) {
+
+    public ByteBuffer read(long addr) {
 
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
@@ -200,43 +366,60 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             }
 
-            if (dst != null && dst.remaining() >= nbytes) {
+            final long pos = (long) offset + headerSize;
 
-                // copy exactly this many bytes.
-                
-                dst.limit(dst.position() + nbytes);
-                
-                // copy into the caller's buffer.
+            final ByteBuffer dst;
 
-                raf.getChannel().read(dst, (long) offset + headerSize);
+            // copy the data into the buffer.
 
-                // flip for reading.
+            if (aio) {
+             
+                // check the write cache.
+                ByteBuffer buf = writeCache.get(pos);
 
-                dst.flip();
+                if (buf != null) {
 
-                // the caller's buffer.
+                    /*
+                     * Duplicate the buffer so that callers can not side effect
+                     * the buffer state (position and limit) while it is waiting
+                     * to be written to the disk.
+                     */
 
-                return dst;
+                    return buf.asReadOnlyBuffer();
+
+                } else {
+
+                    /*
+                     * Read from the disk.
+                     */
+
+                    // allocate a new buffer of the exact capacity.
+                    dst = ByteBuffer.allocate(nbytes);
+
+                    raf.getChannel().read(dst, pos);
+
+                }
 
             } else {
 
                 // allocate a new buffer of the exact capacity.
-
                 dst = ByteBuffer.allocate(nbytes);
 
-                // copy the data into the buffer.
+                synchronized (this) {
 
-                raf.getChannel().read(dst, (long) offset + headerSize);
+                    raf.getChannel().read(dst, pos);
 
-                // flip for reading.
-
-                dst.flip();
-
-                // return the buffer.
-
-                return dst;
+                }
 
             }
+
+            // flip for reading.
+
+            dst.flip();
+
+            // return the buffer.
+
+            return dst;
 
         } catch (IOException ex) {
 
@@ -279,17 +462,34 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             }
 
-            // the offset at which the record will be written (not adjusted for
-            // the root blocks).
+            /*
+             * The offset at which the record will be written (not adjusted for
+             * the root blocks).
+             */
             final int offset = nextOffset;
 
-            // write the data onto the end of the file.
-            final int count = raf.getChannel().write(data, pos);
-            
-            if(count != nbytes) {
-            
-                throw new IOException("Expecting to write " + nbytes
-                        + " bytes, but wrote " + count + " bytes.");
+            if (aio) {
+
+                /*
+                 * Queue up a write.
+                 */
+                
+                writerExecutor.submit(new WriterTask(pos, data));
+                
+            } else synchronized(this) {
+
+                /* 
+                 * Write the data synchronously onto the end of the file.
+                 */
+
+                final int count = raf.getChannel().write(data, pos);
+
+                if (count != nbytes) {
+
+                    throw new IOException("Expecting to write " + nbytes
+                            + " bytes, but wrote " + count + " bytes.");
+
+                }
                 
             }
 

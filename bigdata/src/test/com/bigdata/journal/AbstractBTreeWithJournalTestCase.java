@@ -45,45 +45,40 @@ Modifications:
  * Created on Nov 17, 2006
  */
 
-package com.bigdata.objndx;
+package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
+import com.bigdata.objndx.AbstractBTreeTestCase;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.SimpleEntry;
 
 /**
- * Stress tests of the {@link BTree} writing on the {@link Journal}. This does
- * NOT include the use of the {@link BTree} to provide an object index of for
- * the journal - those tests require reading and write data on the journal using
- * its high-level API. Rather, this suite simply contains stress tests of the
- * btree operations at larger scale and including incremental writes against the
- * store.
+ * Stress tests of the {@link BTree} writing on the {@link Journal}. This suite
+ * simply contains stress tests of the btree operations at larger scale and
+ * including incremental writes against the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBTreeWithJournal extends AbstractBTreeTestCase {
+abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTestCase {
 
-    public TestBTreeWithJournal() {
+    public AbstractBTreeWithJournalTestCase() {
     }
 
-    public TestBTreeWithJournal(String name) {
+    public AbstractBTreeWithJournalTestCase(String name) {
         super(name);
     }
 
+    abstract public BufferMode getBufferMode();
+    
     public Properties getProperties() {
 
         if (properties == null) {
 
             properties = super.getProperties();
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
-                    .toString());
-
-//            properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.megabyte*20);
+            properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString() );
 
         }
 
@@ -109,16 +104,8 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
 
         Journal journal = new Journal(properties);
 
-        // A modest leaf queue capacity.
-        final int leafQueueCapacity = 500;
-
-        final int nscan = 10;
-
         BTree btree = new BTree(journal, branchingFactor,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        leafQueueCapacity, nscan),
-                SimpleEntry.Serializer.INSTANCE, null // no record compressor
-        );
+                SimpleEntry.Serializer.INSTANCE);
 
         return btree;
 
@@ -132,7 +119,7 @@ public class TestBTreeWithJournal extends AbstractBTreeTestCase {
      * Note: For sequential keys, m=128 causes the journal to exceed its initial
      * extent.
      */
-    int[] branchingFactors = new int[]{3,4,5,10,20};//,64};//,128};//,512};
+    int[] branchingFactors = new int[]{3,4,5,10};//,20,64};//,128};//,512};
     
     /**
      * A stress test for sequential key insertion that runs with a variety of

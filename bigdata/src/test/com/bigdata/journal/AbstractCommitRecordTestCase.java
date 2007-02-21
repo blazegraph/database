@@ -93,7 +93,10 @@ abstract public class AbstractCommitRecordTestCase extends TestCase {
     public ICommitRecord getRandomCommitRecord() {
 
         final long timestamp = System.currentTimeMillis();
-        
+
+        // using the clock for this as well so that it is an ascending value.
+        final long commitCounter = System.currentTimeMillis();
+
         final int n = ICommitRecord.MAX_ROOT_ADDRS;
         
         long[] roots = new long[n];
@@ -106,7 +109,7 @@ abstract public class AbstractCommitRecordTestCase extends TestCase {
             
         }
 
-        return new CommitRecord(timestamp,roots);
+        return new CommitRecord(timestamp,commitCounter,roots);
         
     }
     

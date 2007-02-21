@@ -194,7 +194,7 @@ public class IndexSegmentMerger {
                 new IndexSegment.CustomAddressSerializer(),
                 in1.nodeSer.keySerializer,
                 in1.nodeSer.valueSerializer,
-                new RecordCompressor(),
+                null, //new RecordCompressor(),
                 useChecksum
                 );
 

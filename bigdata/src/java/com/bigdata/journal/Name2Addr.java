@@ -42,6 +42,9 @@ public class Name2Addr extends BTree {
      * candidates for the commit protocol. The use of this cache also minimizes
      * the use of the {@link #keyBuilder} and therefore minimizes the relatively
      * expensive operation of encoding unicode names to byte[] keys.
+     * 
+     * @todo use a weak value cache so that unused indices may be swept by the
+     *       GC.
      */
     private Map<String,IIndex> name2BTree = new HashMap<String,IIndex>();
 
@@ -143,8 +146,7 @@ public class Name2Addr extends BTree {
             
         }
 
-        /* re-load btree from the store.
-         */
+        // re-load btree from the store.
         btree = BTreeMetadata.load(this.store, entry.addr);
         
         // save name -> btree mapping in transient cache.

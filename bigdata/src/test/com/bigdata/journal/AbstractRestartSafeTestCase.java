@@ -118,7 +118,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         assertEquals(tmp.position(),tmp.limit());
 
         // read the data back.
-        ByteBuffer actual = store.read(addr1,null);
+        ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected,actual);
         
@@ -148,7 +148,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
          * therefore correctly reject this address as never written.
          */
         try {
-            actual = store.read(addr1,null);
+            actual = store.read(addr1);
             fail("Expecting: "+IllegalArgumentException.class);
         }catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
@@ -188,7 +188,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         assertEquals(tmp.position(),tmp.limit());
 
         // read the data back.
-        ByteBuffer actual = store.read(addr1,null);
+        ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected,actual);
         
@@ -213,7 +213,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         assertTrue( store.isStable() );
         
         // read the data back.
-        actual = store.read(addr1,null);
+        actual = store.read(addr1);
         
         assertEquals(expected,actual);
 
@@ -257,7 +257,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             assertEquals(expected.length,tmp.position());
             assertEquals(tmp.position(),tmp.limit());
 
-            assertEquals(expected,store.read(addr, null));
+            assertEquals(expected,store.read(addr));
         
             addrs[i] = addr;
             
@@ -277,7 +277,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             
             byte[] expected = records[order[i]];
 
-            assertEquals(expected,store.read(addr, null));
+            assertEquals(expected,store.read(addr));
             
         }
         
@@ -307,7 +307,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             
             byte[] expected = records[order[i]];
 
-            assertEquals(expected,store.read(addr, null));
+            assertEquals(expected,store.read(addr));
             
         }
 

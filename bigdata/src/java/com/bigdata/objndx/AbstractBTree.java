@@ -132,7 +132,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * flag turns on some more expensive assertions.
      */
-    final protected boolean debug = false;
+    final protected boolean debug = DEBUG||true;
 
     /**
      * Counters tracking various aspects of the btree.
@@ -162,19 +162,23 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     final protected NodeSerializer nodeSer;
 
     /**
-     * Leaves are added to a hard reference queue when they are created or read
-     * from the store. On eviction from the queue the leaf is serialized by a
-     * listener against the {@link IRawStore}. Once the leaf is no longer
-     * strongly reachable its weak references may be cleared by the VM. Note
-     * that leaves are evicted as new leaves are added to the hard reference
-     * queue. This occurs in two situations: (1) when a new leaf is created
-     * during a split of an existing leaf; and (2) when a leaf is read in from
-     * the store. The minimum capacity for the hard reference queue is two (2)
-     * so that a split may occur without forcing eviction of either leaf in the
+     * Leaves (and nodes) are added to a hard reference queue when they are
+     * created or read from the store. On eviction from the queue a dirty leaf
+     * (or node) is serialized by a listener against the {@link IRawStore}.
+     * Once the leaf is no longer strongly reachable its weak references may be
+     * cleared by the VM.
+     * <p>
+     * Note that leaves (and nodes) are evicted as new leaves (or nodes) are
+     * added to the hard reference queue. This occurs in two situations: (1)
+     * when a new leaf (or node) is created during a split of an existing leaf
+     * (or node); and (2) when a leaf (or node) is read in from the store.
+     * <p>
+     * The minimum capacity for the hard reference queue is two (2) so that a
+     * split may occur without forcing eviction of either leaf (or node) in the
      * split. Incremental writes basically make it impossible for the commit IO
      * to get "too large" where too large is defined by the size of the hard
-     * reference cache.
-     * 
+     * reference cache and help to ensure fast commit operations on the store.
+     * <p>
      * Note: The code in {@link Node#postOrderIterator(boolean)} and
      * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
      * those iterators are used when persisting a node using a post-order
@@ -197,7 +201,18 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *       leaves. Would this make it possible to create a policy that targets
      *       a fixed memory burden for the index? As it stands the #of nodes and
      *       the #of leaves in memory can vary and leaves require much more
-     *       memory than nodes (for most trees).
+     *       memory than nodes (for most trees). (As an alternative, allow a
+     *       btree to retain some #of levels of the nodes in memory using a
+     *       separate node cache.)
+     * 
+     * FIXME Verify that memory allocated for leaves or nodes on the queue is
+     * reclaimed when copy-on-write is triggered since those data are no longer
+     * reachable by this instance of the btree. This is essentially a memory
+     * leak. Note that we can not just clear the hard reference on the queue,
+     * but we can release the keys and values for the node, which constitute
+     * most of its state. The node will already be marked as "!dirty" since copy
+     * on write was triggered, so it will NOT be serialized when it is evicted
+     * from the hard reference queue.
      */
     final protected HardReferenceQueue<PO> leafQueue;
 
@@ -977,7 +992,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * the node has a parent, then the parent is notified of the persistent
      * identity assigned to the node by the store. This method is NOT recursive
      * and dirty children of a node will NOT be visited.
-     * 
+     * <p>
      * Note: This will throw an exception if the backing store is read-only.
      * 
      * @return The persistent identity assigned by the store.
@@ -1024,16 +1039,6 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             assert !parent.isPersistent();
 
         }
-
-        // /*
-        // * Convert the keys buffer to an immutable keys buffer. The immutable
-        // * keys buffer is potentially much more compact.
-        // */
-        // if( node.keys instanceof MutableKeyBuffer ) {
-        //
-        // node.keys = new ImmutableKeyBuffer((MutableKeyBuffer)node.keys);
-        //                
-        // }
 
         /*
          * Serialize the node or leaf onto a shared buffer.
@@ -1098,13 +1103,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected AbstractNode readNodeOrLeaf(long addr) {
 
-        /*
-         * offer the node serializer's buffer to the IRawStore. it will be used
-         * iff it is large enough and the store does not prefer to return a
-         * read-only slice.
-         */
-        // nodeSer.buf.clear();
-        ByteBuffer tmp = store.read(addr, nodeSer._buf);
+//        /*
+//         * offer the node serializer's buffer to the IRawStore. it will be used
+//         * iff it is large enough and the store does not prefer to return a
+//         * read-only slice.
+//         */
+//        ByteBuffer tmp = store.read(addr, nodeSer._buf);
+        ByteBuffer tmp = store.read(addr);
         assert tmp.position() == 0;
         assert tmp.limit() == Addr.getByteCount(addr);
 

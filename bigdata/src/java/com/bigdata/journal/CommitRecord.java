@@ -59,15 +59,22 @@ package com.bigdata.journal;
 public class CommitRecord implements ICommitRecord {
 
     private final long timestamp;
+    private final long commitCounter;
     private final long[] roots;
-    
-    public CommitRecord(long timestamp) {
 
-        this(timestamp,new long[ICommitRecord.MAX_ROOT_ADDRS]);
+    /**
+     * @todo this may not be the correct commit counter unless this method is
+     *       synchronized with the commitService.
+     * 
+     * @todo are commit counters global or local?
+     */
+    public CommitRecord() {
+
+        this(0L,0L,new long[ICommitRecord.MAX_ROOT_ADDRS]);
         
     }
 
-    public CommitRecord(long timestamp, long[] roots) {
+    public CommitRecord(long timestamp, long commitCounter, long[] roots) {
         
 //        assert timestamp != 0L; // @todo what constraint?
         
@@ -76,6 +83,8 @@ public class CommitRecord implements ICommitRecord {
         assert roots.length == ICommitRecord.MAX_ROOT_ADDRS;
         
         this.timestamp = timestamp;
+        
+        this.commitCounter = commitCounter;
         
         this.roots = roots;
         
@@ -87,6 +96,12 @@ public class CommitRecord implements ICommitRecord {
         
     }
 
+    final public long getCommitCounter() {
+        
+        return commitCounter;
+        
+    }
+    
     final public int getRootAddrCount() {
         
         return roots.length;
@@ -106,6 +121,8 @@ public class CommitRecord implements ICommitRecord {
         sb.append("CommitRecord");
         
         sb.append("{timestamp="+timestamp);
+        
+        sb.append(", commitCounter="+commitCounter);
         
         sb.append(", roots=[");
         

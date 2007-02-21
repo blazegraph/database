@@ -407,8 +407,10 @@ public class FileMetadata {
                 
                 switch (bufferMode) {
                 case Direct: {
-                    // Allocate a direct buffer.
-                    buffer = ByteBuffer.allocateDirect((int) userExtent);
+                    // Allocate the buffer buffer.
+                    buffer = (useDirectBuffers ? ByteBuffer
+                            .allocateDirect((int) userExtent) : ByteBuffer
+                            .allocate((int) userExtent));
                     // Setup to read data from file into the buffer.
                     buffer.limit(nextOffset);
                     buffer.position(0);
@@ -530,17 +532,15 @@ public class FileMetadata {
                 switch (bufferMode) {
                 case Direct:
                     /*
-                     * Allocate a direct buffer.
+                     * Allocate the buffer.
                      * 
                      * Note that we do not read in any data since no user data has
                      * been written and the root blocks are not cached in the buffer
                      * to avoid possible overwrites.
                      */
-    //                buffer = ByteBuffer.allocateDirect((int) userExtent);
                     buffer = (useDirectBuffers ? ByteBuffer
-                            .allocateDirect((int)userExtent)
-                            : ByteBuffer
-                                    .allocate((int)userExtent));
+                            .allocateDirect((int) userExtent) : ByteBuffer
+                            .allocate((int) userExtent));
                     break;
                 case Mapped:
                     /*

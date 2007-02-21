@@ -58,9 +58,11 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * Base class for writing test cases for the different {@link IBufferStrategy}
+ * implementations.
  * 
  * @todo write tests for
- *       {@link IBufferStrategy#transferTo(java.io.RandomAccessFile)}.  This
+ *       {@link IBufferStrategy#transferTo(java.io.RandomAccessFile)}. This
  *       code is currently getting "checked" by the {@link IndexSegmentBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -270,7 +272,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
-        assertEquals(b, bufferStrategy.read(addr, null));
+        assertEquals(b, bufferStrategy.read(addr));
         
         /*
          * now write some more random bytes forcing an extension of the buffer.
@@ -295,10 +297,10 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
                 .getUserExtent());
 
         // verify data written before we overflowed the buffer.
-        assertEquals(b, bufferStrategy.read(addr, null));
+        assertEquals(b, bufferStrategy.read(addr));
 
         // verify data written after we overflowed the buffer.
-        assertEquals(b2, bufferStrategy.read(addr2, null));
+        assertEquals(b2, bufferStrategy.read(addr2));
     
         store.close();
 

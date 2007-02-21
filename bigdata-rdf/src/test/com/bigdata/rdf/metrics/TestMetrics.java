@@ -86,7 +86,6 @@ import com.bigdata.rdf.TripleStore.LoadStats;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-
 public class TestMetrics extends AbstractMetricsTestCase {
 
     /**

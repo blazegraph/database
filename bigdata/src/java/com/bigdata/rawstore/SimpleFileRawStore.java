@@ -54,7 +54,7 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TemporaryRawStore;
 
 
 /**
@@ -62,7 +62,7 @@ import com.bigdata.journal.TemporaryStore;
  * size of the file is restricted to {@link Integer#MAX_VALUE} bytes since we
  * must code the offset into the file using {@link Addr#toLong(int, int)}.
  * 
- * @see {@link TemporaryStore}, which provides a more solution for temporary
+ * @see {@link TemporaryRawStore}, which provides a more solution for temporary
  *      data that begins with the benefits of a memory-resident buffer and then
  *      converts to a disk-based store on overflow.
  * 
@@ -127,6 +127,12 @@ public class SimpleFileRawStore implements IRawStore {
         
     }
 
+    public boolean isFullyBuffered() {
+        
+        return false;
+        
+    }
+    
     /**
      * This also releases the lock if any obtained by the constructor.
      */
@@ -148,7 +154,7 @@ public class SimpleFileRawStore implements IRawStore {
         
     }
 
-    public ByteBuffer read(long addr, ByteBuffer dst) {
+    public ByteBuffer read(long addr) {
 
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
@@ -164,10 +170,11 @@ public class SimpleFileRawStore implements IRawStore {
 
         }
 
-        if(deleted.contains(addr)) {
-            
-            throw new IllegalArgumentException("Address was deleted in this session");
-            
+        if (deleted.contains(addr)) {
+
+            throw new IllegalArgumentException(
+                    "Address was deleted in this session");
+
         }
 
         try {
@@ -178,43 +185,21 @@ public class SimpleFileRawStore implements IRawStore {
 
             }
 
-            if (dst != null && dst.remaining() >= nbytes) {
+            // allocate a new buffer of the exact capacity.
 
-                // copy exactly this many bytes.
+            ByteBuffer dst = ByteBuffer.allocate(nbytes);
 
-                dst.limit(dst.position() + nbytes);
+            // copy the data into the buffer.
 
-                // copy into the caller's buffer.
-                
-                raf.getChannel().read(dst,(long)offset);
+            raf.getChannel().read(dst, (long) offset);
 
-                // flip for reading.
+            // flip for reading.
 
-                dst.flip();
+            dst.flip();
 
-                // the caller's buffer.
+            // return the buffer.
 
-                return dst;
-
-            } else {
-
-                // allocate a new buffer of the exact capacity.
-
-                dst = ByteBuffer.allocate(nbytes);
-
-                // copy the data into the buffer.
-
-                raf.getChannel().read(dst,(long)offset);
-
-                // flip for reading.
-
-                dst.flip();
-
-                // return the buffer.
-
-                return dst;
-
-            }
+            return dst;
 
         } catch (IOException ex) {
 

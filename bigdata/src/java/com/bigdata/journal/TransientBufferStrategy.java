@@ -87,6 +87,12 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
+    public boolean isFullyBuffered() {
+        
+        return true;
+        
+    }
+    
     public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
         
         if(rootBlock == null) throw new IllegalArgumentException();

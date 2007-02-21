@@ -420,7 +420,7 @@ public class TestTx extends ProxyTestCase {
          * Write v0 on tx0.
          */
         final byte[] id0 = new byte[] { 1 };
-        final byte[] v0 = getRandomData(journal).array();
+        final byte[] v0 = getRandomData().array();
         journal.getIndex(name,tx0).insert(id0, v0);
         assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
 
@@ -444,7 +444,7 @@ public class TestTx extends ProxyTestCase {
          /*
           * Test write after delete (succeeds, returning null).
           */
-         final byte[] v1 = getRandomData(journal).array();
+         final byte[] v1 = getRandomData().array();
          assertNull(journal.getIndex(name,tx0).insert(id0, v1));
 
          // Still not visible in concurrent transaction.
@@ -511,7 +511,7 @@ public class TestTx extends ProxyTestCase {
          * Write v0 on tx0.
          */
         final byte[] id0 = new byte[] { 1 };
-        final byte[] v0 = getRandomData(journal).array();
+        final byte[] v0 = getRandomData().array();
         journal.getIndex(name,tx0).insert(id0, v0);
         assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
 
@@ -535,7 +535,7 @@ public class TestTx extends ProxyTestCase {
         /*
          * Test write after delete (succeeds, returning null).
          */
-        final byte[] v1 = getRandomData(journal).array();
+        final byte[] v1 = getRandomData().array();
         assertNull(journal.getIndex(name,tx0).insert(id0, v1));
 
         // Still not visible in concurrent transaction.
@@ -620,7 +620,7 @@ public class TestTx extends ProxyTestCase {
          * Write v0 on tx0.
          */
         final byte[] id0 = new byte[] { 1 };
-        final byte[] v0 = getRandomData(journal).array();
+        final byte[] v0 = getRandomData().array();
         journal.getIndex(name,tx0).insert(id0, v0);
         assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
 
@@ -639,7 +639,7 @@ public class TestTx extends ProxyTestCase {
         /*
          * write(id0,v1) in tx1.
          */
-        final byte[] v1 = getRandomData(journal).array();
+        final byte[] v1 = getRandomData().array();
         assertNull(journal.getIndex(name,tx1).insert(id0, v1));
 
         // Still not visible in concurrent transaction.
@@ -706,7 +706,7 @@ public class TestTx extends ProxyTestCase {
 //
 //            // Write a random data version for id 0.
 //            final int id0 = 1;
-//            final ByteBuffer expected_id0_v0 = getRandomData(journal);
+//            final ByteBuffer expected_id0_v0 = getRandomData();
 //            journal.write( id0, expected_id0_v0);
 //            assertEquals(expected_id0_v0.array(),journal.read( id0, null));
 //            final ISlotAllocation slots_v0 = journal.objectIndex.get(0);
@@ -733,7 +733,7 @@ public class TestTx extends ProxyTestCase {
 //             * Update the version outside of the transaction.  This change SHOULD
 //             * NOT be visible to either transaction.
 //             */
-//            final ByteBuffer expected_id0_v1 = getRandomData(journal);
+//            final ByteBuffer expected_id0_v1 = getRandomData();
 //            journal.write( id0, expected_id0_v1);
 ////            final ISlotAllocation slots_v1 = journal.objectIndex.getSlots(0);
 //            /*
@@ -767,7 +767,7 @@ public class TestTx extends ProxyTestCase {
 //             * the transaction began. Verify that the written version does not
 //             * show up either on the journal or in tx1.
 //             */
-//            final ByteBuffer expected_tx1_id0_v0 = getRandomData(journal);
+//            final ByteBuffer expected_tx1_id0_v0 = getRandomData();
 //            tx1.write(id0, expected_tx1_id0_v0);
 //            assertDeleted(journal, id0);
 //            assertNotFound(tx0.read(id0, null));
@@ -779,7 +779,7 @@ public class TestTx extends ProxyTestCase {
 //             * the transaction began. Verify that the written version does not
 //             * show up either on the journal or in tx1.
 //             */
-//            final ByteBuffer expected_tx0_id0_v0 = getRandomData(journal);
+//            final ByteBuffer expected_tx0_id0_v0 = getRandomData();
 //            tx0.write(id0, expected_tx0_id0_v0);
 //            assertDeleted(journal, id0);
 //            assertEquals(expected_tx0_id0_v0.array(),tx0.read(id0, null));
@@ -788,7 +788,7 @@ public class TestTx extends ProxyTestCase {
 //            /*
 //             * Write a 2nd version on tx0 and reverify.
 //             */
-//            final ByteBuffer expected_tx0_id0_v1 = getRandomData(journal);
+//            final ByteBuffer expected_tx0_id0_v1 = getRandomData();
 //            tx0.write(id0, expected_tx0_id0_v1);
 //            assertDeleted(journal, id0);
 //            assertEquals(expected_tx0_id0_v1.array(),tx0.read(id0, null));
@@ -797,7 +797,7 @@ public class TestTx extends ProxyTestCase {
 //            /*
 //             * Write a 2nd version on tx1 and reverify.
 //             */
-//            final ByteBuffer expected_tx1_id0_v1 = getRandomData(journal);
+//            final ByteBuffer expected_tx1_id0_v1 = getRandomData();
 //            tx1.write(id0, expected_tx1_id0_v1);
 //            assertDeleted(journal, id0);
 //            assertEquals(expected_tx0_id0_v1.array(),tx0.read(id0, null));
@@ -814,7 +814,7 @@ public class TestTx extends ProxyTestCase {
 //            /*
 //             * Write a 3rd version on tx0 and reverify.
 //             */
-//            final ByteBuffer expected_tx0_id0_v2 = getRandomData(journal);
+//            final ByteBuffer expected_tx0_id0_v2 = getRandomData();
 //            tx0.write(id0, expected_tx0_id0_v2);
 //            assertDeleted(journal, id0);
 //            assertEquals(expected_tx0_id0_v2.array(),tx0.read(id0, null));
@@ -875,17 +875,17 @@ public class TestTx extends ProxyTestCase {
 //            final int id0 = 1;
 //            
 //            // pre-existing version of id0.
-//            final ByteBuffer expected_preExistingVersion = getRandomData(journal);
+//            final ByteBuffer expected_preExistingVersion = getRandomData();
 //
 //            // Two versions of id0 written during tx0.
-//            final ByteBuffer expected0v0 = getRandomData(journal);
-//            final ByteBuffer expected0v1 = getRandomData(journal);
+//            final ByteBuffer expected0v0 = getRandomData();
+//            final ByteBuffer expected0v1 = getRandomData();
 //            
 //            // Three versions of id1.
 //            final int id1 = 2;
-//            final ByteBuffer expected1v0 = getRandomData(journal);
-//            final ByteBuffer expected1v1 = getRandomData(journal);
-//            final ByteBuffer expected1v2 = getRandomData(journal);
+//            final ByteBuffer expected1v0 = getRandomData();
+//            final ByteBuffer expected1v1 = getRandomData();
+//            final ByteBuffer expected1v2 = getRandomData();
 //
 //            // Write pre-existing version of id0 onto the journal.
 //            journal.write(id0,expected_preExistingVersion);
@@ -1151,7 +1151,7 @@ public class TestTx extends ProxyTestCase {
 
         final byte[] id1 = new byte[]{1};
 
-        final byte[] v0 = getRandomData(journal).array();
+        final byte[] v0 = getRandomData().array();
 
         // write data version on tx1
         assertNull(journal.getIndex(name,tx1).insert(id1, v0));
@@ -1229,7 +1229,7 @@ public class TestTx extends ProxyTestCase {
         
         final byte[] id0 = new byte[]{1};
 
-        final byte[] v0 = getRandomData(journal).array();
+        final byte[] v0 = getRandomData().array();
 
         // data version not visible in global scope.
         assertNull(journal.getIndex(name).lookup(id0));
@@ -1311,8 +1311,8 @@ public class TestTx extends ProxyTestCase {
 //            int id0 = 1;
 //            
 //            // create random data for versions.
-//            ByteBuffer expected_id0_v0 = getRandomData(journal);
-//            ByteBuffer expected_id0_v1 = getRandomData(journal);
+//            ByteBuffer expected_id0_v0 = getRandomData();
+//            ByteBuffer expected_id0_v1 = getRandomData();
 //
 //            // data version not visible in global scope.
 //            assertNotFound(journal.read( id0, null));

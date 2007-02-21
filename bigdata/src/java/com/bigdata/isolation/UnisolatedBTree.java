@@ -116,7 +116,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * will cause less growth in the store without sacrificing too much
      * performance.
      */
-    public static final int DEFAULT_BRANCHING_FACTOR = 32;
+    public static final int DEFAULT_BRANCHING_FACTOR = 16;
     
     /**
      * The optional conflict resolver.

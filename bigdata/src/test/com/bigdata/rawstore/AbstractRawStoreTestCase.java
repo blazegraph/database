@@ -92,12 +92,23 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      *            Non-null byte[].
      * @param actual
      *            Buffer.
+     * 
+     * @todo optimize test helper when ByteBuffer is backed by an array, but
+     *       also compensate for the arrayOffset.
      */
-    public void assertEquals(byte[] expected, ByteBuffer actual ) {
+    static public void assertEquals(byte[] expected, ByteBuffer actual ) {
 
         if( expected == null ) throw new IllegalArgumentException();
         
         if( actual == null ) fail("actual is null");
+
+        if(actual.hasArray() && actual.arrayOffset()==0) {
+        
+            assertEquals(expected,actual.array());
+            
+            return;
+            
+        }
         
         /* Create a read-only view on the buffer so that we do not mess with
          * its position, mark, or limit.
@@ -184,7 +195,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
         try {
 
-            store.read( 0L, null);
+            store.read( 0L );
             
             fail("Expecting: "+IllegalArgumentException.class);
                 
@@ -211,7 +222,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             final int offset = 10;
             
-            store.read( Addr.toLong(nbytes, offset), null);
+            store.read( Addr.toLong(nbytes, offset) );
             
             fail("Expecting: "+IllegalArgumentException.class);
                 
@@ -236,7 +247,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             final int offset = 0;
             
-            store.read( Addr.toLong(nbytes, offset), null);
+            store.read( Addr.toLong(nbytes, offset) );
             
             fail("Expecting: "+IllegalArgumentException.class);
                 
@@ -346,7 +357,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(tmp.position(),tmp.limit());
 
         // read the data back.
-        ByteBuffer actual = store.read(addr1,null);
+        ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected,actual);
         
@@ -386,7 +397,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         {
             // read the data back.
-            ByteBuffer actual = store.read(addr1, null);
+            ByteBuffer actual = store.read(addr1);
 
             assertEquals(expected, actual);
 
@@ -402,7 +413,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         {
             // read the data back.
-            ByteBuffer actual2 = store.read(addr1, null);
+            ByteBuffer actual2 = store.read(addr1);
 
             assertEquals(expected, actual2);
 
@@ -415,342 +426,342 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         
     }
 
-    /**
-     * Test verifies read behavior when the offered buffer has exactly the
-     * required #of bytes of remaining.
-     */
-    public void test_writeReadWith2ndBuffer_exactCapacity() {
-        
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len);
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // verify the data are record correct.
-        assertEquals(expected1,actual);
-
-        /*
-         * the caller's buffer MUST be used since it has sufficient bytes
-         * remaining
-         */
-        assertTrue("Caller's buffer was not used.", actual==buf);
-
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len,actual.limit());
-
-    }
-    
-    public void test_writeReadWith2ndBuffer_excessCapacity_zeroPosition() {
-        
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len+1);
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // verify the data are record correct.
-        assertEquals(expected1,actual);
-
-        /*
-         * the caller's buffer MUST be used since it has sufficient bytes
-         * remaining
-         */
-        assertTrue("Caller's buffer was not used.", actual==buf);
-
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len,actual.limit());
-
-    }
-    
-    public void test_writeReadWith2ndBuffer_excessCapacity_nonZeroPosition() {
-        
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len+2);
-        buf.position(1); // advance the position by one byte.
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // copy the expected data leaving the first byte zero.
-        byte[] expected2 = new byte[len+1];
-        System.arraycopy(expected1, 0, expected2, 1, expected1.length);
-        
-        // verify the data are record correct.
-        assertEquals(expected2,actual);
-
-        /*
-         * the caller's buffer MUST be used since it has sufficient bytes
-         * remaining
-         */
-        assertTrue("Caller's buffer was not used.", actual==buf);
-
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len+1,actual.limit());
-
-    }
-    
-    /**
-     * Test verifies read behavior when the offered buffer does not have
-     * sufficient remaining capacity.
-     */
-    public void test_writeReadWith2ndBuffer_wouldUnderflow_nonZeroPosition() {
-    
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer that is large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len);
-        buf.position(1); // but advance the position so that there is not enough room.
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // verify the data are record correct.
-        assertEquals(expected1,actual);
-
-        /*
-         * the caller's buffer MUST NOT be used since it does not have
-         * sufficient bytes remaining.
-         */
-        assertFalse("Caller's buffer was used.", actual==buf);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len,actual.limit());
-        
-    }
-
-    /**
-     * Test verifies read behavior when the offered buffer does not have
-     * sufficient remaining capacity.
-     */
-    public void test_writeReadWith2ndBuffer_wouldUnderflow_zeroPosition() {
-    
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer that is not large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len-1);
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // verify the data are record correct.
-        assertEquals(expected1,actual);
-
-        /*
-         * the caller's buffer MUST NOT be used since it does not have
-         * sufficient bytes remaining.
-         */
-        assertFalse("Caller's buffer was used.", actual==buf);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len,actual.limit());
-        
-    }
-
-    /**
-     * Test verifies that an oversized buffer provided to
-     * {@link IRawStore#read(long, ByteBuffer)} will not cause more bytes to be
-     * read than are indicated by the {@link Addr address}.
-     */
-    public void test_writeReadWith2ndBuffer_wouldOverflow_zeroPosition() {
-    
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer that is more than large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len+1);
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // verify the data are record correct - only [len] bytes should be copied.
-        assertEquals(expected1,actual);
-
-        /*
-         * the caller's buffer MUST be used since it has sufficient bytes
-         * remaining.
-         */
-        assertTrue("Caller's buffer was used.", actual==buf);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len,actual.limit());
-        
-    }
-
-    /**
-     * Test verifies that an oversized buffer provided to
-     * {@link IRawStore#read(long, ByteBuffer)} will not cause more bytes to be
-     * read than are indicated by the {@link Addr address}.
-     */
-    public void test_writeReadWith2ndBuffer_wouldOverflow_nonZeroPosition() {
-    
-        IRawStore store = getStore();
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected1 = new byte[len];
-        
-        r.nextBytes(expected1);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
-        
-        long addr1 = store.write(tmp);
-
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
-
-        // a buffer that is more than large enough to hold the record.
-        ByteBuffer buf = ByteBuffer.allocate(len+2);
-        
-        // non-zero position.
-        buf.position(1);
-
-        // read the data, offering our buffer.
-        ByteBuffer actual = store.read(addr1, buf);
-        
-        // copy the expected data leaving the first byte zero.
-        byte[] expected2 = new byte[len+1];
-        System.arraycopy(expected1, 0, expected2, 1, expected1.length);
-
-        // verify the data are record correct - only [len] bytes should be copied.
-        assertEquals(expected2,actual);
-
-        /*
-         * the caller's buffer MUST be used since it has sufficient bytes
-         * remaining.
-         */
-        assertTrue("Caller's buffer was used.", actual==buf);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(len+1,actual.limit());
-        
-    }
-
+//    /**
+//     * Test verifies read behavior when the offered buffer has exactly the
+//     * required #of bytes of remaining.
+//     */
+//    public void test_writeReadWith2ndBuffer_exactCapacity() {
+//        
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len);
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // verify the data are record correct.
+//        assertEquals(expected1,actual);
+//
+//        /*
+//         * the caller's buffer MUST be used since it has sufficient bytes
+//         * remaining
+//         */
+//        assertTrue("Caller's buffer was not used.", actual==buf);
+//
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len,actual.limit());
+//
+//    }
+//    
+//    public void test_writeReadWith2ndBuffer_excessCapacity_zeroPosition() {
+//        
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len+1);
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // verify the data are record correct.
+//        assertEquals(expected1,actual);
+//
+//        /*
+//         * the caller's buffer MUST be used since it has sufficient bytes
+//         * remaining
+//         */
+//        assertTrue("Caller's buffer was not used.", actual==buf);
+//
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len,actual.limit());
+//
+//    }
+//    
+//    public void test_writeReadWith2ndBuffer_excessCapacity_nonZeroPosition() {
+//        
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len+2);
+//        buf.position(1); // advance the position by one byte.
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // copy the expected data leaving the first byte zero.
+//        byte[] expected2 = new byte[len+1];
+//        System.arraycopy(expected1, 0, expected2, 1, expected1.length);
+//        
+//        // verify the data are record correct.
+//        assertEquals(expected2,actual);
+//
+//        /*
+//         * the caller's buffer MUST be used since it has sufficient bytes
+//         * remaining
+//         */
+//        assertTrue("Caller's buffer was not used.", actual==buf);
+//
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len+1,actual.limit());
+//
+//    }
+//    
+//    /**
+//     * Test verifies read behavior when the offered buffer does not have
+//     * sufficient remaining capacity.
+//     */
+//    public void test_writeReadWith2ndBuffer_wouldUnderflow_nonZeroPosition() {
+//    
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer that is large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len);
+//        buf.position(1); // but advance the position so that there is not enough room.
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // verify the data are record correct.
+//        assertEquals(expected1,actual);
+//
+//        /*
+//         * the caller's buffer MUST NOT be used since it does not have
+//         * sufficient bytes remaining.
+//         */
+//        assertFalse("Caller's buffer was used.", actual==buf);
+//        
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len,actual.limit());
+//        
+//    }
+//
+//    /**
+//     * Test verifies read behavior when the offered buffer does not have
+//     * sufficient remaining capacity.
+//     */
+//    public void test_writeReadWith2ndBuffer_wouldUnderflow_zeroPosition() {
+//    
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer that is not large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len-1);
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // verify the data are record correct.
+//        assertEquals(expected1,actual);
+//
+//        /*
+//         * the caller's buffer MUST NOT be used since it does not have
+//         * sufficient bytes remaining.
+//         */
+//        assertFalse("Caller's buffer was used.", actual==buf);
+//        
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len,actual.limit());
+//        
+//    }
+//
+//    /**
+//     * Test verifies that an oversized buffer provided to
+//     * {@link IRawStore#read(long, ByteBuffer)} will not cause more bytes to be
+//     * read than are indicated by the {@link Addr address}.
+//     */
+//    public void test_writeReadWith2ndBuffer_wouldOverflow_zeroPosition() {
+//    
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer that is more than large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len+1);
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // verify the data are record correct - only [len] bytes should be copied.
+//        assertEquals(expected1,actual);
+//
+//        /*
+//         * the caller's buffer MUST be used since it has sufficient bytes
+//         * remaining.
+//         */
+//        assertTrue("Caller's buffer was used.", actual==buf);
+//        
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len,actual.limit());
+//        
+//    }
+//
+//    /**
+//     * Test verifies that an oversized buffer provided to
+//     * {@link IRawStore#read(long, ByteBuffer)} will not cause more bytes to be
+//     * read than are indicated by the {@link Addr address}.
+//     */
+//    public void test_writeReadWith2ndBuffer_wouldOverflow_nonZeroPosition() {
+//    
+//        IRawStore store = getStore();
+//        
+//        Random r = new Random();
+//        
+//        final int len = 100;
+//        
+//        byte[] expected1 = new byte[len];
+//        
+//        r.nextBytes(expected1);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+//        
+//        long addr1 = store.write(tmp);
+//
+//        // verify that the position is advanced to the limit.
+//        assertEquals(len,tmp.position());
+//        assertEquals(tmp.position(),tmp.limit());
+//
+//        // a buffer that is more than large enough to hold the record.
+//        ByteBuffer buf = ByteBuffer.allocate(len+2);
+//        
+//        // non-zero position.
+//        buf.position(1);
+//
+//        // read the data, offering our buffer.
+//        ByteBuffer actual = store.read(addr1, buf);
+//        
+//        // copy the expected data leaving the first byte zero.
+//        byte[] expected2 = new byte[len+1];
+//        System.arraycopy(expected1, 0, expected2, 1, expected1.length);
+//
+//        // verify the data are record correct - only [len] bytes should be copied.
+//        assertEquals(expected2,actual);
+//
+//        /*
+//         * the caller's buffer MUST be used since it has sufficient bytes
+//         * remaining.
+//         */
+//        assertTrue("Caller's buffer was used.", actual==buf);
+//        
+//        /*
+//         * verify the position and limit after the read.
+//         */
+//        assertEquals(0,actual.position());
+//        assertEquals(len+1,actual.limit());
+//        
+//    }
+//
     /**
      * Test verifies that write does not permit changes to the store state by
      * modifying the supplied buffer after the write operation (i.e., a copy
@@ -778,7 +789,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(tmp.position(),tmp.limit());
 
         // verify read.
-        assertEquals(expected1,store.read(addr1, null));
+        assertEquals(expected1,store.read(addr1));
 
         // clone the data.
         byte[] expected2 = expected1.clone();
@@ -790,7 +801,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          * verify read - this will fail if the original data was not copied by
          * the store.
          */
-        assertEquals(expected2,store.read(addr1, null));
+        assertEquals(expected2,store.read(addr1));
 
     }
 
@@ -818,7 +829,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(len,tmp.position());
         assertEquals(tmp.position(),tmp.limit());
 
-        ByteBuffer actual = store.read(addr1, null);
+        ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected1,actual);
 
@@ -840,7 +851,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
             // verify no change in store state.
             
-            assertEquals(expected1,store.read(addr1, null));
+            assertEquals(expected1,store.read(addr1));
 
         }
         
@@ -880,7 +891,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             assertEquals(expected.length,tmp.position());
             assertEquals(tmp.position(),tmp.limit());
 
-            assertEquals(expected,store.read(addr, null));
+            assertEquals(expected,store.read(addr));
         
             addrs[i] = addr;
             
@@ -900,7 +911,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             byte[] expected = records[order[i]];
 
-            assertEquals(expected,store.read(addr, null));
+            assertEquals(expected,store.read(addr));
             
         }
         

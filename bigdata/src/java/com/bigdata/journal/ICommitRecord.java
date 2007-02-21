@@ -85,7 +85,14 @@ public interface ICommitRecord {
      * there is no {@link ICommitRecord} written on the {@link Journal}.
      */
     public long getTimestamp();
-   
+
+    /**
+     * The commit counter associated with the commit record. This is used by
+     * transactions in order to determine whether or not intervening commits
+     * have occurred since the transaction start time.
+     */
+    public long getCommitCounter();
+    
     /**
      * The #of allowed root addresses.
      */

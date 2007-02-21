@@ -52,13 +52,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TemporaryRawStore;
 
 /**
  * A purely transient append-only implementation useful when data need to be
  * buffered in memory. The writes are stored in an {@link ArrayList}.
  * 
- * @see {@link TemporaryStore}, which provides a more scalable solution for temporary
+ * @see {@link TemporaryRawStore}, which provides a more scalable solution for temporary
  *      data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -129,6 +129,12 @@ public class SimpleMemoryRawStore implements IRawStore {
         
     }
 
+    public boolean isFullyBuffered() {
+        
+        return true;
+        
+    }
+    
     public void close() {
         
         if( !open ) throw new IllegalStateException();
@@ -140,7 +146,7 @@ public class SimpleMemoryRawStore implements IRawStore {
         
     }
 
-    public ByteBuffer read(long addr, ByteBuffer dst) {
+    public ByteBuffer read(long addr) {
 
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
@@ -178,31 +184,9 @@ public class SimpleMemoryRawStore implements IRawStore {
             
         }
         
-        if(dst != null && dst.remaining()>=nbytes) {
-
-            // place limit on the #of valid bytes in dst.
+        // return a read-only view onto the data in the store.
             
-            dst.limit(dst.position() + nbytes);
-            
-            // copy into the caller's buffer.
-            
-            dst.put(b,0,b.length);
-            
-            // flip for reading.
-            
-            dst.flip();
-            
-            // the caller's buffer.
-            
-            return dst;
-            
-        } else {
-
-            // return a read-only view onto the data in the store.
-            
-            return ByteBuffer.wrap(b).asReadOnlyBuffer();
-            
-        }
+        return ByteBuffer.wrap(b).asReadOnlyBuffer();
         
     }
 

@@ -21,7 +21,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBufferStrategy extends IRawStore {
+public interface IBufferStrategy extends IRawStore, IMROW {
     
     /**
      * The next offset at which a data item would be written on the store.

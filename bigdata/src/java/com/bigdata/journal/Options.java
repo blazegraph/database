@@ -152,12 +152,12 @@ public class Options {
      * forceMetadata} that determines whether the journal will be forced to
      * stable storage on a commit (default <code>forceMetadata</code>).
      * <dl>
-     * <dt>no</dt>
+     * <dt>No</dt>
      * <dd>This option is useful when the journal is replicated so that we can
      * always failover to another server having the same data. Unless the file
      * is replicated or transient, this mode can lead to lost data if there is a
      * hardware or software failure.</dd>
-     * <dt>force</dt>
+     * <dt>Force</dt>
      * <dd>Force the journal contents, but not the file metadata, to stable
      * storage. The precise semantics of this option are dependent on the OS and
      * hardware platform (some hardware platforms may guarentee that the file
@@ -168,7 +168,7 @@ public class Options {
      * utility), to the file allocation structure in the file system (which is
      * always a serious loss, but is normally repairable with a file system
      * repair utility). </dd>
-     * <dt>forceMetadata</dt>
+     * <dt>ForceMetadata</dt>
      * <dd>Force the journal contents and the file metadata to stable storage.
      * This option is the most secure. </dd>
      * </dl>
@@ -245,7 +245,7 @@ public class Options {
      * The default for the {@link #FORCE_ON_COMMIT} option (file data and
      * metadata are forced).
      */
-    public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.ForceMetadata;
+    public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.Force;
     
     /**
      * The default for the {@link #DOUBLE_SYNC} option (application data is NOT

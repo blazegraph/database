@@ -117,6 +117,8 @@ import java.nio.channels.FileChannel;
  * @version $Id$
  * 
  * @see BenchmarkJournalWriteRate
+ * 
+ * @deprecated never implemented and to be replaced by aio support in {@link DiskOnlyStrategy}
  */
 public class BlockWriteCache {
 

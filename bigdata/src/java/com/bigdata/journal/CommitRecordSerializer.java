@@ -72,6 +72,8 @@ public class CommitRecordSerializer {
 
         final long timestamp = commitRecord.getTimestamp();
 
+        final long commitCounter = commitRecord.getCommitCounter();
+
         final int n = commitRecord.getRootAddrCount();
         
         try {
@@ -84,6 +86,8 @@ public class CommitRecordSerializer {
             dos.writeInt(VERSION0);
 
             dos.writeLong(timestamp);
+
+            dos.writeLong(commitCounter);
             
             LongPacker.packLong(dos, n);
             
@@ -118,6 +122,8 @@ public class CommitRecordSerializer {
 
             final long timestamp = dis.readLong();
             
+            final long commitCounter = dis.readLong();
+            
             final int n = (int)LongPacker.unpackLong(dis);
 
             final long[] roots = new long[n];
@@ -128,7 +134,7 @@ public class CommitRecordSerializer {
 
             }
             
-            return new CommitRecord(timestamp,roots);
+            return new CommitRecord(timestamp,commitCounter,roots);
 
         } catch (IOException ex) {
 

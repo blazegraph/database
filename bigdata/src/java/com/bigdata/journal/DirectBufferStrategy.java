@@ -24,10 +24,16 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
     DirectBufferStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
-        super(maximumExtent, BufferMode.Direct,fileMetadata);
+        super(maximumExtent, BufferMode.Direct, fileMetadata);
 
     }
 
+    public boolean isFullyBuffered() {
+        
+        return true;
+        
+    }
+    
     /**
      * Extends the basic behavior to write through to the backing file.
      */

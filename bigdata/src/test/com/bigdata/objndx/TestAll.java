@@ -103,8 +103,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIncrementalWrite.class );
         // test copy-on-write scenarios.
         suite.addTestSuite( TestCopyOnWrite.class );
-        // stress test using journal as the backing store.
-        suite.addTestSuite( TestBTreeWithJournal.class );
         
         /*
          * test atomic commit
@@ -127,21 +125,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
         // test of the bloom filter integration.
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
-        // @todo test compacting merge of two index segments.
+        // test compacting merge of two index segments.
         suite.addTestSuite( TestIndexSegmentMerger.class );
-
-        /*
-         * use of btree to support transactional isolation.
-         *
-         * @todo verify that null is allowed to represent a delted value.
-         * 
-         * @todo test of double-delete.
-         * 
-         * @todo test as simple object store (persistent identifiers) by
-         * refactoring the journal test suites.
-         * 
-         * @todo test on partitioned index.
-         */
 
         /*
          * use of btree to support column store.

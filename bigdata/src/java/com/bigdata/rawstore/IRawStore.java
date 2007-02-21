@@ -149,22 +149,6 @@ public interface IRawStore {
      *            A long integer formed using {@link Addr} that encodes both the
      *            offset from which the data will be read and the #of bytes to
      *            be read.
-     * @param dst
-     *            The destination buffer (optional). This buffer will be used if
-     *            it has sufficient {@link ByteBuffer#remaining()} capacity.
-     *            When used, the data will be written into the offered buffer
-     *            starting at {@link ByteBuffer#position()} and the
-     *            {@link ByteBuffer#position()} will be advanced by the #of
-     *            bytes read.<br>
-     *            When <code>null</code> or when a buffer is offered without
-     *            sufficient {@link ByteBuffer#remaining()} capacity the
-     *            implementation is encouraged to return a read-only slice
-     *            containing the data or, failing that, to allocate a new buffer
-     *            with sufficient capacity.<br>
-     *            Note that it is not an error to offer a buffer that is too
-     *            small - it will simply be ignored.<br>
-     *            Note that it is not an error to offer a buffer with excess
-     *            remaining capacity.
      * 
      * @return The data read. The buffer will be flipped to prepare for reading
      *         (the position will be zero and the limit will be the #of bytes
@@ -174,7 +158,41 @@ public interface IRawStore {
      *                If the address is known to be invalid (never written or
      *                deleted). Note that the address 0L is always invalid.
      */
-    public ByteBuffer read(long addr, ByteBuffer dst);
+    public ByteBuffer read(long addr);
+
+//    /**
+//     * Read the data (unisolated).
+//     * 
+//     * @param addr
+//     *            A long integer formed using {@link Addr} that encodes both the
+//     *            offset from which the data will be read and the #of bytes to
+//     *            be read.
+//     * @param dst
+//     *            The destination buffer (optional). This buffer will be used if
+//     *            it has sufficient {@link ByteBuffer#remaining()} capacity.
+//     *            When used, the data will be written into the offered buffer
+//     *            starting at {@link ByteBuffer#position()} and the
+//     *            {@link ByteBuffer#position()} will be advanced by the #of
+//     *            bytes read.<br>
+//     *            When <code>null</code> or when a buffer is offered without
+//     *            sufficient {@link ByteBuffer#remaining()} capacity the
+//     *            implementation is encouraged to return a read-only slice
+//     *            containing the data or, failing that, to allocate a new buffer
+//     *            with sufficient capacity.<br>
+//     *            Note that it is not an error to offer a buffer that is too
+//     *            small - it will simply be ignored.<br>
+//     *            Note that it is not an error to offer a buffer with excess
+//     *            remaining capacity.
+//     * 
+//     * @return The data read. The buffer will be flipped to prepare for reading
+//     *         (the position will be zero and the limit will be the #of bytes
+//     *         read).
+//     * 
+//     * @exception IllegalArgumentException
+//     *                If the address is known to be invalid (never written or
+//     *                deleted). Note that the address 0L is always invalid.
+//     */
+//    public ByteBuffer read(long addr, ByteBuffer dst);
 
     /**
      * True iff the store is open.
@@ -193,8 +211,25 @@ public interface IRawStore {
     
     /**
      * True iff backed by stable storage.
+     * 
+     * @exception IllegalStateException
+     *                if the store is not open.
      */
     public boolean isStable();
+   
+    /**
+     * True iff the store is fully buffered (all reads are against memory).
+     * Implementations MAY change the value returned by this method over the
+     * life cycle of the store, e.g., to conserve memory a store may drop or
+     * decrease its buffer if it is backed by disk.
+     * <p>
+     * Note: This does not guarentee that the OS will not swap the buffer onto
+     * disk.
+     * 
+     * @exception IllegalStateException
+     *                if the store is not open.
+     */
+    public boolean isFullyBuffered();
     
     /**
      * Force the data to stable storage. While this is NOT sufficient to

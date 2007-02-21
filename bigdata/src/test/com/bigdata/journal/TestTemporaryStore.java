@@ -56,7 +56,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Test suite for {@link TemporaryStore}.
+ * Test suite for {@link TemporaryRawStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -78,7 +78,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 
     protected IRawStore getStore() {
 
-        return new TemporaryStore();
+        return new TemporaryRawStore();
         
     }
 
@@ -89,7 +89,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      */
     public void test_overflow() {
         
-        TemporaryStore store = (TemporaryStore) getStore();
+        TemporaryRawStore store = (TemporaryRawStore) getStore();
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
@@ -125,7 +125,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      */
     public void test_writeNoExtend() {
 
-        TemporaryStore store = (TemporaryStore) getStore();
+        TemporaryRawStore store = (TemporaryRawStore) getStore();
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
@@ -166,7 +166,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      */
     public void test_writeWithExtend() {
 
-        TemporaryStore store = (TemporaryStore) getStore();
+        TemporaryRawStore store = (TemporaryRawStore) getStore();
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
@@ -205,7 +205,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
-        assertEquals(b, bufferStrategy.read(addr, null));
+        assertEquals(b, bufferStrategy.read(addr));
         
         /*
          * now write some more random bytes forcing an extension of the buffer.
@@ -230,10 +230,10 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
                 .getUserExtent());
 
         // verify data written before we overflowed the buffer.
-        assertEquals(b, bufferStrategy.read(addr, null));
+        assertEquals(b, bufferStrategy.read(addr));
 
         // verify data written after we overflowed the buffer.
-        assertEquals(b2, bufferStrategy.read(addr2, null));
+        assertEquals(b2, bufferStrategy.read(addr2));
     
         store.close();
 
@@ -256,7 +256,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
          * requirements. This should have no impact on the ability to test
          * correctness.
          */
-        TemporaryStore store = new TemporaryStore(Bytes.kilobyte*10,
+        TemporaryRawStore store = new TemporaryRawStore(Bytes.kilobyte*10,
                 Bytes.kilobyte * 100, false);
         
         // verify that we are using an in-memory buffer.
@@ -346,7 +346,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
                     .getUserExtent());
 
             // verify the data.
-            assertEquals(b, store.read(addr, null));
+            assertEquals(b, store.read(addr));
 
         }
 
@@ -382,10 +382,10 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
                         .getBufferStrategy().getUserExtent());
 
         // verify data written before we overflowed the buffer.
-        assertEquals(b, store.read(addr, null));
+        assertEquals(b, store.read(addr));
 
         // verify data written after we overflowed the buffer.
-        assertEquals(b2, store.read(addr2, null));
+        assertEquals(b2, store.read(addr2));
     
         // the name of the on-disk file.
         File file = ((DiskOnlyStrategy)store.getBufferStrategy()).getFile();

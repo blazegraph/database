@@ -408,7 +408,11 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue,
                 PackedAddressSerializer.INSTANCE, valueSer,
-                NodeFactory.INSTANCE, recordCompressor, true /* useChecksum */);
+                NodeFactory.INSTANCE, //
+                recordCompressor, //
+                // FIXME only use checksum for stores that are not fully buffered.
+                true || !store.isFullyBuffered()/* useChecksum */
+                );
 
         /*
          * Note: the mutable BTree has a limit here so that split() will always
@@ -452,7 +456,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
                 hardReferenceQueue, 
                 PackedAddressSerializer.INSTANCE, 
                 metadata.valueSer, NodeFactory.INSTANCE,
-                metadata.recordCompressor, metadata.useChecksum);
+                metadata.recordCompressor,//
+                metadata.useChecksum // use checksum iff used on create.
+                );
         
         // save a reference to the immutable metadata record.
         this.metadata = metadata;

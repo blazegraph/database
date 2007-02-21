@@ -66,7 +66,7 @@ public interface ITx extends IStore {
     public long getStartTimestamp();
 
     /**
-     * Prepare the transaction for a {@link #commit()}.
+     * Validate the write set for the transaction.
      * 
      * @exception IllegalStateException
      *                If the transaction is not active. If the transaction is

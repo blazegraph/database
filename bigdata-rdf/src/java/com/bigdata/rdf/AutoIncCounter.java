@@ -140,7 +140,7 @@ public class AutoIncCounter implements UserDefinedFunction, ICommitter {
 
         try {
     
-            ByteBuffer buf = store.read(addr, null);
+            ByteBuffer buf = store.read(addr);
 
             ByteBufferInputStream bbis = new ByteBufferInputStream(buf);
 
