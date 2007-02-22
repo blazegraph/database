@@ -114,9 +114,9 @@ public class TestMappedJournal extends AbstractTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 
-        properties.setProperty(Options.SEGMENT, "0");
+//        properties.setProperty(Options.SEGMENT, "0");
 
-        properties.setProperty(Options.FILE,getTestJournalFile(properties));
+//        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -131,35 +131,30 @@ public class TestMappedJournal extends AbstractTestCase {
     public void test_create_mapped01() throws IOException {
 
         final Properties properties = getProperties();
-        
-        try {
-            
-            Journal journal = new Journal(properties);
 
-            MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
-            
-            assertTrue("isStable",bufferStrategy.isStable());
-            assertFalse("isFullyBuffered",bufferStrategy.isFullyBuffered());
-            assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
-            assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getInitialExtent());
-            assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
-                    bufferStrategy.getMaximumExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy.getBufferMode());
-            assertNotNull("directBuffer", bufferStrategy.directBuffer);
-            assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
-            assertTrue( "userExtent", bufferStrategy.getExtent() > bufferStrategy.getUserExtent());
-            assertEquals( "bufferCapacity", bufferStrategy.getUserExtent(), bufferStrategy.directBuffer
-                    .capacity());
-            
-            journal.close();
+        Journal journal = new Journal(properties);
 
-        } finally {
-            
-            deleteTestJournalFile();
-            
-        }
+        MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
+
+        assertTrue("isStable", bufferStrategy.isStable());
+        assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
+//        assertEquals(Options.FILE, properties.getProperty(Options.FILE),
+//                bufferStrategy.file.toString());
+        assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+                bufferStrategy.getInitialExtent());
+        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                bufferStrategy.getMaximumExtent());
+        assertNotNull("raf", bufferStrategy.raf);
+        assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy
+                .getBufferMode());
+        assertNotNull("directBuffer", bufferStrategy.directBuffer);
+        assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
+        assertTrue("userExtent", bufferStrategy.getExtent() > bufferStrategy
+                .getUserExtent());
+        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
+                bufferStrategy.directBuffer.capacity());
+
+        journal.closeAndDelete();
 
     }
     

@@ -111,7 +111,9 @@ public class TestCommitHistory extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
-        assertNull(journal.getCommitRecord(journal.timestampFactory.nextTimestamp()));
+        assertNull(journal.getCommitRecord(journal.nextTimestamp()));
+        
+        journal.closeAndDelete();
         
     }
     
@@ -151,6 +153,8 @@ public class TestCommitHistory extends ProxyTestCase {
         
         assertEquals(journal.getCommitRecord(),commitRecord);
         
+        journal.closeAndDelete();
+        
     }
     
     /**
@@ -158,15 +162,17 @@ public class TestCommitHistory extends ProxyTestCase {
      */
     public void test_commitRecordIndex_restartSafe() {
         
-        Properties properties = getProperties();
+//        Properties properties = getProperties();
+//        
+//        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
         
-        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
-        
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         if(!journal.isStable()) {
             
             // test only applies to restart-safe journals.
+            
+            journal.closeAndDelete();
             
             return;
             
@@ -197,9 +203,7 @@ public class TestCommitHistory extends ProxyTestCase {
          * Close and then re-open the store and verify that the correct commit
          * record is returned.
          */
-        journal.close();
-        
-        journal = new Journal(properties);
+        journal = reopenStore(journal);
         
         ICommitRecord commitRecord2 = journal.getCommitRecord();
 
@@ -212,6 +216,8 @@ public class TestCommitHistory extends ProxyTestCase {
 
         assertEquals(commitRecord1, commitRecord3);
         assertEquals(commitRecord2, commitRecord3);
+        
+        journal.closeAndDelete();
 
     }
     
@@ -222,11 +228,11 @@ public class TestCommitHistory extends ProxyTestCase {
      */
     public void test_commitRecordIndex_find() {
         
-        Properties properties = getProperties();
+//        Properties properties = getProperties();
 
-        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
+//        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
         
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         final int limit = 10;
         
@@ -275,7 +281,7 @@ public class TestCommitHistory extends ProxyTestCase {
              * there will be at least one possible timestamp between each commit
              * timestamp.
              */
-            final long ts = journal.timestampFactory.nextTimestamp();
+            final long ts = journal.nextTimestamp();
             
             assertTrue(ts>commitTime[i]);
             
@@ -287,9 +293,8 @@ public class TestCommitHistory extends ProxyTestCase {
              * Close and then re-open the store so that we will also be testing
              * restart-safety of the commit record index.
              */
-            journal.close();
 
-            journal = new Journal(properties);
+            journal = reopenStore(journal);
 
         }
 
@@ -337,6 +342,8 @@ public class TestCommitHistory extends ProxyTestCase {
             assertNull(journal.getCommitRecord(commitTime[0] - 1));
             
         }
+        
+        journal.closeAndDelete();
         
     }
     

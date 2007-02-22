@@ -65,6 +65,9 @@ import com.bigdata.scaleup.PartitionedJournal.MergePolicy;
 import com.bigdata.scaleup.PartitionedJournal.Options;
 
 /**
+ * @todo update how we create and get rid of the temporary files created by the
+ * tests.
+ * 
  * @todo rather than writing this test suite directly, we mostly want to apply
  * the existing proxy test suites for {@link Journal}.
  * 
@@ -104,7 +107,7 @@ public class TestPartitionedJournal extends TestCase2 {
     
     protected void deleteTestFiles() {
 
-        NameAndExtensionFilter filter = new NameAndExtensionFilter(getName(),PartitionedJournal.JNL);
+        NameAndExtensionFilter filter = new NameAndExtensionFilter(getName(),Options.JNL);
         
         File[] files = filter.getFiles();
 

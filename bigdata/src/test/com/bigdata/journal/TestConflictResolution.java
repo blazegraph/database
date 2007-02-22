@@ -126,9 +126,7 @@ public class TestConflictResolution extends ProxyTestCase {
      */
     public void test_writeWriteConflict_correctDetection() {
 
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -184,7 +182,7 @@ public class TestConflictResolution extends ProxyTestCase {
             assertTrue(tmp.isAborted());
         }
         
-        journal.close();
+        journal.closeAndDelete();
 
     }
     
@@ -200,9 +198,7 @@ public class TestConflictResolution extends ProxyTestCase {
      */
     public void test_writeWriteConflict_conflictIsResolved() {
 
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -259,7 +255,7 @@ public class TestConflictResolution extends ProxyTestCase {
          */
         assertEquals(v1c,(byte[])journal.getIndex(name).lookup(k1));
         
-        journal.close();
+        journal.closeAndDelete();
 
     }
     

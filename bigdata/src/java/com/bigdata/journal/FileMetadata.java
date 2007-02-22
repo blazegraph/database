@@ -158,9 +158,7 @@ public class FileMetadata {
      * @param segmentId
      *            The unique segment identifier.
      * @param file
-     *            The name of the file to be opened - when null, a file with a
-     *            unique name will be created in the default temporary
-     *            directory.
+     *            The name of the file to be opened.
      * @param bufferMode
      *            The {@link BufferMode}.
      * @param useDirectBuffers
@@ -169,9 +167,23 @@ public class FileMetadata {
      *            {@link ByteBuffer#allocate(int)}. This has no effect for the
      *            {@link BufferMode#Disk} and {@link BufferMode#Mapped} modes.
      * @param initialExtent
-     *            The initial extent of the file iff a new file is created.
+     *            The initial extent of the journal. The size of the journal is
+     *            automatically increased up to the <i>maximumExtent</i> on an
+     *            as necessary basis.
+     * @param maximumExtent
+     *            The maximum extent of the journal before it will
+     *            {@link Journal#overflow()}.
      * @param create
      *            When true, the file is created if it does not exist.
+     * @param isEmptyFile
+     *            This flag must be set when the temporary file mechanism is
+     *            used to create a new temporary file otherwise an empty file is
+     *            treated as an error since it does not contain valid root
+     *            blocks.
+     * @param deleteOnExit
+     *            When set, a <em>new</em> file will be marked for deletion
+     *            when the VM exits. This may be used as part of a temporary
+     *            store strategy.
      * @param readOnly
      *            When true, the file is opened in a read-only mode and it is an
      *            error if the file does not exist.
@@ -185,11 +197,12 @@ public class FileMetadata {
      *             journal.
      */
     FileMetadata(int segmentId, File file, BufferMode bufferMode,
-            boolean useDirectBuffers, long initialExtent, boolean create,
+            boolean useDirectBuffers, long initialExtent, long maximumExtent,
+            boolean create, boolean isEmptyFile, boolean deleteOnExit,
             boolean readOnly, ForceEnum forceWrites) throws RuntimeException {
 
-//        if (file == null)
-//            throw new IllegalArgumentException();
+        if (file == null)
+            throw new IllegalArgumentException();
 
         if (bufferMode == null)
             throw new IllegalArgumentException();
@@ -225,8 +238,10 @@ public class FileMetadata {
 
         this.readOnly = readOnly;
         
-        this.exists = file != null && file.exists();
-
+        this.exists = !isEmptyFile && file.exists();
+        
+        this.file = file;
+        
         if (exists) {
 
             System.err.println("Opening existing file: "
@@ -242,7 +257,7 @@ public class FileMetadata {
 
             }
 
-            if ( ! create ) {
+            if ( ! create && ! isEmptyFile ) {
 
                 throw new RuntimeException("File does not exist and '"
                         + Options.CREATE + "' was not specified: "
@@ -250,25 +265,9 @@ public class FileMetadata {
 
             }
 
-            if (file == null) {
-                
-                try {
-
-                    file = File.createTempFile("bigdata", ".store");
-                    
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-                
-            }
-
             System.err.println("Will create file: " + file.getAbsoluteFile());
 
         }
-        
-        this.file = file;
         
         try {
             
@@ -459,11 +458,18 @@ public class FileMetadata {
                  * Create a new journal.
                  */
     
+                // Mark the file for deletion on exit.
+                if(deleteOnExit) file.deleteOnExit();
+                
                 /*
                  * Set the initial extent.
+                 * 
+                 * Note: since a mapped file CAN NOT be extended, we pre-extend
+                 * it to its maximum extent here.
                  */
     
-                this.extent = initialExtent;
+                this.extent = (bufferMode == BufferMode.Mapped ? maximumExtent
+                        : initialExtent);
     
                 this.userExtent = extent - headerSize0;
                 

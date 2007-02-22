@@ -234,6 +234,8 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         assertTrue(answerSet.containsStatement(y, rdfType, A));
         assertTrue(answerSet.containsStatement(z, rdfType, A));
 
+        store.closeAndDelete();
+        
     }
     
 }

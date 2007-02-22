@@ -103,15 +103,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
             
         }
 
-        try {
-        
-            doConcurrentClientTest(journal, 5, 20, 100, 3, 100);
-        
-        } finally {
-        
-            journal.close();
-            
-        }
+        doConcurrentClientTest(journal, 5, 20, 100, 3, 100);
         
     }
 
@@ -229,6 +221,8 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
             
         }
         
+        journal.closeAndDelete();
+                
         String msg = "#clients="
                 + nclients + ", nops=" + nops + ", ntx=" + ntrials + ", ncomitted="
                 + ncommitted + ", naborted=" + naborted + ", nfailed=" + nfailed
@@ -466,6 +460,12 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
                 keyLen, nops);
 
         journal.shutdown();
+        
+        if(journal.getFile()!=null) {
+            
+            journal.getFile().delete();
+            
+        }
 
         return msg;
 

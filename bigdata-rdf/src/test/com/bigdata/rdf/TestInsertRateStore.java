@@ -547,6 +547,8 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
 
         store.commit();
 
+        store.closeAndDelete();
+        
         long elapsed = System.currentTimeMillis() - begin;
 
         w.write
@@ -566,7 +568,7 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
         w.flush();
 
         w.close();
-
+        
         }
 
         /**

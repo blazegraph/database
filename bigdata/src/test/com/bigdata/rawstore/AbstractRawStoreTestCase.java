@@ -161,6 +161,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             System.err.println("Ignoring expected exception: "+ex);
             
         }   
+
+        store.closeAndDelete();
         
     }
 
@@ -184,6 +186,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
         
+        store.closeAndDelete();
+
     }
     
     /**
@@ -204,7 +208,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             System.err.println("Ignoring expected exception: "+ex);
             
         }   
-                
+
+        store.closeAndDelete();
+            
     }
     
     /**
@@ -231,7 +237,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             System.err.println("Ignoring expected exception: "+ex);
             
         }   
-                
+        
+        store.closeAndDelete();
+
     }
     
     /**
@@ -256,7 +264,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             System.err.println("Ignoring expected exception: "+ex);
             
         }   
-                
+
+        store.closeAndDelete();
+
     }
     
 //    
@@ -367,6 +377,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(0,actual.position());
         assertEquals(expected.length,actual.limit());
         
+        store.closeAndDelete();
+
     }
 
     /**
@@ -423,7 +435,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             assertEquals(0, actual2.position());
             assertEquals(expected.length, actual2.limit());
         }
-        
+    
+        store.closeAndDelete();
+
     }
 
 //    /**
@@ -803,6 +817,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         assertEquals(expected2,store.read(addr1));
 
+        store.closeAndDelete();
+
     }
 
     /**
@@ -855,6 +871,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
         }
         
+        store.closeAndDelete();
+
     }
     
     /**
@@ -914,7 +932,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             assertEquals(expected,store.read(addr));
             
         }
-        
+    
+        store.closeAndDelete();
+
     }
     
 //    /**
@@ -967,6 +987,10 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //        
 //    }
 
+    /**
+     * Note: This will leave a test file around each time since we can
+     * not really call closeAndDelete() when we are testing close().
+     */
     public void test_close() {
         
         IRawStore store = getStore();
@@ -987,7 +1011,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             System.err.println("Ignoring expected exception: "+ex);
         }
-        
+
     }
 
 }

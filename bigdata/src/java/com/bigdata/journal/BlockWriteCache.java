@@ -79,7 +79,7 @@ import java.nio.channels.FileChannel;
  * order to be coherent.
  * </p>
  * 
- * FIXME Implement and integrate this buffering strategy in order to recover an
+ * @todo Implement and integrate this buffering strategy in order to recover an
  * approximately 5x overhead introduced by doing too many IOs.
  * 
  * @todo The write strategy can (nearly) rely that writes are always on

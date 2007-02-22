@@ -113,9 +113,9 @@ public class TestDiskJournal extends AbstractTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        properties.setProperty(Options.SEGMENT, "0");
+//        properties.setProperty(Options.SEGMENT, "0");
 
-        properties.setProperty(Options.FILE,getTestJournalFile(properties));
+//        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -128,32 +128,26 @@ public class TestDiskJournal extends AbstractTestCase {
      * @throws IOException
      */
     public void test_create_disk01() throws IOException {
-        
+
         final Properties properties = getProperties();
 
-        try {
-            
-            Journal journal = new Journal(properties);
-            
-            DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
-            
-            assertTrue("isStable",bufferStrategy.isStable());
-            assertFalse("isFullyBuffered",bufferStrategy.isFullyBuffered());
-            assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
-            assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getInitialExtent());
-            assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
-                    bufferStrategy.getMaximumExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy.getBufferMode());
+        Journal journal = new Journal(properties);
 
-            journal.close();
-            
-        } finally {
-            
-            deleteTestJournalFile();
-            
-        }
+        DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
+
+        assertTrue("isStable", bufferStrategy.isStable());
+        assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
+//        assertEquals(Options.FILE, properties.getProperty(Options.FILE),
+//                bufferStrategy.file.toString());
+        assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+                bufferStrategy.getInitialExtent());
+        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                bufferStrategy.getMaximumExtent());
+        assertNotNull("raf", bufferStrategy.raf);
+        assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy
+                .getBufferMode());
+
+        journal.closeAndDelete();
 
     }
     

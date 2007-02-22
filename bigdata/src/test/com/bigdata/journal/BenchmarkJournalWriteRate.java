@@ -165,9 +165,11 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         properties.setProperty(Options.SEGMENT, "0");
         
-        properties.setProperty(Options.FILE,getFilename());
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
-        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+//        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+
+        properties.setProperty(Options.DELETE_ON_EXIT,"true");
         
         return properties;
         
@@ -228,9 +230,9 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         try {
 
-            journal.close();
+            journal.closeAndDelete();
             
-            deleteFile();
+//            deleteFile();
             
         }
         catch( IllegalStateException ex ) {
@@ -339,6 +341,8 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 //                + ", isolation="+ isTx
                 );
 
+//        store.closeAndDelete(); // done in tearDown.
+        
         return elapsed;
         
     }

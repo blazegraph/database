@@ -74,40 +74,30 @@ public class TestTxJournalProtocol extends ProxyTestCase {
      * case where the first transaction is active.
      */
     public void test_duplicateTransactionIdentifiers01() throws IOException {
-        
-        final Properties properties = getProperties();
+
+        Journal journal = new Journal(getProperties());
+
+        Tx tx0 = new Tx(journal, 0, false);
 
         try {
 
-            Journal journal = new Journal(properties);
+            // Try to create another transaction with the same identifier.
+            new Tx(journal, 0, false);
 
-            Tx tx0 = new Tx(journal,0);
+            fail("Expecting: " + IllegalStateException.class);
 
-            try {
+        }
 
-                // Try to create another transaction with the same identifier.
-                new Tx(journal,0);
-                
-                fail( "Expecting: "+IllegalStateException.class);
-                
-            }
-            
-            catch( IllegalStateException ex ) {
-             
-                System.err.println("Ignoring expected exception: "+ex);
-                
-            }
-            
-            tx0.abort();
-            
-            journal.close();
+        catch (IllegalStateException ex) {
 
-        } finally {
+            System.err.println("Ignoring expected exception: " + ex);
 
-            deleteTestJournalFile();
+        }
 
-        }       
-        
+        tx0.abort();
+
+        journal.closeAndDelete();
+
     }
     
     /**
@@ -121,46 +111,36 @@ public class TestTxJournalProtocol extends ProxyTestCase {
      *       are waiting for GC. Also, it may be possible to summarily reject
      *       transaction identifiers if they are before a timestamp when a
      *       transaction service has notified the journal that no active
-     *       transactions remain before that timestamp.  If those modifications
+     *       transactions remain before that timestamp. If those modifications
      *       are made, then add the appropriate tests here.
      */
     public void test_duplicateTransactionIdentifiers02() throws IOException {
-        
-        final Properties properties = getProperties();
+
+        Journal journal = new Journal(getProperties());
+
+        ITx tx0 = new Tx(journal, 0, false);
+
+        tx0.prepare();
 
         try {
 
-            Journal journal = new Journal(properties);
+            // Try to create another transaction with the same identifier.
+            new Tx(journal, 0, false);
 
-            ITx tx0 = new Tx(journal,0);
+            fail("Expecting: " + IllegalStateException.class);
 
-            tx0.prepare();
-            
-            try {
+        }
 
-                // Try to create another transaction with the same identifier.
-                new Tx(journal,0);
-                
-                fail( "Expecting: "+IllegalStateException.class);
-                
-            }
-            
-            catch( IllegalStateException ex ) {
-             
-                System.err.println("Ignoring expected exception: "+ex);
-                
-            }
+        catch (IllegalStateException ex) {
 
-            tx0.abort();
-            
-            journal.close();
+            System.err.println("Ignoring expected exception: " + ex);
 
-        } finally {
+        }
 
-            deleteTestJournalFile();
+        tx0.abort();
 
-        }       
-        
+        journal.closeAndDelete();
+
     }
 
 }

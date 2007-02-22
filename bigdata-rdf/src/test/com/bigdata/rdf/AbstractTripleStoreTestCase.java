@@ -165,7 +165,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
     
     public void tearDown() {
 
-        if(store.isOpen()) store.close();
+        if(store.isOpen()) store.closeAndDelete();
         
     }
     

@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rawstore;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -135,6 +136,15 @@ public class SimpleMemoryRawStore implements IRawStore {
         
     }
     
+    /**
+     * This always returns <code>null</code>.
+     */
+    public File getFile() {
+        
+        return null;
+        
+    }
+    
     public void close() {
         
         if( !open ) throw new IllegalStateException();
@@ -143,6 +153,12 @@ public class SimpleMemoryRawStore implements IRawStore {
         
         // discard all the records.
         records.clear();
+        
+    }
+
+    public void closeAndDelete() {
+        
+        close();
         
     }
 

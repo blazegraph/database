@@ -48,10 +48,11 @@ Modifications:
 package com.bigdata.journal;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
+
+import com.bigdata.rawstore.IRawStore;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
@@ -105,6 +106,59 @@ abstract public class AbstractTestCase
         log.info("\n================:END:" + testCase.getName()
                 + ":END:====================\n");
 
+        deleteTestFile();
+        
+    }
+    
+    public void tearDown() throws Exception {
+        
+        super.tearDown();
+        
+        deleteTestFile();
+        
+    }
+
+    /**
+     * Note: your unit must close the store for delete to work.
+     */
+    protected void deleteTestFile() {
+
+        if(m_properties==null) return; // never requested.
+        
+        String val;
+        
+        val = (String) m_properties.getProperty(Options.FILE);
+        
+        if(val!= null) {
+        
+            File file = new File(val);
+            
+            if(file.exists()) {
+
+                val = (String) m_properties.getProperty(Options.DELETE_ON_EXIT);
+        
+                if(val==null) {
+                    
+                    val = (String) m_properties.getProperty(Options.DELETE_ON_CLOSE);
+                    
+                }
+                
+                if(Boolean.parseBoolean(val)) {
+                    
+                    System.err.println("Attempting to delete file: "+file);
+                    
+                    if(!file.delete()) {
+                    
+                        log.warn("Could not delete file: "+file);
+
+                    }
+                    
+                }
+            
+            }
+            
+        }
+
     }
 
     //
@@ -138,23 +192,60 @@ abstract public class AbstractTestCase
              */
             
             m_properties = super.getProperties();
+//          m_properties = new Properties( m_properties );
+         
+            /*
+             * Wrap up the cached properties so that they are not modifable by the
+             * caller (no side effects between calls).
+             */
             
-        }
+            /*
+             * Use a temporary file for the test. Such files are always deleted when
+             * the journal is closed or the VM exits.
+             */
+            m_properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//            m_properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+            m_properties.setProperty(Options.DELETE_ON_EXIT,"true");
+            
+            m_properties.setProperty(Options.SEGMENT, "0");
+            
+        }        
         
-        /*
-         * Wrap up the cached properties so that they are not modifable by the
-         * caller (no side effects between calls).
-         */
+        return m_properties;
         
-        Properties properties = new Properties( m_properties );
+    }
+
+    /**
+     * Re-open the same backing store.
+     * 
+     * @param store
+     *            the existing store.
+     * 
+     * @return A new store.
+     * 
+     * @exception Throwable
+     *                if the existing store is not closed, e.g., from failure to
+     *                obtain a file lock, etc.
+     */
+    protected Journal reopenStore(Journal store) {
         
-        /*
-         * The test files are always deleted when the journal is closed
-         * normally.
-         */
-        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+        // close the store.
+        store.close();
         
-        return properties;
+        Properties properties = (Properties)getProperties().clone();
+        
+        // Turn this off now since we want to re-open the same store.
+        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+        
+        // The backing file that we need to re-open.
+        File file = store.getFile();
+        
+        assertNotNull(file);
+        
+        // Set the file property explictly.
+        properties.setProperty(Options.FILE,file.toString());
+        
+        return new Journal( properties );
         
     }
 
@@ -191,118 +282,118 @@ abstract public class AbstractTestCase
     //
 
     /**
-     * <p>
-     * Return the name of a journal file to be used for a unit test. The file is
-     * created using the temporary file creation mechanism, but it is then
-     * deleted. Ideally the returned filename is unique for the scope of the
-     * test and will not be reported by the journal as a "pre-existing" file.
-     * </p>
-     * <p>
-     * Note: This method is not advised for performance tests in which the disk
-     * allocation matters since the file is allocated in a directory choosen by
-     * the OS.
-     * </p>
-     * 
-     * @param properties
-     *            The configured properties. This is used to extract metadata
-     *            about the journal test configuration that is included in the
-     *            generated filename. Therefore this method should be invoked
-     *            after you have set the properties, or at least the
-     *            {@link Options#BUFFER_MODE}.
-     * 
-     * @return The unique filename.
-     * 
-     * @see {@link #getProperties()}, which sets the "deleteOnClose" flag for
-     *      unit tests.
-     */
-    protected String getTestJournalFile(Properties properties) {
-        
-        return getTestJournalFile(getName(),properties);
-        
-    }
-
-    static public String getTestJournalFile(String name,Properties properties) {
-
-        // Used to name the file.
-        String bufferMode = properties.getProperty(Options.BUFFER_MODE);
-        
-        // Used to name the file.
-        if( bufferMode == null ) bufferMode = "default";
-        
-        try {
-
-            // Create the temp. file.
-            File tmp = File.createTempFile("test-" + bufferMode + "-"
-                    + name + "-", ".jnl");
-            
-            // Delete the file otherwise the Journal will attempt to open it.
-            if (!tmp.delete()) {
-
-                throw new RuntimeException("Unable to remove empty test file: "
-                        + tmp);
-
-            }
-
-            // make sure that the file is eventually removed.
-            tmp.deleteOnExit();
-            
-            return tmp.toString();
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-
-    /**
-     * Version of {@link #deleteTestJournalFile(String)} that obtains the name
-     * of the journal file from the {@link Options#FILE} property (if any) on
-     * {@link #getProperties()}.
-     */
-    protected void deleteTestJournalFile() {
-    
-        String filename = getProperties().getProperty(Options.FILE);
-        
-        if( filename != null ) {
-            
-            deleteTestJournalFile(filename);
-            
-        }
-        
-    }
-    
-    /**
-     * Delete the test file (if any). Note that test files are NOT created when
-     * testing the {@link BufferMode#Transient} journal. A warning message that
-     * the file could not be deleted generally means that you forgot to close
-     * the journal in your test.
-     * 
-     * @param filename
-     *            The filename (optional).
-     */
-    protected void deleteTestJournalFile(String filename) {
-        
-        if( filename == null ) return;
-        
-        try {
-            
-            File file = new File(filename);
-            
-            if ( file.exists() && ! file.delete()) {
-                
-                System.err.println("Warning: could not delete: " + file.getAbsolutePath());
-                
-            }
-            
-        } catch (Throwable t) {
-            
-            System.err.println("Warning: " + t);
-            
-        }
-        
-    }
+//     * <p>
+//     * Return the name of a journal file to be used for a unit test. The file is
+//     * created using the temporary file creation mechanism, but it is then
+//     * deleted. Ideally the returned filename is unique for the scope of the
+//     * test and will not be reported by the journal as a "pre-existing" file.
+//     * </p>
+//     * <p>
+//     * Note: This method is not advised for performance tests in which the disk
+//     * allocation matters since the file is allocated in a directory choosen by
+//     * the OS.
+//     * </p>
+//     * 
+//     * @param properties
+//     *            The configured properties. This is used to extract metadata
+//     *            about the journal test configuration that is included in the
+//     *            generated filename. Therefore this method should be invoked
+//     *            after you have set the properties, or at least the
+//     *            {@link Options#BUFFER_MODE}.
+//     * 
+//     * @return The unique filename.
+//     * 
+//     * @see {@link #getProperties()}, which sets the "deleteOnClose" flag for
+//     *      unit tests.
+//     */
+//    protected String getTestJournalFile(Properties properties) {
+//        
+//        return getTestJournalFile(getName(),properties);
+//        
+//    }
+//
+//    static public String getTestJournalFile(String name,Properties properties) {
+//
+//        // Used to name the file.
+//        String bufferMode = properties.getProperty(Options.BUFFER_MODE);
+//        
+//        // Used to name the file.
+//        if( bufferMode == null ) bufferMode = "default";
+//        
+//        try {
+//
+//            // Create the temp. file.
+//            File tmp = File.createTempFile("test-" + bufferMode + "-"
+//                    + name + "-", ".jnl");
+//            
+//            // Delete the file otherwise the Journal will attempt to open it.
+//            if (!tmp.delete()) {
+//
+//                throw new RuntimeException("Unable to remove empty test file: "
+//                        + tmp);
+//
+//            }
+//
+//            // make sure that the file is eventually removed.
+//            tmp.deleteOnExit();
+//            
+//            return tmp.toString();
+//            
+//        } catch (IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * Version of {@link #deleteTestJournalFile(String)} that obtains the name
+//     * of the journal file from the {@link Options#FILE} property (if any) on
+//     * {@link #getProperties()}.
+//     */
+//    protected void deleteTestJournalFile() {
+//    
+//        String filename = getProperties().getProperty(Options.FILE);
+//        
+//        if( filename != null ) {
+//            
+//            deleteTestJournalFile(filename);
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Delete the test file (if any). Note that test files are NOT created when
+//     * testing the {@link BufferMode#Transient} journal. A warning message that
+//     * the file could not be deleted generally means that you forgot to close
+//     * the journal in your test.
+//     * 
+//     * @param filename
+//     *            The filename (optional).
+//     */
+//    protected void deleteTestJournalFile(String filename) {
+//        
+//        if( filename == null ) return;
+//        
+//        try {
+//            
+//            File file = new File(filename);
+//            
+//            if ( file.exists() && ! file.delete()) {
+//                
+//                System.err.println("Warning: could not delete: " + file.getAbsolutePath());
+//                
+//            }
+//            
+//        } catch (Throwable t) {
+//            
+//            System.err.println("Warning: " + t);
+//            
+//        }
+//        
+//    }
 
     /**
      * Helper method verifies that the contents of <i>actual</i> from

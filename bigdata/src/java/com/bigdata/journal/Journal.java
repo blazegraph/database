@@ -48,6 +48,7 @@
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
@@ -63,79 +64,41 @@ import org.apache.log4j.Logger;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.scaleup.PartitionedJournal.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * <p>
- * An append-only persistence capable data structure supporting atomic commit,
- * scalable named indices, and transactions. Writes are logically appended to
- * the journal to minimize disk head movement.
- * </p>
- * 
- * <p>
- * The journal provides for fast migration of committed data to a read-optimized
- * database. Data may be migrated as soon as a transaction commits and only the
- * most recent state for any datum need be migrated. Note that the criteria for
- * migration typically are met before the slots occupied by those objects may be
- * released. This is because a concurrent transaction must be permitted to read
- * from the committed state of the database at the time that the transaction was
- * begun.
+ * The {@link Journal} is an append-only persistence capable data structure
+ * supporting atomic commit, named indices, and transactions. Writes are
+ * logically appended to the journal to minimize disk head movement.
  * </p>
  * <p>
- * The journal is a ring buffer divised of slots. The slot size and initial
- * extent are specified when the journal is provisioned. Objects are written
- * onto free slots. Slots are released once no active transaction can read from
- * that slots. In this way, the journal buffers consistent histories.
+ * Commit processing. The journal maintains two root blocks. Commit updates the
+ * root blocks using the Challis algorithm. (The root blocks are updated using
+ * an alternating pattern and timestamps are recorded at the head and tail of
+ * each root block to detect partial writes.) When the journal is backed by a
+ * disk file, the data
+ * {@link Options#FORCE_ON_COMMIT optionally flushed to disk on commit}. If
+ * desired, the writes may be flushed before the root blocks are updated to
+ * ensure that the writes are not reordered - see {@link Options#DOUBLE_SYNC}.
  * </p>
  * <p>
- * The journal maintains two indices:
- * <ol>
- * <li>An object index from int32 object identifier to a slot allocation; and
- * </li>
- * <li>An allocation index from slot to a slot status record.</li>
- * </ol>
- * These data structures are b+trees. The nodes of the btrees are stored in the
- * journal. These data structures are fully isolated. The roots of the indices
- * are choosen based on the transaction begin time. Changes result in a copy on
- * write. Writes percolate up the index nodes to the root node.
+ * Note: This class does NOT provide a thread-safe implementation of the
+ * {@link IRawStore} API. Writes on the store MUST be serialized. Transaction
+ * that write on the store are automatically serialized by {@link #commit(long)}.
  * </p>
  * <p>
- * Commit processing. The journal also maintains two root blocks. Commit updates
- * the root blocks using the Challis algorithm. (The root blocks are updated
- * using an alternating pattern and timestamps are recorded at the head and tail
- * of each root block to detect partial writes.) When the journal is backed by a
- * disk file, the file is flushed to disk on commit.
- * </p>
- * <p>
- * A journal may be used without a database file as an object database. The
- * design is very efficient for absorbing writes, but read operations are not
- * optimized. Overall performance will degrade as the journal size increases
- * beyond the limits of physical memory and as the object index depth increases.
- * </p>
- * <p>
- * A journal and a database file form a logical segment in the bigdata
- * distributed database architecture. In bigdata, the segment size is generally
- * limited to a few hundred megabytes. At this scale, the journal and database
- * may both be wired into memory for the fastest performance. If memory
- * constraits are tighted, these files may be memory-mapped or used as a
- * disk-base data structures. A single journal may buffer for multiple copies of
- * the same database segment or journals may be chained for redundancy.
- * </p>
- * <p>
- * Very large objects should be handled by specially provisioned database files
- * using large pages and a "never overwrite" strategy.
- * </p>
- * <p>
- * Note: This class is NOT thread-safe. Instances of this class MUST use a
- * single-threaded context. That context is the single-threaded journal server
- * API. The journal server may be either embedded (in which case objects are
- * migrated to the server using FIFO queues) or networked (in which case the
- * journal server exposes a non-blocking service with a single thread for reads,
- * writes and deletes on the journal). (However, note transaction processing MAY
- * be concurrent since the write set of a transaction is written on a
- * {@link TemporaryRawStore}.)
+ * Note: transaction processing MAY occur be concurrent since the write set of a
+ * each transaction is written on a distinct {@link TemporaryRawStore}.
+ * However, each transaction is NOT thread-safe and MUST NOT be executed by more
+ * than one concurrent thread. Typically, a thread pool of some fixed size is
+ * created and transctions are assigned to threads when they start on the
+ * journal. If and as necessary, the {@link TemporaryRawStore} will spill from
+ * memory onto disk allowing scalable transactions (up to 2G per transactions).
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -144,7 +107,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * FIXME Priority items are:
  * <ol>
  * <li> Transaction isolation.</li>
- * <li> Scale out database (automatic re-partitioning of indices).</li>
+ * <li> Concurrent load for RDFS w/o rollback.</li>
+ * <li> Scale out database (automatic re-partitioning of indices and processing
+ * of deletion markers).</li>
  * <li> Distributed database protocols.</li>
  * <li> Segment server (mixture of journal server and read-optimized database
  * server).</li>
@@ -185,15 +150,19 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       be deserialized during state-based validation if a conflict is
  *       detected.
  * 
- * FIXME Write tests for writable and read-only fully isolated transactions,
- * including the non-duplication of per-tx data structures (e.g., you always get
- * the same object back when you ask for an isolated named index).
- * 
  * @todo I need to revisit the assumptions for very large objects in the face of
  *       the recent / planned redesign. I expect that using an index with a key
  *       formed as [URI][chuck#] would work just fine. Chunks would then be
  *       limited to 32k or so. Writes on such indices should probably be
  *       directed to a journal using a disk-only mode.
+ * 
+ * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
+ *       or other persistence capable data structure basis. It is nice to be
+ *       able to choose for which indices and when ( {@link Journal} vs
+ *       {@link IndexSegment}) to apply these algorithms. However, it might be
+ *       nice to factor their application out a bit into a layered api - as long
+ *       as the right layering is correctly re-established on load of the
+ *       persistence data structure.
  */
 public class Journal implements IJournal {
 
@@ -227,18 +196,14 @@ public class Journal implements IJournal {
     final protected Properties properties;
 
     /**
+     * The directory that should be used for temporary files.
+     */
+    final public File tmpDir;
+    
+    /**
      * The implementation logic for the current {@link BufferMode}.
      */
     final IBufferStrategy _bufferStrategy;
-
-    /**
-     * The service used to generate commit timestamps.
-     * 
-     * @todo parameterize using {@link Options} so that we can resolve a
-     *       low-latency service for use with a distributed database commit
-     *       protocol.
-     */
-    protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
 
     /**
      * The current root block. This is updated each time a new root block is
@@ -323,8 +288,11 @@ public class Journal implements IJournal {
         long maximumExtent = Options.DEFAULT_MAXIMUM_EXTENT;
         boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
         boolean create = Options.DEFAULT_CREATE;
-        boolean readOnly = Options.DEFAULT_READ_ONLY;
+        boolean createTempFile = Options.DEFAULT_CREATE_TEMP_FILE;
+        boolean isEmptyFile = false;
         boolean deleteOnClose = Options.DEFAULT_DELETE_ON_CLOSE;
+        boolean deleteOnExit = Options.DEFAULT_DELETE_ON_EXIT;
+        boolean readOnly = Options.DEFAULT_READ_ONLY;
         ForceEnum forceWrites = Options.DEFAULT_FORCE_WRITES;
         ForceEnum forceOnCommit = Options.DEFAULT_FORCE_ON_COMMIT;
         boolean doubleSync = Options.DEFAULT_DOUBLE_SYNC;
@@ -335,6 +303,7 @@ public class Journal implements IJournal {
             throw new IllegalArgumentException();
 
         this.properties = properties = (Properties) properties.clone();
+//        this.properties = properties;
 
         /*
          * "bufferMode" mode. Note that very large journals MUST use the
@@ -425,6 +394,50 @@ public class Journal implements IJournal {
         this.maximumExtent = maximumExtent;
 
         /*
+         * "createTempFile"
+         */
+
+        val = properties.getProperty(Options.CREATE_TEMP_FILE);
+
+        if (val != null) {
+
+            createTempFile = Boolean.parseBoolean(val);
+
+            if(createTempFile) {
+                
+                create = false;
+            
+                isEmptyFile = true;
+                
+            }
+         
+        }
+
+        // "tmp.dir"
+        val = properties.getProperty(Options.TMP_DIR);
+        
+        tmpDir = val == null ? new File(System.getProperty("java.io.tmpdir"))
+                : new File(val); 
+
+        if (!tmpDir.exists()) {
+            
+            if (!tmpDir.mkdirs()) {
+
+                throw new RuntimeException("Could not create directory: "
+                        + tmpDir.getAbsolutePath());
+                
+            }
+            
+        }
+
+        if(!tmpDir.isDirectory()) {
+            
+            throw new RuntimeException("Not a directory: "
+                    + tmpDir.getAbsolutePath());
+            
+        }
+            
+        /*
          * "readOnly"
          */
 
@@ -491,6 +504,71 @@ public class Journal implements IJournal {
         this.deleteOnClose = deleteOnClose;
 
         /*
+         * "deleteOnExit"
+         */
+
+        val = properties.getProperty(Options.DELETE_ON_EXIT);
+
+        if (val != null) {
+
+            deleteOnExit = Boolean.parseBoolean(val);
+
+        }
+        
+        /*
+         * "file"
+         */
+
+        File file;
+        
+        if(bufferMode==BufferMode.Transient) {
+            
+            file = null;
+            
+        } else {
+            
+            val = properties.getProperty(Options.FILE);
+
+            if(createTempFile && val != null) {
+                
+                throw new RuntimeException("Can not use option '"
+                        + Options.CREATE_TEMP_FILE + "' with option '"
+                        + Options.FILE + "'");
+                
+            }
+
+            if( createTempFile ) {
+                
+                try {
+
+                    val = File.createTempFile("bigdata-" + bufferMode + "-",
+                            ".jnl", tmpDir).toString();
+
+//                    // the file that gets opened.
+//                    properties.setProperty(Options.FILE, val);
+//                    // turn off this property to facilitate re-open of the same file.
+//                    properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+                    
+                } catch(IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+            }
+            
+            if (val == null) {
+
+                throw new RuntimeException("Required property: '"
+                        + Options.FILE + "'");
+
+            }
+            
+            file = new File(val);
+
+        }
+
+        /*
          * Create the appropriate IBufferStrategy object.
          */
 
@@ -540,26 +618,12 @@ public class Journal implements IJournal {
         case Direct: {
 
             /*
-             * "file"
-             */
-
-            val = properties.getProperty(Options.FILE);
-
-            if (val == null) {
-
-                throw new RuntimeException("Required property: '"
-                        + Options.FILE + "'");
-
-            }
-
-            File file = new File(val);
-
-            /*
              * Setup the buffer strategy.
              */
 
             FileMetadata fileMetadata = new FileMetadata(segmentId, file,
-                    BufferMode.Direct, useDirectBuffers, initialExtent, create,
+                    BufferMode.Direct, useDirectBuffers, initialExtent,
+                    maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
             _bufferStrategy = new DirectBufferStrategy(maximumExtent,
@@ -574,26 +638,12 @@ public class Journal implements IJournal {
         case Mapped: {
 
             /*
-             * "file"
-             */
-
-            val = properties.getProperty(Options.FILE);
-
-            if (val == null) {
-
-                throw new RuntimeException("Required property: '"
-                        + Options.FILE + "'");
-
-            }
-
-            File file = new File(val);
-
-            /*
              * Setup the buffer strategy.
              */
 
             FileMetadata fileMetadata = new FileMetadata(segmentId, file,
-                    BufferMode.Mapped, useDirectBuffers, initialExtent, create,
+                    BufferMode.Mapped, useDirectBuffers, initialExtent,
+                    maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
             _bufferStrategy = new MappedBufferStrategy(maximumExtent,
@@ -608,26 +658,12 @@ public class Journal implements IJournal {
         case Disk: {
 
             /*
-             * "file"
-             */
-
-            val = properties.getProperty(Options.FILE);
-
-            if (val == null) {
-
-                throw new RuntimeException("Required property: '"
-                        + Options.FILE + "'");
-
-            }
-
-            File file = new File(val);
-
-            /*
              * Setup the buffer strategy.
              */
 
             FileMetadata fileMetadata = new FileMetadata(segmentId, file,
-                    BufferMode.Disk, useDirectBuffers, initialExtent, create,
+                    BufferMode.Disk, useDirectBuffers, initialExtent,
+                    maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
             _bufferStrategy = new DiskOnlyStrategy(maximumExtent, fileMetadata);
@@ -705,9 +741,12 @@ public class Journal implements IJournal {
 
     }
 
-    /**
-     * Close immediately.
-     */
+    public File getFile() {
+        
+        return _bufferStrategy.getFile();
+        
+    }
+    
     public void close() {
 
         assertOpen();
@@ -730,6 +769,18 @@ public class Journal implements IJournal {
 
     }
 
+    public void closeAndDelete() {
+        
+        close();
+        
+        if (!deleteOnClose) {
+            
+            _bufferStrategy.deleteFile();
+            
+        }
+        
+    }
+    
     private void assertOpen() {
 
         if (!_bufferStrategy.isOpen()) {
@@ -1281,28 +1332,15 @@ public class Journal implements IJournal {
     }
 
     /**
-     * Return the {@link ICommitRecord} for the most recent committed state
-     * whose commit timestamp is less than or equal to <i>timestamp</i>. This
-     * is used by a {@link Tx transaction} to locate the committed state that is
-     * the basis for its operations.
-     * 
-     * @param timestamp
-     *            Typically, the timestamp assigned to a transaction.
-     * 
-     * @return The {@link ICommitRecord} for the most recent committed state
-     *         whose commit timestamp is less than or equal to <i>timestamp</i>
-     *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
-     *         that satisify the probe.
-     * 
      * @todo the {@link CommitRecordIndex} is a possible source of thread
      *       contention since transactions need to use this code path in order
      *       to locate named indices but the {@link #commitService} can also
      *       write on this index. I have tried some different approaches to
      *       handling this.
      */
-    public ICommitRecord getCommitRecord(long timestamp) {
+    public ICommitRecord getCommitRecord(long comitTime) {
         
-        return _commitRecordIndex.find(timestamp);
+        return _commitRecordIndex.find(comitTime);
 
     }
 
@@ -1325,16 +1363,26 @@ public class Journal implements IJournal {
                 .getRootAddr(ROOT_NAME2ADDR))).get(name);
 
     }
+    
 
     /*
      * ITransactionManager and friends.
      * 
-     * @todo refactor into a service. provide an implementation that supports
-     * only a single Journal resource and an implementation that supports a
-     * scale up/out architecture. the journal should resolve the service using
-     * JINI.  the timestamp service should probably be co-located with the
-     * transaction service.
+     * @todo refactor into an ITransactionManager service. provide an
+     * implementation that supports only a single Journal resource and an
+     * implementation that supports a scale up/out architecture. the journal
+     * should resolve the service using JINI. the timestamp service should
+     * probably be co-located with the transaction service.
      */
+
+    /**
+     * The service used to generate commit timestamps.
+     * 
+     * @todo parameterize using {@link Options} so that we can resolve a
+     *       low-latency service for use with a distributed database commit
+     *       protocol.
+     */
+    protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
 
     /**
      * A hash map containing all active transactions. A transaction that is
@@ -1372,8 +1420,11 @@ public class Journal implements IJournal {
 //        System.err.println("#active=" + activeTx.size() + ", #committed="
 //                + _rootBlock.getCommitCounter());
         
-        return new Tx(this, timestampFactory.nextTimestamp(), readOnly)
-                .getStartTimestamp();
+        final long startTime = nextTimestamp();
+        
+        new Tx(this, startTime, readOnly);
+        
+        return startTime;
 
     }
 
@@ -1383,18 +1434,6 @@ public class Journal implements IJournal {
 
     }
 
-    public IIndex getIndex(String name, long ts) {
-        
-        if(name == null) throw new IllegalArgumentException();
-        
-        ITx tx = activeTx.get(ts);
-        
-        if(tx==null) throw new IllegalStateException();
-        
-        return tx.getIndex(name);
-        
-    }
-    
     public void abort(long ts) {
 
         ITx tx = getTx(ts);
@@ -1648,6 +1687,24 @@ public class Journal implements IJournal {
 
         return tx;
 
+    }
+
+    public long nextTimestamp() {
+        
+        return timestampFactory.nextTimestamp();
+        
+    }
+
+    public IIndex getIndex(String name, long ts) {
+        
+        if(name == null) throw new IllegalArgumentException();
+        
+        ITx tx = activeTx.get(ts);
+        
+        if(tx==null) throw new IllegalStateException();
+        
+        return tx.getIndex(name);
+        
     }
     
 }

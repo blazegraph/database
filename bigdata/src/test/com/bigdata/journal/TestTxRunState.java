@@ -88,47 +88,37 @@ public class TestTxRunState extends ProxyTestCase {
      */
     public void test_runStateMachine_activeAbort() throws IOException {
         
-        final Properties properties = getProperties();
+        Journal journal = new Journal(getProperties());
 
-        try {
-            
-            Journal journal = new Journal(properties);
+        long ts0 = 0;
 
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+        assertFalse(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
 
-            ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getStartTimestamp());
-            
-            assertTrue( tx0.isActive() );
-            assertFalse( tx0.isPrepared() );
-            assertFalse( tx0.isAborted() );
-            assertFalse( tx0.isCommitted() );
-            assertFalse( tx0.isComplete() );
-            
-            assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
-            
-            tx0.abort();
+        ITx tx0 = new Tx(journal, ts0, false);
+        assertEquals(ts0, tx0.getStartTimestamp());
 
-            assertFalse( tx0.isActive() );
-            assertFalse( tx0.isPrepared() );
-            assertTrue( tx0.isAborted() );
-            assertFalse( tx0.isCommitted() );
-            assertTrue( tx0.isComplete() );
+        assertTrue(tx0.isActive());
+        assertFalse(tx0.isPrepared());
+        assertFalse(tx0.isAborted());
+        assertFalse(tx0.isCommitted());
+        assertFalse(tx0.isComplete());
 
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+        assertTrue(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
 
-            journal.close();
+        tx0.abort();
 
-        } finally {
+        assertFalse(tx0.isActive());
+        assertFalse(tx0.isPrepared());
+        assertTrue(tx0.isAborted());
+        assertFalse(tx0.isCommitted());
+        assertTrue(tx0.isComplete());
 
-            deleteTestJournalFile();
-            
-        }
+        assertFalse(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
+
+        journal.closeAndDelete();
 
     }
     
@@ -137,18 +127,14 @@ public class TestTxRunState extends ProxyTestCase {
      */
     public void test_runStateMachine_activePrepareAbort() throws IOException {
         
-        final Properties properties = getProperties();
-        
-        try {
-            
-            Journal journal = new Journal(properties);
+            Journal journal = new Journal(getProperties());
 
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            ITx tx0 = new Tx(journal,ts0);
+            ITx tx0 = new Tx(journal,ts0, false);
             assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
@@ -182,13 +168,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-            
-        }
+            journal.closeAndDelete();
 
     }
 
@@ -197,18 +177,14 @@ public class TestTxRunState extends ProxyTestCase {
      */
     public void test_runStateMachine_activePrepareCommit() throws IOException {
         
-        final Properties properties = getProperties();
-
-        try {
-            
-            Journal journal = new Journal(properties);
+            Journal journal = new Journal(getProperties());
 
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            ITx tx0 = new Tx(journal,ts0);
+            ITx tx0 = new Tx(journal,ts0, false);
             assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
@@ -242,13 +218,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-            
-        }
+            journal.closeAndDelete();
 
     }
 
@@ -257,66 +227,56 @@ public class TestTxRunState extends ProxyTestCase {
      * attempt to abort the same transaction results in an exception that does
      * not change the transaction run state.
      */
-    public void test_runStateMachine_activeAbortAbort_correctRejection() throws IOException {
-        
-        final Properties properties = getProperties();
-        
+    public void test_runStateMachine_activeAbortAbort_correctRejection()
+            throws IOException {
+
+        Journal journal = new Journal(getProperties());
+
+        long ts0 = 0;
+
+        assertFalse(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
+
+        ITx tx0 = new Tx(journal, ts0, false);
+        assertEquals(ts0, tx0.getStartTimestamp());
+
+        assertTrue(tx0.isActive());
+        assertFalse(tx0.isPrepared());
+        assertFalse(tx0.isAborted());
+        assertFalse(tx0.isCommitted());
+        assertFalse(tx0.isComplete());
+
+        assertTrue(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
+
+        tx0.abort();
+
+        assertFalse(tx0.isActive());
+        assertFalse(tx0.isPrepared());
+        assertTrue(tx0.isAborted());
+        assertFalse(tx0.isCommitted());
+        assertTrue(tx0.isComplete());
+
+        assertFalse(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
+
         try {
-            
-            Journal journal = new Journal(properties);
-
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
-
-            ITx tx0 = new Tx(journal,ts0);
-            assertEquals(ts0,tx0.getStartTimestamp());
-            
-            assertTrue( tx0.isActive() );
-            assertFalse( tx0.isPrepared() );
-            assertFalse( tx0.isAborted() );
-            assertFalse( tx0.isCommitted() );
-            assertFalse( tx0.isComplete() );
-            
-            assertTrue(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
-            
             tx0.abort();
-
-            assertFalse( tx0.isActive() );
-            assertFalse( tx0.isPrepared() );
-            assertTrue( tx0.isAborted() );
-            assertFalse( tx0.isCommitted() );
-            assertTrue( tx0.isComplete() );
-
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
-
-            try {
-                tx0.abort();
-                fail("Expecting: "+IllegalStateException.class);
-            }
-            catch( IllegalStateException ex ) {
-                System.err.println("Ignoring expected exception: "+ex);
-            }
-
-            assertFalse( tx0.isActive() );
-            assertFalse( tx0.isPrepared() );
-            assertTrue( tx0.isAborted() );
-            assertFalse( tx0.isCommitted() );
-            assertTrue( tx0.isComplete() );
-
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
-
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-            
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
         }
+
+        assertFalse(tx0.isActive());
+        assertFalse(tx0.isPrepared());
+        assertTrue(tx0.isAborted());
+        assertFalse(tx0.isCommitted());
+        assertTrue(tx0.isComplete());
+
+        assertFalse(journal.activeTx.containsKey(ts0));
+        assertFalse(journal.preparedTx.containsKey(ts0));
+
+        journal.closeAndDelete();
 
     }
 
@@ -327,18 +287,14 @@ public class TestTxRunState extends ProxyTestCase {
      */
     public void test_runStateMachine_activePreparePrepare_correctRejection() throws IOException {
         
-        final Properties properties = getProperties();
-
-        try {
-            
-            Journal journal = new Journal(properties);
+            Journal journal = new Journal(getProperties());
 
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            ITx tx0 = new Tx(journal,ts0);
+            ITx tx0 = new Tx(journal,ts0,false);
             assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
@@ -378,13 +334,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-            
-        }
+            journal.closeAndDelete();
 
     }
 
@@ -395,18 +345,14 @@ public class TestTxRunState extends ProxyTestCase {
      */
     public void test_runStateMachine_activeCommit_correctRejection() throws IOException {
         
-        final Properties properties = getProperties();
-
-        try {
-            
-            Journal journal = new Journal(properties);
+            Journal journal = new Journal(getProperties());
 
             long ts0 = 0;
             
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            ITx tx0 = new Tx(journal,ts0);
+            ITx tx0 = new Tx(journal,ts0,false);
             assertEquals(ts0,tx0.getStartTimestamp());
             
             assertTrue( tx0.isActive() );
@@ -435,13 +381,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
 
-            journal.close();
-
-        } finally {
-
-            deleteTestJournalFile();
-            
-        }
+            journal.closeAndDelete();
 
     }
 
@@ -454,9 +394,7 @@ public class TestTxRunState extends ProxyTestCase {
     public void test_runStateMachine_prepared_correctRejection()
             throws IOException {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -530,7 +468,7 @@ public class TestTxRunState extends ProxyTestCase {
         assertFalse(journal.preparedTx.containsKey(tmp.getStartTimestamp()));
         assertNull(journal.getTx(tmp.getStartTimestamp()));
         
-        journal.close();
+        journal.closeAndDelete();
 
     }
 

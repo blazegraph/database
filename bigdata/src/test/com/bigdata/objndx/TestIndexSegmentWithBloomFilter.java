@@ -99,9 +99,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
             properties.setProperty(Options.SEGMENT, "0");
 
-            properties.setProperty(Options.FILE, getName()+".jnl");
-
-            properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.megabyte*20);
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
         }
 
@@ -451,7 +449,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * Closing the journal.
          */
         System.err.println("Closing journal.");
-        btree.getStore().close();
+        btree.getStore().closeAndDelete();
         
     }
 

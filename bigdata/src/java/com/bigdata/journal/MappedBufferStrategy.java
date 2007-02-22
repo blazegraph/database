@@ -4,7 +4,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
 import com.bigdata.rawstore.Addr;
-import com.bigdata.scaleup.PartitionedJournal;
 
 /**
  * <p>
@@ -18,7 +17,16 @@ import com.bigdata.scaleup.PartitionedJournal;
  * <p>
  * Note: Extension and truncation of a mapped file are not possible with the JDK
  * since there is no way to guarentee that the mapped file will be unmapped in a
- * timely manner.
+ * timely manner. Journals that handle {@link IJournal#overflow()} should
+ * trigger overflow just a bit earlier for a {@link MappedByteBuffer} in an
+ * attempt to avoid running out of space in the journal. If a transaction can
+ * not be committed due to overflow, it could be re-committed <em>after</em>
+ * handling the overflow event (e.g., throw a "CommitRetryException").
+ * </p>
+ * <p>
+ * Note that the use of mapped files might not prove worth the candle due to the
+ * difficulties with resource deallocation for this strategy and the good
+ * performance of some alternative strategies.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -26,14 +34,6 @@ import com.bigdata.scaleup.PartitionedJournal;
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
  * @see BufferMode#Mapped
- * 
- * @todo since the mapped file can not be extended or truncated, use of mapped
- *       files pretty much suggests that we pre-extend to the maximum allowable
- *       extent. it something can not be committed due to overflow, then a tx
- *       could be re-committed after a rollover of a {@link PartitionedJournal}.
- *       Note that the use of mapped files might not prove worth the candle due
- *       to the difficulties with resource deallocation for this strategy and
- *       the good performance of some alternative strategies.
  */
 public class MappedBufferStrategy extends DiskBackedBufferStrategy {
 

@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rawstore;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.Journal;
@@ -208,6 +209,17 @@ public interface IRawStore {
      *                if the store is not open.
      */
     public void close();
+    
+    /**
+     * Closes the store immediately and releases its persistent resources.
+     */
+    public void closeAndDelete();
+    
+    /**
+     * The backing file -or- <code>null</code> if there is no backing file
+     * for the store.
+     */
+    public File getFile();
     
     /**
      * True iff backed by stable storage.

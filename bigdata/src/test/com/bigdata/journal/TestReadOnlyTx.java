@@ -78,9 +78,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
      */
     public void test_isReadOnly() {
 
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         String name = "abc";
         
@@ -155,6 +153,8 @@ public class TestReadOnlyTx extends ProxyTestCase {
             
         }
 
+        journal.closeAndDelete();
+        
     }
 
 }

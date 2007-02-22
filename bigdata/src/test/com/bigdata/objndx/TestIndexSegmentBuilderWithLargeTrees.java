@@ -55,7 +55,6 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -92,9 +91,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             properties.setProperty(Options.SEGMENT, "0");
 
-            properties.setProperty(Options.FILE, getName()+".jnl");
-
-            properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.megabyte*20);
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
         }
 
@@ -116,36 +113,10 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      */
     public BTree getBTree(int branchingFactor) {
 
-        Properties properties = getProperties();
-
-        String filename = properties.getProperty(Options.FILE);
-
-        if (filename != null) {
-
-            File file = new File(filename);
-
-            if (file.exists() && !file.delete()) {
-
-                throw new RuntimeException("Could not delete file: "
-                        + file.getAbsoluteFile());
-
-            }
-
-        }
-
-        System.err.println("Opening journal: " + filename);
-        Journal journal = new Journal(properties);
-
-        // A modest leaf queue capacity.
-        final int leafQueueCapacity = 500;
-
-        final int nscan = 10;
+        Journal journal = new Journal(getProperties());
 
         BTree btree = new BTree(journal, branchingFactor,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        leafQueueCapacity, nscan),
-                SimpleEntry.Serializer.INSTANCE, null // no record compressor
-        );
+                SimpleEntry.Serializer.INSTANCE);
 
         return btree;
 
@@ -333,7 +304,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             System.err.println("Closing index segment.");
             seg.close();
-
+            
             if (!outFile.delete()) {
 
                 log.warn("Could not delete index segment: " + outFile);
@@ -346,7 +317,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
          * Closing the journal.
          */
         System.err.println("Closing journal.");
-        btree.getStore().close();
+        btree.getStore().closeAndDelete();
         
     }
 

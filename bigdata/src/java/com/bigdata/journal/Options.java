@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.journal;
 
+import java.io.File;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
@@ -66,8 +67,8 @@ public class Options {
     public static final String FILE = "file";
 
     /**
-     * <code>bufferMode</code> - One of "transient", "direct", "mapped",
-     * or "disk". See {@link BufferMode} for more information about each
+     * <code>bufferMode</code> - One of "Transient", "Direct", "Mapped",
+     * or "Disk". See {@link BufferMode} for more information about each
      * mode.
      * 
      * @see BufferMode#Transient
@@ -200,16 +201,46 @@ public class Options {
      * stable on disk.
      */
     public static final String DOUBLE_SYNC = "doubleSync";
+
+    /**
+     * <code>createTempFile</code> - This boolean option causes a new file to
+     * be created using the
+     * {@link File#createTempFile(String, String, File) temporary file mechanism}.
+     * If {@link #DELETE_ON_EXIT} is also specified, then the temporary file
+     * will be {@link File#deleteOnExit() marked for deletion} when the JVM
+     * exits. This option is often used when preparing a journal for a unit
+     * test. The default temporary directory is used unless it is overriden by
+     * the {@link #TMP_DIR} option.
+     */
+    public final static String CREATE_TEMP_FILE = "createTempFile";
     
     /**
-     * <code>deleteOnClose</code> - This optional boolean option causes
-     * the journal file to be deleted when the journal is closed (default
-     * <em>false</em>). This option is used by the test suites to keep
-     * down the disk burden of the tests and MUST NOT be used with live
-     * data.
+     * <code>deleteOnClose</code> - This boolean option causes the journal
+     * file to be deleted when the journal is closed (default <em>false</em>).
+     * This option is used by the some test suites (those that do not test
+     * restart safety) to keep down the disk burden of the tests and MUST NOT be
+     * used with restart-safe data.
      */
     public final static String DELETE_ON_CLOSE = "deleteOnClose";
+
+    /**
+     * <code>deleteOnExit</code> - This boolean option causes the journal file
+     * to be deleted when the VM exits (default <em>false</em>). This option
+     * is used by the test suites to keep down the disk burden of the tests
+     * and MUST NOT be used with restart-safe data.
+     */
+    public final static String DELETE_ON_EXIT = "deleteOnExit";
     
+    /**
+     * <code>tmp.dir</code> - The property whose value is the name of the
+     * directory in which temporary files will be created. When not specified
+     * the default is governed by the value of the System property named
+     * <code>java.io.tmpdir</code>. There are several kinds of temporary
+     * files that can be created, including temporary journals, intermediate
+     * files from an index merge process, etc.
+     */
+    public static final String TMP_DIR = "tmp.dir";
+
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.
      */
@@ -258,4 +289,19 @@ public class Options {
      */
     public final static boolean DEFAULT_DELETE_ON_CLOSE = false;
 
+    /**
+     * The default for the {@link #DELETE_ON_EXIT} option.
+     */
+    public final static boolean DEFAULT_DELETE_ON_EXIT = false;
+
+    /**
+     * The default for the {@link #CREATE_TEMP_FILE} option.
+     */
+    public final static boolean DEFAULT_CREATE_TEMP_FILE = false;
+
+    /**
+     * The recommened extension for journal files.
+     */
+    public static final String JNL = ".jnl";
+    
 }

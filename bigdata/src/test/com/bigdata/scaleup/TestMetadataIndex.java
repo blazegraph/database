@@ -73,7 +73,6 @@ import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.scaleup.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * A test suite for managing a partitioned index.
@@ -276,6 +275,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         assertEquals(part0,md.get(key0));
         assertEquals(part1,md.get(key1));
         assertEquals(part2,md.get(key2));
+        
+        store.closeAndDelete();
 
     }
     
@@ -671,19 +672,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         final Properties properties = new Properties();
         
-        final File journalFile = new File(getName()+".jnl");
-
-        if(journalFile.exists() && !journalFile.delete() ) {
-        
-            fail("Could not delete file: "+journalFile.getAbsoluteFile());
-            
-        }
-        
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
         
-        properties.setProperty(Options.FILE,journalFile.toString());
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
 
         properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+
+        properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
         properties.setProperty(Options.SEGMENT,"0");
 
@@ -962,9 +957,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         System.err.println("End of stress test: ntrial="+ntrials+", nops="+nops);
 
-        // delete the journal file afterwards.
-        if(journalFile.exists()) journalFile.delete();
-        
     }
     
     /**

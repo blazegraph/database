@@ -1,7 +1,7 @@
 package com.bigdata.journal;
 
+import java.io.File;
 import java.nio.ByteBuffer;
-
 
 /**
  * Transient buffer strategy uses a direct buffer but never writes on disk.
@@ -38,10 +38,8 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
                 initialExtent, //
                 BufferMode.Transient, //
                 (useDirectBuffers ? ByteBuffer
-                        .allocateDirect((int) assertNonDiskExtent(initialExtent))
-                        : ByteBuffer
-                                .allocate((int) assertNonDiskExtent(initialExtent)))
-                );
+                        .allocateDirect((int) initialExtent) : ByteBuffer
+                        .allocate((int) initialExtent)));
     
         open = true;
         
@@ -60,6 +58,15 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         // NOP.
         
     }
+    
+    /**
+     * Always returns <code>null</code>.
+     */
+    public File getFile() {
+        
+        return null;
+        
+    }
 
     public void close() {
         
@@ -69,10 +76,14 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
             
         }
 
-//        force(true);
-        
         open = false;
         
+    }
+
+    public void closeAndDelete() {
+        
+        close();
+
     }
 
     final public boolean isOpen() {

@@ -47,7 +47,9 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 import java.util.Random;
 
 import com.bigdata.rawstore.IRawStore;
@@ -75,9 +77,25 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
     public AbstractRestartSafeTestCase(String name) {
         super(name);
     }
+
+//    /**
+//     * override to disable deletion of the store on close.
+//     */
+//    public Properties getProperties() {
+//        
+//        Properties properties = super.getProperties();
+//        
+//        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
+//
+//        return properties;
+//        
+//    }
     
     /**
      * Re-open the same backing store.
+     * 
+     * @param store
+     *            the existing store.
      * 
      * @return A new store.
      * 
@@ -85,9 +103,25 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
      *                if the existing store is not closed, e.g., from failure to
      *                obtain a file lock, etc.
      */
-    protected IRawStore reopenStore() {
+    protected IRawStore reopenStore(IRawStore store) {
+
+        // close the store.
+        store.close();
         
-        return new Journal(getProperties());
+        Properties properties = (Properties)getProperties().clone();
+        
+        // Turn this off now since we want to re-open the same store.
+        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+        
+        // The backing file that we need to re-open.
+        File file = store.getFile();
+        
+        assertNotNull(file);
+        
+        // Set the file property explictly.
+        properties.setProperty(Options.FILE,file.toString());
+        
+        return new Journal( properties );
         
     }
 
@@ -134,11 +168,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
 //         */
 //        store.commit();
         
-        // close the store.
-        store.close();
-        
         // re-open the store.
-        store = (IAtomicStore)reopenStore();
+        store = (IAtomicStore)reopenStore(store);
         
         assertTrue( store.isStable() );
         
@@ -157,7 +188,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
 //        // verify that the data are all zeros since we did not commit the store.
 //        assertEquals(new byte[len],actual);
 
-        store.close();
+        store.closeAndDelete();
         
     }
     
@@ -204,11 +235,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
          */
         store.commit();
         
-        // close the store.
-        store.close();
-        
         // re-open the store.
-        store = (IAtomicStore)reopenStore();
+        store = (IAtomicStore)reopenStore(store);
         
         assertTrue( store.isStable() );
         
@@ -217,7 +245,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         assertEquals(expected,actual);
 
-        store.close();
+        store.closeAndDelete();
         
     }
     
@@ -287,11 +315,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
          */
         store.commit();
         
-        // close the store.
-        store.close();
-        
         // re-open the store.
-        store = (IAtomicStore)reopenStore();
+        store = (IAtomicStore)reopenStore(store);
         
         assertTrue( store.isStable() );
 
@@ -311,7 +336,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             
         }
 
-        store.close();
+        store.closeAndDelete();
         
     }
     

@@ -152,6 +152,14 @@ public class TemporaryRawStore implements IRawStore {
         
     }
 
+    public File getFile() {
+        
+        if(!open) throw new IllegalStateException();
+        
+        return buf.getFile();
+        
+    }
+    
     /**
      * Close the store and delete the associated file, if any.
      */
@@ -161,11 +169,20 @@ public class TemporaryRawStore implements IRawStore {
         
         open = false;
         
-        buf.close();
+//        buf.close();
+//        
+//        buf.deleteFile();
         
-        buf.deleteFile();
+        buf.closeAndDelete();
         
         buf = null;
+        
+    }
+
+    public void closeAndDelete() {
+    
+        // Close already deletes the backing file.
+        close();
         
     }
 
@@ -246,15 +263,31 @@ public class TemporaryRawStore implements IRawStore {
         
         int segmentId = 0;
         
-        File file = null; // request a unique filename.
+        File file;
+        
+        try {
+
+            file = File.createTempFile("bigdata", ".tmpStore");
+            
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
         /*
          * Set the initial extent to be large enough for the root blocks plus
          * twice the data in the in-memory buffer.
          */
-        long initialExtent = FileMetadata.headerSize0 + tmp.getUserExtent() * 2;
+        final long initialExtent = FileMetadata.headerSize0 + tmp.getUserExtent() * 2;
         
-        final boolean create = true;
+        final long maximumDiskExtent = Bytes.gigabyte32 * 2;
+        
+        final boolean create = false;
+        
+        final boolean isEmptyFile = true;
+        
+        final boolean deleteOnExit = true;
         
         final boolean readOnly = false;
         
@@ -266,10 +299,8 @@ public class TemporaryRawStore implements IRawStore {
          */
         FileMetadata fileMetadata = new FileMetadata(segmentId, file,
                 BufferMode.Disk, useDirectBuffers, initialExtent,
-                create, readOnly, forceWrites);
-        
-        // Mark the file for deletion on exit.
-        fileMetadata.file.deleteOnExit();
+                maximumDiskExtent, create, isEmptyFile, deleteOnExit,
+                readOnly, forceWrites);
         
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,

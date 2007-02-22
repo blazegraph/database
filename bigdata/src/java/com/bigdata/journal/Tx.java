@@ -213,15 +213,6 @@ public class Tx implements IStore, ITx {
     private Map<String, IIndex> btrees = new HashMap<String, IIndex>();
     
     /**
-     * Create a fully isolated read-write transaction.
-     */
-    public Tx(Journal journal,long timestamp) {
-        
-        this(journal, timestamp, false);
-        
-    }
-    
-    /**
      * Create a transaction starting the last committed state of the journal as
      * of the specified startTime.
      * 
@@ -407,7 +398,7 @@ public class Tx implements IStore, ITx {
              * @todo resolve this against a service in a manner that will
              * support a distributed database commit protocol.
              */
-            commitTimestamp = journal.timestampFactory.nextTimestamp();
+            commitTimestamp = journal.nextTimestamp();
 
             try {
 

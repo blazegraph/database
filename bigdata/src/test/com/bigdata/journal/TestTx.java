@@ -91,9 +91,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_noIndicesRegistered() {
 
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         journal.commit();
         
@@ -106,7 +104,7 @@ public class TestTx extends ProxyTestCase {
         // commit.
         assertTrue(journal.commit(tx)!=0L);
 
-        journal.close();
+        journal.closeAndDelete();
         
     }
 
@@ -117,9 +115,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_indexNotVisibleUnlessCommitted() {
        
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
         
@@ -148,7 +144,51 @@ public class TestTx extends ProxyTestCase {
         
         journal.abort(tx2);
         
-        journal.close();
+        journal.closeAndDelete();
+        
+    }
+
+    /**
+     * Test verifies that you always get the same object back when you ask for
+     * an isolated named index.  This is important both to conserve resources
+     * and since the write set is in the isolated index -- you lose it and it
+     * is gone.
+     */
+    public void test_sameIndexObject() {
+
+        Journal journal = new Journal(getProperties());
+        
+        final String name = "abc";
+
+        {
+            
+            journal.registerIndex(name, new UnisolatedBTree(journal));
+            
+            journal.commit();
+            
+        }
+
+        final long tx1 = journal.newTx();
+
+        final IIndex ndx1 = journal.getIndex(name,tx1);
+        
+        assertNotNull(ndx1);
+        
+        final long tx2 = journal.newTx();
+
+        final IIndex ndx2 = journal.getIndex(name,tx2);
+
+        assertTrue(tx1 != tx2);
+
+        assertTrue(ndx1 != ndx2);
+        
+        assertNotNull(ndx2);
+        
+        assertTrue( ndx1 == journal.getIndex(name,tx1));
+
+        assertTrue( ndx2 == journal.getIndex(name,tx2));
+        
+        journal.closeAndDelete();
         
     }
     
@@ -160,9 +200,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_readIsolation() {
         
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         final String name = "abc";
         
@@ -256,7 +294,7 @@ public class TestTx extends ProxyTestCase {
         
         journal.abort(tx2);
 
-        journal.close();
+        journal.closeAndDelete();
         
     }
 
@@ -270,9 +308,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_writeIsolation() {
         
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         final String name = "abc";
         
@@ -374,7 +410,7 @@ public class TestTx extends ProxyTestCase {
             
         }
         
-        journal.close();
+        journal.closeAndDelete();
         
     }
 
@@ -392,9 +428,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_delete001() {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -468,7 +502,7 @@ public class TestTx extends ProxyTestCase {
          // Still visible in global scope.
          assertTrue(journal.getIndex(name).contains(id0));
 
-         journal.close();
+         journal.closeAndDelete();
     
     }
 
@@ -483,9 +517,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_delete002() {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -576,7 +608,7 @@ public class TestTx extends ProxyTestCase {
         // Still not visible in global scope.
         assertFalse(journal.getIndex(name).contains(id0));
 
-        journal.close();
+        journal.closeAndDelete();
 
     }
 
@@ -592,9 +624,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_delete003() {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         String name = "abc";
 
@@ -664,7 +694,7 @@ public class TestTx extends ProxyTestCase {
         assertTrue(journal.getIndex(name).contains(id0));
         assertEquals(v1, (byte[])journal.getIndex(name).lookup(id0));
 
-        journal.close();
+        journal.closeAndDelete();
 
     }
 
@@ -1123,9 +1153,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_commit_noConflict01() {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         final String name = "abc";
         
@@ -1203,7 +1231,7 @@ public class TestTx extends ProxyTestCase {
         assertEquals(v0, (byte[]) journal.getIndex(name).lookup(
                 id1));
 
-        journal.close();
+        journal.closeAndDelete();
 
     }
 
@@ -1213,9 +1241,7 @@ public class TestTx extends ProxyTestCase {
      */
     public void test_deletePreExistingVersion_noConflict() {
 
-        final Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         final String name = "abc";
         
@@ -1268,7 +1294,7 @@ public class TestTx extends ProxyTestCase {
         // data version now deleted in global scope.
         assertFalse(journal.getIndex(name).contains(id0));
 
-        journal.close();
+        journal.closeAndDelete();
 
     }
 

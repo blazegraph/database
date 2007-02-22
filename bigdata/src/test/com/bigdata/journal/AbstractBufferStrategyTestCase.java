@@ -88,11 +88,19 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
             properties.setProperty(Options.BUFFER_MODE, getBufferMode()
                     .toString());
 
+            /*
+             * Use a temporary file for the test. Such files are always deleted when
+             * the journal is closed or the VM exits.
+             */
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
             properties.setProperty(Options.SEGMENT, "0");
 
-            // Note: also deletes the file before it is used.
-            properties.setProperty(Options.FILE, AbstractTestCase
-                    .getTestJournalFile(getName(), properties));
+//            // Note: also deletes the file before it is used.
+//            properties.setProperty(Options.FILE, AbstractTestCase
+//                    .getTestJournalFile(getName(), properties));
         }
         
         return properties;
@@ -176,7 +184,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
         }
         
-        store.close();
+        store.closeAndDelete();
         
     }
 
@@ -215,7 +223,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
-        store.close();
+        store.closeAndDelete();
 
     }
     
@@ -302,7 +310,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // verify data written after we overflowed the buffer.
         assertEquals(b2, bufferStrategy.read(addr2));
     
-        store.close();
+        store.closeAndDelete();
 
     }
     

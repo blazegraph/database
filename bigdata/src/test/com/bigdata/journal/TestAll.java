@@ -102,7 +102,7 @@ public class TestAll extends TestCase {
         // test the different journal modes.
         suite.addTest( TestTransientJournal.suite() );
         suite.addTest( TestDirectJournal.suite() );
-        suite.addTest( TestMappedJournal.suite() );
+//        suite.addTest( TestMappedJournal.suite() );
         suite.addTest( TestDiskJournal.suite() );
 
         return suite;

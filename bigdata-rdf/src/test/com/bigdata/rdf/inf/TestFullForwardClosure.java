@@ -92,6 +92,8 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
         
         store.commit();
         
+        store.closeAndDelete();
+        
     }
         
 }

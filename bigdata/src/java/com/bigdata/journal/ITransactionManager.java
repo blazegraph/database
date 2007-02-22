@@ -55,7 +55,7 @@ import com.bigdata.objndx.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITransactionManager {
+public interface ITransactionManager extends ITimestampService {
 
     /**
      * Create a new fully-isolated read-write transaction.

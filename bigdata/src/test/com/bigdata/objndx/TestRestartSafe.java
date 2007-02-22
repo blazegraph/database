@@ -53,7 +53,6 @@ import java.util.Properties;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -87,8 +86,10 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
                     .toString());
 
             properties.setProperty(Options.SEGMENT, "0");
-            properties.setProperty(Options.FILE, getName()+".jnl");
-            properties.setProperty(Options.DELETE_ON_CLOSE,"false");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+//            properties.setProperty(Options.FILE, getName()+".jnl");
+//            properties.setProperty(Options.DELETE_ON_CLOSE,"false");
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
         }
 
@@ -99,6 +100,40 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
     private Properties properties;
     
     /**
+     * Re-open the same backing store.
+     * 
+     * @param store
+     *            the existing store.
+     * 
+     * @return A new store.
+     * 
+     * @exception Throwable
+     *                if the existing store is not closed, e.g., from failure to
+     *                obtain a file lock, etc.
+     */
+    protected Journal reopenStore(Journal store) {
+        
+        // close the store.
+        store.close();
+        
+        Properties properties = (Properties)getProperties().clone();
+        
+        // Turn this off now since we want to re-open the same store.
+        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+        
+        // The backing file that we need to re-open.
+        File file = store.getFile();
+        
+        assertNotNull(file);
+        
+        // Set the file property explictly.
+        properties.setProperty(Options.FILE,file.toString());
+        
+        return new Journal( properties );
+        
+    }
+
+    /**
      * Return a btree backed by a journal with the indicated branching factor.
      * The serializer requires that values in leaves are {@link SimpleEntry}
      * objects.
@@ -108,54 +143,22 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
      * 
      * @return The btree.
      */
-    public BTree getBTree(int branchingFactor,Journal journal) {
+    public BTree getBTree(int branchingFactor, Journal journal) {
 
-//        try {
-//            
-//            Properties properties = getProperties();
+        BTree btree = new BTree(journal, branchingFactor,
+                SimpleEntry.Serializer.INSTANCE);
 
-            // A modest leaf queue capacity.
-            final int leafQueueCapacity = 500;
+        return btree;
             
-            final int nscan = 10;
-
-            BTree btree = new BTree(journal,
-                    branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            leafQueueCapacity, nscan),
-                    SimpleEntry.Serializer.INSTANCE,
-                    null // no record compressor
-                    );
-
-            return btree;
-//
-//        } catch (IOException ex) {
-//            
-//            throw new RuntimeException(ex);
-//            
-//        }
-        
     }
 
     /**
-     * 
-     * FIXME develop test to use IStore.getBTree(name) and commit callback protocol.
      * 
      * @throws IOException
      */
     public void test_restartSafe01() throws IOException {
 
-        Properties properties = getProperties();
-        
-        File file = new File(properties.getProperty(Options.FILE));
-        
-        if(file.exists() && !file.delete()) {
-            
-            fail("Could not delete file: "+file.getAbsoluteFile());
-            
-        }
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         final int m = 3;
 
@@ -191,8 +194,6 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             
             journal.commit();
             
-            journal.close();
-
         }
         
         /*
@@ -200,7 +201,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
          */
         {
         
-            journal = new Journal(properties);
+            journal = reopenStore(journal);
             
             final BTree btree = new BTree(journal, BTreeMetadata.read(journal,
                     addr1));
@@ -211,7 +212,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                     btree.entryIterator());
     
-            journal.close();
+            journal.closeAndDelete();
             
         }
 

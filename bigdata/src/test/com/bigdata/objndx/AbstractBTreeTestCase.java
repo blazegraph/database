@@ -904,20 +904,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         for( int i=0; i<20; i++ ) {
          
-            doInsertRandomKeySequenceTest(m, m, trace);
+            doInsertRandomKeySequenceTest(m, m, trace).getStore().closeAndDelete();
             
-            doInsertRandomSparseKeySequenceTest(m, m, trace);
-            
-        }
-        
-        /*
-         * Try several permutations of the key-value presentation order.
-         */
-        for( int i=0; i<20; i++ ) {
-         
-            doInsertRandomKeySequenceTest(m, m*m, trace);
-            
-            doInsertRandomSparseKeySequenceTest(m, m*m, trace);
+            doInsertRandomSparseKeySequenceTest(m, m, trace).getStore().closeAndDelete();
             
         }
         
@@ -926,9 +915,20 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         for( int i=0; i<20; i++ ) {
          
-            doInsertRandomKeySequenceTest(m, m*m*m, trace);
+            doInsertRandomKeySequenceTest(m, m*m, trace).getStore().closeAndDelete();
             
-            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace);
+            doInsertRandomSparseKeySequenceTest(m, m*m, trace).getStore().closeAndDelete();
+            
+        }
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m*m*m, trace).getStore().closeAndDelete();
+            
+            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace).getStore().closeAndDelete();
             
         }
         
@@ -937,9 +937,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //         */
 //        for( int i=0; i<20; i++ ) {
 //         
-//            doInsertRandomKeySequenceTest(m, m*m*m*m, trace);
+//            doInsertRandomKeySequenceTest(m, m*m*m*m, trace).getStore().close();
 //
-//            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace);
+//            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace).getStore().close();
 //            
 //        }
         
@@ -956,7 +956,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param trace
      *            The trace level (zero disables most tracing).
      */
-    public void doInsertRandomKeySequenceTest(int m, int ninserts, int trace) {
+    public BTree doInsertRandomKeySequenceTest(int m, int ninserts, int trace) {
 
         /*
          * generate keys.  the keys are a dense monotonic sequence.
@@ -974,7 +974,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        doInsertRandomKeySequenceTest(m, keys, entries, trace);
+        return doInsertRandomKeySequenceTest(m, keys, entries, trace);
         
     }
 
@@ -1432,6 +1432,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         log.info(btree.counters.toString());
 
+        btree.getStore().closeAndDelete();
+        
+        
     }
 
     /**
@@ -1526,6 +1529,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("height", 0, btree.height);
         log.info(btree.counters.toString());
 
+        btree.getStore().closeAndDelete();
+        
     }
     
     /**

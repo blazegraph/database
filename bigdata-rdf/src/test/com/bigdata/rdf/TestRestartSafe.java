@@ -267,6 +267,8 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals(bn1,store.getTerm(bn1_id));
         assertEquals(bn2,store.getTerm(bn2_id));
 
+        store.closeAndDelete();
+        
     }
 
 }

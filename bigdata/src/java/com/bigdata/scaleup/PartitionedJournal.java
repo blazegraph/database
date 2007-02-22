@@ -54,8 +54,10 @@ import java.util.Iterator;
 import java.util.Properties;
 
 import com.bigdata.journal.CommitRecordIndex;
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.BTree;
@@ -279,11 +281,6 @@ public class PartitionedJournal implements IJournal {
     private final String basename;
 
     /**
-     * The recommened extension for slave files.
-     */
-    public static final String JNL = ".jnl";
-    
-    /**
      * The recommened extension for index segment files.
      */
     public static final String SEG = ".seg";
@@ -342,6 +339,9 @@ public class PartitionedJournal implements IJournal {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo support the use of temporary files for the partitioned journal and
+     *       their clean removal on exit.
      */
     public static class Options extends com.bigdata.journal.Options {
 
@@ -366,14 +366,6 @@ public class PartitionedJournal implements IJournal {
          * in the directory named by the {@link #JOURNAL_DIR} property.
          */
         public static final String SEGMENT_DIR = "segment.dir";
-
-        /**
-         * <code>tmp.dir</code> - The property whose value is the name of the
-         * directory in which temporary files will be created.  When not
-         * specified the default is governed by the value of the System
-         * property named <code>java.io.tmpdir</code>
-         */
-        public static final String TMP_DIR = "tmp.dir";
 
         /**
          * <code>migrationThreshold</code> - The name of a property whose
@@ -463,36 +455,19 @@ public class PartitionedJournal implements IJournal {
             
         }
         
-        // "tmp.dir"
-        val = properties.getProperty(Options.TMP_DIR);
-        
-        tmpDir = val == null ? new File(System.getProperty("java.io.tmpdir"))
-                : new File(val); 
-
-        if (!tmpDir.exists()) {
-            
-            if (!tmpDir.mkdirs()) {
-
-                throw new RuntimeException("Could not create directory: "
-                        + tmpDir.getAbsolutePath());
-                
-            }
-            
-        }
-        
         /*
          * Scan the slave directory for basename*.jnl. Open the most current
          * file found in that directory. If no file is found, then create one.
          */
         
         File[] journalFiles = new NameAndExtensionFilter(new File(journalDir,
-                basename).toString(), JNL).getFiles();
+                basename).toString(), Options.JNL).getFiles();
         
         final File file;
         
         if(journalFiles.length==0) {
         
-            file = new File(journalDir,basename+JNL);
+            file = new File(journalDir,basename+Options.JNL);
             
         } else if(journalFiles.length==1) {
 
@@ -542,6 +517,8 @@ public class PartitionedJournal implements IJournal {
          * Create the initial slave slave.
          */
         this.slave = createSlave(this,properties);
+
+        this.tmpDir = slave.tmpDir;
         
     }
     
@@ -794,10 +771,10 @@ public class PartitionedJournal implements IJournal {
         slave = newJournal;
 
         // immediate shutdown of the old journal.
-        oldJournal.close();
+        oldJournal.closeAndDelete();
         
-        // delete the old backing file (if any).
-        oldJournal.getBufferStrategy().deleteFile();
+//        // delete the old backing file (if any).
+//        oldJournal.getBufferStrategy().deleteFile();
         
     }
     
@@ -1114,7 +1091,7 @@ public class PartitionedJournal implements IJournal {
         
         try {
 
-            file = File.createTempFile(basename,JNL, journalDir);
+            file = File.createTempFile(basename,Options.JNL, journalDir);
             
             if (!file.delete()) {
 
@@ -1140,10 +1117,22 @@ public class PartitionedJournal implements IJournal {
         return slave.getProperties();
     }
 
+    /**
+     * Return the file for the current {@link SlaveJournal}.
+     */
+    public File getFile() {
+        return slave.getFile();
+    }
+    
     public void close() {
         slave.close();
     }
 
+    public void closeAndDelete() {
+        // @todo implement full delete on the database.
+        slave.closeAndDelete();
+    }
+    
     public void force(boolean metadata) {
         slave.force(metadata);
     }
@@ -1234,6 +1223,18 @@ public class PartitionedJournal implements IJournal {
 
     public long newTx(boolean readOnly) {
         return slave.newTx(readOnly);
+    }
+
+    public ICommitRecord getCommitRecord(long commitTime) {
+       return slave.getCommitRecord(commitTime);
+    }
+
+    public IRootBlockView getRootBlockView() {
+        return slave.getRootBlockView();
+    }
+
+    public long nextTimestamp() {
+        return slave.nextTimestamp();
     }
 
 }

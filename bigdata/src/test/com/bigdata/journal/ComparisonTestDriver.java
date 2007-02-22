@@ -160,17 +160,6 @@ public class ComparisonTestDriver {
 
         String name = sb.toString();
 
-        /*
-         * Create a temporary file for the journal. Note that you must delete
-         * the temporary file before starting the journal since it is empty and
-         * just a placeholder for a unique filename.
-         */
-        File file = File.createTempFile("bigdata", ".jnl");
-        
-        file.deleteOnExit();
-        
-        properties.setProperty(Options.FILE, file.toString());
-
         return new Condition(name,properties);
         
     }
@@ -256,8 +245,8 @@ public class ComparisonTestDriver {
         Properties properties = new Properties();
 
         // force delete of the files on close of the journal under test.
-        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
-        
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
         properties.setProperty(Options.SEGMENT, "0");
 
         // avoids journal overflow when running out to 60 seconds.
@@ -304,13 +293,6 @@ public class ComparisonTestDriver {
             while (itr.hasNext()) {
 
                 Condition condition = itr.next();
-
-                File file = new File(condition.properties
-                        .getProperty(Options.FILE));
-
-                if (!file.delete())
-                    throw new AssertionError(
-                            "Could not remove temp file before test");
 
                 IComparisonTest test = (IComparisonTest) cl.newInstance();
 

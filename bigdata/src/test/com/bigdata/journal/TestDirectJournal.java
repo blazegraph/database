@@ -114,9 +114,9 @@ public class TestDirectJournal extends AbstractTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
-        properties.setProperty(Options.SEGMENT, "0");
+//        properties.setProperty(Options.SEGMENT, "0");
 
-        properties.setProperty(Options.FILE,getTestJournalFile(properties));
+//        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -132,34 +132,29 @@ public class TestDirectJournal extends AbstractTestCase {
 
         final Properties properties = getProperties();
 
-        try {
-            
-            Journal journal = new Journal(properties);
-            
-            DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
-            
-            assertTrue("isStable",bufferStrategy.isStable());
-            assertTrue("isFullyBuffered",bufferStrategy.isFullyBuffered());
-            assertEquals(Options.FILE, properties.getProperty(Options.FILE), bufferStrategy.file.toString());
-            assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
-                    bufferStrategy.getInitialExtent());
-            assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
-                    bufferStrategy.getMaximumExtent());
-            assertNotNull("raf", bufferStrategy.raf);
-            assertEquals("bufferMode", BufferMode.Direct, bufferStrategy.getBufferMode());
-            assertNotNull("directBuffer", bufferStrategy.directBuffer);
-            assertTrue( "userExtent", bufferStrategy.getExtent() > bufferStrategy.getUserExtent());
-            assertEquals( "bufferCapacity", bufferStrategy.getUserExtent(), bufferStrategy.directBuffer
-                    .capacity());
+        Journal journal = new Journal(properties);
 
-            journal.close();
-            
-        } finally {
-            
-            deleteTestJournalFile();
-            
-        }
-        
+        DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
+
+        assertTrue("isStable", bufferStrategy.isStable());
+        assertTrue("isFullyBuffered", bufferStrategy.isFullyBuffered());
+//        assertEquals(Options.FILE, properties.getProperty(Options.FILE),
+//                bufferStrategy.file.toString());
+        assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+                bufferStrategy.getInitialExtent());
+        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+                bufferStrategy.getMaximumExtent());
+        assertNotNull("raf", bufferStrategy.raf);
+        assertEquals("bufferMode", BufferMode.Direct, bufferStrategy
+                .getBufferMode());
+        assertNotNull("directBuffer", bufferStrategy.directBuffer);
+        assertTrue("userExtent", bufferStrategy.getExtent() > bufferStrategy
+                .getUserExtent());
+        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
+                bufferStrategy.directBuffer.capacity());
+
+        journal.closeAndDelete();
+
     }
 
     /**

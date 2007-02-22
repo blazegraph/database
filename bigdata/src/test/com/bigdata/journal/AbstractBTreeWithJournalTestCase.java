@@ -80,6 +80,22 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
             properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString() );
 
+            /*
+             * Use a temporary file for the test. Such files are always deleted when
+             * the journal is closed or the VM exits.
+             * 
+             * Note: Your unit test must close the store for delete to work.
+             */
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.SEGMENT, "0");
+
+//            // Note: also deletes the file before it is used.
+//            properties.setProperty(Options.FILE, AbstractTestCase
+//                    .getTestJournalFile(getName(), properties));
+
         }
 
         return properties;
@@ -100,9 +116,7 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
      */
     public BTree getBTree(int branchingFactor) {
 
-        Properties properties = getProperties();
-
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
 
         BTree btree = new BTree(journal, branchingFactor,
                 SimpleEntry.Serializer.INSTANCE);
@@ -111,15 +125,14 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
     }
     
-    /*
-     * @todo try large branching factors, but limit the total #of keys inserted
-     * or the running time will be too long (I am using an expontential #of keys
-     * by default).
-     * 
-     * Note: For sequential keys, m=128 causes the journal to exceed its initial
-     * extent.
+    /**
+     * The branching factors that will be used in the stress tests. The larger
+     * the branching factor, the longer the run for these tests. The very small
+     * branching factors (3, 4) test the btree code more fully since they will
+     * exercise the fence posts on the invariants for nodes and leaves on pretty
+     * much each mutation.
      */
-    int[] branchingFactors = new int[]{3,4,5,10};//,20,64};//,128};//,512};
+    int[] branchingFactors = new int[]{3,4};//,5,10,20,64};//,128};//,512};
     
     /**
      * A stress test for sequential key insertion that runs with a variety of
@@ -131,14 +144,46 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
             
             int m = branchingFactors[i];
             
-            doSplitWithIncreasingKeySequence( getBTree(m), m, m );
+            {
+
+                BTree btree = getBTree(m);
+                
+                doSplitWithIncreasingKeySequence( btree, m, m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
             
-            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m );
+            {
 
-            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m );
+                BTree btree = getBTree(m);
+                
+                doSplitWithIncreasingKeySequence( btree, m, m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
 
-            doSplitWithIncreasingKeySequence( getBTree(m), m, m*m*m*m );
+                BTree btree = getBTree(m);
+                
+                doSplitWithIncreasingKeySequence( btree, m, m*m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
 
+                BTree btree = getBTree(m);
+                
+                doSplitWithIncreasingKeySequence( btree, m, m*m*m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
         }
         
     }
@@ -152,14 +197,46 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
         for(int i=0; i<branchingFactors.length; i++) {
             
             int m = branchingFactors[i];
-            
-            doSplitWithDecreasingKeySequence( getBTree(m), m, m );
-            
-            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m );
 
-            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m );
+            {
 
-            doSplitWithDecreasingKeySequence( getBTree(m), m, m*m*m*m );
+                BTree btree = getBTree(m);
+                
+                doSplitWithDecreasingKeySequence( btree, m, m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+                
+                doSplitWithDecreasingKeySequence( btree, m, m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+                
+                doSplitWithDecreasingKeySequence( btree, m, m*m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+                
+                doSplitWithDecreasingKeySequence( btree, m, m*m*m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
 
         }
         
@@ -175,16 +252,37 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
             
             int m = branchingFactors[i];
             
-            doSplitWithRandomDenseKeySequence( getBTree(m), m, m );
+            {
             
-            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m );
+                BTree btree = getBTree(m);
+                
+                doSplitWithRandomDenseKeySequence( btree, m, m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
+            
+            {
+                
+                BTree btree = getBTree(m);
+                
+                doSplitWithRandomDenseKeySequence( btree, m, m*m );
+                
+                btree.getStore().closeAndDelete();
+                
+            }
 
-            doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m );
+            {
 
-            // This case overflows the default journal extent.
-//            doSplitWithRandomKeySequence( getBTree(m), m, m*m*m*m );
+                BTree btree = getBTree(m);
 
-        }
+                doSplitWithRandomDenseKeySequence( btree, m, m * m * m);
+
+                btree.getStore().closeAndDelete();
+
+            }
+
+         }
         
     }
 

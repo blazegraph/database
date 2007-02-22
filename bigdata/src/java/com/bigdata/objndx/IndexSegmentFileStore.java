@@ -122,6 +122,12 @@ public class IndexSegmentFileStore implements IRawStore {
         
     }
     
+    public File getFile() {
+        
+        return file;
+        
+    }
+    
     public void close() {
 
         if (!open)
@@ -139,6 +145,18 @@ public class IndexSegmentFileStore implements IRawStore {
 
         open = false;
 
+    }
+    
+    public void closeAndDelete() {
+        
+        close();
+        
+        if(!file.delete()) {
+            
+            System.err.println("WARN: Could not delete: "+file.getAbsolutePath());
+            
+        }
+        
     }
 
     public long write(ByteBuffer data) {

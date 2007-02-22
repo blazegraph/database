@@ -175,33 +175,8 @@ public abstract class ProxyTestCase
     public Properties getProperties() {
         return getOurDelegate().getProperties();
     }
-    
-//    public IObjectManager getObjectManager() {
-//        return getOurDelegate().getObjectManager();
-//    }
-//
-//    public void dropStore() {
-//        getOurDelegate().dropStore();
-//    }
-//    
-//    public boolean isStoreOpen() {
-//        return getOurDelegate().isStoreOpen();
-//    }
-//    
-//    public IObjectManager reopenStore() {
-//        return getOurDelegate().reopenStore();
-//    }
-//    
-//    public IObjectManager openStore() {
-//        return getOurDelegate().openStore();
-//    }
-//    
-//    public void closeStore() {
-//        getOurDelegate().closeStore();
-//    }
-//    
-//    public IGeneric addGeneric() {
-//        return getObjectManager().makeObject();
-//    }
 
+    public Journal reopenStore(Journal store) {
+        return getOurDelegate().reopenStore(store);
+    }
 }

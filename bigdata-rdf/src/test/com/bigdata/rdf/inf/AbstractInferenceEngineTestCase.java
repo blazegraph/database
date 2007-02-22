@@ -148,7 +148,8 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
     
     public void tearDown() {
 
-        store.close();
+        if (store.isOpen())
+            store.closeAndDelete();
         
     }
     

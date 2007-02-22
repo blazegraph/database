@@ -133,6 +133,12 @@ public class SimpleFileRawStore implements IRawStore {
         
     }
     
+    public File getFile() {
+        
+        return file;
+        
+    }
+    
     /**
      * This also releases the lock if any obtained by the constructor.
      */
@@ -149,6 +155,18 @@ public class SimpleFileRawStore implements IRawStore {
         } catch(IOException ex) { 
             
             throw new RuntimeException(ex);
+            
+        }
+        
+    }
+
+    public void closeAndDelete() {
+        
+        close();
+        
+        if(!file.delete()) {
+            
+            System.err.println("WARN: Could not delete: "+file.getAbsolutePath());
             
         }
         

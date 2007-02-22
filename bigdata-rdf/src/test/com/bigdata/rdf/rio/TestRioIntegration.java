@@ -220,6 +220,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             
         } // next source to load.
 
+        store.closeAndDelete();
+        
 //        long elapsed = System.currentTimeMillis() - begin;
 //        
 //        log.info(total_stmts

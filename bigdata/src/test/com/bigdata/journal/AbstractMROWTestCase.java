@@ -280,6 +280,8 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
                 + ", ncancelled=" + ncancelled + ", nerrors=" + nerr + " in "
                 + elapsed + "ms (" + nok * 1000 / elapsed
                 + " reads per second); nwritten=" + nwritten);
+        
+        store.closeAndDelete();
        
     }
 
@@ -530,14 +532,8 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
 //      properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.SEGMENT, "0");
-        
-        File file = File.createTempFile("bigdata", ".jnl");
-        
-        file.deleteOnExit();
-        
-        if(!file.delete()) fail("Could not remove temp file before test");
-        
-        properties.setProperty(Options.FILE, file.toString());
+
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
         Journal journal = new Journal(properties);
         
@@ -545,6 +541,12 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
                 writeDelayMillis, timeout, nclients, ntrials, reclen, nreads);
         
         journal.shutdown();
+        
+        if(journal.getFile()!=null) {
+            
+            journal.getFile().delete();
+            
+        }
         
     }
 

@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Properties;
-
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.SimpleEntry;
 import com.bigdata.scaleup.PartitionedJournal;
@@ -89,11 +87,7 @@ public class TestNamedIndices extends ProxyTestCase {
      */
     public void test_registerAndUse() {
 
-        Properties properties = getProperties();
-
-        properties.setProperty(Options.DELETE_ON_CLOSE, "false");
-        
-        Journal journal = new Journal(properties);
+        Journal journal = new Journal(getProperties());
         
         String name = "abc";
         
@@ -115,14 +109,12 @@ public class TestNamedIndices extends ProxyTestCase {
          */
         journal.commit();
         
-        journal.close();
-        
         if (journal.isStable()) {
-
+            
             /*
              * re-open the journal and test restart safety.
              */
-            journal = new Journal(properties);
+            journal = reopenStore(journal);
 
             btree = (BTree) journal.getIndex(name);
 
@@ -130,9 +122,9 @@ public class TestNamedIndices extends ProxyTestCase {
             assertEquals("entryCount", 1, btree.getEntryCount());
             assertEquals(v0, btree.lookup(k0));
 
-            journal.close();
-
         }
+
+        journal.closeAndDelete();
 
     }
 
