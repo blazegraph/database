@@ -59,34 +59,65 @@ import com.bigdata.objndx.IIndex;
 public interface ITx extends IStore {
 
     /**
-     * The transaction identifier (aka timestamp).
+     * The start time for the transaction as assigned by a centralized
+     * transaction manager service. Transaction start times are unique and also
+     * serve as transaction identifiers. Note that this is NOT the time at which
+     * a transaction begins executing on a specific journal as the same
+     * transaction may start at different moments on different journals and
+     * typically will only start on some journals rather than all.
      * 
-     * @return The transaction identifier (aka timestamp).
+     * @return The transaction start time.
      */
     public long getStartTimestamp();
 
     /**
-     * Validate the write set for the transaction.
+     * Return the commit timestamp assigned to this transaction by a centralized
+     * transaction manager service.
+     * 
+     * @return The commit timestamp assigned to this transaction.
+     * 
+     * @exception UnsupportedOperationException
+     *                unless the transaction is writable.
      * 
      * @exception IllegalStateException
-     *                If the transaction is not active. If the transaction is
+     *                if the transaction is writable but has not yet prepared (
+     *                the commit time is assigned when the transaction is
+     *                prepared).
+     */
+    public long getCommitTimestamp();
+    
+    /**
+     * Prepare the transaction for a {@link #commit()} by validating the write
+     * set for each index isolated by the transaction.
+     * 
+     * @param commitTime
+     *            The commit time assigned by a centralized transaction manager
+     *            service -or- ZERO (0L) IFF the transaction is read-only.
+     * 
+     * @exception IllegalStateException
+     *                if the transaction is not active. If the transaction is
      *                not complete, then it will be aborted.
      * 
      * @exception ValidationError
      *                If the transaction can not be validated. If this exception
      *                is thrown, then the transaction was aborted.
      */
-    public void prepare();
+    public void prepare(long commitTime);
 
     /**
-     * Commit the transaction.
+     * Commit a transaction that has already been {@link #prepare(long)}d.
      * 
-     * @return The commit time assigned to the transactions.
+     * @return The commit time assigned to the transactions -or- 0L if the
+     *         transaction was read-only.
      * 
      * @exception IllegalStateException
-     *                If the transaction has not {@link #prepare() prepared}.
+     *                If the transaction has not {@link #prepare(long) prepared}.
      *                If the transaction is not already complete, then it is
      *                aborted.
+     * 
+     * @return The commit timestamp assigned by a centralized transaction
+     *         manager service or <code>0L</code> if the transaction was
+     *         read-only.
      */
     public long commit();
 
@@ -151,9 +182,9 @@ public interface ITx extends IStore {
      * {@link IsolatedBTree} will read through named index as of the ground
      * state of this transaction.
      * <p>
-     * During {@link #prepare()}, the write set of each {@link IsolatedBTree}
-     * will be validated against the then current commited state of the named
-     * index.
+     * During {@link #prepare(long)}, the write set of each
+     * {@link IsolatedBTree} will be validated against the then current commited
+     * state of the named index.
      * <p>
      * During {@link #commit()}, the validated write sets will be merged down
      * onto the then current committed state of the named index.

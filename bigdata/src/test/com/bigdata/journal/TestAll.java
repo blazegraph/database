@@ -102,6 +102,14 @@ public class TestAll extends TestCase {
         // test the different journal modes.
         suite.addTest( TestTransientJournal.suite() );
         suite.addTest( TestDirectJournal.suite() );
+        /*
+         * Note: The mapped journal is somewhat problematic and its tests are
+         * disabled for the moment since (a) we have to pre-allocate large
+         * extends; (b) it does not perform any better than other options; and
+         * (c) we can not synchronously unmap or delete a mapped file which
+         * makes cleanup of the test suites difficult and winds up spewing 200M
+         * files all over your temp directory.
+         */
 //        suite.addTest( TestMappedJournal.suite() );
         suite.addTest( TestDiskJournal.suite() );
 

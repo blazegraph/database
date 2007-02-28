@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.journal.TransactionServer.IsolationEnum;
 
 import junit.framework.TestCase;
 

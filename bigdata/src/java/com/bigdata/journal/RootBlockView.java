@@ -81,9 +81,9 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_VERSION    = OFFSET_MAGIC       + SIZEOF_MAGIC;
     static final transient short OFFSET_SEGMENT_ID = OFFSET_VERSION     + SIZEOF_VERSION;
     static final transient short OFFSET_NEXT_OFFSET= OFFSET_SEGMENT_ID  + SIZEOF_SEGMENT_ID;
-    static final transient short OFFSET_FIRST_TX   = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
-    static final transient short OFFSET_LAST_TX    = OFFSET_FIRST_TX    + SIZEOF_TIMESTAMP;
-    static final transient short OFFSET_COMMIT_TS  = OFFSET_LAST_TX     + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_FIRST_CMIT = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
+    static final transient short OFFSET_LAST_CMIT  = OFFSET_FIRST_CMIT    + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_COMMIT_TS  = OFFSET_LAST_CMIT     + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_COMMIT_CTR = OFFSET_COMMIT_TS   + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_COMMIT_REC = OFFSET_COMMIT_CTR  + SIZEOF_COUNTER;
     static final transient short OFFSET_COMMIT_NDX = OFFSET_COMMIT_REC  + SIZEOF_ADDR;
@@ -120,14 +120,12 @@ public class RootBlockView implements IRootBlockView {
      * @param nextOffset
      *            The next offset at which a record will be written on the
      *            store.
-     * @param firstTxId
-     *            The timestamp of the earliest transaction committed on the
-     *            store or zero (0L) iff no transactions have committed on the
-     *            store.
-     * @param lastTxId
-     *            The timestamp of the most recent transaction committed on the
-     *            store or zero (0L) iff no transactions have committed on the
-     *            store.
+     * @param firstCommitTime
+     *            The timestamp of the earliest commit on the store or zero (0L)
+     *            iff there have been no commits.
+     * @param lastCommitTime
+     *            The timestamp of the most recent commit on the store or zero
+     *            (0L) iff there have been no commits.
      * @param commitTime
      *            The timestamp assigned to this commit - this is distinct from
      *            the timestamps written as part of the Challis algorithm. The
@@ -150,17 +148,17 @@ public class RootBlockView implements IRootBlockView {
      *            the store is first created).
      */
     RootBlockView(boolean rootBlock0, int segmentId, int nextOffset,
-            long firstTxId, long lastTxId, long commitTimestamp,
+            long firstCommitTime, long lastCommitTime, long commitTimestamp,
             long commitCounter, long commitRecordAddr,
             long commitRecordIndexAddr) {
 
         if (nextOffset < 0)
             throw new IllegalArgumentException("nextOffset is negative.");
-        if( firstTxId == 0L && lastTxId != 0L)
+        if( firstCommitTime == 0L && lastCommitTime != 0L)
             throw new IllegalArgumentException("first transaction identifier is zero, but last transaction identifier is not.");
-        if (firstTxId != 0 && lastTxId < firstTxId)
+        if (firstCommitTime != 0 && lastCommitTime < firstCommitTime)
             throw new IllegalArgumentException("last transaction identifier is less than first transaction identifier.");
-        if( lastTxId != 0 && commitTimestamp < lastTxId) {
+        if( lastCommitTime != 0 && commitTimestamp < lastCommitTime) {
             throw new IllegalArgumentException("commit counter must be greater than the start time of the last committed transactions");
         }
         if (commitCounter < 0)
@@ -199,8 +197,8 @@ public class RootBlockView implements IRootBlockView {
         buf.putInt(VERSION0);
         buf.putInt(segmentId);
         buf.putInt(nextOffset);
-        buf.putLong(firstTxId);
-        buf.putLong(lastTxId);
+        buf.putLong(firstCommitTime);
+        buf.putLong(lastCommitTime);
         buf.putLong(commitTimestamp);
         buf.putLong(commitCounter);
         buf.putLong(commitRecordAddr);
@@ -277,15 +275,15 @@ public class RootBlockView implements IRootBlockView {
         
     }
 
-    public long getFirstTxCommitTime() {
+    public long getFirstCommitTime() {
         
-        return buf.getLong(OFFSET_FIRST_TX);
+        return buf.getLong(OFFSET_FIRST_CMIT);
         
     }
     
-    public long getLastTxCommitTime() {
+    public long getLastCommitTime() {
         
-        return buf.getLong(OFFSET_LAST_TX);
+        return buf.getLong(OFFSET_LAST_CMIT);
         
     }
     
@@ -368,9 +366,9 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", version="+getVersion());
         sb.append(", segmentId="+getSegmentId());
         sb.append(", nextOffset="+getNextOffset());
-        sb.append(", firstTxId="+getFirstTxCommitTime());
-        sb.append(", lastTxId="+getLastTxCommitTime());
-        sb.append(", commitTimestamp="+getCommitTimestamp());
+        sb.append(", firstCommitTime="+getFirstCommitTime());
+        sb.append(", lastCommitTime="+getLastCommitTime());
+        sb.append(", commitTime="+getCommitTimestamp());
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+Addr.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+Addr.toString(getCommitRecordIndexAddr()));

@@ -220,8 +220,14 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
             }
             
         }
+
+        journal.shutdown();
         
-        journal.closeAndDelete();
+        if(journal.getFile()!=null) {
+ 
+            journal.getFile().delete();
+            
+        }
                 
         String msg = "#clients="
                 + nclients + ", nops=" + nops + ", ntx=" + ntrials + ", ncomitted="
@@ -376,7 +382,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
         
-//        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
+        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
@@ -385,15 +391,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.SEGMENT, "0");
-        
-        File file = File.createTempFile("bigdata", ".jnl");
-        
-        file.deleteOnExit();
-        
-        if(!file.delete()) fail("Could not remove temp file before test");
-        
-        properties.setProperty(Options.FILE, file.toString());
 
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+        
         new StressTestConcurrent().doComparisonTest(properties);
 
     }
@@ -458,14 +458,6 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         String msg = doConcurrentClientTest(journal, timeout, nclients, ntrials,
                 keyLen, nops);
-
-        journal.shutdown();
-        
-        if(journal.getFile()!=null) {
-            
-            journal.getFile().delete();
-            
-        }
 
         return msg;
 

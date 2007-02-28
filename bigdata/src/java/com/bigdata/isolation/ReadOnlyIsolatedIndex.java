@@ -42,52 +42,24 @@ Modifications:
 
 */
 /*
- * Created on Feb 17, 2007
+ * Created on Feb 27, 2007
  */
 
-package com.bigdata.journal;
+package com.bigdata.isolation;
+
+import com.bigdata.objndx.ReadOnlyIndex;
 
 /**
- * An instance of this class is thrown when a transaction
- * {@link ITx#prepare(long)}s if there is a write-write conflict that can not
- * be resolved.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ValidationError extends RuntimeException {
+public class ReadOnlyIsolatedIndex extends ReadOnlyIndex implements IIsolatedIndex {
 
     /**
-     * 
+     * @param src
      */
-    private static final long serialVersionUID = 7606167478216451303L;
-
-    /**
-     * 
-     */
-    public ValidationError() {
-    }
-
-    /**
-     * @param message
-     */
-    public ValidationError(String message) {
-        super(message);
-    }
-
-    /**
-     * @param cause
-     */
-    public ValidationError(Throwable cause) {
-        super(cause);
-    }
-
-    /**
-     * @param message
-     * @param cause
-     */
-    public ValidationError(String message, Throwable cause) {
-        super(message, cause);
+    public ReadOnlyIsolatedIndex(IIsolatableIndex src) {
+        super(src);
     }
 
 }

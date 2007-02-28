@@ -109,10 +109,10 @@ public class TestRootBlockView extends TestCase2 {
             assertEquals("rootBlock0", rootBlock0, rootBlock.isRootBlock0());
             assertEquals("segmentId", segmentId, rootBlock.getSegmentId());
             assertEquals("nextOffset", nextOffset, rootBlock.getNextOffset());
-            assertEquals("firstTxId", firstTxId, rootBlock.getFirstTxCommitTime());
-            assertEquals("lastTxId", lastTxId, rootBlock.getLastTxCommitTime());
+            assertEquals("firstTxId", firstTxId, rootBlock.getFirstCommitTime());
+            assertEquals("lastTxId", lastTxId, rootBlock.getLastCommitTime());
             assertEquals("commitCounter", commitCounter, rootBlock.getCommitCounter());
-            assertEquals("commitTimestamp", commitTimestamp, rootBlock.getCommitTimestamp());
+            assertEquals("commitTime", commitTimestamp, rootBlock.getCommitTimestamp());
             assertEquals("commitRecordAddr", commitRecordAddr, rootBlock.getCommitRecordAddr());
             assertEquals("commitRecordIndexAddr", commitRecordIndexAddr, rootBlock.getCommitRecordIndexAddr());
 
@@ -124,10 +124,10 @@ public class TestRootBlockView extends TestCase2 {
             assertEquals("rootBlock0", rootBlock0, rootBlock.isRootBlock0());
             assertEquals("segmentId", segmentId, rootBlock.getSegmentId());
             assertEquals("nextOffset", nextOffset, rootBlock.getNextOffset());
-            assertEquals("firstTxId", firstTxId, rootBlock.getFirstTxCommitTime());
-            assertEquals("lastTxId", lastTxId, rootBlock.getLastTxCommitTime());
+            assertEquals("firstTxId", firstTxId, rootBlock.getFirstCommitTime());
+            assertEquals("lastTxId", lastTxId, rootBlock.getLastCommitTime());
             assertEquals("commitCounter", commitCounter, rootBlock.getCommitCounter());
-            assertEquals("commitTimestamp", commitTimestamp, rootBlock.getCommitTimestamp());
+            assertEquals("commitTime", commitTimestamp, rootBlock.getCommitTimestamp());
             assertEquals("commitRecordAddr", commitRecordAddr, rootBlock.getCommitRecordAddr());
             assertEquals("commitRecordIndexAddr", commitRecordIndexAddr, rootBlock.getCommitRecordIndexAddr());
 

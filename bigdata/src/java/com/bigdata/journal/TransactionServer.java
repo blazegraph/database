@@ -124,36 +124,6 @@ public class TransactionServer {
     protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
 
     /**
-     * Isolation levels for a transaction.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static enum IsolationEnum {
-        
-        /**
-         * A fully isolated read-write transaction.
-         */
-        ReadWrite(),
-        
-        /**
-         * A fully isolated read-only transaction.
-         */
-        ReadOnly(),
-        
-        /**
-         * A read-only transaction that will read any data successfully
-         * committed on the database (the view provided by the transaction does
-         * not remain valid as of the transaction start time but evolves as
-         * concurrent transactions commit).
-         */
-        ReadCommitted();
-        
-        private IsolationEnum() {}
-        
-    }
-    
-    /**
      * Class modeling transaction metadata. An instance of this class is used to
      * model a transaction in the {@link TransactionServer}. {@link ITx}
      * objects are used to model the transaction local to a {@link Journal}.

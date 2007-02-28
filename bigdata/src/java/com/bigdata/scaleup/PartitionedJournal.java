@@ -58,6 +58,7 @@ import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.BTree;
@@ -1213,16 +1214,12 @@ public class PartitionedJournal implements IJournal {
         return slave.getIndex(name, ts);
     }
 
-    public long newReadCommittedTx() {
-        return slave.newReadCommittedTx();
-    }
-
     public long newTx() {
         return slave.newTx();
     }
 
-    public long newTx(boolean readOnly) {
-        return slave.newTx(readOnly);
+    public long newTx(IsolationEnum level) {
+        return slave.newTx(level);
     }
 
     public ICommitRecord getCommitRecord(long commitTime) {

@@ -290,13 +290,15 @@ public class ComparisonTestDriver {
 
             Iterator<Condition> itr = conditions.iterator();
 
+            int i = 0;
+            
             while (itr.hasNext()) {
 
                 Condition condition = itr.next();
 
                 IComparisonTest test = (IComparisonTest) cl.newInstance();
 
-                System.err.println("Running: "+ condition.name);
+                System.err.println("Running "+ condition.name +" ("+i+" of "+nconditions+")");
 
                 try {
                     condition.result = test
@@ -309,12 +311,14 @@ public class ComparisonTestDriver {
 
                 writer.write(condition.result + ", " + condition.name+"\n");
 
+                writer.flush();
+                
             }
-            
-            writer.flush();
             
             writer.close();
 
+            i++;
+            
         }
 
         {

@@ -106,22 +106,24 @@ public interface IRootBlockView {
     public int getNextOffset();
     
     /**
-     * The commit time of the earliest transaction whose data are on the store
-     * or 0L iff no transactions have committed on the store.
+     * The commit time of the earliest commit on the store or 0L iff there have
+     * been no commits.
      * 
-     * @return The commit time of the earliest transaction committed on the
-     *         store.
+     * @return The earliest commit time on the store or 0L iff there have been
+     *         no commits.
      */
-    public long getFirstTxCommitTime();
+    public long getFirstCommitTime();
     
     /**
-     * The commit time of the most recent transaction whose data are on the
-     * store or 0L iff no transactions have committed on the store.
+     * The commit time of the most recent commit on the store or 0L iff there
+     * have been no commits.
      * 
-     * @return The commit time of the most recent transaction committed on the
-     *         store.
+     * @return The commit time of the most recent commit on the store or 0L iff
+     *         there have been no commits.
+     * 
+     * @todo this is the same as {@link #getCommitTimestamp()}
      */
-    public long getLastTxCommitTime();
+    public long getLastCommitTime();
     
     /**
      * The timestamp at which the root block was last modified - this is a
@@ -145,6 +147,8 @@ public interface IRootBlockView {
      * {@link #getRootBlockTimestamp() root block timestamp}.
      * 
      * @return The commit timestamp.
+     * 
+     * @todo this the same as {@link #getLastCommitTime()}.
      */
     public long getCommitTimestamp();
 

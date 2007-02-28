@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Properties;
-
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
 
@@ -108,7 +106,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * index.
              */
             
-            final long tx1 = journal.newTx(true);
+            final long tx1 = journal.newTx(IsolationEnum.ReadOnly);
             
             IIndex ndx = journal.getIndex(name,tx1);
 
@@ -134,7 +132,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * transaction.
              */
             
-            final long tx1 = journal.newTx(true);
+            final long tx1 = journal.newTx(IsolationEnum.ReadOnly);
             
             IIndex ndx = journal.getIndex(name,tx1);
 

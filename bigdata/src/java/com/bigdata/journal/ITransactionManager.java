@@ -47,7 +47,10 @@
 
 package com.bigdata.journal;
 
+import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.IndexSegment;
 
 /**
  * A client-facing interface for managing transaction life cycles.
@@ -66,36 +69,74 @@ public interface ITransactionManager extends ITimestampService {
     public long newTx();
 
     /**
-     * Create a new fully-isolated transaction.
-     * 
-     * @param readOnly
-     *            When true, the transaction will reject writes.
-     * 
-     * @return The transaction start time, which serves as the unique identifier
-     *         for the transaction.
-     */
-    public long newTx(boolean readOnly);
-
-    /**
-     * Create a new read-committed transaction. The transaction will reject
-     * writes. Any data committed by concurrent transactions will become visible
-     * to indices isolated by this transaction (hence, "read comitted").
+     * Create a new transaction.
      * <p>
-     * This provides more isolation than "read dirty" since the concurrent
-     * transactions MUST commit before their writes become visible to the a
-     * read-committed transaction.
+     * The concurrency control algorithm is MVCC, so readers never block and
+     * only write-write conflicts can arise. It is possible to register an
+     * {@link UnisolatedBTree} with an {@link IConflictResolver} in order to
+     * present the application with an opportunity to validate write-write
+     * conflicts using state-based techniques (i.e., by looking at the records
+     * and timestamps and making an informed decision).
+     * <p>
+     * MVCC requires a strategy to release old versions that are no longer
+     * accessible to active transactions. bigdata uses a highly efficient
+     * technique in which writes are multiplexed onto append-only
+     * {@link Journal}s and then evicted on overflow into {@link IndexSegment}s
+     * using a bulk index build mechanism. Old journal and index segment
+     * resources are simply deleted from the file system some time after they
+     * are no longer accessible to active transactions.
+     * 
+     * @param level
+     *            The isolation level. The following isolation levels are
+     *            supported:
+     *            <dl>
+     *            <dt>{@link IsolationEnum#ReadCommitted}</dt>
+     *            <dd>A read-only transaction in which data become visible
+     *            within the transaction as concurrent transactions commit. This
+     *            is suitable for very long read processes that do not require a
+     *            fully consistent view of the data.</dd>
+     *            <dt>{@link IsolationEnum#ReadOnly}</dt>
+     *            <dd>A fully isolated read-only transaction.</dd>
+     *            <dt>{@link IsolationEnum#ReadWrite}</dt>
+     *            <dd>A fully isolated read-write transaction.</dd>
+     *            </dl>
      * 
      * @return The transaction start time, which serves as the unique identifier
      *         for the transaction.
      */
-    public long newReadCommittedTx();
+    public long newTx(IsolationEnum level);
+    
+//    /**
+//     * Create a new fully-isolated transaction.
+//     * 
+//     * @param readOnly
+//     *            When true, the transaction will reject writes.
+//     * 
+//     * @return The transaction start time, which serves as the unique identifier
+//     *         for the transaction.
+//     */
+//    public long newTx(boolean readOnly);
+//
+//    /**
+//     * Create a new read-committed transaction. The transaction will reject
+//     * writes. Any data committed by concurrent transactions will become visible
+//     * to indices isolated by this transaction (hence, "read comitted").
+//     * <p>
+//     * This provides more isolation than "read dirty" since the concurrent
+//     * transactions MUST commit before their writes become visible to the a
+//     * read-committed transaction.
+//     * 
+//     * @return The transaction start time, which serves as the unique identifier
+//     *         for the transaction.
+//     */
+//    public long newReadCommittedTx();
 
     /**
      * Return the named index as isolated by the transaction.
      * 
      * @param name
      *            The index name.
-     * @param ts
+     * @param startTime
      *            The transaction start time, which serves as the unique
      *            identifier for the transaction.
      * 
@@ -107,24 +148,24 @@ public interface ITransactionManager extends ITimestampService {
      * @exception IllegalStateException
      *                if there is no active transaction with that timestamp.
      */
-    public IIndex getIndex(String name, long ts);
+    public IIndex getIndex(String name, long startTime);
 
     /**
      * Abort the transaction.
      * 
-     * @param ts
+     * @param startTime
      *            The transaction start time, which serves as the unique
      *            identifier for the transaction.
      * 
      * @exception IllegalStateException
      *                if there is no active transaction with that timestamp.
      */
-    public void abort(long ts);
+    public void abort(long startTime);
 
     /**
      * Commit the transaction.
      * 
-     * @param ts
+     * @param startTime
      *            The transaction start time, which serves as the unique
      *            identifier for the transaction.
      *            
@@ -133,6 +174,6 @@ public interface ITransactionManager extends ITimestampService {
      * @exception IllegalStateException
      *                if there is no active transaction with that timestamp.
      */
-    public long commit(long ts);
+    public long commit(long startTime);
 
 }

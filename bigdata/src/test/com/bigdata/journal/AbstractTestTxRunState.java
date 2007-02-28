@@ -48,7 +48,8 @@ Modifications:
 package com.bigdata.journal;
 
 import java.io.IOException;
-import java.util.Properties;
+
+import junit.framework.TestSuite;
 
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
@@ -57,32 +58,96 @@ import com.bigdata.objndx.IIndex;
  * Test suite for the state machine governing the transaction {@link RunState}
  * transitions.
  * 
- * @todo refactor to test both {@link Tx} and the as yet to be written
- *       read-committed transaction class (ideally they will share a base class
- *       which encapsulates the state transaction mechanisms).
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTxRunState extends ProxyTestCase {
+abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
+    public static TestSuite suite() {
+        
+        TestSuite suite = new TestSuite("Transaction run state");
+
+        suite.addTestSuite(TestReadCommitted.class);
+        suite.addTestSuite(TestReadOnly.class);
+        suite.addTestSuite(TestReadWrite.class);
+        
+        return suite;
+        
+    }
+    
     /**
      * 
      */
-    public TestTxRunState() {
+    public AbstractTestTxRunState() {
     }
 
     /**
      * @param name
      */
-    public TestTxRunState(String name) {
+    public AbstractTestTxRunState(String name) {
         super(name);
     }
 
+    /**
+     * Return a new transaction start time.
+     */
+    abstract public long newTx(Journal journal);
+    
+    public static class TestReadCommitted extends AbstractTestTxRunState {
+        
+        public TestReadCommitted() {
+        }
+        
+        public TestReadCommitted(String name) {
+            super(name);
+        }
+
+        public long newTx(Journal journal) {
+            
+            return journal.newTx(IsolationEnum.ReadCommitted);
+            
+        }
+        
+    }
+    
+    public static class TestReadOnly extends AbstractTestTxRunState {
+        
+        public TestReadOnly() {
+        }
+        
+        public TestReadOnly(String name) {
+            super(name);
+        }
+
+        public long newTx(Journal journal) {
+            
+            return journal.newTx(IsolationEnum.ReadOnly);
+            
+        }
+        
+    }
+    
+    public static class TestReadWrite extends AbstractTestTxRunState {
+        
+        public TestReadWrite() {
+        }
+        
+        public TestReadWrite(String name) {
+            super(name);
+        }
+
+        public long newTx(Journal journal) {
+            
+            return journal.newTx(IsolationEnum.ReadWrite);
+            
+        }
+        
+    }
+    
     /*
      * Transaction run state tests.
      */
-
+    
     /**
      * Simple test of the transaction run state machine.
      */
@@ -90,13 +155,13 @@ public class TestTxRunState extends ProxyTestCase {
         
         Journal journal = new Journal(getProperties());
 
-        long ts0 = 0;
+        assertTrue(journal.activeTx.isEmpty());
+        assertTrue(journal.preparedTx.isEmpty());
 
-        assertFalse(journal.activeTx.containsKey(ts0));
-        assertFalse(journal.preparedTx.containsKey(ts0));
-
-        ITx tx0 = new Tx(journal, ts0, false);
+        final long ts0 = newTx(journal);
+        final ITx tx0 = journal.getTx(ts0);
         assertEquals(ts0, tx0.getStartTimestamp());
+        assertTrue(tx0 == journal.getTx(ts0));
 
         assertTrue(tx0.isActive());
         assertFalse(tx0.isPrepared());
@@ -107,7 +172,14 @@ public class TestTxRunState extends ProxyTestCase {
         assertTrue(journal.activeTx.containsKey(ts0));
         assertFalse(journal.preparedTx.containsKey(ts0));
 
-        tx0.abort();
+        journal.abort(ts0);
+        
+        /*
+         * note: when the abort is asynchronous, i.e., for a read-write
+         * transaction, this causes the test to wait until the abort task has
+         * been executed.
+         */ 
+        journal.commitService.shutdown();
 
         assertFalse(tx0.isActive());
         assertFalse(tx0.isPrepared());
@@ -129,13 +201,13 @@ public class TestTxRunState extends ProxyTestCase {
         
             Journal journal = new Journal(getProperties());
 
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+            assertTrue(journal.activeTx.isEmpty());
+            assertTrue(journal.preparedTx.isEmpty());
 
-            ITx tx0 = new Tx(journal,ts0, false);
-            assertEquals(ts0,tx0.getStartTimestamp());
+            final long ts0 = newTx(journal);
+            final ITx tx0 = journal.getTx(ts0);
+            assertEquals(ts0, tx0.getStartTimestamp());
+            assertTrue(tx0 == journal.getTx(ts0));
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -146,7 +218,8 @@ public class TestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            tx0.prepare();
+            final long commitTime = (tx0.isReadOnly()?0L:journal.nextTimestamp());
+            tx0.prepare(commitTime);
 
             assertFalse( tx0.isActive() );
             assertTrue( tx0.isPrepared() );
@@ -179,13 +252,13 @@ public class TestTxRunState extends ProxyTestCase {
         
             Journal journal = new Journal(getProperties());
 
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+            assertTrue(journal.activeTx.isEmpty());
+            assertTrue(journal.preparedTx.isEmpty());
 
-            ITx tx0 = new Tx(journal,ts0, false);
-            assertEquals(ts0,tx0.getStartTimestamp());
+            final long ts0 = newTx(journal);
+            final ITx tx0 = journal.getTx(ts0);
+            assertEquals(ts0, tx0.getStartTimestamp());
+            assertTrue(tx0 == journal.getTx(ts0));
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -196,7 +269,10 @@ public class TestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            tx0.prepare();
+            final long commitTime = (tx0.isReadOnly() ? 0L : journal
+                .nextTimestamp());
+            
+            tx0.prepare(commitTime);
 
             assertFalse( tx0.isActive() );
             assertTrue( tx0.isPrepared() );
@@ -207,7 +283,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertFalse(journal.activeTx.containsKey(ts0));
             assertTrue(journal.preparedTx.containsKey(ts0));
 
-            tx0.commit();
+            assertEquals(commitTime,tx0.commit());
 
             assertFalse( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -232,13 +308,13 @@ public class TestTxRunState extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
-        long ts0 = 0;
+        assertTrue(journal.activeTx.isEmpty());
+        assertTrue(journal.preparedTx.isEmpty());
 
-        assertFalse(journal.activeTx.containsKey(ts0));
-        assertFalse(journal.preparedTx.containsKey(ts0));
-
-        ITx tx0 = new Tx(journal, ts0, false);
+        final long ts0 = newTx(journal);
+        final ITx tx0 = journal.getTx(ts0);
         assertEquals(ts0, tx0.getStartTimestamp());
+        assertTrue(tx0 == journal.getTx(ts0));
 
         assertTrue(tx0.isActive());
         assertFalse(tx0.isPrepared());
@@ -289,13 +365,13 @@ public class TestTxRunState extends ProxyTestCase {
         
             Journal journal = new Journal(getProperties());
 
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+            assertTrue(journal.activeTx.isEmpty());
+            assertTrue(journal.preparedTx.isEmpty());
 
-            ITx tx0 = new Tx(journal,ts0,false);
-            assertEquals(ts0,tx0.getStartTimestamp());
+            final long ts0 = newTx(journal);
+            final ITx tx0 = journal.getTx(ts0);
+            assertEquals(ts0, tx0.getStartTimestamp());
+            assertTrue(tx0 == journal.getTx(ts0));
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -306,7 +382,9 @@ public class TestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            tx0.prepare();
+            final long commitTime = (tx0.isReadOnly() ? 0L : journal
+                .nextTimestamp());
+            tx0.prepare(commitTime);
 
             assertFalse( tx0.isActive() );
             assertTrue( tx0.isPrepared() );
@@ -318,7 +396,7 @@ public class TestTxRunState extends ProxyTestCase {
             assertTrue(journal.preparedTx.containsKey(ts0));
 
             try {
-                tx0.prepare();
+                tx0.prepare(commitTime);
                 fail("Expecting: "+IllegalStateException.class);
             }
             catch( IllegalStateException ex ) {
@@ -347,13 +425,13 @@ public class TestTxRunState extends ProxyTestCase {
         
             Journal journal = new Journal(getProperties());
 
-            long ts0 = 0;
-            
-            assertFalse(journal.activeTx.containsKey(ts0));
-            assertFalse(journal.preparedTx.containsKey(ts0));
+            assertTrue(journal.activeTx.isEmpty());
+            assertTrue(journal.preparedTx.isEmpty());
 
-            ITx tx0 = new Tx(journal,ts0,false);
-            assertEquals(ts0,tx0.getStartTimestamp());
+            final long ts0 = newTx(journal);
+            final ITx tx0 = journal.getTx(ts0);
+            assertEquals(ts0, tx0.getStartTimestamp());
+            assertTrue(tx0 == journal.getTx(ts0));
             
             assertTrue( tx0.isActive() );
             assertFalse( tx0.isPrepared() );
@@ -390,6 +468,8 @@ public class TestTxRunState extends ProxyTestCase {
      * after a PREPARE.
      * 
      * @throws IOException
+     * 
+     * @todo also test after an abort.
      */
     public void test_runStateMachine_prepared_correctRejection()
             throws IOException {
@@ -406,7 +486,7 @@ public class TestTxRunState extends ProxyTestCase {
             
         }
 
-        final long tx0 = journal.newTx();
+        final long tx0 = newTx(journal);
 
         ITx tmp = journal.getTx(tx0);
 

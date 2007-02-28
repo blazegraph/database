@@ -106,10 +106,18 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * FIXME Priority items are:
  * <ol>
- * <li> Transaction isolation.</li>
+ * <li> Transaction isolation (correctness tests, isolatedbtree tests, fused
+ * view tests).</li>
  * <li> Concurrent load for RDFS w/o rollback.</li>
+ * <li> Group commit for higher transaction throughput.<br>
+ * Note: TPS is basically constant for a given combination of the buffer mode
+ * and whether or not commits are forced to disk. This means that the #of
+ * clients is not a strong influence on performance. The big wins are Transient
+ * and Force := No since neither conditions synchs to disk. This suggests that
+ * the big win for TPS throughput is going to be group commit. </li>
  * <li> Scale out database (automatic re-partitioning of indices and processing
  * of deletion markers).</li>
+ * <li> AIO for the Direct and Disk modes.</li>
  * <li> Distributed database protocols.</li>
  * <li> Segment server (mixture of journal server and read-optimized database
  * server).</li>
@@ -122,10 +130,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * key indices, and secondary indexes.</li>
  * <li> Architecture using queues from GOM to journal/database segment server
  * supporting both embedded and remote scenarios.</li>
- * <li>Expand on latency and decision criteria for notifying clients when pages
- * or objects of interest have been modified by another transaction that has
- * committed (or in the case of distributed workers on a single transaction, its
- * peers).</li>
  * </ol>
  * 
  * @todo There is a dependency in a distributed database architecture on
@@ -936,7 +940,7 @@ public class Journal implements IJournal {
      */
     public long commit() {
 
-        return commit(null);
+        return commitNow(nextTimestamp());
 
     }
 
@@ -952,12 +956,9 @@ public class Journal implements IJournal {
      * @return The timestamp assigned to the commit record -or- 0L if there were
      *         no data to commit.
      */
-    protected long commit(Tx tx) {
+    protected long commitNow(long commitTime) {
 
         assertOpen();
-
-        final long commitTimestamp = (tx == null ? timestampFactory
-                .nextTimestamp() : tx.getCommitTimestamp());
 
         /*
          * First, run each of the committers accumulating the updated root
@@ -993,7 +994,7 @@ public class Journal implements IJournal {
 
         final long newCommitCounter = old.getCommitCounter() + 1;
 
-        final ICommitRecord commitRecord = new CommitRecord(commitTimestamp,
+        final ICommitRecord commitRecord = new CommitRecord(commitTime,
                 newCommitCounter, rootAddrs);
 
         final long commitRecordAddr = write(ByteBuffer
@@ -1046,31 +1047,17 @@ public class Journal implements IJournal {
              * Note: These are commit time timestamps.
              */
 
-            long firstTxId = old.getFirstTxCommitTime();
+            final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
+                    : old.getFirstCommitTime());
 
-            long lastTxId = old.getLastTxCommitTime();
+            final long lastCommitTime = commitTime;
 
-            if (tx != null && !tx.isReadOnly()) {
-
-                if (firstTxId == 0L) {
-
-                    assert lastTxId == 0L;
-
-                    firstTxId = lastTxId = tx.getCommitTimestamp();
-
-                } else {
-
-                    lastTxId = tx.getCommitTimestamp();
-
-                }
-
-            }
 
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getSegmentId(), _bufferStrategy
-                            .getNextOffset(), firstTxId, lastTxId,
-                    commitTimestamp, newCommitCounter,
+                            .getNextOffset(), firstCommitTime, lastCommitTime,
+                    commitTime, newCommitCounter,
                     commitRecordAddr, commitRecordIndexAddr);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
@@ -1096,7 +1083,7 @@ public class Journal implements IJournal {
 
         }
 
-        return commitTimestamp;
+        return commitTime;
 
     }
 
@@ -1363,7 +1350,6 @@ public class Journal implements IJournal {
                 .getRootAddr(ROOT_NAME2ADDR))).get(name);
 
     }
-    
 
     /*
      * ITransactionManager and friends.
@@ -1393,45 +1379,61 @@ public class Journal implements IJournal {
 
     /**
      * A hash map containing all transactions that have prepared but not yet
-     * either committed or aborted. A transaction will be in this map only while
-     * it is actively committing, so this is always a "map" of one and could be
-     * replaced by a scalar reference.
+     * either committed or aborted.
+     * 
+     * @todo A transaction will be in this map only while it is actively
+     *       committing, so this is always a "map" of one and could be replaced
+     *       by a scalar reference (except that we may allow concurrent prepare
+     *       and commit of read-only transactions).
      */
     final Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
 
     /**
      * A thread that imposes serializability on transactions. A writable
      * transaction that attempts to {@link #commit()} is added as a
-     * {@link CommitTask} and queued for execution by this thread. When its turn
+     * {@link TxCommitTask} and queued for execution by this thread. When its turn
      * comes, it will validate its write set and commit iff validation succeeds.
      */
     final ExecutorService commitService = Executors
             .newSingleThreadExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
     
+    public long nextTimestamp() {
+        
+        return timestampFactory.nextTimestamp();
+        
+    }
+
     public long newTx() {
 
-        return newTx(false);
+        return newTx(IsolationEnum.ReadWrite);
 
     }
 
-    public long newTx(boolean readOnly) {
+    public long newTx(IsolationEnum level) {
 
-//        System.err.println("#active=" + activeTx.size() + ", #committed="
-//                + _rootBlock.getCommitCounter());
-        
         final long startTime = nextTimestamp();
+
+        switch (level) {
+
+        case ReadCommitted:
+            new ReadCommittedTx(this, startTime);
+            break;
         
-        new Tx(this, startTime, readOnly);
+        case ReadOnly:
+            new Tx(this, startTime, true);
+            break;
         
+        case ReadWrite:
+            new Tx(this, startTime, false);
+            break;
+
+        default:
+            throw new AssertionError("Unknown isolation level: " + level);
+        }
+
         return startTime;
-
-    }
-
-    public long newReadCommittedTx() {
-
-        throw new UnsupportedOperationException();
-
+        
     }
 
     public void abort(long ts) {
@@ -1441,10 +1443,17 @@ public class Journal implements IJournal {
         if (tx == null)
             throw new IllegalArgumentException("No such tx: " + ts);
         
-        if(tx.isReadOnly()) return;
+        if(tx.isReadOnly()) {
+         
+            // abort is synchronous.
+            tx.abort();
+            
+        } else {
 
-        // queue the abort request.
-        commitService.submit(new AbortTask(tx));
+            // queue the abort request.
+            commitService.submit(new TxAbortTask(tx));
+            
+        }
         
     }
 
@@ -1481,7 +1490,8 @@ public class Journal implements IJournal {
 
         if(tx.isReadOnly()) {
         
-            tx.prepare();
+            // read-only transactions do not get a commit time.
+            tx.prepare(0L);
 
             return tx.commit();
             
@@ -1489,7 +1499,7 @@ public class Journal implements IJournal {
         
         try {
 
-            long commitTime = commitService.submit(new CommitTask(tx)).get();
+            long commitTime = commitService.submit(new TxCommitTask(tx)).get();
             
             if(DEBUG) {
                 
@@ -1524,15 +1534,21 @@ public class Journal implements IJournal {
     /**
      * Task validates and commits a transaction when it is run by the
      * {@link Journal#commitService}.
+     * <p>
+     * Note: The commit protocol does not permit unisolated writes on the
+     * journal once a transaction begins to prepare until the transaction has
+     * either committed or aborted (if such writes were allowed then we would
+     * have to re-validate any prepared transactions in order to enforce
+     * serializability).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class CommitTask implements Callable<Long> {
+    private static class TxCommitTask implements Callable<Long> {
         
         private final ITx tx;
         
-        public CommitTask(ITx tx) {
+        public TxCommitTask(ITx tx) {
             
             assert tx != null;
             
@@ -1542,7 +1558,15 @@ public class Journal implements IJournal {
 
         public Long call() throws Exception {
             
-            tx.prepare();
+            /*
+             * The commit time is assigned when we prepare the transaction.
+             * 
+             * @todo resolve this against a service in a manner that will
+             * support a distributed database commit protocol.
+             */
+            final long commitTime = ((Tx)tx).journal.nextTimestamp();
+            
+            tx.prepare(commitTime);
             
             return tx.commit();
             
@@ -1561,11 +1585,11 @@ public class Journal implements IJournal {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class AbortTask implements Callable<Long> {
+    private static class TxAbortTask implements Callable<Long> {
         
         private final ITx tx;
         
-        public AbortTask(ITx tx) {
+        public TxAbortTask(ITx tx) {
             
             assert tx != null;
             
@@ -1687,12 +1711,6 @@ public class Journal implements IJournal {
 
         return tx;
 
-    }
-
-    public long nextTimestamp() {
-        
-        return timestampFactory.nextTimestamp();
-        
     }
 
     public IIndex getIndex(String name, long ts) {

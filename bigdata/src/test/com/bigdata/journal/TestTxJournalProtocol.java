@@ -48,14 +48,17 @@ Modifications:
 package com.bigdata.journal;
 
 import java.io.IOException;
-import java.util.Properties;
 
 /**
  * Test suite for the integration of the {@link Journal} and the {@link ITx}
  * implementations.
  * 
  * @todo the tests in this suite are stale and need to be reviewed, possibly
- *       revised or replaced, and certainly extended.
+ *       revised or replaced, and certainly extended. The main issue is that
+ *       they do not test the basic contract for the journal, transactions, and
+ *       the transaction manager service but instead test some particulars of
+ *       the implementation that might not even be the right way to manage that
+ *       contract.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -77,12 +80,14 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
-        Tx tx0 = new Tx(journal, 0, false);
+        final long startTime = journal.nextTimestamp();
+
+        Tx tx0 = new Tx(journal, startTime, false);
 
         try {
 
             // Try to create another transaction with the same identifier.
-            new Tx(journal, 0, false);
+            new Tx(journal, startTime, false);
 
             fail("Expecting: " + IllegalStateException.class);
 
@@ -118,14 +123,16 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
-        ITx tx0 = new Tx(journal, 0, false);
+        final long startTime = journal.nextTimestamp();
 
-        tx0.prepare();
+        ITx tx0 = new Tx(journal, startTime, false);
+        
+        tx0.prepare(journal.nextTimestamp());
 
         try {
 
-            // Try to create another transaction with the same identifier.
-            new Tx(journal, 0, false);
+            // Try to create another transaction with the same start time.
+            new Tx(journal, startTime, false);
 
             fail("Expecting: " + IllegalStateException.class);
 

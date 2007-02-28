@@ -42,52 +42,74 @@ Modifications:
 
 */
 /*
- * Created on Feb 17, 2007
+ * Created on Feb 27, 2006
  */
-
 package com.bigdata.journal;
 
 /**
- * An instance of this class is thrown when a transaction
- * {@link ITx#prepare(long)}s if there is a write-write conflict that can not
- * be resolved.
+ * Isolation levels for a transaction.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ValidationError extends RuntimeException {
+public enum IsolationEnum {
 
     /**
+     * A read-only transaction that will read any data successfully
+     * committed on the database (the view provided by the transaction does
+     * not remain valid as of the transaction start time but evolves as
+     * concurrent transactions commit) (level 0).
+     */
+    ReadCommitted(0),
+
+    /**
+     * A fully isolated read-only transaction (level 1).
+     */
+    ReadOnly(1),
+
+    /**
+     * A fully isolated read-write transaction (level 2).
+     */
+    ReadWrite(2);
+
+    private final int level;
+
+    private IsolationEnum(int level) {
+
+        this.level = level;
+        
+    }
+
+    /**
+     * The integer code for the isolation level.
+     */
+    public int getLevel() {
+        
+        return level;
+        
+    }
+    
+    /**
+     * Convert an integer isolation level into an {@link IsolationEnum}.
      * 
+     * @param level
+     *            The isolation level.
+     *            
+     * @return The corresponding enum value.
      */
-    private static final long serialVersionUID = 7606167478216451303L;
+    public IsolationEnum get(int level) {
 
-    /**
-     * 
-     */
-    public ValidationError() {
+        switch (level) {
+        case 0:
+            return ReadCommitted;
+        case 1:
+            return ReadOnly;
+        case 2:
+            return ReadWrite;
+        default:
+            throw new IllegalArgumentException("level=" + level);
+        }
+
     }
-
-    /**
-     * @param message
-     */
-    public ValidationError(String message) {
-        super(message);
-    }
-
-    /**
-     * @param cause
-     */
-    public ValidationError(Throwable cause) {
-        super(cause);
-    }
-
-    /**
-     * @param message
-     * @param cause
-     */
-    public ValidationError(String message, Throwable cause) {
-        super(message, cause);
-    }
-
+    
 }
