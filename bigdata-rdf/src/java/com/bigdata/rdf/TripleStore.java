@@ -68,7 +68,10 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.Errors;
+import com.bigdata.objndx.IBatchOp;
 import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
@@ -575,10 +578,16 @@ public class TripleStore extends /*Partitioned*/Journal {
 //        long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
         long insertTime = 0; // time to insert terms into the forward and reverse index.
+        
+        final long elapsed_SPO;
+        final long elapsed_POS;
+        final long elapsed_OSP;
 
         System.err.print("Writing " + numStmts + " statements...");
 
         { // SPO
+
+            final long beginIndex = System.currentTimeMillis();
             
             IIndex ndx_spo = getSPOIndex();
 
@@ -609,10 +618,14 @@ public class TripleStore extends /*Partitioned*/Journal {
 
             }
 
+            elapsed_SPO = System.currentTimeMillis() - beginIndex;
+            
         }
 
         { // POS
 
+            final long beginIndex = System.currentTimeMillis();
+            
             IIndex ndx_pos = getPOSIndex();
 
             { // sort
@@ -642,9 +655,13 @@ public class TripleStore extends /*Partitioned*/Journal {
                 
             }
 
+            elapsed_POS = System.currentTimeMillis() - beginIndex;
+
         }
 
         { // OSP
+
+            final long beginIndex = System.currentTimeMillis();
             
             IIndex ndx_osp = getOSPIndex();
 
@@ -675,12 +692,15 @@ public class TripleStore extends /*Partitioned*/Journal {
 
             }
 
+            elapsed_OSP = System.currentTimeMillis() - beginIndex;
+
         }
 
         long elapsed = System.currentTimeMillis() - begin;
 
         System.err.println("in " + elapsed + "ms; sort=" + sortTime
-                + "ms, keyGen+insert=" + insertTime + "ms");
+                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
+                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
         
     }
 
@@ -905,7 +925,7 @@ public class TripleStore extends /*Partitioned*/Journal {
                 + "ms, sort=" + sortTime + "ms, insert=" + insertTime + "ms");
         
     }
-    
+
     /**
      * Add a term into the term:id index and the id:term index, returning the
      * assigned term identifier (non-batch API).

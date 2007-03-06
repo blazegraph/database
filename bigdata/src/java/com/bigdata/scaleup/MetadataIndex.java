@@ -61,6 +61,8 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo mutation operations need to be synchronized.
+ * 
  * @todo define a UUID so that is at least possible to rename a partitioned
  *       index? the uuid would be store in the metadata record for the metadata
  *       index and in each index segment generated for that metadata index. we

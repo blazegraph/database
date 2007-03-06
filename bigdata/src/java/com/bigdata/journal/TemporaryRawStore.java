@@ -194,6 +194,12 @@ public class TemporaryRawStore implements IRawStore {
         
     }
 
+    public long size() {
+        
+        return buf.size();
+        
+    }
+    
     public boolean isOpen() {
         
         return open;

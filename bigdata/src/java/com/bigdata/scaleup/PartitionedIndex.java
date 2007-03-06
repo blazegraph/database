@@ -67,6 +67,8 @@ import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentFileStore;
+import com.bigdata.scaleup.PartitionedJournal.IViewMetadata;
+import com.bigdata.scaleup.PartitionedJournal.JournalMetadata;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key
@@ -245,6 +247,51 @@ public class PartitionedIndex implements IIndex, ICommitter {
         
         return view;
         
+    }
+
+    /**
+     * Return the resources required to provide a coherent view of the partition
+     * in which the key is found.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return The resources required to read on the partition containing that
+     *         key. The resources are arranged in reverse timestamp order
+     *         (increasing age).
+     * 
+     * @todo reconcile with {@link #getView(byte[])}?
+     */
+    protected IViewMetadata[] getResources(byte[] key) {
+
+        JournalMetadata journalResource = new JournalMetadata((Journal) btree
+                .getStore(), IndexSegmentLifeCycleEnum.LIVE);
+
+        PartitionMetadata pmd = mdi.find(key);
+
+        final int liveCount = pmd.getLiveCount();
+
+        IViewMetadata[] resources = new IViewMetadata[liveCount + 1];
+
+        int n = 0;
+
+        resources[n++] = journalResource;
+
+        for (int i = 0; i < resources.length; i++) {
+
+            SegmentMetadata seg = pmd.segs[i];
+
+            if (seg.state != IndexSegmentLifeCycleEnum.LIVE)
+                continue;
+
+            resources[n++] = seg;
+
+        }
+
+        assert n == resources.length;
+        
+        return resources;
+
     }
     
     public String getName() {

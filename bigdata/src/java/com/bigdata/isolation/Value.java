@@ -55,7 +55,7 @@ import org.CognitiveWeb.extser.ShortPacker;
 import com.bigdata.objndx.IValueSerializer;
 
 /**
- * A non-persistence capable implementation of {@link IObjectIndexEntry}.
+ * A persistence capable implementation of {@link IValue}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

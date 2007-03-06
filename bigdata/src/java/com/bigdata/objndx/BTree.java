@@ -410,8 +410,15 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
                 PackedAddressSerializer.INSTANCE, valueSer,
                 NodeFactory.INSTANCE, //
                 recordCompressor, //
-                // FIXME only use checksum for stores that are not fully buffered.
-                true || !store.isFullyBuffered()/* useChecksum */
+                /*
+                 * Note: there is less need to use checksum for stores that are
+                 * not fully buffered since the data are always read from memory
+                 * which we presume is already parity checked. While a checksum
+                 * on a fully buffered store could detect an overwrite, the
+                 * journal architecture makes that extremely unlikely and one
+                 * has never been observed.
+                 */
+                !store.isFullyBuffered()/* useChecksum */
                 );
 
         /*

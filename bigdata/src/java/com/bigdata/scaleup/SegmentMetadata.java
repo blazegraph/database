@@ -43,7 +43,10 @@
  */
 package com.bigdata.scaleup;
 
+import java.io.File;
+
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.scaleup.PartitionedJournal.IViewMetadata;
 
 /**
  * Metadata for a single {@link IndexSegment}.
@@ -51,7 +54,7 @@ import com.bigdata.objndx.IndexSegment;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SegmentMetadata {
+public class SegmentMetadata implements IViewMetadata {
 
     /**
      * The name of the file containing the {@link IndexSegment}.
@@ -89,6 +92,18 @@ public class SegmentMetadata {
         
         return false;
         
+    }
+
+    public File getFile() {
+        return new File(filename);
+    }
+
+    public long size() {
+        return nbytes;
+    }
+
+    public IndexSegmentLifeCycleEnum status() {
+        return state;
     }
     
 }

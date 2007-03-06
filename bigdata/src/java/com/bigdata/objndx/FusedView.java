@@ -62,7 +62,7 @@ import java.util.NoSuchElementException;
  * @todo support N sources for a {@link FusedView} by chaining together multiple
  *       {@link FusedView} instances if not in a more efficient manner.
  */
-public class FusedView implements IIndex {
+public class FusedView implements IIndex, IFusedView {
 
     /**
      * Holds the various btrees that are the sources for the view.

@@ -103,6 +103,12 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         this.bufferMode = bufferMode;
         
     }
+    
+    public final long size() {
+        
+        return (long)nextOffset;
+        
+    }
 
     /**
      * Invoked if the store would overflow on {@link #write(ByteBuffer)}. The

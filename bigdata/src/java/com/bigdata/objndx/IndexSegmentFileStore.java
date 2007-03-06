@@ -170,6 +170,12 @@ public class IndexSegmentFileStore implements IRawStore {
         throw new UnsupportedOperationException();
         
     }
+    
+    public long size() {
+        
+        return metadata.length;
+        
+    }
 
     /**
      * Read from the index segment. If the request is in the node region and

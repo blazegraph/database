@@ -42,38 +42,19 @@ Modifications:
 
 */
 /*
- * Created on Feb 12, 2007
+ * Created on Mar 6, 2007
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
-import com.bigdata.scaleup.PartitionedJournal.IViewMetadata;
+package com.bigdata.objndx;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * A marker interface indicating fused view providing read-only operations on
+ * multiple B+-Trees mapping variable length unsigned byte[] keys to arbitrary
+ * values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
-
-    /**
-     * @param src1
-     * @param src2
-     */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
-    }
-
-    /**
-     * @param srcs
-     */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
-    }
+public interface IFusedView {
 
 }

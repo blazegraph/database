@@ -328,5 +328,19 @@ public class SimpleFileRawStore implements IRawStore {
         }
                 
     }
+
+    public long size() {
+        
+        try {
+        
+            return raf.length();
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
     
 }

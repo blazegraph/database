@@ -1106,6 +1106,12 @@ public class Journal implements IJournal {
 
     }
 
+    public long size() {
+        
+        return _bufferStrategy.size();
+        
+    }
+    
     public long write(ByteBuffer data) {
 
         assertOpen();

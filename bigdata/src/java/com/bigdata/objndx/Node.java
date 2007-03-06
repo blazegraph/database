@@ -1894,6 +1894,15 @@ public class Node extends AbstractNode implements INodeData {
          * called - for things to be coherent you would have to discover the
          * index of the children before modifying their keys.
          * 
+         * @todo 85% of the use of this method is updateEntryCount(). Since that
+         * method is only called on update, we would do well to buffer hard
+         * references during descent and test the buffer in this method before
+         * performing a full search. Since concurrent writers are not allowed,
+         * we only need a single buffer whose height is the height of the tree.
+         * This should prove especially beneficial for larger branching factors.
+         * For smaller branching factors the cost might be so small as to be
+         * ignorable.
+         * 
          * @see Leaf#merge(Leaf sibling,boolean isRightSibling)
          */
 

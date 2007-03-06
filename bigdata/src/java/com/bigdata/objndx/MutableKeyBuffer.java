@@ -1,9 +1,9 @@
 package com.bigdata.objndx;
 
-
 /**
  * A mutable implementation of {@link IKeyBuffer}.
  * 
+ * @todo 27% of the search cost is dealing with the prefix.
  * @todo track prefix length for mutable keys (update when first/last key are
  *       updated).  at present the node/leaf logic directly manipulates the
  *       keys. that will have to be changed to track the prefix length.

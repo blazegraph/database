@@ -53,11 +53,15 @@ import java.io.IOException;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 
 /**
- * Test suite for compacting merge of index segments (really, of two B+-Trees).
+ * Test suite for compacting merge of B+-Trees.
  * 
  * @todo write tests where the keys do not overlap (done).
  * 
  * @todo write tests where the keys overlap but there are no conflicts.
+ * 
+ * @todo write tests: merging a tree with itself, merging trees w/o deletion
+ *       markers, merging trees w/ deletion markers, merging trees w/ age-based
+ *       version expiration, merging trees with count-based version expiration.
  * 
  * @todo write tests where there are keys that conflict. conflicts need to be
  *       resolved according to some policy, and there are a variety of policies
@@ -100,6 +104,19 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
     }
 
     /**
+     * Return the temporary directory.
+     */
+    static synchronized protected File getTempDir() {
+        
+        File tmpDir = new File(System.getProperty("java.io.tmpdir"));
+
+        assertTrue(!tmpDir.exists() || tmpDir.mkdirs());
+
+        return tmpDir;
+        
+    }
+    
+    /**
      * Test builds two btrees, populates them with disjoint key ranges (1-10
      * and 11-20), and then merges their entries.
      * 
@@ -123,32 +140,11 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 
         }
         
-        File outFile = new File( getName()+".merge");
-        
-        if(outFile.exists() && ! outFile.delete() ) {
-            
-            throw new AssertionError("Could not delete test file: "
-                    + outFile.getAbsoluteFile());
-            
-        }
-        
         // branching factor used by leaves emitted by the merge process.
         final int m = 3;
         
-        IndexSegmentMerger merger = new IndexSegmentMerger(outFile, m, btree1,
-                btree2);
+        IndexSegmentMerger merger = new IndexSegmentMerger(m, btree1, btree2);
 
-        /*
-         * FIXME nothing is really defined until this operation so maybe it
-         * makes sense to have the "merger" be an iterator backed by a file
-         * whose contents are eagerly generated when the source btrees are large (>
-         * X MB) and buffered in a simple in-memory leaf data structure when
-         * they are small. The only real reason to go to an external file to
-         * buffer the contents is that we may have to merge index segments that
-         * are larger than we would like. Actually, another reason is that we
-         * could produce multiple merged file segments if there was a need to
-         * split the index during the merge operation.
-         */
         MergedLeafIterator itr = merger.merge();
         
         assertEquals("nentries",20,merger.nentries);
@@ -179,16 +175,12 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 
         assertEquals(20,entryIndex);
         
-        // close the iterator and delete the backing file (if any).
-        itr.close();
-
-        // @todo consider adding a rewind() method to the iterator.
-        
         /*
-         * @todo build an index segment from the merged entries and validate its
-         * contents.
+         * Verify that the tmpStore was closed. The backing file (if any) is
+         * deleted when the tmpStore is closed.
          */
-        
+        assertFalse(itr.tmpStore.isOpen());
+
     }
 
     /**
@@ -223,20 +215,10 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
         assertEquals("btree1.nentries", 10, btree1.getEntryCount());
         assertEquals("btree2.nentries", 10, btree2.getEntryCount());
         
-        File outFile = new File( getName()+".merge");
-        
-        if(outFile.exists() && ! outFile.delete() ) {
-            
-            throw new AssertionError("Could not delete test file: "
-                    + outFile.getAbsoluteFile());
-            
-        }
-        
         // branching factor used by leaves emitted by the merge process.
         final int m = 3;
         
-        IndexSegmentMerger merger = new IndexSegmentMerger(outFile, m, btree1,
-                btree2);
+        IndexSegmentMerger merger = new IndexSegmentMerger(m, btree1, btree2);
 
         MergedLeafIterator itr = merger.merge();
         
@@ -268,15 +250,11 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 
         assertEquals(20,entryIndex);
         
-        // close the iterator and delete the backing file (if any).
-        itr.close();
-
-        // @todo consider adding a rewind() method to the iterator.
-        
         /*
-         * @todo build an index segment from the merged entries and validate its
-         * contents.
+         * Verify that the tmpStore was closed. The backing file (if any) is
+         * deleted when the tmpStore is closed.
          */
+        assertFalse(itr.tmpStore.isOpen());
         
     }
     

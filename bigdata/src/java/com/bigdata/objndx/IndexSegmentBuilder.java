@@ -92,9 +92,9 @@ import com.bigdata.rawstore.IRawStore;
  * Note: In order for the nodes to be written in a contiguous block we either
  * have to buffer them in memory or have to write them onto a temporary file and
  * then copy them into place after the last leaf has been processed. The code
- * currently uses a temporary file for this purpose. This space demand was not
- * present in West's algorithm because it did not attempt to place the leaves
- * contiguously onto the store.
+ * abstracts this decision using a {@link TemporaryRawStore} for this purpose.
+ * This space demand was not present in West's algorithm because it did not
+ * attempt to place the leaves contiguously onto the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -109,7 +109,7 @@ import com.bigdata.rawstore.IRawStore;
  *      less efficient on first glance.
  * 
  * FIXME use the shortest separator key.
- *
+ * 
  * @see IndexSegment
  * @see IndexSegmentFile
  * @see IndexSegmentMerger
@@ -285,6 +285,11 @@ public class IndexSegmentBuilder {
      * onto the output file and synch and close that output file.
      */
     final long elapsed_write;
+    
+    /**
+     * The data throughput rate in megabytes per second.
+     */
+    final float mbPerSec;
     
     /**
      * <p>
@@ -713,6 +718,10 @@ public class IndexSegmentBuilder {
             
             elapsed = System.currentTimeMillis() - begin;
 
+            // data rate in MB/sec.
+            mbPerSec = (elapsed == 0 ? 0 : md.length / Bytes.megabyte32
+                    / (elapsed / 1000f));
+            
             NumberFormat cf = NumberFormat.getNumberInstance();
             
             cf.setGroupingUsed(true);
@@ -725,16 +734,19 @@ public class IndexSegmentBuilder {
 
             System.err.println("index segment build: total=" + elapsed
                     + "ms := setup(" + elapsed_setup + "ms) + build("
-                    + elapsed_build + "ms) +  write(" + elapsed_write
-                    + "ms); " + cf.format(plan.nentries) + " entries, "
+                    + elapsed_build + "ms) +  write(" + elapsed_write + "ms); "
+                    + cf.format(plan.nentries) + " entries, "
                     + fpf.format(((double) md.length / Bytes.megabyte32))
-                    + "MB");
+                    + "MB" + ", rate=" + fpf.format(mbPerSec) + "MB/sec");
 
             log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build
                     + "ms) +  write(" + elapsed_write + "ms); nentries="
                     + plan.nentries + ", branchingFactor=" + m + ", nnodes="
-                    + nnodesWritten + ", nleaves=" + nleavesWritten);
+                    + nnodesWritten + ", nleaves=" + nleavesWritten+
+                    fpf.format(((double) md.length / Bytes.megabyte32))
+                    + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
+
 
         } catch (Throwable ex) {
 

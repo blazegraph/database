@@ -293,4 +293,10 @@ public class SimpleMemoryRawStore implements IRawStore {
         
     }
     
+    public long size() {
+        
+        return nextOffset;
+        
+    }
+    
 }

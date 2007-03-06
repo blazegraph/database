@@ -190,7 +190,7 @@ public class NodeSerializer {
      * The total initial buffer capacity is this value times the
      * {@link #branchingFactor}.
      */
-    public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 * 1;
+    public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 / 4;
     
     /**
      * The {@link Adler32} checksum. This is an int32 value, even through the

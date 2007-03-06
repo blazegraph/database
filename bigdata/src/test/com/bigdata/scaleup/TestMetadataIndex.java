@@ -122,7 +122,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         super(name);
         
     }
-
+    
     /**
      * Test the ability to create and update the metadata for a partition.
      */
@@ -591,19 +591,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * another index segment
          */
 
-        File outFile02_tmp = new File(getName() + "-part0.02.tmp");
-
-        outFile02_tmp.deleteOnExit();
-
         File outFile02 = new File(getName() + "-part0.02.seg");
 
         outFile02.deleteOnExit();
 
-        assertTrue(!outFile02_tmp.exists() || outFile02_tmp.delete());
         assertTrue(!outFile02.exists() || outFile02.delete());
 
-        MergedLeafIterator mergeItr = new IndexSegmentMerger(outFile02_tmp,
-                100, btree, seg01).merge();
+        MergedLeafIterator mergeItr = new IndexSegmentMerger(100, btree, seg01)
+                .merge();
         
         new IndexSegmentBuilder(outFile02, null, mergeItr.nentries,
                 new MergedEntryIterator(mergeItr), 100, btree
@@ -854,13 +849,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 // The #of entries that we expected in the segment after the merge.
                 final int expectedEntryCount = groundTruth.getEntryCount();
-                
-                // tmp file for the merge process.
-                File outFile02_tmp = new File(getName() + "-part0."+trial+".tmp");
-
-                outFile02_tmp.deleteOnExit();
-
-                assertTrue(!outFile02_tmp.exists() || outFile02_tmp.delete());
 
                 // output file for the merged segment.
                 File outFile02 = new File(getName() + "-part0."+trial+".seg");
@@ -869,9 +857,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 assertTrue(!outFile02.exists() || outFile02.delete());
 
-                // merge the data from the btree on the journal and the index segment.
-                MergedLeafIterator mergeItr = new IndexSegmentMerger(
-                        outFile02_tmp, mseg2, testData, seg).merge();
+                // merge the data from the btree on the journal and the index
+                // segment.
+                MergedLeafIterator mergeItr = new IndexSegmentMerger(mseg2,
+                        testData, seg).merge();
 
                 // verify #of entries that are passed on by the merge.
                 assertEquals("entryCount",expectedEntryCount,mergeItr.nentries);

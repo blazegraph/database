@@ -119,8 +119,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         
         TestRioIntegration test = new TestRioIntegration("TestInsertRateStore");
         test.setUp();
-//        test.doTest( new PresortRioLoader(test.store), args );
-        test.doTest( new BulkRioLoader(test.store), args );
+        test.doTest( new PresortRioLoader(test.store), args );
+//        test.doTest( new BulkRioLoader(test.store), args );
         test.tearDown();
             
     }
@@ -279,6 +279,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     protected String[] testData = new String[] {
             "data/nciOncology.owl" // nterms := 289844
 //            "data/wordnet_nouns-20010201.rdf"
+//            "data/taxonomy.rdf"
             };
     
     protected void assertDataLoaded() {

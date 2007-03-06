@@ -47,42 +47,35 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Vector;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.objndx.IndexSegmentBuilder.NOPNodeFactory;
 import com.bigdata.objndx.IndexSegmentBuilder.SimpleLeafData;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Class supporting a compacting merge of two btrees into a series of ordered
- * leaves on a temporary file in support of a compacting merge of mutable
- * {@link BTree}s and/or immutable {@link IndexSegment}s.
+ * leaves written on a {@link TemporaryRawStore} in support of a compacting
+ * merge of mutable {@link BTree}s and/or immutable {@link IndexSegment}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo write tests: merging a tree with itself, merging trees w/o deletion
- *       markers, merging trees w/ deletion markers, merging trees w/ age-based
- *       version expiration, merging trees with count-based version expiration.
- * 
- * @todo Support delete during merge to support transactions (a TimestampValue
- *       having a greater timestamp and a null value is interpreted as a delete
- *       marker).
+ * @todo Support merge rule that knows how to process timestamped entries and
+ *       deletion markers and that removes deletion markers iff a full
+ *       compacting merge is requested.
  * 
  * @todo Support deletion based on history policy (requires timestamps in the
  *       keys and explicit awareness of column store nature).
@@ -91,14 +84,12 @@ import cutthecrap.utils.striterators.Striterator;
  *       whether it should be maintained on the {@link IndexSegmentMetadata} as
  *       well.
  * 
- * FIXME rewrite to use {@link IRawStore} objects as buffers ala the
- * {@link IndexSegmentBuilder} and see if we are better off using memory or disk
- * to buffer the merge.
- * 
  * @see {@link FusedView}, which provides a dynamic view of two or more btrees.
  *      However, this class is more efficient when we are going to do a bulk
  *      merge operation since it performs the merge and computes the #of output
  *      entries in one pass.
+ * 
+ * @todo parameterize recordCompressor.
  */
 public class IndexSegmentMerger {
 
@@ -121,6 +112,11 @@ public class IndexSegmentMerger {
             .toInt();
 
     /**
+     * @todo parameterize useChecksum.
+     */
+    final boolean useChecksum = false;
+    
+    /**
      * Compacting merge of two btrees, writing the results onto a file. The file
      * data format is simply a sequence of leaves using the specified branching
      * factor. Leaves are filled from entries in an entry scan of the source
@@ -128,26 +124,16 @@ public class IndexSegmentMerger {
      * that it may be deficient and in that there is no node structure over the
      * leaves.
      * 
-     * @param raf
-     *            The file on which the results are written as a series of
-     *            leaves. Typically this file will be created in a temporary
-     *            directory and the file will be removed when the results of the
-     *            compacting merge are no longer required.
      * @param m
-     *            The branching factor used by the leaves written on that file.
+     *            The branching factor used by the leaves written on the
+     *            temporary store.
      * @param in1
      *            A btree.
      * @param in2
      *            Another btree.
-     * 
-     * @todo exclusive lock on the output file.
      */
-    public IndexSegmentMerger(File outFile, int m, AbstractBTree in1,
-            AbstractBTree in2) throws IOException {
+    public IndexSegmentMerger(int m, AbstractBTree in1, AbstractBTree in2) throws IOException {
         
-        if (outFile == null)
-            throw new IllegalArgumentException();
-
         if (m < AbstractBTree.MIN_BRANCHING_FACTOR)
             throw new IllegalArgumentException();
         
@@ -157,40 +143,24 @@ public class IndexSegmentMerger {
         if( in2 == null )
             throw new IllegalArgumentException();
         
-        // @todo verify that we are compacting trees for the same index
-        
-        this.outFile = outFile;
-        
-        if( outFile.exists() && outFile.length() > 0) {
-            
-            throw new IOException("output file exists: "
-                    + outFile.getAbsoluteFile());
-            
-        }
-        
-        // this is a temporary file so make sure that it will disappear.
-        outFile.deleteOnExit();
-
-        out = new RandomAccessFile(outFile,"rw");
+        tmpStore = new TemporaryRawStore();
         
         // reads leaves from the 1st btree.
-        itr1 = in1.leafIterator();
+//        itr1 = in1.leafIterator();
+        itr1 = new SourceLeafIterator(in1);
         
         // reads leaves from the 2nd btree.
-        itr2 = in2.leafIterator();
+//        itr2 = in2.leafIterator();
+        itr2 = new SourceLeafIterator(in2);
 
         // output leaf - reused for each leaf written.
         leaf = new SimpleLeafData(0, m);
         leaf.reset(m);
         
-        // @todo should we always use checksums for the temporary file?
-        final boolean useChecksum = true;
-        
-        // Used to serialize the stack and leaves for the output tree.
-        int initialBufferCapacity = 0; // will be estimated.
+        // Used to serialize the leaves.
         nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
                 m,
-                initialBufferCapacity,
+                0 /*initialBufferCapacity will be estimated*/,
                 new IndexSegment.CustomAddressSerializer(),
                 in1.nodeSer.keySerializer,
                 in1.nodeSer.valueSerializer,
@@ -200,29 +170,105 @@ public class IndexSegmentMerger {
 
     }
 
-    final File outFile;
+    /**
+     * FIXME Support n-way merge.
+     * 
+     * @param m
+     *            The output branching factor.
+     * @param srcs
+     *            The source indices in reverse timestamp order (by increasing
+     *            age).
+     *            
+     * @throws IOException
+     */
+    public IndexSegmentMerger(int m, AbstractBTree[] srcs) throws IOException {
+    
+        throw new UnsupportedOperationException();
+    
+    }
+
+    /**
+     * Used to buffer the output of the merge process.
+     */
+    final TemporaryRawStore tmpStore;
     
     /**
-     * Used to write the merged output file.
+     * The address at which each leaf in written in the {@link #tmpStore}. The
+     * entries in this list are ordered. The first entry is the first leaf
+     * written, the second entry is the second leaf written, etc.
      */
-    final RandomAccessFile out;
+    final Vector<Long> addrs = new Vector<Long>();
     
     final NodeSerializer nodeSer;
-    
-    final Iterator itr1; // reads leaves from the 1st btree.
-    Leaf leaf1 = null; // current leaf in 1st btree.
-    int index1 = 0; // current entry index in current leaf of 1st btree.
-    boolean exhausted1 = false; // true iff the 1st iterator is exhausted.
 
-    final Iterator itr2; // reads leaves from the 2nd btree.
-    Leaf leaf2 = null; // current leaf in 2nd btree.
-    int index2 = 0; // current entry index in current leaf of 2nd btree.
-    boolean exhausted2 = false; // true iff the 2nd iterator is exhausted.
+    final SourceLeafIterator itr1;
+    final SourceLeafIterator itr2;
+    
+//    final Iterator itr1; // reads leaves from the 1st btree.
+//    Leaf leaf1 = null; // current leaf in 1st btree.
+//    int index1 = 0; // current entry index in current leaf of 1st btree.
+//    boolean exhausted1 = false; // true iff the 1st iterator is exhausted.
+//
+//    final Iterator itr2; // reads leaves from the 2nd btree.
+//    Leaf leaf2 = null; // current leaf in 2nd btree.
+//    int index2 = 0; // current entry index in current leaf of 2nd btree.
+//    boolean exhausted2 = false; // true iff the 2nd iterator is exhausted.
 
     /**
-     * the output leaf. we reuse this for each leaf that we write. when the
-     * leaf is full we write it onto the file and then reset it so that it
-     * is ready to accept more keys.
+     * @todo this will need to be modified to use a key range so that we can
+     *       evict an index partition worth of data at a time from a btree on
+     *       the journal. Once we do that, is there any point to operating at
+     *       the leaf iterator level vs just using an {@link EntryIterator}?
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class SourceLeafIterator {
+
+        final Iterator itr; // reads leaves from the source btree.
+        Leaf leaf = null; // current leaf in source btree.
+        int index = 0; // current entry index in current leaf of source btree.
+        boolean exhausted = false; // true iff the source btree is exhausted.
+
+        public SourceLeafIterator(AbstractBTree src) {
+            
+            itr = src.leafIterator();
+            
+        }
+
+        public Leaf next() {
+            
+            return (Leaf)itr.next();
+            
+        }
+        
+        /**
+         * If the current leaf is not fully consumed then return immediately.
+         * Otherwise read the next leaf from the source btree into {@link #leaf}.
+         * If there are no more leaves available then {@link #exhausted} is set
+         * to false. {@link #index} is reset to zero(0) in either case.
+         * 
+         * @return true unless this source btree is exhausted.
+         */
+        protected boolean nextLeaf() {
+            if (index < leaf.nkeys)
+                return !exhausted;
+            index = 0;
+            if (itr.hasNext()) {
+                leaf = (Leaf) itr.next();
+            } else {
+                leaf = null;
+                exhausted = true;
+            }
+            return !exhausted;
+        }
+
+    }
+    
+    /**
+     * The output leaf. We reuse this for each leaf that we write. When the
+     * output leaf is full we write it onto the {@link #tmpStore} and then reset
+     * it so that it is ready to accept more keys.
      */
     final SimpleLeafData leaf;
     
@@ -305,31 +351,31 @@ public class IndexSegmentMerger {
          * exhausted, apply the merge rule to the current entry for each tree.
          */
         
-        leaf1 = (Leaf)itr1.next();
+        itr1.leaf = itr1.next();
         
-        leaf2 = (Leaf)itr2.next();
+        itr2.leaf = itr2.next();
         
-        while( !exhausted1 && ! exhausted2 ) {
+        while( !itr1.exhausted && ! itr2.exhausted ) {
             
             applyMergeRule();
             
         }
         
         // copy anything remaining in the 1st btree.
-        while(!exhausted1) {
+        while(!itr1.exhausted) {
 
-            outputKey(leaf1,index1++);
+            outputKey(itr1.leaf,itr1.index++);
             
-            nextLeaf1();
+            itr1.nextLeaf();
             
         }
 
         // copy anything remaining in the 2nd btree.
-        while(!exhausted2) {
+        while(!itr2.exhausted) {
 
-            outputKey(leaf2,index2++);
+            outputKey(itr2.leaf,itr2.index++);
             
-            nextLeaf2();
+            itr2.nextLeaf();
             
         }
 
@@ -342,29 +388,33 @@ public class IndexSegmentMerger {
             
         }
 
-//        // synch to disk (not necessary since file is not reused).
-//        out.getChannel().force(false);
+        /*
+         * reporting.
+         */
+        {
 
-        final long elapsed = System.currentTimeMillis()-begin;
+            final long elapsed = System.currentTimeMillis() - begin;
 
-        final long length = out.length();
-        
-        NumberFormat cf = NumberFormat.getNumberInstance();
-        
-        cf.setGroupingUsed(true);
-        
-        NumberFormat fpf = NumberFormat.getNumberInstance();
-        
-        fpf.setGroupingUsed(false);
-        
-        fpf.setMaximumFractionDigits(2);
+            final long length = tmpStore.size();
 
-        System.err.println("merge: " + elapsed + "ms, " + cf.format(nentries)
-                + " entries, "
-                + fpf.format(((double) length / Bytes.megabyte32)) + "MB");
+            NumberFormat cf = NumberFormat.getNumberInstance();
 
-        return new MergedLeafIterator(outFile, out, leaf.m, nentries, nleaves,
-                maxLeafBytes, nodeSer);
+            cf.setGroupingUsed(true);
+
+            NumberFormat fpf = NumberFormat.getNumberInstance();
+
+            fpf.setGroupingUsed(false);
+
+            fpf.setMaximumFractionDigits(2);
+
+            System.err.println("merge: " + elapsed + "ms, "
+                    + cf.format(nentries) + " entries, "
+                    + fpf.format(((double) length / Bytes.megabyte32)) + "MB");
+            
+        }
+
+        return new MergedLeafIterator(tmpStore, addrs, leaf.m, nentries,
+                nleaves, maxLeafBytes, nodeSer);
         
     }
 
@@ -388,7 +438,7 @@ public class IndexSegmentMerger {
      */
     protected void applyMergeRule() throws IOException {
         
-        assert !exhausted1 && !exhausted2;
+        assert !itr1.exhausted && !itr2.exhausted;
 
         /*
          * @todo this does unnecessary allocation if the IKeyBuffers are
@@ -396,9 +446,9 @@ public class IndexSegmentMerger {
          * is) then we should write a special purpose comparator that can
          * do less allocation and less search for this case.
          */ 
-        byte[] key1 = leaf1.keys.getKey(index1);
+        byte[] key1 = itr1.leaf.keys.getKey(itr1.index);
         
-        byte[] key2 = leaf2.keys.getKey(index2);
+        byte[] key2 = itr2.leaf.keys.getKey(itr2.index);
         
         int ret = BytesUtil.compareBytes(key1,key2);
         
@@ -408,70 +458,70 @@ public class IndexSegmentMerger {
              * prefer source one in case of a tie.
              */
             
-            outputKey(leaf1,index1++);
+            outputKey(itr1.leaf,itr1.index++);
             
-            index2++;
+            itr2.index++;
             
-            nextLeaf1();
-            nextLeaf2();
+            itr1.nextLeaf();
+            itr2.nextLeaf();
 
         } else if(ret<0) {
 
-            outputKey(leaf1,index1++);
+            outputKey(itr1.leaf,itr1.index++);
             
-            nextLeaf1();
+            itr1.nextLeaf();
             
         } else {
 
-            outputKey(leaf2,index2++);
+            outputKey(itr2.leaf,itr2.index++);
             
-            nextLeaf2();
+            itr2.nextLeaf();
             
         }
         
     }
     
-    /**
-     * If the current leaf is not fully consumed then return immediately.
-     * Otherwise read the next leaf from the 1nd source btree into
-     * {@link #leaf1}. If there are no more leaves available then
-     * {@link #exhausted1} is set to false. {@link #index1} is reset to zero(0)
-     * in either case.
-     * 
-     * @return true unless this source btree is exhausted.
-     */
-    protected boolean nextLeaf1() {
-        if(index1<leaf1.nkeys) return !exhausted1;
-        index1 = 0;
-        if (itr1.hasNext()) {
-            leaf1 = (Leaf) itr1.next();
-        } else {
-            leaf1 = null;
-            exhausted1 = true;
-        }
-        return !exhausted1;
-    }
-
-    /**
-     * If the current leaf is not fully consumed then return immediately.
-     * Otherwise read the next leaf from the 2nd source btree into
-     * {@link #leaf2}. If there are no more leaves available then
-     * {@link #exhausted2} is set to false. {@link #index2} is reset to zero(0)
-     * in either case.
-     * 
-     * @return true unless this source btree is exhausted.
-     */
-    protected boolean nextLeaf2() {
-        if(index2<leaf2.nkeys) return !exhausted2;
-        index2 = 0;
-        if (itr2.hasNext()) {
-            leaf2 = (Leaf) itr2.next();
-        } else {
-            leaf2 = null;
-            exhausted2 = true;
-        }
-        return !exhausted2;
-    }
+//    /**
+//     * If the current leaf is not fully consumed then return immediately.
+//     * Otherwise read the next leaf from the 1nd source btree into
+//     * {@link #leaf1}. If there are no more leaves available then
+//     * {@link #exhausted1} is set to false. {@link #index1} is reset to zero(0)
+//     * in either case.
+//     * 
+//     * @return true unless this source btree is exhausted.
+//     */
+//    protected boolean nextLeaf1() {
+//        if(index1<leaf1.nkeys) return !exhausted1;
+//        index1 = 0;
+//        if (itr1.hasNext()) {
+//            leaf1 = (Leaf) itr1.next();
+//        } else {
+//            leaf1 = null;
+//            exhausted1 = true;
+//        }
+//        return !exhausted1;
+//    }
+//
+//    /**
+//     * If the current leaf is not fully consumed then return immediately.
+//     * Otherwise read the next leaf from the 2nd source btree into
+//     * {@link #leaf2}. If there are no more leaves available then
+//     * {@link #exhausted2} is set to false. {@link #index2} is reset to zero(0)
+//     * in either case.
+//     * 
+//     * @return true unless this source btree is exhausted.
+//     */
+//    protected boolean nextLeaf2() {
+//        if(index2<leaf2.nkeys) return !exhausted2;
+//        index2 = 0;
+//        if (itr2.hasNext()) {
+//            leaf2 = (Leaf) itr2.next();
+//        } else {
+//            leaf2 = null;
+//            exhausted2 = true;
+//        }
+//        return !exhausted2;
+//    }
 
     /**
      * Output the current key from the specified source leaf onto the output
@@ -488,7 +538,7 @@ public class IndexSegmentMerger {
     protected void outputKey(ILeafData src,int srcpos) throws IOException {
 
         if(DEBUG) log.debug("#leavesWritten=" + nleaves + ", src="
-                + (src == leaf1 ? "leaf1" : "leaf2") + ", srcpos=" + srcpos);
+                + (src == itr1.leaf ? "leaf1" : "leaf2") + ", srcpos=" + srcpos);
         
         MutableKeyBuffer keys = (MutableKeyBuffer) leaf.keys;
         
@@ -529,34 +579,15 @@ public class IndexSegmentMerger {
         
         ByteBuffer buf = nodeSer.putNodeOrLeaf( leaf );
 
-        FileChannel outChannel = out.getChannel();
-        
-        // position on the channel before the write.
-        final long offset = outChannel.position();
-        
-        if(offset>Integer.MAX_VALUE) {
-            
-            throw new IOException("Index segment exceeds int32 bytes.");
-            
-        }
+        // write the record
         
         final int nbytes = buf.limit();
         
-        /*
-         * write header containing the #of bytes in the record.
-         * 
-         * @todo it is unelegant to have to read in this this 4 byte header for
-         * each leaf. perhaps it would have better performance to write a header
-         * block at the end of the merge file that indexed into the leaves?
-         */
-        out.writeInt(nbytes);
+        final long addr = tmpStore.write(buf);
+
+        addrs.add(addr);
         
-        // write the compressed record on the channel.
-        final int nbytes2 = outChannel.write(buf);
-        
-        assert nbytes2 == buf.limit();
-        
-        System.err.print("."); // wrote a leaf.
+        System.err.print(">"); // wrote a leaf.
 
         nleaves++;
         
@@ -576,8 +607,8 @@ public class IndexSegmentMerger {
      */
     public static class MergedLeafIterator implements Iterator<ILeafData> {
 
-        public final File file;
-        protected final RandomAccessFile raf;
+        public final TemporaryRawStore tmpStore;
+        public final Vector<Long> addrs;
         public final int m;
         public final int nentries;
         public final int nleaves;
@@ -585,16 +616,6 @@ public class IndexSegmentMerger {
         protected final NodeSerializer nodeSer;
         
         private int leafIndex = 0;
-
-        /**
-         * Offset of the last leaf read from the file.
-         */
-        private int offset;
-        
-        /**
-         * Used to read leaves from the file.
-         */
-        private final ByteBuffer buf;
         
         /**
          * Used to note when the iterator is exhausted and delete the temporary
@@ -603,20 +624,22 @@ public class IndexSegmentMerger {
         private boolean exhausted;
         
         /**
-         * @param file 
-         * @param raf
+         * @param tmpStore
+         * @param addrs
+         *            An ordered list of the addresses at which the leaves may
+         *            be found in <i>tmpStore</i>.
          * @param m
          * @param nentries
          * @param nleaves
          * @param maxLeafBytes
          * @param nodeSer
          */
-        public MergedLeafIterator(File file, RandomAccessFile raf, int m,
-                int nentries, int nleaves, int maxLeafBytes,
-                NodeSerializer nodeSer) throws IOException {
+        public MergedLeafIterator(TemporaryRawStore tmpStore,
+                Vector<Long> addrs, int m, int nentries, int nleaves,
+                int maxLeafBytes, NodeSerializer nodeSer) throws IOException {
             
-            this.file = file;
-            this.raf = raf;
+            this.tmpStore = tmpStore;
+            this.addrs = addrs;
             this.m = m;
             this.nentries = nentries;
             this.nleaves = nleaves;
@@ -625,56 +648,27 @@ public class IndexSegmentMerger {
                     maxLeafBytes, nodeSer.addrSerializer,
                     nodeSer.keySerializer, nodeSer.valueSerializer,
                     nodeSer.recordCompressor, nodeSer.useChecksum);
-
-            // note: allocates direct buffer when size is large.
-            this.buf = NodeSerializer.alloc(maxLeafBytes);
-            
-            // rewind.
-            raf.seek(0);
             
         }
        
         /**
-         * Close the channel and delete the merge file.
+         * Closes and deletes the backing store.
          * <p>
          * This is invoked automatically when the iterator is exhausted. 
          * 
          * @throws IOException
          */
         public void close() {
+
+            log.info("Closing temporary store");
             
-            if (raf.getChannel().isOpen()) {
-
-                try {
-                    
-                    System.err.println("Closing MergedLeafIterator: file="+file);
-
-                    raf.close();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                if (file.exists() && !file.delete()) {
-
-                    log.warn("Could not delete file: " + file.getAbsoluteFile());
-
-                }
-                
-            }
+            tmpStore.close();
 
         }
 
         /**
-         * Test whether more leaves are available.
-         * <p>
-         * Automatically closes out the backing buffer when all leaves have been
-         * processed.
-         * 
-         * FIXME I am not seeing an automatic close of this iterator when
-         * invoked by {@link MergedEntryIterator}.
+         * Test whether more leaves are available. Automatically closes out the
+         * backing buffer when all leaves have been processed.
          */
         public boolean hasNext() {
         
@@ -694,51 +688,26 @@ public class IndexSegmentMerger {
 
         public ILeafData next() {
 
-            if(!hasNext()) throw new NoSuchElementException();
-            
-            try {
+            if (!hasNext())
+                throw new NoSuchElementException();
 
-                // #of bytes in the next leaf.
-                int nbytes = raf.readInt();
+            // the address of the next leaf.
+            final long addr = addrs.get(leafIndex);
 
-                offset += Bytes.SIZEOF_INT;
-                
-                if (DEBUG)
-                    log.debug("will read " + nbytes + " bytes at offset="
-                            + offset);
+            /*
+             * Note: this is using a nodeSer whose node factory does not require
+             * a non-null btree reference.
+             */
 
-                buf.limit(nbytes);
-                buf.position(0);
+            ByteBuffer buf = tmpStore.read(addr);
 
-                int nread = raf.getChannel().read(buf);
+            ILeafData leaf = nodeSer.getLeaf(null/* btree */, addr, buf);
 
-                assert nread == nbytes;
+            leafIndex++;
 
-                offset += nread;
+            System.err.print("<"); // read a leaf.
 
-                long addr = Addr.toLong(nbytes, offset);
-
-                /*
-                 * Note: this is using a nodeSer whose node factory does not
-                 * require a non-null btree reference.
-                 */ 
-                
-                // @todo cleanup buffer logic here and elsewhere.
-                buf.position(0);
-                
-                ILeafData leaf = nodeSer.getLeaf(null/*btree*/, addr, buf);
-
-                leafIndex++;
-                
-                return leaf;
-
-            }
-
-            catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
+            return leaf;
 
         }
 

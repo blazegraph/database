@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -384,7 +383,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         
         properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 
@@ -393,6 +392,14 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         properties.setProperty(Options.SEGMENT, "0");
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+        
+        properties.setProperty(TestOptions.TIMEOUT,"10");
+
+        properties.setProperty(TestOptions.NCLIENTS,"100");
+
+        properties.setProperty(TestOptions.KEYLEN,"4");
+
+        properties.setProperty(TestOptions.NOPS,"4");
         
         new StressTestConcurrent().doComparisonTest(properties);
 

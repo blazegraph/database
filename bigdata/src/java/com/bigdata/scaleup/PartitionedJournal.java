@@ -52,7 +52,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.Executors;
 
+import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.isolation.Value;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
@@ -61,12 +66,16 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IIndex;
+import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.IndexSegmentMerger;
+import com.bigdata.objndx.IndexSegmentMetadata;
+import com.bigdata.objndx.RecordCompressor;
 import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
@@ -619,12 +628,6 @@ public class PartitionedJournal implements IJournal {
      */
     public void overflow() {
                
-        synchronousOverflow();
-        
-    }
-
-    protected void synchronousOverflow() {
-        
         /* 
          * Create the new buffer.
          */
@@ -647,6 +650,88 @@ public class PartitionedJournal implements IJournal {
 
         // The slave that overflowed.
         final SlaveJournal oldJournal = slave;
+        
+        synchronousOverflow(oldJournal, newJournal);
+        
+        /*
+         * replace the old buffer with the new buffer and delete the old buffer.
+         * 
+         * @todo consider scheduling the old buffer for deletion instead so that
+         * we have some time to verify that the new index segments are good
+         * before deleting the buffered writes.  We are already doing this with
+         * the old segments.
+         */
+        
+        // atomic commit makes these changes restart safe
+        newJournal.commit();
+
+        // Change to the new journal.
+        slave = newJournal;
+
+        // immediate shutdown of the old journal.
+        oldJournal.closeAndDelete();
+        
+//        // delete the old backing file (if any).
+//        oldJournal.getBufferStrategy().deleteFile();
+        
+    }
+
+    /**
+     * Does not queue indices for eviction, forcing the old journal to remain
+     * active. The old journal is re-opened using {@link BufferMode#Disk} in
+     * order to reduce the amount of RAM required to buffer the data. This
+     * option is conceptually the simplest. It has the advantage of never
+     * discarding historical commit states, and the corresponding disadvantage
+     * of never throwing away old data that is no longer reachable from the
+     * current committed state. Old journals can be distributed, just like index
+     * segments, but they are not optimized for read performance and they
+     * multiplex together multiple indices using smaller branching factors.
+     */
+    protected void noSegmentsOverflow() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * Creates an asynchronous task that will evict data onto index segments.
+     * For each named index for which the journal has absorbed writes, the task
+     * is responsible for identifying the index partitions that were written on
+     * and queuing up (in the index key order) tasks to build/merge the data on
+     * the journal for each partition onto a new index segment.
+     * <p>
+     * While these tasks can be run in parallel either for the same index or for
+     * different indices, parallism could impose a significant resource burden
+     * and a single worker thread is probably sufficient to keep pace with
+     * writes absorbed on the new journal.
+     * <p>
+     * The schedule of tasks to be executed needs to be restart safe so that all
+     * tasks will run eventually. This is most easily accomplished by
+     * representing the schedule on a btree that is migrated from
+     * {@link SlaveJournal} to {@link SlaveJournal} on {@link #overflow()}.
+     * Writes on that btree MUST be synchronized since concurrent worker threads
+     * could update the schedule state concurrently and an {@link #overflow()}
+     * event could be concurrent with the execution of a worker thread.
+     * 
+     * @todo consider making the touched (written on) partitions part of the
+     *       persistent state of the {@link UnisolatedBTree} so that we do not
+     *       need to explicitly search the key space of the btree and compare it
+     *       with the key space of the partitions.
+     */
+    protected void asynchronousOverflow() {
+
+        throw new UnsupportedOperationException();
+
+    }
+    
+    /**
+     * Synchronously evicts all data onto {@link IndexSegment}s.
+     * 
+     * @todo rewrite this in terms of {@link IPartitionTask}s that get executed
+     *       synchronously.
+     */
+    protected void synchronousOverflow(SlaveJournal oldJournal,
+            SlaveJournal newJournal) {
         
         /*
          * We need to consider each named btree registered on this store. We can
@@ -739,7 +824,7 @@ public class PartitionedJournal implements IJournal {
              * will need a cache on the master journal that is used to retain
              * the still valid open index segments across an overflow. This is
              * important because opening an index segment has significant
-             * latency.
+             * latency (fix this using a weak value cache for open indices).
              */
             oldIndex.closeViews();
             
@@ -755,27 +840,6 @@ public class PartitionedJournal implements IJournal {
             newJournal.getMetadataIndex(name).addAll(mdi);
             
         }
-        
-        /*
-         * replace the old buffer with the new buffer and delete the old buffer.
-         * 
-         * @todo consider scheduling the old buffer for deletion instead so that
-         * we have some time to verify that the new index segments are good
-         * before deleting the buffered writes.  We are already doing this with
-         * the old segments.
-         */
-        
-        // atomic commit makes these changes restart safe
-        newJournal.commit();
-
-        // Change to the new journal.
-        slave = newJournal;
-
-        // immediate shutdown of the old journal.
-        oldJournal.closeAndDelete();
-        
-//        // delete the old backing file (if any).
-//        oldJournal.getBufferStrategy().deleteFile();
         
     }
     
@@ -877,18 +941,13 @@ public class PartitionedJournal implements IJournal {
             // @todo assumes only one live index segment for the partition.
             final IndexSegment seg = (IndexSegment)view.srcs[1];
 
-            // tmp file for the merge process.
-            File tmpFile = File.createTempFile("merge", ".tmp", tmpDir);
-
-            tmpFile.deleteOnExit();
-
             // output file for the merged segment.
             File outFile = getSegmentFile(name, pmd.partId, segId);
 
             // merge the data from the btree on the slave and the index
             // segment.
-            MergedLeafIterator mergeItr = new IndexSegmentMerger(tmpFile,
-                    mseg2, oldIndex.btree, seg).merge();
+            MergedLeafIterator mergeItr = new IndexSegmentMerger(mseg2,
+                    oldIndex.btree, seg).merge();
 
             // build the merged index segment.
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
@@ -985,6 +1044,575 @@ public class PartitionedJournal implements IJournal {
         }
 
     }
+
+    /**
+     * Interface for metadata about a {@link Journal} or {@link IndexSegment}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo rename IResourceMetadata
+     */
+    public static interface IViewMetadata {
+       
+        /**
+         * The store file.
+         */
+        public File getFile();
+        
+        /**
+         * The #of bytes in the store file.
+         */
+        public long size();
+    
+        /**
+         * The life cycle state of that store file.
+         * 
+         * @todo rename ResourceState/state()
+         */
+        public IndexSegmentLifeCycleEnum status();
+    
+    }
+    
+    /**
+     * Metadata required to locate a {@link Journal} resource.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo make this persistence capable by modifying the value serializer to
+     * use the {@link IViewMetadata} interface.
+     */
+    public static class JournalMetadata implements IViewMetadata {
+
+        protected final String filename;
+        protected final IndexSegmentLifeCycleEnum state;
+        
+        public File getFile() {
+            return new File(filename);
+        }
+
+        /**
+         * Always returns ZERO (0L) since we can not accurately estimate the #of
+         * bytes on the journal dedicated to a given partition of a named index.
+         */
+        public long size() {
+            return 0L;
+        }
+
+        public IndexSegmentLifeCycleEnum status() {
+            return state;
+        }
+
+        public JournalMetadata(Journal journal, IndexSegmentLifeCycleEnum state) {
+            
+            if(journal.getFile()==null) {
+                
+                throw new IllegalArgumentException("Journal is not persistent.");
+                
+            }
+            
+            this.filename = journal.getFile().toString();
+
+            this.state = state;
+            
+        }
+        
+    }
+
+    /**
+     * Interface for a scheduleable task that produces one or more
+     * {@link IndexSegment}s, updates the {@link MetadataIndex} to reflect the
+     * existence of the new {@link IndexSegment}s and notifies existing views
+     * with a depedency on the source(s) that they must switch over to the new
+     * {@link IndexSegment}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IPartitionTask extends
+            java.util.concurrent.Callable<Object> {
+        
+        /**
+         * Run the task.
+         * 
+         * @return No return semantics are defined.
+         * 
+         * @throws Exception
+         *             The exception thrown by the task.
+         */
+        public Object call() throws Exception;
+
+    }
+
+    /**
+     * Abstract base class for tasks that build {@link IndexSegment}(s).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo write test suite for executing partition task schedules.
+     * 
+     * @todo add a
+     *       {@link Executors#newSingleThreadExecutor(java.util.concurrent.ThreadFactory)}
+     *       that will be used to run these tasks and modify the shutdown logic
+     *       for the master to also shutdown that thread.
+     * 
+     * @todo add result to persistent schedule outcome so that this is restart
+     *       safe.
+     * 
+     * @todo once the {@link IndexSegment} is ready the metadata index needs to
+     *       be updated to reflect that the indexsegment is live and the views
+     *       that rely on the partition on the old journal need to be
+     *       invalidated so new views utilize the new indexsegment rather than
+     *       the data on the old journal.
+     * 
+     * @todo the old journal is not available for release until all partitions
+     *       for all indices have been evicted. we need to track that in a
+     *       restart safe manner.
+     * 
+     * @todo parameterize useChecksum, recordCompressor.
+     * 
+     * @todo assiging sequential segment identifiers may impose an unnecessary
+     *       message overhead since we can just use the temporary file mechanism
+     *       and the inspect the {@link IndexSegmentMetadata} to learn more
+     *       about a given store file.
+     * 
+     * @todo try performance with and without checksums and with and without
+     *       record compression.
+     */
+    abstract public static class AbstractPartitionTask implements
+            IPartitionTask {
+
+        protected final PartitionedJournal master;
+        /**
+         * Branching factor used for generated {@link IndexSegment}(s). 
+         */
+        protected final int branchingFactor;
+        protected final double errorRate;
+        protected final String name;
+        protected final int partId;
+        protected final byte[] fromKey;
+        protected final byte[] toKey;
+
+        /**
+         * Branching factor used for temporary file(s).
+         */
+        protected final int tmpFileBranchingFactor = Bytes.kilobyte32*4;
+
+        /**
+         * When true, pre-record checksum are generated for the output
+         * {@link IndexSegment}.
+         */
+        protected final boolean useChecksum = false;
+        
+        /**
+         * When non-null, a {@link RecordCompressor} will be applied to the
+         * output {@link IndexSegment}.
+         */
+        protected final RecordCompressor recordCompressor = null;
+        
+        /**
+         * The serializer used by all {@link IIsolatableIndex}s.
+         */
+        static protected final IValueSerializer valSer = Value.Serializer.INSTANCE;
+        
+        /**
+         * 
+         * @param master
+         *            The master.
+         * @param name
+         *            The index name.
+         * @param branchingFactor
+         *            The branching factor to be used on the new
+         *            {@link IndexSegment}(s).
+         * @param errorRate
+         *            The error rate for the bloom filter for the new
+         *            {@link IndexSegment}(s) -or- zero(0d) if no bloom filter
+         *            is desired.
+         * @param partId
+         *            The unique partition identifier for the partition.
+         * @param fromKey
+         *            The first key that would be accepted into that partition
+         *            (aka the separator key for that partition).<br>
+         *            Note: Failure to use the actual separatorKeys for the
+         *            partition will result in changing the separator key in a
+         *            manner that is incoherent! The change arises since the
+         *            updates are stored in the metadata index based on the
+         *            supplied <i>fromKey</i>.
+         * @param toKey
+         *            The first key that would NOT be accepted into that
+         *            partition (aka the separator key for the right sibling
+         *            partition and <code>null</code> iff there is no right
+         *            sibling).
+         * 
+         * @todo It is an error to supply a <i>fromKey</i> that is not also the
+         *       separatorKey for the partition, however the code does not
+         *       detect this error.
+         * 
+         * @todo It is possible for the partition to be redefined (joined with a
+         *       sibling or split into two partitions). In this case any already
+         *       scheduled operations MUST abort and new operations with the
+         *       correct separator keys must be scheduled.
+         */
+        public AbstractPartitionTask(PartitionedJournal master, String name,
+                int branchingFactor, double errorRate, int partId,
+                byte[] fromKey, byte[] toKey) {
+
+            this.master = master;
+            this.branchingFactor = branchingFactor;
+            this.errorRate = errorRate;
+            this.name = name;
+            this.partId = partId;
+            this.fromKey = fromKey;
+            this.toKey = toKey;
+
+        }
+
+        /**
+         * 
+         * @todo update the metadata index (synchronized) and invalidate
+         *       existing partitioned index views that depend on the source
+         *       index.
+         *       
+         * @param resources
+         */
+        protected void updatePartition(IViewMetadata[] resources) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Task builds an {@link IndexSegment} for a partition from data on a
+     * historical read-only {@link SlaveJournal}. When the {@link IndexSegment}
+     * is ready the metadata index is updated to make the segment "live" and
+     * existing views are notified that the source data on the partition must be
+     * invalidated in favor of the new {@link IndexSegment}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo this must use a merge rule that knows about deletion markers and is
+     *       only usable when the input is an {@link UnisolatedBTree}. The
+     *       output {@link IndexSegment} will contain timestamps and deletion
+     *       markers and support isolation.
+     */
+    public static class BuildTask extends AbstractPartitionTask {
+
+        private final IViewMetadata src;
+        private final int segId;
+        
+        /**
+         * 
+         * @param src
+         *            The source for the build operation. Only those entries in
+         *            the described key range will be used.
+         * @param segId
+         *            The output segment identifier.
+         */
+        public BuildTask(PartitionedJournal master, String name,
+                int branchingFactor, double errorRate, int partId,
+                byte[] fromKey, byte[] toKey, IViewMetadata src, int segId) {
+            
+            super(master,name,branchingFactor,errorRate,partId,fromKey,toKey);
+            
+            this.src = src;
+            
+            this.segId = segId;
+            
+        }
+        
+        /**
+         * Build an {@link IndexSegment} from a key range corresponding to an
+         * index partition.
+         */
+        public Object call() throws Exception {
+
+            AbstractBTree src = master.getIndex(name,this.src);
+            
+            File outFile = master.getSegmentFile(name, partId, segId);
+
+            new IndexSegmentBuilder(outFile, master.tmpDir, src.rangeCount(
+                    fromKey, toKey), src.rangeIterator(fromKey, toKey),
+                    branchingFactor, valSer, useChecksum, recordCompressor,
+                    errorRate);
+
+            IViewMetadata[] resources = new SegmentMetadata[] { new SegmentMetadata(
+                    "" + outFile, outFile.length(),
+                    IndexSegmentLifeCycleEnum.NEW) };
+
+            updatePartition(resources);
+            
+            return null;
+            
+        }
+        
+    }
+
+    /**
+     * Abstract base class for compacting merge tasks.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    abstract static class AbstractMergeTask extends AbstractPartitionTask {
+
+        protected final int segId;
+        protected final boolean fullCompactingMerge;
+
+        /**
+         * A compacting merge of two or more resources.
+         * 
+         * @param segId
+         *            The output segment identifier.
+         * 
+         * @param fullCompactingMerge
+         *            True iff this will be a full compacting merge.
+         */
+        protected AbstractMergeTask(PartitionedJournal master, String name,
+                int branchingFactor, double errorRate, int partId,
+                byte[] fromKey, byte[] toKey, int segId,
+                boolean fullCompactingMerge) {
+            
+            super(master, name, branchingFactor, errorRate, partId, fromKey,
+                    toKey);
+            
+            this.segId = segId;
+            
+            this.fullCompactingMerge = fullCompactingMerge;
+            
+        }
+        
+        /**
+         * Compacting merge of two or more resources - deletion markers are
+         * preserved iff {@link #fullCompactingMerge} is <code>false</code>.
+         * 
+         * @todo make sure that deletion markers get removed from the view as
+         *       part of the index segment merger logic (choose the most recent
+         *       write for each key, but if it is a delete then remove the entry
+         *       from the merge so that it does not appear in the temporary file
+         *       that is the input to the {@link IndexSegmentBuilder}).
+         */
+        public Object call() throws Exception {
+            
+            // tmp file for the merge process.
+            File tmpFile = File.createTempFile("merge", ".tmp", master.tmpDir);
+
+            tmpFile.deleteOnExit();
+
+            // output file for the merged segment.
+            File outFile = master.getSegmentFile(name, partId, segId);
+
+            IViewMetadata[] resources = getResources();
+            
+            AbstractBTree[] srcs = new AbstractBTree[resources.length];
+            
+            for(int i=0; i<srcs.length; i++) {
+
+                // open the index - closed by the weak value cache.
+                srcs[i] = master.getIndex(name, resources[i]);
+                
+            }
+            
+            // merge the data from the btree on the slave and the index
+            // segment.
+            MergedLeafIterator mergeItr = new IndexSegmentMerger(
+                    tmpFileBranchingFactor, srcs).merge();
+
+            // build the merged index segment.
+            new IndexSegmentBuilder(outFile, null, mergeItr.nentries,
+                    new MergedEntryIterator(mergeItr), branchingFactor, valSer,
+                    useChecksum, recordCompressor, errorRate);
+
+            // close the merged leaf iterator (and release its buffer/file).
+            // @todo this should be automatic when the iterator is exhausted but
+            // I am not seeing that.
+            mergeItr.close();
+
+            /*
+             * @todo Update the metadata index for this partition. This needs to
+             * be an atomic operation so we have to synchronize on the metadata
+             * index or simply move the operation into the MetadataIndex API and
+             * let it encapsulate the problem.
+             * 
+             * We mark the earlier index segment as "DEAD" for this partition
+             * since it has been replaced by the merged result.
+             * 
+             * Note: it is a good idea to wait until you have opened the merged
+             * index segment, and even until it has begun to serve data, before
+             * deleting the old index segment that was an input to that merge!
+             * The code currently waits until the next time a compacting merge
+             * is performed for the partition and then deletes the DEAD index
+             * segment.
+             */
+
+            final MetadataIndex mdi = master.getSlave().getMetadataIndex(name);
+            
+            final PartitionMetadata pmd = mdi.get(fromKey);
+
+            // #of live segments for this partition.
+            final int liveCount = pmd.getLiveCount();
+            
+            // @todo assuming compacting merge each time.
+            if(liveCount!=1) throw new UnsupportedOperationException();
+            
+            // new segment definitions.
+            final SegmentMetadata[] newSegs = new SegmentMetadata[2];
+
+            // assume only the last segment is live.
+            final SegmentMetadata oldSeg = pmd.segs[pmd.segs.length-1];
+            
+            newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
+                    IndexSegmentLifeCycleEnum.DEAD);
+
+            newSegs[1] = new SegmentMetadata(outFile.toString(), outFile.length(),
+                    IndexSegmentLifeCycleEnum.LIVE);
+            
+            mdi.put(fromKey, new PartitionMetadata(0, segId + 1, newSegs));
+            
+            return null;
+            
+        }
+    
+        /**
+         * The resources that comprise the view in reverse timestamp order
+         * (increasing age).
+         */
+        abstract protected IViewMetadata[] getResources();
+        
+    }
+    
+    /**
+     * Task builds an {@link IndexSegment} using a compacting merge of two
+     * resources having data for the same partition. Common use cases are a
+     * journal and an index segment or two index segments. Only the most recent
+     * writes will be retained for any given key (duplicate suppression). Since
+     * this task does NOT provide a full compacting merge (it may be applied to
+     * a subset of the resources required to materialize a view for a commit
+     * time), deletion markers MAY be present in the resulting
+     * {@link IndexSegment}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class MergeTask extends AbstractMergeTask {
+
+        private final IViewMetadata[] resources;
+
+        /**
+         * A compacting merge of two or more resources.
+         * 
+         * @param srcs
+         *            The source resources, which must be given in reverse
+         *            timestamp order (increasing age).
+         * @param segId
+         *            The output segment identifier.
+         */
+        public MergeTask(PartitionedJournal master, String name,
+                int branchingFactor, double errorRate, int partId,
+                byte[] fromKey, byte[] toKey, IViewMetadata[] resources,
+                int segId) {
+
+            super(master, name, branchingFactor, errorRate, partId, fromKey,
+                    toKey, segId, false);
+            
+            this.resources = resources;
+            
+        }
+
+        protected IViewMetadata[] getResources() {
+            
+            return resources;
+            
+        }
+        
+    }
+    
+    /**
+     * Task builds an {@link IndexSegment} using a full compacting merge of all
+     * resources having data for the same partition as of a specific commit
+     * time. Only the most recent writes will be retained for any given key
+     * (duplicate suppression). Deletion markers wil NOT be present in the
+     * resulting {@link IndexSegment}.
+     * <p>
+     * Note: A full compacting merge does not necessarily result in only a
+     * single {@link IndexSegment} for a partition since (a) it may be requested
+     * for a historical commit time; and (b) subsequent writes may have
+     * occurred, resulting in additional data on either the journal and/or new
+     * {@link IndexSegment} that do not participate in the merge.
+     * <p>
+     * Note: in order to perform a full compacting merge the task MUST read from
+     * all resources required to provide a consistent view for a partition
+     * otherwise lost deletes may result.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class FullMergeTask extends AbstractMergeTask {
+
+        private final long commitTime;
+
+        /**
+         * A full compacting merge of an index partition.
+         * 
+         * @param segId
+         *            The output segment identifier.
+         * 
+         * @param commitTime
+         *            The commit time for the view that is the input to the
+         *            merge operation.
+         */
+        public FullMergeTask(PartitionedJournal master, String name,
+                int branchingFactor, double errorRate, int partId,
+                byte[] fromKey, byte[] toKey, long commitTime, int segId) {
+
+            super(master, name, branchingFactor, errorRate, partId, fromKey,
+                    toKey, segId, true);
+
+            this.commitTime = commitTime;
+
+        }
+
+        protected IViewMetadata[] getResources() {
+            
+            final PartitionedIndex oldIndex = ((PartitionedIndex) master
+                    .getIndex(name, commitTime));
+            
+            final IViewMetadata[] resources = oldIndex.getResources(fromKey);
+            
+            return resources;
+
+        }
+        
+    }
+
+//    /**
+//     * Task builds an {@link IndexSegment} by joining an existing
+//     * {@link IndexSegment} for a partition with an existing
+//     * {@link IndexSegment} for either the left or right sibling of that
+//     * partition.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class JoinTask implements IPartitionTask {
+//        
+//    }
+//    /**
+//     * Task splits an {@link IndexSegment} into two new {@link IndexSegment}s.
+//     * This task is executed when a partition is split in order to breakdown the
+//     * {@link IndexSegment} for that partition into data for the partition and
+//     * its new left/right sibling.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class SplitTask implements IPartitionTask {
+//        
+//    }
     
 //    /**
 //     * Update the metadata index to reflect the split of one index segment
@@ -1138,6 +1766,10 @@ public class PartitionedJournal implements IJournal {
         slave.force(metadata);
     }
 
+    public long size() {
+        return slave.size();
+    }
+    
     public boolean isOpen() {
         return slave.isOpen();
     }
@@ -1234,4 +1866,19 @@ public class PartitionedJournal implements IJournal {
         return slave.nextTimestamp();
     }
 
+    /**
+     * Return an index view located either on a historical slave journal or an
+     * index segment.
+     * 
+     * @todo instances must be stored in a weak value cache so that we do not
+     *       attempt to re-open the journal (or index segment) if it is already
+     *       open and so that the journal (or index segment) may be closed out
+     *       once it is no longer required by any active view.
+     */
+    protected AbstractBTree getIndex(String name,IViewMetadata resource) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

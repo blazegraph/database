@@ -257,4 +257,10 @@ public interface IRawStore {
      */
     public void force(boolean metadata);
     
+    /**
+     * The #of application data bytes written on the store (does not count any
+     * headers or root blocks that may exist for the store).
+     */
+    public long size();
+    
 }
