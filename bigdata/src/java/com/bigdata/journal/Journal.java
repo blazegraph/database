@@ -61,6 +61,7 @@ import java.util.concurrent.Executors;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
@@ -1282,6 +1283,19 @@ public class Journal implements IJournal {
 
     }
 
+    /**
+     * Registers an {@link UnisolatedBTree} that will support transactional
+     * isolation.
+     * <p>
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
+    public IIndex registerIndex(String name) {
+        
+        return registerIndex( name, new UnisolatedBTree(this));
+        
+    }
+    
     /**
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.

@@ -202,7 +202,7 @@ public class TransactionServer {
 
             this.readCommitted = isolationLevel == IsolationEnum.ReadCommitted;
             
-//            runState = RunState.ACTIVE;
+//            runState = RunState.Active;
             
             heartbeat = System.nanoTime();
             
@@ -566,15 +566,15 @@ public class TransactionServer {
 // * <p>
 // * The criteria for deallocating historical versions is that (a) there is
 // a
-// * more recent version; and (b) there is no ACTIVE (vs PENDING or
+// * more recent version; and (b) there is no Active (vs PENDING or
 // COMPLETED)
 // * transaction which could read from that historical version. The journal
 // * does NOT locally have enough information to decide when it can swept
 // * historical versions written by a given transaction. This notice MUST
 // come
 // * from a transaction service which has global knowledge of which
-// * transactions have PREPARED or ABORTED and can generate notices when all
-// * transactions before a given timestamp have been PREPARED or ABORTED.
+// * transactions have Prepared or Aborted and can generate notices when all
+// * transactions before a given timestamp have been Prepared or Aborted.
 // For
 // * example, a long running transaction can cause notice to be delayed for
 // * many short lived transactions that have since completed. Once the long

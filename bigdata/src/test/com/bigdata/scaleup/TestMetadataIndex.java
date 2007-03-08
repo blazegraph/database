@@ -161,15 +161,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         assertEquals(part1,md.get(key0));
         
         PartitionMetadata part2 = new PartitionMetadata(partId0,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
 
         assertEquals(part1,md.put(key0, part2));
 
         assertEquals(part2,md.get(key0));
         
         PartitionMetadata part3 = new PartitionMetadata(partId0,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
-                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
+                        new SegmentMetadata("b", 20L,ResourceState.Live) });
 
         assertEquals(part2,md.put(key0, part3));
 
@@ -241,14 +241,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         final int partId1 = 1;
         PartitionMetadata part1 = new PartitionMetadata(partId1,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
         PartitionMetadata part2 = new PartitionMetadata(partId2,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
-                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
+                        new SegmentMetadata("b", 20L,ResourceState.Live) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2, md.get(key2));
 
@@ -329,14 +329,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         final int partId1 = 1;
         PartitionMetadata part1 = new PartitionMetadata(partId1,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
         PartitionMetadata part2 = new PartitionMetadata(partId2,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,IndexSegmentLifeCycleEnum.LIVE),
-                        new SegmentMetadata("b", 20L,IndexSegmentLifeCycleEnum.LIVE) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
+                        new SegmentMetadata("b", 20L,ResourceState.Live) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2,md.get(key2));
 
@@ -454,13 +454,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         md.put(new byte[] {}, new PartitionMetadata(0,1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile,
-                        outFile.length(),IndexSegmentLifeCycleEnum.LIVE) }));
+                        outFile.length(),ResourceState.Live) }));
 
         /*
          * open and verify the index segment against the btree data.
          */
-        IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                btree.getNodeSerializer().getValueSerializer());
+        IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg);
         
@@ -559,13 +559,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         md.put(new byte[] {}, new PartitionMetadata(0,2,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),IndexSegmentLifeCycleEnum.LIVE) }));
+                        outFile01.length(),ResourceState.Live) }));
 
         /*
          * open and verify the index segment against the btree data.
          */
-        IndexSegment seg01 = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                btree.getNodeSerializer().getValueSerializer());
+        IndexSegment seg01 = new IndexSegmentFileStore(outFile01).load();
+        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -608,19 +608,19 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          * 
-         * Note: We mark index segment 01 as "DEAD" for this partition since it
+         * Note: We mark index segment 01 as "Dead" for this partition since it
          * has been replaced by the merged result (index segment 02).
          */
         md.put(new byte[] {}, new PartitionMetadata(0, 3, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),IndexSegmentLifeCycleEnum.DEAD),
-                new SegmentMetadata("" + outFile02, outFile02.length(),IndexSegmentLifeCycleEnum.LIVE) }));
+                new SegmentMetadata("" + outFile01, outFile01.length(),ResourceState.Dead),
+                new SegmentMetadata("" + outFile02, outFile02.length(),ResourceState.Live) }));
 
         /*
          * open and verify the merged index segment against the total expected
          * data.
          */
-        IndexSegment seg02 = new IndexSegment(new IndexSegmentFileStore(
-                outFile02), btree.getNodeSerializer().getValueSerializer());
+        IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
+        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                 seg02.entryIterator());
@@ -828,13 +828,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                         new PartitionMetadata(0,2,
                                 new SegmentMetadata[] { new SegmentMetadata(""
                                         + outFile01, outFile01.length(),
-                                        IndexSegmentLifeCycleEnum.LIVE) }));
+                                        ResourceState.Live) }));
 
                 /*
                  * open and verify the index segment against the btree data.
                  */
-                seg = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                        testData.getNodeSerializer().getValueSerializer());
+                seg = new IndexSegmentFileStore(outFile01).load();
+//                        @todo testData.getNodeSerializer().getValueSerializer());
 
                 if(validateEachTrial) assertSameBTree(testData, seg);
 
@@ -884,24 +884,23 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 /*
                  * update the metadata index for this partition.
                  * 
-                 * @todo We could mark the earlier index segment as "DEAD" for
+                 * @todo We could mark the earlier index segment as "Dead" for
                  * this partition since it has been replaced by the merged
-                 * result.  We could then delete the files for "DEAD" index
+                 * result.  We could then delete the files for "Dead" index
                  * segments after a suitable grace period. 
                  */
                 PartitionMetadata oldpart = md.put(new byte[] {},
                         new PartitionMetadata(0, nextSegId++,
                         new SegmentMetadata[] {
                                 new SegmentMetadata("" + outFile02, outFile02
-                                        .length(), IndexSegmentLifeCycleEnum.LIVE) }));
+                                        .length(), ResourceState.Live) }));
 
                 /*
                  * open and verify the merged index segment against the total
                  * expected data.
                  */
-                IndexSegment seg02 = new IndexSegment(
-                        new IndexSegmentFileStore(outFile02),
-                        testData.getNodeSerializer().getValueSerializer());
+                IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
+//                 @todo testData.getNodeSerializer().getValueSerializer());
 
                 if(validateEachTrial) assertSameBTree(groundTruth,seg02);
                 
@@ -1028,13 +1027,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         md.put(new byte[] {}, new PartitionMetadata(0,1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),IndexSegmentLifeCycleEnum.LIVE) }));
+                        outFile01.length(),ResourceState.Live) }));
 
         /*
          * open and verify the index segment against the btree data.
          */
-        IndexSegment seg01 = new IndexSegment(new IndexSegmentFileStore(outFile01),
-                btree.getNodeSerializer().getValueSerializer());
+        IndexSegment seg01 = new IndexSegmentFileStore(outFile01).load();
+        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -1071,14 +1070,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * update the metadata index for this partition.
          */
         md.put(new byte[] {}, new PartitionMetadata(0, 1, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),IndexSegmentLifeCycleEnum.LIVE),
-                new SegmentMetadata("" + outFile02, outFile02.length(),IndexSegmentLifeCycleEnum.LIVE) }));
+                new SegmentMetadata("" + outFile01, outFile01.length(),ResourceState.Live),
+                new SegmentMetadata("" + outFile02, outFile02.length(),ResourceState.Live) }));
 
         /*
          * open and verify the index segment against the btree data.
          */
-        IndexSegment seg02 = new IndexSegment(new IndexSegmentFileStore(
-                outFile02), btree.getNodeSerializer().getValueSerializer());
+        IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
+        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree, seg02);
 

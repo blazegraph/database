@@ -46,6 +46,7 @@ package com.bigdata.scaleup;
 import java.io.File;
 import java.util.Properties;
 
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
@@ -81,6 +82,12 @@ public class SlaveJournal extends Journal {
     protected Name2MetadataAddr name2MetadataAddr;
 
     private final PartitionedJournal master;
+    
+    protected PartitionedJournal getMaster() {
+
+        return master;
+        
+    }
     
     public SlaveJournal(PartitionedJournal master,Properties properties) {
         
@@ -156,25 +163,51 @@ public class SlaveJournal extends Journal {
         setCommitter(ROOT_NAME_2_METADATA_ADDR, name2MetadataAddr);
 
     }
+
+    /**
+     * Registers and returns a {@link PartitionedIndex} under the given name and
+     * assigns an {@link UnisolatedBTree} to absorb writes for that
+     * {@link PartitionedIndex}. The resulting index will support transactional
+     * isolation.
+     * <p>
+     * A {@link MetadataIndex} is also registered under the given name and an
+     * initial partition for that index is created using the separator key
+     * <code>new byte[]{}</code>. The partition will initially consist of
+     * zero {@link IndexSegment}s.
+     * <p>
+     * Note: The returned object is invalid once the {@link PartitionedJournal}
+     * {@link PartitionedJournal#overflow()}s.
+     * <p>
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
+    public IIndex registerIndex(String name) {
+        
+        return registerIndex(name, new UnisolatedBTree(this));
+        
+    }
     
     /**
-     * Registers and returns {@link PartitionedIndex} under the given name
-     * and assigns the supplied {@link BTree} to absorb writes for that
+     * Registers and returns a {@link PartitionedIndex} under the given name and
+     * assigns the supplied {@link IIndex} to absorb writes for that
      * {@link PartitionedIndex}.
      * <p>
-     * A {@link MetadataIndex} is also registered under the given name and
-     * an initial partition for that index is created using the separator
-     * key <code>new byte[]{}</code>. The partition will initially
-     * consist of zero {@link IndexSegment}s.
+     * A {@link MetadataIndex} is also registered under the given name and an
+     * initial partition for that index is created using the separator key
+     * <code>new byte[]{}</code>. The partition will initially consist of
+     * zero {@link IndexSegment}s.
      * <p>
-     * Note: The returned object is invalid once the
-     * {@link PartitionedJournal} {@link PartitionedJournal#overflow()}s.
+     * Note: The returned object is invalid once the {@link PartitionedJournal}
+     * {@link PartitionedJournal#overflow()}s.
+     * <p>
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
      * 
      * @todo use a prototype model so that the registered btree type is
-     *       preserved? (Only the metadata extensions are preserved right
-     *       now).  One way to do this is by putting the constructor on the
-     *       metadata object.  Another is to make the btree Serializable and
-     *       then just declare everything else as transient.
+     *       preserved? (Only the metadata extensions are preserved right now).
+     *       One way to do this is by putting the constructor on the metadata
+     *       object. Another is to make the btree Serializable and then just
+     *       declare everything else as transient.
      */
     public IIndex registerIndex(String name, IIndex btree) {
 

@@ -1659,15 +1659,22 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             try {
 
-                assertEquals(expectedVal, actualVal);
+                assertSameValue(expectedVal, actualVal);
                 
             } catch (AssertionFailedError ex) {
                 /*
                  * Lazily generate message.
                  */
-                fail("Values differ: index=" + index + ", key="
-                        + BytesUtil.toString(expectedKey) + ", expected="
-                        + expectedVal + ", actual=" + actualVal, ex);
+                fail("Values differ: index="
+                        + index
+                        + ", key="
+                        + BytesUtil.toString(expectedKey)
+                        + ", expected="
+                        + (expectedVal instanceof byte[] ? BytesUtil
+                                .toString((byte[]) expectedVal) : expectedVal)
+                        + ", actual="
+                        + (actualVal instanceof byte[] ? BytesUtil
+                                .toString((byte[]) actualVal) : actualVal), ex);
                 
             }
             

@@ -41,38 +41,38 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.isolation;
+import java.io.File;
 
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.journal.Journal;
+import com.bigdata.objndx.IndexSegment;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * Interface for metadata about a {@link Journal} or {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
+public interface IResourceMetadata {
 
     /**
-     * @param src1
-     * @param src2
+     * The store file.
      */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
-    }
+    public File getFile();
+    
+    /**
+     * The #of bytes in the store file.
+     */
+    public long size();
 
     /**
-     * @param srcs
+     * The life cycle state of that store file.
      */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
-    }
+    public ResourceState state();
+
+//    public int hashCode();
+//    
+//    public boolean equals(IResourceMetadata o);
 
 }

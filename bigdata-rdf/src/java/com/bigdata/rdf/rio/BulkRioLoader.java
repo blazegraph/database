@@ -389,8 +389,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
 
             if (seg == null) {
 
-                seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.serializers.TermIdSerializer.INSTANCE);
+                seg = new IndexSegmentFileStore(file).load();
+                // com.bigdata.rdf.serializers.TermIdSerializer.INSTANCE)
             }
             
             return seg;
@@ -404,8 +404,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
 
             if (seg == null) {
 
-                seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.serializers.RdfValueSerializer.INSTANCE);
+                seg = new IndexSegmentFileStore(file).load();
+//                        com.bigdata.rdf.serializers.RdfValueSerializer.INSTANCE);
 
             }
             
@@ -419,8 +419,8 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
 
             if (seg == null) {
 
-                seg = new IndexSegment(new IndexSegmentFileStore(file),
-                        com.bigdata.rdf.serializers.StatementSerializer.INSTANCE);
+                seg = new IndexSegmentFileStore(file).load();
+//                com.bigdata.rdf.serializers.StatementSerializer.INSTANCE);
 
             }
             

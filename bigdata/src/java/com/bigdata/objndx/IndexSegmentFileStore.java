@@ -1,10 +1,16 @@
 package com.bigdata.objndx;
 
+import it.unimi.dsi.mg4j.util.BloomFilter;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -21,6 +27,12 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 public class IndexSegmentFileStore implements IRawStore {
+
+    /**
+     * Logger.
+     */
+    protected static final Logger log = Logger
+            .getLogger(IndexSegmentFileStore.class);
 
     /**
      * A buffer containing the disk image of the nodes in the index segment.
@@ -46,6 +58,11 @@ public class IndexSegmentFileStore implements IRawStore {
     protected final IndexSegmentMetadata metadata;
 
     /**
+     * A read-only view of the extension metadata record for the index segment.
+     */
+    protected final IndexSegmentExtensionMetadata extensionMetadata;
+    
+    /**
      * True iff the store is open.
      */
     private boolean open = false;
@@ -58,7 +75,9 @@ public class IndexSegmentFileStore implements IRawStore {
      * @throws IOException
      * 
      * @todo make it optional to fully buffer the index nodes?
-     * @todo make it optional to fully buffer the entire file.
+     * @todo make it optional to fully buffer the leaves as well as the nodes?
+     * 
+     * @see #load()
      */
     public IndexSegmentFileStore(File file) {
 
@@ -85,6 +104,11 @@ public class IndexSegmentFileStore implements IRawStore {
             IndexSegment.log.info(metadata.toString());
 
             /*
+             * Read in the extension metadata record.
+             */
+            this.extensionMetadata = readExtensionMetadata();
+
+            /*
              * Read the index nodes from the file into a buffer. If there are no
              * index nodes then we skip this step. Note that we always read in
              * the root, so if the index is just a root leaf then the root will
@@ -94,6 +118,10 @@ public class IndexSegmentFileStore implements IRawStore {
             this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf)
                     : null);
 
+            /*
+             * Mark as open so that we can use read(long addr) to read other
+             * data (the root node/leaf).
+             */
             this.open = true;
 
         } catch (IOException ex) {
@@ -104,6 +132,45 @@ public class IndexSegmentFileStore implements IRawStore {
 
     }
 
+    /**
+     * Load the {@link IndexSegment} or derived class from the store. The
+     * {@link IndexSegment} or derived class MUST provide a public constructor
+     * with the following signature: <code>
+     * 
+     * <i>className</i>(IndexSegmentFileStore store)
+     * 
+     * </code>
+     * 
+     * @param store
+     *            The store.
+     * 
+     * @return The {@link IndexSegment} or derived class loaded from that store.
+     * 
+     * @see IndexSegmentExtensionMetadata, which provides a metadata extension
+     *      protocol for the {@link IndexSegment}.
+     */
+    public IndexSegment load() {
+        
+        try {
+            
+            Class cl = Class.forName(extensionMetadata.className);
+            
+            Constructor ctor = cl
+                    .getConstructor(new Class[] { IndexSegmentFileStore.class });
+
+            IndexSegment seg = (IndexSegment) ctor
+                    .newInstance(new Object[] { this });
+            
+            return seg;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+    
     public boolean isOpen() {
         
         return open;
@@ -283,4 +350,137 @@ public class IndexSegmentFileStore implements IRawStore {
 
     }
 
+    /**
+     * Reads the bloom filter directly from the file.
+     * 
+     * @return The bloom filter -or- <code>null</code> if the bloom filter was
+     *         not constructed when the {@link IndexSegment} was built.
+     */
+    protected BloomFilter readBloomFilter() throws IOException {
+
+        final long addr = metadata.addrBloom;
+        
+        if(addr == 0L) {
+            
+            return null;
+            
+        }
+        
+        log.info("reading bloom filter: "+Addr.toString(addr));
+        
+        final int off = Addr.getOffset(addr);
+        
+        final int len = Addr.getByteCount(addr);
+        
+        ByteBuffer buf = ByteBuffer.allocate(len);
+
+        buf.limit(len);
+
+        buf.position(0);
+
+        try {
+
+            // read into [dst] - does not modify the channel's position().
+            final int nread = raf.getChannel().read(buf, off);
+            
+            assert nread == len;
+            
+            buf.flip(); // Flip buffer for reading.
+            
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        assert buf.position() == 0;
+        assert buf.limit() == len;
+
+//        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
+//        
+////        ByteArrayInputStream bais = new ByteArrayInputStream(buf.array());
+//        
+//        ObjectInputStream ois = new ObjectInputStream(bais);
+//        
+//        try {
+//
+//            BloomFilter bloomFilter = (BloomFilter) ois.readObject();
+//            
+//            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
+//                    + ", entryCount=" + metadata.nentries + ", bytesOnDisk="
+//                    + len + ", errorRate=" + metadata.errorRate);
+//            
+//            return bloomFilter;
+//            
+//        }
+//        
+//        catch(Exception ex) {
+//            
+//            IOException ex2 = new IOException("Could not read bloom filter: "+ex);
+//            
+//            ex2.initCause(ex);
+//            
+//            throw ex2;
+//            
+//        }
+
+      BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
+      
+      log.info("Read bloom filter: minKeys=" + bloomFilter.size()
+              + ", entryCount=" + metadata.nentries + ", bytesOnDisk="
+              + len + ", errorRate=" + metadata.errorRate);
+      
+      return bloomFilter;
+
+    }
+    
+    /**
+     * Reads the {@link IndexSegmentExtensionMetadata} record directly from the
+     * file.
+     */
+    protected IndexSegmentExtensionMetadata readExtensionMetadata() throws IOException {
+
+        final long addr = metadata.addrExtensionMetadata;
+        
+        assert addr != 0L;
+        
+        log.info("reading extension metadata record: "+Addr.toString(addr));
+        
+        final int off = Addr.getOffset(addr);
+        
+        final int len = Addr.getByteCount(addr);
+        
+        ByteBuffer buf = ByteBuffer.allocate(len);
+
+        buf.limit(len);
+
+        buf.position(0);
+
+        try {
+
+            // read into [dst] - does not modify the channel's position().
+            final int nread = raf.getChannel().read(buf, off);
+            
+            assert nread == len;
+            
+            buf.flip(); // Flip buffer for reading.
+            
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        assert buf.position() == 0;
+        assert buf.limit() == len;
+
+        IndexSegmentExtensionMetadata extensionMetadata = (IndexSegmentExtensionMetadata) SerializerUtil
+                .deserialize(buf);
+
+        log.info("Read extension metadata: " + extensionMetadata);
+
+        return extensionMetadata;
+
+    }
+    
 }

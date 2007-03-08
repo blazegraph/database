@@ -71,6 +71,4 @@ public interface IStore {
      */
     public IIndex getIndex(String name);
     
-//    public ITx startTx(long txId);
-    
 }

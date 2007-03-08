@@ -56,6 +56,7 @@ import com.bigdata.objndx.BatchRemove;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.ISimpleBTree;
+import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.EntryIterator.EntryFilter;
 import com.bigdata.rawstore.IRawStore;
 
@@ -81,33 +82,40 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  * 
  * @see IsolatedBTree, a {@link BTree} that has been isolated by a transaction.
- *
+ * 
+ * @see UnisolatedIndexSegment, a read-only {@link IndexSegment} suitable for
+ *      storing data from an {@link UnisolatedBTree}.
+ * 
  * The following is an ad-hoc summary of the behavior of some methods exposed by
  * this class:
-<pre>
-
-contains() - done.
-insert() - done.
-remove() - done.
-lookup() - done.
-
-addAll() - ok as implemented.  values will be wrapped in {@link IValue} objects
-as they are inserted.  if the source is also an {@link UnisolatedBTree} then the
-application values will be inserted into this tree, not the {@link IValue} objects.
-
-indexOf() - ok as implemented (counts deleted entries).
-keyAt() - ok as implemented, but will return keys for deleted entries.
-valueAt() - overriden to return null for a deleted entry.
-
-rangeCount - ok as implemented (counts deleted entries).
-rangeIterator - must filter out deleted entries.
-
-entryIterator() - only non-deleted entries.
-
-IBatchBTree - all methods are overriden to use {@link IBatchOp#apply(ISimpleBTree)}
-so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
-
-</pre>
+ * 
+ * <pre>
+ *  
+ *  contains() - done.
+ *  insert() - done.
+ *  remove() - done.
+ *  lookup() - done.
+ *  
+ *  addAll() - ok as implemented.  values will be wrapped in {@link IValue} objects
+ *  as they are inserted.  if the source is also an {@link UnisolatedBTree} then the
+ *  application values will be inserted into this tree, not the {@link IValue} objects.
+ *  
+ *  indexOf() - ok as implemented (counts deleted entries).
+ *  keyAt() - ok as implemented, but will return keys for deleted entries.
+ *  valueAt() - overriden to return null for a deleted entry.
+ *  
+ *  rangeCount - ok as implemented (counts deleted entries).
+ *  rangeIterator - must filter out deleted entries.
+ *  
+ *  entryIterator() - only non-deleted entries.
+ *  
+ *  IBatchBTree - all methods are overriden to use {@link IBatchOp#apply(ISimpleBTree)}
+ *  so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
+ *  
+ * </pre>
+ * 
+ * @todo Any changes to the non-mutation operations on this class MUST also be
+ *       reflected in {@link UnisolatedIndexSegment}.
  */
 public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
@@ -256,9 +264,9 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     }
     
     /**
-     * This method breaks isolatation to return the {@link Value} for a key. It
-     * is used by {@link IsolatedBTree#validate(UnisolatedBTree)} to test
-     * version counters when a key already exists in the global scope.
+     * This method breaks isolation to return the {@link Value} for a key. It is
+     * used by {@link IsolatedBTree#validate(UnisolatedBTree)} to test version
+     * counters when a key already exists in the global scope.
      * 
      * @todo make protected and refactor tests so that we do not need public
      *       access to this method. there should be tests in this package that
@@ -436,7 +444,8 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     }
     
     /**
-     * A filter that hides deleted entries.
+     * A filter that hides deleted entries and resolves {@link Value}s to the
+     * corresponding application datum.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

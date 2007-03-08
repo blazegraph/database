@@ -41,38 +41,31 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.isolation;
-
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IndexSegment;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * Interface for a scheduleable task that produces one or more
+ * {@link IndexSegment}s, updates the {@link MetadataIndex} to reflect the
+ * existence of the new {@link IndexSegment}s and notifies existing views
+ * with a depedency on the source(s) that they must switch over to the new
+ * {@link IndexSegment}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
-
+public interface IPartitionTask extends
+        java.util.concurrent.Callable<Object> {
+    
     /**
-     * @param src1
-     * @param src2
+     * Run the task.
+     * 
+     * @return No return semantics are defined.
+     * 
+     * @throws Exception
+     *             The exception thrown by the task.
      */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
-    }
-
-    /**
-     * @param srcs
-     */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
-    }
+    public Object call() throws Exception;
 
 }

@@ -64,6 +64,20 @@ public interface IIndexManager extends IStore {
      * <p>
      * Note: A named index must be registered outside of any transaction before
      * it may be used inside of a transaction.
+     * 
+     * @param name
+     *            The name that can be used to recover the index.
+     * 
+     * @return The object that would be returned by {@link #getIndex(String)}.
+     */
+    public IIndex registerIndex(String name);
+
+    /**
+     * Register a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
      * <p>
      * Note: The return object MAY differ from the supplied {@link BTree}. For
      * example, when using partitioned indices the {@link BTree} is encapsulated
@@ -81,7 +95,7 @@ public interface IIndexManager extends IStore {
      *       possible to retain additional metadata.
      */
     public IIndex registerIndex(String name, IIndex btree);
-    
+
     /**
      * Drops the named index (unisolated). The index is removed as a
      * {@link ICommitter} and all resources dedicated to that index are

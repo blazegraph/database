@@ -62,6 +62,9 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.isolation.UnisolatedIndexSegment;
+import com.bigdata.isolation.Value;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
@@ -73,9 +76,11 @@ import com.bigdata.rawstore.IRawStore;
  * Builds an {@link IndexSegment} given a source btree and a target branching
  * factor. There are two main use cases:
  * <ol>
+ * 
  * <li>Evicting a key range of an index into an optimized on-disk index. In
  * this case, the input is a {@link BTree} that is ideally backed by a fully
  * buffered {@link IRawStore} so that no random reads are required.</li>
+ * 
  * <li>Merging index segments. In this case, the input is typically records
  * emerging from a merge-sort. There are two distinct cases here. In one, we
  * simply have raw records that are being merged into an index. This might occur
@@ -87,6 +92,7 @@ import com.bigdata.rawstore.IRawStore;
  * than are merged with) key-value entries in the older version. If an entry
  * history policy is defined, then it must be applied here to cause key-value
  * whose retention is no longer required by that policy to be dropped.</li>
+ * 
  * </ol>
  * 
  * Note: In order for the nodes to be written in a contiguous block we either
@@ -108,10 +114,17 @@ import com.bigdata.rawstore.IRawStore;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
+ * FIXME support build from a key range rather than just an entire source tree.
+ * this is required to support partitioned indices.
+ * 
+ * FIXME support efficient prior/next leaf scans.
+ * 
  * FIXME use the shortest separator key.
  * 
  * @see IndexSegment
  * @see IndexSegmentFile
+ * @see IndexSegmentMetadata
+ * @see IndexSegmentExtensionMetadata
  * @see IndexSegmentMerger
  */
 public class IndexSegmentBuilder {
@@ -199,6 +212,12 @@ public class IndexSegmentBuilder {
      */
     final BloomFilter bloomFilter;
     
+//    /**
+//     * When non-null, a map containing extension metadata.  This is set by the
+//     * constructor.
+//     */
+//    final Map<String, Serializable> metadataMap;
+    
     /**
      * The offset in the output file of the last leaf written onto that file.
      * Together with {@link #lastLeafSize} this is used to compute the
@@ -262,6 +281,22 @@ public class IndexSegmentBuilder {
      * The plan for building the B+-Tree.
      */
     final public IndexSegmentPlan plan;
+   
+//    /**
+//     * The address at which each leaf is written on the file.  This information
+//     * is stored in the {@link IndexSegmentExtensionMetadata} and may be used to
+//     * perform fast forward or reverse leaf scans by first looking up the leaf
+//     * address based on its ordinal position within the file and then scanning
+//     * forward or backward through the addresses in this array.  The array is
+//     * buffered when the {@link IndexSegment} is loaded.
+//     *
+//     * @todo We need to be able to extend the leaf data structure for this
+//     * purpose.  We could write the addr of the prior leaf on the leaf, but
+//     * not of the next leaf.  For that we need to ordinal position of the leaf.
+//     * 
+//     * @see ... 
+//     */
+//    final long[] leaveAddrs;
     
     /**
      * The process runtime in milliseconds.
@@ -411,15 +446,19 @@ public class IndexSegmentBuilder {
      *            Generating the bloom filter is fairly expensive and this
      *            option should only be enabled if you know that point access
      *            tests are a hotspot for an index.
-     * 
      * @throws IOException
-     * 
-     * FIXME support efficient prior/next leaf scans.
      */
+//    * @param metadataMap
+//    *            An optional serializable map containing application defined
+//    *            extension metadataMap. The map will be serialized with the
+//    *            {@link IndexSegmentExtensionMetadata} object as part of the
+//    *            {@link IndexSegmentFileStore}.
     public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
             IEntryIterator entryIterator, final int m,
             IValueSerializer valueSerializer, boolean useChecksum,
-            RecordCompressor recordCompressor, final double errorRate)
+            RecordCompressor recordCompressor, final double errorRate
+//          , final Map<String, Serializable> metadataMap
+            )
             throws IOException {
 
         assert outFile != null;
@@ -500,6 +539,8 @@ public class IndexSegmentBuilder {
 
             }
 
+//            this.metadataMap = metadataMap;
+            
             // Used to serialize the nodes and leaves for the output tree.
             nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
                     m,
@@ -1054,24 +1095,6 @@ public class IndexSegmentBuilder {
         // serialize.
         ByteBuffer buf = nodeSer.putLeaf(leaf);
 
-//        /*
-//         * Write leaf on the channel.
-//         */
-//        
-//        FileChannel outChannel = out.getChannel();
-//
-//        // position on the channel before the write.
-//        final long offset = outChannel.position();
-//        
-//        if(offset>Integer.MAX_VALUE) {
-//            
-//            throw new IOException("Index segment exceeds int32 bytes.");
-//            
-//        }
-//        
-//        // write on the channel.
-//        final int nbytes = outChannel.write(buf);
-
         final long addr1 = leafBuffer.write(buf);
         
         final int nbytes = Addr.getByteCount(addr1);
@@ -1198,14 +1221,22 @@ public class IndexSegmentBuilder {
      * The file is divided up as follows:
      * 
      * <pre>
-     * metadata record
-     * leaves
-     * nodes (may be empty)
-     * extension metadata records, including the optional bloom filter.
+     *  fixed length metadata record (required)
+     *  leaves (required)
+     *  nodes (may be empty)
+     *  the bloom filter (optional).
+     *  the extension metadata record (required, but extensible).
      * </pre>
      * 
-     * Each of these regions has a variable length and some may be missing
-     * entirely.
+     * <p>
+     * The index segment metadata is divided into a base
+     * {@link IndexSegmentMetadata} record with a fixed format containing only
+     * essential data and additional metadata records written at the end of the
+     * file including the optional bloom filter and the required
+     * {@link IndexSegmentExtensionMetadata} record. the latter is where we
+     * write variable length metadata including the _name_ of the index, or
+     * additional metadata defined by a specific class of index.
+     * 
      * <p>
      * Once all nodes and leaves have been buffered we are ready to start
      * writing the data. We skip over a fixed size metadata record since
@@ -1223,24 +1254,6 @@ public class IndexSegmentBuilder {
      * @param outChannel
      * 
      * @throws IOException
-     * 
-     * @todo the metadata record can be divided into a base record with a fixed
-     *       format containing only essential data and an extensible record to
-     *       be written at the end of the file. the latter section is where we
-     *       would write the bloom filters and other variable length metadata
-     *       including the _name_ of the index, or additional metadata defined
-     *       by a specific class of index.
-     *       <p>
-     *       the commit point for the index segment file should be a metadata
-     *       record at the head of the file having identical timestamps at the
-     *       start and end of its data section. since the file format is
-     *       immutable it is ok to have what is essentially only a single root
-     *       block. if the timestamps do not agree then the build was no
-     *       successfully completed.
-     *       <p>
-     *       the checksum of the index segment file should be stored in the
-     *       partitioned index so that it can be validated after being moved
-     *       around, etc.
      * 
      * @todo it would be nice to have the same file format and addresses as the
      *       journal. in order to do this we need to (a) write two root blocks
@@ -1375,6 +1388,52 @@ public class IndexSegmentBuilder {
         }
         
         /*
+         * Write out the extensible metadata record at the end of the file.
+         */
+        final long addrExtensionMetadata;
+        {
+
+            /*
+             * Choose the implementation class based on whether or not the index
+             * is isolatable.
+             * 
+             * @todo this test may be too fragile and is not extensible to other
+             * implementation classes.
+             * 
+             * FIXME at a minimum, the BTree class should be accessible and
+             * provided to the extension metadata constructor so that any
+             * interesting metadata may also be stored in the index segment.
+             */
+            final Class cl = (nodeSer.valueSerializer instanceof Value.Serializer ? UnisolatedIndexSegment.class
+                    : IndexSegment.class);
+
+            /*
+             * Setup and serialize the extension metadata.
+             */
+            IndexSegmentExtensionMetadata extensionMetadata = new IndexSegmentExtensionMetadata(
+                    cl, nodeSer.valueSerializer, nodeSer.recordCompressor);
+//                    metadataMap);
+
+            final byte[] extensionMetadataBytes = SerializerUtil
+                    .serialize(extensionMetadata);
+
+            assert out.length() < Integer.MAX_VALUE;
+            
+            final int offset = (int)out.length(); 
+
+            // seek to the end of the file.
+            out.seek(offset);
+            
+            // write the serialized extension metadata.
+            out.write(extensionMetadataBytes, 0, extensionMetadataBytes.length);
+
+            // note its address.
+            addrExtensionMetadata = Addr.toLong(extensionMetadataBytes.length,
+                    offset);
+            
+        }
+        
+        /*
          * Seek to the start of the file and write out the metadata record.
          */
         {
@@ -1382,16 +1441,13 @@ public class IndexSegmentBuilder {
             // timestamp for the index segment.
             final long now = System.currentTimeMillis();
             
-            // @todo name of the index segment - drop this field? add uuids?
-            final String name = "<no name>";
-            
             outChannel.position(0);
             
             IndexSegmentMetadata md = new IndexSegmentMetadata(plan.m,
-                    plan.height, useChecksum, recordCompressor != null,
-                    plan.nleaves, nnodesWritten, plan.nentries,
-                    maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
-                    errorRate, addrBloom, out.length(), now, name);
+                    plan.height, useChecksum, plan.nleaves, nnodesWritten,
+                    plan.nentries, maxNodeOrLeafLength, addrLeaves, addrNodes,
+                    addrRoot, addrExtensionMetadata, addrBloom, errorRate, out
+                            .length(), now);
 
             md.write(out);
             
@@ -1479,6 +1535,15 @@ public class IndexSegmentBuilder {
     protected static class SimpleLeafData extends AbstractSimpleNodeData implements ILeafData {
 
         // mutable.
+        
+//        /**
+//         * The ordinal position of this leaf in the {@link IndexSegment}.
+//         */
+//        int leafIndex;
+        
+        /**
+         * The values stored in the leaf.
+         */
         final Object[] vals;
         
         public SimpleLeafData(int level,int m) {

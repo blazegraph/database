@@ -115,7 +115,7 @@ public class PartitionMetadata {
 
         for (int i = 0; i < segs.length; i++) {
 
-            if (segs[i].state == IndexSegmentLifeCycleEnum.LIVE)
+            if (segs[i].state == ResourceState.Live)
                 count++;
 
         }
@@ -137,7 +137,7 @@ public class PartitionMetadata {
         
         for (int i = 0; i < segs.length; i++) {
 
-            if (segs[i].state == IndexSegmentLifeCycleEnum.LIVE) {
+            if (segs[i].state == ResourceState.Live) {
 
                 files[k++] = segs[i].filename;
                 
@@ -332,7 +332,7 @@ public class PartitionMetadata {
 
                     long nbytes = is.readLong();
 
-                    IndexSegmentLifeCycleEnum state = IndexSegmentLifeCycleEnum
+                    ResourceState state = ResourceState
                             .valueOf(is.readInt());
 
                     val.segs[j] = new SegmentMetadata(filename, nbytes, state);

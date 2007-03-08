@@ -118,8 +118,7 @@ import com.bigdata.rawstore.IRawStore;
  * FIXME I have not finished working through the fused view support for this
  * class.
  */
-public class IsolatedBTree extends UnisolatedBTree implements IIsolatableIndex,
-        IIsolatedIndex {
+public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
 
     /**
      * The index that is being isolated by the {@link IsolatedBTree}.

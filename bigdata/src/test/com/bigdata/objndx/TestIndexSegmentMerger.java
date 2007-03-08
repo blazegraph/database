@@ -47,13 +47,17 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.File;
 import java.io.IOException;
 
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 
 /**
  * Test suite for compacting merge of B+-Trees.
+ * 
+ * @todo write tests of a key range merge (feature not supported yet, but
+ *       required for partitioned index segment builds).
+ * 
+ * @todo test N-way merge.
  * 
  * @todo write tests where the keys do not overlap (done).
  * 
@@ -101,19 +105,6 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
      */
     public TestIndexSegmentMerger(String name) {
         super(name);
-    }
-
-    /**
-     * Return the temporary directory.
-     */
-    static synchronized protected File getTempDir() {
-        
-        File tmpDir = new File(System.getProperty("java.io.tmpdir"));
-
-        assertTrue(!tmpDir.exists() || tmpDir.mkdirs());
-
-        return tmpDir;
-        
     }
     
     /**

@@ -42,37 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Feb 12, 2007
+ * Created on Mar 7, 2007
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+package com.bigdata.objndx;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * Test suite for verification of fast forward and reverse leaf scans for
+ * {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
+public class TestIndexSegmentFastLeafScan extends AbstractBTreeTestCase {
 
     /**
-     * @param src1
-     * @param src2
+     * 
      */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
+    public TestIndexSegmentFastLeafScan() {
     }
 
     /**
-     * @param srcs
+     * @param name
      */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
+    public TestIndexSegmentFastLeafScan(String name) {
+        super(name);
     }
 
+    public void test_fastForwardScan() {
+        
+        fail("write test");
+
+    }
+    
+    public void test_fastReverseScan() {
+
+        fail("write test");
+        
+    }
+    
 }

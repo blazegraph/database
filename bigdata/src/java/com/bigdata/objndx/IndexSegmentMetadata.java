@@ -3,37 +3,65 @@ package com.bigdata.objndx;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
+import java.util.UUID;
 
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 
 /**
  * The metadata record for an {@link IndexSegment}.
+ * <p>
+ * The commit point for the index segment file should be a metadata record at
+ * the head of the file having identical timestamps at the start and end of its
+ * data section. Since the file format is immutable it is ok to have what is
+ * essentially only a single root block. If the timestamps do not agree then the
+ * build was not successfully completed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo consider recording the min/max key or just making it easy to determine
- *       that for an {@link IndexSegment}. This has do to with both correct
- *       rejection of queries directed to the wrong index segment and managing
- *       the metadata for a distributed index.
- * 
- * @todo add a uuid for each index segment and a uuid for the index to which the
- *       segments belong? examine the format of the uuid. can we use part of it
- *       as the unique basis for one up identifiers within a parition?
- * 
- * FIXME We need a general mechanism for persisting metadata including the
- * valSer, record compressor, and user-defined objects for indices. These data
- * can go into a series of extensible metadata records located at the end of the
- * file. The bloom filter itself could be an example of such a metadata record.
- * Such metadata should survive conversions from a btree to an index segment,
- * mergers of index segments or btrees, and conversion from an index segment to
- * a btree.
- * 
- * FIXME introduce two timestamps in the metadata record. the record is valid
- * iff both timestamps agree and are non-zero.
+ * @todo the checksum of the index segment file should be stored in the
+ *       partitioned index so that it can be validated after being moved around,
+ *       etc. it would also be good to checksum the {@link IndexSegmentMetadata}
+ *       record.
  */
 public class IndexSegmentMetadata {
+
+    static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
+    static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
+    static final int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_INT;
+    static final int SIZEOF_COUNTS = Bytes.SIZEOF_INT;
+    static final int SIZEOF_NBYTES = Bytes.SIZEOF_INT;
+    static final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
+    static final int SIZEOF_ERROR_RATE = Bytes.SIZEOF_DOUBLE;
+    static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
+
+    /**
+     * The #of unused bytes in the metadata record format. Note that the unused
+     * space occurs between the file size and the final timestamp in the record.
+     * As the unused bytes are allocated in new versions the value in this field
+     * MUST be adjusted down from its original value of 256.
+     */
+    static final int SIZEOF_UNUSED = 256;
+
+    /**
+     * The #of bytes required by the current metadata record format.
+     */
+    static final int SIZE = //
+            SIZEOF_MAGIC + //
+            SIZEOF_VERSION + //
+            Bytes.SIZEOF_LONG + // timestamp0
+            Bytes.SIZEOF_UUID + // index segment UUID.
+            SIZEOF_BRANCHING_FACTOR + // branchingFactor
+            SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
+            SIZEOF_NBYTES + // max record length
+            Bytes.SIZEOF_BYTE + // useChecksum
+            SIZEOF_ADDR * 5 + // leaves, nodes, root, ext metadata, bloomFilter
+            Bytes.SIZEOF_DOUBLE + // errorRate
+            Bytes.SIZEOF_LONG + // file size
+            SIZEOF_UNUSED + // available bytes for future versions.
+            Bytes.SIZEOF_LONG // timestamp1
+    ;
     
     /**
      * Magic value written at the start of the metadata record.
@@ -44,7 +72,12 @@ public class IndexSegmentMetadata {
      * Version 0 of the serialization format.
      */
     static transient final public int VERSION0 = 0x0;
-    
+   
+    /**
+     * UUID for this {@link IndexSegment}.
+     */
+    final public UUID uuid;
+
     /**
      * Branching factor for the index segment.
      */
@@ -55,21 +88,6 @@ public class IndexSegmentMetadata {
      * there is only a root leaf in the tree).
      */
     final public int height;
-    
-    /**
-     * When true, the checksum was computed and stored for the nodes and leaves
-     * in the file and will be verified on de-serialization.
-     */
-    final public boolean useChecksum;
-    
-    /**
-     * When true, a {@link RecordCompressor} was used to write the nodes and
-     * leaves of the {@link IndexSegment}.
-     * 
-     * @todo modify to specify the implementation of a record compressor
-     *       interface.
-     */
-    final public boolean useRecordCompressor;
     
     /**
      * The #of leaves serialized in the file.
@@ -98,6 +116,12 @@ public class IndexSegmentMetadata {
     final public int maxNodeOrLeafLength;
     
     /**
+     * When true, the checksum was computed and stored for the nodes and leaves
+     * in the file and will be verified on de-serialization.
+     */
+    final public boolean useChecksum;
+    
+    /**
      * The {@link Addr address} of the contiguous region containing the
      * serialized leaves in the file.
      * <p>
@@ -122,10 +146,9 @@ public class IndexSegmentMetadata {
     final public long addrRoot;
 
     /**
-     * The target error rate for the optional bloom filter and 0.0 iff
-     * the bloom filter was not constructed.
+     * The address of the {@link IndexSegmentExtensionMetadata} record.
      */
-    final public double errorRate;
+    final public long addrExtensionMetadata;
     
     /**
      * Address of the optional bloom filter and 0L iff no bloom filter
@@ -136,6 +159,12 @@ public class IndexSegmentMetadata {
     final public long addrBloom;
     
     /**
+     * The target error rate for the optional bloom filter and 0.0 iff
+     * the bloom filter was not constructed.
+     */
+    final public double errorRate;
+    
+    /**
      * Length of the file in bytes.
      */
     final public long length;
@@ -144,23 +173,6 @@ public class IndexSegmentMetadata {
      * Timestamp when the {@link IndexSegment} was generated.
      */
     final public long timestamp;
-    
-    /**
-     * @todo Name of the index?  or uuid? or drop?
-     */
-    final public String name;
-
-    /**
-     * The #of bytes in the metadata record.
-     * 
-     * @todo This is oversized in order to allow some slop for future entries
-     *       and in order to permit the variable length index name to be
-     *       recorded in the index segment file.  The size needs to be reviewed
-     *       once the design is crisper.
-     */
-    public static final int SIZE = Bytes.kilobyte32 * 4;
-    
-    public static final int MAX_NAME_LENGTH = Bytes.kilobyte32 * 2;
 
     /**
      * Reads the metadata record for the {@link IndexSegment} from the current
@@ -191,14 +203,14 @@ public class IndexSegmentMetadata {
             throw new IOException("unknown version="+version);
             
         }
+
+        final long timestamp0 = raf.readLong();
+        
+        uuid = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
         
         branchingFactor = raf.readInt();
 
         height = raf.readInt();
-        
-        useChecksum = raf.readBoolean();
-        
-        useRecordCompressor = raf.readBoolean();
         
         nleaves = raf.readInt();
         
@@ -208,15 +220,19 @@ public class IndexSegmentMetadata {
 
         maxNodeOrLeafLength = raf.readInt();
         
+        useChecksum = raf.readBoolean();
+                
         addrLeaves = raf.readLong();
 
         addrNodes = raf.readLong();
         
         addrRoot = raf.readLong();
 
-        errorRate = raf.readDouble();
-        
+        addrExtensionMetadata = raf.readLong();
+
         addrBloom = raf.readLong();
+        
+        errorRate = raf.readDouble();
         
         length = raf.readLong();
         
@@ -225,11 +241,17 @@ public class IndexSegmentMetadata {
                     + raf.length() + ", expected=" + length);
         }
         
-        timestamp = raf.readLong();
-
-        name = raf.readUTF();
+        raf.skipBytes(SIZEOF_UNUSED);
         
-        assert name.length() <= MAX_NAME_LENGTH;
+        final long timestamp1 = raf.readLong();
+        
+        if(timestamp0 != timestamp1) {
+            
+            throw new RuntimeException("Timestamps do not agree - file is not useable.");
+            
+        }
+        
+        this.timestamp = timestamp0;
         
     }
 
@@ -240,11 +262,10 @@ public class IndexSegmentMetadata {
      * @todo javadoc.
      */
     public IndexSegmentMetadata(int branchingFactor, int height,
-            boolean useChecksum, boolean useRecordCompressor, int nleaves,
-            int nnodes, int nentries, int maxNodeOrLeafLength,
-            long addrLeaves, long addrNodes, long addrRoot,
-            double errorRate, long addrBloom, long length, long timestamp,
-            String name) {
+            boolean useChecksum, int nleaves, int nnodes, int nentries,
+            int maxNodeOrLeafLength, long addrLeaves, long addrNodes,
+            long addrRoot, long addrExtensionMetadata, long addrBloom,
+            double errorRate, long length, long timestamp) {
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -285,18 +306,12 @@ public class IndexSegmentMetadata {
         
         assert timestamp != 0L;
         
-        assert name != null;
-        
-        assert name.length() <= MAX_NAME_LENGTH;
+        this.uuid = UUID.randomUUID();
 
         this.branchingFactor = branchingFactor;
 
         this.height = height;
 
-        this.useChecksum = useChecksum;
-
-        this.useRecordCompressor = useRecordCompressor;
-        
         this.nleaves = nleaves;
         
         this.nnodes = nnodes;
@@ -305,21 +320,23 @@ public class IndexSegmentMetadata {
 
         this.maxNodeOrLeafLength = maxNodeOrLeafLength;
         
+        this.useChecksum = useChecksum;
+        
         this.addrLeaves = addrLeaves;
         
         this.addrNodes = addrNodes;
         
         this.addrRoot = addrRoot;
 
-        this.errorRate = errorRate;
-        
+        this.addrExtensionMetadata = addrExtensionMetadata;
+
         this.addrBloom = addrBloom;
+        
+        this.errorRate = errorRate;
         
         this.length = length;
         
         this.timestamp = timestamp;
-
-        this.name = name;
         
     }
 
@@ -338,14 +355,16 @@ public class IndexSegmentMetadata {
         raf.writeInt(MAGIC);
 
         raf.writeInt(VERSION0);
+
+        raf.writeLong(timestamp);
         
+        raf.writeLong(uuid.getMostSignificantBits());
+
+        raf.writeLong(uuid.getLeastSignificantBits());
+
         raf.writeInt(branchingFactor);
                         
         raf.writeInt(height);
-        
-        raf.writeBoolean(useChecksum);
-                
-        raf.writeBoolean(useRecordCompressor);
         
         raf.writeInt(nleaves);
 
@@ -355,21 +374,25 @@ public class IndexSegmentMetadata {
 
         raf.writeInt(maxNodeOrLeafLength);
         
+        raf.writeBoolean(useChecksum);
+        
         raf.writeLong(addrLeaves);
         
         raf.writeLong(addrNodes);
 
         raf.writeLong(addrRoot);
 
-        raf.writeDouble(errorRate);
+        raf.writeLong(addrExtensionMetadata);
         
         raf.writeLong(addrBloom);
         
+        raf.writeDouble(errorRate);
+        
         raf.writeLong(length);
+
+        raf.skipBytes(SIZEOF_UNUSED);
         
         raf.writeLong(timestamp);
-        
-        raf.writeUTF(name);
         
     }
     
@@ -381,22 +404,22 @@ public class IndexSegmentMetadata {
         StringBuilder sb = new StringBuilder();
         
         sb.append("magic="+Integer.toHexString(MAGIC));
+        sb.append(", uuid="+uuid);
         sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
-        sb.append(", useChecksum=" + useChecksum);
-        sb.append(", useRecordCompressor=" + useRecordCompressor);
         sb.append(", nleaves=" + nleaves);
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", addrLeaves=" + addrLeaves);
-        sb.append(", addrNodes=" + addrNodes);
+        sb.append(", useChecksum=" + useChecksum);
+        sb.append(", addrLeaves=" + Addr.toString(addrLeaves));
+        sb.append(", addrNodes=" + Addr.toString(addrNodes));
         sb.append(", addrRoot=" + Addr.toString(addrRoot));
-        sb.append(", errorRate=" + errorRate);
+        sb.append(", addrExtensionMetadata=" + Addr.toString(addrExtensionMetadata));
         sb.append(", addrBloom=" + Addr.toString(addrBloom));
+        sb.append(", errorRate=" + errorRate);
         sb.append(", length=" + length);
         sb.append(", timestamp=" + new Date(timestamp));
-        sb.append(", name="+name);
 
         return sb.toString();
     }

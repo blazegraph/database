@@ -53,13 +53,12 @@ import java.util.Random;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
-import com.bigdata.objndx.SimpleEntry;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.scaleup.PartitionedJournal.MergePolicy;
 import com.bigdata.scaleup.PartitionedJournal.Options;
@@ -143,7 +142,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        IIndex index = new BTree(journal, 3, SimpleEntry.Serializer.INSTANCE);
+        IIndex index = new UnisolatedBTree(journal);
         
         assertNull(journal.getIndex(name));
         
@@ -159,7 +158,7 @@ public class TestPartitionedJournal extends TestCase2 {
         assertEquals("mdi.entryCount", 1, mdi.getEntryCount());
         
         final byte[] k0 = new byte[]{0};
-        final Object v0 = new SimpleEntry(0);
+        final byte[] v0 = new byte[]{0};
         
         index.insert( k0, v0);
 
@@ -181,7 +180,7 @@ public class TestPartitionedJournal extends TestCase2 {
 
             assertNotNull("btree", index);
             assertEquals("entryCount", 1, ((PartitionedIndex)index).getBTree().getEntryCount());
-            assertEquals(v0, index.lookup(k0));
+            assertEquals(v0, (byte[])index.lookup(k0));
 
             journal.dropIndex(name);
             
@@ -209,8 +208,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new BTree(journal, 3,
-                SimpleEntry.Serializer.INSTANCE)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
         
         journal.overflow();
 
@@ -244,8 +242,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new BTree(journal, 3,
-                SimpleEntry.Serializer.INSTANCE)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal, 3)));
 
         final TestData data = new TestData(journal.migrationThreshold-1);
         
@@ -295,8 +292,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new BTree(journal, 3,
-                SimpleEntry.Serializer.INSTANCE)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
 
         final TestData data = new TestData(journal.migrationThreshold);
         
@@ -361,11 +357,10 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new BTree(journal, 3,
-                SimpleEntry.Serializer.INSTANCE)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
 
-        final BTree groundTruth = new BTree(new SimpleMemoryRawStore(),
-                BTree.DEFAULT_BRANCHING_FACTOR, SimpleEntry.Serializer.INSTANCE);
+        final UnisolatedBTree groundTruth = new UnisolatedBTree(
+                new SimpleMemoryRawStore());
 
         final int ntrials = 10;
 
@@ -403,10 +398,10 @@ public class TestPartitionedJournal extends TestCase2 {
                 
                 assertEquals("#segments",2,pmd.segs.length);
                 
-                assertEquals("state", IndexSegmentLifeCycleEnum.DEAD,
+                assertEquals("state", ResourceState.Dead,
                         pmd.segs[0].state);
                 
-                assertEquals("state", IndexSegmentLifeCycleEnum.LIVE,
+                assertEquals("state", ResourceState.Live,
                         pmd.segs[1].state);
                 
             }
@@ -460,7 +455,7 @@ public class TestPartitionedJournal extends TestCase2 {
         public final int nrecords;
         
         public final byte[][] keys;
-        public final SimpleEntry[] vals;
+        public final byte[][] vals;
         
         /**
          * generates a set of N records with ascending keys and values that
@@ -476,7 +471,7 @@ public class TestPartitionedJournal extends TestCase2 {
             
             keys = new byte[nrecords][];
             
-            vals = new SimpleEntry[nrecords];
+            vals = new byte[nrecords][];
             
             int key = 0;
             
@@ -489,8 +484,8 @@ public class TestPartitionedJournal extends TestCase2 {
                 key = key + r.nextInt(100) + 1;
                 
                 keys[i] = keyBuilder.reset().append(key).getKey();
-                
-                vals[i] = new SimpleEntry(key);
+
+                vals[i] = keys[i].clone();
                 
             }
             
@@ -507,7 +502,7 @@ public class TestPartitionedJournal extends TestCase2 {
             
             for(int i=0; i<nrecords; i++) {
 
-                SimpleEntry actual = (SimpleEntry)ndx.lookup(keys[i]);
+                byte[] actual = (byte[])ndx.lookup(keys[i]);
                 
                 assertEquals(vals[i],actual);
                 

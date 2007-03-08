@@ -41,38 +41,54 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.isolation;
+import java.io.File;
 
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.journal.Journal;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * Metadata required to locate a {@link Journal} resource.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo refactor to isolate and override the merge rule.
+ * @todo make this persistence capable by modifying the value serializer to
+ * use the {@link IResourceMetadata} interface.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
+public class JournalMetadata implements IResourceMetadata {
 
-    /**
-     * @param src1
-     * @param src2
-     */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
+    protected final String filename;
+    protected final ResourceState state;
+    
+    public File getFile() {
+        return new File(filename);
     }
 
     /**
-     * @param srcs
+     * Always returns ZERO (0L) since we can not accurately estimate the #of
+     * bytes on the journal dedicated to a given partition of a named index.
      */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
+    public long size() {
+        return 0L;
     }
 
+    public ResourceState state() {
+        return state;
+    }
+
+    public JournalMetadata(Journal journal, ResourceState state) {
+        
+        if(journal.getFile()==null) {
+            
+            throw new IllegalArgumentException("Journal is not persistent.");
+            
+        }
+        
+        this.filename = journal.getFile().toString();
+
+        this.state = state;
+        
+    }
+    
 }

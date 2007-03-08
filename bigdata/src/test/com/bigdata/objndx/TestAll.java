@@ -125,6 +125,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
         // test of the bloom filter integration.
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
+        // test of the fast forward and reverse leaf scans.
+        suite.addTestSuite( TestIndexSegmentFastLeafScan.class );
         // test compacting merge of two index segments.
         suite.addTestSuite( TestIndexSegmentMerger.class );
 

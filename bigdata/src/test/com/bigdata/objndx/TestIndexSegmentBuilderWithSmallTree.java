@@ -6,8 +6,6 @@ import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.cache.HardReferenceQueue;
-
 /**
  * Test suite based on a small btree with known keys and values.
  * 
@@ -123,12 +121,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                // setup reference queue to hold all leaves and nodes.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        7, 7),
-                // take the other parameters from the btree.
-                btree.nodeSer.valueSerializer);
+        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                // setup reference queue to hold all leaves and nodes.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        7, 7),
+//                // take the other parameters from the btree.
+//                @todo btree.nodeSer.valueSerializer);
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
         TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
@@ -197,13 +195,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                // setup reference queue to hold all leaves and nodes.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        3, 3),
-                // take the other parameters from the btree.
-                btree.nodeSer.valueSerializer
-                );
+        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                // setup reference queue to hold all leaves and nodes.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        3, 3),
+//                // take the other parameters from the btree.
+//                @todo btree.nodeSer.valueSerializer
+//                );
         TestIndexSegmentPlan.assertEquals(9,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
         TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
@@ -257,13 +255,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
              * example, those aspects that depend on the specifics of the length
              * of serialized nodes or leaves).
              */
-        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                // setup reference queue to hold all leaves and nodes.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        1, 1),
-                // take the other parameters from the btree.
-                        btree.nodeSer.valueSerializer
-                );
+        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                // setup reference queue to hold all leaves and nodes.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        1, 1),
+//                // take the other parameters from the btree.
+//                        @todo btree.nodeSer.valueSerializer
+//                );
         TestIndexSegmentPlan.assertEquals(10,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(0,seg.getHeight());
         TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
@@ -338,12 +336,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                // setup reference queue to hold all leaves and nodes.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        3, 3),
-                        btree.nodeSer.valueSerializer
-                );
+        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                // setup reference queue to hold all leaves and nodes.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        3, 3),
+//                        @todo btree.nodeSer.valueSerializer
+//                );
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
         TestIndexSegmentPlan.assertEquals(3,seg.getLeafCount());
@@ -431,12 +429,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                // setup reference queue to hold all leaves and nodes.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        11, 11),
-                        btree.nodeSer.valueSerializer
-                );
+        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                // setup reference queue to hold all leaves and nodes.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        11, 11),
+//                        @todo btree.nodeSer.valueSerializer
+//                );
         TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
         TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
         TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());

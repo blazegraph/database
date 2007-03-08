@@ -282,11 +282,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * specifics of the length of serialized nodes or leaves).
          */
         System.err.println("Opening index segment w/ bloom filter.");
-        final IndexSegment seg2 = new IndexSegment(new IndexSegmentFileStore(outFile2),
-                // setup reference queue.
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        100, 20),
-                btree.nodeSer.valueSerializer);
+        final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
+//                // setup reference queue.
+//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        100, 20),
+//                @todo btree.nodeSer.valueSerializer);
 
         /*
          * Verify the total index order.
@@ -377,11 +377,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/o bloom filter.");
-            final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                    // setup reference queue.
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            100, 20),
-                            btree.nodeSer.valueSerializer);
+            final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+//                    // setup reference queue.
+//                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                            100, 20),
+//                            @todo btree.nodeSer.valueSerializer);
 
             /*
              * Verify can load the index file and that the metadata
@@ -391,11 +391,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/ bloom filter.");
-            final IndexSegment seg2 = new IndexSegment(new IndexSegmentFileStore(outFile2),
-                    // setup reference queue.
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            100, 20),
-                            btree.nodeSer.valueSerializer);
+            final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
+//                    // setup reference queue.
+//                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                            100, 20),
+//                            @todo btree.nodeSer.valueSerializer);
 
             /*
              * Explicitly test the bloom filter against ground truth. 

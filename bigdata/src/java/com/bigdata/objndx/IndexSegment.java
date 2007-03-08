@@ -1,17 +1,12 @@
 package com.bigdata.objndx;
 
-import it.unimi.dsi.mg4j.util.BloomFilter;
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.nio.ByteBuffer;
 
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 
@@ -35,19 +30,13 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegment extends AbstractBTree implements IIndex {
+public class IndexSegment extends AbstractBTree {
 
     /**
      * Type safe reference to the backing store.
      */
     final protected IndexSegmentFileStore fileStore;
     
-//    /**
-//     * The root of the btree. Since this is a read-only index the root can never
-//     * be replaced.
-//     */
-//    final protected AbstractNode root;
-
     /**
      * An optional bloom filter that will be used to filter point tests. Since
      * bloom filters do not support removal of keys the option to use a filter
@@ -86,24 +75,18 @@ public class IndexSegment extends AbstractBTree implements IIndex {
         
     }
 
-//    public AbstractNode getRoot() {
-//        
-//        return root;
-//        
-//    }
-    
     public int getEntryCount() {
 
         return fileStore.metadata.nentries;
         
     }
 
-    public IndexSegment(IndexSegmentFileStore fileStore, IValueSerializer valSer) {
-
+    public IndexSegment(IndexSegmentFileStore fileStore ) {
+        
         this(fileStore, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
                 BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer);
+                BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
         
     }
     
@@ -120,29 +103,23 @@ public class IndexSegment extends AbstractBTree implements IIndex {
      *            should be relatively high since each entry is relatively
      *            large, e.g., try with 100 and 20 respectively.
      * @param valSer
+     * 
      * @throws IOException
      * 
      * @todo explore good defaults for the hard reference queue, which should
      *       probably be much smaller as the branching factor grows larger.
-     * 
-     * FIXME move the value serializer into the metadata record.
-     * 
-     * FIXME add a boolean flag to mark index segments that are the final result
-     * of a compacting merge.  This will make it possible to reconstruct from the
-     * file system which index segments are part of the consistent state for a
-     * given restart time.
      */
-    public IndexSegment(IndexSegmentFileStore fileStore,
-            HardReferenceQueue<PO> hardReferenceQueue,
-            IValueSerializer valSer) {
+    protected IndexSegment(IndexSegmentFileStore fileStore,
+            HardReferenceQueue<PO> hardReferenceQueue) {
 
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
                 new CustomAddressSerializer(Addr
-                        .getOffset(fileStore.metadata.addrNodes)), valSer,
+                        .getOffset(fileStore.metadata.addrNodes)),
+                fileStore.extensionMetadata.valSer,
                 ImmutableNodeFactory.INSTANCE,
-                fileStore.metadata.useRecordCompressor ? new RecordCompressor()
-                        : null, fileStore.metadata.useChecksum);
+                fileStore.extensionMetadata.recordCompressor,
+                fileStore.metadata.useChecksum);
 
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentFileStore) fileStore;
@@ -166,7 +143,7 @@ public class IndexSegment extends AbstractBTree implements IIndex {
 
             try {
 
-                this.bloomFilter = readBloomFilter(fileStore.metadata.addrBloom);
+                this.bloomFilter = fileStore.readBloomFilter();
 
             } catch (IOException ex) {
 
@@ -178,82 +155,6 @@ public class IndexSegment extends AbstractBTree implements IIndex {
         
     }
 
-    /**
-     * Reads the bloom filter from the file.
-     * 
-     * Note: this goes around the {@link IndexSegmentFileStore} API since the bloom filter
-     * is not (currently) written as a compressed record and since the size of
-     * the largest compressed record does not pay attention to the serialized
-     * size of the optional bloom filter.
-     */
-    protected BloomFilter readBloomFilter(long addr) throws IOException {
-
-        assert addr != 0L;
-        
-        System.err.println("reading bloom filter: "+Addr.toString(addr));
-        
-        final int off = Addr.getOffset(addr);
-        
-        final int len = Addr.getByteCount(addr);
-        
-        ByteBuffer buf = ByteBuffer.allocate(len);
-
-        buf.limit(len);
-
-        buf.position(0);
-
-        try {
-
-            // read into [dst] - does not modify the channel's position().
-            final int nread = fileStore.raf.getChannel().read(buf, off);
-            
-            assert nread == len;
-            
-            buf.flip(); // Flip buffer for reading.
-            
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        assert buf.position() == 0;
-        assert buf.limit() == len;
-
-        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
-        
-//        ByteArrayInputStream bais = new ByteArrayInputStream(buf.array());
-        
-        ObjectInputStream ois = new ObjectInputStream(bais);
-        
-        try {
-
-            BloomFilter bloomFilter = (BloomFilter) ois.readObject();
-            
-            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
-                    + ", entryCount=" + getEntryCount() + ", bytesOnDisk="
-                    + len + ", errorRate=" + fileStore.metadata.errorRate);
-            
-            return bloomFilter;
-            
-        }
-        
-        catch(Exception ex) {
-            
-            IOException ex2 = new IOException("Could not read bloom filter: "+ex);
-            
-            ex2.initCause(ex);
-            
-            throw ex2;
-            
-        }
-
-    }
-    
-    /**
-     * @todo move to parent class and have various methods test to validate that
-     *       the index is open (lookup, insert, remove, scan).
-     */
     public void close() {
         
         fileStore.close();

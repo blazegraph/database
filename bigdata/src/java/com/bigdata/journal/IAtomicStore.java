@@ -96,14 +96,14 @@ public interface IAtomicStore extends IRawStore {
      * <p>
      * Note: the committers must be reset after restart or whenever 
      * 
-     * @param rootSlot
+     * @param index
      *            The slot in the root block where the {@link Addr address} of
      *            the {@link ICommitter} will be recorded.
      * 
      * @param committer
      *            The commiter.
      */
-    public void setCommitter(int rootSlot, ICommitter committer);
+    public void setCommitter(int index, ICommitter committer);
 
     /**
      * The last address stored in the specified root slot as of the last
@@ -118,5 +118,28 @@ public interface IAtomicStore extends IRawStore {
      *                if the index is negative or too large.
      */
     public long getRootAddr(int index);
+
+    /**
+     * Return a read-only view of the current root block.
+     * 
+     * @return The current root block.
+     */
+    public IRootBlockView getRootBlockView();
+
+    /**
+     * Return the {@link ICommitRecord} for the most recent committed state
+     * whose commit timestamp is less than or equal to <i>timestamp</i>. This
+     * is used by a {@link Tx transaction} to locate the committed state that is
+     * the basis for its operations.
+     * 
+     * @param timestamp
+     *            Typically, the timestamp assigned to a transaction.
+     * 
+     * @return The {@link ICommitRecord} for the most recent committed state
+     *         whose commit timestamp is less than or equal to <i>timestamp</i>
+     *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
+     *         that satisify the probe.
+     */
+    public ICommitRecord getCommitRecord(long commitTime);
 
 }

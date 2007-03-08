@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.scaleup;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -66,9 +65,6 @@ import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentFileStore;
-import com.bigdata.scaleup.PartitionedJournal.IViewMetadata;
-import com.bigdata.scaleup.PartitionedJournal.JournalMetadata;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key
@@ -113,9 +109,25 @@ public class PartitionedIndex implements IIndex, ICommitter {
 
     /**
      * A cache of the fused views for in use partitions.
+     * 
+     * @todo reconcile this with
+     *       {@link PartitionedJournal#getIndex(String, IResourceMetadata)}
+     *       which provides a weak value cache for index segments.
      */
     private final Map<Integer,FusedView> views = new HashMap<Integer,FusedView>();
 
+    public PartitionedJournal getMaster() {
+        
+        return getSlave().getMaster();
+        
+    }
+    
+    public SlaveJournal getSlave() {
+        
+        return (SlaveJournal)getBTree().getStore();
+        
+    }
+    
     /**
      * The mutable {@link BTree} used to absorb writes.
      */
@@ -134,27 +146,26 @@ public class PartitionedIndex implements IIndex, ICommitter {
      *            The partition.
      * 
      * @return The live {@link IndexSegment}s for that partition.
-     * 
-     * @todo there needs to be synchronization with the
-     *       {@link PartitionedJournal} so that index segments may be closed out
-     *       as required but it would be very nice (or perhaps necessary) to be
-     *       able to perform a compacting merge while an {@link IndexSegment}
-     *       was open for reading.
      */
     protected IndexSegment[] openIndexSegments(PartitionMetadata pmd) {
         
-        String[] files = pmd.getLiveSegmentFiles();
+        final int liveCount = pmd.getLiveCount();
         
-        IndexSegment[] segs = new IndexSegment[files.length];
+        IndexSegment[] segs = new IndexSegment[liveCount];
         
-        for(int i=0; i<segs.length; i++) {
+        PartitionedJournal master = getMaster();
+        
+        int n = 0;
+        
+        for(int i=0; i<pmd.segs.length; i++) {
             
-            File file = new File(files[i]);
+            if(pmd.segs[i].state != ResourceState.Live) continue;
             
-            segs[i] = new IndexSegment(new IndexSegmentFileStore(file), btree
-                    .getNodeSerializer().getValueSerializer());
+            segs[n++] = (IndexSegment) master.getIndex(getName(), pmd.segs[i]);
             
         }
+        
+        assert n == liveCount;
         
         return segs;
 
@@ -262,16 +273,16 @@ public class PartitionedIndex implements IIndex, ICommitter {
      * 
      * @todo reconcile with {@link #getView(byte[])}?
      */
-    protected IViewMetadata[] getResources(byte[] key) {
+    protected IResourceMetadata[] getResources(byte[] key) {
 
         JournalMetadata journalResource = new JournalMetadata((Journal) btree
-                .getStore(), IndexSegmentLifeCycleEnum.LIVE);
+                .getStore(), ResourceState.Live);
 
         PartitionMetadata pmd = mdi.find(key);
 
         final int liveCount = pmd.getLiveCount();
 
-        IViewMetadata[] resources = new IViewMetadata[liveCount + 1];
+        IResourceMetadata[] resources = new IResourceMetadata[liveCount + 1];
 
         int n = 0;
 
@@ -281,7 +292,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
 
             SegmentMetadata seg = pmd.segs[i];
 
-            if (seg.state != IndexSegmentLifeCycleEnum.LIVE)
+            if (seg.state != ResourceState.Live)
                 continue;
 
             resources[n++] = seg;

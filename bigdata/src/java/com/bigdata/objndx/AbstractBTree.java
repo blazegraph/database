@@ -105,10 +105,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     /**
      * Log for btree opeations.
-     * 
-     * @todo consider renaming the logger.
      */
-    protected static final Logger log = Logger.getLogger(BTree.class);
+    protected static final Logger log = Logger.getLogger(AbstractBTree.class);
 
     /**
      * Log for {@link BTree#dump(PrintStream)} and friends.

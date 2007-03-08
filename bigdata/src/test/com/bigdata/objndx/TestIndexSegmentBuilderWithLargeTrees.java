@@ -277,11 +277,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
                     + "), out(m=" + m + ")");
             
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
-                    tmpDir, btree, m, 0.);
+                    tmpDir, btree, m, 0.
+                    /*
+                     * @todo pass in btree.nodeSer.valueSerializer
+                     */
+                    );
 
-            // @todo verify post-condition for the temporary file.
-//            assertFalse(builder.tmp)
-            
             /*
              * Verify can load the index file and that the metadata
              * associated with the index file is correct (we are only
@@ -290,12 +291,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment.");
-            final IndexSegment seg = new IndexSegment(new IndexSegmentFileStore(outFile),
-                    // setup reference queue.
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            100, 20),
-                    // take the other parameters from the btree.
-                    btree.nodeSer.valueSerializer);
+            final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
             /*
              * Verify the total index order.
              */

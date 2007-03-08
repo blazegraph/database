@@ -47,6 +47,9 @@ Modifications:
 
 package com.bigdata.journal;
 
+import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.ByteArrayValueSerializer;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.Addr;
 
@@ -56,7 +59,7 @@ import com.bigdata.rawstore.Addr;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TemporaryStore extends TemporaryRawStore {
+public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
 
     /**
      * 
@@ -98,6 +101,17 @@ public class TemporaryStore extends TemporaryRawStore {
         
         name2Addr = new Name2Addr(this);
 
+    }
+
+    /**
+     * Registers a {@link BTree} whose values are variable length byte[]s.
+     */
+    public IIndex registerIndex(String name) {
+    
+        return registerIndex(name, new BTree(this,
+                BTree.DEFAULT_BRANCHING_FACTOR,
+                ByteArrayValueSerializer.INSTANCE));
+        
     }
     
     public IIndex registerIndex(String name, IIndex btree) {

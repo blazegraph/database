@@ -116,7 +116,7 @@ abstract public class AbstractTx implements ITx {
         
         journal.activateTx(this);
 
-        this.runState = RunState.ACTIVE;
+        this.runState = RunState.Active;
 
     }
     
@@ -156,11 +156,11 @@ abstract public class AbstractTx implements ITx {
         }
         
         switch(runState) {
-        case ACTIVE:
-        case ABORTED:
+        case Active:
+        case Aborted:
             throw new IllegalStateException();
-        case PREPARED:
-        case COMMITTED:
+        case Prepared:
+        case Committed:
             if(commitTime == 0L) throw new AssertionError();
             return commitTime;
         }
@@ -186,31 +186,31 @@ abstract public class AbstractTx implements ITx {
     
     final public boolean isActive() {
         
-        return runState == RunState.ACTIVE;
+        return runState == RunState.Active;
         
     }
     
     final public boolean isPrepared() {
         
-        return runState == RunState.PREPARED;
+        return runState == RunState.Prepared;
         
     }
     
     final public boolean isComplete() {
         
-        return runState == RunState.COMMITTED || runState == RunState.ABORTED;
+        return runState == RunState.Committed || runState == RunState.Aborted;
         
     }
 
     final public boolean isCommitted() {
         
-        return runState == RunState.COMMITTED;
+        return runState == RunState.Committed;
         
     }
  
     final public boolean isAborted() {
         
-        return runState == RunState.ABORTED;
+        return runState == RunState.Aborted;
         
     }
 
@@ -221,7 +221,7 @@ abstract public class AbstractTx implements ITx {
 
         try {
 
-            runState = RunState.ABORTED;
+            runState = RunState.Aborted;
 
             journal.completedTx(this);
             
@@ -290,7 +290,7 @@ abstract public class AbstractTx implements ITx {
 
         journal.prepared(this);
 
-        runState = RunState.PREPARED;
+        runState = RunState.Prepared;
         
     }
     
@@ -339,7 +339,7 @@ abstract public class AbstractTx implements ITx {
                 
             }
             
-            runState = RunState.COMMITTED;
+            runState = RunState.Committed;
 
             journal.completedTx(this);
             

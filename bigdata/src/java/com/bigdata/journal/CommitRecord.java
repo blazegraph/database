@@ -52,9 +52,6 @@ package com.bigdata.journal;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo can I make the roots named in some less scalable manner? E.g., an array
- *       list or hash table?
  */
 public class CommitRecord implements ICommitRecord {
 

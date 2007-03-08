@@ -50,7 +50,6 @@ package com.bigdata.journal;
 import java.util.Properties;
 
 import com.bigdata.objndx.IIndex;
-import com.bigdata.rawstore.IRawStore;
 
 /**
  * <p>
@@ -62,8 +61,8 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMROW, IRawStore, IAtomicStore,
-        IIndexManager, ITransactionManager {
+public interface IJournal extends IMROW, IAtomicStore, IIndexManager,
+        ITransactionManager {
 
     /**
      * A copy of the properties used to initialize this journal.
@@ -100,28 +99,5 @@ public interface IJournal extends IMROW, IRawStore, IAtomicStore,
      * @param startTime The transaction start time.
      */
     public IIndex getIndex(String name, long startTime);
-
-    /**
-     * Return a read-only view of the current root block.
-     * 
-     * @return The current root block.
-     */
-    public IRootBlockView getRootBlockView();
-
-    /**
-     * Return the {@link ICommitRecord} for the most recent committed state
-     * whose commit timestamp is less than or equal to <i>timestamp</i>. This
-     * is used by a {@link Tx transaction} to locate the committed state that is
-     * the basis for its operations.
-     * 
-     * @param timestamp
-     *            Typically, the timestamp assigned to a transaction.
-     * 
-     * @return The {@link ICommitRecord} for the most recent committed state
-     *         whose commit timestamp is less than or equal to <i>timestamp</i>
-     *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
-     *         that satisify the probe.
-     */
-    public ICommitRecord getCommitRecord(long commitTime);
 
 }

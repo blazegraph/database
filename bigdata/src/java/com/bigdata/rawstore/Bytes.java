@@ -55,10 +55,13 @@ package com.bigdata.rawstore;
  */
 public class Bytes {
 
-    public static final int SIZEOF_BYTE  = 1;
-    public static final int SIZEOF_SHORT = 2;
-    public static final int SIZEOF_INT   = 4;
-    public static final int SIZEOF_LONG  = 8;
+    public static final int SIZEOF_BYTE   = 1;
+    public static final int SIZEOF_SHORT  = 2;
+    public static final int SIZEOF_INT    = 4;
+    public static final int SIZEOF_LONG   = 8;
+    public static final int SIZEOF_FLOAT  = 4;
+    public static final int SIZEOF_DOUBLE = 8;
+    public static final int SIZEOF_UUID   = 16;
     
     /*
      * int32 constants.

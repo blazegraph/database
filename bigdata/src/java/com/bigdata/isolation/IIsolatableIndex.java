@@ -60,13 +60,12 @@ import com.bigdata.objndx.Leaf;
 
 /**
  * <p>
- * Interface for transactional isolation of an index.
- * </p>
- * <p>
- * This is a marker interface for an index that supports deletion markers and
- * transactions. Both unisolated and isolated indicies MUST use this interface
- * in order to support transactions since version counters MUST be maintained in
- * the unisolated indices as well as the isolated indices.
+ * This is a marker interface for an index that can be isolated by a
+ * transaction. Implementations of this interface understand and maintain both
+ * version counters and deletion markers and constrain application data to
+ * variable length byte[]s. Both unisolated and isolated indicies MUST use this
+ * interface in order to support transactions since version counters MUST be
+ * maintained in the unisolated indices as well as the isolated indices.
  * </p>
  * <p>
  * The basic design for isolation requires that reads are performed against a
@@ -166,7 +165,6 @@ import com.bigdata.objndx.Leaf;
  * 
  * @todo is double-deletion of a deleted key on an isolated btree is an error or
  *       should it be silently ignored?
- * 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

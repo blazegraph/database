@@ -6,7 +6,6 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -154,7 +153,7 @@ public class BTreeMetadata implements Serializable {
 
     /**
      * Re-load the {@link BTree} or derived class from the store. The
-     * {@link BTree} or derived class MUST provide a public construct with the
+     * {@link BTree} or derived class MUST provide a public constructor with the
      * following signature: <code>
      * 
      * <i>className</i>(IRawStore store, BTreeMetadata metadata)
@@ -170,7 +169,7 @@ public class BTreeMetadata implements Serializable {
      * @return The {@link BTree} or derived class loaded from that
      *         {@link BTreeMetadata} record.
      * 
-     * @see BTree#newMetadata(), which MUST be overloaded if you subclass extend
+     * @see BTree#newMetadata(), which MUST be overloaded if you subclass
      *      {@link BTreeMetadata}.
      */
     public static BTree load(IRawStore store, long addr) {

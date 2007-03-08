@@ -55,6 +55,6 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMROW extends IRawStore {
+public interface IMROW /*extends IRawStore*/ {
 
 }

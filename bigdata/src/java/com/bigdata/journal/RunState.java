@@ -8,10 +8,10 @@ package com.bigdata.journal;
  */
 public enum RunState {
     
-    ACTIVE("active"),
-    PREPARED("prepared"),
-    COMMITTED("committed"),
-    ABORTED("aborted");
+    Active("Active"),
+    Prepared("Prepared"),
+    Committed("Committed"),
+    Aborted("Aborted");
     
     private final String name;
     

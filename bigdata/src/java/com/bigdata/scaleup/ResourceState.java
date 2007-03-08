@@ -41,38 +41,39 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.scaleup;
 
-package com.bigdata.isolation;
-
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IndexSegment;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * Enumeration of life-cycle states for {@link IndexSegment}s in a
+ * partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
+public enum ResourceState {
 
-    /**
-     * @param src1
-     * @param src2
-     */
-    public IsolatableFusedView(AbstractBTree src1, AbstractBTree src2) {
-        super(src1, src2);
+    New("New",0),
+    Live("Live",1),
+    Dead("Dead",2);
+    
+    final private String name;
+    final private int id;
+    
+    ResourceState(String name,int id) {this.name = name;this.id = id;}
+    
+    public String toString() {return name;}
+    
+    public int valueOf() {return id;}
+    
+    static public ResourceState valueOf(int id) {
+        switch(id) {
+        case 0: return New;
+        case 1: return Live;
+        case 2: return Dead;
+        default: throw new IllegalArgumentException("Unknown: code="+id);
+        }
     }
-
-    /**
-     * @param srcs
-     */
-    public IsolatableFusedView(AbstractBTree[] srcs) {
-        super(srcs);
-    }
-
+    
 }
