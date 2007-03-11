@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.BTree;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -135,7 +135,7 @@ public class TestCommitRecordIndex extends AbstractCommitRecordTestCase {
         {
             
             // reload the index from the store.
-            ndx = (CommitRecordIndex)BTreeMetadata.load(store, ndx_addr);
+            ndx = (CommitRecordIndex)BTree.load(store, ndx_addr);
 
             // verify existence test.
             assertTrue(ndx.hasTimestamp(cr1.getTimestamp()));

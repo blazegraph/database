@@ -53,7 +53,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.TripleStore;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * A test of the RIO integration.

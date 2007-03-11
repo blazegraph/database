@@ -130,26 +130,7 @@ public interface ITransactionManager extends ITimestampService {
 //     *         for the transaction.
 //     */
 //    public long newReadCommittedTx();
-
-    /**
-     * Return the named index as isolated by the transaction.
-     * 
-     * @param name
-     *            The index name.
-     * @param startTime
-     *            The transaction start time, which serves as the unique
-     *            identifier for the transaction.
-     * 
-     * @return The isolated index.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> is <code>null</code>
-     * 
-     * @exception IllegalStateException
-     *                if there is no active transaction with that timestamp.
-     */
-    public IIndex getIndex(String name, long startTime);
-
+    
     /**
      * Abort the transaction.
      * 

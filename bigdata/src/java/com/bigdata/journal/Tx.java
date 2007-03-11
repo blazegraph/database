@@ -60,7 +60,7 @@ import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionedIndex;
+import com.bigdata.scaleup.PartitionedIndexView;
 
 /**
  * <p>
@@ -100,24 +100,7 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       up to the point where a "commit" or "abort" is _requested_ for the tx.
  * 
  * @todo Support transactions where the indices isolated by the transactions are
- *       {@link PartitionedIndex}es.
- * 
- * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
- *       to support the {@link IsolatedBTree}s in use by a {@link Tx}. Deletes
- *       of old journals and index segments MUST be deferred until no
- *       transaction remains which can read those data. This metadata must be
- *       restart-safe so that resources are eventually deleted. On restart,
- *       active transactions will have been discarded abort and their resources
- *       released. (Do we need a restart-safe means to indicate the set of
- *       running transactions?)<br>
- *       There is also a requirement for quickly locating the specific journal
- *       and index segments required to support isolation of an index. This
- *       probably means an index into the history of the {@link MetadataIndex}
- *       (so we don't throw it away until no transactions can reach back that
- *       far) as well as an index into the named indices index -- perhaps simply
- *       an index by startTime into the root addresses (or whole root block
- *       views, or moving the root addresses out of the root block and into the
- *       store with only the address of the root addresses in the root block).
+ *       {@link PartitionedIndexView}es.
  * 
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
@@ -128,7 +111,7 @@ import com.bigdata.scaleup.PartitionedIndex;
  *       pre-conditions itself and exceptions being thrown from here if the
  *       server failed to test the pre-conditions and they were not met
  */
-public class Tx extends AbstractTx implements IStore, ITx {
+public class Tx extends AbstractTx implements IIndexStore, ITx {
 
     /**
      * The historical {@link ICommitRecord} choosen as the ground state for this

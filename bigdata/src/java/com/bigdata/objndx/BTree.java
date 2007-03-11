@@ -46,6 +46,8 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.lang.reflect.Constructor;
+
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.rawstore.Addr;
@@ -640,6 +642,51 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     public void delete() {
 
         throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * Re-load the {@link BTree} or derived class from the store. The
+     * {@link BTree} or derived class MUST provide a public constructor with the
+     * following signature: <code>
+     * 
+     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * 
+     * </code>
+     * 
+     * @param store
+     *            The store.
+     * @param addr
+     *            The address of the {@link BTreeMetadata} record for that
+     *            class.
+     * 
+     * @return The {@link BTree} or derived class loaded from that
+     *         {@link BTreeMetadata} record.
+     * 
+     * @see BTree#newMetadata(), which MUST be overloaded if you subclass
+     *      {@link BTreeMetadata} in order to store extended metadata.
+     */
+    public static BTree load(IRawStore store, long addr) {
+        
+        BTreeMetadata metadata = BTreeMetadata.read(store, addr);
+        
+        try {
+            
+            Class cl = Class.forName(metadata.className);
+            
+            Constructor ctor = cl.getConstructor(new Class[] {
+                    IRawStore.class, BTreeMetadata.class });
+            
+            BTree btree = (BTree) ctor.newInstance(new Object[] { store,
+                    metadata });
+            
+            return btree;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
 

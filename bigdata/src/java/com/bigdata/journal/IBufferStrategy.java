@@ -86,10 +86,6 @@ public interface IBufferStrategy extends IRawStore, IMROW {
      *            Governs whether or not the journal is forced to stable storage
      *            and whether or not the file metadata for the journal is forced
      *            to stable storage. See {@link Options#FORCE_ON_COMMIT}.
-     * 
-     * @todo this is basically an atomic commit. Reconcile it with
-     *       {@link IAtomicStore#commit()}. Note that the latter works with
-     *       registered committers, while this does not.
      */
     public void writeRootBlock(IRootBlockView rootBlock,
             ForceEnum forceOnCommitEnum);

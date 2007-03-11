@@ -57,7 +57,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * Test restart safety for the various indices.

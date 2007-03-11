@@ -57,6 +57,7 @@ import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentMerger;
 import com.bigdata.objndx.Leaf;
+import com.bigdata.scaleup.IsolatablePartitionedIndexView;
 
 /**
  * <p>
@@ -137,7 +138,7 @@ import com.bigdata.objndx.Leaf;
  * @todo The read-only view must be against the partitioned index, not just the
  *       btree on the journal. the UnisolatedBTree is different in that it reads
  *       against a view and writes on the UnisolatedBTree. In fact, this is
- *       precisely how the PartitionedIndex works already. All that we have to
+ *       precisely how the PartitionedIndexView works already. All that we have to
  *       do is to construct the view from the historical committed state from
  *       which the transaction emerges. In order to do this, we need to be able
  *       to recover prior historical states of btrees which we could do by
@@ -192,8 +193,8 @@ import com.bigdata.objndx.Leaf;
  *       correctly process delete markers (this applies to the batch api as
  *       well). The place to do this is probably where the btrees are created
  *       using an IsolatedBtree class (extends BTree or perhaps just implements
- *       {@link IIndex} so that we can use it in combination with the FusedView
- *       to support partitioned indices). FusedView will also need to be
+ *       {@link IIndex} so that we can use it in combination with the ReadOnlyFusedView
+ *       to support partitioned indices). ReadOnlyFusedView will also need to be
  *       modified to support delete markers and could thrown an exception if the
  *       version counters were out of the expected order (so could the leaf
  *       merge iterator). The UnisolatedBTree would always use the
@@ -207,7 +208,7 @@ import com.bigdata.objndx.Leaf;
  * 
  * @see UnisolatedBTree
  * @see IsolatableFusedView
- * @see IsolatablePartitionedIndex
+ * @see IsolatablePartitionedIndexView
  * @see IndexSegmentMerger
  * @see Journal
  * @see Tx

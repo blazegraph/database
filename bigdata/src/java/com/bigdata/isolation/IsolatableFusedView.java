@@ -48,17 +48,17 @@ Modifications:
 package com.bigdata.isolation;
 
 import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.ReadOnlyFusedView;
 
 /**
- * A {@link FusedView} that understands how to process delete markers.
+ * An {@link IFusedView} that understands how to process delete markers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @todo refactor to isolate and override the merge rule.
  */
-public class IsolatableFusedView extends FusedView implements IIsolatableIndex {
+public class IsolatableFusedView extends ReadOnlyFusedView implements IIsolatableIndex {
 
     /**
      * @param src1

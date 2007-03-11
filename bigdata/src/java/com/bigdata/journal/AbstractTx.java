@@ -73,10 +73,10 @@ abstract public class AbstractTx implements ITx {
     /**
      * The start startTime assigned to this transaction.
      * <p>
-     * Note: Transaction {@link #startTime} and {@link #commitTime}s
-     * are assigned by a global time service. The time service must provide
-     * unique times for transaction start and commit timestamps and for commit
-     * times for unisolated {@link Journal#commit()}s.
+     * Note: Transaction {@link #startTime} and {@link #commitTime}s are
+     * assigned by a global time service. The time service must provide unique
+     * times for transaction start and commit timestamps and commit times for
+     * unisolated {@link Journal#commit()}s.
      */
     final protected long startTime;
     

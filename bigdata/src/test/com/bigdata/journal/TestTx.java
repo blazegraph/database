@@ -732,7 +732,7 @@ public class TestTx extends ProxyTestCase {
 //            Journal journal = new Journal(properties);
 //
 //            // Transaction begins before the write.
-//            IStore tx0 = new Tx(journal,0);
+//            IIndexStore tx0 = new Tx(journal,0);
 //
 //            // Write a random data version for id 0.
 //            final int id0 = 1;
@@ -751,7 +751,7 @@ public class TestTx extends ProxyTestCase {
 //            assertNotFound(tx0.read(id0, null));
 //
 //            // Transaction begins after the write.
-//            IStore tx1 = new Tx(journal,1);
+//            IIndexStore tx1 = new Tx(journal,1);
 //
 //            /*
 //             * Verify that the version shows up in a transaction created after

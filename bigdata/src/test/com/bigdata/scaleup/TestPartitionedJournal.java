@@ -60,8 +60,8 @@ import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.scaleup.PartitionedJournal.MergePolicy;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.MergePolicy;
+import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * @todo update how we create and get rid of the temporary files created by the
@@ -138,7 +138,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         properties.setProperty(Options.BASENAME,getName());
         
-        PartitionedJournal journal = new PartitionedJournal(properties);
+        MasterJournal journal = new MasterJournal(properties);
         
         final String name = "abc";
         
@@ -148,9 +148,9 @@ public class TestPartitionedJournal extends TestCase2 {
         
         index = journal.registerIndex(name, index);
         
-        assertTrue(journal.getIndex(name) instanceof PartitionedIndex);
+        assertTrue(journal.getIndex(name) instanceof PartitionedIndexView);
         
-        assertEquals("name", name, ((PartitionedIndex) journal.getIndex(name))
+        assertEquals("name", name, ((PartitionedIndexView) journal.getIndex(name))
                 .getName());
         
         MetadataIndex mdi = journal.getSlave().getMetadataIndex(name);
@@ -174,12 +174,12 @@ public class TestPartitionedJournal extends TestCase2 {
             /*
              * re-open the journal and test restart safety.
              */
-            journal = new PartitionedJournal(properties);
+            journal = new MasterJournal(properties);
 
-            index = (PartitionedIndex) journal.getIndex(name);
+            index = (PartitionedIndexView) journal.getIndex(name);
 
             assertNotNull("btree", index);
-            assertEquals("entryCount", 1, ((PartitionedIndex)index).getBTree().getEntryCount());
+            assertEquals("entryCount", 1, ((PartitionedIndexView)index).getBTree().getEntryCount());
             assertEquals(v0, (byte[])index.lookup(k0));
 
             journal.dropIndex(name);
@@ -204,7 +204,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         properties.setProperty(Options.BASENAME,getName());
         
-        PartitionedJournal journal = new PartitionedJournal(properties);
+        MasterJournal journal = new MasterJournal(properties);
         
         final String name = "abc";
         
@@ -238,7 +238,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         properties.setProperty(Options.BASENAME,getName());
         
-        PartitionedJournal journal = new PartitionedJournal(properties);
+        MasterJournal journal = new MasterJournal(properties);
         
         final String name = "abc";
         
@@ -288,7 +288,7 @@ public class TestPartitionedJournal extends TestCase2 {
         properties.setProperty(Options.MERGE_POLICY,
                 MergePolicy.CompactingMerge.toString());
         
-        PartitionedJournal journal = new PartitionedJournal(properties);
+        MasterJournal journal = new MasterJournal(properties);
         
         final String name = "abc";
         
@@ -322,7 +322,7 @@ public class TestPartitionedJournal extends TestCase2 {
         /*
          * Verify that the btree is empty.
          */
-        assertEquals(0, ((PartitionedIndex) journal.getIndex(name)).getBTree()
+        assertEquals(0, ((PartitionedIndexView) journal.getIndex(name)).getBTree()
                 .getEntryCount());
 
         journal.dropIndex(name);
@@ -353,7 +353,7 @@ public class TestPartitionedJournal extends TestCase2 {
         properties.setProperty(Options.MERGE_POLICY,
                 MergePolicy.CompactingMerge.toString());
         
-        PartitionedJournal journal = new PartitionedJournal(properties);
+        MasterJournal journal = new MasterJournal(properties);
         
         final String name = "abc";
         
@@ -409,7 +409,7 @@ public class TestPartitionedJournal extends TestCase2 {
             /*
              * Verify that the btree is empty.
              */
-            assertEquals(0, ((PartitionedIndex) journal.getIndex(name))
+            assertEquals(0, ((PartitionedIndexView) journal.getIndex(name))
                     .getBTree().getEntryCount());
 
             /* 

@@ -54,7 +54,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.Options;
 import com.bigdata.rawstore.Bytes;
 
 /**

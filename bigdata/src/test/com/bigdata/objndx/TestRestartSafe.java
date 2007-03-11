@@ -203,8 +203,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         
             journal = reopenStore(journal);
             
-            final BTree btree = new BTree(journal, BTreeMetadata.read(journal,
-                    addr1));
+            final BTree btree = BTree.load(journal, addr1);
             
             assertTrue(btree.dump(Level.DEBUG,System.err));
             

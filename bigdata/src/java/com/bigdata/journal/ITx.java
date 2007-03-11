@@ -56,7 +56,7 @@ import com.bigdata.objndx.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITx extends IStore {
+public interface ITx extends IIndexStore {
 
     /**
      * The start time for the transaction as assigned by a centralized

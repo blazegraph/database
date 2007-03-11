@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.SimpleEntry;
-import com.bigdata.scaleup.PartitionedJournal;
+import com.bigdata.scaleup.MasterJournal;
 
 /**
  * Test suite for api supporting registration, lookup, use, and atomic commit
@@ -67,7 +67,7 @@ import com.bigdata.scaleup.PartitionedJournal;
  *       journal without a commit causes the named btree to be lost.
  * 
  * @todo reuse this test suite to test the basic features of a
- *       {@link PartitionedJournal}.
+ *       {@link MasterJournal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

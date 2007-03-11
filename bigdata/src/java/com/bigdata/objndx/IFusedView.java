@@ -55,6 +55,11 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IFusedView {
+public interface IFusedView extends IIndex {
 
+    /**
+     * Return the ordered array of sources from which the fused view is reading.
+     */
+    public AbstractBTree[] getSources();
+    
 }

@@ -54,7 +54,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * Base class for test suites for inference engine and the magic sets

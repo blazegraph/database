@@ -93,10 +93,22 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager,
     public IIndex getIndex(String name);
 
     /**
-     * Return the named index isolated by the transaction having the
-     * specified start time.
+     * Return the named index as isolated by the transaction having the
+     * specified transaction start time.
      * 
-     * @param startTime The transaction start time.
+     * @param name
+     *            The index name.
+     * @param startTime
+     *            The transaction start time, which serves as the unique
+     *            identifier for the transaction.
+     * 
+     * @return The isolated index.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>
+     * 
+     * @exception IllegalStateException
+     *                if there is no active transaction with that timestamp.
      */
     public IIndex getIndex(String name, long startTime);
 

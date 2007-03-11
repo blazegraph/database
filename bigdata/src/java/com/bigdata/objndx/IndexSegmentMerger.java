@@ -84,7 +84,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       whether it should be maintained on the {@link IndexSegmentMetadata} as
  *       well.
  * 
- * @see {@link FusedView}, which provides a dynamic view of two or more btrees.
+ * @see {@link ReadOnlyFusedView}, which provides a dynamic view of two or more btrees.
  *      However, this class is more efficient when we are going to do a bulk
  *      merge operation since it performs the merge and computes the #of output
  *      entries in one pass.

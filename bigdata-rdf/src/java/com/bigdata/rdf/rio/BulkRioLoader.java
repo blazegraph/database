@@ -69,7 +69,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.scaleup.PartitionedJournal;
+import com.bigdata.scaleup.MasterJournal;
 
 /**
  * Bulk loader statement handler for the RIO RDF Parser that collects distinct
@@ -353,7 +353,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * @todo and hash lookup of the index segments iff open (isolate as
      *       getTermIndices:Iterator<IndexSegment>?)
      * 
-     * @deprecated Replace this with the use of a {@link PartitionedJournal}.
+     * @deprecated Replace this with the use of a {@link MasterJournal}.
      */
     public static class Indices {
     

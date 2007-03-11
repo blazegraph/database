@@ -56,7 +56,7 @@ import com.bigdata.objndx.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndexManager extends IStore {
+public interface IIndexManager extends IIndexStore {
 
     /**
      * Register a named index. Once registered the index will participate in

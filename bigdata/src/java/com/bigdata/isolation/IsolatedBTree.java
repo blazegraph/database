@@ -52,7 +52,6 @@ import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.ByteArrayValueSerializer;
-import com.bigdata.objndx.FusedView;
 import com.bigdata.objndx.IBatchBTree;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.ILinearList;
@@ -166,7 +165,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * @todo This constructor is somewhat different since it requires access to
      *       a persistence capable parameter in order to reconstruct the view.
      *       Consider whether or not this can be refactored per
-     *       {@link BTreeMetadata#load(IRawStore, long)}.
+     *       {@link BTree#load(IRawStore, long)}.
      */
     public IsolatedBTree(IRawStore store, BTreeMetadata metadata, UnisolatedBTree src) {
 
@@ -334,11 +333,13 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
-        // FIXME we need a version of FusedView that is aware of delete markers
-        // and that applies them such that a key deleted in the write set will
-        // not have a value reported from the isolated index.
+        /*
+         * This uses a version of ReadOnlyFusedView that is aware of delete markers and
+         * that applies them such that a key deleted in the write set will not
+         * have a value reported from the isolated index.
+         */
         
-        return new FusedView(this,src).rangeIterator(fromKey, toKey);
+        return new IsolatableFusedView(this,src).rangeIterator(fromKey, toKey);
         
     }
 
@@ -348,7 +349,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      */
     public IEntryIterator entryIterator() {
 
-        return new FusedView(this,src).rangeIterator(null,null);
+        return rangeIterator(null,null);
         
     }
 

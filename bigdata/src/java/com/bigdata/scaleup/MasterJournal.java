@@ -68,7 +68,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.IFusedView;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
@@ -80,10 +80,10 @@ import com.bigdata.rawstore.Bytes;
 
 /**
  * <p>
- * A store that supports {@link PartitionedIndex}s.
+ * A store that supports {@link PartitionedIndexView}s.
  * </p>
  * <p>
- * A {@link PartitionedIndex} is an {@link IIndex} that is dynamically
+ * A {@link PartitionedIndexView} is an {@link IIndex} that is dynamically
  * decomposed into key-range partitions. Each partition is defined by a
  * <i>separator key</i>. The separator key is the first key that may be
  * inserted into, or read from, that partition. A total ordering over partitions
@@ -102,19 +102,19 @@ import com.bigdata.rawstore.Bytes;
  * <p>
  * All writes bound for any partition of any index are absorbed on the
  * {@link Journal} to which that partition has been assigned. For each
- * {@link PartitionedIndex}, there is a corresponding {@link BTree} that
+ * {@link PartitionedIndexView}, there is a corresponding {@link BTree} that
  * absorbs writes (including deletes) on the {@link Journal}. The
- * {@link PartitionedJournal} actually delegates all storage services to a
+ * {@link MasterJournal} actually delegates all storage services to a
  * {@link SlaveJournal}. When the {@link SlaveJournal} {@link #overflow()}s,
  * it is frozen and a new {@link SlaveJournal} is deployed to absorb further
- * writes. During this time, reads on the {@link PartitionedJournal} are served
- * by a {@link FusedView} of the data on the new {@link SlaveJournal} and the
- * data on the old {@link SlaveJournal}.
+ * writes. During this time, reads on the {@link MasterJournal} are served by an
+ * {@link IFusedView} of the data on the new {@link SlaveJournal} and the data
+ * on the old {@link SlaveJournal}.
  * </p>
  * <p>
  * While reads and writes proceed in the foreground on the new
  * {@link SlaveJournal}, a background thread builds an {@link IndexSegment}
- * from each modified {@link BTree} corresponding to a {@link PartitionedIndex}.
+ * from each modified {@link BTree} corresponding to a {@link PartitionedIndexView}.
  * Note that we would be free to delete the old {@link SlaveJournal} and old
  * {@link IndexSegment}s except that concurrent transactions may still need to
  * read from historical states which would be lost by the merge. However,
@@ -252,10 +252,10 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionedJournal implements IJournal {
+public class MasterJournal implements IJournal {
 
     /**
-     * The {@link Journal} currently serving requests for the store.
+     * The {@link SlaveJournal} currently serving requests for the master.
      */
     private SlaveJournal slave;
 
@@ -343,7 +343,7 @@ public class PartitionedJournal implements IJournal {
     protected final MergePolicy mergePolicy;
     
     /**
-     * Options for the {@link PartitionedJournal}.
+     * Options for the {@link MasterJournal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -379,7 +379,7 @@ public class PartitionedJournal implements IJournal {
          * <code>migrationThreshold</code> - The name of a property whose
          * value is the minimum #of entries in a btree before the btree will be
          * evicted to to an {@link IndexSegment} on
-         * {@link PartitionedJournal#overflow()}.  A btree with fewer entries is
+         * {@link MasterJournal#overflow()}.  A btree with fewer entries is
          * simply copied onto the new slave.
          */
         public static final String MIGRATION_THRESHOLD = "migrationThreshold";
@@ -401,7 +401,7 @@ public class PartitionedJournal implements IJournal {
     /**
      * Create a new slave capable of supporting partitioned indices. 
      */
-    public PartitionedJournal(Properties properties) {
+    public MasterJournal(Properties properties) {
         
         String val;
         int migrationThreshold = 1000; // default.
@@ -546,7 +546,7 @@ public class PartitionedJournal implements IJournal {
      * @param properties
      * @return
      */
-    protected SlaveJournal createSlave(PartitionedJournal master, Properties properties ) {
+    protected SlaveJournal createSlave(MasterJournal master, Properties properties ) {
         
         return new SlaveJournal(this,properties);
         
@@ -748,23 +748,23 @@ public class PartitionedJournal implements IJournal {
         while(itr.hasNext()) {
 
             /*
-             * The name of a PartitionedIndex.
+             * The name of a PartitionedIndexView.
              */
             final String name = ((Entry) itr.next()).name;
             
             /*
-             * The named PartitionedIndex.
+             * The named PartitionedIndexView.
              */
-            final PartitionedIndex oldIndex = ((PartitionedIndex) getIndex(name));
+            final PartitionedIndexView oldIndex = ((PartitionedIndexView) getIndex(name));
             
             /*
-             * The mutable btree on the slave for the named PartitionedIndex.
+             * The mutable btree on the slave for the named PartitionedIndexView.
              */
             final BTree oldBTree = oldIndex.btree;
 
             /*
              * The metadata index describing the partitions for the named
-             * PartitionedIndex.
+             * PartitionedIndexView.
              */
             final MetadataIndex mdi = oldJournal.getMetadataIndex(name);
 
@@ -874,7 +874,7 @@ public class PartitionedJournal implements IJournal {
      * @param mdi
      *            The metadata index defining the partitions for the btree.
      */
-    protected void evict(String name, PartitionedIndex oldIndex,
+    protected void evict(String name, PartitionedIndexView oldIndex,
             MetadataIndex mdi) throws IOException {
 
         /*
@@ -948,10 +948,10 @@ public class PartitionedJournal implements IJournal {
 
             System.err.println("Evicting and merging with existing segment.");
 
-            final FusedView view = (FusedView)oldIndex.getView(separatorKey);
+            final IFusedView view = (IFusedView)oldIndex.getView(separatorKey);
             
             // @todo assumes only one live index segment for the partition.
-            final IndexSegment seg = (IndexSegment)view.srcs[1];
+            final IndexSegment seg = (IndexSegment)view.getSources()[1];
 
             // output file for the merged segment.
             File outFile = getSegmentFile(name, pmd.partId, segId);
@@ -1288,7 +1288,7 @@ public class PartitionedJournal implements IJournal {
      * 
      * @todo we need a coherent approach to managing the open index segments.
      *       there are notes on this in
-     *       {@link PartitionedIndex#openIndexSegments(PartitionMetadata)} and
+     *       {@link PartitionedIndexView#openIndexSegments(PartitionMetadata)} and
      *       {@link #getIndex(String, IResourceMetadata)}. We need to explictly
      *       close index segments (or rather their backing file store) when they
      *       are no longer in use.

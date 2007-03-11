@@ -46,12 +46,12 @@ package com.bigdata.scaleup;
 import java.io.File;
 import java.util.Properties;
 
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
@@ -81,15 +81,15 @@ public class SlaveJournal extends Journal {
      */
     protected Name2MetadataAddr name2MetadataAddr;
 
-    private final PartitionedJournal master;
+    private final MasterJournal master;
     
-    protected PartitionedJournal getMaster() {
+    protected MasterJournal getMaster() {
 
         return master;
         
     }
     
-    public SlaveJournal(PartitionedJournal master,Properties properties) {
+    public SlaveJournal(MasterJournal master,Properties properties) {
         
         super(properties);
         
@@ -154,7 +154,7 @@ public class SlaveJournal extends Journal {
              * Reload the btree from its root address.
              */
 
-            name2MetadataAddr = (Name2MetadataAddr)BTreeMetadata
+            name2MetadataAddr = (Name2MetadataAddr)BTree
                     .load(this, addr);
 
         }
@@ -165,9 +165,9 @@ public class SlaveJournal extends Journal {
     }
 
     /**
-     * Registers and returns a {@link PartitionedIndex} under the given name and
+     * Registers and returns a {@link PartitionedIndexView} under the given name and
      * assigns an {@link UnisolatedBTree} to absorb writes for that
-     * {@link PartitionedIndex}. The resulting index will support transactional
+     * {@link PartitionedIndexView}. The resulting index will support transactional
      * isolation.
      * <p>
      * A {@link MetadataIndex} is also registered under the given name and an
@@ -175,8 +175,8 @@ public class SlaveJournal extends Journal {
      * <code>new byte[]{}</code>. The partition will initially consist of
      * zero {@link IndexSegment}s.
      * <p>
-     * Note: The returned object is invalid once the {@link PartitionedJournal}
-     * {@link PartitionedJournal#overflow()}s.
+     * Note: The returned object is invalid once the {@link MasterJournal}
+     * {@link MasterJournal#overflow()}s.
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
@@ -188,17 +188,17 @@ public class SlaveJournal extends Journal {
     }
     
     /**
-     * Registers and returns a {@link PartitionedIndex} under the given name and
+     * Registers and returns a {@link PartitionedIndexView} under the given name and
      * assigns the supplied {@link IIndex} to absorb writes for that
-     * {@link PartitionedIndex}.
+     * {@link PartitionedIndexView}.
      * <p>
      * A {@link MetadataIndex} is also registered under the given name and an
      * initial partition for that index is created using the separator key
      * <code>new byte[]{}</code>. The partition will initially consist of
      * zero {@link IndexSegment}s.
      * <p>
-     * Note: The returned object is invalid once the {@link PartitionedJournal}
-     * {@link PartitionedJournal#overflow()}s.
+     * Note: The returned object is invalid once the {@link MasterJournal}
+     * {@link MasterJournal#overflow()}s.
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
@@ -242,32 +242,74 @@ public class SlaveJournal extends Journal {
         name2MetadataAddr.add(name, mdi);
 
         /*
-         * Now register the partitioned index on the super class.
+         * Now register the view on the super class. The view will delegate
+         * writes and the commit protocol to the btree specified by the caller,
+         * but will support index partitions and will read from a fused view of
+         * the resources for each index partition.
          */
-        return super.registerIndex(name, new PartitionedIndex(
-                (BTree) btree, mdi));
+        return super.registerIndex(name, getView((BTree) btree, mdi));
         
     }
     
+    /**
+     * Returns a {@link PartitionedIndexView} or
+     * {@link IsolatablePartitionedIndexView} depending on whether or not the
+     * named index supports isolation.
+     */
     public IIndex getIndex(String name) {
 
+        /*
+         * Obtain the persistence capable index. If this is a cache hit, then it
+         * will be the view. Otherwise this will be either a BTree or an
+         * UnisolatedBTree that was just loaded from the store and we will have
+         * to wrap it up as a view.
+         */
         IIndex index = super.getIndex(name);
-        
-        if(index instanceof BTree) {
+
+        if (index instanceof BTree) {
+
+            /*
+             * Wrap up the mutable B+-Tree responsible for absorbing writes as
+             * a view.
+             */
             
-            index = new PartitionedIndex((BTree)index,getMetadataIndex(name));
+            MetadataIndex mdi = getMetadataIndex(name);
             
+            /*
+             * Choose the type of view based on whether or not the registered index
+             * supports isolation.
+             */
+            index = getView((BTree)index,mdi);
+
         }
 
         return index;
-        
+
     }
 
     /**
-     * Return the {@link MetadataIndex} for the named {@link PartitionedIndex}.
-     * This object is used to maintain the definitions of the partitions for
-     * that index, including where each file is located that contains live data
-     * for the index.
+     * Choose the type of view based on whether or not the registered index
+     * supports isolation.
+     */
+    private PartitionedIndexView getView(BTree btree, MetadataIndex mdi) {
+        
+        if (btree instanceof IIsolatableIndex) {
+            
+            return new IsolatablePartitionedIndexView((UnisolatedBTree) btree,
+                    mdi);
+        } else {
+            
+            return new PartitionedIndexView((BTree) btree, mdi);
+    
+        }
+
+    }
+    
+    /**
+     * Return the {@link MetadataIndex} for the named
+     * {@link PartitionedIndexView}. This object is used to maintain the
+     * definitions of the partitions for that index, including where each
+     * resource is located that contains data for each partition of the index.
      */
     public MetadataIndex getMetadataIndex(String name) {
 
@@ -278,16 +320,17 @@ public class SlaveJournal extends Journal {
     }
 
     /**
-     * FIXME write tests. use to clean up the test suites. note that we can
-     * not drop files until we have done an atomic commit. also note that
+     * FIXME write tests. use to clean up the test suites. note that we can not
+     * drop files until we have done an atomic commit. also note that
      * restart-safe removal of files is not going to happen without some
-     * additional sophistication.  one solution is to periodically compare
-     * the named indices and the segments directory, either deleting or
+     * additional sophistication, eg, placing a task to schedule deletion of
+     * resources onto the restart safe schedule. one solution is to periodically
+     * compare the named indices and the segments directory, either deleting or
      * flagging for an operator those things which do not belong.
      */
     public void dropIndex(String name) {
         
-        PartitionedIndex ndx = (PartitionedIndex) getIndex(name);
+        PartitionedIndexView ndx = (PartitionedIndexView) getIndex(name);
         
         if (ndx == null)
             throw new IllegalArgumentException("Not registered: " + name);

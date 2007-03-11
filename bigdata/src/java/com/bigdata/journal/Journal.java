@@ -63,12 +63,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.scaleup.PartitionedJournal.Options;
+import com.bigdata.scaleup.MasterJournal.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -107,30 +106,31 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * FIXME Priority items are:
  * <ol>
- * <li> Transaction isolation (correctness tests, isolatedbtree tests, fused
- * view tests).</li>
  * <li> Concurrent load for RDFS w/o rollback.</li>
  * <li> Group commit for higher transaction throughput.<br>
- * Note: TPS is basically constant for a given combination of the buffer mode
- * and whether or not commits are forced to disk. This means that the #of
- * clients is not a strong influence on performance. The big wins are Transient
- * and Force := No since neither conditions synchs to disk. This suggests that
- * the big win for TPS throughput is going to be group commit. </li>
- * <li> Scale out database (automatic re-partitioning of indices and processing
+ * Note: For short transactions, TPS is basically constant for a given
+ * combination of the buffer mode and whether or not commits are forced to disk.
+ * This means that the #of clients is not a strong influence on performance. The
+ * big wins are Transient and Force := No since neither conditions synchs to
+ * disk. This suggests that the big win for TPS throughput is going to be group
+ * commit. </li>
+ * <li> Scale-up database (automatic re-partitioning of indices and processing
  * of deletion markers).</li>
  * <li> AIO for the Direct and Disk modes.</li>
- * <li> Distributed database protocols.</li>
- * <li> Segment server (mixture of journal server and read-optimized database
+ * <li> GOM integration, including: support for primary key (clustered) indices;
+ * using queues from GOM to journal/database segment server supporting both
+ * embedded and remote scenarios; and using state-based conflict resolution to
+ * obtain high concurrency for generic objects, link set metadata, and indices.</li>
+ * <li> Scale-out database, including:
+ * <ul>
+ * <li> Data server (mixture of journal server and read-optimized database
  * server).</li>
- * <li> Testing of an "embedded database" using both a journal only and a
- * journal + read-optimized database design. This can be tested up to the GPO
- * layer.</li>
- * <li>Support primary key (clustered) indices in GPO/PO layer.</li>
- * <li>Implement backward validation and state-based conflict resolution with
- * custom merge rules for RDFS, persistent objects, generic objects, and primary
- * key indices, and secondary indexes.</li>
- * <li> Architecture using queues from GOM to journal/database segment server
- * supporting both embedded and remote scenarios.</li>
+ * <li> Transaction service (low-latency with failover).</li>
+ * <li> Metadata index services (one per named index with failover).</li>
+ * <li> Resource reclaimation. </li>
+ * <li> Job scheduler to map functional programs across the data (possible
+ * Hadoop integration point).</li>
+ * </ul>
  * </ol>
  * 
  * @todo There is a dependency in a distributed database architecture on
@@ -548,11 +548,6 @@ public class Journal implements IJournal {
 
                     val = File.createTempFile("bigdata-" + bufferMode + "-",
                             ".jnl", tmpDir).toString();
-
-//                    // the file that gets opened.
-//                    properties.setProperty(Options.FILE, val);
-//                    // turn off this property to facilitate re-open of the same file.
-//                    properties.setProperty(Options.CREATE_TEMP_FILE,"false");
                     
                 } catch(IOException ex) {
                     
@@ -934,10 +929,10 @@ public class Journal implements IJournal {
      * {@link ICommitter#handleCommit()}. The {@link Addr address} returned by
      * that method is the address from which the {@link ICommitter} may be
      * reloaded (and its previous address if its state has not changed). That
-     * address is saved in the slot of the root block under which that committer
-     * was {@link #registerCommitter(int, ICommitter) registered}. We then
-     * force the data to stable store, update the root block, and force the root
-     * block and the file metadata to stable store.
+     * address is saved in the {@link ICommitRecord} under the index for which
+     * that committer was {@link #registerCommitter(int, ICommitter) registered}.
+     * We then force the data to stable store, update the root block, and force
+     * the root block and the file metadata to stable store.
      */
     public long commit() {
 
@@ -946,9 +941,9 @@ public class Journal implements IJournal {
     }
 
     /**
-     * Handle the {@link #commit()} and integrations with transaction support so
-     * that we can update the first and last transaction identifiers on the root
-     * block as necessary.
+     * Handles the {@link #commit()} and integrations with transaction support
+     * so that we can update the first and last transaction identifiers on the
+     * root block as necessary.
      * 
      * @param tx
      *            The transaction that is committing or <code>null</code> if
@@ -1232,7 +1227,7 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            name2Addr = (Name2Addr) BTreeMetadata.load(this, addr);
+            name2Addr = (Name2Addr) BTree.load(this, addr);
 
         }
 
@@ -1275,7 +1270,7 @@ public class Journal implements IJournal {
              * Reload the btree from its root address.
              */
 
-            ndx = (CommitRecordIndex) BTreeMetadata.load(this, addr);
+            ndx = (CommitRecordIndex) BTree.load(this, addr);
 
         }
 
@@ -1366,7 +1361,7 @@ public class Journal implements IJournal {
          * @todo cache these results in a weak value cache.
          */
 
-        return ((Name2Addr) BTreeMetadata.load(this, commitRecord
+        return ((Name2Addr) BTree.load(this, commitRecord
                 .getRootAddr(ROOT_NAME2ADDR))).get(name);
 
     }

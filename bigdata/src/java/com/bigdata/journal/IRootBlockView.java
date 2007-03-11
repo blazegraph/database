@@ -50,7 +50,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 import com.bigdata.rawstore.Addr;
-import com.bigdata.scaleup.PartitionedJournal;
+import com.bigdata.scaleup.MasterJournal;
 
 /**
  * Interface for a root block on the journal. The root block provides metadata
@@ -170,7 +170,7 @@ public interface IRootBlockView {
      * quickly recover the root addresses for a given commit timestamp, which is
      * a featured used to support transactional isolation.
      * <p>
-     * Note: When using a {@link PartitionedJournal} the {@link Addr address} of
+     * Note: When using a {@link MasterJournal} the {@link Addr address} of
      * the {@link ICommitRecord} MAY refer to a historical {@link SlaveJournal}
      * and care MUST be exercised to resolve the address against the appropriate
      * {@link SlaveJournal}.

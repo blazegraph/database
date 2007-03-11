@@ -43,9 +43,12 @@
  */
 package com.bigdata.scaleup;
 
-
+import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -63,6 +66,12 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @todo mutation operations need to be synchronized.
  * 
+ * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
+ *       to support the {@link IsolatedBTree}s in use by a {@link Tx}. Deletes
+ *       of old journals and index segments MUST be deferred until no
+ *       transaction remains which can read those data. This metadata must be
+ *       restart-safe so that resources are eventually deleted.
+ *       
  * @todo define a UUID so that is at least possible to rename a partitioned
  *       index? the uuid would be store in the metadata record for the metadata
  *       index and in each index segment generated for that metadata index. we
@@ -77,13 +86,13 @@ public class MetadataIndex extends BTree {
 
     /**
      * The name of the metadata index, which is the always the same as the name
-     * under which the corresponding {@link PartitionedIndex} was registered.
+     * under which the corresponding {@link PartitionedIndexView} was registered.
      */
     private final String name;
     
     /**
      * The name of the metadata index, which is the always the same as the name
-     * under which the corresponding {@link PartitionedIndex} was registered.
+     * under which the corresponding {@link PartitionedIndexView} was registered.
      */
     final public String getName() {
         
@@ -100,7 +109,7 @@ public class MetadataIndex extends BTree {
      *            The branching factor.
      * @param name
      *            The name of the metadata index - this MUST be the name under
-     *            which the corresponding {@link PartitionedIndex} was
+     *            which the corresponding {@link PartitionedIndexView} was
      *            registered.
      */
     public MetadataIndex(IRawStore store, int branchingFactor, String name) {
@@ -138,7 +147,7 @@ public class MetadataIndex extends BTree {
         
         /**
          * The name of the metadata index, which is the always the same as the name
-         * under which the corresponding {@link PartitionedIndex} was registered.
+         * under which the corresponding {@link PartitionedIndexView} was registered.
          */
         public final String name;
         

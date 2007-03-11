@@ -59,17 +59,23 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo support N sources for a {@link FusedView} by chaining together multiple
- *       {@link FusedView} instances if not in a more efficient manner.
+ * @todo support N sources for a {@link ReadOnlyFusedView} by chaining together multiple
+ *       {@link ReadOnlyFusedView} instances if not in a more efficient manner.
  */
-public class FusedView implements IIndex, IFusedView {
+public class ReadOnlyFusedView implements IIndex, IFusedView {
 
     /**
      * Holds the various btrees that are the sources for the view.
      */
     public final AbstractBTree[] srcs;
     
-    public FusedView(AbstractBTree src1, AbstractBTree src2) {
+    public AbstractBTree[] getSources() {
+        
+        return srcs;
+        
+    }
+    
+    public ReadOnlyFusedView(AbstractBTree src1, AbstractBTree src2) {
         
         this(new AbstractBTree[] { src1, src2 });
         
@@ -83,7 +89,7 @@ public class FusedView implements IIndex, IFusedView {
      *            for a given key by lookup() and which value is retained by
      *            rangeQuery().
      */
-    public FusedView(final AbstractBTree[] srcs) {
+    public ReadOnlyFusedView(final AbstractBTree[] srcs) {
         
         if (srcs == null)
             throw new IllegalArgumentException("sources is null");

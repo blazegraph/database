@@ -53,14 +53,14 @@ import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.IndexSegmentMerger;
 
 /**
- * Test suite for {@link PartitionedIndex}.
+ * Test suite for {@link PartitionedIndexView}.
  * 
  * @todo This should be refactored to test when using {@link BTree} as well as
  *       {@link UnisolatedBTree}. The latter is more important for database
  *       operations as it supports isolation and column stores.  Changing over
  *       from {@link BTree} to {@link UnisolatedBTree} highlights many assumptions
  *       in {@link IndexSegmentBuilder}, {@link IndexSegmentMerger}, and the
- *       code that handles {@link PartitionedJournal#overflow()}.
+ *       code that handles {@link MasterJournal#overflow()}.
  * 
  * @todo where possible, it would be nice to leverage the unit tests for the
  *       mutable btree. note that rangeCount does not have the same behavior for

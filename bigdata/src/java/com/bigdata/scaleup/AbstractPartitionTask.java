@@ -99,7 +99,7 @@ import com.bigdata.rawstore.Bytes;
 abstract public class AbstractPartitionTask implements
         IPartitionTask {
 
-    protected final PartitionedJournal master;
+    protected final MasterJournal master;
     /**
      * Branching factor used for generated {@link IndexSegment}(s). 
      */
@@ -170,7 +170,7 @@ abstract public class AbstractPartitionTask implements
      *       scheduled operations MUST abort and new operations with the
      *       correct separator keys must be scheduled.
      */
-    public AbstractPartitionTask(PartitionedJournal master, String name,
+    public AbstractPartitionTask(MasterJournal master, String name,
             int branchingFactor, double errorRate, int partId,
             byte[] fromKey, byte[] toKey) {
 
@@ -226,7 +226,7 @@ abstract public class AbstractPartitionTask implements
          * @param segId
          *            The output segment identifier.
          */
-        public BuildTask(PartitionedJournal master, String name,
+        public BuildTask(MasterJournal master, String name,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, IResourceMetadata src, int segId) {
             
@@ -289,7 +289,7 @@ abstract public class AbstractPartitionTask implements
          * @param fullCompactingMerge
          *            True iff this will be a full compacting merge.
          */
-        protected AbstractMergeTask(PartitionedJournal master, String name,
+        protected AbstractMergeTask(MasterJournal master, String name,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, int segId,
                 boolean fullCompactingMerge) {
@@ -428,7 +428,7 @@ abstract public class AbstractPartitionTask implements
          * @param segId
          *            The output segment identifier.
          */
-        public MergeTask(PartitionedJournal master, String name,
+        public MergeTask(MasterJournal master, String name,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, IResourceMetadata[] resources,
                 int segId) {
@@ -482,7 +482,7 @@ abstract public class AbstractPartitionTask implements
          *            The commit time for the view that is the input to the
          *            merge operation.
          */
-        public FullMergeTask(PartitionedJournal master, String name,
+        public FullMergeTask(MasterJournal master, String name,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, long commitTime, int segId) {
 
@@ -495,7 +495,7 @@ abstract public class AbstractPartitionTask implements
 
         protected IResourceMetadata[] getResources() {
             
-            final PartitionedIndex oldIndex = ((PartitionedIndex) master
+            final PartitionedIndexView oldIndex = ((PartitionedIndexView) master
                     .getIndex(name, commitTime));
             
             final IResourceMetadata[] resources = oldIndex.getResources(fromKey);

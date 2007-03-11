@@ -43,8 +43,15 @@ public class Name2Addr extends BTree {
      * the use of the {@link #keyBuilder} and therefore minimizes the relatively
      * expensive operation of encoding unicode names to byte[] keys.
      * 
-     * @todo use a weak value cache so that unused indices may be swept by the
-     *       GC.
+     * FIXME This is the place to solve the resource (RAM) burden for indices is
+     * Name2Addr. Currently, indices are never closed once opened which is a
+     * resource leak. We need to close them out eventually based on LRU plus
+     * timeout plus NOT IN USE. The way to approach this is a weak reference
+     * cache combined with an LRU or hard reference queue that tracks reference
+     * counters (just like the BTree hard reference cache for leaves). Eviction
+     * events lead to closing an index iff the reference counter is zero.
+     * Touches keep recently used indices from closing even though they may have
+     * a zero reference count.
      */
     private Map<String,IIndex> name2BTree = new HashMap<String,IIndex>();
 
@@ -147,7 +154,7 @@ public class Name2Addr extends BTree {
         }
 
         // re-load btree from the store.
-        btree = BTreeMetadata.load(this.store, entry.addr);
+        btree = BTree.load(this.store, entry.addr);
         
         // save name -> btree mapping in transient cache.
         name2BTree.put(name,btree);

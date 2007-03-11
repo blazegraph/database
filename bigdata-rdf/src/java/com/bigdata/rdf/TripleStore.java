@@ -88,7 +88,7 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.scaleup.PartitionedIndex;
+import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.scaleup.SlaveJournal;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -139,7 +139,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * 
  * @todo Refactor to use a delegation mechanism so that we can run with or
  *       without partitioned indices? (All you have to do now is change the
- *       class that is being extended from Journal to PartitionedJournal and
+ *       class that is being extended from Journal to MasterJournal and
  *       handle some different initialization properties.)
  * 
  * @todo the only added cost for a quad store is the additional statement
@@ -396,8 +396,8 @@ public class TripleStore extends /*Partitioned*/Journal {
      * {@link TripleStore} and to cache hard references to those indices.
      * 
      * FIXME setupCommitters and discardCommitters are not invoked when we are
-     * using a {@link PartitionedIndex}.  I need to refactor the apis so that
-     * these methods do not appear on {@link PartitionedIndex} or that they are
+     * using a {@link PartitionedIndexView}.  I need to refactor the apis so that
+     * these methods do not appear on {@link PartitionedIndexView} or that they are
      * correctly invoked by the {@link SlaveJournal}.  I expect that they are
      * not required on {@link IJournal} but only on {@link Journal}.
      */
@@ -409,7 +409,7 @@ public class TripleStore extends /*Partitioned*/Journal {
 
         /*
          * This is here as a work around so that this counter gets initialized
-         * whether or not we are extending Journal vs PartitionedJournal.
+         * whether or not we are extending Journal vs MasterJournal.
          */
         getCounter();
         

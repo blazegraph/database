@@ -78,7 +78,7 @@ package com.bigdata.istore;
  * 
  * @todo Add stream-based operations. Note that very large objects are going to
  *       scale out using an unisolated stream-based API. That API probably
- *       belongs to the {@link IStore} rather than the {@link IOM} since large
+ *       belongs to the {@link IIndexStore} rather than the {@link IOM} since large
  *       streams can not be made transactional (well, they can we a journal
  *       designed for large writes and using a disk-only strategy, but do you
  *       want to bother?) Maybe we should put those methods on IOM so that

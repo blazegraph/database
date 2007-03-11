@@ -45,32 +45,34 @@ Modifications:
  * Created on Feb 12, 2007
  */
 
-package com.bigdata.isolation;
+package com.bigdata.scaleup;
 
+import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionedIndex;
 
 /**
- * A partitioned index that supports transactions and deletion markers.
+ * A {@link PartitionedIndexView} that supports transactions and deletion
+ * markers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME support processing of delete markers. They can exist in the mutable
+ * FIXME implement; support processing of delete markers. They can exist in the mutable
  * btree and in index segments that are not either a clean first eviction or a
  * full compacting merge (e.g., they can still exist in a compacting merge if
- * there are other index segments or btrees that are part of a partition but
- * are not partitipating in the compacting merge). 
+ * there are other index segments or btrees that are part of a partition but are
+ * not partitipating in the compacting merge).
  */
-public class IsolatablePartitionedIndex extends PartitionedIndex implements IIsolatableIndex {
+public class IsolatablePartitionedIndexView extends PartitionedIndexView implements IIsolatableIndex {
 
     /**
      * @param btree
      * @param mdi
      */
-    public IsolatablePartitionedIndex(UnisolatedBTree btree, MetadataIndex mdi) {
+    public IsolatablePartitionedIndexView(UnisolatedBTree btree, MetadataIndex mdi) {
         super(btree, mdi);
+        throw new UnsupportedOperationException();
     }
 
     public boolean contains(byte[] key) {

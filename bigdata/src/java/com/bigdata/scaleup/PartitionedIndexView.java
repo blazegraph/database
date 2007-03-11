@@ -61,25 +61,25 @@ import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.BatchLookup;
 import com.bigdata.objndx.BatchRemove;
 import com.bigdata.objndx.EmptyEntryIterator;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.ReadOnlyFusedView;
 import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.objndx.IFusedView;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key
  * ranges. Each key range is a <i>partition</i>. A partition is defined by the
- * smallest key that can enter that partition. A {@link MetadataIndex} contains
- * the definitions of the partitions. Each partition has a mutable {@link BTree}
- * that will absorb writes for a partition and the same {@link BTree} may be
- * used to absorb writes for multiple partitions of the same index. Periodically
- * the writes on the {@link BTree} are evicted into one or more
- * {@link IndexSegment}s that contain historical read-only data for that
- * partition.
- * <p>
- * The scale up design uses a single {@link Journal journal} to absorb writes
- * for all partitions of all indices and locates all {@link IndexSegment}s on
- * the same host.
+ * lowest value key that can enter that partition (the separator key). A
+ * {@link MetadataIndex} contains the definitions of the partitions. Each
+ * partition has a mutable {@link BTree} that will absorb writes for a
+ * partition. The same {@link BTree} is used to absorb writes distined for any
+ * partitions of the same index on the same {@link Journal}. This class
+ * internally tracks whether or not a write has occurred on each partition. That
+ * information is used to guide eviction decisions when the
+ * {@link Journal#overflow()}s and buffered writes are migrated onto one or
+ * more {@link IndexSegment}s each of which contains historical read-only data
+ * for a single index partition.
  * <p>
  * Writes on a {@link PartitionIndex} simply write through to the {@link BTree}
  * corresponding to that index (having the same name) on the
@@ -87,17 +87,37 @@ import com.bigdata.objndx.IndexSegment;
  * <p>
  * Read operations process the spanned partitions sequence so that the
  * aggregated results are in index order. For each partition, the read request
- * is constructed using a {@link FusedView} of the mutable {@link BTree} used to
- * absorb writes and the live {@link IndexSegment}s for that partition.
+ * is constructed using ah {@link IFusedView} of the mutable {@link BTree} used
+ * to absorb writes and the live {@link IndexSegment}s for that partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo add a restart safe data structure tracking each partition for which
+ *       writes have been absorbed on the {@link Journal}. this could be just
+ *       an ordered set of partition identifiers for which writes have been
+ *       absorbed that is maintained by an insertion sort, an ordered array of
+ *       <partId:writeCounter>, or a btree mapping partition identifiers to
+ *       write counters. The data need to be associated as part of the metadata
+ *       for the btree that is absorbing writes for that partition. The simplest
+ *       way to do this is to subclass BTree or UnisolatedBTree so that they are
+ *       partition aware and automatically track the #of writes destined for
+ *       each partition.
+ * 
+ * @todo For a scale-out solution the clients are responsible for talking with
+ *       the metadata service and locating the data service for each partition.
+ *       The client is responsible for directing the writes to the correct data
+ *       service. The data service simply fronts for the journal and directs the
+ *       writes onto the {@link BTree} absorbing writes for the named index. It
+ *       is a (client) error for a write to be directed to a {@link Journal} not
+ *       tasked with buffering data for the partition into which that write
+ *       should go.
  */
-public class PartitionedIndex implements IIndex, ICommitter {
+public class PartitionedIndexView implements IIndex, ICommitter {
 
     /**
      * The mutable {@link BTree} used to absorb all writes for the
-     * {@link PartitionedIndex}.
+     * {@link PartitionedIndexView}.
      */
     protected final BTree btree;
 
@@ -111,12 +131,12 @@ public class PartitionedIndex implements IIndex, ICommitter {
      * A cache of the fused views for in use partitions.
      * 
      * @todo reconcile this with
-     *       {@link PartitionedJournal#getIndex(String, IResourceMetadata)}
+     *       {@link MasterJournal#getIndex(String, IResourceMetadata)}
      *       which provides a weak value cache for index segments.
      */
-    private final Map<Integer,FusedView> views = new HashMap<Integer,FusedView>();
+    private final Map<Integer,ReadOnlyFusedView> views = new HashMap<Integer,ReadOnlyFusedView>();
 
-    public PartitionedJournal getMaster() {
+    public MasterJournal getMaster() {
         
         return getSlave().getMaster();
         
@@ -153,7 +173,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
         
         IndexSegment[] segs = new IndexSegment[liveCount];
         
-        PartitionedJournal master = getMaster();
+        MasterJournal master = getMaster();
         
         int n = 0;
         
@@ -176,11 +196,11 @@ public class PartitionedIndex implements IIndex, ICommitter {
      */
     protected void closeViews() {
 
-        Iterator<Map.Entry<Integer,FusedView>> itr = views.entrySet().iterator();
+        Iterator<Map.Entry<Integer,ReadOnlyFusedView>> itr = views.entrySet().iterator();
         
         while(itr.hasNext()) {
             
-            FusedView view = itr.next().getValue();
+            ReadOnlyFusedView view = itr.next().getValue();
             
             // @todo assumes one open segment per view.
             IndexSegment seg = (IndexSegment)view.srcs[1];
@@ -205,7 +225,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
      * 
      * @todo use an weak value LRU policy to close out partitions that are not
      *       being actively used. note that we still need to know which
-     *       partitions have been touched on a {@link PartitionedIndex} when we
+     *       partitions have been touched on a {@link PartitionedIndexView} when we
      *       export its data in response to a journal overflow event. This
      *       suggests a hard reference queue to hold onto recently used views
      *       and a persistent bitmap or flag in the metadata index to identify
@@ -223,7 +243,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
         
         PartitionMetadata pmd = mdi.find(key);
         
-        FusedView view = views.get(pmd.partId);
+        ReadOnlyFusedView view = views.get(pmd.partId);
         
         if(view==null) {
             
@@ -249,7 +269,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
             System.arraycopy(segs, 0, sources, 1, segs.length);
             
             // create the fused view.
-            view = new FusedView(sources);
+            view = new ReadOnlyFusedView(sources);
             
             // place the view in the cache.
             views.put(pmd.partId, view);
@@ -314,12 +334,12 @@ public class PartitionedIndex implements IIndex, ICommitter {
     /**
      * @param btree
      *            The mutable {@link BTree} used to absorb all writes for the
-     *            {@link PartitionedIndex}.
+     *            {@link PartitionedIndexView}.
      * @param mdi
      *            The metadata index used to locate the partitions relevant to a
      *            given read operation.
      */
-    public PartitionedIndex(BTree btree, MetadataIndex mdi) {
+    public PartitionedIndexView(BTree btree, MetadataIndex mdi) {
         
         this.btree = btree;
         
@@ -370,7 +390,7 @@ public class PartitionedIndex implements IIndex, ICommitter {
     /**
      * For each partition spanned by the key range, report the sum of the counts
      * for each source in the view for that partition (since this is based on 
-     * {@link FusedView}s for each partition, it will may overcount the #of
+     * {@link ReadOnlyFusedView}s for each partition, it will may overcount the #of
      * entries actually in the range on each partition).
      * <p>
      * If the count would exceed {@link Integer#MAX_VALUE} then the result is
@@ -644,6 +664,10 @@ public class PartitionedIndex implements IIndex, ICommitter {
 
     }
 
+    /**
+     * The commit is delegated to the mutable B+-Tree since that is where all
+     * the writes are absorbed.
+     */
     public long handleCommit() {
 
         return btree.handleCommit();

@@ -49,10 +49,12 @@ package com.bigdata.scaleup;
 
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * Extension of {@link Name2Addr} for locating the {@link MetadataIndex}
+ * associated with a named {@link PartitionedIndexView}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -68,12 +70,6 @@ public class Name2MetadataAddr extends Name2Addr {
 
         super(store,metadata);
         
-    }
-    
-    protected IIndex loadBTree(IRawStore store, String name, long addr) {
-        
-        return (MetadataIndex)BTreeMetadata.load(this.store, addr);
-
     }
 
 }

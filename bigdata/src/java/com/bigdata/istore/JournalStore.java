@@ -136,7 +136,7 @@ abstract public class JournalStore implements IStore {
 //    
 //    static class OM implements IOM {
 //        
-//        private final IStore store;
+//        private final IIndexStore store;
 //        private final Journal journal;
 //
 //        /**
@@ -148,7 +148,7 @@ abstract public class JournalStore implements IStore {
 //        // FIXME This is NOT restart safe :-)
 //        final private OMExtensibleSerializer _extSer;
 //        
-//        OM(IStore store,Journal journal) {
+//        OM(IIndexStore store,Journal journal) {
 //        
 //            assert store != null;
 //
@@ -290,13 +290,13 @@ abstract public class JournalStore implements IStore {
 //
 //    static class OMTx implements ITx {
 //
-//        private final IStore store;
+//        private final IIndexStore store;
 //
 //        private final Tx tx;
 //        
 //        private final TxExtensibleSerializer extser;
 //
-//        OMTx(IStore store, Tx tx) {
+//        OMTx(IIndexStore store, Tx tx) {
 //
 //            assert store != null;
 //

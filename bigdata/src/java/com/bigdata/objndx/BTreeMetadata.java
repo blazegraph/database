@@ -2,7 +2,6 @@ package com.bigdata.objndx;
 
 import java.io.Externalizable;
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 
 import com.bigdata.io.SerializerUtil;
@@ -139,128 +138,14 @@ public class BTreeMetadata implements Serializable {
      * 
      * @return the metadata record.
      * 
-     * @see #load(IRawStore, long), which will load the btree not just the
-     *      {@link BTreeMetadata}.
-     * 
-     * @todo review remaining uses of this method vs
-     *       {@link #load(IRawStore, long)}.
+     * @see #load(IRawStore, long), which will load the {@link BTree} or derived
+     *      subclass not just the {@link BTreeMetadata}.
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
         return (BTreeMetadata) SerializerUtil.deserialize(store.read(addr));
         
     }
-
-    /**
-     * Re-load the {@link BTree} or derived class from the store. The
-     * {@link BTree} or derived class MUST provide a public constructor with the
-     * following signature: <code>
-     * 
-     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
-     * 
-     * </code>
-     * 
-     * @param store
-     *            The store.
-     * @param addr
-     *            The address of the {@link BTreeMetadata} record for that
-     *            class.
-     * 
-     * @return The {@link BTree} or derived class loaded from that
-     *         {@link BTreeMetadata} record.
-     * 
-     * @see BTree#newMetadata(), which MUST be overloaded if you subclass
-     *      {@link BTreeMetadata}.
-     */
-    public static BTree load(IRawStore store, long addr) {
-        
-        BTreeMetadata metadata = read(store, addr);
-        
-        try {
-            
-            Class cl = Class.forName(metadata.className);
-            
-            Constructor ctor = cl.getConstructor(new Class[] {
-                    IRawStore.class, BTreeMetadata.class });
-            
-            BTree btree = (BTree) ctor.newInstance(new Object[] { store,
-                    metadata });
-            
-            return btree;
-            
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-    
-//    /**
-//     * Write out the metadata record for the btree on the store and return the
-//     * {@link Addr address}.
-//     * 
-//     * @return The address of the metadata record.
-//     */
-//    protected long write(IRawStore store) {
-//
-//        ByteBuffer buf = ByteBuffer.allocate(SIZEOF_METADATA);
-//
-//        buf.putLong(addrRoot);
-//        buf.putInt(branchingFactor);
-//        buf.putInt(height);
-//        buf.putInt(nnodes);
-//        buf.putInt(nleaves);
-//        buf.putInt(nentries);
-//        buf.putInt(keyType.intValue());
-//        
-//        buf.flip(); // prepare for writing.
-//
-//    }
-
-//    /**
-//     * Read the persistent metadata record for the btree.
-//     * 
-//     * @param addrMetadta
-//     *            The address from which the metadata record will be read.
-//     * 
-//     * @return The persistent identifier of the root of the btree.
-//     */
-//    public BTreeMetadata(IRawStore store,long addrMetadata) {
-//
-//        assert store != null;
-//        
-//        assert addrMetadata != 0L;
-//        
-//        this.addrMetadata = addrMetadata;
-//        
-//        ByteBuffer buf = store.read(addrMetadata,null);
-//        assert buf.position() == 0;
-//        assert buf.limit() == Addr.getByteCount(addrMetadata);
-//        
-//        addrRoot = buf.getLong();
-//        
-//        branchingFactor = buf.getInt();
-//        
-//        height = buf.getInt();
-//
-//        nnodes = buf.getInt();
-//        
-//        nleaves = buf.getInt();
-//        
-//        nentries = buf.getInt();
-//        
-//        keyType = ArrayType.parseInt( buf.getInt() );
-//        
-//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
-//        assert height >= 0;
-//        assert nnodes >= 0;
-//        assert nleaves >= 0;
-//        assert nentries >= 0;
-//
-//        BTree.log.info(toString());
-//
-//    }
 
     /**
      * A human readable representation of the metadata record.
@@ -276,6 +161,11 @@ public class BTreeMetadata implements Serializable {
         sb.append(", nleaves=" + nleaves);
         sb.append(", nentries=" + nentries);
         sb.append(", addrMetadata=" + Addr.toString(addrMetadata));
+        sb.append(", valueSerializer=" + valueSer.getClass().getName());
+        sb.append(", recordCompressor="
+                + (recordCompressor == null ? null : recordCompressor
+                        .getClass().getName()));
+        sb.append(", useChecksum=" + useChecksum);
         
         return sb.toString();
         

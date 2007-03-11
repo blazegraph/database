@@ -48,7 +48,7 @@ Modifications:
 package com.bigdata.objndx;
 
 /**
- * Test suite for {@link FusedView}.
+ * Test suite for {@link ReadOnlyFusedView}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -74,41 +74,41 @@ public class TestFusedView extends AbstractBTreeTestCase {
         BTree btree2 = getBTree(3);
         
         try {
-            new FusedView(null);
+            new ReadOnlyFusedView(null);
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
         
         try {
-            new FusedView(new AbstractBTree[]{});
+            new ReadOnlyFusedView(new AbstractBTree[]{});
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
         
         try {
-            new FusedView(new AbstractBTree[]{btree1});
+            new ReadOnlyFusedView(new AbstractBTree[]{btree1});
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
                 
         try {
-            new FusedView(new AbstractBTree[]{btree1,null});
+            new ReadOnlyFusedView(new AbstractBTree[]{btree1,null});
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
                 
         try {
-            new FusedView(new AbstractBTree[]{btree1,btree1});
+            new ReadOnlyFusedView(new AbstractBTree[]{btree1,btree1});
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
                 
-        new FusedView(new AbstractBTree[]{btree1,btree2});
+        new ReadOnlyFusedView(new AbstractBTree[]{btree1,btree2});
                 
     }
 
@@ -142,7 +142,7 @@ public class TestFusedView extends AbstractBTreeTestCase {
         BTree btree1 = getBTree(3);
         BTree btree2 = getBTree(3);
 
-        FusedView view = new FusedView(new AbstractBTree[] { btree1, btree2 });
+        ReadOnlyFusedView view = new ReadOnlyFusedView(new AbstractBTree[] { btree1, btree2 });
         
         assertEquals(0, btree1.rangeCount(null, null));
         assertEquals(0, btree2.rangeCount(null, null));

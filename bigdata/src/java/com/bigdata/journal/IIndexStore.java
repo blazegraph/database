@@ -56,7 +56,7 @@ import com.bigdata.objndx.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStore {
+public interface IIndexStore {
 
     /**
      * Return a named index.

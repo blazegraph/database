@@ -49,6 +49,7 @@ package com.bigdata.isolation;
 
 import com.bigdata.journal.TestTx;
 import com.bigdata.objndx.AbstractBTreeTestCase;
+import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.rawstore.IRawStore;
@@ -133,7 +134,7 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
             
-            btree = new IsolatedBTree(store,BTreeMetadata.read(store, addr), src);
+            btree = (IsolatedBTree)BTree.load(store,addr);
 
             assertTrue(store==btree.getStore());
             assertEquals(branchingFactor,btree.getBranchingFactor());
@@ -153,7 +154,7 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
 
-            btree = new IsolatedBTree(store, BTreeMetadata.read(store, addr), src);
+            btree = (IsolatedBTree)BTree.load(store,addr);
 
             assertTrue(store == btree.getStore());
             assertEquals(branchingFactor, btree.getBranchingFactor());

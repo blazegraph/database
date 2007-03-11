@@ -60,9 +60,8 @@ import com.bigdata.journal.Options;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.FusedView;
+import com.bigdata.objndx.ReadOnlyFusedView;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.IndexSegmentFileStore;
@@ -267,7 +266,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         store = new Journal(properties);
         
         // re-load the index.
-        md = (MetadataIndex)BTreeMetadata.load(store, addr);
+        md = (MetadataIndex)BTree.load(store, addr);
         assertEquals("name","abc",md.getName());
         
         assertEquals("#entries",3,md.getEntryCount());
@@ -467,7 +466,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * verify the fused view is the same as the data already on the btree.
          */
-        FusedView view = new FusedView(new AbstractBTree[]{btree,seg});
+        ReadOnlyFusedView view = new ReadOnlyFusedView(new AbstractBTree[]{btree,seg});
         
         assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                 view.rangeIterator(null,null));
@@ -572,7 +571,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * verify the fused view is the same as the data already on the btree.
          */
-        assertSameIterator(new Object[] { v1, v3, v5, v7 }, new FusedView(
+        assertSameIterator(new Object[] { v1, v3, v5, v7 }, new ReadOnlyFusedView(
                 new AbstractBTree[] { btree, seg01 }).rangeIterator(null, null));
 
         /*
@@ -1040,7 +1039,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * verify the fused view is the same as the data already on the btree.
          */
-        assertSameIterator(new Object[] { v1, v3, v5, v7 }, new FusedView(
+        assertSameIterator(new Object[] { v1, v3, v5, v7 }, new ReadOnlyFusedView(
                 new AbstractBTree[] { btree, seg01 }).rangeIterator(null, null));
 
         /*
@@ -1084,7 +1083,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * verify the fused view is the same as the data already on the btree.
          */
-        assertSameIterator(new Object[] { v2, v4, v6, v8 }, new FusedView(
+        assertSameIterator(new Object[] { v2, v4, v6, v8 }, new ReadOnlyFusedView(
                 new AbstractBTree[] { btree, seg02 }).rangeIterator(null, null));
 
         /*
@@ -1092,7 +1091,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * inserted into the trees.
          */
         assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
-                new FusedView(new AbstractBTree[] { seg01, seg02 })
+                new ReadOnlyFusedView(new AbstractBTree[] { seg01, seg02 })
                         .rangeIterator(null, null));
         
         /*
