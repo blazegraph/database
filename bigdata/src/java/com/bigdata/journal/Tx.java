@@ -57,9 +57,7 @@ import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndexView;
 
 /**
@@ -359,6 +357,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
                 
             } else {
                 
+                // writeable index backed by the temp. store.
                 index = new IsolatedBTree(tmpStore,src);
                 
             }

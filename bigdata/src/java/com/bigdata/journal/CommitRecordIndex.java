@@ -6,6 +6,8 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IValueSerializer;
@@ -17,7 +19,10 @@ import com.bigdata.rawstore.IRawStore;
  * BTree mapping commit times to {@link ICommitRecord}s. The keys are the long
  * integers. The values are {@link Entry} objects recording the commit time of
  * the index and the {@link Addr address} of the {@link ICommitRecord} for that
- * commit time.
+ * commit time. A canonicalizing cache is maintained such that the caller will
+ * never observe distinct concurrent instances of the same {@link ICommitRecord}.
+ * This in turn facilitates canonicalizing caches for objects loaded from that
+ * {@link ICommitRecord}.
  */
 public class CommitRecordIndex extends BTree {
 
@@ -25,15 +30,22 @@ public class CommitRecordIndex extends BTree {
      * @todo refactor to share with the {@link Journal}?
      */
     private KeyBuilder keyBuilder = new KeyBuilder();
-
-//    /**
-//     * Cache of added/retrieved commit records.
-//     * 
-//     * @todo This only works for exact timestamp matches so the cache might not
-//     * be very useful here.  Also, this must be a weak value cache or it will
-//     * leak memory.
-//     */
-//    private Map<Long, ICommitRecord> cache = new HashMap<Long, ICommitRecord>();
+    
+    /**
+     * A weak value cache for {@link ICommitRecord}s. Note that lookup may be
+     * by exact match -or- by the record have the largest timestamp LTE to the
+     * given probe. For the latter, we have to determine the timestamp of the
+     * matching record and use that to test the cache (after we have already
+     * done the lookup in the index).
+     * <p>
+     * The main purpose of this cache is not to speed up access to historical
+     * {@link ICommitRecord}s but rather to establish a canonicalizing lookup
+     * service for {@link ICommitRecord}s so that we can in turn establish a
+     * canonicalizing mapping for read-only objects (typically the unnamed
+     * indices) loaded from a given {@link ICommitRecord}.
+     */
+    final private WeakValueCache<Long, ICommitRecord> cache = new WeakValueCache<Long, ICommitRecord>(
+            new LRUCache<Long, ICommitRecord>(10));
 
     public CommitRecordIndex(IRawStore store) {
 
@@ -73,12 +85,14 @@ public class CommitRecordIndex extends BTree {
     }
 
     /**
-     * Existence test for a commit record with the specified commit timestamp.
+     * Existence test for a commit record with the specified commit timestamp
+     * (exact match).
      * 
      * @param commitTime
      *            The commit timestamp.
+     * 
      * @return true iff such an {@link ICommitRecord} exists in the index with
-     *         that commit timestamp.
+     *         that commit timestamp (exact match(.
      */
     synchronized public boolean hasTimestamp(long commitTime) {
         
@@ -88,8 +102,6 @@ public class CommitRecordIndex extends BTree {
     
     /**
      * Return the {@link ICommitRecord} with the given timestamp (exact match).
-     * This method tests a cache of the named btrees and will return the same
-     * instance if the index is found in the cache.
      * 
      * @param commitTime
      *            The commit time.
@@ -100,12 +112,14 @@ public class CommitRecordIndex extends BTree {
     synchronized public ICommitRecord get(long commitTime) {
 
         ICommitRecord commitRecord;
-        
-//        commitRecord = cache.get(commitTime);
-//        
-//        if (commitRecord != null)
-//            return commitRecord;
 
+        // exact match cache test.
+        commitRecord = cache.get(commitTime);
+        
+        if (commitRecord != null)
+            return commitRecord;
+
+        // exact match index lookup.
         final Entry entry = (Entry) super.lookup(getKey(commitTime));
 
         if (entry == null) {
@@ -119,12 +133,10 @@ public class CommitRecordIndex extends BTree {
          */
         commitRecord = loadCommitRecord(store,entry.addr);
         
-//        /*
-//         * save commit time -> commit record mapping in transient cache (this
-//         * only works for for exact matches on the timestamp so the cache may
-//         * not be very useful here).
-//         */
-//        cache.put(commitRecord.getTimestamp(),commitRecord);
+        /*
+         * save commit time -> commit record mapping in transient cache.
+         */
+        cache.put(commitRecord.getTimestamp(),commitRecord,false/*dirty*/);
 
         // return btree.
         return commitRecord;
@@ -133,18 +145,23 @@ public class CommitRecordIndex extends BTree {
 
     /**
      * Return the {@link ICommitRecord} having the largest timestamp that is
-     * strictly less than the given timestamp.
+     * less than or equal to the given timestamp. This is used primarily to
+     * locate the commit record that will serve as the ground state for a
+     * transaction having <i>timestamp</i> as its start time. In this context
+     * the LTE search identifies the most recent commit state that is never the
+     * less earlier than the start time of the transaction.
      * 
      * @param timestamp
      *            The given timestamp.
      * 
      * @return The commit record -or- <code>null</code> iff there are no
-     *         {@link ICommitRecord}s in the that satisify the probe.
+     *         {@link ICommitRecord}s in the index that satisify the probe.
      * 
      * @see #get(long)
      */
     synchronized public ICommitRecord find(long timestamp) {
 
+        // find (first less than or equal to).
         final int index = findIndexOf(timestamp);
         
         if(index == -1) {
@@ -155,11 +172,37 @@ public class CommitRecordIndex extends BTree {
             
         }
 
-        // return the matched record.
-        
+        /*
+         * Retrieve the entry for the commit record from the index.  This
+         * also stores the actual commit time for the commit record.
+         */
         Entry entry = (Entry) super.valueAt( index );
+
+        /*
+         * Test the cache for this commit record using its actual commit time.
+         */
+        ICommitRecord commitRecord = cache.get(entry.commitTime);
+
+        if(commitRecord == null) {
+            
+            /*
+             * Load the commit record from the store using the address stored in
+             * the entry.
+             */ 
         
-        return loadCommitRecord(store,entry.addr);
+            commitRecord = loadCommitRecord(store,entry.addr);
+
+            assert entry.commitTime == commitRecord.getTimestamp();
+            
+            /*
+             * Insert the commit record into the cache usings its actual commit
+             * time.
+             */
+            cache.put(entry.commitTime,commitRecord,false/* dirty */);
+            
+        }
+        
+        return commitRecord;
 
     }
     
@@ -267,8 +310,11 @@ public class CommitRecordIndex extends BTree {
         // add an entry to the persistent index.
         super.insert(key,new Entry(commitTime,commitRecordAddr));
         
-//        // add to the transient cache.
-//        cache.put(commitTime, commitRecord);
+        // should not be an existing entry for that commit time.
+        assert cache.get(commitTime) == null;
+        
+        // add to the transient cache.
+        cache.put(commitTime, commitRecord, false/*dirty*/);
         
     }
 

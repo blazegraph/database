@@ -61,12 +61,20 @@ import java.util.concurrent.Executors;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
+import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.ReadOnlyIndex;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.scaleup.MasterJournal;
+import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.scaleup.MasterJournal.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -1126,6 +1134,8 @@ public class Journal implements IJournal {
 
     final public long getRootAddr(int index) {
 
+        assertOpen();
+
         if (_commitRecord == null) {
 
             return getCommitRecord().getRootAddr(index);
@@ -1297,6 +1307,8 @@ public class Journal implements IJournal {
      */
     public IIndex registerIndex(String name, IIndex btree) {
 
+        assertOpen();
+
         if (getIndex(name) != null) {
 
             throw new IllegalStateException("Index already registered: name="
@@ -1313,6 +1325,8 @@ public class Journal implements IJournal {
 
     public void dropIndex(String name) {
 
+        assertOpen();
+        
         name2Addr.dropIndex(name);
 
     }
@@ -1325,6 +1339,8 @@ public class Journal implements IJournal {
      * version of the named btree.
      */
     public IIndex getIndex(String name) {
+
+        assertOpen();
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -1340,31 +1356,167 @@ public class Journal implements IJournal {
      *       write on this index. I have tried some different approaches to
      *       handling this.
      */
-    public ICommitRecord getCommitRecord(long comitTime) {
-        
-        return _commitRecordIndex.find(comitTime);
+    public ICommitRecord getCommitRecord(long commitTime) {
+
+        assertOpen();
+
+        return _commitRecordIndex.find(commitTime);
 
     }
 
     /**
-     * Returns a read-only named index loaded from the given root block. Writes
-     * on the index will NOT be made persistent and the index will NOT
-     * participate in commits.
+     * Returns a read-only named index loaded from the given root block. This
+     * method imposes a canonicalizing mapping and contracts that there will be
+     * at most one instance of the historical index at a time. This contract is
+     * used to facilitate buffer management. Writes on the index will NOT be
+     * made persistent and the index will NOT participate in commits.
+     * <p>
+     * Note: since this is always a request for historical read-only data, this
+     * method MUST NOT register a committer and the returned btree MUST NOT
+     * participate in the commit protocol.
+     * <p>
+     * Note: The caller MUST take care not to permit writes since they could be
+     * visible to other users of the same read-only index. This is typically
+     * accomplished by wrapping the returned object in class that will throw an
+     * exception for writes such as {@link ReadOnlyIndex},
+     * {@link ReadOnlyIsolatedIndex}, or {@link ReadCommittedIndex}.
      */
-    public IIndex getIndex(String name, ICommitRecord commitRecord) {
+    protected IIndex getIndex(String name, ICommitRecord commitRecord) {
+
+        assertOpen();
+
+        if(name == null) throw new IllegalArgumentException();
+
+        if(commitRecord == null) throw new IllegalArgumentException();
+        
+        /*
+         * The address of an historical Name2Addr mapping used to resolve named
+         * indices for the historical state associated with this commit record.
+         */
+        final long metaAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
 
         /*
-         * Note: since this is always a request for historical read-only data,
-         * this method MUST NOT register a committer and the returned btree MUST
-         * NOT participate in the commit protocol.
-         * 
-         * @todo cache these results in a weak value cache.
+         * Resolve the address of the historical Name2Addr object using the
+         * canonicalizing object cache. This prevents multiple historical
+         * Name2Addr objects springing into existance for the same commit
+         * record.
          */
-
-        return ((Name2Addr) BTree.load(this, commitRecord
-                .getRootAddr(ROOT_NAME2ADDR))).get(name);
+        Name2Addr name2Addr = (Name2Addr)getIndex(metaAddr);
+        
+        /*
+         * The address at which the named index was written for that historical
+         * state.
+         */
+        final long indexAddr = name2Addr.getAddr(name);
+        
+        // No such index by name for that historical state.
+        if(indexAddr==0L) return null;
+        
+        /*
+         * Resolve the named index using the object cache to impose a
+         * canonicalizing mapping on the historical named indices based on the
+         * address on which it was written in the store.
+         */
+        return getIndex(indexAddr);
 
     }
+    
+    /**
+     * A cache that is used by the {@link Journal} to provide a canonicalizing
+     * mapping from an {@link Addr address} to the instance of a read-only
+     * historical object loaded from that {@link Addr address}.
+     * <p>
+     * Note: the "live" version of an object MUST NOT be placed into this cache
+     * since its state will continue to evolve with additional writes while the
+     * cache is intended to provide a canonicalizing mapping to only the
+     * historical states of the object. This means that objects such as indices
+     * and the {@link Name2Addr} index MUST NOT be inserted into the cache if
+     * the are being read from the store for "live" use. For this reason
+     * {@link Name2Addr} uses its own caching mechanisms.
+     * 
+     * @todo discard cache on abort? that should not be necessary. even through
+     *       it can contain objects whose addresses were not made restart safe
+     *       those addresses should not be accessible to the application and
+     *       hence the objects should never be looked up and will be evicted in
+     *       due time from the cache. (this does rely on the fact that the store
+     *       never reuses an address.)
+     * 
+     * FIXME This is the place to solve the resource (RAM) burden for indices is
+     * Name2Addr. Currently, indices are never closed once opened which is a
+     * resource leak. We need to close them out eventually based on LRU plus
+     * timeout plus NOT IN USE. The way to approach this is a weak reference
+     * cache combined with an LRU or hard reference queue that tracks reference
+     * counters (just like the BTree hard reference cache for leaves). Eviction
+     * events lead to closing an index iff the reference counter is zero.
+     * Touches keep recently used indices from closing even though they may have
+     * a zero reference count.
+     * 
+     * @todo the {@link MasterJournal} needs to do similar things with
+     *       {@link IndexSegment}.
+     * 
+     * @todo review the metadata index lookup in the {@link SlaveJournal}. This
+     *       is a somewhat different case since we only need to work with the
+     *       current metadata index as along as we make sure not to reclaim
+     *       resources (journals and index segments) until there are no more
+     *       transactions which can read from them.
+     * 
+     * @todo support metering of index resources and timeout based shutdown of
+     *       indices. note that the "live" {@link Name2Addr} has its own cache
+     *       for the unisolated indices and that metering needs to pay attention
+     *       to the indices in that cache as well. Also, those indices can be
+     *       shutdown as long as they are not dirty (pending a commit).
+     */
+    final private WeakValueCache<Long, ICommitter> objectCache = new WeakValueCache<Long, ICommitter>(
+            new LRUCache<Long, ICommitter>(20));
+    
+    /**
+     * A canonicalizing mapping for index objects.
+     * 
+     * @param addr
+     *            The {@link Addr address} of the index object.
+     *            
+     * @return The index object.
+     */
+    final protected IIndex getIndex(long addr) {
+        
+        synchronized (objectCache) {
+
+            IIndex obj = (IIndex) objectCache.get(addr);
+
+            if (obj == null) {
+                
+                obj = BTree.load(this,addr);
+                
+            }
+            
+            objectCache.put(addr, (ICommitter)obj, false/*dirty*/);
+    
+            return obj;
+
+        }
+        
+    }
+
+//    /**
+//     * Insert or touch an object in the object cache.
+//     * 
+//     * @param addr
+//     *            The {@link Addr address} of the object in the store.
+//     * @param obj
+//     *            The object.
+//     * 
+//     * @see #getIndex(long), which provides a canonicalizing mapping for index
+//     *      objects using the object cache.
+//     */
+//    final protected void touch(long addr,Object obj) {
+//        
+//        synchronized(objectCache) {
+//            
+//            objectCache.put(addr, (ICommitter)obj, false/*dirty*/);
+//            
+//        }
+//        
+//    }
 
     /*
      * ITransactionManager and friends.

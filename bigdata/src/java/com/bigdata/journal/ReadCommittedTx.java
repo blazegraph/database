@@ -211,7 +211,10 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
             // update the commit record.
             this.commitRecord = currentCommitRecord;
             
-            // lookup the current index view against that commit record.
+            /*
+             * Lookup the current committed index view against that commit
+             * record.
+             */
             this.index = (IIsolatableIndex) tx.journal.getIndex(name,
                     commitRecord);
             

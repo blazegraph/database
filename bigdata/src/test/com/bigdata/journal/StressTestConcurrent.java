@@ -379,11 +379,11 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         Properties properties = new Properties();
 
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
         
         properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 

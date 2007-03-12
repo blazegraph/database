@@ -24,6 +24,16 @@ import com.bigdata.rawstore.IRawStore;
  * values are {@link Entry} objects recording the name of the index and the last
  * known {@link Addr address} of the {@link BTreeMetadata} record for the named
  * index.
+ * <p>
+ * Note: The {@link Journal} maintains an instance of this class that evolves
+ * with each {@link Journal#commit()}. However, the journal also makes use of
+ * historical states for the {@link Name2Addr} index in order to resolve the
+ * historical state of a named index. Of necessity, the {@link Name2Addr}
+ * objects used for this latter purpose MUST be distinct from the evolving
+ * instance otherwise the current version of the named index would be resolved.
+ * Note further that the historical {@link Name2Addr} states are accessed using
+ * a canonicalizing mapping but that current evolving {@link Name2Addr} instance
+ * is NOT part of that mapping.
  */
 public class Name2Addr extends BTree {
 
@@ -34,35 +44,39 @@ public class Name2Addr extends BTree {
      * @todo refactor a default instance of the keybuilder that is wrapped in a
      * synchonization interface for multi-threaded use or move an instance onto
      * the store since it already has a single-threaded contract for its api?
-     */  
+     */
     private KeyBuilder keyBuilder = new KeyBuilder();
 
     /**
-     * Cache of added/retrieved btrees. Only btrees found in this cache are
-     * candidates for the commit protocol. The use of this cache also minimizes
-     * the use of the {@link #keyBuilder} and therefore minimizes the relatively
-     * expensive operation of encoding unicode names to byte[] keys.
+     * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
+     * "live" {@link Name2Addr} instance. Only the indices found in this cache
+     * are candidates for the commit protocol. The use of this cache also
+     * minimizes the use of the {@link #keyBuilder} and therefore minimizes the
+     * relatively expensive operation of encoding unicode names to byte[] keys.
      * 
-     * FIXME This is the place to solve the resource (RAM) burden for indices is
-     * Name2Addr. Currently, indices are never closed once opened which is a
-     * resource leak. We need to close them out eventually based on LRU plus
-     * timeout plus NOT IN USE. The way to approach this is a weak reference
-     * cache combined with an LRU or hard reference queue that tracks reference
-     * counters (just like the BTree hard reference cache for leaves). Eviction
-     * events lead to closing an index iff the reference counter is zero.
-     * Touches keep recently used indices from closing even though they may have
-     * a zero reference count.
+     * FIXME This never lets go of an unisolated index once it has been looked
+     * up and placed into this cache. Therefore, modify this class to use a
+     * combination of a weak value cache (so that we can let go of the
+     * unisolated named indices) and a commit list (so that we have hard
+     * references to any dirty indices up to the next invocation of
+     * {@link #handleCommit()}. This will require a protocol by which we notice
+     * writes on the named index, probably using a listener API so that we do
+     * not have to wrap up the index as a different kind of object.
      */
-    private Map<String,IIndex> name2BTree = new HashMap<String,IIndex>();
-
+    private Map<String, IIndex> indexCache = new HashMap<String, IIndex>();
+    
+//    protected final Journal journal;
+    
     public Name2Addr(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
 
+//        this.journal = store;
+        
     }
 
     /**
-     * Load from the store.
+     * Load from the store (de-serialization constructor).
      * 
      * @param store
      *            The backing store.
@@ -73,6 +87,8 @@ public class Name2Addr extends BTree {
 
         super(store, metadata);
 
+//        this.journal = store;
+        
     }
 
     /**
@@ -91,7 +107,7 @@ public class Name2Addr extends BTree {
          * journal since only trees that have been touched can have data for the
          * current commit.
          */
-        Iterator<Map.Entry<String,IIndex>> itr = name2BTree.entrySet().iterator();
+        Iterator<Map.Entry<String,IIndex>> itr = indexCache.entrySet().iterator();
         
         while(itr.hasNext()) {
             
@@ -106,6 +122,9 @@ public class Name2Addr extends BTree {
             
             // update persistent mapping.
             insert(getKey(name),new Entry(name,addr));
+            
+//            // place into the object cache on the journal.
+//            journal.touch(addr, btree);
             
         }
         
@@ -140,7 +159,7 @@ public class Name2Addr extends BTree {
      */
     public IIndex get(String name) {
 
-        IIndex btree = name2BTree.get(name);
+        IIndex btree = indexCache.get(name);
         
         if (btree != null)
             return btree;
@@ -153,16 +172,76 @@ public class Name2Addr extends BTree {
             
         }
 
+//        /*
+//         * Reload the index from the store using the object cache to ensure a
+//         * canonicalizing mapping.
+//         */
+//        btree = journal.getIndex(entry.addr);
+        
         // re-load btree from the store.
         btree = BTree.load(this.store, entry.addr);
-        
+      
         // save name -> btree mapping in transient cache.
-        name2BTree.put(name,btree);
+        indexCache.put(name,btree);
 
         // return btree.
         return btree;
 
     }
+    
+    /**
+     * Return the {@link Addr address} from which the historical state of the
+     * named index may be loaded.
+     * <p>
+     * Note: This is a lower-level access mechanism that is used by
+     * {@link Journal#getIndex(String, ICommitRecord)} when accessing historical
+     * named indices from an {@link ICommitRecord}.
+     * 
+     * @param name
+     *            The index name.
+     * 
+     * @return The address or <code>0L</code> if the named index was not
+     *         registered.
+     */
+    protected long getAddr(String name) {
+
+        /*
+         * Note: This uses a private cache to reduce the Unicode -> key
+         * translation burden. We can not use the normal cache since that maps
+         * the name to the index and we have to return the address not the index
+         * in order to support a canonicalizing mapping in the Journal.
+         */
+        synchronized (addrCache) {
+
+            Long addr = addrCache.get(name);
+
+            if (addr == null) {
+
+                final Entry entry = (Entry) super.lookup(getKey(name));
+
+                if (entry == null) {
+
+                    addr = 0L;
+                    
+                } else {
+                    
+                    addr = entry.addr;
+                    
+                }
+
+                addrCache.put(name, addr);
+                
+            }
+
+            return addr;
+
+        }
+
+    }
+    /**
+     * A private cache used only by {@link #getAddr(String)}.
+     */
+    private HashMap<String/* name */, Long/* Addr */> addrCache = new HashMap<String, Long>();
 
     /**
      * Add an entry for the named index.
@@ -209,8 +288,11 @@ public class Name2Addr extends BTree {
         // add an entry to the persistent index.
         super.insert(key,new Entry(name,addr));
         
+//        // touch the btree in the journal's object cache.
+//        journal.touch(addr, btree);
+        
         // add name -> btree mapping to the transient cache.
-        name2BTree.put(name, btree);
+        indexCache.put(name, btree);
         
     }
 
@@ -233,7 +315,7 @@ public class Name2Addr extends BTree {
         }
         
         // remove the name -> btree mapping to the transient cache.
-        name2BTree.remove(name);
+        indexCache.remove(name);
 
         // remove the entry from the persistent index.
         super.remove(key);

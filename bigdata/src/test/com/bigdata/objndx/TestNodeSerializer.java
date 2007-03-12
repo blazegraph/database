@@ -525,7 +525,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          * record and there for the checksum is not even computed.
          */
 
-        if(nodeSer.recordCompressor==null ) {
+        if(nodeSer.useChecksum && nodeSer.recordCompressor==null ) {
             
         final int checksum = buf.getInt(NodeSerializer.OFFSET_CHECKSUM);
         

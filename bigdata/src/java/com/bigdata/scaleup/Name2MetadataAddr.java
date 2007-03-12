@@ -66,6 +66,11 @@ public class Name2MetadataAddr extends Name2Addr {
         
     }
     
+    /**
+     * Deserialization constructor.
+     * @param store
+     * @param metadata
+     */
     public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
 
         super(store,metadata);

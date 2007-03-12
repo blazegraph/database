@@ -72,7 +72,7 @@ public class IsolatablePartitionedIndexView extends PartitionedIndexView impleme
      */
     public IsolatablePartitionedIndexView(UnisolatedBTree btree, MetadataIndex mdi) {
         super(btree, mdi);
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
     }
 
     public boolean contains(byte[] key) {

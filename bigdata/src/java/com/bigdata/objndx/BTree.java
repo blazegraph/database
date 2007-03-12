@@ -486,7 +486,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     }
 
     /**
-     * Reload a btree using a default hard reference queue configuration.
+     * Load from the store (required de-serialization constructor).
      * 
      * @param store
      *            The backing store.

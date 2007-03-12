@@ -271,7 +271,11 @@ final public class WeakValueCache<K,T>
         _initialCapacity = initialCapacity;
         
         _loadFactor = loadFactor;
-        
+
+        /*
+         * @todo Consider changing to a concurrent hash map.  Would this let us
+         * remove some of the synchronization constraints?  Probably not.
+         */
         _cache = new HashMap<K,IWeakRefCacheEntry<K,T>>( initialCapacity, loadFactor );
         
         _queue = new ReferenceQueue<T>();

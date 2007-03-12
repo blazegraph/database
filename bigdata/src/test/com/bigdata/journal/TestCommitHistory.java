@@ -48,11 +48,14 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
-import java.util.Properties;
+
+import com.bigdata.objndx.BTree;
 
 /**
- * Test the ability to get (exact match) and find (most recent less than
- * or equal to) historical commit records in a {@link Journal}.
+ * Test the ability to get (exact match) and find (most recent less than or
+ * equal to) historical commit records in a {@link Journal}. Also verifies that
+ * a canonicalizing cache is maintained (you never obtain distinct concurrent
+ * instances of the same commit record).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -162,10 +165,6 @@ public class TestCommitHistory extends ProxyTestCase {
      */
     public void test_commitRecordIndex_restartSafe() {
         
-//        Properties properties = getProperties();
-//        
-//        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
-        
         Journal journal = new Journal(getProperties());
         
         if(!journal.isStable()) {
@@ -227,10 +226,6 @@ public class TestCommitHistory extends ProxyTestCase {
      * multiple records (if the store is stable).
      */
     public void test_commitRecordIndex_find() {
-        
-//        Properties properties = getProperties();
-
-//        properties.setProperty(Options.DELETE_ON_CLOSE,"false");
         
         Journal journal = new Journal(getProperties());
 
@@ -345,6 +340,179 @@ public class TestCommitHistory extends ProxyTestCase {
         
         journal.closeAndDelete();
         
+    }
+
+    /**
+     * Test verifies that exact match and find always return the same reference
+     * for the same commit record (at least as long as the test holds a hard
+     * reference to the commit record of interest).
+     */
+    public void test_canonicalizingCache() {
+        
+        Journal journal = new Journal(getProperties());
+
+        /*
+         * The first commit flushes the root leaves of some indices so we get
+         * back a non-zero commit timestamp.
+         */
+        final long commitTime0 = journal.commit();
+
+        assertTrue(commitTime0 != 0L);
+        
+        /*
+         * obtain the commit record for that commit timestamp.
+         */
+        ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
+
+        // should be the same instance that is held by the journal.
+        assertTrue(commitRecord0 == journal.getCommitRecord());
+
+        /*
+         * write a record on the store, commit the store, and note the commit
+         * time.
+         */
+        journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+        
+        final long commitTime1 = journal.commit();
+        
+        assertTrue(commitTime1!=0L);
+        
+        /*
+         * obtain the commit record for that commit timestamp.
+         */
+        ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+
+        // should be the same instance that is held by the journal.
+        assertTrue(commitRecord1 == journal.getCommitRecord());
+        
+        /*
+         * verify that we obtain the same instance with find as with an exact
+         * match.
+         */ 
+        
+        assertTrue(commitRecord0 == journal.getCommitRecord(commitTime1 - 1));
+        
+        assertTrue(commitRecord1 == journal.getCommitRecord(commitTime1 + 0 ));
+
+        assertTrue(commitRecord1 == journal.getCommitRecord(commitTime1 + 1));
+
+        journal.closeAndDelete();
+
+    }
+    
+    /**
+     * Test of the canonicalizing object cache used to prevent distinct
+     * instances of a historical index from being created. The test also
+     * verifies that the historical named index is NOT the same instance as the
+     * current unisolated index by that name.
+     */
+    public void test_objectCache() {
+        
+        Journal journal = new Journal(getProperties());
+
+        final String name = "abc";
+
+        final BTree liveIndex = (BTree) journal.registerIndex(name);
+        
+        final long commitTime0 = journal.commit();
+
+        assertTrue(commitTime0 != 0L);
+        
+        /*
+         * obtain the commit record for that commit timestamp.
+         */
+        ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
+
+        // should be the same instance that is held by the journal.
+        assertTrue(commitRecord0 == journal.getCommitRecord());
+
+        /*
+         * verify that a request for last committed state the named index
+         * returns a different instance than the "live" index.
+         */
+        
+        final BTree historicalIndex0 = (BTree)journal.getIndex(name, commitRecord0);
+        
+        assertTrue(liveIndex != historicalIndex0);
+
+        // re-request is still the same object.
+        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                commitRecord0));
+        
+        /*
+         * The re-load address for the live index as of that commit record.
+         */
+        final long liveIndexAddr0 = liveIndex.getMetadata().getMetadataAddr();
+        
+        /*
+         * write a record on the store, commit the store, and note the commit
+         * time.
+         */
+        journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+        
+        final long commitTime1 = journal.commit();
+        
+        assertTrue(commitTime1!=0L);
+        
+        /*
+         * we did NOT write on the named index, so its address in the store must
+         * not change.
+         */
+        assertEquals(liveIndexAddr0,liveIndex.getMetadata().getMetadataAddr());
+        
+        // obtain the commit record for that commit timestamp.
+        ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+
+        // should be the same instance that is held by the journal.
+        assertTrue(commitRecord1 == journal.getCommitRecord());
+
+        /*
+         * verify that we get the same historical index object for the new
+         * commit record since the index state was not changed and it will be
+         * reloaded from the same address.
+         */
+        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                commitRecord1));
+
+        // re-request is still the same object.
+        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                commitRecord0));
+
+        // re-request is still the same object.
+        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                commitRecord1));
+
+        /*
+         * Now write on the live index and commit. verify that there is a new
+         * historical index available for the new commit record, that it is not
+         * the same as the live index, and that it is not the same as the
+         * previous historical index (which should still be accessible).
+         */
+        
+        // live index is the same reference.
+        assertTrue(liveIndex == journal.getIndex(name));
+        
+        liveIndex.insert(new byte[]{1,2}, new byte[]{1,2});
+        
+        final long commitTime2 = journal.commit();
+        
+        // obtain the commit record for that commit timestamp.
+        ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
+
+        // should be the same instance that is held by the journal.
+        assertTrue(commitRecord2 == journal.getCommitRecord());
+        
+        // must be a different index object.
+        
+        BTree historicalIndex2 = (BTree) journal.getIndex(name, commitRecord2);
+        
+        assertTrue(historicalIndex0 != historicalIndex2);
+
+        // the live index must be distinct from the historical index.
+        assertTrue(liveIndex != historicalIndex2); 
+        
+        journal.closeAndDelete();
+
     }
     
 }

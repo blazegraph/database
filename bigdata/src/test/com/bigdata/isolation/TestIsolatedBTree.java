@@ -134,7 +134,9 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
             
-            btree = (IsolatedBTree)BTree.load(store,addr);
+            // special constructor is required.
+            btree = (IsolatedBTree) new IsolatedBTree(store, BTreeMetadata
+                    .read(store, addr), src);
 
             assertTrue(store==btree.getStore());
             assertEquals(branchingFactor,btree.getBranchingFactor());
@@ -154,7 +156,9 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
 
             final long addr = btree.write();
 
-            btree = (IsolatedBTree)BTree.load(store,addr);
+            // special constructor is required.
+            btree = (IsolatedBTree) new IsolatedBTree(store, BTreeMetadata
+                    .read(store, addr), src);
 
             assertTrue(store == btree.getStore());
             assertEquals(branchingFactor, btree.getBranchingFactor());

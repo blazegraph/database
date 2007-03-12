@@ -839,7 +839,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * or leaf.
      * </p>
      * <p>
-     * This method guarentees that the specified node will NOT be synchronously
+     * This method guarantees that the specified node will NOT be synchronously
      * persisted as a side effect and thereby made immutable. (Of course, the
      * node may be already immutable.)
      * </p>

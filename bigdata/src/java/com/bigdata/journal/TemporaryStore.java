@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.ByteArrayValueSerializer;
 import com.bigdata.objndx.IIndex;
