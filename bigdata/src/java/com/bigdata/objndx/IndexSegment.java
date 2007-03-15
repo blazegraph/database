@@ -7,6 +7,7 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 
@@ -35,61 +36,75 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Type safe reference to the backing store.
      */
-    final protected IndexSegmentFileStore fileStore;
-    
+    protected final IndexSegmentFileStore fileStore;
+
     /**
      * An optional bloom filter that will be used to filter point tests. Since
      * bloom filters do not support removal of keys the option to use a filter
      * is restricted to {@link IndexSegment}s since they are read-only data
      * structures.
      */
-    final it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
-    
+    it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
+
     /**
-     * Text of a message used in exceptions for mutation operations on the
-     * index segment.
+     * Text of a message used in exceptions for mutation operations on the index
+     * segment.
      */
-    final protected static String MSG_READ_ONLY = "Read-only index";
+    final protected transient static String MSG_READ_ONLY = "Read-only index";
 
     public int getBranchingFactor() {
-        
+
+        reopen();
+
         return fileStore.metadata.branchingFactor;
-        
+
     }
 
     public int getHeight() {
-        
+
+        reopen();
+
         return fileStore.metadata.height;
-        
+
     }
 
     public int getLeafCount() {
-        
+
+        reopen();
+
         return fileStore.metadata.nleaves;
-        
+
     }
 
     public int getNodeCount() {
-        
+
+        reopen();
+
         return fileStore.metadata.nnodes;
-        
+
     }
 
     public int getEntryCount() {
 
+        reopen();
+
         return fileStore.metadata.nentries;
-        
+
     }
 
-    public IndexSegment(IndexSegmentFileStore fileStore ) {
-        
+    public IndexSegment(IndexSegmentFileStore fileStore) {
+
         this(fileStore, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
                 BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                 BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
-        
+
+        // report on the event.
+        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
+                .toString(), fileStore.size());
+
     }
-    
+
     /**
      * Open a read-only index segment.
      * 
@@ -123,18 +138,65 @@ public class IndexSegment extends AbstractBTree {
 
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentFileStore) fileStore;
-        
+
+        _open();
+
+    }
+
+    /**
+     * Extended to also close the backing file.
+     */
+    public void close() {
+
+        if (root == null) {
+
+            throw new IllegalStateException("Already closed.");
+
+        }
+
+        // close the backing file.
+        fileStore.close();
+
+        // release the optional bloom filter.
+        bloomFilter = null;
+
+        // release buffers and hard reference to the root node.
+        super.close();
+
+        // report event.
+        ResourceManager.closeIndexSegment(fileStore.getFile().toString());
+
+    }
+
+    /**
+     * Re-opens the backing file.
+     */
+    protected void reopen() {
+
+        if (root == null) {
+
+            // reopen the file.
+            fileStore.reopen();
+
+            _open();
+
+        }
+
+    }
+
+    private void _open() {
+
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.metadata.addrRoot);
 
-        if( fileStore.metadata.addrBloom == 0L ) {
-        
+        if (fileStore.metadata.addrBloom == 0L) {
+
             /*
              * No bloom filter.
              */
-            
+
             this.bloomFilter = null;
-            
+
         } else {
 
             /*
@@ -150,122 +212,14 @@ public class IndexSegment extends AbstractBTree {
                 throw new RuntimeException(ex);
 
             }
-                        
+
         }
-        
+
     }
 
-    public void close() {
-        
-        fileStore.close();
-        
-    }
-    
-//    /**
-//     * Overrides the base class to use the optional bloom filter when present.
-//     * 
-//     * @todo Verify that the bloom filter is safe for concurrent readers
-//     * 
-//     * FIXME restore use of the bloom filter once I update the api to byte[]s.
-//     * 
-//     * FIXME use the bloom filter for the batch lookup api as well.
-//     */
-//    public Object lookup(Object key) {
-//
-//        if (key == null) {
-//
-//            throw new IllegalArgumentException();
-//            
-//        }
-//
-//        Object key2;
-//        if(stride > 1) {
-//            /*
-//             * When the stride is greater than one the application needs to
-//             * provide an array parameter anyway so you do not need to copy
-//             * anything.
-//             */
-//            key2 = key;
-//        } else {
-//            /*
-//             * unautobox the key. When unboxing a key, we need to allocate a new
-//             * buffer each time in order to support concurrent readers.
-//             */
-//            key2 = ArrayType.alloc(keyType, 1, stride);
-//            unbox(key,key2);
-//        }
-//
-//        if( bloomFilter != null && ! containsKey(key2)) {
-//
-//            /*
-//             * If the bloom filter reports that the key does not exist then we
-//             * always believe it.
-//             */
-//
-//            counters.nbloomRejects++;
-//            
-//            return null;
-//        
-//        }
-//        
-//        /*
-//         * Either there is no bloom filter or the bloom filter believes that the
-//         * key exists. Either way we now lookup the entry in the btree.  Again,
-//         * we allocate temporary arrays in order to support concurrent readers.
-//         */
-//
-//        final Object[] values = new Object[1];
-//
-//        /*
-//         * use the super class implementation since we already tested the bloom
-//         * filter.
-//         */
-//        super.lookup(1,key2,values);
-//        
-//        return values[0];
-//
-//    }
-
-    /**
-     * Operation is not supported.
+    /*
+     * bloom filter support.
      */
-    public void insert(int ntuples, Object keys, Object[] values) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * Operation is not supported.
-     */
-    public void remove(int ntuples, Object keys, Object[] values) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-//    /**
-//     * Used to unbox an application key into a supplied buffer.
-//     * 
-//     * @param src
-//     *            The application key (Integer, Long, etc).
-//     * @param dst
-//     *            A polymorphic array with room for a single key.
-//     */
-//    private void unbox(Object src,Object dst) {
-//        assert stride == 1;
-//        switch(keyType) {
-//        case BYTE: ((byte[])dst)[0] = ((Byte)src).byteValue(); break;
-//        case SHORT: ((short[])dst)[0] = ((Short)src).shortValue(); break;
-//        case CHAR: ((char[])dst)[0] = ((Character)src).charValue(); break;
-//        case INT: ((int[])dst)[0] = ((Integer)src).intValue(); break;
-//        case LONG: ((long[])dst)[0] = ((Long)src).longValue(); break;
-//        case FLOAT: ((float[])dst)[0] = ((Float)src).floatValue(); break;
-//        case DOUBLE: ((double[])dst)[0] = ((Double)src).doubleValue(); break;
-//        case OBJECT: ((Object[])dst)[0] = src; break;
-//        default: throw new UnsupportedOperationException();
-//        }
-//    }
 
     /**
      * Returns true if the optional bloom filter reports that the key exists.
@@ -274,8 +228,8 @@ public class IndexSegment extends AbstractBTree {
      *            The key.
      * 
      * @return True if the bloom filter believes that the key is present in the
-     *         index. When true, you must still test the key to verify that it
-     *         is, in fact, present in the index. When false, you do NOT need to
+     *         index. When true, you MUST still test the key to verify that it
+     *         is, in fact, present in the index. When false, you SHOULD NOT
      *         test the index.
      * 
      * @todo examine the #of weights in use by the bloom filter and its impact
@@ -283,11 +237,18 @@ public class IndexSegment extends AbstractBTree {
      */
     final protected boolean containsKey(byte[] key) {
 
+        reopen();
+
         assert bloomFilter != null;
-        
+
         return bloomFilter.contains(key);
-        
+
     }
+
+    /*
+     * ISimpleBTree (disallows mutation operations, applies the optional bloom
+     * filter when present).
+     */
 
     /**
      * Operation is disallowed.
@@ -306,16 +267,146 @@ public class IndexSegment extends AbstractBTree {
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
     }
-    
+
+    /**
+     * Applies the optional bloom filter if it exists. If the bloom filter
+     * reports true, then verifies that the key does in fact exist in the index.
+     */
+    public boolean contains(byte[] key) {
+
+        if (bloomFilter != null) {
+
+            if (!containsKey(key)) {
+
+                // rejected by the bloom filter.
+                return false;
+
+            }
+
+            // test the index.
+            return super.contains(key);
+
+        }
+
+        // test the index.
+        return super.contains(key);
+
+    }
+
+    /**
+     * Applies the optional bloom filter if it exists. If the bloom filter
+     * exists and reports true, then looks up the value for the key in the index
+     * (note that the key might not exist in the index since a bloom filter
+     * allows false positives).
+     */
+    public Object lookup(Object key) {
+
+        if (bloomFilter != null) {
+
+            byte[] _key;
+
+            if (key instanceof byte[]) {
+
+                _key = (byte[]) key;
+
+            } else {
+                _key = unbox(key);
+
+            }
+
+            if (!containsKey(_key)) {
+
+                // rejected by the bloom filter.
+                return null;
+
+            }
+
+            /*
+             * Test the index (may be a false positive and we need the value
+             * paired to the key in any case).
+             */
+            return super.lookup(_key);
+
+        }
+
+        // test the index.
+        return super.lookup(key);
+
+    }
+
+    /*
+     * IBatchBTree (disallows mutation operations, applies optional bloom filter
+     * for batch operations).
+     */
+
+    /**
+     * Disallowed.
+     */
+    public void insert(BatchInsert op) {
+
+        throw new UnsupportedOperationException(MSG_READ_ONLY);
+
+    }
+
+    /**
+     * Disallowed.
+     */
+    public void remove(BatchRemove op) {
+
+        throw new UnsupportedOperationException(MSG_READ_ONLY);
+
+    }
+
+    /**
+     * Apply a batch lookup operation. The bloom filter is used iff it is
+     * defined.
+     */
+    public void lookup(BatchLookup op) {
+
+        if( bloomFilter != null ) {
+            
+            op.apply(this);
+            
+        } else {
+            
+            super.lookup(op);
+            
+        }
+        
+    }
+
+    /**
+     * Apply a batch existence test operation. The bloom filter is used iff it
+     * is defined.
+     */
+    public void contains(BatchContains op) {
+
+        if( bloomFilter != null ) {
+            
+            op.apply(this);
+            
+        } else {
+            
+            super.contains(op);
+            
+        }
+
+    }
+
+    /*
+     * INodeFactory
+     */
+
     /**
      * Factory for immutable nodes and leaves used by the {@link NodeSerializer}.
      */
     protected static class ImmutableNodeFactory implements INodeFactory {
 
         public static final INodeFactory INSTANCE = new ImmutableNodeFactory();
-        
-        private ImmutableNodeFactory() {}
-        
+
+        private ImmutableNodeFactory() {
+        }
+
         public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, Object[] values) {
 
@@ -356,31 +447,31 @@ public class IndexSegment extends AbstractBTree {
                     int branchingFactor, int nentries, IKeyBuffer keys,
                     long[] childKeys, int[] childEntryCount) {
 
-                super(btree, addr, branchingFactor, nentries, keys,
-                        childKeys, childEntryCount);
+                super(btree, addr, branchingFactor, nentries, keys, childKeys,
+                        childEntryCount);
 
             }
 
             public void delete() {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
 
-            public Object insert(Object key,Object val) {
+            public Object insert(Object key, Object val) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
-            
+
             public Object remove(Object key) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
-            
+
         }
-        
+
         /**
          * Immutable leaf throws {@link UnsupportedOperationException} for the
          * public mutator API but does not try to override all low-level
@@ -401,31 +492,31 @@ public class IndexSegment extends AbstractBTree {
              */
             protected ImmutableLeaf(AbstractBTree btree, long addr,
                     int branchingFactor, IKeyBuffer keys, Object[] values) {
-                
+
                 super(btree, addr, branchingFactor, keys, values);
-                
+
             }
-            
+
             public void delete() {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
 
-            public Object insert(Object key,Object val) {
+            public Object insert(Object key, Object val) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
-            
+
             public Object remove(Object key) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
-                
+
             }
 
         }
-        
+
     }
 
     /**
@@ -470,9 +561,9 @@ public class IndexSegment extends AbstractBTree {
          * constructor de-serialization of addresses is disabled.
          */
         public CustomAddressSerializer() {
-            
+
             this.offsetNodes = 0;
-            
+
         }
 
         /**
@@ -490,31 +581,32 @@ public class IndexSegment extends AbstractBTree {
          * @see IndexSegmentMetadata#offsetNodes
          */
         public CustomAddressSerializer(long offsetNodes) {
-            
+
             /*
              * Note: trim to int (we restrict the maximum size of the segment).
              */
             this.offsetNodes = (int) offsetNodes;
-            
-//            System.err.println("offsetNodes="+offsetNodes);
-            
+
+            // System.err.println("offsetNodes="+offsetNodes);
+
         }
-        
+
         /**
-         * This over-estimates the space requirements. 
+         * This over-estimates the space requirements.
          */
         public int getSize(int n) {
-            
+
             return Bytes.SIZEOF_LONG * n;
-            
+
         }
 
         /**
          * Packs the addresses, which MUST already have been encoded according
          * to the conventions of this class.
          */
-        public void putChildAddresses(DataOutputStream os, long[] childAddr, int nchildren) throws IOException {
-            
+        public void putChildAddresses(DataOutputStream os, long[] childAddr,
+                int nchildren) throws IOException {
+
             for (int i = 0; i < nchildren; i++) {
 
                 long addr = childAddr[i];
@@ -524,27 +616,27 @@ public class IndexSegment extends AbstractBTree {
                  */
                 if (addr == 0L) {
 
-                    throw new RuntimeException("Child is not persistent: index="
-                            + i);
+                    throw new RuntimeException(
+                            "Child is not persistent: index=" + i);
 
                 }
 
-                // test the low bit.  when set this is a node; otherwise a leaf.
+                // test the low bit. when set this is a node; otherwise a leaf.
                 final boolean isLeaf = (addr & 1) == 0;
-                
+
                 // strip off the low bit.
                 addr >>= 1;
-                
+
                 final int offset = Addr.getOffset(addr);
-                
+
                 final int nbytes = Addr.getByteCount(addr);
-                
+
                 final int adjustedOffset = (isLeaf ? (offset << 1)
                         : ((offset << 1) | 1));
-                
+
                 // write the adjusted offset (requires decoding).
                 LongPacker.packLong(os, adjustedOffset);
-                
+
                 // write the #of bytes (does not require decoding).
                 LongPacker.packLong(os, nbytes);
 
@@ -560,7 +652,7 @@ public class IndexSegment extends AbstractBTree {
 
             // check that we know the offset for deserialization.
             assert offsetNodes > 0;
-            
+
             for (int i = 0; i < nchildren; i++) {
 
                 /*
@@ -569,42 +661,43 @@ public class IndexSegment extends AbstractBTree {
                  * offset is left-shifted by one and its low bit indicates
                  * whether the referent is a node (1) or a leaf (0).
                  */
-                
+
                 /*
                  * offset (this field must be decoded).
                  */
                 long v = LongPacker.unpackLong(is);
-                
+
                 assert v <= Integer.MAX_VALUE;
-                
-                // test the low bit.  when set this is a node; otherwise a leaf.
+
+                // test the low bit. when set this is a node; otherwise a leaf.
                 final boolean isLeaf = (v & 1) == 0;
 
                 // right shift by one to remove the low bit.
                 v >>= 1;
 
                 // compute the real offset into the file.
-                final int offset = isLeaf? (int)v : (int)v + offsetNodes;
-                
+                final int offset = isLeaf ? (int) v : (int) v + offsetNodes;
+
                 /*
                  * nbytes (this field does not need any further interpretation).
                  */
-                
+
                 v = LongPacker.unpackLong(is);
-                
+
                 assert v <= Integer.MAX_VALUE;
-                
+
                 final int nbytes = (int) v;
 
                 /*
                  * combine into the correct address.
                  */
                 final long addr = Addr.toLong(nbytes, offset);
-                
+
                 if (addr == 0L) {
 
                     throw new RuntimeException(
-                            "Child does not have persistent address: index=" + i);
+                            "Child does not have persistent address: index="
+                                    + i);
 
                 }
 
@@ -629,22 +722,22 @@ public class IndexSegment extends AbstractBTree {
          * 
          * @return The encoded address.
          */
-        static public long encode(int nbytes,int offset,boolean isLeaf) {
-            
+        static public long encode(int nbytes, int offset, boolean isLeaf) {
+
             long addr = Addr.toLong(nbytes, (int) offset);
-            
+
             addr <<= 1; // (addr << 1)
-            
+
             if (!isLeaf) {
-                
+
                 addr |= 1; // addr++;
-            
+
             }
-            
+
             return addr;
-            
+
         }
 
     }
-    
+
 }

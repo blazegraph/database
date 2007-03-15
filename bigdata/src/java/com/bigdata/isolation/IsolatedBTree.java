@@ -178,6 +178,15 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
     }
 
     /**
+     * True iff there are no writes on this isolated index.
+     */
+    public boolean isEmptyWriteSet() {
+        
+        return super.nentries == 0;
+        
+    }
+    
+    /**
      * If the key is not in the write set, then delegate to
      * {@link UnisolatedBTree#contains(byte[])} on the isolated index. If the
      * key is in the write set but the entry is deleted then return
@@ -439,7 +448,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = root.rangeIterator(null, null, null);
+        final IEntryIterator itr = getRoot().rangeIterator(null, null, null);
 
         while (itr.hasNext()) {
 
@@ -559,7 +568,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = root.rangeIterator(null, null, null);
+        final IEntryIterator itr = getRoot().rangeIterator(null, null, null);
 
         while (itr.hasNext()) {
 

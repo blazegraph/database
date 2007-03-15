@@ -110,9 +110,14 @@ public class TemporaryRawStore implements IRawStore {
     }
 
     /**
-     * Create a {@link TemporaryRawStore} with an initial in-memory capacity of 10M
-     * that will grow up to 100M before converting into a disk-based store
-     * backed by a temporary file.
+     * Create a {@link TemporaryRawStore} with an initial in-memory capacity of
+     * 10M that will grow up to 100M before converting into a disk-based store
+     * backed by a temporary file. These defaults are appropriate for a
+     * relatively small number of processes that will write a lot of data. If
+     * you have a lot of processes then you need to be more conservative with
+     * RAM in the initial allocation and switch over to disk sooner. For
+     * example, transactions use smaller defaults in order to support a large
+     * #of concurrent transactions without a large memory burden.
      * 
      * @todo the memory growth strategy does not respect the in-memory maximum
      *       without parameterizing and overriding the #of bytes to extent the
@@ -168,10 +173,6 @@ public class TemporaryRawStore implements IRawStore {
         if(!open) throw new IllegalStateException();
         
         open = false;
-        
-//        buf.close();
-//        
-//        buf.deleteFile();
         
         buf.closeAndDelete();
         
@@ -240,6 +241,10 @@ public class TemporaryRawStore implements IRawStore {
         
         try {
             
+            /*
+             * Note: this operation will transparently extend the in-memory
+             * buffer as necessary up to the specified maximum capacity.
+             */
             return buf.write(data);
             
         } catch(OverflowException ex) {

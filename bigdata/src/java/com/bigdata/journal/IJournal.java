@@ -61,8 +61,7 @@ import com.bigdata.objndx.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMROW, IAtomicStore, IIndexManager,
-        ITransactionManager {
+public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
 
     /**
      * A copy of the properties used to initialize this journal.

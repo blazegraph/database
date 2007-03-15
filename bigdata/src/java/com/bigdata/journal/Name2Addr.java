@@ -180,9 +180,12 @@ public class Name2Addr extends BTree {
         
         // re-load btree from the store.
         btree = BTree.load(this.store, entry.addr);
-      
+        
         // save name -> btree mapping in transient cache.
         indexCache.put(name,btree);
+
+        // report event (loaded btree).
+        ResourceManager.openUnisolatedBTree(name);
 
         // return btree.
         return btree;

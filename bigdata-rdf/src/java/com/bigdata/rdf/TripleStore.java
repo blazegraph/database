@@ -1058,7 +1058,7 @@ public class TripleStore extends /*Partitioned*/Journal {
     }
 
     public void overflow() {
-        
+
         System.err.println("*** Overflow *** ");
 
         // the current state.
@@ -1072,6 +1072,7 @@ public class TripleStore extends /*Partitioned*/Journal {
         ndx_osp = null;
         this.counter = null;
         
+        // invoke the base behavior on the super class.
         super.overflow();
         
         // create a new counter that will be persisted on the new slave journal.

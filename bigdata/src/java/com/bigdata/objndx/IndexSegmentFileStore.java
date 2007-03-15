@@ -40,7 +40,7 @@ public class IndexSegmentFileStore implements IRawStore {
      * the use of this buffer means that reading a node that has fallen off
      * of the queue does not require any IOs.
      */
-    protected final ByteBuffer buf_nodes;
+    private ByteBuffer buf_nodes;
 
     /**
      * The file containing the index segment.
@@ -50,17 +50,17 @@ public class IndexSegmentFileStore implements IRawStore {
     /**
      * The random access file used to read the index segment.
      */
-    protected final RandomAccessFile raf;
+    private RandomAccessFile raf;
 
     /**
      * A read-only view of the metadata record for the index segment.
      */
-    protected final IndexSegmentMetadata metadata;
+    protected IndexSegmentMetadata metadata;
 
     /**
      * A read-only view of the extension metadata record for the index segment.
      */
-    protected final IndexSegmentExtensionMetadata extensionMetadata;
+    protected IndexSegmentExtensionMetadata extensionMetadata;
     
     /**
      * True iff the store is open.
@@ -86,6 +86,24 @@ public class IndexSegmentFileStore implements IRawStore {
 
         this.file = file;
 
+        reopen();
+
+    }
+
+    /**
+     * Re-open a closed store. This operation should succeed if the backing file
+     * is still accessible.
+     * 
+     * @exception IllegalStateException
+     *                if the store is not closed.
+     * 
+     * @see #close()
+     */
+    public void reopen() {
+
+        if (open)
+            throw new IllegalStateException("Already open.");
+        
         if (!file.exists()) {
 
             throw new RuntimeException("File does not exist: "
@@ -131,7 +149,7 @@ public class IndexSegmentFileStore implements IRawStore {
         }
 
     }
-
+    
     /**
      * Load the {@link IndexSegment} or derived class from the store. The
      * {@link IndexSegment} or derived class MUST provide a public constructor
@@ -195,6 +213,11 @@ public class IndexSegmentFileStore implements IRawStore {
         
     }
     
+    /**
+     * Closes the file and releases the internal buffers and metadata records.
+     * This operation may be reversed by {@link #reopen()} as long as the
+     * backing file remains available.
+     */
     public void close() {
 
         if (!open)
@@ -203,14 +226,22 @@ public class IndexSegmentFileStore implements IRawStore {
         try {
 
             raf.close();
+            
+            raf = null;
+            
+            buf_nodes = null;
+
+            metadata = null;
+            
+            extensionMetadata = null;
+            
+            open = false;
 
         } catch (IOException ex) {
 
             throw new RuntimeException(ex);
 
         }
-
-        open = false;
 
     }
     

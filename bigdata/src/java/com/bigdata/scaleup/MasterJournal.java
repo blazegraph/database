@@ -65,6 +65,7 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;
@@ -675,9 +676,6 @@ public class MasterJournal implements IJournal {
         // immediate shutdown of the old journal.
         oldJournal.closeAndDelete();
         
-//        // delete the old backing file (if any).
-//        oldJournal.getBufferStrategy().deleteFile();
-        
     }
 
     /**
@@ -1262,10 +1260,6 @@ public class MasterJournal implements IJournal {
         return slave.getIndex(name, ts);
     }
 
-    public long newTx() {
-        return slave.newTx();
-    }
-
     public long newTx(IsolationEnum level) {
         return slave.newTx(level);
     }
@@ -1319,9 +1313,15 @@ public class MasterJournal implements IJournal {
         IndexSegment seg = resourceCache.get(filename);
         
         if( seg == null ) {
+
+            // open the file.
+            IndexSegmentFileStore fileStore = new IndexSegmentFileStore(
+                    resource.getFile());
             
-            seg = new IndexSegmentFileStore(resource.getFile()).load();
+            // load the btree.
+            seg = fileStore.load();
             
+            // save in the cache.
             resourceCache.put(filename, seg, false);
             
         }

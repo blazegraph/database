@@ -68,7 +68,7 @@ abstract public class AbstractTx implements ITx {
      * The transaction uses the {@link Journal} for some handshaking in the
      * commit protocol and to locate the named indices that it isolates.
      */
-    final protected Journal journal;
+    final protected AbstractJournal journal;
     
     /**
      * The start startTime assigned to this transaction.
@@ -96,9 +96,15 @@ abstract public class AbstractTx implements ITx {
      */
     final protected boolean readOnly;
     
+    /**
+     * The type-safe enumeration representing the isolation level of this
+     * transaction.
+     */
+    final protected IsolationEnum level;
+    
     private RunState runState;
 
-    protected AbstractTx(Journal journal, long startTime, boolean readOnly ) {
+    protected AbstractTx(AbstractJournal journal, long startTime, IsolationEnum level ) {
         
         if (journal == null)
             throw new IllegalArgumentException();
@@ -109,14 +115,19 @@ abstract public class AbstractTx implements ITx {
         
         this.startTime = startTime;
 
-        this.readOnly = readOnly;
+        this.readOnly = level != IsolationEnum.ReadWrite;;
 
+        this.level = level;
+        
         // pre-compute the hash code for the transaction.
         this.hashCode = Long.valueOf(startTime).hashCode();
         
         journal.activateTx(this);
 
         this.runState = RunState.Active;
+
+        // report event.
+        ResourceManager.openTx(startTime, level);
 
     }
     
@@ -177,7 +188,13 @@ abstract public class AbstractTx implements ITx {
         return ""+startTime;
         
     }
- 
+
+    final public IsolationEnum getIsolationLevel() {
+        
+        return level;
+        
+    }
+    
     final public boolean isReadOnly() {
         
         return readOnly;
@@ -224,6 +241,8 @@ abstract public class AbstractTx implements ITx {
             runState = RunState.Aborted;
 
             journal.completedTx(this);
+            
+            ResourceManager.closeTx(startTime, commitTime, true);
             
         } finally {
             
@@ -343,6 +362,8 @@ abstract public class AbstractTx implements ITx {
 
             journal.completedTx(this);
             
+            ResourceManager.closeTx(startTime, commitTime, false);
+
         } catch( Throwable t) {
 
             /*

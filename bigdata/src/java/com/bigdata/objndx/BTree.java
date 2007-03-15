@@ -481,7 +481,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         /*
          * Read the root node of the btree.
          */
-        this.root = readNodeOrLeaf( metadata.addrRoot );
+//        this.root = readNodeOrLeaf( metadata.addrRoot );
+        reopen();
 
     }
 
@@ -502,6 +503,49 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         
     }
     
+    
+    /**
+     * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
+     * update the metadata so we can clear the hard reference queue and release
+     * the hard reference to the root node. {@link #reopen()} is responsible for
+     * reloading the root node.
+     */
+    public void close() {
+
+        /*
+         * flush any dirty records, noting the address of the metadata record
+         * so that we can reload the store.
+         */
+        handleCommit();
+        
+        /*
+         * this will clear the hard reference cache, release the node serializer
+         * buffers, and release the hard reference to the root node.
+         */
+        super.close();
+        
+    }
+    
+    /**
+     * Reloads the root node iff it is <code>null</code> (indicating a closed
+     * index).
+     * 
+     * @see #close()
+     */
+    protected void reopen() {
+
+        if (root == null) {
+
+            /*
+             * reload the root node.
+             */
+
+            root = readNodeOrLeaf(metadata.addrRoot);
+
+        }
+
+    }
+    
     /**
      * Writes dirty nodes using a post-order traversal that first writes any
      * dirty leaves and then (recursively) their parent nodes. The parent nodes
@@ -518,6 +562,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      *         object.
      */
     public long write() {
+        
+        assert root != null; // i.e., isOpen().
 
         if (root.dirty) {
 
@@ -562,13 +608,16 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     }
     
     /**
-     * Method returns the metadata record persisted by {@link #write()}.  You
-     * MUST override this method to return a subclass of {@link BTreeMetadata}
-     * in order to persist additional metadata with the btree.
+     * Method returns the metadata record persisted by {@link #write()}.
+     * <p>
+     * Note: In order to persist additional metadata with the btree you MUST
+     * override this method to return a subclass of {@link BTreeMetadata}.
      * 
      * @return A new metadata object that can be used to restore the btree.
      */
     protected BTreeMetadata newMetadata() {
+        
+        assert root != null; // i.e., isOpen().
         
         return new BTreeMetadata(this);
         
@@ -577,16 +626,20 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     /**
      * Handle request for a commit by {@link #write()}ing dirty nodes and
      * leaves onto the store, writing a new metadata record, and returning the
-     * address of that metadata record.<
+     * address of that metadata record.
      * <p>
      * Note: In order to avoid needless writes the existing metadata record is
-     * always returned iff all of the folowing are true:
+     * always returned if:
      * <ol>
-     * <li> it metadata record is defined (it is not defined when a btree is
-     * first created).</li>
-     * <li> the root of the btree is NOT dirty </li>
-     * <li> the persistent address of the root of the btree is the same as the
-     * address record in the metadata record.</li>
+     * <li> the metadata record is defined (it is not defined when a btree is
+     * first created) -AND- </li>
+     * <li> the root of the btree is NOT dirty and the persistent address of the
+     * root of the btree is the same as the address record in the metadata
+     * record -OR- </li>
+     * <li> the root is <code>null</code>, indicating that the index is
+     * closed (flushing the index to disk and updating the metadata record is
+     * part of the close protocol so we know that the metadata address is
+     * current in this case).</li>
      * </ol>
      * 
      * @return The {@link Addr address} of a metadata record from which the
@@ -594,8 +647,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      */
     public long handleCommit() {
 
-        if (metadata != null && !root.isDirty()
-                && metadata.addrRoot == root.getIdentity()) {
+        if (metadata != null
+                && (root == null || !root.dirty
+                        && metadata.addrRoot == root.getIdentity())) {
 
             /*
              * There have not been any writes on this btree.

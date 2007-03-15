@@ -179,7 +179,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
          * transaction, this causes the test to wait until the abort task has
          * been executed.
          */ 
-        journal.commitService.shutdown();
+        journal.writeService.shutdown();
 
         assertFalse(tx0.isActive());
         assertFalse(tx0.isPrepared());
@@ -575,7 +575,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 //            
 //        }
 //
-//        ITx tx0 = journal.newTx();
+//        ITx tx0 = journal.newTx(IsolationEnum.ReadWrite);
 //
 //        IIndex ndx = tx0.getIndex(name);
 //        
@@ -659,7 +659,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 //            
 //        }
 //
-//        ITx tx0 = journal.newTx();
+//        ITx tx0 = journal.newTx(IsolationEnum.ReadWrite);
 //
 //        IIndex ndx = tx0.getIndex(name);
 //        

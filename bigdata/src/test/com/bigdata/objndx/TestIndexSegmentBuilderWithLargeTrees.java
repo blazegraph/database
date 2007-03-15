@@ -51,7 +51,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -59,14 +58,6 @@ import com.bigdata.journal.Options;
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
  * and then compares the trees for the same total ordering.
- * 
- * @todo do a variant that only evicts index segments when the journal overflows
- *       and that merges segments as we go. While we can limit the size of the
- *       journal to provoke overflow, for this test will be unable to compare to
- *       the data in a single btree. Instead we have to compare against ground
- *       truth in either a generated or external dataset. This will also test
- *       the logic that directs queries and scans to the appropriate segment of
- *       a segmented index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -209,7 +200,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m ) );
 
-            // @todo overflows the initial journal extent.
+            // Note: overflows the initial journal extent.
 //            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m*m ) );
 
         }
@@ -238,7 +229,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m,trace) );
 
-            //@todo overflows the initial journal extent.
+            // Note: overflows the initial journal extent.
 //            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m*m,trace) );
 
         }
@@ -276,19 +267,14 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
                     + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                     + "), out(m=" + m + ")");
             
-            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
-                    tmpDir, btree, m, 0.
-                    /*
-                     * @todo pass in btree.nodeSer.valueSerializer
-                     */
-                    );
+            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
 
             /*
-             * Verify can load the index file and that the metadata
-             * associated with the index file is correct (we are only
-             * checking those aspects that are easily defined by the test
-             * case and not, for example, those aspects that depend on the
-             * specifics of the length of serialized nodes or leaves).
+             * Verify can load the index file and that the metadata associated
+             * with the index file is correct (we are only checking those
+             * aspects that are easily defined by the test case and not, for
+             * example, those aspects that depend on the specifics of the length
+             * of serialized nodes or leaves).
              */
             System.err.println("Opening index segment.");
             final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
@@ -299,6 +285,18 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
             assertSameBTree(btree, seg);
 
             System.err.println("Closing index segment.");
+            seg.close();
+
+            /*
+             * Note: close() is a reversable operation. This verifies that by
+             * immediately re-verifying the index segment. The index segment
+             * SHOULD be transparently re-opened for this operation.
+             */
+            System.err.println("Re-verifying index segment.");
+            assertSameBTree(btree, seg);
+
+            // Close again so that we can delete the backing file.
+            System.err.println("Re-closing index segment.");
             seg.close();
             
             if (!outFile.delete()) {

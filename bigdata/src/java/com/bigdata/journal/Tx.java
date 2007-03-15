@@ -91,11 +91,22 @@ import com.bigdata.scaleup.PartitionedIndexView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo track whether or not the transaction has written any isolated data. do
- *       this at the same time that I modify the isolated indices use a
+ * @todo In order to support a distributed transaction commit protocol the write
+ *       set of a validated transaction needs to be made restart safe without
+ *       making it restart safe on the corresponding unisolated index on the
+ *       journal. It may be that the right thing to do is to write the validated
+ *       data onto the unisolated indices but not commit the journal and not
+ *       permit other unisolated writes until the commit message arives, e.g.,
+ *       block in the {@link AbstractJournal#writeService} waiting on the commit
+ *       message. A timeout would cause the buffered writes to be discarded (by
+ *       an abort).
+ * 
+ * @todo track whether or not the transaction has written any isolated data (I
+ *       currently rangeCount the isolated indices in {@link #isEmptyWriteSet()}).
+ *       do this at the same time that I modify the isolated indices use a
  *       delegation strategy so that I can trap attempts to access an isolated
- *       index once the transaction is no longer active.  define "active" as
- *       up to the point where a "commit" or "abort" is _requested_ for the tx.
+ *       index once the transaction is no longer active. define "active" as up
+ *       to the point where a "commit" or "abort" is _requested_ for the tx.
  * 
  * @todo Support transactions where the indices isolated by the transactions are
  *       {@link PartitionedIndexView}es.
@@ -166,9 +177,10 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      *            When true the transaction will reject writes and
      *            {@link #prepare()} and {@link #commit()} will be NOPs.
      */
-    public Tx(Journal journal, long startTime, boolean readOnly) {
+    public Tx(AbstractJournal journal, long startTime, boolean readOnly) {
 
-        super(journal, startTime, readOnly);
+        super(journal, startTime, readOnly ? IsolationEnum.ReadOnly
+                : IsolationEnum.ReadWrite);
         
         /*
          * The commit record serving as the ground state for the indices
@@ -314,9 +326,9 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             throw new IllegalArgumentException();
 
         if (!isActive()) {
-
-            throw new IllegalStateException();
-
+            
+            throw new IllegalStateException(NOT_ACTIVE);
+            
         }
 
         /*
@@ -359,6 +371,9 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
                 
                 // writeable index backed by the temp. store.
                 index = new IsolatedBTree(tmpStore,src);
+
+                // report event.
+                ResourceManager.isolateIndex(startTime, name);
                 
             }
 
@@ -367,6 +382,35 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         }
         
         return index;
+        
+    }
+
+    final public boolean isEmptyWriteSet() {
+        
+        if(isReadOnly()) {
+            
+            // Read-only transactions always have empty write sets.
+            return true;
+            
+        }
+
+        Iterator<IIsolatedIndex> itr = btrees.values().iterator();
+
+        while(itr.hasNext()) {
+            
+            IsolatedBTree ndx = (IsolatedBTree) itr.next();
+            
+            if(!ndx.isEmptyWriteSet()) {
+                
+                // At least one isolated index was written on.
+                
+                return false;
+                
+            }
+            
+        }
+        
+        return true;
         
     }
 

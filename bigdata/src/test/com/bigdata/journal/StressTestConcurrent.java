@@ -278,7 +278,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
          */
         public Long call() throws Exception {
             
-            final long tx = journal.newTx();
+            final long tx = journal.newTx(IsolationEnum.ReadWrite);
             
             final IIndex ndx = journal.getIndex(name,tx);
 
@@ -366,7 +366,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      *       {@link TemporaryRawStore#buf} to to null when the store was closed.
      *       However, there is still going to be something that was causing
      *       those transactions and their stores to be hanging around -- perhaps
-     *       the commitService in the Journal which might be holding onto
+     *       the writeService in the Journal which might be holding onto
      *       {@link Future}s?
      * 
      * @see ComparisonTestDriver, which parameterizes the use of this stress

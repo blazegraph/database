@@ -158,6 +158,10 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
          * Extend the capacity.
          */
         truncate( newExtent );
+
+        // report event.
+        ResourceManager.extendJournal(getFile() == null ? null : getFile()
+                .toString(), newExtent);
         
         // Retry the write operation.
         return true;

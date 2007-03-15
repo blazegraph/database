@@ -48,10 +48,12 @@ Modifications:
 package com.bigdata.journal;
 
 
+import com.bigdata.service.OldTransactionServer;
+
 import junit.framework.TestCase;
 
 /**
- * Test suite for semantics of the {@link TransactionServer}.
+ * Test suite for semantics of the {@link OldTransactionServer}.
  * 
  * @todo The test suite has to cover the basic API, including correct generation
  *       of abort, prepare, and commit notices, but also the tracking of ground
@@ -80,7 +82,7 @@ public class TestTransactionServer extends TestCase {
 
     public void test_ctor() {
         
-        new TransactionServer();
+        new OldTransactionServer();
         
     }
 
@@ -98,7 +100,7 @@ public class TestTransactionServer extends TestCase {
      */
     public void test001() {
         
-        TransactionServer server = new MyTransactionServer();
+        OldTransactionServer server = new MyTransactionServer();
         
         /* groundState is t0.
          * 
@@ -148,7 +150,7 @@ public class TestTransactionServer extends TestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class MyTransactionServer extends TransactionServer {
+    static class MyTransactionServer extends OldTransactionServer {
 
         public MyTransactionServer() {
             super();
