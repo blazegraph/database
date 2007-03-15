@@ -53,7 +53,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.TripleStore;
-import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * A test of the RIO integration.
@@ -154,7 +153,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
         long total_stmts = 0;
 
-        long begin = System.currentTimeMillis();
+//        long begin = System.currentTimeMillis();
         
         for ( int i = 0; i < resources.length; i++ ) {
 

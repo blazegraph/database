@@ -56,7 +56,7 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchContains implements IBatchOp {
+public class BatchContains implements IReadOnlyBatchOp {
 
     /**
      * The #of tuples to be processed.

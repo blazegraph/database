@@ -51,6 +51,7 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.ResourceManager;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
@@ -82,7 +83,7 @@ public class SlaveJournal extends Journal {
     protected Name2MetadataAddr name2MetadataAddr;
 
     private final MasterJournal master;
-    
+
     protected MasterJournal getMaster() {
 
         return master;
@@ -99,12 +100,15 @@ public class SlaveJournal extends Journal {
         this.master = master;
 
     }
-
+    
     /**
      * The overflow event is delegated to the master.
      */
     public void overflow() {
     
+        // handles event reporting.
+        super.overflow();
+        
         master.overflow();
         
     }

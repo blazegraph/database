@@ -87,6 +87,8 @@ public class BTreeMetadata implements Serializable {
      */
     protected BTreeMetadata(BTree btree) {
         
+        assert btree.isOpen();
+        
         this.addrRoot = btree.root.getIdentity();
         
         this.branchingFactor = btree.branchingFactor;

@@ -111,6 +111,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestCommit.class );
         // verify that a store is restart-safe iff it commits.
         suite.addTestSuite( TestRestartSafe.class );
+        // test the close/reopen protocol for releasing index buffers.
+        suite.addTestSuite( TestReopen.class );
 
         /*
          * index rebuilding.
@@ -131,7 +133,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentMerger.class );
 
         /*
-         * use of btree to support column store.
+         * @todo use of btree to support column store (in another package)
          * 
          * @todo handle column names and timestamp as part of the key.
          * 

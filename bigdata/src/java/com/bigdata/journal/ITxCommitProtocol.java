@@ -42,44 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Dec 13, 2005
+ * Created on Mar 15, 2007
  */
-package com.bigdata.cache;
+
+package com.bigdata.journal;
+
+import com.bigdata.service.IDataService;
 
 /**
+ * An interface implemented by an {@link IDataService} for the commit / abort of
+ * the local write set for a transaction as directed by a centralized
+ * {@link ITransactionManager} in response to client requests.
  * <p>
- * Interface for hard reference cache entries exposes a <i>dirty</i> flag in
- * addition to the object identifier and object reference.
- * </p>
+ * Clients DO NOT make direct calls against this API. Instead, they MUST locate
+ * the {@link ITransactionManager} service and direct messages to that service.
+ * <p>
+ * Note: These methods should be invoked iff the transaction manager knows that
+ * the {@link IDataService} is buffering writes for the transaction.
  * 
- * @author thompsonbry
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Support clearing updated objects for hot cache between transactions.
- *       Add metadata boolean that indicates whether the object was modified
- *       since the cache was last cleared regardless of whether the object has
- *       since been installed on the persistence layer and marked as clean. The
- *       purpose of this is to support clearing of modified objects from the
- *       object cache when a transaction is aborted. Such objects must be
- *       cleared if they have been modified since they were installed in the
- *       cache regardless of whether they are currently dirty or not. Supporting
- *       this feature will probably require a hard reference Set containing the
- *       object identifier of each object that was marked as dirty in the cache
- *       since the cache was last cleared.
+ * FIXME in order to support 2-/3-phase commit, the [commitTime] from the
+ * transaction manager service must be passed through to the journal. There also
+ * needs to be a distinct "prepare" message that validates the write set of the
+ * transaction and makes it restart safe. finally, i have to coordinate the
+ * serialization of the wait for the "commit" message.
  */
-public interface ICacheEntry<K,T> extends IWeakRefCacheEntry<K,T> {
+public interface ITxCommitProtocol {
 
     /**
-     * Return true iff the object associated with this entry is dirty.
+     * Request commit of the transaction write set.
      */
-    public boolean isDirty();
+    public void commit(long tx);
 
     /**
-     * Set the dirty flag.
-     * 
-     * @param dirty
-     *            true iff the object associated with this entry is dirty.
+     * Request abort of the transaction write set.
      */
-    public void setDirty(boolean dirty);
+    public void abort(long tx);
 
 }

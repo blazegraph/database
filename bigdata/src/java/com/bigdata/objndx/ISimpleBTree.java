@@ -56,11 +56,7 @@ package com.bigdata.objndx;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME re-define this interface for byte[] keys
- * 
- * @todo implement a strongly typed subclass of BTree using a default
- *       {@link KeyBuilder} and use that to run the various test suites that
- *       have a dependency on int keys.
+ * @todo re-define this interface for byte[] keys
  * 
  * @see KeyBuilder, which may be used to encode one or more primitive data type
  *      values or Unicode strings into a variable length unsigned byte[] key.

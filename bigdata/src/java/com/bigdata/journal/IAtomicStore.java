@@ -60,12 +60,12 @@ import com.bigdata.rawstore.IRawStore;
 public interface IAtomicStore extends IRawStore {
 
     /**
-     * Abandon the current write set.
+     * Abandon the current write set (immediate, synchronous).
      */
     public void abort();
     
     /**
-     * Request an atomic commit.
+     * Atomic commit (immediate, synchronous).
      * 
      * @return The timestamp assigned to the {@link ICommitRecord} -or- 0L if
      *         there were no data to commit.

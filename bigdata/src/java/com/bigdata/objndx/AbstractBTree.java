@@ -151,14 +151,37 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * The root of the btree. This is initially a leaf until the leaf is split,
      * at which point it is replaced by a node. The root is also replaced each
      * time copy-on-write triggers a cascade of updates.
+     * <p>
+     * This hard reference is cleared to <code>null</code> if an index is
+     * {@link #close() closed}. {@link #getRoot()} automatically uses
+     * {@link #reopen()} to reload the root so that closed indices may be
+     * transparently made ready for further use (indices are closed to reduce
+     * their resource burden, not to make their references invalid). The
+     * {@link AbstractNode} and derived classes <em>assume</em> that the root
+     * is non-null. This assumption is valid if {@link #close()} is invoked by
+     * the application in a manner consistent with the single-threaded contract
+     * for the {@link AbstractBTree}.
      */
     protected AbstractNode root;
-
+    
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree.
      */
     final protected NodeSerializer nodeSer;
 
+    /**
+     * Count of the #of times that a reference to this {@link AbstractBTree}
+     * occurs on a {@link HardReferenceQueue}. This field will remain zero(0)
+     * unless the {@link AbstractBTree} is placed onto a
+     * {@link HardReferenceQueue} maintained by the application.
+     * <p>
+     * Note: <em>DO NOT MODIFY THIS FIELD DIRECTLY</em> -- The journal is
+     * responsible for setting up the {@link HardReferenceQueue}, updating this
+     * field, and {@link #close() closing} {@link AbstractBTree}s that are not
+     * in use.
+     */
+    public int referenceCount = 0;
+    
     /**
      * Leaves (and nodes) are added to a hard reference queue when they are
      * created or read from the store. On eviction from the queue a dirty leaf
@@ -313,7 +336,97 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
 
     /**
-     * The persistence store.
+     * The contract for close is to reduce the resource burden of the index (by
+     * discarding buffers) while not rendering the index inoperative. An index
+     * that has been {@link #close() closed} MAY be {@link #reopen() reopened}
+     * at any time (conditional on the continued availability of the backing
+     * store). The index reference remains valid after a {@link #close()}. A
+     * closed index is transparently restored by either {@link #getRoot()} or
+     * {@link #reopen()}. 
+     * <p>
+     * This implementation clears the hard reference queue (releasing all node
+     * references), releases the hard reference to the root node, and releases
+     * the buffers on the {@link NodeSerializer} (they will be naturally
+     * reallocated on reuse).
+     * <p>
+     * Note: {@link AbstractBTree} is NOT thread-safe and {@link #close()} MUST
+     * be invoked in a context in which there will not be concurrent threads --
+     * the natural choice being the single-threaded commit service on the
+     * journal.
+     * 
+     * @exception IllegalStateException
+     *                if the root is <code>null</code>, indicating that the
+     *                index is already closed.
+     * 
+     * @exception IllegalStateException
+     *                if the root is dirty (this implies that this is a mutable
+     *                btree and there are mutations that have not been written
+     *                through to the store)
+     */
+    public void close() {
+
+        if(root==null) {
+
+            throw new IllegalStateException("Already closed");
+            
+        }
+
+        if (root.dirty) {
+            
+            throw new IllegalStateException("Root node is dirty");
+            
+        }
+        
+        /*
+         * Release buffers.
+         */
+        nodeSer.close();
+        
+        /*
+         * Clear the hard reference queue (this will not trigger any writes
+         * since we know as a pre-condition that the root node is clean).
+         */
+        leafQueue.evictAll(true);
+        
+        /*
+         * Clear the reference to the root node (permits GC).
+         */
+        root = null;
+        
+    }
+    
+    /**
+     * This is part of a {@link #close()}/{@link #reopen()} protocol that may
+     * be used to reduce the resource burden of an {@link AbstractBTree}. The
+     * implementation must reload the root node of the tree iff {@link #root} is
+     * <code>null</code> (indicating that the index has been closed). This
+     * method is automatically invoked by a variety of methods that need to
+     * ensure that the index is available for use.
+     * 
+     * @see #close()
+     * @see #isOpen()
+     * @see #getRoot()
+     */
+    abstract protected void reopen();
+    
+    /**
+     * An "open" index has its buffers and root node in place rather than having
+     * to reallocate buffers or reload the root node from the store.
+     * 
+     * @return If the index is "open".
+     * 
+     * @see #close()
+     * @see #reopen()
+     * @see #getRoot()
+     */
+    final public boolean isOpen() {
+        
+        return root != null;
+        
+    }
+    
+    /**
+     * The backing store.
      */
     public IRawStore getStore() {
 
@@ -373,9 +486,16 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * The root of the btree. This is initially a leaf until the leaf is split,
      * at which point it is replaced by a node. The root is also replaced each
      * time copy-on-write triggers a cascade of updates.
+     * <p>
+     * The hard reference to the root node is cleared if the index is
+     * {@link #close() closed}. This method automatically {@link #reopen()}s
+     * the index if it is closed, making it available for use.
      */
     final public AbstractNode getRoot() {
 
+        // make sure that the root is defined.
+        if(root == null) reopen();
+        
         return root;
 
     }
@@ -420,7 +540,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.batchInsert(op);
+            int nused = getRoot().batchInsert(op);
 
             assert nused > 0;
 
@@ -468,7 +588,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.batchLookup(op);
+            int nused = getRoot().batchLookup(op);
 
             assert nused > 0;
 
@@ -498,7 +618,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.batchContains(op);
+            int nused = getRoot().batchContains(op);
 
             assert nused > 0;
 
@@ -519,7 +639,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             /*
              * Each call MAY process more than one tuple.
              */
-            int nused = root.batchRemove(op);
+            int nused = getRoot().batchRemove(op);
 
             assert nused > 0;
 
@@ -551,7 +671,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *             for int keys passed into the non-batch api. It will disappear
      *             as soon as I update the test suites.
      */
-    final private byte[] unbox(Object key) {
+    final protected byte[] unbox(Object key) {
      
         return keyBuilder.reset().append(((Integer) key).intValue()).getKey();
         
@@ -566,11 +686,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (key instanceof byte[]) {
         
-            return root.insert((byte[]) key,value);
+            return getRoot().insert((byte[]) key,value);
             
         } else {
             
-            return root.insert( unbox(key), value );
+            return getRoot().insert( unbox(key), value );
             
         }
         
@@ -585,11 +705,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (key instanceof byte[]) {
 
-            return root.lookup((byte[])key);
+            return getRoot().lookup((byte[])key);
             
         } else {
             
-            return root.lookup(unbox(key));
+            return getRoot().lookup(unbox(key));
             
         }
 
@@ -602,7 +722,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nfinds++;
         
-        return root.contains((byte[])key);
+        return getRoot().contains((byte[])key);
 
     }
 
@@ -615,11 +735,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (key instanceof byte[]) {
         
-            return root.remove((byte[])key);
+            return getRoot().remove((byte[])key);
             
         } else {
             
-            return root.remove(unbox(key));
+            return getRoot().remove(unbox(key));
             
         }
 
@@ -632,7 +752,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nindexOf++;
 
-        int index = root.indexOf(key);
+        int index = getRoot().indexOf(key);
 
         return index;
 
@@ -648,7 +768,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.ngetKey++;
 
-        return root.keyAt(index);
+        return getRoot().keyAt(index);
 
     }
 
@@ -662,7 +782,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.ngetKey++;
 
-        return root.valueAt(index);
+        return getRoot().valueAt(index);
 
     }
 
@@ -674,12 +794,14 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
          * parameters is desired then invoke compareBytes on the keys (if both
          * are non-null) before calling rangeIterator on the root node.
          */
-        return root.rangeIterator(fromKey, toKey);
+        return getRoot().rangeIterator(fromKey, toKey);
 
     }
 
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
+        AbstractNode root = getRoot();
+        
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
         int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
@@ -711,7 +833,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     public IEntryIterator entryIterator() {
 
-        return root.entryIterator();
+        return getRoot().entryIterator();
 
     }
 
@@ -725,7 +847,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected Iterator leafIterator() {
 
-        return new Striterator(root.postOrderIterator())
+        return new Striterator(getRoot().postOrderIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -822,7 +944,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
                     + utils[2] + "%");
         }
 
-        return root.dump(level, out, 0, true);
+        if (root != null) {
+            
+            return root.dump(level, out, 0, true);
+            
+        } else return true;
 
     }
 
@@ -922,6 +1048,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected void writeNodeRecursive(AbstractNode node) {
 
+        assert root != null; // i.e., isOpen().
         assert node != null;
         assert node.dirty;
         assert !node.deleted;
@@ -997,6 +1124,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected long writeNodeOrLeaf(AbstractNode node) {
 
+        assert root != null; // i.e., isOpen().
         assert node != null;
         assert node.btree == this;
         assert node.dirty;

@@ -66,6 +66,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.UnisolatedIndexSegment;
 import com.bigdata.isolation.Value;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.objndx.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Addr;
@@ -788,6 +789,9 @@ public class IndexSegmentBuilder {
                     fpf.format(((double) md.length / Bytes.megabyte32))
                     + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
 
+            // report event
+            ResourceManager.buildIndexSegment(null/* name */,
+                    outFile.toString(), plan.nentries, elapsed, md.length);
 
         } catch (Throwable ex) {
 

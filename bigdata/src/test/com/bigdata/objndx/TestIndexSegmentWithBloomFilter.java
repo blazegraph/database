@@ -57,7 +57,6 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -283,10 +282,6 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          */
         System.err.println("Opening index segment w/ bloom filter.");
         final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
-//                // setup reference queue.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        100, 20),
-//                @todo btree.nodeSer.valueSerializer);
 
         /*
          * Verify the total index order.
@@ -378,10 +373,6 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              */
             System.err.println("Opening index segment w/o bloom filter.");
             final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                    // setup reference queue.
-//                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                            100, 20),
-//                            @todo btree.nodeSer.valueSerializer);
 
             /*
              * Verify can load the index file and that the metadata
@@ -392,10 +383,6 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              */
             System.err.println("Opening index segment w/ bloom filter.");
             final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
-//                    // setup reference queue.
-//                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                            100, 20),
-//                            @todo btree.nodeSer.valueSerializer);
 
             /*
              * Explicitly test the bloom filter against ground truth. 
@@ -425,6 +412,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             System.err.println("Verifying index segments.");
             assertSameBTree(btree, seg);
             assertSameBTree(btree, seg2);
+            seg2.close(); // close seg w/ bloom filter and the verify with implicit reopen.
             assertSameBTree(seg, seg2);
 
             System.err.println("Closing index segments.");

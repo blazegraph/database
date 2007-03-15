@@ -314,6 +314,8 @@ public class NodeSerializer {
      * or writes on multiple btrees that are backed by different stores.
      */
     private final ChecksumUtility chk;
+
+    private final int initialBufferCapacity;
     
     public IValueSerializer getValueSerializer() {
         
@@ -415,6 +417,8 @@ public class NodeSerializer {
 
         }
         
+        this.initialBufferCapacity = initialBufferCapacity;
+        
         this._buf = alloc(initialBufferCapacity);
 
         /*
@@ -438,6 +442,24 @@ public class NodeSerializer {
         
     }
 
+    /**
+     * Releases any buffers. They will be automatically reallocated if the
+     * {@link NodeSerializer} is used again.
+     * 
+     * @todo write tests of this feature, including random closes during the
+     *       {@link NodeSerializer} stress test and with and without record
+     *       compression (the {@link #cbuf} field is not being automatically
+     *       (re-)allocated right now so that will break if we clear the
+     *       buffer).
+     */
+    public void close() {
+        
+        _buf = null;
+        
+        cbuf = null;
+        
+    }
+    
     /**
      * Allocate a buffer of the stated capacity.
      * 
@@ -599,7 +621,7 @@ public class NodeSerializer {
      *                if there is not enough space remaining in the buffer.
      */
     public ByteBuffer putNodeOrLeaf(IAbstractNodeData node) {
-        
+
         if(node instanceof INodeData) {
             
             return putNode((INodeData)node);
@@ -625,6 +647,13 @@ public class NodeSerializer {
      */
     public ByteBuffer putNode(INodeData node) {
 
+        if( _buf == null ) {
+            
+            // the buffer was released so we reallocate it.
+            _buf = alloc(initialBufferCapacity);
+            
+        }
+        
         while (true) {
 
             try {
@@ -642,7 +671,7 @@ public class NodeSerializer {
     }
     
     private ByteBuffer putNode(ByteBuffer buf, INodeData node) {
-        
+
         assert buf != null;
         assert node != null;
 
@@ -934,6 +963,13 @@ public class NodeSerializer {
      */
     public ByteBuffer putLeaf(ILeafData leaf) {
 
+        if( _buf == null ) {
+            
+            // the buffer was released so we reallocate it.
+            _buf = alloc(initialBufferCapacity);
+            
+        }
+        
         while (true) {
 
             try {
@@ -1361,7 +1397,7 @@ public class NodeSerializer {
     /**
      * Buffer for compressed records.
      */
-    final private ByteBuffer cbuf;
+    private ByteBuffer cbuf;
         
     /**
      * If compression is enabled, then decompress the data.

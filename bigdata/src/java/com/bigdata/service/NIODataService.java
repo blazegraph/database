@@ -45,7 +45,7 @@ Modifications:
  * Created on Oct 9, 2006
  */
 
-package com.bigdata.journal;
+package com.bigdata.service;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,34 +56,36 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * The network facing interface for a journal file. The journal is used to
- * absorb pre-serialized objects and smaller streams (large streams should be
- * directed to a suitably provisioned read-write database segment, e.g., large
- * pages, large extents, and lots of disk). This means that objects appearing
- * from the network-facing interface of the journal already have an assigned
- * int64 identifier. This service identifies the target journal based on the
- * segment component of the identifier. What the journal does is allocate slots
- * to absorb those objects and update an object index so that they can be
- * recovered. The journal accepts int32 within segment persistent identifiers.
- * The internal addresses for the journal are slot identifiers, which are not
- * visible to the application.
+ * The network facing {@link DataService} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo There needs to be an API for streaming large objects.
+ * @todo Refactor code from the nio test suites. Note that the
+ *       {@link DataService} already breaks down the tasks into various thread
+ *       pools. This class needs to deploy one thread to accept connections, one
+ *       to accept requests (which may be assembled over a series of socket
+ *       reads). Once a request is complete, it is handed off to a pool of
+ *       worker threads iff it has high latency and otherwise executed
+ *       immediately (e.g., an tx abort is low latency and is always executed
+ *       directly - pretty much everything else is high latency and needs to be
+ *       managed by a worker pool). As worker threads complete, they formulate a
+ *       response and then place it on the queue for sending back responses to
+ *       clients.
  * 
- * @todo Refactor code from the nio test suites.
+ * @todo break down into transaction service that directs 2-3 phase commits on
+ *       the data services involved in a given transaction. this will require a
+ *       protocol for notifying the transaction service when a client will write
+ *       on a data service instance.
  * 
- * @todo Support both row oriented operations on the journal and page oriented
- *       operations on the read-optimized database from a single server (and
- *       rename this class).
+ * @todo provide a service for moving index partitions around to support load
+ *       distribution.
  * 
- * @todo Support replicated segments, e.g., via chaining or ROWAA, including the
- *       case with RAM-only segments that gain failover through replication.
+ * @todo Support data replication, e.g., via pipelining writes or ROWAA,
+ *       including the case with RAM-only segments that gain failover through
+ *       replication.
  */
-
-public class JournalServer {
+public class NIODataService {
     
 //
 //    /**
@@ -178,7 +180,7 @@ public class JournalServer {
 //     *       threads that allow greater parallism when processing requests in
 //     *       different transactions against different segments.
 //     */
-//    public JournalServer(Properties properties) {
+//    public NIODataService(Properties properties) {
 //
 //        Queue<ClientRequest> requests = new ConcurrentLinkedQueue<ClientRequest>();
 //

@@ -91,9 +91,18 @@ import com.bigdata.objndx.IIndex;
  */
 public class ReadCommittedTx extends AbstractTx implements ITx {
 
-    public ReadCommittedTx(Journal journal, long startTime ) {
+    public ReadCommittedTx(AbstractJournal journal, long startTime ) {
         
-        super(journal, startTime, true /*readOnly*/);
+        super(journal, startTime, IsolationEnum.ReadCommitted);
+        
+    }
+    
+    /**
+     * The write set is always empty.
+     */
+    final public boolean isEmptyWriteSet() {
+        
+        return true;
         
     }
 
@@ -104,6 +113,12 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
      *         registered.
      */
     public IIndex getIndex(String name) {
+
+        if (!isActive()) {
+            
+            throw new IllegalStateException(NOT_ACTIVE);
+            
+        }
 
         if (journal.getIndex(name) == null) {
 

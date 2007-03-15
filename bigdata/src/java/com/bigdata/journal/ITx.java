@@ -130,9 +130,19 @@ public interface ITx extends IIndexStore {
     public void abort();
 
     /**
+     * The type-safe isolation level for this transaction.
+     */
+    public IsolationEnum getIsolationLevel();
+    
+    /**
      * When true, the transaction will reject writes.
      */
     public boolean isReadOnly();
+    
+    /**
+     * When true, the transaction has an empty write set.
+     */
+    public boolean isEmptyWriteSet();
     
     /**
      * A transaction is "active" when it is created and remains active until it

@@ -49,7 +49,6 @@ package com.bigdata.isolation;
 
 import com.bigdata.journal.TestTx;
 import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.rawstore.IRawStore;

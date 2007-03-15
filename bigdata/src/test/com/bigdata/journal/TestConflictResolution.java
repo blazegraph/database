@@ -151,9 +151,9 @@ public class TestConflictResolution extends ProxyTestCase {
          * Create two transactions.
          */
         
-        final long tx1 = journal.newTx();
+        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
         
-        final long tx2 = journal.newTx();
+        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
         
         /*
          * Write a value under the same key on the same index in both
@@ -226,9 +226,9 @@ public class TestConflictResolution extends ProxyTestCase {
          * Create two transactions.
          */
         
-        final long tx1 = journal.newTx();
+        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
         
-        final long tx2 = journal.newTx();
+        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
         
         /*
          * Write a value under the same key on the same index in both
@@ -295,9 +295,9 @@ public class TestConflictResolution extends ProxyTestCase {
 //         * Create two transactions.
 //         */
 //        
-//        final long tx1 = journal.newTx();
+//        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
 //        
-//        final long tx2 = journal.newTx();
+//        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
 //        
 //        /*
 //         * Write a value under the same key on the same index in both

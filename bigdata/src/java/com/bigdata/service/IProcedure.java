@@ -42,44 +42,40 @@ Modifications:
 
 */
 /*
- * Created on Dec 13, 2005
+ * Created on Mar 15, 2007
  */
-package com.bigdata.cache;
+
+package com.bigdata.service;
+
+import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.IJournal;
+import com.bigdata.journal.ITx;
 
 /**
- * <p>
- * Interface for hard reference cache entries exposes a <i>dirty</i> flag in
- * addition to the object identifier and object reference.
- * </p>
+ * A procedure to be executed on an {@link IDataService}.
  * 
- * @author thompsonbry
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Support clearing updated objects for hot cache between transactions.
- *       Add metadata boolean that indicates whether the object was modified
- *       since the cache was last cleared regardless of whether the object has
- *       since been installed on the persistence layer and marked as clean. The
- *       purpose of this is to support clearing of modified objects from the
- *       object cache when a transaction is aborted. Such objects must be
- *       cleared if they have been modified since they were installed in the
- *       cache regardless of whether they are currently dirty or not. Supporting
- *       this feature will probably require a hard reference Set containing the
- *       object identifier of each object that was marked as dirty in the cache
- *       since the cache was last cleared.
  */
-public interface ICacheEntry<K,T> extends IWeakRefCacheEntry<K,T> {
+public interface IProcedure {
 
     /**
-     * Return true iff the object associated with this entry is dirty.
-     */
-    public boolean isDirty();
-
-    /**
-     * Set the dirty flag.
+     * Run the procedure.
+     * <p>
+     * Unisolated procedures have "auto-commit" ACID properties for the local
+     * {@link IDataService} on which they execute, but DO NOT have distributed
+     * ACID properties. In order for a distributed procedure to be ACID, the
+     * procedure MUST be fully isolated.
      * 
-     * @param dirty
-     *            true iff the object associated with this entry is dirty.
+     * @param tx
+     *            The transaction identifier (aka start time) -or- zero (0L) IFF
+     *            this is an unisolationed operation.
+     * @param store
+     *            The store against which writes will be made. If the procedure
+     *            is running inside of a transaction, then this will be an
+     *            {@link ITx}. If the procedure is running unisolated, then
+     *            this will be an {@link IJournal}.
      */
-    public void setDirty(boolean dirty);
-
+    public void apply(long tx,IIndexStore store);
+    
 }

@@ -62,7 +62,7 @@ public class CommitRecord implements ICommitRecord {
 
     /**
      * @todo this may not be the correct commit counter unless this method is
-     *       synchronized with the commitService.
+     *       synchronized with the writeService.
      * 
      * @todo are commit counters global or local?
      */

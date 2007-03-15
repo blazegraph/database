@@ -197,13 +197,13 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
-        return root.rangeIterator(fromKey, toKey, DeletedEntryFilter.INSTANCE);
+        return getRoot().rangeIterator(fromKey, toKey, DeletedEntryFilter.INSTANCE);
 
     }
 
     public IEntryIterator entryIterator() {
 
-        return root.rangeIterator(null, null, DeletedEntryFilter.INSTANCE);
+        return rangeIterator(null, null);
 
     }
 
