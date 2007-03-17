@@ -134,7 +134,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       {@link DataService} instance for the write when it needs to commit or
  *       abort the tx.
  */
-public class DataService implements IDataService {
+public class DataService implements IDataService, IServiceShutdown {
 
     protected Journal journal;
     
@@ -285,10 +285,10 @@ public class DataService implements IDataService {
      * ITxCommitProtocol.
      */
     
-    public void commit(long tx) {
+    public long commit(long tx) {
         
         // will place task on writeService and block iff necessary.
-        journal.commit(tx);
+        return journal.commit(tx);
         
     }
 
@@ -389,9 +389,8 @@ public class DataService implements IDataService {
 
     }
     
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey,
-            boolean countOnly, boolean keysOnly, boolean valuesOnly)
-            throws InterruptedException, ExecutionException {
+    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey,
+            byte[] toKey, int flags) throws InterruptedException, ExecutionException {
 
         if( name == null ) throw new IllegalArgumentException();
         
@@ -399,48 +398,48 @@ public class DataService implements IDataService {
             throw new UnsupportedOperationException(
                     "Unisolated context not allowed");
         
-        RangeQueryResult result = (RangeQueryResult)txService.submit(
-                new RangeQueryTask(tx, name, fromKey, toKey, countOnly,
-                        keysOnly, valuesOnly)).get();
+        RangeQueryResult result = (RangeQueryResult) txService.submit(
+                new RangeQueryTask(tx, name, fromKey, toKey, flags)).get();
         
         return result;
         
     }
 
-    /**
-     * @todo if unisolated or isolated at the read-commit level, then the
-     *       operation really needs to be broken down by partition or perhaps by
-     *       index segment leaf so that we do not have too much latency during a
-     *       read (this could be done for rangeQuery as well).
-     * 
-     * @todo if fully isolated, then there is no problem running map.
-     * 
-     * @todo The definition of a row is different if using a key formed from the
-     *       column name, application key, and timestamp.
-     * 
-     * @todo For at least GOM we need to deserialize rows from byte[]s, so we
-     *       need to have the (de-)serializer to the application level value on
-     *       hand.
-     */
-    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
-            IMapOp op) throws InterruptedException, ExecutionException {
-
-            if( name == null ) throw new IllegalArgumentException();
-            
-            if (tx == 0L)
-                throw new UnsupportedOperationException(
-                        "Unisolated context not allowed");
-            
-            RangeQueryResult result = (RangeQueryResult) txService.submit(
-                new RangeQueryTask(tx, name, fromKey, toKey, false, false,
-                        false)).get();
-
-            // @todo resolve the reducer service.
-            IReducer reducer = null;
-            
-            op.apply(result.itr, reducer);
-            
-    }
+//    /**
+//     * @todo if unisolated or isolated at the read-commit level, then the
+//     *       operation really needs to be broken down by partition or perhaps by
+//     *       index segment leaf so that we do not have too much latency during a
+//     *       read (this could be done for rangeQuery as well).
+//     * 
+//     * @todo if fully isolated, then there is no problem running map.
+//     * 
+//     * @todo The definition of a row is different if using a key formed from the
+//     *       column name, application key, and timestamp.
+//     * 
+//     * @todo For at least GOM we need to deserialize rows from byte[]s, so we
+//     *       need to have the (de-)serializer to the application level value on
+//     *       hand.
+//     */
+//    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
+//            IMapOp op) throws InterruptedException, ExecutionException {
+//
+//            if( name == null ) throw new IllegalArgumentException();
+//            
+//            if (tx == 0L)
+//                throw new UnsupportedOperationException(
+//                        "Unisolated context not allowed");
+//            
+//            int flags = 0; // @todo set to deliver keys + values for map op.
+//            
+//            RangeQueryResult result = (RangeQueryResult) txService.submit(
+//                new RangeQueryTask(tx, name, fromKey, toKey, flags)).get();
+//
+//            // @todo resolve the reducer service.
+//            IReducer reducer = null;
+//            
+//            op.apply(result.itr, reducer);
+//            
+//    }
     
     /**
      * Abstract class for tasks that execute batch api operations. There are
@@ -629,14 +628,12 @@ public class DataService implements IDataService {
         private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
-        private final boolean countOnly;
-        private final boolean keysOnly;
-        private final boolean valuesOnly;
+        private final int flags;
         
         private final ITx tx;
 
-        public RangeQueryTask(long startTime, String name, byte[] fromKey, byte[] toKey,
-                boolean countOnly, boolean keysOnly, boolean valuesOnly) {
+        public RangeQueryTask(long startTime, String name, byte[] fromKey,
+                byte[] toKey, int flags) {
             
             assert startTime != 0L;
             
@@ -663,9 +660,7 @@ public class DataService implements IDataService {
             this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
-            this.countOnly = countOnly;
-            this.keysOnly = keysOnly;
-            this.valuesOnly = valuesOnly;
+            this.flags = flags;
             
         }
         
@@ -680,12 +675,14 @@ public class DataService implements IDataService {
             IIndex ndx = getIndex(name);
             
             final int count = ndx.rangeCount(fromKey, toKey); 
+
+            boolean countOnly = false;
             
             final IEntryIterator itr = (countOnly ? null : ndx.rangeIterator(
                     fromKey, toKey));
             
             return new RangeQueryResult(count, itr, tx.getStartTimestamp(),
-                    name, fromKey, toKey, countOnly, keysOnly, valuesOnly);
+                    name, fromKey, toKey, flags);
             
         }
         
@@ -708,13 +705,10 @@ public class DataService implements IDataService {
         public final String name;
         public final byte[] fromKey;
         public final byte[] toKey;
-        public final boolean countOnly;
-        public final boolean keysOnly;
-        public final boolean valuesOnly;
+        public final int flags;
 
         public RangeQueryResult(int count, IEntryIterator itr, long startTime,  String name,
-                byte[] fromKey, byte[] toKey, boolean countOnly,
-                boolean keysOnly, boolean valuesOnly) {
+                byte[] fromKey, byte[] toKey, int flags) {
             
             this.count = count;
             
@@ -724,9 +718,7 @@ public class DataService implements IDataService {
             this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
-            this.countOnly = countOnly;
-            this.keysOnly = keysOnly;
-            this.valuesOnly = valuesOnly;
+            this.flags = flags;
 
         }
         

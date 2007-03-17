@@ -47,6 +47,7 @@ Modifications:
 package org.CognitiveWeb.bigdata.jini;
 
 import java.io.IOException;
+import java.rmi.RMISecurityManager;
 import java.rmi.RemoteException;
 
 import net.jini.core.entry.Entry;
@@ -107,17 +108,16 @@ public class TestServer implements DiscoveryListener, LeaseListener
     public TestServer() {
 
         /*
-         * Generate a ServiceID ourselves. This makes it easier to register
-         * the same service against multiple lookup services.
+         * Generate a ServiceID ourselves. This makes it easier to register the
+         * same service against multiple lookup services.
          * 
-         * @todo If you want to restart (or re-register) the same service,
-         * then you need to read the serviceID from some persistent
-         * location. If you are using activation, then the service can be
-         * remotely started using its serviceID which takes that
-         * responsibility out of your hands. When using activation, you will
-         * only create a serviceID once when you install the service onto
-         * some component and activity takes responsiblity for starting the
-         * service on demand.
+         * @todo If you want to restart (or re-register) the same service, then
+         * you need to read the serviceID from some persistent location. If you
+         * are using activation, then the service can be remotely started using
+         * its serviceID which takes that responsibility out of your hands. When
+         * using activation, you will only create a serviceID once when you
+         * install the service onto some component and activition takes
+         * responsiblity for starting the service on demand.
          */
         Uuid uuid = UuidFactory.generate();
         serviceID = new ServiceID(uuid.getMostSignificantBits(),
@@ -196,11 +196,11 @@ public class TestServer implements DiscoveryListener, LeaseListener
                         new Address("street", "organization", "organizationalUnit",
                                 "locality", "stateOrProvince", "postalCode",
                                 "country"), 
-                        new ServiceInfo("BigTable", // product or package name
+                        new ServiceInfo("bigdata", // product or package name
                                 "SYSTAP,LLC", // manufacturer
-                                "CognitiveWeb", // vendor
+                                "SYSTAP,LLC", // vendor
                                 "0.1-beta", // version
-                                "model", // model
+                                "bigdata", // model
                                 "serial#" // serialNumber
                         ) });
 
@@ -304,14 +304,19 @@ public class TestServer implements DiscoveryListener, LeaseListener
     }
     
     /**
-     * {@link Status} is abstract so a service basically needs to provide their own
-     * concrete implementation.
+     * {@link Status} is abstract so a service basically needs to provide their
+     * own concrete implementation.
      * 
      * @version $Id$
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     public static class MyStatus extends Status {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3431522046169284463L;
+        
         /*
          * Note: public fields are required and must be Serializable.
          */
@@ -329,19 +334,24 @@ public class TestServer implements DiscoveryListener, LeaseListener
     }
     
     /**
-     * {@link ServiceType}is abstract so a service basically needs to
-     * provide their own concrete implementation. This class does not
-     * support icons (always returns null for
-     * {@link ServiceType#getIcon(int)}.  See {@link java.beans.BeanInfo}
-     * for how to interpret and support the getIcon() method.
+     * {@link ServiceType} is abstract so a service basically needs to provide
+     * their own concrete implementation. This class does not support icons
+     * (always returns null for {@link ServiceType#getIcon(int)}. See
+     * {@link java.beans.BeanInfo} for how to interpret and support the
+     * getIcon() method.
      * 
      * @version $Id$
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson </a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
+     *         </a>
      */
     public static class MyServiceType extends ServiceType
     {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2088608425852657477L;
+        
         public String displayName;
         public String shortDescription;
         

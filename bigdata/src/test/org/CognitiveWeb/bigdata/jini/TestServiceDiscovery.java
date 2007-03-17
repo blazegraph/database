@@ -49,7 +49,6 @@ package org.CognitiveWeb.bigdata.jini;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
-import java.rmi.RMISecurityManager;
 
 import junit.framework.TestCase;
 import net.jini.core.discovery.LookupLocator;
@@ -63,7 +62,24 @@ import org.apache.log4j.Logger;
  * Test the ability to register, discover, and invoke a jini service.
  * </p>
  * <p>
- * jini MUST be running.
+ * Note: jini MUST be running. You can get the jini starter kit and install it
+ * to get jini running.
+ * </p>
+ * <p>
+ * Note: The registered service will NOT show up correctly in the Service
+ * Browser (you will see "Unknown service") unless you set the codebase when
+ * executing this test class and the .class files are available for download
+ * from the codebase URL. I jump start the tests myself using
+ * </p>
+ * 
+ * <pre>
+ *   -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+ * </pre>
+ * 
+ * <p>
+ * which presuposes that the required class files are on that server available
+ * for download. The security policy is overlax, but you do need to grant some
+ * privledges in order to partitipate in discovery, etc.
  * </p>
  * 
  * @todo While service lookup is unicast, service registration is multicast.
@@ -73,19 +89,8 @@ import org.apache.log4j.Logger;
  *       how to get remote class loading working so that the requirements on a
  *       client remain that minimal. Right now I am also using jini-ext.jar,
  *       reggie.jar and sun-util.jar to run this test. jini-ext.jar is the big
- *       one at over 1M.
- * 
- * @todo The registered service is not showing up in the Service Browser because
- *       the classes required to deserialize an instance of the service item
- *       (including our MyStatus and other Entry classes) and the service proxy
- *       itself are not being deployed to a directory where reggie can be used
- *       to download those classes to the Service Browser. Solving this problem
- *       will also solve the above configuration issue and will make it possible
- *       to bundle fewer JARs with bigdata. For this workstation IIS must be
- *       running and the class files (or JAR) must be copied to
- *       "C:\Inetpub\wwwroot". The -Djava.rmi.server.codebase=... property must
- *       be set for the JARs to be downloaded from that server. I am not sure
- *       yet what needs to be done to get the Service Browser working smoothly.
+ *       one at over 1M. (this can be facilitated using the dljar ant task and
+ *       specifing jini-core as the target platform.)
  * 
  * @todo Figure out how to divide the service into a proxy and a remote object.
  *       We need this in order to measure the cost of sending data across the
@@ -95,6 +100,14 @@ import org.apache.log4j.Logger;
  *       Perhaps we can use this as is to support two phase commits across the
  *       database segments? The transaction model does not impose any semantics,
  *       e.g., there is no locking, but we can handle all of that.
+ * 
+ * @see http://archives.java.sun.com/cgi-bin/wa?A2=ind0311&L=jini-users&F=&S=&P=7182
+ *      for a description of policy files and
+ *      http://www.dancres.org/cottage/jini-start-examples-2_1.zip for the
+ *      policy files described.<br>
+ *      When testing standalone with only trusted code and NO downloaded code,
+ *      it is reasonable to consider running the test code using
+ *      "-Djava.security.policy=policy.all" so that you can get things moving.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
@@ -113,10 +126,13 @@ public class TestServiceDiscovery extends TestCase {
      * @throws ClassNotFoundException
      */
     
-    public void test_serviceDiscover() throws IOException, ClassNotFoundException {
+    public void test_serviceDiscovery() throws IOException, ClassNotFoundException {
 
-	// install suitable security manager
-	System.setSecurityManager(new RMISecurityManager());
+	/*
+     * install suitable security manager. this is required before the
+     * application can download code.
+     */
+	System.setSecurityManager(new SecurityManager());
 
 	/*
          * Launch the server to which we will connect.
@@ -133,6 +149,7 @@ public class TestServiceDiscovery extends TestCase {
 
         // Find the service registrar (unicast protocol).
         final int timeout = 4*1000; // seconds.
+        System.err.println("hostname: "+hostname);
         LookupLocator lookupLocator = new LookupLocator("jini://"+hostname);
         ServiceRegistrar serviceRegistrar = lookupLocator.getRegistrar( timeout );
 
@@ -200,6 +217,14 @@ public class TestServiceDiscovery extends TestCase {
     public static class TestServerImpl implements ITestService, Serializable
     {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -920558820563934297L;
+
+        /**
+         * De-serialization constructor (required).
+         */
         public TestServerImpl() {
             log.info("Created: "+this);
         }
@@ -208,6 +233,24 @@ public class TestServiceDiscovery extends TestCase {
             log.info("invoked: "+this);
         }
 
+    }
+
+    public static void main(String[] args) throws Exception {
+        
+        TestServiceDiscovery test = new TestServiceDiscovery();
+        
+        test.setUp();
+
+        try {
+        
+            test.test_serviceDiscovery();
+        
+        } finally {
+        
+            test.tearDown();
+
+        }
+        
     }
     
 }
