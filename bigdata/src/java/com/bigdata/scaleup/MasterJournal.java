@@ -65,7 +65,6 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.BTree;

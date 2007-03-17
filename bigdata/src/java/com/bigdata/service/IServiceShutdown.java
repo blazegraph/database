@@ -42,44 +42,35 @@ Modifications:
 
 */
 /*
- * Created on Mar 15, 2007
+ * Created on Mar 17, 2007
  */
 
-package com.bigdata.journal;
-
-import com.bigdata.service.IDataService;
+package com.bigdata.service;
 
 /**
- * An interface implemented by an {@link IDataService} for the commit / abort of
- * the local write set for a transaction as directed by a centralized
- * {@link ITransactionManager} in response to client requests.
- * <p>
- * Clients DO NOT make direct calls against this API. Instead, they MUST locate
- * the {@link ITransactionManager} service and direct messages to that service.
- * <p>
- * Note: These methods should be invoked iff the transaction manager knows that
- * the {@link IDataService} is buffering writes for the transaction.
+ * API for service shutdown.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME in order to support 2-/3-phase commit, the [commitTime] from the
- * transaction manager service must be passed through to the journal rather than
- * being returned from {@link #commit(long)}. There also needs to be a distinct
- * "prepare" message that validates the write set of the transaction and makes
- * it restart safe. finally, i have to coordinate the serialization of the wait
- * for the "commit" message.
+ * @todo reconcile with jini startup/shutdown.
  */
-public interface ITxCommitProtocol {
+public interface IServiceShutdown {
 
     /**
-     * Request commit of the transaction write set.
+     * The service will no longer accept new requests, but existing requests
+     * will be processed (sychronous).
+     * 
+     * @return Once the service has finished processing pending requests.
      */
-    public long commit(long tx) throws ValidationError;
-
+    public void shutdown();
+    
     /**
-     * Request abort of the transaction write set.
+     * The service will no longer accept new requests and will make a best
+     * effort attempt to terminate all existing requests and return ASAP.
+     * 
+     * @return Once the service has shutdown.
      */
-    public void abort(long tx);
-
+    public void shutdownNow();
+    
 }

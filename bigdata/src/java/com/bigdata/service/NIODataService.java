@@ -85,7 +85,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *       including the case with RAM-only segments that gain failover through
  *       replication.
  */
-public class NIODataService {
+public class NIODataService implements IServiceShutdown {
+
+    public void shutdown() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public void shutdownNow() {
+        // TODO Auto-generated method stub
+        
+    }
     
 //
 //    /**

@@ -115,12 +115,12 @@ public class DataServiceClient implements IDataService {
         delegate.batchOp(tx, name, op);
     }
 
-    public void map(long tx, String name, byte[] fromKey, byte[] toKey, IMapOp op) throws InterruptedException, ExecutionException {
-        delegate.map(tx, name, fromKey, toKey, op);
-    }
+//    public void map(long tx, String name, byte[] fromKey, byte[] toKey, IMapOp op) throws InterruptedException, ExecutionException {
+//        delegate.map(tx, name, fromKey, toKey, op);
+//    }
 
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, boolean countOnly, boolean keysOnly, boolean valuesOnly) throws InterruptedException, ExecutionException {
-        return delegate.rangeQuery(tx, name, fromKey, toKey, countOnly, keysOnly, valuesOnly);
+    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException {
+        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
     }
 
     public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException {
@@ -131,8 +131,8 @@ public class DataServiceClient implements IDataService {
         delegate.abort(tx);
     }
 
-    public void commit(long tx) {
-        delegate.commit(tx);
+    public long commit(long tx) {
+        return delegate.commit(tx);
     }
 
 }

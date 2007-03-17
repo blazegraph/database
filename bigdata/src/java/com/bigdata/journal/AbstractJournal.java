@@ -186,7 +186,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       as the right layering is correctly re-established on load of the
  *       persistence data structure.
  */
-public abstract class AbstractJournal implements IJournal, ITimestampService {
+public abstract class AbstractJournal implements IJournal, ITimestampService, ITxCommitProtocol {
 
     /**
      * Logger.

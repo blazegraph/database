@@ -97,7 +97,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo track ground states so that we known when we can release old journals
  *       and index segments?
  */
-public class TransactionService implements ITransactionManager {
+public class TransactionService implements ITransactionManager, IServiceShutdown {
 
     /**
      * Logger.

@@ -173,9 +173,7 @@ public interface IDataService extends ITxCommitProtocol {
      * @param name
      * @param fromKey
      * @param toKey
-     * @param countOnly
-     * @param keysOnly
-     * @param valuesOnly
+     * @param flags (@todo define flags: count yes/no, keys yes/no, values yes/no)
      * 
      * @exception InterruptedException
      *                if the operation was interrupted (typically by
@@ -190,14 +188,13 @@ public interface IDataService extends ITxCommitProtocol {
      *                {@link IsolationEnum#ReadCommitted}.
      */
     public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, boolean countOnly, boolean keysOnly,
-            boolean valuesOnly) throws InterruptedException, ExecutionException;
+            byte[] toKey, int flags) throws InterruptedException, ExecutionException;
 
-    /**
-     * Maps an operation against all key/value pairs in a key range, writing the
-     * result onto a reducer service.
-     */
-    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
-            IMapOp op) throws InterruptedException, ExecutionException;
+//    /**
+//     * Execute a map worker task against all key/value pairs in a key range,
+//     * writing the results onto N partitions of an intermediate file.
+//     */
+//    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
+//            IMapOp op) throws InterruptedException, ExecutionException;
 
 }
