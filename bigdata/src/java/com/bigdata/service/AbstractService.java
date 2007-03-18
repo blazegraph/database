@@ -42,15 +42,15 @@ Modifications:
 
 */
 /*
- * Created on Jun 19, 2006
+ * Created on Mar 18, 2007
  */
-package org.CognitiveWeb.bigdata.jini;
+
+package com.bigdata.service;
 
 import java.io.IOException;
-import java.rmi.Remote;
+import java.io.Serializable;
 import java.rmi.RemoteException;
 
-import net.jini.admin.JoinAdmin;
 import net.jini.core.entry.Entry;
 import net.jini.core.lease.Lease;
 import net.jini.core.lookup.ServiceID;
@@ -60,13 +60,8 @@ import net.jini.core.lookup.ServiceRegistration;
 import net.jini.discovery.DiscoveryEvent;
 import net.jini.discovery.DiscoveryListener;
 import net.jini.discovery.LookupDiscovery;
-import net.jini.export.Exporter;
-import net.jini.export.ProxyAccessor;
 import net.jini.id.Uuid;
 import net.jini.id.UuidFactory;
-import net.jini.jeri.BasicILFactory;
-import net.jini.jeri.BasicJeriExporter;
-import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
@@ -82,50 +77,85 @@ import net.jini.lookup.entry.StatusType;
 import org.apache.log4j.Logger;
 
 /**
- * Launches a server used by the test. The server is launched in a separate
- * thread that will die after a timeout, taking the server with it. The server
- * exposes some methods for testing, notably a method to test remote method
- * invocation and one to shutdown the server.
- * 
- * @todo Look into the manager classes for service joins, discovery, etc. The
- *       code in this class can probably be simplified drammatically.
- * 
+ * Abstract base class for services discoverable using JINI.
+ *  
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
- *         </a>
  */
-public class TestServer implements DiscoveryListener, LeaseListener
+abstract public class AbstractService implements DiscoveryListener, LeaseListener, IServiceShutdown
 {
-    
-    public static Logger log = Logger.getLogger(TestServer.class);
-    
+
+    public static Logger log = Logger.getLogger(AbstractService.class);
+
     private ServiceID serviceID; 
     private ServiceItem item;
     private ServiceRegistration reg;
     final private LeaseRenewalManager leaseManager = new LeaseRenewalManager();
 
     /**
-     * Server startup performs asynchronous multicast lookup discovery. The
-     * {@link #discovered(DiscoveryEvent)}method is invoked asynchronously
-     * to register {@link TestServerImpl}instances.
+     * Close down the service (no longer discoverable).
+     * 
+     * @todo revoke lease, etc.
      */
-    public TestServer() {
+    private void _close() {
+        
+    }
 
+    /**
+     * Waits for existing leases to expire before shutting down, but does not
+     * grant any new leases.
+     */
+    public void shutdown() {
+        
         /*
-         * Generate a ServiceID ourselves. This makes it easier to register the
-         * same service against multiple lookup services.
-         * 
-         * @todo If you want to restart (or re-register) the same service, then
-         * you need to read the serviceID from some persistent location. If you
-         * are using activation, then the service can be remotely started using
-         * its serviceID which takes that responsibility out of your hands. When
-         * using activation, you will only create a serviceID once when you
-         * install the service onto some component and activition takes
-         * responsiblity for starting the service on demand.
+         * @todo wait for leases to expire and then shutdown. do not renew any
+         * leases.
          */
+        
+        _close();
+        
+    }
+    
+    /**
+     * Shutdown immediately, violating any existing leases.
+     */
+    public void shutdownNow() {
+        
+        _close();
+        
+    }
+    
+    /**
+     * Return the {@link ServiceID}. Using a consistent {@link ServiceID} makes
+     * it easier to register the same service against multiple lookup services.
+     * <p>
+     * This implementation generates a new {@link ServiceID} each time.
+     * 
+     * @todo If you want to restart (or re-register) the same service, then you
+     *       need to read the serviceID from some persistent location. If you
+     *       are using activation, then the service can be remotely started
+     *       using its serviceID which takes that responsibility out of your
+     *       hands. When using activation, you will only create a serviceID once
+     *       when you install the service onto some component and activition
+     *       takes responsiblity for starting the service on demand.
+     */
+    public ServiceID getServiceID() {
+
         Uuid uuid = UuidFactory.generate();
-        serviceID = new ServiceID(uuid.getMostSignificantBits(),
-                uuid.getLeastSignificantBits());
+        
+        return new ServiceID(uuid.getMostSignificantBits(), uuid
+                .getLeastSignificantBits());
+
+    }
+
+    /**
+     * Server startup performs asynchronous multicast lookup discovery. The
+     * {@link #discovered(DiscoveryEvent)} method is invoked asynchronously to
+     * register {@link TestServerImpl} instances.
+     */
+    public AbstractService() {
+
+        serviceID = getServiceID();
 
         try {
 
@@ -154,9 +184,7 @@ public class TestServer implements DiscoveryListener, LeaseListener
      *       status code. This means that the service needs to expose an
      *       indicator of whether or not it has been registered.
      * 
-     * @todo Modify service proxy to use RMI. The client stub should be
-     *       downloaded from the codebase and should know how to commuicate with
-     *       the discovered service, e.g., using RMI or a custom NIO protocol.
+     * @todo Modify service proxy to use RMI.
      * 
      * @todo This should be a fast operation and should not make remote calls.
      *       Service registration therefore needs to happen in another thread so
@@ -173,7 +201,7 @@ public class TestServer implements DiscoveryListener, LeaseListener
     }
 
     /**
-     * Registers a service proxy with each identified registrar. The
+     * Registers a service proxy with reach identified registrar. The
      * registration happens in another thread to keep the latency down for the
      * {@link DiscoveryListener#discovered(net.jini.discovery.DiscoveryEvent)}
      * event.
@@ -181,16 +209,15 @@ public class TestServer implements DiscoveryListener, LeaseListener
      * @param registrars
      *            One or more service registrars.
      */
+
     private void registerService( final ServiceRegistrar[] registrars ) {
 
-        log.info("Discovered "+registrars.length+" service registrars");
+        AbstractService.log.info("Discovered "+registrars.length+" service registrars");
 
         new Thread("Register Service") {
             public void run() {
-                // the service 
-                Object impl = new TestServerImpl().getProxy();
                 // Create an information item about a service
-                item = new ServiceItem(serviceID, impl, new Entry[] {
+                item = new ServiceItem(serviceID, new TestServerImpl(), new Entry[] {
                         new Comment("Test service(comment)"), // human facing comment.
                         new Name("Test service(name)"), // human facing name.
                         new MyServiceType("Test service (display name)",
@@ -219,26 +246,6 @@ public class TestServer implements DiscoveryListener, LeaseListener
                         try {
                             // Register the service.
                             reg = registrar.register(item, Lease.FOREVER);
-                            /*
-                             * Setup automatic lease renewal.
-                             * 
-                             * Note: A single lease manager can handle multiple services
-                             * and the lease of a given service on multiple service
-                             * registrars. It knows which lease is about to expire and
-                             * preemptively extends the lease on the behalf of the
-                             * registered service. It will notify the LeaseListener iff
-                             * it is unable to renew a lease.
-                             */
-                            log.info("lease will expire in "
-                                    + (reg.getLease().getExpiration() - System
-                                            .currentTimeMillis()) + "ms");
-                            leaseManager
-                                    .renewUntil(reg.getLease(), Lease.FOREVER, TestServer.this);
-                            /*
-                             * Service has been registered and lease renewal is
-                             * operating.
-                             */
-                            break;
                         } catch (RemoteException ex) {
                             // retry until successful.
                             try {
@@ -246,6 +253,26 @@ public class TestServer implements DiscoveryListener, LeaseListener
                             } catch (InterruptedException ex2) {
                             }
                         }
+                        /*
+                         * Setup automatic lease renewal.
+                         * 
+                         * Note: A single lease manager can handle multiple services
+                         * and the lease of a given service on multiple service
+                         * registrars. It knows which lease is about to expire and
+                         * preemptively extends the lease on the behalf of the
+                         * registered service. It will notify the LeaseListener iff
+                         * it is unable to renew a lease.
+                         */
+                        AbstractService.log.info("lease will expire in "
+                                + (reg.getLease().getExpiration() - System
+                                        .currentTimeMillis()) + "ms");
+                        leaseManager
+                                .renewUntil(reg.getLease(), Lease.FOREVER, AbstractService.this);
+                        /*
+                         * Service has been registered and lease renewal is
+                         * operating.
+                         */
+                        break;
                     }
                 }
            }
@@ -260,7 +287,7 @@ public class TestServer implements DiscoveryListener, LeaseListener
      */
     public void discarded(DiscoveryEvent arg0) {
 
-        log.info("");
+        AbstractService.log.info("");
         
     }
 
@@ -271,7 +298,7 @@ public class TestServer implements DiscoveryListener, LeaseListener
      */
     public void notify(LeaseRenewalEvent event) {
 
-        log.error("Lease could not be renewed: " + event);
+        AbstractService.log.error("Lease could not be renewed: " + event);
         
     }
     
@@ -281,7 +308,7 @@ public class TestServer implements DiscoveryListener, LeaseListener
     public static void launchServer() {
         new Thread("launchServer") {
             public void run() {
-                TestServer.main(new String[] {});
+                AbstractService.main(new String[] {});
             }
         }.start();
     }
@@ -294,19 +321,23 @@ public class TestServer implements DiscoveryListener, LeaseListener
      */
     public static void main(String[] args) {
         final long lifespan = 3 * 60 * 1000; // life span in seconds.
-        log.info("Will start test server.");
-        TestServer testServer = new TestServer();
-        log.info("Started test server.");
+        AbstractService.log.info("Will start test server.");
+        AbstractService testServer = new AbstractService(){
+            /* @todo this is an anonymous class - each service must provide its
+             * own main() and registration information.
+             */
+        };
+        AbstractService.log.info("Started test server.");
         try {
             Thread.sleep(lifespan);
         }
         catch( InterruptedException ex ) {
-            log.warn(ex);
+            AbstractService.log.warn(ex);
         }
         /*
          * @todo This forces a hard reference to remain for the test server.
          */
-        log.info("Server will die: "+testServer);
+        AbstractService.log.info("Server will die: "+testServer);
     }
     
     /**
@@ -383,162 +414,54 @@ public class TestServer implements DiscoveryListener, LeaseListener
     }
 
     /**
-     * The remote service implementation object. This implements the
-     * {@link Remote} interface and uses JERI to create a proxy for the remote
-     * object and configure and manage the protocol for communications between
-     * the client (service proxy) and the remote object (the service
-     * implementation).
-     * <p>
-     * Note: You have to implement {@link JoinAdmin} in order to show up as an
-     * administerable service (blue folder) in the jini Service Browser.
+     * The interfaces implemented by the service should be made locally
+     * available to the client so that it can execute methods on those
+     * interfaces without using reflection.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface ITestService
+    {
+
+        /**
+         * Method for testing remote invocation.
+         */
+        public void invoke();
+                
+    }
+
+    /**
+     * The proxy object that gets passed around.
+     * 
+     * @todo It appears that multiple instances of this class are getting
+     *       created. This is consistent with the notion that the instance is
+     *       being "passed" around by state and not by reference. This implies
+     *       that instances are not consumed when they are discovered but merely
+     *       cloned using Java serialization.
      * 
      * @version $Id$
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
      *         </a>
      */
-    public static class TestServerImpl implements ProxyAccessor, ITestService/*, Serializable*/
+    public static class TestServerImpl implements ITestService, Serializable
     {
 
         /**
          * Note: Mark the {@link Logger} as transient since we do NOT need to
          * serialize its state.
-         * <p>
-         * 
-         * @todo When the service uses a proxy and a remote communications
-         *       protocol, the service instance is remote and this object is not
-         *       instantiated on the client (test this hypothesis by removing
-         *       log4j from the codebase).
          */
         public static final transient Logger log = Logger.getLogger(TestServerImpl.class);
 
-        // Note required when using a service proxy.  the Exporter handles the proxy generation.
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = -920558820563934297L;
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -920558820563934297L;
 
         /**
-         * The location of the JERI configuration file.
-         * 
-         * @todo provide a command line option to override the file location.
+         * De-serialization constructor (required).
          */
-        private transient static String CONFIG_FILE = "jeri/jeri.config";
-
-        private ITestService proxy;
-        
-//        /**
-//         * 
-//         * @param args
-//         * @throws Exception
-//         * 
-//         * @see http://jan.newmarch.name/java/jini/tutorial/Jeri.xml for an
-//         *      explanation of what is going on here.
-//         */
-//        public static void main(String[] args) throws Exception {
-//
-//            String[] configArgs = new String[] { CONFIG_FILE };
-//
-//            // get the configuration (by default a FileConfiguration)
-//            Configuration config = ConfigurationProvider
-//                    .getInstance(configArgs);
-//            System.out.println("Configuration: " + config.toString());
-//            
-//            // and use the configuration to construct an exporter
-//            Exporter exporter = (Exporter) config.getEntry(
-//                    //
-//                    TestServerImpl.class.getName(), // component
-//                    "exporter", // name
-//                    Exporter.class, // type (of the return object)
-//                    new BasicJeriExporter(TcpServerEndpoint.getInstance(0),
-//                            new BasicILFactory()) /* default */,//
-//                    Configuration.NO_DATA // data.
-//                    );
-//
-//            // export an object of this class
-//            Remote proxy = exporter.export(new TestServerImpl());
-//            System.out.println("Proxy is " + proxy.toString());
-//
-//            // now unexport it once finished
-//            exporter.unexport(true);
-//
-//        } 
-
-        /*
-         * @todo presumably service shutdown should clear the proxy reference
-         * once the service has been removed from the registry.
-         */
-        public Object getProxy() {
-
-            return proxy;
-        
-        }        
-        
-        /**
-         * Service constructor.
-         * 
-         * @todo can the constructor accept arguments?
-         */
-        public TestServerImpl() /*@todo throws RemoteException ?*/ {
-
-            /*
-             * @todo when this is added the test will succeed the first time but
-             * thereafter will fail with a connection refused to the end point
-             * for the _expired_ service. While that exception makes sense in
-             * that the expired service should not be connectable, I do not
-             * understand why adding or dropping this line has any influence.
-             * Perhaps the problem is that it changes GC behavior and the prior
-             * test service is otherwise NOT expired? Look into what this
-             * service is doing to shutdown after the test and what is should
-             * be doing.
-             * 
-             * So - the test does NOT attempt to close down the service - I was
-             * deliberately leaving it open so that I could explore the service
-             * in the Service Browser.  The issue may be that this replaces the
-             * SecurityManager after one was already installed in the VM by the
-             * test itself! 
-             */
-//            System.setSecurityManager(new SecurityManager());
-
-            try {
-
-                // @todo work out use of a configuration file.
-//                String[] configArgs = new String[] { CONFIG_FILE };
-//
-//                // get the configuration (by default a FileConfiguration)
-//                Configuration config = ConfigurationProvider
-//                        .getInstance(configArgs);
-//                System.out.println("Configuration: " + config.toString());
-//                
-//                // and use the configuration to construct an exporter
-//                Exporter exporter = (Exporter) config.getEntry(
-//                        //
-//                        TestServerImpl.class.getName(), // component
-//                        "exporter", // name
-//                        Exporter.class, // type (of the return object)
-//                        new BasicJeriExporter(TcpServerEndpoint.getInstance(0),
-//                                new BasicILFactory()) /* default */,//
-//                        Configuration.NO_DATA // data.
-//                        );
-
-                // hardwired jeri exporter using TCP.
-                Exporter exporter = new BasicJeriExporter(TcpServerEndpoint
-                        .getInstance(0), new BasicILFactory());
-
-                // export an object of this class
-                proxy = (ITestService) exporter.export(this);
-                log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
-
-            } catch(Exception ex) {
-                // @todo should we retry the operation?
-                log.error(ex);
-                throw new RuntimeException(ex);
-            }
-
-            // @todo who will unexport the proxy?
-            
-//                // now unexport it once finished
-//                exporter.unexport(true);
-                
+        public TestServerImpl() {
 //            System.err.println("Created: "+this);
             log.info("Created: "+this);
         }

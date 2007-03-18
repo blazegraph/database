@@ -48,7 +48,6 @@ package org.CognitiveWeb.bigdata;
 
 import net.jini.discovery.DiscoveryEvent;
 
-import org.CognitiveWeb.bigdata.jini.TestServiceDiscovery.TestServerImpl;
 import org.CognitiveWeb.concurrent.locking.TxDag;
 import org.apache.log4j.Logger;
 
