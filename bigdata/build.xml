@@ -71,6 +71,10 @@
 	then unarchive bigdata.jar into this directory so that the actual class files
 	themselves are available for download (only .class files are downloaded, NOT
 	JARs).
+
+		cd /home/groups/c/cw/cweb/maven-repository/bigdata/jars
+			
+		/usr/java/j2sdk1.4.2_05/bin/jar xf bigdata.jar
 	
 	Finally, the code that will expose services with downloadable code MUST set
 	
@@ -95,9 +99,27 @@
 		
 	for some (very good) guidence in debugging jini services.
 
+	Note: You may have to restart jini locally in order to force download of 
+	updated classes from the codebase!
+
 	See http://archives.java.sun.com/cgi-bin/wa?A2=ind0512&L=jini-users&P=R391&I=-3
 	for instructions on setting up an "download jar" (dljar) ANT task that can make
 	life much simpler (one supposes).
+
+    See http://archives.java.sun.com/cgi-bin/wa?A2=ind0311&L=jini-users&F=&S=&P=7182
+        for a description of policy files and
+        http://www.dancres.org/cottage/jini-start-examples-2_1.zip for the
+        policy files described.
+	
+	See http://jan.newmarch.name/java/jini/tutorial/Ant.xml for a description of
+	one (simple) approach to using ant for jini projects (it does not use the
+	dljar ant task but explicitly enumerates what goes where).
+	
+	See http://jan.newmarch.name/java/jini/tutorial/TroubleShooting.xml#RMI%20Stubs
+	for common errors when using RMI stubs.
+	
+	See https://java.sun.com/products/jini/2.1/doc/api/com/sun/jini/example/browser/package-summary.html
+	for the dirty on the jini Service Browser.
 	
 	@todo you need to install the client and server deployments on machines
 	that will run clients or servers respectively. -->

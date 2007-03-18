@@ -47,7 +47,6 @@ Modifications:
 package org.CognitiveWeb.bigdata.jini;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.InetAddress;
 
 import junit.framework.TestCase;
@@ -69,11 +68,14 @@ import org.apache.log4j.Logger;
  * Note: The registered service will NOT show up correctly in the Service
  * Browser (you will see "Unknown service") unless you set the codebase when
  * executing this test class and the .class files are available for download
- * from the codebase URL. I jump start the tests myself using
+ * from the codebase URL. I jump start the tests myself by copying them onto an
+ * HTTP server and using the following options in the command line to execute
+ * the test:
  * </p>
  * 
  * <pre>
- *   -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+ *    -Djava.security.policy=policy.all
+ *    -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
  * </pre>
  * 
  * <p>
@@ -96,24 +98,15 @@ import org.apache.log4j.Logger;
  *       We need this in order to measure the cost of sending data across the
  *       network.
  * 
- * @todo Explore the jini {@link net.jini.core.transaction.Transaction}model.
+ * @todo Explore the jini {@link net.jini.core.transaction.Transaction} model.
  *       Perhaps we can use this as is to support two phase commits across the
  *       database segments? The transaction model does not impose any semantics,
  *       e.g., there is no locking, but we can handle all of that.
- * 
- * @see http://archives.java.sun.com/cgi-bin/wa?A2=ind0311&L=jini-users&F=&S=&P=7182
- *      for a description of policy files and
- *      http://www.dancres.org/cottage/jini-start-examples-2_1.zip for the
- *      policy files described.<br>
- *      When testing standalone with only trusted code and NO downloaded code,
- *      it is reasonable to consider running the test code using
- *      "-Djava.security.policy=policy.all" so that you can get things moving.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
  *         </a>
  */
-
 public class TestServiceDiscovery extends TestCase {
 
     public static Logger log = Logger.getLogger(TestServiceDiscovery.class);
@@ -126,16 +119,24 @@ public class TestServiceDiscovery extends TestCase {
      * @throws ClassNotFoundException
      */
     
-    public void test_serviceDiscovery() throws IOException, ClassNotFoundException {
+    public void test_serviceDiscovery() throws IOException,
+            ClassNotFoundException {
 
-	/*
-     * install suitable security manager. this is required before the
-     * application can download code.
-     */
-	System.setSecurityManager(new SecurityManager());
+        /*
+         * Install suitable security manager. this is required before the client
+         * can download code. The code will be downloaded from the HTTP server
+         * identified by the codebase property specified for the VM running the
+         * service. For the purposes of this test, we are using the _same_ VM to
+         * run the client and the service, so you have to specify the codebase
+         * property when running the test.
+         */
+        System.setSecurityManager(new SecurityManager());
 
-	/*
-         * Launch the server to which we will connect.
+        /*
+         * Launch the server to which we will connect (this is being done by the
+         * test harness rather than setting up activation for the service since
+         * we want to explicitly control the service instances for the purpose
+         * of testing).
          */
         TestServer.launchServer();
         
@@ -154,13 +155,26 @@ public class TestServiceDiscovery extends TestCase {
         ServiceRegistrar serviceRegistrar = lookupLocator.getRegistrar( timeout );
 
         /*
-         * What follows is an example of service lookup, but we have to register
-         * the service first.
+         * Prepare a template for lookup search.
+         * 
+         * Note: The client needs a local copy of the interface in order to be
+         * able to invoke methods on the service without using reflection. The
+         * implementation class will be downloaded from the codebase identified
+         * by the server.
          */
-        
-        // Prepare a template for lookup search
-	ServiceTemplate template = new ServiceTemplate(null,
-                new Class[] { TestServerImpl.class }, null);
+        ServiceTemplate template = new ServiceTemplate(//
+                /*
+                 * use this to request the service by its serviceID.
+                 */
+                null,
+                /*
+                 * Use this to filter services by an interface that they expose.
+                 */
+                new Class[] { ITestService.class },
+                /*
+                 * use this to filter for services by Entry attributes.
+                 */
+                null);
 
         /*
          * Lookup a service. This can fail if the service registrar has not
@@ -171,70 +185,32 @@ public class TestServiceDiscovery extends TestCase {
          * notification events for the service if it is not found and enter a
          * wait state).
          */
-	TestServerImpl service = null;
-	for( int i=0; i<10 && service == null; i++) {
-	    service = (TestServerImpl) serviceRegistrar.lookup(template /*, maxMatches*/);
-	    if( service == null ) {
-	        log.info("Service not found: sleeping...");
-	        try {Thread.sleep(100);}
-	        catch( InterruptedException ex) {}
-	    }
-	}
+        ITestService service = null;
+        for (int i = 0; i < 10 && service == null; i++) {
+            service = (ITestService) serviceRegistrar
+                    .lookup(template /* , maxMatches */);
+            if (service == null) {
+                log.info("Service not found: sleeping...");
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException ex) {
+                }
+            }
+        }
 
-	assertNotNull("Could not find service.", service );
-	
-	service.invoke();
-	
-	// Sleep for a bit so that I can inspect the service in the Service Browser.
-        try {Thread.sleep(10000);}
-        catch( InterruptedException ex) {}
-	
+        assertNotNull("Could not find service.", service);
+
+        service.invoke();
+
+        // Sleep for a bit so that I can inspect the service in the Service
+        // Browser.
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException ex) {
+        }
+
     }
     
-    public static interface ITestService
-    {
-
-        /**
-         * Method for testing remote invocation.
-         */
-        public void invoke();
-                
-    }
-
-    /**
-     * The proxy object that gets passed around.
-     * 
-     * @todo It appears that multiple instances of this class are getting
-     *       created. This is consistent with the notion that the instance is
-     *       being "passed" around by state and not by reference. This implies
-     *       that instances are not consumed when they are discovered but merely
-     *       cloned using Java serialization.
-     * 
-     * @version $Id$
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
-     *         </a>
-     */
-    public static class TestServerImpl implements ITestService, Serializable
-    {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -920558820563934297L;
-
-        /**
-         * De-serialization constructor (required).
-         */
-        public TestServerImpl() {
-            log.info("Created: "+this);
-        }
-
-        public void invoke() {
-            log.info("invoked: "+this);
-        }
-
-    }
-
     public static void main(String[] args) throws Exception {
         
         TestServiceDiscovery test = new TestServiceDiscovery();

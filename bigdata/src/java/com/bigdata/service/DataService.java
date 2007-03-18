@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -133,8 +134,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       so that the transaction manager can locate the primary
  *       {@link DataService} instance for the write when it needs to commit or
  *       abort the tx.
+ * 
+ * @todo narrow file access permissions so that we only require
+ *       {read,write,create,delete} access to a temporary directory and a data
+ *       directory.
  */
-public class DataService implements IDataService, IServiceShutdown {
+public class DataService extends AbstractService implements IDataService, IWritePipeline, IResourceTransfer {
 
     protected Journal journal;
     
@@ -870,6 +875,13 @@ public class DataService implements IDataService, IServiceShutdown {
             
         }
         
+    }
+
+    /**
+     * @todo IResourceTransfer is not implemented.
+     */
+    public void sendResource(String filename, InetSocketAddress sink) {
+        throw new UnsupportedOperationException();
     }
 
 }
