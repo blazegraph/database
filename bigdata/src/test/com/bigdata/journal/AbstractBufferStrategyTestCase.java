@@ -96,8 +96,6 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 //            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
             properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
-            properties.setProperty(Options.SEGMENT, "0");
-
 //            // Note: also deletes the file before it is used.
 //            properties.setProperty(Options.FILE, AbstractTestCase
 //                    .getTestJournalFile(getName(), properties));

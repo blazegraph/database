@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 import com.bigdata.rawstore.Addr;
 import com.bigdata.scaleup.MasterJournal;
@@ -94,11 +95,6 @@ public interface IRootBlockView {
      * The root block version number.
      */
     public int getVersion();
-    
-    /**
-     * The segment identifier.
-     */
-    public int getSegmentId();
     
     /**
      * The next offset at which a data item would be written on the store.
@@ -190,6 +186,11 @@ public interface IRootBlockView {
      * {@link ICommitRecord}.
      */
     public long getCommitRecordIndexAddr();
+    
+    /**
+     * The unique journal identifier
+     */
+    public UUID getUUID();
     
     /**
      * A read-only buffer whose contents are the root block.

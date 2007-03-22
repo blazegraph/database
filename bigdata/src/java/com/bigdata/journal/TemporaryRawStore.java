@@ -272,8 +272,6 @@ public class TemporaryRawStore implements IRawStore {
         
         TransientBufferStrategy tmp = (TransientBufferStrategy)buf;
         
-        int segmentId = 0;
-        
         File file;
         
         try {
@@ -308,7 +306,7 @@ public class TemporaryRawStore implements IRawStore {
         /* Create a unique store file and setup the root blocks.  The file
          * will be pre-extended to the requested initialExtent.
          */
-        FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+        FileMetadata fileMetadata = new FileMetadata(file,
                 BufferMode.Disk, useDirectBuffers, initialExtent,
                 maximumDiskExtent, create, isEmptyFile, deleteOnExit,
                 readOnly, forceWrites);

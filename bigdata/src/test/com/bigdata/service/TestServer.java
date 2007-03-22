@@ -44,11 +44,19 @@ Modifications:
 /*
  * Created on Jun 19, 2006
  */
-package org.CognitiveWeb.bigdata.jini;
+package com.bigdata.service;
 
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
+import java.util.Properties;
 
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
@@ -62,18 +70,15 @@ import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
-import net.jini.id.Uuid;
-import net.jini.id.UuidFactory;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.JoinManager;
-import net.jini.lookup.entry.ServiceType;
-import net.jini.lookup.entry.Status;
-import net.jini.lookup.entry.StatusType;
+import net.jini.lookup.ServiceIDListener;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.Journal;
 import com.sun.jini.start.ServiceStarter;
 
 /**
@@ -86,17 +91,18 @@ import com.sun.jini.start.ServiceStarter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
  *         </a>
  * 
- * @todo work through use the {@link ServiceStarter} (in start.jar).  I am 
- * having trouble getting past some classpath errors using
+ * @todo work through use the {@link ServiceStarter} (in start.jar). I am having
+ *       trouble getting past some classpath errors using
+ * 
  * <pre>
-java -Djava.security.policy=policy.all -classpath ant-deploy\reggie.jar;ant-deploy\jini-core.jar;ant-deploy\jini-ext.jar;ant-deploy\sun-util.jar;ant-deploy\bigdata.jar -jar ant-deploy\start.jar src\test\org\CognitiveWeb\bigdata\jini\TestServer.config
+ *    java -Djava.security.policy=policy.all -classpath ant-deploy\reggie.jar;ant-deploy\jini-core.jar;ant-deploy\jini-ext.jar;ant-deploy\sun-util.jar;ant-deploy\bigdata.jar -jar ant-deploy\start.jar src\test\org\CognitiveWeb\bigdata\jini\TestServer.config
  * </pre>
  * 
- * @todo The serviceID should probably be persisted as a named root object in
- *       the journal.  Each resource (journal or index segment) should also
- *       have its own UUID.  Finally, each index name should have its own UUID. 
+ * @todo support NIO protocol for data intensive APIs (data service, file
+ *       transfer). Research how heavy mashalling is and what options exist to
+ *       make it faster and lighter.
  */
-public class TestServer implements LeaseListener /*, ServiceIDListener*/
+public class TestServer implements LeaseListener, ServiceIDListener
 {
     
     public static final transient Logger log = Logger
@@ -109,6 +115,7 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
     private TestServiceImpl impl;
     private Exporter exporter;
     private ITestService proxy;
+    private File serviceIdFile = null;
 
     /**
      * Server startup performs asynchronous multicast lookup discovery. The
@@ -116,12 +123,6 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
      * register a proxy for a {@link TestServiceImpl} instance. The protocol for
      * remote communications between the proxy and the {@link TestServiceImpl}
      * is specified by a {@link Configuration}.
-     * 
-     * @todo use a specific group (bigdata) for discovery.
-     * 
-     * @todo support NIO protocol for data intensive APIs (data service, file
-     *       transfer). Research how heavy mashalling is and what options exist
-     *       to make it faster and lighter.
      */
     public TestServer(String[] args) {
 
@@ -131,10 +132,7 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
         
         Entry[] entries = null;
         LookupLocator[] unicastLocators = null;
-//        File serviceIdFile = null;
         String[] groups = null;
-
-        serviceID = getServiceID();
 
         try {
             
@@ -159,16 +157,33 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
                     Entry[].class, null/* default */);
 
-// serviceIdFile = (File) config.getEntry(ADVERT_LABEL,
-//                    "serviceIdFile", File.class, null); // default
+            serviceIdFile = (File) config.getEntry(ADVERT_LABEL,
+                    "serviceIdFile", File.class); // default
+
+            if(serviceIdFile.exists()) {
+
+                try {
+
+                    serviceID = readServiceId(serviceIdFile);
+                    
+                } catch(IOException ex) {
+                    
+                    log.fatal("Could not read serviceID from existing file: "
+                            + serviceIdFile);
+
+                    System.exit(1);
+                    
+                }
+                
+            } else {
+                
+                log.info("New service instance - ServiceID will be assigned");
+                
+            }
             
             /*
              * Extract how the service will provision itself from the
              * Configuration.
-             * 
-             * @todo extract a Properties object to hand to the Journal
-             * constructor.  Some things should be injected after the
-             * fact, such as the serviceID.
              */
 
             // use the configuration to construct an exporter
@@ -178,8 +193,34 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
                     Exporter.class // type (of the return object)
                     );
 
-            // create the service object (and its proxy).
-            impl = new TestServiceImpl(config);
+            /*
+             * Access the properties file used to configure the service.
+             */
+
+            File propertyFile = (File) config.getEntry(SERVICE_LABEL,
+                    "propertyFile", File.class);
+
+            Properties properties = new Properties();
+            
+            try {
+            
+                InputStream is = new BufferedInputStream(new FileInputStream(
+                        propertyFile));
+                
+                properties.load(is);
+                
+                is.close();
+                
+            } catch (IOException ex) {
+
+                log.fatal("Configuration error: "+ex, ex);
+                
+                System.exit(1);
+                
+            }
+
+            // create the service object.
+            impl = new TestServiceImpl(properties);
 
             // export a proxy object for this service instance.
             proxy = (ITestService) exporter.export(impl);
@@ -216,12 +257,25 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
 //            DiscoveryManagement discoveryManager = new LookupDiscovery(
 //                    groups);
             
-            // @todo use ServiceIDListener?
-            joinManager = new JoinManager(proxy, // service proxy
-                      entries,  // attr sets
-                      serviceID,  // ServiceIDListener
-                      discoveryManager,   // DiscoveryManager
-                      new LeaseRenewalManager());
+            if (serviceID != null) {
+                /*
+                 * We read the serviceID from local storage.
+                 */
+                joinManager = new JoinManager(proxy, // service proxy
+                        entries, // attr sets
+                        serviceID, // ServiceIDListener
+                        discoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager());
+            } else {
+                /*
+                 * We are requesting a serviceID from the registrar.
+                 */
+                joinManager = new JoinManager(proxy, // service proxy
+                        entries, // attr sets
+                        this, // ServiceIDListener
+                        discoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager());
+            }
             
         } catch (IOException ex) {
             
@@ -230,6 +284,8 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
             try {
                 /* unexport the proxy */
                 unexport(true);
+                joinManager.terminate();
+                discoveryManager.terminate();
             } catch (Throwable t) {
                 /* ignore */
             }
@@ -253,7 +309,8 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
 //            //
 //        }
 //    }
-    
+
+
     /**
      * Unexports the proxy.
      * 
@@ -278,41 +335,68 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
         return false;
 
     }
-    
+
     /**
-     * Generate a ServiceID ourselves. This makes it easier to register the same
-     * service against multiple lookup services.
+     * Read and return the {@link ServiceID} from an existing local file.
      * 
-     * @todo If you want to restart (or re-register) the same service, then you
-     *       need to read the serviceID from some persistent location. If you
-     *       are using activation, then the service can be remotely started
-     *       using its serviceID which takes that responsibility out of your
-     *       hands. When using activation, you will only create a serviceID once
-     *       when you install the service onto some component and activition
-     *       takes responsiblity for starting the service on demand.
+     * @param file
+     *            The file whose contents are the serialized {@link ServiceID}.
+     * 
+     * @return The {@link ServiceID} read from that file.
+     * 
+     * @exception IOException
+     *                if the {@link ServiceID} could not be read from the file.
      */
-    private ServiceID getServiceID() {
-        
-        Uuid uuid = UuidFactory.generate();
-        
-        return new ServiceID(uuid.getMostSignificantBits(),
-                uuid.getLeastSignificantBits());
+    public ServiceID readServiceId(File file) throws IOException {
 
-    }   
+        FileInputStream is = new FileInputStream(file);
+        
+        ServiceID serviceID = new ServiceID(new DataInputStream(is));
+        
+        is.close();
 
-//    /**
-//     * @todo implement {@link ServiceIDListener} and pass into the
-//     *       {@link JoinManager} constructor if you want to use a persistent
-//     *       {@link ServiceID}. This method is responsible for saving the
-//     *       serviceID on stable storage when it is invoked.
-//     * 
-//     * @param serviceID
-//     */
-//    public void serviceIDNotify(ServiceID serviceID) {
-//
-//        log.info("serviceID=" + serviceID);
-//        
-//    }
+        log.info("Read ServiceID=" + serviceID+" from "+file);
+
+        return serviceID;
+        
+    }
+
+    /**
+     * This method is responsible for saving the {@link ServiceID} on stable
+     * storage when it is invoked. It will be invoked iff the {@link ServiceID}
+     * was not defined and one was therefore assigned.
+     * 
+     * @param serviceID
+     *            The assigned {@link ServiceID}.
+     */
+    public void serviceIDNotify(ServiceID serviceID) {
+
+        log.info("serviceID=" + serviceID);
+
+        if (serviceIdFile != null) {
+            
+            try {
+            
+                DataOutputStream dout = new DataOutputStream(
+                        new FileOutputStream(serviceIdFile));
+            
+                serviceID.writeBytes(dout);
+                
+                dout.flush();
+                
+                dout.close();
+                
+                log.info("ServiceID saved: " + serviceIdFile);
+
+            } catch (Exception ex) {
+
+                log.error("Could not save ServiceID", ex);
+                
+            }
+            
+        }
+
+    }
 
     /**
      * Note: This is only invoked if the automatic lease renewal by the lease
@@ -339,7 +423,7 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
         new Thread("launchServer") {
             public void run() {
                 TestServer
-                        .main(new String[] { "src/test/org/CognitiveWeb/bigdata/jini/TestServer.config" });
+                        .main(new String[] { "src/test/com/bigdata/service/TestServer.config" });
             }
         }.start();
         log.info("Starting service.");
@@ -390,80 +474,80 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
 //        log.info("Server will die: "+testServer);
     }
     
-    /**
-     * {@link Status} is abstract so a service needs to provide their own
-     * concrete implementation.
-     * 
-     * @version $Id$
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @download
-     */
-    public static class MyStatus extends Status {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 3431522046169284463L;
-        
-        /**
-         * Deserialization constructor (required).
-         */
-        public MyStatus(){}
-        
-        public MyStatus(StatusType statusType) {
-
-            /*
-             * Note: This just sets the read/write public [severity] field on
-             * the super class.
-             */
-            super(statusType);
-            
-        }
-        
-    }
-    
-    /**
-     * {@link ServiceType} is abstract so a service basically needs to provide
-     * their own concrete implementation. This class does not support icons
-     * (always returns null for {@link ServiceType#getIcon(int)}. See
-     * {@link java.beans.BeanInfo} for how to interpret and support the
-     * getIcon() method.
-     * 
-     * @version $Id$
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
-     *         </a>
-     * @download
-     */
-    public static class MyServiceType extends ServiceType
-    {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -2088608425852657477L;
-        
-        public String displayName;
-        public String shortDescription;
-        
-        /**
-         * Deserialization constructor (required).
-         */
-        public MyServiceType() {}
-
-        public MyServiceType(String displayName, String shortDescription) {
-            this.displayName = displayName;
-            this.shortDescription = shortDescription;
-        }
-        
-        public String getDisplayName() {
-            return displayName;
-        }
-        
-        public String getShortDescription() {
-            return shortDescription;
-        }
-        
-    }
+//    /**
+//     * {@link Status} is abstract so a service needs to provide their own
+//     * concrete implementation.
+//     * 
+//     * @version $Id$
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @download
+//     */
+//    public static class MyStatus extends Status {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 3431522046169284463L;
+//        
+//        /**
+//         * Deserialization constructor (required).
+//         */
+//        public MyStatus(){}
+//        
+//        public MyStatus(StatusType statusType) {
+//
+//            /*
+//             * Note: This just sets the read/write public [severity] field on
+//             * the super class.
+//             */
+//            super(statusType);
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * {@link ServiceType} is abstract so a service basically needs to provide
+//     * their own concrete implementation. This class does not support icons
+//     * (always returns null for {@link ServiceType#getIcon(int)}. See
+//     * {@link java.beans.BeanInfo} for how to interpret and support the
+//     * getIcon() method.
+//     * 
+//     * @version $Id$
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
+//     *         </a>
+//     * @download
+//     */
+//    public static class MyServiceType extends ServiceType
+//    {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = -2088608425852657477L;
+//        
+//        public String displayName;
+//        public String shortDescription;
+//        
+//        /**
+//         * Deserialization constructor (required).
+//         */
+//        public MyServiceType() {}
+//
+//        public MyServiceType(String displayName, String shortDescription) {
+//            this.displayName = displayName;
+//            this.shortDescription = shortDescription;
+//        }
+//        
+//        public String getDisplayName() {
+//            return displayName;
+//        }
+//        
+//        public String getShortDescription() {
+//            return shortDescription;
+//        }
+//        
+//    }
 
     /**
      * The remote service implementation object. This implements the
@@ -485,13 +569,14 @@ public class TestServer implements LeaseListener /*, ServiceIDListener*/
         /**
          * Service constructor.
          * 
-         * @throws ConfigurationException
+         * @param properties
          */
-        public TestServiceImpl(Configuration config)
-                throws ConfigurationException {
+        public TestServiceImpl(Properties properties) {
 
             log.info("Created: " + this );
 
+            new Journal(properties);
+            
         }
 
         public void invoke() {

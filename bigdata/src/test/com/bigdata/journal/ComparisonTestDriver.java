@@ -247,7 +247,6 @@ public class ComparisonTestDriver {
         // force delete of the files on close of the journal under test.
         properties.setProperty(Options.CREATE_TEMP_FILE,"true");
 //        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
-        properties.setProperty(Options.SEGMENT, "0");
 
         // avoids journal overflow when running out to 60 seconds.
         properties.setProperty(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);

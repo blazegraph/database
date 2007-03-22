@@ -42,38 +42,41 @@ Modifications:
 
 */
 /*
- * Created on Jun 26, 2006
+ * Created on Mar 22, 2007
  */
-package org.CognitiveWeb.bigdata.jini;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.service;
+
+import java.rmi.Remote;
+import java.util.Properties;
 
 /**
- * Aggregates tests in dependency order.
+ * The bigdata data server.
  * 
- * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
+public class DataServer extends AbstractServer {
 
-public class TestAll extends TestCase {
+    /**
+     * @param args
+     */
+    public DataServer(String[] args) {
 
-    public TestAll() {}
-    
-    public TestAll(String name) {super(name);}
-    
-    public static Test suite()
-    {
+        super(args);
+        
+    }
 
-        TestSuite suite = new TestSuite(TestAll.class.getName());
-
-        suite.addTestSuite( TestServiceDiscovery.class );
-
-//        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
-
-        return suite;
+    public static void main(String[] args) {
+        
+        new DataServer(args).run();
         
     }
     
+    protected Remote newService(Properties properties) {
+        
+        return new DataService(properties);
+        
+    }
+
 }

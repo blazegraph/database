@@ -90,7 +90,6 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
 //                    .toString());
 //            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
-            properties.setProperty(Options.SEGMENT, "0");
             if(properties.getProperty(Options.FILE)==null) {
                 properties.setProperty(Options.FILE, getName()+".jnl");
             }

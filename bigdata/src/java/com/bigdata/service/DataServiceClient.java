@@ -47,9 +47,11 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.journal.ValidationError;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.service.DataService.RangeQueryResult;
 
@@ -111,7 +113,7 @@ public class DataServiceClient implements IDataService {
 
     }
 
-    public void batchOp(long tx, String name, IBatchOp op) throws InterruptedException, ExecutionException {
+    public void batchOp(long tx, String name, IBatchOp op) throws InterruptedException, ExecutionException, IOException {
         delegate.batchOp(tx, name, op);
     }
 
@@ -119,19 +121,19 @@ public class DataServiceClient implements IDataService {
 //        delegate.map(tx, name, fromKey, toKey, op);
 //    }
 
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException {
+    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException, IOException {
         return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
     }
 
-    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException {
+    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException, IOException {
         delegate.submit(tx, proc);
     }
 
-    public void abort(long tx) {
+    public void abort(long tx) throws IOException {
         delegate.abort(tx);
     }
 
-    public long commit(long tx) {
+    public long commit(long tx) throws ValidationError, IOException {
         return delegate.commit(tx);
     }
 

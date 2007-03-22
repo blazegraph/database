@@ -85,7 +85,6 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
                     .toString());
 
-            properties.setProperty(Options.SEGMENT, "0");
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 //            properties.setProperty(Options.FILE, getName()+".jnl");
 //            properties.setProperty(Options.DELETE_ON_CLOSE,"false");

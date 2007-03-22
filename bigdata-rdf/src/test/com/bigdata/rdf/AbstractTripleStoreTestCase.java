@@ -93,7 +93,6 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
 //            properties.setProperty(Options.FORCE_WRITES,ForceEnum.Force.toString());
 //            properties.setProperty(Options.FORCE_WRITES,ForceEnum.ForceMetadata.toString());
             
-            properties.setProperty(Options.SEGMENT, "0");
             if(properties.getProperty(Options.FILE)==null) {
                 properties.setProperty(Options.FILE, getName()+".jnl");
             }
