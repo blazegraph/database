@@ -62,13 +62,7 @@ import java.rmi.RemoteException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @client This interface must be available to the client in order for it to
- *         execute the methods defined by the interface without the use of
- *         reflection.
- * 
- * @server This interface must be available to the server since it exposes this
- *         interface on its service.
+ * @download
  */
 public interface ITestService extends Remote
 {

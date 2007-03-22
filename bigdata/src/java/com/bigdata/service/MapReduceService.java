@@ -219,16 +219,13 @@ public class MapReduceService implements IServiceShutdown {
         }
 
         /**
-         * Resolve the metadata service for the named index.
-         * 
-         * @param name
-         *            The index name.
+         * Resolve the metadata service.
          * 
          * @return The metadata service for the named index.
          * 
          * @todo change the return type.
          */
-        protected IMetadataService getMetadataService(String name) {
+        protected IMetadataService getMetadataService() {
             
             throw new UnsupportedOperationException();
             
@@ -255,9 +252,9 @@ public class MapReduceService implements IServiceShutdown {
          */
         public Object call() throws Exception {
             
-            IMetadataService mds = getMetadataService(name);
+            IMetadataService mds = getMetadataService();
             
-            final int nentries = mds.rangeCount(fromKey,toKey);  
+            final int nentries = mds.rangeCount(name,fromKey,toKey);  
             
             return null;
             

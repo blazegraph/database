@@ -63,19 +63,12 @@ import com.bigdata.scaleup.MetadataIndex;
 public class MetadataService implements IMetadataService, IServiceShutdown {
 
     /**
-     * The name of the index.
-     */
-    protected final String name;
-    
-    /**
      * The name of the journal on which the metadata index is stored.
      * 
      * @todo support two-tier metadata index and reconcile with
      *       {@link MetadataIndex} and {@link MasterJournal}.
      */
     protected final Journal journal;
-    
-    protected MetadataIndex mdi;
     
     public MetadataService(Properties properties) {
         
@@ -92,17 +85,17 @@ public class MetadataService implements IMetadataService, IServiceShutdown {
         
     }
 
-    public InetSocketAddress getDataService(byte[] key) {
+    public InetSocketAddress getDataService(String name,byte[] key) {
         // TODO Auto-generated method stub
         return null;
     }
 
-    public int getEntryCount() {
+    public int getEntryCount(String name) {
         // TODO Auto-generated method stub
         return 0;
     }
 
-    public int rangeCount(byte[] fromKey,byte[] toKey) {
+    public int rangeCount(String name,byte[] fromKey,byte[] toKey) {
         // TODO Auto-generated method stub
         return 0;
     }
