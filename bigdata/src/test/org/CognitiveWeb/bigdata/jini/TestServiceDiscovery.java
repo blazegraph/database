@@ -48,6 +48,7 @@ package org.CognitiveWeb.bigdata.jini;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.rmi.ConnectException;
 
 import junit.framework.TestCase;
 import net.jini.core.discovery.LookupLocator;
@@ -207,6 +208,17 @@ public class TestServiceDiscovery extends TestCase {
         try {
             Thread.sleep(10000);
         } catch (InterruptedException ex) {
+        }
+
+        /*
+         * try service invocation again. if the service lease is canceled before
+         * we do this then we should see an exception here.
+         */
+        try {
+            service.invoke();
+            fail("Expecting "+ConnectException.class);
+        } catch(ConnectException ex) {
+            log.info("Ignoring expected exception: "+ex);
         }
 
     }

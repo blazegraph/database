@@ -1,4 +1,4 @@
-<project name="bigdata" default="deploy" basedir=".">
+<project name="bigdata" default="jar" basedir=".">
 
 	<property file="build.properties" />
 
@@ -21,42 +21,38 @@
 		<mkdir dir="${build.dir}" />
 	</target>
 
-	<!-- @todo drop dbcache, extser, concurrent. -->
-	<!-- FIXME Use JARs for other packages, NOT compiled classes.  This is 
-	     especially important because of the licenses on some packages. -->
 	<target name="compile" depends="prepare">
 		<mkdir dir="${build.dir}" />
 		<javac destdir="${build.dir}" classpathref="build.classpath" debug="on">
-			<src path="${cweb.dir}/commons/src/java" />
-			<src path="${cweb.dir}/concurrent/src/java" />
-			<src path="${cweb.dir}/dbcache/src/java" />
-			<src path="${cweb.dir}/extser/src/java" />
-			<src path="${cweb.dir}/junit-ext/src/java" />
-			<src path="${cweb.dir}/lgpl-utils/src/java" />
 			<src path="${bigdata.dir}/src/java" />
 			<src path="${bigdata.dir}/src/test" />
 		</javac>
-		<!--
-        <copy toDir="${build.dir}/classes">
-            <fileset dir="${src.dir}">
-                <exclude name="**/*.java"/>
-            </fileset>
-        </copy>
--->
 	</target>
 
+	<!-- build the main jar.
+	
+		 Note: clients share much of the bigadata java code since they require
+		 access to local temporary stores and btrees for some operations. Also,
+		 servers require client code (including the bulky ICU package) when they
+		 run remote jobs on the behalf of clients.  Therefore, there is point in
+		 creating both a "client" and a "server" JAR.
+		 -->
 	<target name="jar" depends="compile">
 		<jar destfile="${jar.name}">
 			<fileset dir="${build.dir}" />
 			<manifest>
+				<!-- @todo could be main routine for services startup, or perhaps
+				     a standalone instance startup. -->
 				<attribute name="Main-Class" value="org/CognitiveWeb/bigdata/TestServiceDiscovery" />
 			</manifest>
 		</jar>
 	</target>
 
-	<!-- Prepare a bigdata deployment.  you need to copy the deployment directory
-	to an HTTP server so that downloadable code can be resolved for activatable
-	services, e.g.,
+	<!-- The following are somewhat dated notes on using jini with downloadable
+	     code.
+	
+	You need to copy downloadable code to an HTTP server so that the classes can
+	be resolved for activatable services, e.g.,
 	
 	assuming:
 	
@@ -133,21 +129,36 @@
 	<!--
 	write a test to validate the pre- and post- conditions for deployment. -->
 	<!-- add properties to build.properties for the http server location,
-		 failover sites, etc. -->
+		 failover sites, network for service discovery, jeri protocol settings,
+		 etc. -->
+	
+	<!-- builds the basic bigdata deployment.
+	
+		 Note: clients require access to the ICU libraries for encoding unicode
+		 keys.  However, a server can operate as a client when running submitted
+		 jobs, so these libraries need to be deployed to server machines as well.
+		 
+		 @todo include an ant/shell/bat script for starting bigdata services or
+		 just a README?
+	-->
 	<target name="deploy" depends="jar">
 		<copy toDir="${deploy.dir}">
 			<fileset dir="${bigdata.dir}/lib">
-				<!-- do not deploy the jini jars for download - the client must
-				     have them available locally, e.g., from the jini starter
-				     kit. -->
-				<exclude name="reggie.jar" />
+				<!-- review necessar jini dependencies for deployment. -->
+			    <exclude name="reggie.jar" />
 				<exclude name="sun-util.jar" />
 				<exclude name="jini-core.jar" />
 				<exclude name="jini-ext.jar" />
-				<exclude name="**/*.dll" />
-				<exclude name="**/*.so" />
+				<!-- ICU4JNI is not a supported configuration at this time. -->
+				<exclude name="**/icu4jni.jar" />
+				<exclude name="**/icu*.dll" />
+				<exclude name="**/ICU*.dll" />
+				<!-- The BytesUtil JNI class is not recommended at this time. -->
+				<exclude name="**/*BytesUtil*" />
 			</fileset>
 			<fileset dir="${bigdata.dir}/LEGAL">
+				<!-- Not required in the distribution. -->
+				<exclude name="README.txt" />
 			</fileset>
 			<fileset file="${jar.name}/">
 			</fileset>

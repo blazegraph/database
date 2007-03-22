@@ -65,7 +65,7 @@ public interface IMetadataService {
     /**
      * The approximate number of entries in the index (non-transactional).
      */
-    public int getEntryCount();
+    public int getEntryCount(String name);
     
     /**
      * The approximate number of entries in the index for the specified key
@@ -75,7 +75,7 @@ public interface IMetadataService {
      * @param toKey
      * @return
      */
-    public int rangeCount(byte[] fromKey,byte[] toKey);
+    public int rangeCount(String name,byte[] fromKey,byte[] toKey);
     
     /**
      * Return the address of the {@link IDataService} that has current primary
@@ -94,6 +94,6 @@ public interface IMetadataService {
      *       the index partition that would contain the key plus some number of
      *       index partitions surrounding that partition.
      */
-    public InetSocketAddress getDataService(byte[] key);
+    public InetSocketAddress getDataService(String name, byte[] key);
     
 }

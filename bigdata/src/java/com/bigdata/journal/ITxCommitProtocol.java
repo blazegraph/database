@@ -68,7 +68,9 @@ import com.bigdata.service.IDataService;
  * being returned from {@link #commit(long)}. There also needs to be a distinct
  * "prepare" message that validates the write set of the transaction and makes
  * it restart safe. finally, i have to coordinate the serialization of the wait
- * for the "commit" message.
+ * for the "commit" message. (The write set of the transaction also needs to be
+ * restart safe when it indicates that it has "prepared" so that a commit will
+ * eventually succeed.)
  */
 public interface ITxCommitProtocol {
 

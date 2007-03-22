@@ -139,7 +139,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       {read,write,create,delete} access to a temporary directory and a data
  *       directory.
  */
-public class DataService extends AbstractService implements IDataService, IWritePipeline, IResourceTransfer {
+public class DataService extends AbstractService implements IDataService,
+        IWritePipeline, IResourceTransfer {
 
     protected Journal journal;
     
