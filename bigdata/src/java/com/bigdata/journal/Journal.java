@@ -47,36 +47,9 @@
 
 package com.bigdata.journal;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
-import com.bigdata.isolation.ReadOnlyIsolatedIndex;
-import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.ReadOnlyIndex;
-import com.bigdata.rawstore.Addr;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.MasterJournal;
-import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.scaleup.MasterJournal.Options;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Concrete implementation that does not handle {@link #overflow()} events.

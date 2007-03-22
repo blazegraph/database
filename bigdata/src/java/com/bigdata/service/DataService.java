@@ -47,7 +47,9 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.rmi.Remote;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -91,6 +93,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see DataServer, which is used to start this service.
  * 
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
@@ -138,8 +142,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo narrow file access permissions so that we only require
  *       {read,write,create,delete} access to a temporary directory and a data
  *       directory.
+ * 
+ * @todo all of the interfaces implemented by this class need to extend
+ *       {@link Remote} in order to be made visible on the proxy object
+ *       exported by JERI.
  */
-public class DataService extends AbstractService implements IDataService,
+public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
 
     protected Journal journal;
@@ -291,14 +299,14 @@ public class DataService extends AbstractService implements IDataService,
      * ITxCommitProtocol.
      */
     
-    public long commit(long tx) {
+    public long commit(long tx) throws IOException {
         
         // will place task on writeService and block iff necessary.
         return journal.commit(tx);
         
     }
 
-    public void abort(long tx) {
+    public void abort(long tx) throws IOException {
 
         // will place task on writeService iff read-write tx.
         journal.abort(tx);

@@ -48,7 +48,9 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
+import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.TimestampFactory;
@@ -62,25 +64,27 @@ import com.bigdata.util.TimestampFactory;
  * @todo add checksum field to the root blocks and maintain it. we don't really
  *       need a magic for the root blocks if we use a checksum. or maybe it is
  *       [magic,checksum,[data]] with the timestamps inside of the checksumed
- *       data region.
+ *       data region. the {@link #OFFSET_UNUSED1} field might be put to this
+ *       purpose.
  */
 public class RootBlockView implements IRootBlockView {
 
     static final transient short SIZEOF_TIMESTAMP  = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_MAGIC      = Bytes.SIZEOF_INT;
     static final transient short SIZEOF_VERSION    = Bytes.SIZEOF_INT;
-    static final transient short SIZEOF_SEGMENT_ID = Bytes.SIZEOF_INT;
+//    static final transient short SIZEOF_SEGMENT_ID = Bytes.SIZEOF_INT;
     static final transient short SIZEOF_ADDR       = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_COUNTER    = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_OFFSET     = Bytes.SIZEOF_INT;
-    static final transient short SIZEOF_UNUSED     = 256; // Note: a chunk of reserved bytes.
+    // Note: a chunk of reserved bytes.
+    static final transient short SIZEOF_UNUSED     = 256-Bytes.SIZEOF_UUID;
     
 //  static final transient short OFFSET_CHECKSUM   =  
     static final transient short OFFSET_TIMESTAMP0 = 0;
     static final transient short OFFSET_MAGIC      = OFFSET_TIMESTAMP0  + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_VERSION    = OFFSET_MAGIC       + SIZEOF_MAGIC;
-    static final transient short OFFSET_SEGMENT_ID = OFFSET_VERSION     + SIZEOF_VERSION;
-    static final transient short OFFSET_NEXT_OFFSET= OFFSET_SEGMENT_ID  + SIZEOF_SEGMENT_ID;
+    static final transient short OFFSET_UNUSED1    = OFFSET_VERSION     + SIZEOF_VERSION;
+    static final transient short OFFSET_NEXT_OFFSET= OFFSET_UNUSED1     + Bytes.SIZEOF_INT;
     static final transient short OFFSET_FIRST_CMIT = OFFSET_NEXT_OFFSET + SIZEOF_OFFSET;
     static final transient short OFFSET_LAST_CMIT  = OFFSET_FIRST_CMIT    + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_COMMIT_TS  = OFFSET_LAST_CMIT     + SIZEOF_TIMESTAMP;
@@ -88,7 +92,8 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_COMMIT_REC = OFFSET_COMMIT_CTR  + SIZEOF_COUNTER;
     static final transient short OFFSET_COMMIT_NDX = OFFSET_COMMIT_REC  + SIZEOF_ADDR;
     static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
-    static final transient short OFFSET_TIMESTAMP1 = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_UUID       = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_TIMESTAMP1 = OFFSET_UUID        + Bytes.SIZEOF_UUID;
     static final transient short SIZEOF_ROOT_BLOCK = OFFSET_TIMESTAMP1  + SIZEOF_TIMESTAMP;
 
     /**
@@ -115,8 +120,6 @@ public class RootBlockView implements IRootBlockView {
      * Create a new read-only root block image with a unique timestamp. The
      * other fields are populated from the supplied parameters.
      * 
-     * @param segmentId
-     *            The segment identifier for the journal.
      * @param nextOffset
      *            The next offset at which a record will be written on the
      *            store.
@@ -146,11 +149,15 @@ public class RootBlockView implements IRootBlockView {
      *            for the {@link CommitRecordIndex} was written or 0L if there
      *            are no historical {@link ICommitRecord}s (this is true when
      *            the store is first created).
+     * @param uuid
+     *            The unique journal identifier.
      */
-    RootBlockView(boolean rootBlock0, int segmentId, int nextOffset,
+//    * @param segmentId
+//    *            The segment identifier for the journal.
+    RootBlockView(boolean rootBlock0, /*int segmentId,*/ int nextOffset,
             long firstCommitTime, long lastCommitTime, long commitTimestamp,
             long commitCounter, long commitRecordAddr,
-            long commitRecordIndexAddr) {
+            long commitRecordIndexAddr, UUID uuid) {
 
         if (nextOffset < 0)
             throw new IllegalArgumentException("nextOffset is negative.");
@@ -185,6 +192,9 @@ public class RootBlockView implements IRootBlockView {
             throw new IllegalArgumentException(
                     "The commit record address must exist if there is a commit record index.");
         }
+        if(uuid == null) {
+            throw new IllegalArgumentException("UUID is null");
+        }
         
         buf = ByteBuffer.allocate(SIZEOF_ROOT_BLOCK);
         
@@ -195,7 +205,7 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(rootBlockTimestamp);
         buf.putInt(MAGIC);
         buf.putInt(VERSION0);
-        buf.putInt(segmentId);
+        buf.putInt(0); // unused field
         buf.putInt(nextOffset);
         buf.putLong(firstCommitTime);
         buf.putLong(lastCommitTime);
@@ -204,6 +214,8 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(commitRecordAddr);
         buf.putLong(commitRecordIndexAddr);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
+        buf.putLong(uuid.getMostSignificantBits());
+        buf.putLong(uuid.getLeastSignificantBits());
         buf.putLong(rootBlockTimestamp);
 
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
@@ -350,11 +362,18 @@ public class RootBlockView implements IRootBlockView {
         
     }
 
-    public int getSegmentId() {
-
-        return buf.getInt(OFFSET_SEGMENT_ID);
+    public UUID getUUID() {
+        
+        return new UUID(buf.getLong(OFFSET_UUID)/* MSB */, buf
+                .getLong(OFFSET_UUID + 8)/*LSB*/);
         
     }
+    
+//    public int getSegmentId() {
+//
+//        return buf.getInt(OFFSET_SEGMENT_ID);
+//        
+//    }
 
     public String toString() {
     
@@ -364,7 +383,7 @@ public class RootBlockView implements IRootBlockView {
         
         sb.append("{ rootBlockTimestamp="+getRootBlockTimestamp());
         sb.append(", version="+getVersion());
-        sb.append(", segmentId="+getSegmentId());
+//        sb.append(", segmentId="+getSegmentId());
         sb.append(", nextOffset="+getNextOffset());
         sb.append(", firstCommitTime="+getFirstCommitTime());
         sb.append(", lastCommitTime="+getLastCommitTime());
@@ -372,6 +391,7 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+Addr.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+Addr.toString(getCommitRecordIndexAddr()));
+        sb.append(", uuid="+getUUID());
         
         sb.append("}");
         

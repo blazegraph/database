@@ -163,8 +163,6 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
 
-        properties.setProperty(Options.SEGMENT, "0");
-        
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
 //        properties.setProperty(Options.DELETE_ON_CLOSE,"true");

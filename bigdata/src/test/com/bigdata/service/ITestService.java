@@ -45,7 +45,7 @@ Modifications:
  * Created on Mar 18, 2007
  */
 
-package org.CognitiveWeb.bigdata.jini;
+package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.Remote;

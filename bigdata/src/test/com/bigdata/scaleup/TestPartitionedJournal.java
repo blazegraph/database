@@ -133,9 +133,7 @@ public class TestPartitionedJournal extends TestCase2 {
         Properties properties = getProperties();
 
         properties.setProperty(Options.DELETE_ON_CLOSE, "false");
-        
-        properties.setProperty(Options.SEGMENT, "0");
-        
+                
         properties.setProperty(Options.BASENAME,getName());
         
         MasterJournal journal = new MasterJournal(properties);
@@ -200,8 +198,6 @@ public class TestPartitionedJournal extends TestCase2 {
 
         properties.setProperty(Options.DELETE_ON_CLOSE, "false");
         
-        properties.setProperty(Options.SEGMENT, "0");
-        
         properties.setProperty(Options.BASENAME,getName());
         
         MasterJournal journal = new MasterJournal(properties);
@@ -233,8 +229,6 @@ public class TestPartitionedJournal extends TestCase2 {
         Properties properties = getProperties();
 
         properties.setProperty(Options.DELETE_ON_CLOSE, "false");
-        
-        properties.setProperty(Options.SEGMENT, "0");
         
         properties.setProperty(Options.BASENAME,getName());
         
@@ -280,8 +274,6 @@ public class TestPartitionedJournal extends TestCase2 {
         Properties properties = getProperties();
 
         properties.setProperty(Options.DELETE_ON_CLOSE, "false");
-        
-        properties.setProperty(Options.SEGMENT, "0");
         
         properties.setProperty(Options.BASENAME,getName());
 
@@ -345,9 +337,7 @@ public class TestPartitionedJournal extends TestCase2 {
         Properties properties = getProperties();
 
         properties.setProperty(Options.DELETE_ON_CLOSE, "false");
-        
-        properties.setProperty(Options.SEGMENT, "0");
-        
+                
         properties.setProperty(Options.BASENAME,getName());
 
         properties.setProperty(Options.MERGE_POLICY,

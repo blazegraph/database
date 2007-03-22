@@ -389,8 +389,6 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        properties.setProperty(Options.SEGMENT, "0");
-
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
         properties.setProperty(TestOptions.TIMEOUT,"10");

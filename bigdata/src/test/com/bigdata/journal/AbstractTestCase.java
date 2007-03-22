@@ -207,8 +207,6 @@ abstract public class AbstractTestCase
 //            m_properties.setProperty(Options.DELETE_ON_CLOSE,"true");
             m_properties.setProperty(Options.DELETE_ON_EXIT,"true");
             
-            m_properties.setProperty(Options.SEGMENT, "0");
-            
         }        
         
         return m_properties;

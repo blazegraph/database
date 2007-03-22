@@ -115,15 +115,6 @@ public class Options {
     public static final String MAXIMUM_EXTENT = "maximumExtent";
     
     /**
-     * <code>segment</code> - The unique int32 segment identifier (required
-     * unless this is a {@link BufferMode#Transient} journal). Segment
-     * identifiers are assigned by a bigdata federation (scale out solution).
-     * When using the journal as part of an embedded or scale up database you
-     * may safely assign an arbitrary segment identifier, e.g., zero(0).
-     */
-    public static final String SEGMENT = "segment";
-    
-    /**
      * <code>create</code> - An optional boolean property (default is
      * <code>true</code>). When true and the named file is not found, a new
      * journal will be created.

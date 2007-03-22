@@ -50,6 +50,9 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.util.UUID;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
 
@@ -61,6 +64,11 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  */
 public class FileMetadata {
+
+    /**
+     * Logger.
+     */
+    public static final Logger log = Logger.getLogger(FileMetadata.class);
 
     static final int SIZE_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZE_VERSION = Bytes.SIZEOF_INT;
@@ -76,10 +84,10 @@ public class FileMetadata {
      */
     final int VERSION1 = 0x1;
     
-    /**
-     * The unique segment identifier.
-     */
-    final int segment;
+//    /**
+//     * The unique segment identifier.
+//     */
+//    final int segment;
     
     /**
      * The file that was opened.
@@ -155,8 +163,6 @@ public class FileMetadata {
     /**
      * Prepare a journal file for use by an {@link IBufferStrategy}.
      * 
-     * @param segmentId
-     *            The unique segment identifier.
      * @param file
      *            The name of the file to be opened.
      * @param bufferMode
@@ -196,7 +202,7 @@ public class FileMetadata {
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
-    FileMetadata(int segmentId, File file, BufferMode bufferMode,
+    FileMetadata(File file, BufferMode bufferMode,
             boolean useDirectBuffers, long initialExtent, long maximumExtent,
             boolean create, boolean isEmptyFile, boolean deleteOnExit,
             boolean readOnly, ForceEnum forceWrites) throws RuntimeException {
@@ -230,7 +236,7 @@ public class FileMetadata {
 
         }
 
-        this.segment = segmentId;
+//        this.segment = segmentId;
         
         this.bufferMode = bufferMode;
 
@@ -244,7 +250,7 @@ public class FileMetadata {
         
         if (exists) {
 
-            System.err.println("Opening existing file: "
+            log.info("Opening existing file: "
                     + file.getAbsoluteFile());
 
         } else {
@@ -265,7 +271,7 @@ public class FileMetadata {
 
             }
 
-            System.err.println("Will create file: " + file.getAbsoluteFile());
+            log.info("Will create file: " + file.getAbsoluteFile());
 
         }
         
@@ -381,12 +387,12 @@ public class FileMetadata {
                 try {
                     rootBlock0 = new RootBlockView(true,tmp0);
                 } catch(RootBlockException ex ) {
-                    System.err.println("Bad root block zero: "+ex);
+                    log.warn("Bad root block zero: "+ex);
                 }
                 try {
                     rootBlock1 = new RootBlockView(false,tmp1);
                 } catch(RootBlockException ex ) {
-                    System.err.println("Bad root block one: "+ex);
+                    log.warn("Bad root block one: "+ex);
                 }
                 if( rootBlock0 == null && rootBlock1 == null ) {
                     throw new RuntimeException("Both root blocks are bad - journal is not usable.");
@@ -517,12 +523,15 @@ public class FileMetadata {
                 final long lastTxId = 0L;
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
-                IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
+                final UUID uuid = UUID.randomUUID();
+                IRootBlockView rootBlock0 = new RootBlockView(true, 
                         nextOffset, firstTxId, lastTxId, commitTimestamp,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr);
-                IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
+                        commitCounter, commitRecordAddr, commitRecordIndexAddr,
+                        uuid);
+                IRootBlockView rootBlock1 = new RootBlockView(false,
                         nextOffset, firstTxId, lastTxId, commitTimestamp,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr);
+                        commitCounter, commitRecordAddr, commitRecordIndexAddr,
+                        uuid);
                 FileChannel channel = raf.getChannel();
                 channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
                 channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);

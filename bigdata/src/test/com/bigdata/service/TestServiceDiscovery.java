@@ -44,7 +44,7 @@ Modifications:
 /*
  * Created on Jun 16, 2006
  */
-package org.CognitiveWeb.bigdata.jini;
+package com.bigdata.service;
 
 import java.io.IOException;
 import java.net.InetAddress;

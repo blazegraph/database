@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -75,6 +76,7 @@ import com.bigdata.objndx.ReadOnlyIndex;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.scaleup.IMetadataIndexManager;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.scaleup.MasterJournal.Options;
@@ -305,7 +307,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      */
     public AbstractJournal(Properties properties) {
 
-        int segmentId;
+//        int segmentId;
         long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
         long maximumExtent = Options.DEFAULT_MAXIMUM_EXTENT;
         boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
@@ -351,28 +353,28 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         }
 
-        /*
-         * "segment".
-         */
-
-        val = properties.getProperty(Options.SEGMENT);
-
-        if (val == null) {
-
-            if (bufferMode == BufferMode.Transient) {
-
-                val = "0";
-
-            } else {
-
-                throw new RuntimeException("Required property: '"
-                        + Options.SEGMENT + "'");
-
-            }
-
-        }
-
-        segmentId = Integer.parseInt(val);
+//        /*
+//         * "segment".
+//         */
+//
+//        val = properties.getProperty(Options.SEGMENT);
+//
+//        if (val == null) {
+//
+//            if (bufferMode == BufferMode.Transient) {
+//
+//                val = "0";
+//
+//            } else {
+//
+//                throw new RuntimeException("Required property: '"
+//                        + Options.SEGMENT + "'");
+//
+//            }
+//
+//        }
+//
+//        segmentId = Integer.parseInt(val);
 
         /*
          * "initialExtent"
@@ -617,12 +619,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             final long commitCounter = 0L;
             final long commitRecordAddr = 0L;
             final long commitRecordIndexAddr = 0L;
-            IRootBlockView rootBlock0 = new RootBlockView(true, segmentId,
+            final UUID uuid = UUID.randomUUID();
+            IRootBlockView rootBlock0 = new RootBlockView(true, 
                     nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr);
-            IRootBlockView rootBlock1 = new RootBlockView(false, segmentId,
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
+                    uuid);
+            IRootBlockView rootBlock1 = new RootBlockView(false, 
                     nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr);
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
+                    uuid);
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -638,7 +643,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+            FileMetadata fileMetadata = new FileMetadata(file,
                     BufferMode.Direct, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -658,7 +663,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+            FileMetadata fileMetadata = new FileMetadata(file,
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -678,7 +683,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(segmentId, file,
+            FileMetadata fileMetadata = new FileMetadata(file,
                     BufferMode.Disk, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -1113,10 +1118,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
-                    !old.isRootBlock0(), old.getSegmentId(), _bufferStrategy
+                    !old.isRootBlock0(), /*old.getSegmentId(),*/ _bufferStrategy
                             .getNextOffset(), firstCommitTime, lastCommitTime,
                     commitTime, newCommitCounter,
-                    commitRecordAddr, commitRecordIndexAddr);
+                    commitRecordAddr, commitRecordIndexAddr,
+                    old.getUUID());
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 

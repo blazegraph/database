@@ -47,11 +47,13 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.bigdata.journal.ValidationError;
 import com.bigdata.objndx.IBatchOp;
 import com.bigdata.service.DataService.RangeQueryResult;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -123,11 +125,11 @@ public class EmbeddedDataService implements IDataService, IServiceShutdown {
         delegate.submit(tx, proc);
     }
 
-    public void abort(long tx) {
+    public void abort(long tx) throws IOException {
         delegate.abort(tx);
     }
 
-    public long commit(long tx) {
+    public long commit(long tx) throws ValidationError, IOException {
         return delegate.commit(tx);
     }
 

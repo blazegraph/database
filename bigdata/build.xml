@@ -25,6 +25,7 @@
 		<mkdir dir="${build.dir}" />
 		<javac destdir="${build.dir}" classpathref="build.classpath" debug="on">
 			<src path="${bigdata.dir}/src/java" />
+			<!-- @todo do not bundle the tests in the jar. -->
 			<src path="${bigdata.dir}/src/test" />
 		</javac>
 	</target>
@@ -43,7 +44,7 @@
 			<manifest>
 				<!-- @todo could be main routine for services startup, or perhaps
 				     a standalone instance startup. -->
-				<attribute name="Main-Class" value="org/CognitiveWeb/bigdata/TestServiceDiscovery" />
+				<attribute name="Main-Class" value="com/bigdata/service/TestServiceDiscovery" />
 			</manifest>
 		</jar>
 	</target>

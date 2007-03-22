@@ -196,8 +196,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         properties.setProperty(Options.FILE,file.toString());
 
-        properties.setProperty(Options.SEGMENT,"0");
-
         // setup a store to hold the metadata index.
         Journal store = new Journal(properties);
         
@@ -399,8 +397,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         properties.setProperty(Options.FILE,file.toString());
 
-        properties.setProperty(Options.SEGMENT,"0");
-
         Journal store = new Journal(properties);
         
         // partition metadata index.
@@ -501,8 +497,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         }
         
         properties.setProperty(Options.FILE,file.toString());
-
-        properties.setProperty(Options.SEGMENT,"0");
 
         Journal store = new Journal(properties);
         
@@ -673,8 +667,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         properties.setProperty(Options.DELETE_ON_CLOSE,"true");
 
         properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-        properties.setProperty(Options.SEGMENT,"0");
 
         Journal store = new Journal(properties);
         
@@ -969,8 +961,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         }
         
         properties.setProperty(Options.FILE,file.toString());
-
-        properties.setProperty(Options.SEGMENT,"0");
 
         Journal store = new Journal(properties);
         

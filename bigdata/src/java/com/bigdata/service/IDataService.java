@@ -47,6 +47,7 @@
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.journal.ITransactionManager;
@@ -81,7 +82,7 @@ import com.bigdata.service.DataService.RangeQueryResult;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IDataService extends ITxCommitProtocol {
+public interface IDataService extends IRemoteTxCommitProtocol {
 
     /**
      * Used by the client to submit a batch operation on a named B+Tree
@@ -127,7 +128,7 @@ public interface IDataService extends ITxCommitProtocol {
      *                error.
      */
     public void batchOp(long tx, String name, IBatchOp op)
-            throws InterruptedException, ExecutionException;
+            throws InterruptedException, ExecutionException, IOException;
 
     /**
      * Submit a procedure.
@@ -159,7 +160,7 @@ public interface IDataService extends ITxCommitProtocol {
      * @throws ExecutionException
      */
     public void submit(long tx, IProcedure proc) throws InterruptedException,
-            ExecutionException;
+            ExecutionException, IOException;
     
     /**
      * Streaming traversal of keys and/or values in a given key range.
@@ -188,7 +189,8 @@ public interface IDataService extends ITxCommitProtocol {
      *                {@link IsolationEnum#ReadCommitted}.
      */
     public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int flags) throws InterruptedException, ExecutionException;
+            byte[] toKey, int flags) throws InterruptedException,
+            ExecutionException, IOException, IOException;
 
 //    /**
 //     * Execute a map worker task against all key/value pairs in a key range,

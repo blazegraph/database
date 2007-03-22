@@ -139,6 +139,54 @@ bigdata-client.jar, but also support for generating unicode keys
 
 </p>
 
+<h2>unique identifiers</h2>
+
+<dl>
+
+<dt>Data Service</dt><dd><p>The serviceID identifies the data
+service. If the service dies and then restarts on the same host with
+the same data, then it is still the same service instance. If the
+service dies and is recreated on another host with the same data, then
+it is still the same instance. What is important is that (a) the
+service has the same data (journals, index segments, and serviceID);
+and (b) that the data for that service has not become <em>stale</em>
+(or inconsistent).</p><p> The easiest way in which the data can become
+stale is for the service to fail.  When failover is operating, clients
+will be redirected to one or more other services having consistent
+data for the same index partitions.  If clients then write on _any_ of
+those index partitions and commit, then the old service now has stale
+(aka inconsistent) data. A service with inconsistent data MUST NOT be
+used.
+</p><p>In general, the majority of state for a service will live in
+its index segments.  This can be hundreds or thousands of times more
+data in the index segments than there is in any single journal.  This
+can make it worth while to make the service consistent again.
+</p></dd>
+
+<dt>Journal</dt><dd>Each journal has a UUID that is generated when the
+journal is created (it is stored in the root block).  This serves to
+uniquely identify the journal as a resource regardless of where it may
+be located on the host or in the file system.</dd>
+
+<dt>Index Segment</dt><dd>Each index segment has a UUID that is
+generated when the index segment is created (it is stored in the fixed
+length index segment metadata record).  This serves to uniquely
+identify the index segment as a resource regardless of where it may be
+located on the host or in the file system.</dd>
+
+<dt>Index</dt><dd>Named indices are assigned UUIDs when they are
+created.  This makes it possible to rename an index, since its UUID
+remains the same.</dd>
+
+<dt>metadata service</dt><dd></dd>
+
+<dt>transaction manager service</dt><dd></dd>
+
+<dt>job scheduler service</dt><dd></dd>
+
+</dl>
+
+
 <h2>downloaded code</h2>
 
 <p>
