@@ -56,6 +56,16 @@ import com.sun.jini.start.LifeCycle;
 /**
  * The bigdata data server.
  * 
+ * @todo reduce the permissions required to start the server with the server
+ *       starter.
+ * 
+ * @see src/resources/config for sample configurations.
+ * 
+ * @todo write tests against an standalone installation and then see what it
+ *       looks like when the data services are running on more than one host.
+ *       note that unisolated operations can be tested without a transaction
+ *       server.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -129,64 +139,55 @@ public class DataServer extends AbstractServer {
 
             log.info("");
 
-            boolean destroyEnabled = true;
+            new Thread() {
 
-            if (destroyEnabled) {
-            
-                new Thread() {
+                public void run() {
+
+                    server.shutdownNow();
+
+                    log.info("Deleting state.");
                     
-                    public void run() {
+                    try {
 
-                        server.shutdownNow();
+                        journal.closeAndDelete();
 
-                        try {
+                        log.info("Journal deleted.");
 
-                            journal.closeAndDelete();
+                    } catch (Throwable t) {
 
-                            log.info("Journal deleted.");
-                            
-                        } catch (Throwable t) {
-
-                            log.warn("Could not delete persistent state: " + t,
-                                    t);
-
-                        }
-
-                        if (!server.serviceIdFile.delete()) {
-
-                            log.warn("Could not delete file: "
-                                    + server.serviceIdFile);
-
-                        }
-
-                        try {
-                            Thread.sleep(3);
-                        } catch (InterruptedException ex) {
-                        }
-
-                        log.info("Service Stop requested");
-
-                        System.exit(1);
+                        log.warn("Could not delete journal: " + t, t);
 
                     }
 
-                }.start();
-                
-            } else {
-      
-                throw new RemoteException(
-                        "Service Destroy Not Enabled, Operation Ignored");
-            }
+                    if (!server.serviceIdFile.delete()) {
+
+                        log.warn("Could not delete file: "
+                                + server.serviceIdFile);
+
+                    }
+
+                    try {
+                        Thread.sleep(3);
+                    } catch (InterruptedException ex) {
+                    }
+
+                    log.info("Service stopped.");
+
+                    System.exit(1);
+
+                }
+
+            }.start();
 
         }
 
-//        /*
-//         * JoinAdmin
-//         */
+// /*
+// * JoinAdmin
+// */
 //        
-//        public void addLookupAttributes(Entry[] arg0) throws RemoteException {
+// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
 //            
-//            log.info("");
+// log.info("");
 //
 //            // TODO Auto-generated method stub
 //            

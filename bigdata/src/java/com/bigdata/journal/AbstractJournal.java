@@ -780,6 +780,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         
         assertOpen();
 
+        log.info("");
+        
         // force the commit thread to quit immediately.
         writeService.shutdownNow();
         
@@ -810,6 +812,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      */
     protected void _delete() {
 
+        log.info("");
+        
         if (_bufferStrategy.isOpen()) {
 
             throw new IllegalStateException();
@@ -825,11 +829,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     
     public void close() {
 
+        log.info("");
+        
         _close();
 
     }
 
     public void closeAndDelete() {
+
+        log.info("");
         
         _close();
         

@@ -94,7 +94,7 @@ import com.sun.jini.start.ServiceStarter;
  * The recommended way to start a server is using the {@link ServiceStarter}.
  * 
  * <pre>
- *     java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ *      java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
  * </pre>
  * 
  * Other command line options MAY be recommended depending on the server that
@@ -135,8 +135,11 @@ import com.sun.jini.start.ServiceStarter;
  * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
  *      for documentation on how to use the ServiceStarter.
  * 
- * @todo reduce the permissions required to start the server with the server
- *       starter.
+ * @todo put a lock on the serviceIdFile while the server is running.
+ * 
+ * @todo the {@link DestroyAdmin} implementation on the {@link DataServer} is
+ *       not working correctly.  Untangle the various ways in which things can
+ *       be stopped vs destroyed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -180,6 +183,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     protected Remote proxy;
 
+    private boolean open = false;
+    
     /**
      * The object used to inform the hosting environment that the server is
      * unregistering (terminating). A fake object is used when the server is run
@@ -313,6 +318,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             // export a proxy object for this service instance.
             proxy = exporter.export(impl);
 
+            open = true;
+            
             log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch(ConfigurationException ex) {
@@ -495,25 +502,29 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * Shutdown the server taking time only to unregister it from jini.
      */
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
+        if(!open) return;
+
+        open = false;
+        
         /*
          * Terminate manager threads.
          */
         
         try {
 
-            log.info("Terminating manager threads.");
+            log.info("Terminating service management threads.");
 
+            joinManager.terminate();
+            
+            discoveryManager.terminate();
+        
             /*
              * Hand-shaking with the NonActivableServiceDescriptor.
              */
             lifeCycle.unregister(this);
             
-            joinManager.terminate();
-            
-            discoveryManager.terminate();
-        
         } catch (Exception ex) {
             
             log.error("Could not terminate: "+ex, ex);
@@ -621,7 +632,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
         public void run() {
 
-            log.info("Runing shutdown.");
+            log.info("Running shutdown.");
 
             server.shutdownNow();
             
