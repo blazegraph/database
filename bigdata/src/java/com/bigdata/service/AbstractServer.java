@@ -88,11 +88,20 @@ import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
 
 /**
- * Abstract base class for configurable services discoverable using JINI.
  * <p>
+ * Abstract base class for configurable services discoverable using JINI.
+ * </p>
  * The recommended way to start a server is using the {@link ServiceStarter}.
+ * 
+ * <pre>
+ *     java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ * </pre>
+ * 
+ * Other command line options MAY be recommended depending on the server that
+ * you are starting, e.g., <code>-server -XX:MaxDirectMemorySize=256M </code>.
  * <p>
  * The server MAY be started using a <code>main</code> routine:
+ * </p>
  * 
  * <pre>
  * public static void main(String[] args) {
@@ -102,11 +111,21 @@ import com.sun.jini.start.ServiceStarter;
  * }
  * </pre>
  * 
- * The service may be <em>terminated</em> by terminating the server process.
+ * <p>
+ * The service may be <em>terminated</em> by terminating the server process. A
+ * {@link Runtime#addShutdownHook(Thread)} is installed by the server so that
+ * you can also stop the server using ^C (Windows) and possibly
+ * <code>kill</code> <i>pid</i> (Un*x). You can record the PID of the process
+ * running the server when you start it under Un*x using a shell script. Note
+ * that if you are starting multiple services at once with the
+ * {@link ServiceStarter} then these methods will take down all servers running
+ * in the same VM.
+ * </p>
  * <p>
  * Services are <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
  * the Jini service browser. Note that this tends to imply that all persistent
  * data associated with that service is also destroyed!
+ * </p>
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
  *      describes a bug in the service browser that will display a
@@ -115,6 +134,9 @@ import com.sun.jini.start.ServiceStarter;
  * 
  * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
  *      for documentation on how to use the ServiceStarter.
+ * 
+ * @todo reduce the permissions required to start the server with the server
+ *       starter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -360,6 +382,12 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             
         }
 
+        /*
+         * The runtime shutdown hook appears to be a robust way to handle ^C by
+         * providing a clean service termination.
+         */
+        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+
     }
 
     /**
@@ -506,13 +534,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
     
     /**
-     * Run the server (this should be invoked from <code>main</code>.  You can
-     * stop the server using ^C (Windows) and possibly <code>kill</code> (Un*x).
-     * You can record the PID of the process running the server when you start
-     * it under Un*x using a shell script. 
-     * <p> 
-     * Note: If you want to DESTROY a service (and its state), then you can do
-     * that from the Jini Service Browser.
+     * Run the server (this should be invoked from <code>main</code>.
      */
     protected void run() {
 
@@ -520,7 +542,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         /*
          * Note: I have found the Runtime shutdown hook to be much more robust
-         * than attempting to install a signal handler.
+         * than attempting to install a signal handler.  It is installed by
+         * the server constructor rather than here so that it will be used 
+         * when the server is run by the ServiceStarter as well as from main().
          */
         
 //        /*
@@ -553,11 +577,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 //        } catch(IllegalArgumentException ex) {
 //            log.info("Signal handled not installed: "+ex);
 //        }
-
-        /*
-         * The runtime shutdown hook appears to be a bit more robust.
-         */
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
 
         /*
          * Wait until the server is terminated.
