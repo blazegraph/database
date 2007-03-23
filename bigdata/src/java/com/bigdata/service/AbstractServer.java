@@ -59,6 +59,7 @@ import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Properties;
 
+import net.jini.admin.Administrable;
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -73,26 +74,48 @@ import net.jini.export.Exporter;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
+import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
 
 import org.apache.log4j.Logger;
 
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
+import com.sun.jini.admin.DestroyAdmin;
+import com.sun.jini.admin.StorageLocationAdmin;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.NonActivatableServiceDescriptor;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * Abstract base class for configurable services discoverable using JINI.
- * Services are started using a <code>main</code> routine:
+ * <p>
+ * The recommended way to start a server is using the {@link ServiceStarter}.
+ * <p>
+ * The server MAY be started using a <code>main</code> routine:
+ * 
  * <pre>
-    public static void main(String[] args) {
-
-        new MyServer(args).run();
-                
-    }
- *  </pre>
- *
- *  
+ * public static void main(String[] args) {
+ * 
+ *     new MyServer(args).run();
+ * 
+ * }
+ * </pre>
+ * 
+ * The service may be <em>terminated</em> by terminating the server process.
+ * <p>
+ * Services are <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
+ * the Jini service browser. Note that this tends to imply that all persistent
+ * data associated with that service is also destroyed!
+ * 
+ * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
+ *      describes a bug in the service browser that will display a
+ *      "NullPointerException" dialog box if you destroy a service which
+ *      implements {@link DestroyAdmin} but not {@link JoinAdmin}.
+ * 
+ * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
+ *      for documentation on how to use the ServiceStarter.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -101,7 +124,19 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     
     public static final transient Logger log = Logger
             .getLogger(AbstractServer.class);
-    
+
+    /**
+     * The label in the {@link Configuration} file for the service
+     * description.
+     */
+    protected final static transient String SERVICE_LABEL = "ServiceDescription";
+
+    /**
+     * The label in the {@link Configuration} file for the service advertisment
+     * data.
+     */
+    protected final static transient String ADVERT_LABEL = "AdvertDescription";
+
     private ServiceID serviceID;
     private DiscoveryManagement discoveryManager;
     private JoinManager joinManager;
@@ -109,7 +144,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * The file where the {@link ServiceID} will be written/read. 
      */
-    private File serviceIdFile;
+    protected File serviceIdFile;
     /**
      * Responsible for exporting a proxy for the service.
      */
@@ -121,8 +156,16 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * The exported proxy for the service implementation object.
      */
-    private Remote proxy;
+    protected Remote proxy;
 
+    /**
+     * The object used to inform the hosting environment that the server is
+     * unregistering (terminating). A fake object is used when the server is run
+     * from the command line, otherwise the object is supplied by the
+     * {@link NonActivatableServiceDescriptor}.
+     */
+    private LifeCycle lifeCycle;
+    
     /**
      * Server startup reads {@link Configuration} data from the file(s) named by
      * <i>args</i>, starts the service, and advertises the service for
@@ -134,10 +177,30 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     protected AbstractServer(String[] args) {
 
-        final String SERVICE_LABEL = "ServiceDescription";
-
-        final String ADVERT_LABEL = "AdvertDescription";
+        this( args, new FakeLifeCycle() );
         
+    }
+
+    /**
+     * Server startup invoked by the ServerStarter
+     * 
+     * @param args
+     *            Arguments from the {@link ServiceDescriptor}.
+     * @param lifeCycle
+     *            The life cycle object.
+     * 
+     * @see NonActivatableServiceDescriptor
+     */
+    protected AbstractServer(String[] args, LifeCycle lifeCycle ) {
+        
+        if (lifeCycle == null)
+            throw new IllegalArgumentException();
+        
+        this.lifeCycle = lifeCycle;
+        
+        // @todo verify that this belongs here.
+        System.setSecurityManager(new SecurityManager());
+
         Entry[] entries = null;
         LookupLocator[] unicastLocators = null;
         String[] groups = null;
@@ -147,8 +210,12 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             config = ConfigurationProvider.getInstance(args); 
 
             /*
-             * Extract how the service will perform service discovery.
+             * Extract how the service will advertise itself from the
+             * Configuration.
              */
+
+            entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
+                    Entry[].class, null/* default */);
 
             groups = (String[]) config.getEntry(ADVERT_LABEL, "groups",
                     String[].class, LookupDiscovery.ALL_GROUPS/* default */);
@@ -158,14 +225,19 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                     LookupLocator[].class, null/* default */);
 
             /*
-             * Extract how the service will advertise itself from the
+             * Extract how the service will provision itself from the
              * Configuration.
              */
 
-            entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
-                    Entry[].class, null/* default */);
+            // The exporter used to expose the service proxy.
+            exporter = (Exporter) config.getEntry(//
+                    SERVICE_LABEL, // component
+                    "exporter", // name
+                    Exporter.class // type (of the return object)
+                    );
 
-            serviceIdFile = (File) config.getEntry(ADVERT_LABEL,
+            // The file on which the ServiceID will be written. 
+            serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
                     "serviceIdFile", File.class); // default
 
             if(serviceIdFile.exists()) {
@@ -188,22 +260,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 log.info("New service instance - ServiceID will be assigned");
                 
             }
-            
-            /*
-             * Extract how the service will provision itself from the
-             * Configuration.
-             */
 
-            // use the configuration to construct an exporter
-            exporter = (Exporter) config.getEntry(//
-                    SERVICE_LABEL, // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
-                    );
-
-            /*
-             * Access the properties file used to configure the service.
-             */
+            // The properties file used to configure the service.
 
             File propertyFile = (File) config.getEntry(SERVICE_LABEL,
                     "propertyFile", File.class);
@@ -407,60 +465,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
-     * Run the server (this should be invoked from <code>main</code>.
-     * 
-     * FIXME work through the install a signal handler that will shutdown the
-     * service politely when it is invoked.  Do we need -Xrs on the command
-     * line for this to work?  Which signals should be trapped?  Does this
-     * vary by OS?
-     * 
-     * SIGINT Interactive attention (CTRL-C). JVM will exit normally. Yes <br>
-     * SIGTERM Termination request. JVM will exit normally. Yes <br>
-     * SIGHUP Hang up. JVM will exit normally. Yes
-     * 
-     * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
-     */
-    protected void run() {
-
-        log.info("Started server.");
-
-        /*
-         * Install signal handlers.
-         */
-        
-        ServerShutdownSignalHandler.install("SIGINT",this);
-        
-//        ServerShutdownSignalHandler.install("SIGTERM",this);
-        
-        /*
-         * Wait until the server is terminated.
-         */
-        
-        Object keepAlive = new Object();
-        
-        synchronized (keepAlive) {
-            
-            try {
-                
-                keepAlive.wait();
-                
-            } catch (InterruptedException ex) {
-                
-                log.info(""+ex);
-                
-            }
-            
-        }
-        
-    }
-
-    /**
      * Shutdown the server taking time only to unregister it from jini.
-     * 
-     * @todo make this extensible? provide for normal shutdown vs this? support
-     *       the jini Admin interface.
      */
-    private void shutdownNow() {
+    public void shutdownNow() {
 
         /*
          * Terminate manager threads.
@@ -469,6 +476,11 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         try {
 
             log.info("Terminating manager threads.");
+
+            /*
+             * Hand-shaking with the NonActivableServiceDescriptor.
+             */
+            lifeCycle.unregister(this);
             
             joinManager.terminate();
             
@@ -494,74 +506,179 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
     
     /**
-     * Signal handler shuts down the server politely.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * Run the server (this should be invoked from <code>main</code>.  You can
+     * stop the server using ^C (Windows) and possibly <code>kill</code> (Un*x).
+     * You can record the PID of the process running the server when you start
+     * it under Un*x using a shell script. 
+     * <p> 
+     * Note: If you want to DESTROY a service (and its state), then you can do
+     * that from the Jini Service Browser.
      */
-    static class ServerShutdownSignalHandler implements SignalHandler {
+    protected void run() {
 
-        private final AbstractServer server;
-        
-        private SignalHandler oldHandler;
+        log.info("Started server.");
 
-        protected ServerShutdownSignalHandler(AbstractServer server) {
-
-            if(server == null) throw new IllegalArgumentException();
-            
-            this.server = server;
-            
-        }
-
-        /**
-         * Install the signal handler.
+        /*
+         * Note: I have found the Runtime shutdown hook to be much more robust
+         * than attempting to install a signal handler.
          */
-        public static SignalHandler install(String signalName,
-                AbstractServer server) {
+        
+//        /*
+//         * Install signal handlers.
+//        * SIGINT Interactive attention (CTRL-C). JVM will exit normally. <br>
+//        * SIGTERM Termination request. JVM will exit normally. <br>
+//        * SIGHUP Hang up. JVM will exit normally.<br>
+//        * 
+//        * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
+//        * 
+//        * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
+//        *      for the use of {@link Runtime#addShutdownHook(Thread)}.
+//        * 
+//         */
+//        
+//        try {
+//            ServerShutdownSignalHandler.install("SIGINT",this);
+//        } catch(IllegalArgumentException ex) {
+//            log.info("Signal handled not installed: "+ex);
+//        }
+//        
+//        try {
+//            ServerShutdownSignalHandler.install("SIGTERM",this);
+//        } catch(IllegalArgumentException ex) {
+//            log.info("Signal handled not installed: "+ex);
+//        }
+//
+//        try {
+//            ServerShutdownSignalHandler.install("SIGHUP",this);
+//        } catch(IllegalArgumentException ex) {
+//            log.info("Signal handled not installed: "+ex);
+//        }
 
-            Signal signal = new Signal(signalName);
+        /*
+         * The runtime shutdown hook appears to be a bit more robust.
+         */
+        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
 
-            ServerShutdownSignalHandler newHandler = new ServerShutdownSignalHandler(
-                    server);
-
-            newHandler.oldHandler = Signal.handle(signal, newHandler);
-
-            log.info("Installed handler: " + signal + ", oldHandler="
-                    + newHandler.oldHandler);
-
-            return newHandler;
-            
-        }
-
-        public void handle(Signal sig) {
-
-            log.warn("Signal: "+sig);
-            
-            /*
-             * Handle signal.
-             */
-            server.shutdownNow();
+        /*
+         * Wait until the server is terminated.
+         */
+        
+        Object keepAlive = new Object();
+        
+        synchronized (keepAlive) {
             
             try {
                 
-                // Chain back to previous handler, if one exists
-                if ( oldHandler != SIG_DFL && oldHandler != SIG_IGN ) {
-
-                    oldHandler.handle(sig);
-                    
-                }
+                keepAlive.wait();
                 
-            } catch (Exception ex) {
+            } catch (InterruptedException ex) {
                 
-                log.fatal("Signal handler failed, reason "+ex);
-        
-                System.exit(1);
+                log.info(""+ex);
                 
             }
             
         }
         
     }
+
+    /**
+     * Runs {@link AbstractServer#shutdownNow()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class ShutdownThread extends Thread {
+        
+        final AbstractServer server;
+        
+        public ShutdownThread(AbstractServer server) {
+            
+            if (server == null)
+                throw new IllegalArgumentException();
+            
+            this.server = server;
+            
+        }
+        
+        public void run() {
+
+            log.info("Runing shutdown.");
+
+            server.shutdownNow();
+            
+        }
+        
+    }
+    
+//    /**
+//     * Signal handler shuts down the server politely.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static class ServerShutdownSignalHandler implements SignalHandler {
+//
+//        private final AbstractServer server;
+//        
+//        private SignalHandler oldHandler;
+//
+//        protected ServerShutdownSignalHandler(AbstractServer server) {
+//
+//            if(server == null) throw new IllegalArgumentException();
+//            
+//            this.server = server;
+//            
+//        }
+//
+//        /**
+//         * Install the signal handler.
+//         */
+//        public static SignalHandler install(String signalName,
+//                AbstractServer server) {
+//
+//            Signal signal = new Signal(signalName);
+//
+//            ServerShutdownSignalHandler newHandler = new ServerShutdownSignalHandler(
+//                    server);
+//
+//            newHandler.oldHandler = Signal.handle(signal, newHandler);
+//
+//            log.info("Installed handler: " + signal + ", oldHandler="
+//                    + newHandler.oldHandler);
+//
+//            return newHandler;
+//            
+//        }
+//
+//        public void handle(Signal sig) {
+//
+//            log.warn("Processing signal: "+sig);
+//            
+//            /*
+//             * Handle signal.
+//             */
+//            server.shutdownNow();
+//            
+//            try {
+//                
+//                // Chain back to previous handler, if one exists
+//                if ( oldHandler != SIG_DFL && oldHandler != SIG_IGN ) {
+//
+//                    oldHandler.handle(sig);
+//                    
+//                }
+//                
+//            } catch (Exception ex) {
+//                
+//                log.fatal("Signal handler failed, reason "+ex);
+//        
+//                System.exit(1);
+//                
+//            }
+//            
+//        }
+//        
+//    }
 
     /**
      * This method is responsible for creating the remote service implementation
@@ -620,4 +737,41 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 //
 //    }
 
+
+    /*
+     * Note: You need to extend Remote in order for these APIs to be exported!
+     */
+    
+    public static interface RemoteAdministrable extends Remote, Administrable {
+        
+    }
+    
+    public static interface RemoteDestroyAdmin extends Remote, DestroyAdmin {
+
+    }
+
+    public static interface RemoteJoinAdmin extends Remote, JoinAdmin {
+
+    }
+
+    public static interface RemoteDiscoveryAdmin extends Remote, DiscoveryAdmin {
+
+    }
+
+    public static interface RemoteStorageLocationAdmin extends Remote, StorageLocationAdmin {
+
+    }
+
+    private static class FakeLifeCycle implements LifeCycle {
+
+        public boolean unregister(Object arg0) {
+            
+            log.info("");
+            
+            return true;
+            
+        }
+        
+    }
+    
 }

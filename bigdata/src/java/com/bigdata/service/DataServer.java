@@ -48,7 +48,10 @@ Modifications:
 package com.bigdata.service;
 
 import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.util.Properties;
+
+import com.sun.jini.start.LifeCycle;
 
 /**
  * The bigdata data server.
@@ -66,6 +69,12 @@ public class DataServer extends AbstractServer {
         super(args);
         
     }
+    
+    public DataServer(String[] args, LifeCycle lifeCycle) {
+        
+        super( args, lifeCycle );
+        
+    }
 
     public static void main(String[] args) {
         
@@ -75,7 +84,189 @@ public class DataServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
         
-        return new DataService(properties);
+        return new AdministrableDataService(this,properties);
+        
+    }
+
+    /**
+     * Adds jini administration interfaces to the basic {@link DataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class AdministrableDataService extends DataService implements
+            RemoteAdministrable, RemoteDestroyAdmin {
+        
+        protected AbstractServer server;
+        
+        public AdministrableDataService(AbstractServer server,Properties properties) {
+            
+            super(properties);
+            
+            this.server = server;
+            
+        }
+        
+        public Object getAdmin() throws RemoteException {
+
+            log.info("");
+
+            return server.proxy;
+            
+        }
+
+        /*
+         * DestroyAdmin
+         */
+
+        /**
+         * Destroy the service and deletes any files containing resources (<em>application data</em>)
+         * that was in use by that service.
+         * 
+         * @throws RemoteException
+         */
+        public void destroy() throws RemoteException {
+
+            log.info("");
+
+            boolean destroyEnabled = true;
+
+            if (destroyEnabled) {
+            
+                new Thread() {
+                    
+                    public void run() {
+
+                        server.shutdownNow();
+
+                        try {
+
+                            journal.closeAndDelete();
+
+                            log.info("Journal deleted.");
+                            
+                        } catch (Throwable t) {
+
+                            log.warn("Could not delete persistent state: " + t,
+                                    t);
+
+                        }
+
+                        if (!server.serviceIdFile.delete()) {
+
+                            log.warn("Could not delete file: "
+                                    + server.serviceIdFile);
+
+                        }
+
+                        try {
+                            Thread.sleep(3);
+                        } catch (InterruptedException ex) {
+                        }
+
+                        log.info("Service Stop requested");
+
+                        System.exit(1);
+
+                    }
+
+                }.start();
+                
+            } else {
+      
+                throw new RemoteException(
+                        "Service Destroy Not Enabled, Operation Ignored");
+            }
+
+        }
+
+//        /*
+//         * JoinAdmin
+//         */
+//        
+//        public void addLookupAttributes(Entry[] arg0) throws RemoteException {
+//            
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public void addLookupGroups(String[] arg0) throws RemoteException {
+//
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//
+//        }
+//
+//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public Entry[] getLookupAttributes() throws RemoteException {
+//
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        public String[] getLookupGroups() throws RemoteException {
+//         
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        public LookupLocator[] getLookupLocators() throws RemoteException {
+//         
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
+//         
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public void removeLookupGroups(String[] arg0) throws RemoteException {
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public void setLookupGroups(String[] arg0) throws RemoteException {
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
+//
+//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//            log.info("");
+//
+//            // TODO Auto-generated method stub
+//            
+//        }
         
     }
 
