@@ -55,9 +55,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.rmi.server.ExportException;
 import java.util.Properties;
 
+import net.jini.admin.Administrable;
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -73,12 +75,15 @@ import net.jini.export.Exporter;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
+import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.Journal;
+import com.sun.jini.admin.DestroyAdmin;
+import com.sun.jini.admin.StorageLocationAdmin;
 import com.sun.jini.start.ServiceStarter;
 
 /**
@@ -95,12 +100,25 @@ import com.sun.jini.start.ServiceStarter;
  *       trouble getting past some classpath errors using
  * 
  * <pre>
- *    java -Djava.security.policy=policy.all -classpath ant-deploy\reggie.jar;ant-deploy\jini-core.jar;ant-deploy\jini-ext.jar;ant-deploy\sun-util.jar;ant-deploy\bigdata.jar -jar ant-deploy\start.jar src\test\org\CognitiveWeb\bigdata\jini\TestServer.config
+ *         java -Djava.security.policy=policy.all -classpath ant-deploy\reggie.jar;ant-deploy\jini-core.jar;ant-deploy\jini-ext.jar;ant-deploy\sun-util.jar;ant-deploy\bigdata.jar -jar ant-deploy\start.jar src\test\org\CognitiveWeb\bigdata\jini\TestServer.config
  * </pre>
  * 
  * @todo support NIO protocol for data intensive APIs (data service, file
  *       transfer). Research how heavy mashalling is and what options exist to
  *       make it faster and lighter.
+ * 
+ * @todo Support JASS.
+ * 
+ * @todo {@link JoinAdmin} is not actually implemented (it is declared as a work
+ *       around for {@link DestroyAdmin} which otherwise crashes the Jini
+ *       ServiceBrowser with a NPE when you try to destroy the service).
+ *       Consider using Wonderly's <code>startNow</code> PersistentJiniService
+ *       as a base rather than rolling our own. That might be more robust -- see
+ *       {@link TestPersistentJiniService}.
+ * 
+ * @todo consider {@link StorageLocationAdmin}
+ * 
+ * @todo consider {@link DiscoveryAdmin}
  */
 public class TestServer implements LeaseListener, ServiceIDListener
 {
@@ -115,7 +133,7 @@ public class TestServer implements LeaseListener, ServiceIDListener
     private TestServiceImpl impl;
     private Exporter exporter;
     private ITestService proxy;
-    private File serviceIdFile = null;
+    protected File serviceIdFile = null;
 
     /**
      * Server startup performs asynchronous multicast lookup discovery. The
@@ -157,7 +175,19 @@ public class TestServer implements LeaseListener, ServiceIDListener
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
                     Entry[].class, null/* default */);
 
-            serviceIdFile = (File) config.getEntry(ADVERT_LABEL,
+            /*
+             * Extract how the service will provision itself from the
+             * Configuration.
+             */
+
+            // use the configuration to construct an exporter
+            exporter = (Exporter) config.getEntry(//
+                    SERVICE_LABEL, // component
+                    "exporter", // name
+                    Exporter.class // type (of the return object)
+                    );
+
+            serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
                     "serviceIdFile", File.class); // default
 
             if(serviceIdFile.exists()) {
@@ -181,18 +211,6 @@ public class TestServer implements LeaseListener, ServiceIDListener
                 
             }
             
-            /*
-             * Extract how the service will provision itself from the
-             * Configuration.
-             */
-
-            // use the configuration to construct an exporter
-            exporter = (Exporter) config.getEntry(//
-                    SERVICE_LABEL, // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
-                    );
-
             /*
              * Access the properties file used to configure the service.
              */
@@ -220,7 +238,7 @@ public class TestServer implements LeaseListener, ServiceIDListener
             }
 
             // create the service object.
-            impl = new TestServiceImpl(properties);
+            impl = new TestServiceImpl(this,properties);
 
             // export a proxy object for this service instance.
             proxy = (ITestService) exporter.export(impl);
@@ -446,13 +464,25 @@ public class TestServer implements LeaseListener, ServiceIDListener
         catch( InterruptedException ex ) {
             log.warn(ex);
         }
+        testServer.shutdownNow();
+//        /*
+//         * Note: The reference to the service instance here forces a hard
+//         * reference to remain for the test server. If you comment out this log
+//         * statement, then you need to do something else to hold onto the hard
+//         * reference.
+//         */
+//        log.info("Server will die: "+testServer);
+    }
+    
+    void shutdownNow() {
+        
         /*
          * Terminate manager threads.
          */
         try {
             log.info("Terminating manager threads.");
-            testServer.joinManager.terminate();
-            testServer.discoveryManager.terminate();
+            joinManager.terminate();
+            discoveryManager.terminate();
         } catch (Exception ex) {
             log.error("Could not terminate: "+ex, ex);
         }
@@ -463,15 +493,8 @@ public class TestServer implements LeaseListener, ServiceIDListener
          * in the service browser.
          */
         log.info("Unexporting the service proxy.");
-        testServer.unexport(true);
+        unexport(true);
         
-//        /*
-//         * Note: The reference to the service instance here forces a hard
-//         * reference to remain for the test server. If you comment out this log
-//         * statement, then you need to do something else to hold onto the hard
-//         * reference.
-//         */
-//        log.info("Server will die: "+testServer);
     }
     
 //    /**
@@ -563,19 +586,30 @@ public class TestServer implements LeaseListener, ServiceIDListener
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
      *         </a>
      */
-    public static class TestServiceImpl implements ITestService
+    public static class TestServiceImpl implements ITestService, RemoteAdministrable, RemoteDestroyAdmin, RemoteJoinAdmin
     {
+     
+        private TestServer server;
+        private Journal journal;
+        
+        public Journal getJournal() {
+            
+            return journal;
+            
+        }
 
         /**
          * Service constructor.
          * 
          * @param properties
          */
-        public TestServiceImpl(Properties properties) {
+        public TestServiceImpl(TestServer server,Properties properties) {
 
             log.info("Created: " + this );
 
-            new Journal(properties);
+            journal = new Journal(properties);
+            
+            this.server = server;
             
         }
 
@@ -584,6 +618,188 @@ public class TestServer implements LeaseListener, ServiceIDListener
             log.info("invoked: "+this);
             
         }
+
+        public Object getAdmin() throws RemoteException {
+
+            log.info("");
+
+            return server.proxy;
+            
+        }
+
+        /*
+         * DestroyAdmin
+         */
+
+        /**
+         * Destroy the service (including its persistent state).
+         * 
+         * @throws RemoteException
+         */
+        public void destroy() throws RemoteException {
+
+            log.info("");
+
+            boolean destroyEnabled = true;
+
+            if (destroyEnabled) {
+            
+                new Thread() {
+                    
+                    public void run() {
+
+                        server.shutdownNow();
+
+                        try {
+
+                            getJournal().closeAndDelete();
+
+                            log.info("Journal deleted.");
+                            
+                        } catch (Throwable t) {
+
+                            log.warn("Could not delete persistent state: " + t,
+                                    t);
+
+                        }
+
+                        if (!server.serviceIdFile.delete()) {
+
+                            log.warn("Could not delete file: "
+                                    + server.serviceIdFile);
+
+                        }
+
+                        try {
+                            Thread.sleep(3);
+                        } catch (InterruptedException ex) {
+                        }
+
+                        log.info("Service Stop requested");
+
+                        System.exit(1);
+
+                    }
+
+                }.start();
+            } else {
+                throw new RemoteException(
+                        "Service Destroy Not Enabled, Operation Ignored");
+            }
+
+        }
+
+        /*
+         * JoinAdmin
+         */
+        
+        public void addLookupAttributes(Entry[] arg0) throws RemoteException {
+            
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void addLookupGroups(String[] arg0) throws RemoteException {
+
+            log.info("");
+
+            // TODO Auto-generated method stub
+
+        }
+
+        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
+
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public Entry[] getLookupAttributes() throws RemoteException {
+
+            log.info("");
+
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public String[] getLookupGroups() throws RemoteException {
+         
+            log.info("");
+
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public LookupLocator[] getLookupLocators() throws RemoteException {
+         
+            log.info("");
+
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
+         
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void removeLookupGroups(String[] arg0) throws RemoteException {
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void setLookupGroups(String[] arg0) throws RemoteException {
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
+            log.info("");
+
+            // TODO Auto-generated method stub
+            
+        }
+
+    }
+
+    /*
+     * Note: You need to extend Remote in order for these APIs to be exported!
+     */
+    
+    public static interface RemoteAdministrable extends Remote, Administrable {
+        
+    }
+    
+    public static interface RemoteDestroyAdmin extends Remote, DestroyAdmin {
+
+    }
+
+    public static interface RemoteJoinAdmin extends Remote, JoinAdmin {
+
+    }
+
+    public static interface RemoteDiscoveryAdmin extends Remote, DiscoveryAdmin {
+
+    }
+
+    public static interface RemoteStorageLocationAdmin extends Remote, StorageLocationAdmin {
 
     }
 
