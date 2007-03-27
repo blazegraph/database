@@ -58,6 +58,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -196,6 +197,16 @@ public class IndexSegmentBuilder {
      */
     final protected RecordCompressor recordCompressor;
 
+    /**
+     * The unique identifier for the index whose data is stored in this B+Tree
+     * data structure. When using a scale-out index the same <i>indexUUID</i>
+     * MUST be assigned to each mutable and immutable B+Tree having data for any
+     * partition of that scale-out index. This makes it possible to work
+     * backwards from the B+Tree data structures and identify the index to which
+     * they belong.
+     */
+    final protected UUID indexUUID;
+    
     /**
      * Used to serialize the nodes and leaves of the output tree.
      */
@@ -399,7 +410,7 @@ public class IndexSegmentBuilder {
     
         this(outFile, tmpDir, btree.getEntryCount(), btree.entryIterator(), m,
                 btree.nodeSer.valueSerializer, true/* useChecksum */,
-                null/* new RecordCompressor() */, errorRate);
+                null/* new RecordCompressor() */, errorRate, btree.indexUUID);
         
     }
     
@@ -447,6 +458,15 @@ public class IndexSegmentBuilder {
      *            Generating the bloom filter is fairly expensive and this
      *            option should only be enabled if you know that point access
      *            tests are a hotspot for an index.
+     * @param indexUUID
+     *            The unique identifier for the index whose data is stored in
+     *            this B+Tree data structure. When using a scale-out index the
+     *            same <i>indexUUID</i> MUST be assigned to each mutable and
+     *            immutable B+Tree having data for any partition of that
+     *            scale-out index. This makes it possible to work backwards from
+     *            the B+Tree data structures and identify the index to which
+     *            they belong. See {@link AbstractBTree#getIndexUUID()}.
+     * 
      * @throws IOException
      */
 //    * @param metadataMap
@@ -457,7 +477,8 @@ public class IndexSegmentBuilder {
     public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
             IEntryIterator entryIterator, final int m,
             IValueSerializer valueSerializer, boolean useChecksum,
-            RecordCompressor recordCompressor, final double errorRate
+            RecordCompressor recordCompressor, final double errorRate,
+            final UUID indexUUID
 //          , final Map<String, Serializable> metadataMap
             )
             throws IOException {
@@ -468,9 +489,11 @@ public class IndexSegmentBuilder {
         assert m >= AbstractBTree.MIN_BRANCHING_FACTOR;
         assert valueSerializer != null;
         assert errorRate >= 0d;
+        assert indexUUID != null;
         
         this.useChecksum = useChecksum;
         this.recordCompressor = recordCompressor;
+        this.indexUUID = indexUUID;
 
         final long begin = System.currentTimeMillis();
         
@@ -1451,7 +1474,7 @@ public class IndexSegmentBuilder {
                     plan.height, useChecksum, plan.nleaves, nnodesWritten,
                     plan.nentries, maxNodeOrLeafLength, addrLeaves, addrNodes,
                     addrRoot, addrExtensionMetadata, addrBloom, errorRate, out
-                            .length(), now);
+                            .length(), indexUUID, now);
 
             md.write(out);
             

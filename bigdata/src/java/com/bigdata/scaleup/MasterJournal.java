@@ -776,9 +776,11 @@ public class MasterJournal implements IJournal {
              * the btree (plain vs supporting isolation).
              */
             final BTree newBTree = (oldBTree instanceof UnisolatedBTree ? new UnisolatedBTree(
-                    newJournal, oldBTree.getBranchingFactor())
+                    newJournal, oldBTree.getBranchingFactor(), oldBTree
+                            .getIndexUUID())
                     : new BTree(newJournal, oldBTree.getBranchingFactor(),
-                            oldBTree.getNodeSerializer().getValueSerializer()));
+                            oldBTree.getIndexUUID(), oldBTree
+                                    .getNodeSerializer().getValueSerializer()));
 
             // Register the btree under the same name on the new slave.
             newJournal.registerIndex(name, newBTree);
@@ -919,7 +921,8 @@ public class MasterJournal implements IJournal {
             new IndexSegmentBuilder(outFile, tmpDir, oldIndex.btree
                     .getEntryCount(), oldIndex.btree.getRoot().entryIterator(),
                     mseg, Value.Serializer.INSTANCE, true/* useChecksum */,
-                    null/* new RecordCompressor() */, 0d);
+                    null/* new RecordCompressor() */, 0d, oldIndex.btree
+                            .getIndexUUID());
 
             /*
              * update the metadata index for this partition.
@@ -959,11 +962,11 @@ public class MasterJournal implements IJournal {
                     oldIndex.btree, seg).merge();
 
             // build the merged index segment.
-            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
-                    null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
-                    mseg, oldIndex.btree.getNodeSerializer()
-                            .getValueSerializer(), false/* useChecksum */,
-                    null/* recordCompressor */, 0d/* errorRate */);
+            new IndexSegmentBuilder(outFile, null, mergeItr.nentries,
+                    new MergedEntryIterator(mergeItr), mseg, oldIndex.btree
+                            .getNodeSerializer().getValueSerializer(),
+                    false/* useChecksum */, null/* recordCompressor */,
+                    0d/* errorRate */, oldIndex.btree.getIndexUUID());
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but

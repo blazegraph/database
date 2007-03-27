@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
@@ -69,7 +70,8 @@ public class Name2Addr extends BTree {
     
     public Name2Addr(IRawStore store) {
 
-        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                ValueSerializer.INSTANCE);
 
 //        this.journal = store;
         

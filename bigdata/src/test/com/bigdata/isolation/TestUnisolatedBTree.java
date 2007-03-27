@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import java.util.UUID;
+
 import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
@@ -97,7 +99,8 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         IConflictResolver conflictResolver = new NoConflictResolver();
         {
             
-            UnisolatedBTree btree = new UnisolatedBTree(store,branchingFactor,null);
+            UnisolatedBTree btree = new UnisolatedBTree(store,branchingFactor,UUID.randomUUID(),
+                    null);
             
             assertTrue(store==btree.getStore());
             assertEquals(branchingFactor,btree.getBranchingFactor());
@@ -115,7 +118,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         {
             
             UnisolatedBTree btree = new UnisolatedBTree(store, branchingFactor,
-                    conflictResolver);
+                    UUID.randomUUID(), conflictResolver);
 
             assertTrue(store == btree.getStore());
             assertEquals(branchingFactor, btree.getBranchingFactor());
@@ -146,7 +149,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         final byte[] v3c = new byte[]{3,2};
         
         UnisolatedBTree btree = new UnisolatedBTree(new SimpleMemoryRawStore(),
-                3, null);
+                3, UUID.randomUUID(), null);
 
         /*
          * Preconditions for the key.
@@ -223,7 +226,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         final byte[] v5a = new byte[]{5,1};
 
         UnisolatedBTree btree = new UnisolatedBTree(new SimpleMemoryRawStore(),
-                3, null);
+                3, UUID.randomUUID(), null);
         
         btree.insert(k3,v3);
         btree.insert(k5,v5);
@@ -285,7 +288,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         final byte[] v5a = new byte[]{5,1};
 
         UnisolatedBTree btree = new UnisolatedBTree(new SimpleMemoryRawStore(),
-                3, null);
+                3, UUID.randomUUID(), null);
         
         /*
          * fill the root leaf.
@@ -395,7 +398,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         final byte[] v5a = new byte[]{5,1};
         final byte[] v7a = new byte[]{7,1};
 
-        UnisolatedBTree btree = new UnisolatedBTree(store, 3, null);
+        UnisolatedBTree btree = new UnisolatedBTree(store, 3, UUID.randomUUID(), null);
         
         /*
          * fill the root leaf.

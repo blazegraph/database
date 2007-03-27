@@ -53,6 +53,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -146,7 +147,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         
         { // Setup the named index and commit the journal.
             
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
             
             journal.commit();
             

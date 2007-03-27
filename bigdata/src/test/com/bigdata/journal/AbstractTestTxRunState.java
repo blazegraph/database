@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import junit.framework.TestSuite;
 
@@ -480,7 +481,8 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         {
 
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
+                    .randomUUID()));
         
             journal.commit();
             

@@ -56,6 +56,7 @@ import java.io.Reader;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -267,7 +268,8 @@ public class TripleStore extends /*Partitioned*/Journal {
         if(ndx==null) {
             
             ndx_termId = ndx = registerIndex(name_termId, new BTree(this,
-                    BTree.DEFAULT_BRANCHING_FACTOR, TermIdSerializer.INSTANCE));
+                    BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                    TermIdSerializer.INSTANCE));
             
         }
         
@@ -285,6 +287,7 @@ public class TripleStore extends /*Partitioned*/Journal {
 
             ndx_idTerm = ndx = registerIndex(name_idTerm,
                     new BTree(this, BTree.DEFAULT_BRANCHING_FACTOR,
+                            UUID.randomUUID(),
                             RdfValueSerializer.INSTANCE));
 
         }
@@ -311,6 +314,7 @@ public class TripleStore extends /*Partitioned*/Journal {
 
             ndx = registerIndex(name, new BTree(this,
                     BTree.DEFAULT_BRANCHING_FACTOR,
+                    UUID.randomUUID(),
                     StatementSerializer.INSTANCE));
 
         }

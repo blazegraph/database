@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 
@@ -130,8 +131,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         // setup a store to hold the metadata index.
         IRawStore store = new SimpleMemoryRawStore();
         
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3,"abc");
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -199,8 +205,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         // setup a store to hold the metadata index.
         Journal store = new Journal(properties);
         
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3,"abc");
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -290,8 +301,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         // setup a store to hold the metadata index.
         IRawStore store = new SimpleMemoryRawStore();
         
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store,3,"abc");
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
 
         /*
          * the separator key for the first partition (index := 0). this will
@@ -399,14 +415,20 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
-        // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, "abc");
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
+        // create the metadata index.
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID,
+                SimpleEntry.Serializer.INSTANCE);
         
         /*
          * populate the btree with some data.
@@ -500,14 +522,20 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
-        // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, "abc");
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
+        // create the metadata index.
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID,
+                SimpleEntry.Serializer.INSTANCE);
         
         /*
          * populate the btree with some data.
@@ -571,7 +599,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * create a new btree and insert the other keys/values into this btree.
          */
-        btree = new BTree(store,3,SimpleEntry.Serializer.INSTANCE);
+        btree = new BTree(store, 3, managedIndexUUID,
+                SimpleEntry.Serializer.INSTANCE);
         
         btree.insert(new BatchInsert(values2.length, keys2, values2));
         
@@ -596,7 +625,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         new IndexSegmentBuilder(outFile02, null, mergeItr.nentries,
                 new MergedEntryIterator(mergeItr), 100, btree
                         .getNodeSerializer().getValueSerializer(),
-                false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */);
+                false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */,
+                btree.getIndexUUID());
 
         /*
          * update the metadata index for this partition.
@@ -670,8 +700,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
-        // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, "abc");
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
+        // create the metadata index.
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
@@ -700,7 +735,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final boolean validateEachTrial = false;
         
         // ground truth btree.
-        BTree groundTruth = new BTree(store, mmut, SimpleEntry.Serializer.INSTANCE);
+        BTree groundTruth = new BTree(store, mmut, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
 
         // the current index segment and null if there is none yet.
         IndexSegment seg = null;
@@ -710,7 +745,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         for(int trial=0; trial<ntrials; trial++) {
         
             // test data btree - new tree on each trial!
-            BTree testData = new BTree(store, mmut, SimpleEntry.Serializer.INSTANCE);
+            BTree testData = new BTree(store, mmut, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
 
             /*
              * Insert / remove random key/values.
@@ -862,7 +897,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                         new MergedEntryIterator(mergeItr), mseg, testData
                                 .getNodeSerializer().getValueSerializer(),
                         false/* useChecksum */, null/* recordCompressor */,
-                        0d/* errorRate */);
+                        0d/* errorRate */, testData.getIndexUUID());
 
                 // close the merged leaf iterator (and release its buffer/file).
                 // @todo this should be automatic when the iterator is exhausted but I am not seeing that.
@@ -964,14 +999,19 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
-        // partition metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, "abc");
+        final UUID indexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = UUID.randomUUID();  
+        
+        // create the metadata index.
+        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+                managedIndexUUID, "abc");
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
         
         /*
          * populate the btree with some data.
@@ -1035,7 +1075,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * create a new btree and insert the other keys/values into this btree.
          */
-        btree = new BTree(store,3,SimpleEntry.Serializer.INSTANCE);
+        btree = new BTree(store,3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
         
         btree.insert(new BatchInsert(values2.length, keys2, values2));
         

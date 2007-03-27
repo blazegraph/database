@@ -47,6 +47,8 @@
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -109,6 +111,8 @@ public class TestReopen extends AbstractBTreeTestCase {
 
         IRawStore store = new SimpleMemoryRawStore();
 
+        final UUID indexUUID = UUID.randomUUID();
+        
         /*
          * The btree under test.
          * 
@@ -116,7 +120,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          * be forced when this tree is closed (node evictions are not permitted
          * by the default fixture factory).
          */
-        BTree btree = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
         /*
          * The btree used to maintain ground truth.
@@ -125,7 +129,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          * eventually overflow the hard reference queue and begin evicting nodes
          * and leaves onto the store.
          */
-        BTree groundTruth = new BTree(store, 3, SimpleEntry.Serializer.INSTANCE);
+        BTree groundTruth = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
         final int limit = 10000;
         final int keylen = 6;

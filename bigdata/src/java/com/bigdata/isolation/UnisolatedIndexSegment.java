@@ -74,9 +74,10 @@ import com.bigdata.objndx.IndexSegmentFileStore;
  *       {@link UnisolatedBTree} (I just copied over the logic for non-mutation
  *       operations). There are no direct tests of this class at this time.
  * 
- * @todo define extension that stores the index name and uuid for the named
- *       index to which the segment belongs (add method to {@link AbstractBTree}
- *       to allow subclassing {@link IndexSegmentExtensionMetadata}).
+ * @todo define extension that stores the index name for a named index to which
+ *       the segment belongs (add method to {@link AbstractBTree} to allow
+ *       subclassing {@link IndexSegmentExtensionMetadata})? (Note that we already
+ *       store the indexUUID).
  * 
  * @todo add a boolean flag to mark index segments that are the final result of
  *       a compacting merge. This will make it possible to reconstruct from the
@@ -87,8 +88,8 @@ import com.bigdata.objndx.IndexSegmentFileStore;
  *       rejection of queries directed to the wrong index segment and managing
  *       the metadataMap for a distributed index.
  * 
- * @todo examine the format of the uuid. can we use part of it as the unique
- *       basis for one up identifiers within a parition?
+ * @todo examine the format of the segmentUUID. can we use part of it as the
+ *       unique basis for one up identifiers within a parition?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

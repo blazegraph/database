@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf;
 
 import java.util.Locale;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
@@ -109,6 +110,7 @@ public class TempTripleStore extends TemporaryStore {
 
             ndx = registerIndex(name, new BTree(this,
                     BTree.DEFAULT_BRANCHING_FACTOR,
+                    UUID.randomUUID(),
                     StatementSerializer.INSTANCE));
 
         }

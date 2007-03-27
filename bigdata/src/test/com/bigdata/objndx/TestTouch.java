@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -101,6 +103,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         final BTree btree = new BTree(
                 new SimpleMemoryRawStore(),
                 branchingFactor,
+                UUID.randomUUID(),
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
                 null // no record compressor
@@ -172,6 +175,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         final BTree btree = new BTree(
                 new SimpleMemoryRawStore(),
                 branchingFactor,
+                UUID.randomUUID(),
                 leafQueue,
                 SimpleEntry.Serializer.INSTANCE,
                 null // no record compressor
@@ -245,6 +249,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         final BTree btree = new BTree(
                 new SimpleMemoryRawStore(),
                 branchingFactor,
+                UUID.randomUUID(),
                 leafQueue,
                 valSer,
                 null // no record compressor

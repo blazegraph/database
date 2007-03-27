@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -82,6 +84,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         
         BTree btree = new BTree(store,
                 branchingFactor,
+                UUID.randomUUID(),
                 new MyHardReferenceQueue<PO>(new DefaultEvictionListener(),
                         queueCapacity, queueScan),
                         SimpleEntry.Serializer.INSTANCE,

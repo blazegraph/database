@@ -83,15 +83,6 @@ public class DataServiceClient implements IDataService {
         }
         
     }
-
-    /*
-     * @todo implement remote data service client talking to NIO service
-     * instance. this needs to locate the transaction manager service and
-     * the metadata service for each index used by the client.
-     */
-    abstract private class NIODataServiceClient implements IDataService {
-        
-    }
     
     /**
      * Polite shutdown does not accept new requests and will shutdown once
@@ -116,10 +107,6 @@ public class DataServiceClient implements IDataService {
     public void batchOp(long tx, String name, IBatchOp op) throws InterruptedException, ExecutionException, IOException {
         delegate.batchOp(tx, name, op);
     }
-
-//    public void map(long tx, String name, byte[] fromKey, byte[] toKey, IMapOp op) throws InterruptedException, ExecutionException {
-//        delegate.map(tx, name, fromKey, toKey, op);
-//    }
 
     public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException, IOException {
         return delegate.rangeQuery(tx, name, fromKey, toKey, flags);

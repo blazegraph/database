@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.UUID;
+
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.ByteArrayValueSerializer;
 import com.bigdata.objndx.IIndex;
@@ -109,6 +111,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
     
         return registerIndex(name, new BTree(this,
                 BTree.DEFAULT_BRANCHING_FACTOR,
+                UUID.randomUUID(),
                 ByteArrayValueSerializer.INSTANCE));
         
     }

@@ -47,25 +47,30 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.rmi.Remote;
 
 /**
  * A metadata service for a named index.
  * <p>
  * The metadata service maintains locator information for the data service
- * instances responsible for each partition in the named index.  Partitions
- * are automatically split when they overflow (~200M) and joined when they
- * underflow (~50M).
+ * instances responsible for each partition in the named index. Partitions are
+ * automatically split when they overflow (~200M) and joined when they underflow
+ * (~50M).
+ * <p>
+ * Note: methods on this interface MUST throw {@link IOException} in order to be
+ * compatible with RMI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMetadataService {
+public interface IMetadataService extends Remote {
 
     /**
      * The approximate number of entries in the index (non-transactional).
      */
-    public int getEntryCount(String name);
+    public int getEntryCount(String name) throws IOException;
     
     /**
      * The approximate number of entries in the index for the specified key
@@ -75,7 +80,7 @@ public interface IMetadataService {
      * @param toKey
      * @return
      */
-    public int rangeCount(String name,byte[] fromKey,byte[] toKey);
+    public int rangeCount(String name,byte[] fromKey,byte[] toKey) throws IOException;
     
     /**
      * Return the address of the {@link IDataService} that has current primary
@@ -94,6 +99,6 @@ public interface IMetadataService {
      *       the index partition that would contain the key plus some number of
      *       index partitions surrounding that partition.
      */
-    public InetSocketAddress getDataService(String name, byte[] key);
+    public InetSocketAddress getDataService(String name, byte[] key) throws IOException;
     
 }

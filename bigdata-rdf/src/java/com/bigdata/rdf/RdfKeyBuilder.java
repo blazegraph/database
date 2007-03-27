@@ -306,7 +306,7 @@ public class RdfKeyBuilder {
         } else if (value instanceof BNode) {
 
             /*
-             * @todo if we know that the bnode id is a uuid that we generated
+             * @todo if we know that the bnode id is a segmentUUID that we generated
              * then we should encode that using faster logic that this unicode
              * conversion and stick the sort key on the bnode so that we do
              * not have to convert UUID to id:String to key:byte[]. 

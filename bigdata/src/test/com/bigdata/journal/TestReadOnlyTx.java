@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.UUID;
+
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.IIndex;
 
@@ -90,7 +92,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * register an index, write on the index, and commit the journal.
              */
             IIndex ndx = journal.registerIndex(name, new UnisolatedBTree(
-                    journal));
+                    journal, UUID.randomUUID()));
             
             ndx.insert(k1, v1);
 

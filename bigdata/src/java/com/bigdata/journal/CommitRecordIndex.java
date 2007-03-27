@@ -3,6 +3,7 @@ package com.bigdata.journal;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
@@ -49,7 +50,8 @@ public class CommitRecordIndex extends BTree {
 
     public CommitRecordIndex(IRawStore store) {
 
-        super(store, DEFAULT_BRANCHING_FACTOR, ValueSerializer.INSTANCE);
+        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                ValueSerializer.INSTANCE);
 
     }
 

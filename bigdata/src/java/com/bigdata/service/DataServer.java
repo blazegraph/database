@@ -51,6 +51,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.Properties;
 
+import com.bigdata.journal.IJournal;
 import com.sun.jini.start.LifeCycle;
 
 /**
@@ -99,6 +100,34 @@ public class DataServer extends AbstractServer {
     }
 
     /**
+     * Extends the behavior to close and delete the journal in use by the data
+     * service.
+     */
+    protected void destroy() {
+
+        DataService service = (DataService)impl;
+        
+        super.destroy();
+        
+        try {
+
+            IJournal journal = service.journal;
+            
+            log.info("Closing and deleting: "+journal.getFile());
+            
+            journal.closeAndDelete();
+
+            log.info("Journal deleted.");
+
+        } catch (Throwable t) {
+
+            log.warn("Could not delete journal: " + t, t);
+
+        }
+
+    }
+    
+    /**
      * Adds jini administration interfaces to the basic {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -143,37 +172,9 @@ public class DataServer extends AbstractServer {
 
                 public void run() {
 
-                    server.shutdownNow();
-
-                    log.info("Deleting state.");
+                    server.destroy();
                     
-                    try {
-
-                        journal.closeAndDelete();
-
-                        log.info("Journal deleted.");
-
-                    } catch (Throwable t) {
-
-                        log.warn("Could not delete journal: " + t, t);
-
-                    }
-
-                    if (!server.serviceIdFile.delete()) {
-
-                        log.warn("Could not delete file: "
-                                + server.serviceIdFile);
-
-                    }
-
-                    try {
-                        Thread.sleep(3);
-                    } catch (InterruptedException ex) {
-                    }
-
                     log.info("Service stopped.");
-
-                    System.exit(1);
 
                 }
 

@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.scaleup;
 
 import java.io.File;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 
 import com.bigdata.isolation.IIsolatableIndex;
@@ -106,6 +107,7 @@ abstract public class AbstractPartitionTask implements
     protected final int branchingFactor;
     protected final double errorRate;
     protected final String name;
+    protected final UUID indexUUID;
     protected final int partId;
     protected final byte[] fromKey;
     protected final byte[] toKey;
@@ -171,13 +173,14 @@ abstract public class AbstractPartitionTask implements
      *       correct separator keys must be scheduled.
      */
     public AbstractPartitionTask(MasterJournal master, String name,
-            int branchingFactor, double errorRate, int partId,
+            UUID indexUUID, int branchingFactor, double errorRate, int partId,
             byte[] fromKey, byte[] toKey) {
 
         this.master = master;
         this.branchingFactor = branchingFactor;
         this.errorRate = errorRate;
         this.name = name;
+        this.indexUUID = indexUUID;
         this.partId = partId;
         this.fromKey = fromKey;
         this.toKey = toKey;
@@ -226,11 +229,12 @@ abstract public class AbstractPartitionTask implements
          * @param segId
          *            The output segment identifier.
          */
-        public BuildTask(MasterJournal master, String name,
+        public BuildTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, IResourceMetadata src, int segId) {
             
-            super(master,name,branchingFactor,errorRate,partId,fromKey,toKey);
+            super(master, name, indexUUID, branchingFactor, errorRate, partId,
+                    fromKey, toKey);
             
             this.src = src;
             
@@ -255,7 +259,7 @@ abstract public class AbstractPartitionTask implements
             new IndexSegmentBuilder(outFile, master.tmpDir, src.rangeCount(
                     fromKey, toKey), src.rangeIterator(fromKey, toKey),
                     branchingFactor, valSer, useChecksum, recordCompressor,
-                    errorRate);
+                    errorRate, indexUUID);
 
             IResourceMetadata[] resources = new SegmentMetadata[] { new SegmentMetadata(
                     "" + outFile, outFile.length(),
@@ -290,12 +294,12 @@ abstract public class AbstractPartitionTask implements
          *            True iff this will be a full compacting merge.
          */
         protected AbstractMergeTask(MasterJournal master, String name,
-                int branchingFactor, double errorRate, int partId,
-                byte[] fromKey, byte[] toKey, int segId,
+                UUID indexUUID, int branchingFactor, double errorRate,
+                int partId, byte[] fromKey, byte[] toKey, int segId,
                 boolean fullCompactingMerge) {
             
-            super(master, name, branchingFactor, errorRate, partId, fromKey,
-                    toKey);
+            super(master, name, indexUUID, branchingFactor, errorRate, partId,
+                    fromKey, toKey);
             
             this.segId = segId;
             
@@ -342,7 +346,7 @@ abstract public class AbstractPartitionTask implements
             // build the merged index segment.
             new IndexSegmentBuilder(outFile, null, mergeItr.nentries,
                     new MergedEntryIterator(mergeItr), branchingFactor, valSer,
-                    useChecksum, recordCompressor, errorRate);
+                    useChecksum, recordCompressor, errorRate, indexUUID);
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but
@@ -428,13 +432,13 @@ abstract public class AbstractPartitionTask implements
          * @param segId
          *            The output segment identifier.
          */
-        public MergeTask(MasterJournal master, String name,
+        public MergeTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, IResourceMetadata[] resources,
                 int segId) {
 
-            super(master, name, branchingFactor, errorRate, partId, fromKey,
-                    toKey, segId, false);
+            super(master, name, indexUUID, branchingFactor, errorRate, partId,
+                    fromKey, toKey, segId, false);
             
             this.resources = resources;
             
@@ -482,12 +486,12 @@ abstract public class AbstractPartitionTask implements
          *            The commit time for the view that is the input to the
          *            merge operation.
          */
-        public FullMergeTask(MasterJournal master, String name,
+        public FullMergeTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
                 byte[] fromKey, byte[] toKey, long commitTime, int segId) {
 
-            super(master, name, branchingFactor, errorRate, partId, fromKey,
-                    toKey, segId, true);
+            super(master, name, indexUUID, branchingFactor, errorRate, partId,
+                    fromKey, toKey, segId, true);
 
             this.commitTime = commitTime;
 

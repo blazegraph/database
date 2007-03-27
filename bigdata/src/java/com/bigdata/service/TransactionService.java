@@ -96,6 +96,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo track ground states so that we known when we can release old journals
  *       and index segments?
+ * 
+ * @todo the transactional model might include a counter for the #of clients
+ *       that have started work on a transaction in order to support distributed
+ *       start/commit protocols. if clients use a workflow model, then they
+ *       could pass the responsibility for the counter along with the
+ *       transaction identifier rather than decrementing the counter themselves.
+ *       It might be good to be able to identify which clients are still working
+ *       on a given transaction.
  */
 public class TransactionService implements ITransactionManager, IServiceShutdown {
 

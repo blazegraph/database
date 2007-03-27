@@ -149,7 +149,7 @@ public class RootBlockView implements IRootBlockView {
      *            for the {@link CommitRecordIndex} was written or 0L if there
      *            are no historical {@link ICommitRecord}s (this is true when
      *            the store is first created).
-     * @param uuid
+     * @param segmentUUID
      *            The unique journal identifier.
      */
 //    * @param segmentId
@@ -391,7 +391,7 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+Addr.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+Addr.toString(getCommitRecordIndexAddr()));
-        sb.append(", uuid="+getUUID());
+        sb.append(", segmentUUID="+getUUID());
         
         sb.append("}");
         

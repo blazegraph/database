@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTree;
@@ -116,7 +117,7 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
         Journal journal = new Journal(getProperties());
 
-        BTree btree = new BTree(journal, branchingFactor,
+        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
                 SimpleEntry.Serializer.INSTANCE);
 
         return btree;

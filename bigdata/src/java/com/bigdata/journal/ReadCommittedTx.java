@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.UUID;
+
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IIsolatedIndex;
 import com.bigdata.objndx.BatchContains;
@@ -241,6 +243,10 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
             
             return index;
             
+        }
+        
+        public UUID getIndexUUID() {
+            return getIndex().getIndexUUID();
         }
         
         public boolean contains(byte[] key) {
