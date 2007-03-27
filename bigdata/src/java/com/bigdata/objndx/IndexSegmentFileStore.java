@@ -171,7 +171,7 @@ public class IndexSegmentFileStore implements IRawStore {
         
         try {
             
-            Class cl = Class.forName(extensionMetadata.className);
+            Class cl = Class.forName(extensionMetadata.getClassName());
             
             Constructor ctor = cl
                     .getConstructor(new Class[] { IndexSegmentFileStore.class });

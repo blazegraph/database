@@ -47,7 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -120,7 +120,8 @@ public class TestTx extends ProxyTestCase {
         String name = "abc";
         
         // register index in unisolated scope, but do not commit yet.
-        journal.registerIndex(name, new UnisolatedBTree(journal, 3));
+        journal.registerIndex(name, new UnisolatedBTree(journal, 3, UUID
+                .randomUUID()));
         
         // start tx1.
         final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
@@ -162,7 +163,7 @@ public class TestTx extends ProxyTestCase {
 
         {
             
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal,UUID.randomUUID()));
             
             journal.commit();
             
@@ -220,7 +221,7 @@ public class TestTx extends ProxyTestCase {
              */
             
             IIndex index = journal.registerIndex(name, new UnisolatedBTree(
-                    journal, branchingFactor));
+                    journal, branchingFactor, UUID.randomUUID()));
         
             assertNull(index.insert(k1, v1));
             
@@ -326,7 +327,7 @@ public class TestTx extends ProxyTestCase {
              */
             
             journal.registerIndex(name, new UnisolatedBTree(journal,
-                    branchingFactor));
+                    branchingFactor, UUID.randomUUID()));
             
             assert(journal.commit()!=0L);
             
@@ -436,7 +437,8 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
+                    .randomUUID()));
             
             journal.commit();
 
@@ -525,7 +527,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
             
             journal.commit();
 
@@ -632,7 +634,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
             
             journal.commit();
 
@@ -1159,7 +1161,7 @@ public class TestTx extends ProxyTestCase {
         
         {
             
-            journal.registerIndex(name,new UnisolatedBTree(journal));
+            journal.registerIndex(name,new UnisolatedBTree(journal,UUID.randomUUID()));
             
             journal.commit();
             
@@ -1247,7 +1249,7 @@ public class TestTx extends ProxyTestCase {
         
         {
             
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal,UUID.randomUUID()));
             
             journal.commit();
             

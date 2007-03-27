@@ -42,7 +42,7 @@ public class IndexSegmentMetadata {
      * As the unused bytes are allocated in new versions the value in this field
      * MUST be adjusted down from its original value of 256.
      */
-    static final int SIZEOF_UNUSED = 256;
+    static final int SIZEOF_UNUSED = 240;
 
     /**
      * The #of bytes required by the current metadata record format.
@@ -51,7 +51,7 @@ public class IndexSegmentMetadata {
             SIZEOF_MAGIC + //
             SIZEOF_VERSION + //
             Bytes.SIZEOF_LONG + // timestamp0
-            Bytes.SIZEOF_UUID + // index segment UUID.
+            Bytes.SIZEOF_UUID + // segment UUID.
             SIZEOF_BRANCHING_FACTOR + // branchingFactor
             SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
             SIZEOF_NBYTES + // max record length
@@ -59,6 +59,7 @@ public class IndexSegmentMetadata {
             SIZEOF_ADDR * 5 + // leaves, nodes, root, ext metadata, bloomFilter
             Bytes.SIZEOF_DOUBLE + // errorRate
             Bytes.SIZEOF_LONG + // file size
+            Bytes.SIZEOF_UUID + // index UUID. 
             SIZEOF_UNUSED + // available bytes for future versions.
             Bytes.SIZEOF_LONG // timestamp1
     ;
@@ -74,9 +75,12 @@ public class IndexSegmentMetadata {
     static transient final public int VERSION0 = 0x0;
    
     /**
-     * UUID for this {@link IndexSegment}.
+     * UUID for this {@link IndexSegment} (it is a unique identifier for
+     * the index segment resource).
+     * 
+     * @see #indexUUID
      */
-    final public UUID uuid;
+    final public UUID segmentUUID;
 
     /**
      * Branching factor for the index segment.
@@ -170,6 +174,20 @@ public class IndexSegmentMetadata {
     final public long length;
     
     /**
+     * The unique identifier for the index whose data is on this
+     * {@link IndexSegment}.
+     * <p>
+     * All {@link AbstractBTree}s having data for the same index will have the
+     * same {@link #indexUUID}. A partitioned index is comprised of mutable
+     * {@link BTree}s and historical read-only {@link IndexSegment}s, all of
+     * which will have the same {@link #indexUUID} if they have data for the
+     * same scale-out index.
+     * 
+     * @see #segmentUUID
+     */
+    final public UUID indexUUID;
+    
+    /**
      * Timestamp when the {@link IndexSegment} was generated.
      */
     final public long timestamp;
@@ -206,7 +224,7 @@ public class IndexSegmentMetadata {
 
         final long timestamp0 = raf.readLong();
         
-        uuid = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
+        segmentUUID = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
         
         branchingFactor = raf.readInt();
 
@@ -241,6 +259,8 @@ public class IndexSegmentMetadata {
                     + raf.length() + ", expected=" + length);
         }
         
+        indexUUID = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
+        
         raf.skipBytes(SIZEOF_UNUSED);
         
         final long timestamp1 = raf.readLong();
@@ -265,7 +285,7 @@ public class IndexSegmentMetadata {
             boolean useChecksum, int nleaves, int nnodes, int nentries,
             int maxNodeOrLeafLength, long addrLeaves, long addrNodes,
             long addrRoot, long addrExtensionMetadata, long addrBloom,
-            double errorRate, long length, long timestamp) {
+            double errorRate, long length, UUID indexUUID, long timestamp) {
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -306,7 +326,7 @@ public class IndexSegmentMetadata {
         
         assert timestamp != 0L;
         
-        this.uuid = UUID.randomUUID();
+        this.segmentUUID = UUID.randomUUID();
 
         this.branchingFactor = branchingFactor;
 
@@ -336,6 +356,8 @@ public class IndexSegmentMetadata {
         
         this.length = length;
         
+        this.indexUUID = indexUUID;
+        
         this.timestamp = timestamp;
         
     }
@@ -358,9 +380,9 @@ public class IndexSegmentMetadata {
 
         raf.writeLong(timestamp);
         
-        raf.writeLong(uuid.getMostSignificantBits());
+        raf.writeLong(segmentUUID.getMostSignificantBits());
 
-        raf.writeLong(uuid.getLeastSignificantBits());
+        raf.writeLong(segmentUUID.getLeastSignificantBits());
 
         raf.writeInt(branchingFactor);
                         
@@ -389,6 +411,10 @@ public class IndexSegmentMetadata {
         raf.writeDouble(errorRate);
         
         raf.writeLong(length);
+        
+        raf.writeLong(indexUUID.getMostSignificantBits());
+
+        raf.writeLong(indexUUID.getLeastSignificantBits());
 
         raf.skipBytes(SIZEOF_UNUSED);
         
@@ -404,7 +430,7 @@ public class IndexSegmentMetadata {
         StringBuilder sb = new StringBuilder();
         
         sb.append("magic="+Integer.toHexString(MAGIC));
-        sb.append(", uuid="+uuid);
+        sb.append(", segmentUUID="+segmentUUID);
         sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
         sb.append(", nleaves=" + nleaves);
@@ -419,6 +445,7 @@ public class IndexSegmentMetadata {
         sb.append(", addrBloom=" + Addr.toString(addrBloom));
         sb.append(", errorRate=" + errorRate);
         sb.append(", length=" + length);
+        sb.append(", indexUUID="+indexUUID);
         sb.append(", timestamp=" + new Date(timestamp));
 
         return sb.toString();

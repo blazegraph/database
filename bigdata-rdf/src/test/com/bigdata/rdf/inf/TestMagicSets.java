@@ -54,6 +54,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.TripleStore;
 
@@ -186,17 +187,17 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /*
          * setup the database.
          */
-        URI x = new URIImpl("http://www.foo.org/x");
-        URI y = new URIImpl("http://www.foo.org/y");
-        URI z = new URIImpl("http://www.foo.org/z");
+        URI x = new _URI("http://www.foo.org/x");
+        URI y = new _URI("http://www.foo.org/y");
+        URI z = new _URI("http://www.foo.org/z");
 
-        URI A = new URIImpl("http://www.foo.org/A");
-        URI B = new URIImpl("http://www.foo.org/B");
-        URI C = new URIImpl("http://www.foo.org/C");
+        URI A = new _URI("http://www.foo.org/A");
+        URI B = new _URI("http://www.foo.org/B");
+        URI C = new _URI("http://www.foo.org/C");
 
-        URI rdfType = new URIImpl(RDF.TYPE);
+        URI rdfType = new _URI(RDF.TYPE);
 
-        URI rdfsSubClassOf = new URIImpl(RDFS.SUBCLASSOF);
+        URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
 
         store.addStatement(x, rdfType, C);
         store.addStatement(y, rdfType, B);
@@ -220,7 +221,7 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
 
         // query :- triple(?s,rdf:type,A).
         Triple query = new Triple(store.nextVar(), store.rdfType, new Id(store
-                .addTerm(new URIImpl("http://www.foo.org/A"))));
+                .addTerm(new _URI("http://www.foo.org/A"))));
 
         // Run the queryy.
         TripleStore answerSet = store.query(query, new Rule[] { store.rdfs9,

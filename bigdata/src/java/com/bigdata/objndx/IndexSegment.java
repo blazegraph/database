@@ -131,10 +131,10 @@ public class IndexSegment extends AbstractBTree {
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
                 new CustomAddressSerializer(Addr
                         .getOffset(fileStore.metadata.addrNodes)),
-                fileStore.extensionMetadata.valSer,
+                fileStore.extensionMetadata.getValueSerializer(),
                 ImmutableNodeFactory.INSTANCE,
-                fileStore.extensionMetadata.recordCompressor,
-                fileStore.metadata.useChecksum);
+                fileStore.extensionMetadata.getRecordCompressor(),
+                fileStore.metadata.useChecksum, fileStore.metadata.indexUUID);
 
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentFileStore) fileStore;

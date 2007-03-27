@@ -50,6 +50,7 @@ package com.bigdata.objndx;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
@@ -104,7 +105,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
         Journal journal = new Journal(getProperties());
 
-        BTree btree = new BTree(journal, branchingFactor,
+        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
                 SimpleEntry.Serializer.INSTANCE);
 
         return btree;

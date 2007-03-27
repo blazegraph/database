@@ -49,6 +49,7 @@ package com.bigdata.objndx;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 /**
  * <p>
@@ -88,6 +89,12 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
      *            elements in this array determines which value will be selected
      *            for a given key by lookup() and which value is retained by
      *            rangeQuery().
+     * 
+     * @exception IllegalArgumentException
+     *                if a source is used more than once.
+     * @exception IllegalArgumentException
+     *                unless all sources have the same
+     *                {@link IIndex#getIndexUUID()}
      */
     public ReadOnlyFusedView(final AbstractBTree[] srcs) {
         
@@ -115,6 +122,11 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
                 if (srcs[i] == srcs[j])
                     throw new IllegalArgumentException(
                             "source used more than once");
+
+                if (srcs[i].getIndexUUID().equals(srcs[j].getIndexUUID())) {
+                    throw new IllegalArgumentException(
+                            "Sources have different index UUIDs");
+                }
                 
             }
             
@@ -122,6 +134,10 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
 
         this.srcs = srcs.clone();
         
+    }
+    
+    public UUID getIndexUUID() {
+        return srcs[0].getIndexUUID();
     }
     
     /**

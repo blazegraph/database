@@ -43,8 +43,8 @@ Modifications:
 */
 package com.bigdata.rawstore;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -164,7 +164,7 @@ final public class Addr {
      * 
      * @throws IOException
      */
-    public static void pack(DataOutputStream os,long addr) throws IOException {
+    public static void pack(DataOutput os,long addr) throws IOException {
         
         final int offset = Addr.getOffset(addr);
         
@@ -185,7 +185,7 @@ final public class Addr {
      * 
      * @throws IOException
      */
-    public static long unpack(DataInputStream is) throws IOException {
+    public static long unpack(DataInput is) throws IOException {
     
         long v = LongPacker.unpackLong(is);
         

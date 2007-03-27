@@ -47,37 +47,66 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.Serializable;
+import java.util.UUID;
+
+import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.SerializerUtil;
 
 /**
- * The base class for variable length metadataMap and extension metadataMap for an
- * {@link IndexSegment} as persisted on an {@link IndexSegmentFileStore}. The
- * {@link IndexSegmentMetadata} class is NOT extensible and is used solely for
- * fixed length metadataMap common to all {@link IndexSegment}s, including the
- * root addresses required to bootstrap the load of an {@link IndexSegment} from
- * a file. In contrast, this class provides for both required variable length
- * metadataMap and arbitrary extension metadataMap for an {@link IndexSegment}.
+ * <p>
+ * The base class for variable length metadata and extension metadata for an
+ * {@link IndexSegment} as persisted on an {@link IndexSegmentFileStore}.
+ * </p>
+ * <p>
+ * Note: The {@link IndexSegmentMetadata} class is NOT extensible and is used
+ * solely for fixed length metadata common to all {@link IndexSegment}s,
+ * including the root addresses required to bootstrap the load of an
+ * {@link IndexSegment} from a file. In contrast, this class provides for both
+ * required variable length metadata and arbitrary extension metadata for an
+ * {@link IndexSegment}.
+ * </p>
+ * <p>
+ * Note: Derived classes SHOULD extend the {@link Externalizable} interface and
+ * explicitly manage serialization versions so that their metadata may evolve in
+ * a backward compatible manner.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentExtensionMetadata implements Serializable {
+public class IndexSegmentExtensionMetadata implements Serializable, Externalizable {
 
     private static final long serialVersionUID = 4846316492768402991L;
 
+    private String className;
+    private IValueSerializer valSer;
+    private RecordCompressor recordCompressor;
+    
     /**
      * Either {@link IndexSegment} or a derived class that will be instantiated
      * when the index segment is loaded using
      * {@link IndexSegmentFileStore#load()}
      */
-    public final String className;
+    public final String getClassName() {
+        
+        return className;
+        
+    }
     
     /**
      * The serializer used for the values in the leaves of the index.
      */
-    public final IValueSerializer valSer;
+    public final IValueSerializer getValueSerializer() {
+        
+        return valSer;
+        
+    }
     
     /**
      * When non-null, a {@link RecordCompressor} that was used to write the
@@ -85,31 +114,18 @@ public class IndexSegmentExtensionMetadata implements Serializable {
      * 
      * @todo modify to use an interface.
      */
-    final public RecordCompressor recordCompressor;
-
-//    /**
-//     * When non-null, a map containing extension metadata.
-//     * 
-//     * @see #getMetadata(String name)
-//     */
-//    final private Map<String, Serializable> metadataMap;
-//
-//    /**
-//     * Return the metadata object stored under the key.
-//     * 
-//     * @param name
-//     *            The key.
-//     * 
-//     * @return The metadata object or <code>null</code> if there is nothing
-//     *         stored under that key.
-//     */
-//    public Serializable getMetadata(String name) {
-//        
-//        if(metadataMap==null) return null;
-//        
-//        return metadataMap.get(name);
-//        
-//    }
+    final public RecordCompressor getRecordCompressor() {
+        
+        return recordCompressor;
+        
+    }
+    
+    /**
+     * De-serialization constructor.
+     */
+    public IndexSegmentExtensionMetadata() {
+        
+    }
     
     /**
      * 
@@ -126,15 +142,8 @@ public class IndexSegmentExtensionMetadata implements Serializable {
      *            When non-null, a {@link RecordCompressor} that was used to
      *            write the nodes and leaves of the {@link IndexSegment}.
      */
-//    * 
-//    * @param metadataMap
-//    *            An optional serializable map containing application defined
-//    *            extension metadata. The map will be serialized with the
-//    *            {@link IndexSegmentExtensionMetadata} object as part of the
-//    *            {@link IndexSegmentFileStore}.
     public IndexSegmentExtensionMetadata(Class cl, IValueSerializer valSer,
             RecordCompressor recordCompressor) {
-//            Map<String, Serializable> metadataMap) {
 
         if( cl == null ) throw new IllegalArgumentException();
         
@@ -152,8 +161,6 @@ public class IndexSegmentExtensionMetadata implements Serializable {
         this.valSer = valSer;
         
         this.recordCompressor = recordCompressor;
-        
-//        this.metadataMap = metadataMap;
         
     }
 
@@ -173,6 +180,38 @@ public class IndexSegmentExtensionMetadata implements Serializable {
     public static IndexSegmentExtensionMetadata read(IndexSegmentFileStore store, long addr) {
         
         return (IndexSegmentExtensionMetadata) SerializerUtil.deserialize(store.read(addr));
+        
+    }
+
+    private static final transient int VERSION0 = 0x0;
+    
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    
+        final int version = (int)LongPacker.unpackLong(in);
+        
+        if (version != VERSION0) {
+
+            throw new IOException("Unknown version: version=" + version);
+            
+        }
+        
+        className = in.readUTF();
+        
+        valSer = (IValueSerializer) in.readObject();
+        
+        recordCompressor = (RecordCompressor) in.readObject();
+        
+    }
+    
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        LongPacker.packLong(out,VERSION0);
+
+        out.writeUTF(className);
+
+        out.writeObject(valSer);
+        
+        out.writeObject(recordCompressor);
         
     }
 

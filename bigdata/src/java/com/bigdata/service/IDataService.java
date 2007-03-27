@@ -81,6 +81,13 @@ import com.bigdata.service.DataService.RangeQueryResult;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo add support for triggers. unisolated triggers must be asynchronous if
+ *       they will take actions with high latency (such as writing on a
+ *       different index partition, which could be remote). Low latency actions
+ *       might include emitting asynchronous messages. transactional triggers
+ *       can have more flexibility since they are under less of a latency
+ *       constraint.
  */
 public interface IDataService extends IRemoteTxCommitProtocol {
 

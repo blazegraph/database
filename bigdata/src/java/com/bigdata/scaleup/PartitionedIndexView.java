@@ -51,6 +51,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
@@ -61,11 +62,11 @@ import com.bigdata.objndx.BatchInsert;
 import com.bigdata.objndx.BatchLookup;
 import com.bigdata.objndx.BatchRemove;
 import com.bigdata.objndx.EmptyEntryIterator;
-import com.bigdata.objndx.ReadOnlyFusedView;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IFusedView;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.ReadOnlyFusedView;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key
@@ -344,6 +345,19 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         this.btree = btree;
         
         this.mdi = mdi;
+        
+    }
+
+    /*
+     * IIndex
+     */
+    
+    /**
+     * The UUID for the scale-out index.
+     */
+    public UUID getIndexUUID() {
+        
+        return mdi.getManagedIndexUUID();
         
     }
     

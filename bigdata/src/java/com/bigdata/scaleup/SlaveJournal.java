@@ -45,6 +45,7 @@ package com.bigdata.scaleup;
 
 import java.io.File;
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -187,13 +188,13 @@ public class SlaveJournal extends Journal {
      */
     public IIndex registerIndex(String name) {
         
-        return registerIndex(name, new UnisolatedBTree(this));
+        return registerIndex(name, new UnisolatedBTree(this, UUID.randomUUID()));
         
     }
     
     /**
-     * Registers and returns a {@link PartitionedIndexView} under the given name and
-     * assigns the supplied {@link IIndex} to absorb writes for that
+     * Registers and returns a {@link PartitionedIndexView} under the given name
+     * and assigns the supplied {@link IIndex} to absorb writes for that
      * {@link PartitionedIndexView}.
      * <p>
      * A {@link MetadataIndex} is also registered under the given name and an
@@ -206,12 +207,6 @@ public class SlaveJournal extends Journal {
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
-     * 
-     * @todo use a prototype model so that the registered btree type is
-     *       preserved? (Only the metadata extensions are preserved right now).
-     *       One way to do this is by putting the constructor on the metadata
-     *       object. Another is to make the btree Serializable and then just
-     *       declare everything else as transient.
      */
     public IIndex registerIndex(String name, IIndex btree) {
 
@@ -235,9 +230,16 @@ public class SlaveJournal extends Journal {
                     + BTree.class);
             
         }
-        
+
+        /*
+         * @todo the assigned random UUID for the metadata index must be used by
+         * all B+Tree objects having data for the metadata index so once we
+         * support partitions in the metadata index itself this UUID must be
+         * propagated to all of those downstream objects.
+         */
         MetadataIndex mdi = new MetadataIndex(this,
-                BTree.DEFAULT_BRANCHING_FACTOR, name);
+                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(), btree
+                        .getIndexUUID(), name);
         
         // create the initial partition which can accept any key.
         mdi.put(new byte[]{}, new PartitionMetadata(0));

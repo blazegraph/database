@@ -52,8 +52,8 @@ import it.unimi.dsi.mg4j.util.BloomFilter;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -138,16 +138,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         System.err.println("Opening journal: " + filename);
         Journal journal = new Journal(properties);
 
-        // A modest leaf queue capacity.
-        final int leafQueueCapacity = 500;
-
-        final int nscan = 10;
-
-        BTree btree = new BTree(journal, branchingFactor,
-                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        leafQueueCapacity, nscan),
-                SimpleEntry.Serializer.INSTANCE, null // no record compressor
-        );
+        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
+                SimpleEntry.Serializer.INSTANCE);
 
         return btree;
 

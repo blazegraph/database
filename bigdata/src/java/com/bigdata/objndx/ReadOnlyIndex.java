@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 /**
  * A fly-weight wrapper that does not permit write operations and reads
  * through onto an underlying {@link IIndex}.
@@ -64,6 +66,10 @@ public class ReadOnlyIndex implements IIndex, IRangeQuery {
         
         this.src = src;
         
+    }
+
+    public UUID getIndexUUID() {
+        return src.getIndexUUID();
     }
     
     public boolean contains(byte[] key) {

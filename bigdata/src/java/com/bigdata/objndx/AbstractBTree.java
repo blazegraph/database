@@ -50,6 +50,7 @@ package com.bigdata.objndx;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -142,6 +143,16 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     final protected IRawStore store;
 
+    /**
+     * The unique identifier for the index whose data is stored in this B+Tree
+     * data structure. When using a scale-out index the same <i>indexUUID</i>
+     * MUST be assigned to each mutable and immutable B+Tree having data for any
+     * partition of that scale-out index. This makes it possible to work
+     * backwards from the B+Tree data structures and identify the index to which
+     * they belong.
+     */
+    final protected UUID indexUUID;
+    
     /**
      * The branching factor for the btree.
      */
@@ -303,13 +314,21 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *            fully buffered store, such as a {@link Journal}, since all
      *            reads are against memory which is presumably already parity
      *            checked.
+     * @param indexUUID
+     *            The unique identifier for the index whose data is stored in
+     *            this B+Tree data structure. When using a scale-out index the
+     *            same <i>indexUUID</i> MUST be assigned to each mutable and
+     *            immutable B+Tree having data for any partition of that
+     *            scale-out index. This makes it possible to work backwards from
+     *            the B+Tree data structures and identify the index to which
+     *            they belong.
      */
     protected AbstractBTree(IRawStore store, int branchingFactor,
             int initialBufferCapacity,
             HardReferenceQueue<PO> hardReferenceQueue,
             IAddressSerializer addrSer, IValueSerializer valueSer,
             INodeFactory nodeFactory, RecordCompressor recordCompressor,
-            boolean useChecksum) {
+            boolean useChecksum, UUID indexUUID) {
 
         assert store != null;
 
@@ -323,6 +342,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         assert nodeFactory != null;
 
+        if(indexUUID == null) throw new IllegalArgumentException("indexUUID");
+        
         this.store = store;
 
         this.branchingFactor = branchingFactor;
@@ -333,6 +354,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
                 initialBufferCapacity, addrSer, KeyBufferSerializer.INSTANCE,
                 valueSer, recordCompressor, useChecksum);
 
+        this.indexUUID = indexUUID;
+        
     }
 
     /**
@@ -476,12 +499,26 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * The object responsible for (de-)serializing the nodes and leaves of the
      * {@link IIndex}.
      */
-    public NodeSerializer getNodeSerializer() {
+    final public NodeSerializer getNodeSerializer() {
 
         return nodeSer;
 
     }
 
+    /**
+     * The unique identifier for the index whose data is stored in this B+Tree
+     * data structure. When using a scale-out index the same <i>indexUUID</i>
+     * MUST be assigned to each mutable and immutable B+Tree having data for any
+     * partition of that scale-out index. This makes it possible to work
+     * backwards from the B+Tree data structures and identify the index to which
+     * they belong.
+     */
+    final public UUID getIndexUUID() {
+        
+        return indexUUID;
+        
+    }
+    
     /**
      * The root of the btree. This is initially a leaf until the leaf is split,
      * at which point it is replaced by a node. The root is also replaced each

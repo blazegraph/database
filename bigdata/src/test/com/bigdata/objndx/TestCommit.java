@@ -47,9 +47,10 @@ Modifications:
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 import junit.framework.TestCase2;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -58,8 +59,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME This suite should verify that 
  */
 public class TestCommit extends TestCase2 {
 
@@ -93,14 +92,8 @@ public class TestCommit extends TestCase2 {
         final long rootId;
         {
 
-            BTree btree = new BTree(store,
-                    branchingFactor,
-                    new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-                            BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                            BTree.DEFAULT_HARD_REF_QUEUE_SCAN),
-                            SimpleEntry.Serializer.INSTANCE,
-                            null // no record compressor
-                            );
+            BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
+                    SimpleEntry.Serializer.INSTANCE);
 
             assertTrue(btree.root.isDirty());
 

@@ -50,6 +50,7 @@ package com.bigdata.scaleup;
 import java.io.File;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 
 import junit.framework.TestCase2;
 
@@ -140,7 +141,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        IIndex index = new UnisolatedBTree(journal);
+        IIndex index = new UnisolatedBTree(journal, UUID.randomUUID());
         
         assertNull(journal.getIndex(name));
         
@@ -204,7 +205,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID())));
         
         journal.overflow();
 
@@ -236,7 +237,8 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal, 3)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal,
+                3, UUID.randomUUID())));
 
         final TestData data = new TestData(journal.migrationThreshold-1);
         
@@ -284,7 +286,8 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal,
+                UUID.randomUUID())));
 
         final TestData data = new TestData(journal.migrationThreshold);
         
@@ -347,10 +350,13 @@ public class TestPartitionedJournal extends TestCase2 {
         
         final String name = "abc";
         
-        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal)));
+        final UUID indexUUID = UUID.randomUUID();
+        
+        assertNotNull(journal.registerIndex(name, new UnisolatedBTree(journal,
+                indexUUID)));
 
         final UnisolatedBTree groundTruth = new UnisolatedBTree(
-                new SimpleMemoryRawStore());
+                new SimpleMemoryRawStore(), indexUUID);
 
         final int ntrials = 10;
 

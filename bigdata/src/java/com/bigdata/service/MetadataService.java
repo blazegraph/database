@@ -59,6 +59,32 @@ import com.bigdata.scaleup.MetadataIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME Tag each index with a UUID. The UUID needs to appear in the index
+ * metadata record for each journal and index segment. When it is an named
+ * (scale-out) index, the UUID of the scale-out index must be used for each
+ * B+Tree metadata record having data for that index. This allows us to map
+ * backwards from the data structures to the metadata index. Document this in
+ * the UML model. (I still need to get the correct index UUID to each BTree
+ * constuctor since they are all using a Random UUID right now.)
+ * 
+ * @todo Provide a means to reconstruct the metadata index from the journal and
+ *       index segment data files. We tag each journal and index segment with a
+ *       UUID. Each index is also tagged with a UUID, and that UUID is written
+ *       into the metadata record for the index on each journal and index
+ *       segment. Based on those UUIDs we are able to work backwards from the
+ *       data on disk and identify the indices to which they belong. That
+ *       information in combination with the timestamps in the metadata records
+ *       and the first/last keys in the index partition is sufficient to
+ *       regenerate the metadata indices.
+ * 
+ * @todo A temporal/immortable database can be realized if we never delete old
+ *       journals since they contain the historical committed states of the
+ *       database. The use of index segments would still provide fast read
+ *       performance on recent data, while a suitable twist on the metadata
+ *       index would allow access to those historical states. (E.g., you have to
+ *       be able to access the historical state of the metadata index that
+ *       corresponds to the commit time of interest for the database.)
  */
 public class MetadataService implements IMetadataService, IServiceShutdown {
 
@@ -68,7 +94,7 @@ public class MetadataService implements IMetadataService, IServiceShutdown {
      * @todo support two-tier metadata index and reconcile with
      *       {@link MetadataIndex} and {@link MasterJournal}.
      */
-    protected final Journal journal;
+    protected Journal journal;
     
     public MetadataService(Properties properties) {
         
@@ -77,14 +103,10 @@ public class MetadataService implements IMetadataService, IServiceShutdown {
          * the journal.
          */
         
-        throw new UnsupportedOperationException();
-        
+        journal = new Journal(properties);
+
     }
     
-    public static void main(String[] args) {
-        
-    }
-
     public InetSocketAddress getDataService(String name,byte[] key) {
         // TODO Auto-generated method stub
         return null;

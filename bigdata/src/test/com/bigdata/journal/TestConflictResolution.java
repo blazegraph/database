@@ -47,7 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -141,7 +141,8 @@ public class TestConflictResolution extends ProxyTestCase {
              * register an index and commit the journal.
              */
             
-            journal.registerIndex(name, new UnisolatedBTree(journal));
+            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
+                    .randomUUID()));
 
             journal.commit();
 
@@ -216,7 +217,7 @@ public class TestConflictResolution extends ProxyTestCase {
              */
             
             journal.registerIndex(name, new UnisolatedBTree(journal,
-                    new SingleValueConflictResolver(k1, v1c)));
+                    UUID.randomUUID(), new SingleValueConflictResolver(k1, v1c)));
 
             journal.commit();
 

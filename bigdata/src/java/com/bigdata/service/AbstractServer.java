@@ -177,7 +177,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * The service implementation object.
      */
-    private Remote impl;
+    protected Remote impl;
     /**
      * The exported proxy for the service implementation object.
      */
@@ -636,6 +636,29 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
             server.shutdownNow();
             
+        }
+        
+    }
+
+    /**
+     * Contract is to shutdown the services and <em>destroys</em> its
+     * persistent state. This implementation calls {@link #shutdownNow()} and
+     * then deletes the {@link #serviceIdFile}.
+     * <p>
+     * Concrete subclasses SHOULD extend this method to destroy their persistent
+     * state.
+     */
+    protected void destroy() {
+
+        shutdownNow();
+        
+        log.info("Deleting: "+serviceIdFile);
+
+        if (!serviceIdFile.delete()) {
+
+            log.warn("Could not delete file: "
+                    + serviceIdFile);
+
         }
         
     }

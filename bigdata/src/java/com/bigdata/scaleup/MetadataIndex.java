@@ -43,11 +43,20 @@
  */
 package com.bigdata.scaleup;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.UUID;
+
+import org.CognitiveWeb.extser.LongPacker;
+
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
 
@@ -57,9 +66,6 @@ import com.bigdata.rawstore.IRawStore;
  * the first key that would be directed into the corresponding index segment,
  * e.g., a <em>separator key</em> (this is just the standard btree semantics).
  * The values are {@link PartitionMetadata} objects.
- * 
- * @todo locator logic on a cluster (a socket address in addition to the other
- *       information).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,22 +77,14 @@ import com.bigdata.rawstore.IRawStore;
  *       of old journals and index segments MUST be deferred until no
  *       transaction remains which can read those data. This metadata must be
  *       restart-safe so that resources are eventually deleted.
- *       
- * @todo define a UUID so that is at least possible to rename a partitioned
- *       index? the uuid would be store in the metadata record for the metadata
- *       index and in each index segment generated for that metadata index. we
- *       could also define a partition uuid. finally, each btree and index
- *       segment could have its own uuid. the index segment would also carry the
- *       uuid of the partition and the partitioned index. This would also make
- *       it possible to determine which index segments belong to which
- *       partitions of which partitioned indices and effectively reconstruct the
- *       metadata index for a partitioned index from the data on the ground.
  */
 public class MetadataIndex extends BTree {
 
     /**
      * The name of the metadata index, which is the always the same as the name
      * under which the corresponding {@link PartitionedIndexView} was registered.
+     * 
+     * @todo rename as managedIndexName (and the access method as well).
      */
     private final String name;
     
@@ -101,22 +99,63 @@ public class MetadataIndex extends BTree {
     }
     
     /**
+     * The unique identifier for the index whose data metadata is managed by
+     * this {@link MetadataIndex}.
+     * <p>
+     * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
+     * to each mutable and immutable B+Tree having data for any partition of
+     * that scale-out index. This makes it possible to work backwards from the
+     * B+Tree data structures and identify the index to which they belong. This
+     * field is that UUID. Note that the inherited {@link #getIndexUUID()}
+     * method provides the UUID of the metadata index NOT the managed index!
+     * 
+     * @see IIndex#getIndexUUID()
+     */
+    protected final UUID managedIndexUUID;
+
+    /**
+     * The unique identifier for the index whose data metadata is managed by
+     * this {@link MetadataIndex}.
+     * <p>
+     * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
+     * to each mutable and immutable B+Tree having data for any partition of
+     * that scale-out index. This makes it possible to work backwards from the
+     * B+Tree data structures and identify the index to which they belong. This
+     * field is that UUID. Note that the inherited {@link #getIndexUUID()}
+     * method provides the UUID of the metadata index NOT the managed index!
+     * 
+     * @see IIndex#getIndexUUID()
+     */
+    public UUID getManagedIndexUUID() {
+        
+        return managedIndexUUID;
+        
+    }
+    
+    /**
      * Create a new {@link MetadataIndex}.
      * 
      * @param store
      *            The backing store.
      * @param branchingFactor
      *            The branching factor.
-     * @param name
-     *            The name of the metadata index - this MUST be the name under
-     *            which the corresponding {@link PartitionedIndexView} was
-     *            registered.
+     * @param indexUUID
+     *            The unique identifier for the metadata index.
+     * @param managedIndexUUID
+     *            The unique identifier for the managed scale-out index.
+     * @param managedIndexName
+     *            The name of the managed scale out index.
      */
-    public MetadataIndex(IRawStore store, int branchingFactor, String name) {
+    public MetadataIndex(IRawStore store, int branchingFactor, UUID indexUUID,
+            UUID managedIndexUUID, String managedIndexName) {
 
-        super(store, branchingFactor, PartitionMetadata.Serializer.INSTANCE);
+        super(store, branchingFactor, indexUUID,
+                PartitionMetadata.Serializer.INSTANCE);
         
-        this.name = name;
+        this.name = managedIndexName;
+
+        //
+        this.managedIndexUUID = managedIndexUUID;
         
     }
 
@@ -124,7 +163,9 @@ public class MetadataIndex extends BTree {
         
         super(store, metadata);
         
-        name = ((MetadataIndexMetadata)metadata).name;
+        name = ((MetadataIndexMetadata)metadata).getName();
+
+        managedIndexUUID = ((MetadataIndexMetadata)metadata).getManagedIndexUUID();
         
     }
 
@@ -141,15 +182,46 @@ public class MetadataIndex extends BTree {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class MetadataIndexMetadata extends BTreeMetadata {
+    public static class MetadataIndexMetadata extends BTreeMetadata implements Externalizable {
 
         private static final long serialVersionUID = -7309267778881420043L;
+        
+        private String name;
+        private UUID managedIndexUUID;
         
         /**
          * The name of the metadata index, which is the always the same as the name
          * under which the corresponding {@link PartitionedIndexView} was registered.
          */
-        public final String name;
+        public final String getName() {
+            
+            return name;
+            
+        }
+        
+        /**
+         * The unique identifier for the index whose data metadata is managed by
+         * this {@link MetadataIndex}.
+         * <p>
+         * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
+         * to each mutable and immutable B+Tree having data for any partition of
+         * that scale-out index. This makes it possible to work backwards from the
+         * B+Tree data structures and identify the index to which they belong. This
+         * field is that UUID. Note that the inherited {@link #getIndexUUID()}
+         * method provides the UUID of the metadata index NOT the managed index!
+         */
+        public final UUID getManagedIndexUUID() {
+            
+            return managedIndexUUID;
+            
+        }
+        
+        /**
+         * De-serialization constructor.
+         */
+        public MetadataIndexMetadata() {
+            
+        }
         
         /**
          * @param mdi
@@ -158,10 +230,46 @@ public class MetadataIndex extends BTree {
 
             super(mdi);
             
-            this.name = mdi.name;
+            this.name = mdi.getName();
+            
+            this.managedIndexUUID = mdi.getManagedIndexUUID();
             
         }
 
+        private static final transient int VERSION0 = 0x0;
+        
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+            super.readExternal(in);
+            
+            final int version = (int)LongPacker.unpackLong(in);
+            
+            if (version != VERSION0) {
+
+                throw new IOException("Unknown version: version=" + version);
+                
+            }
+            
+            name = in.readUTF();
+            
+            managedIndexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+            
+        }
+        
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            LongPacker.packLong(out,VERSION0);
+
+            out.writeUTF(name);
+            
+            out.writeLong(managedIndexUUID.getMostSignificantBits());
+            
+            out.writeLong(managedIndexUUID.getLeastSignificantBits());
+            
+        }
+        
     }
     
     /**

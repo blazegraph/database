@@ -47,6 +47,7 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.lang.reflect.Constructor;
+import java.util.UUID;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ICommitter;
@@ -306,12 +307,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         
     }
 
-    public NodeSerializer getNodeSerializer() {
-
-        return nodeSer;
-
-    }
-
     /**
      * The metadata record used to load the last state of the index that was
      * written by {@link #write()}. When an index is loaded this is set to the
@@ -353,36 +348,44 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      */
     protected int nentries;
 
-//    public IAbstractNode getRoot() {
-//
-//        return root;
-//
-//    }
-
     /**
-     * Constructor for a new btree with a default hard reference queue policy
+     * Constructor for a new B+Tree with a default hard reference queue policy
      * and no record compression.
-     * 
-     * @param store
-     * @param branchingFactor
-     * @param valSer
-     */
-    public BTree(IRawStore store, int branchingFactor, IValueSerializer valSer) {
-    
-        this(store, branchingFactor, new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer, null/*recordCompressor*/);
-        
-    }
-    
-    /**
-     * Constructor for a new btree.
      * 
      * @param store
      *            The persistence store.
      * @param branchingFactor
      *            The branching factor.
+     * @param indexUUID
+     *            The unique identifier for the index. All B+Tree objects having
+     *            data for the same scale-out index MUST have the same
+     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
+     *            used.
+     * @param valueSer
+     *            Object that knows how to (de-)serialize the values in a
+     *            {@link Leaf}.
+     */
+    public BTree(IRawStore store, int branchingFactor, UUID indexUUID, IValueSerializer valSer) {
+    
+        this(store, branchingFactor, indexUUID, new HardReferenceQueue<PO>(
+                new DefaultEvictionListener(),
+                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
+                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer, null/* recordCompressor */);
+        
+    }
+    
+    /**
+     * Constructor for a new B+Tree.
+     * 
+     * @param store
+     *            The persistence store.
+     * @param branchingFactor
+     *            The branching factor.
+     * @param indexUUID
+     *            The unique identifier for the index. All B+Tree objects having
+     *            data for the same scale-out index MUST have the same
+     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
+     *            used.
      * @param headReferenceQueue
      *            The hard reference queue. The minimum capacity is 2 to avoid
      *            cache evictions of the leaves participating in a split. A
@@ -400,6 +403,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     public BTree(
             IRawStore store,
             int branchingFactor,
+            UUID indexUUID,
             HardReferenceQueue<PO> hardReferenceQueue,
             IValueSerializer valueSer,
             RecordCompressor recordCompressor )
@@ -420,7 +424,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
                  * journal architecture makes that extremely unlikely and one
                  * has never been observed.
                  */
-                !store.isFullyBuffered()/* useChecksum */
+                !store.isFullyBuffered(),/* useChecksum */
+                indexUUID
                 );
 
         /*
@@ -441,7 +446,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     }
 
     /**
-     * Constructor for an existing btree.
+     * Load an existing B+Tree from the store.
      * 
      * @param store
      *            The persistence store.
@@ -450,33 +455,34 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      * @param hardReferenceQueue
      *            The hard reference queue for {@link Leaf}s.
      * 
-     * @see BTreeMetadata#load(IRawStore, long), which will re-load a
-     *      {@link BTree} or derived class from its {@link BTreeMetadata}
-     *      record.
+     * @see #load(IRawStore, long), which will re-load a {@link BTree} or
+     *      derived class from the {@link Addr address} of its
+     *      {@link BTreeMetadata metadata} record.
      * 
      * @see #newMetadata(), which must be overriden if you subclass
      *      {@link BTreeMetadata}
      */
-    public BTree(IRawStore store, BTreeMetadata metadata,
+    protected BTree(IRawStore store, BTreeMetadata metadata,
             HardReferenceQueue<PO> hardReferenceQueue) {
 
-        super(store, metadata.branchingFactor,
+        super(store, metadata.getBranchingFactor(),
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue, 
                 PackedAddressSerializer.INSTANCE, 
-                metadata.valueSer, NodeFactory.INSTANCE,
-                metadata.recordCompressor,//
-                metadata.useChecksum // use checksum iff used on create.
+                metadata.getValueSerializer(), NodeFactory.INSTANCE,
+                metadata.getRecordCompressor(),//
+                metadata.getUseChecksum(), // use checksum iff used on create.
+                metadata.getIndexUUID()
                 );
         
         // save a reference to the immutable metadata record.
         this.metadata = metadata;
         
         // initialize mutable fields from the immutable metadata record.
-        this.height = metadata.height;
-        this.nnodes = metadata.nnodes;
-        this.nleaves = metadata.nleaves;
-        this.nentries = metadata.nentries;
+        this.height = metadata.getHeight();
+        this.nnodes = metadata.getNodeCount();
+        this.nleaves = metadata.getLeafCount();
+        this.nentries = metadata.getEntryCount();
         
         /*
          * Read the root node of the btree.
@@ -540,7 +546,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
              * reload the root node.
              */
 
-            root = readNodeOrLeaf(metadata.addrRoot);
+            root = readNodeOrLeaf(metadata.getRootAddr());
 
         }
 
@@ -649,7 +655,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
 
         if (metadata != null
                 && (root == null || !root.dirty
-                        && metadata.addrRoot == root.getIdentity())) {
+                        && metadata.getRootAddr() == root.getIdentity())) {
 
             /*
              * There have not been any writes on this btree.
@@ -726,7 +732,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         
         try {
             
-            Class cl = Class.forName(metadata.className);
+            Class cl = Class.forName(metadata.getClassName());
             
             Constructor ctor = cl.getConstructor(new Class[] {
                     IRawStore.class, BTreeMetadata.class });

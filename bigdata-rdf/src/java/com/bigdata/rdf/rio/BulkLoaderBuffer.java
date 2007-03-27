@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import com.bigdata.io.ByteBufferOutputStream;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.KeyBufferSerializer;
@@ -153,11 +154,10 @@ public class BulkLoaderBuffer extends Buffer {
         
         final long begin = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile, null, numTerms,
-                new TermIdIterator(this), branchingFactor,
-                TermIdSerializer.INSTANCE,
-                useChecksum, recordCompressor,
-                errorRate);
+        new IndexSegmentBuilder(outFile, null, numTerms, new TermIdIterator(
+                this), branchingFactor, TermIdSerializer.INSTANCE, useChecksum,
+                recordCompressor, errorRate, store.getTermIdIndex()
+                        .getIndexUUID());
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -184,12 +184,10 @@ public class BulkLoaderBuffer extends Buffer {
         
         final long begin = System.currentTimeMillis();
 
-        new IndexSegmentBuilder(outFile, null,
-                numTerms, new TermIterator(this),
-                branchingFactor,
-                RdfValueSerializer.INSTANCE,
-                useChecksum, recordCompressor,
-                errorRate);
+        new IndexSegmentBuilder(outFile, null, numTerms,
+                new TermIterator(this), branchingFactor,
+                RdfValueSerializer.INSTANCE, useChecksum, recordCompressor,
+                errorRate, store.getIdTermIndex().getIndexUUID());
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -209,12 +207,25 @@ public class BulkLoaderBuffer extends Buffer {
         
         final long begin = System.currentTimeMillis();
         
+        final IIndex ndx;
+        switch(keyOrder) {
+        case SPO:
+            ndx = store.getSPOIndex();
+            break;
+        case POS:
+            ndx = store.getPOSIndex();
+            break;
+        case OSP:
+            ndx = store.getOSPIndex();
+            break;
+        default:
+            throw new AssertionError("Unknown keyOrder=" + keyOrder);
+        }
+        
         new IndexSegmentBuilder(outFile, null, numStmts,
-                new UnknownStatementIterator(keyOrder,this),
-                branchingFactor,
-                StatementSerializer.INSTANCE,
-                useChecksum, recordCompressor,
-                errorRate);
+                new UnknownStatementIterator(keyOrder, this), branchingFactor,
+                StatementSerializer.INSTANCE, useChecksum, recordCompressor,
+                errorRate, ndx.getIndexUUID());
         
         final long elapsed = System.currentTimeMillis() - begin;
 

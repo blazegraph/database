@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.UUID;
+
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.SimpleEntry;
 import com.bigdata.scaleup.MasterJournal;
@@ -89,9 +91,12 @@ public class TestNamedIndices extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
         
-        String name = "abc";
+        final String name = "abc";
         
-        BTree btree = new BTree(journal, 3, SimpleEntry.Serializer.INSTANCE);
+        final UUID indexUUID = UUID.randomUUID();
+        
+        BTree btree = new BTree(journal, 3, indexUUID,
+                SimpleEntry.Serializer.INSTANCE);
         
         assertNull(journal.getIndex(name));
         
@@ -119,6 +124,7 @@ public class TestNamedIndices extends ProxyTestCase {
             btree = (BTree) journal.getIndex(name);
 
             assertNotNull("btree", btree);
+            assertEquals("indexUUID", indexUUID, btree.getIndexUUID() );
             assertEquals("entryCount", 1, btree.getEntryCount());
             assertEquals(v0, btree.lookup(k0));
 

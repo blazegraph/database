@@ -51,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 
@@ -277,7 +278,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
         final int nscan = 10;
         
-        BTree btree = new BTree(store, branchingFactor,
+        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan),
                 SimpleEntry.Serializer.INSTANCE,

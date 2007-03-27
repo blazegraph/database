@@ -47,6 +47,14 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.UUID;
+
+import org.CognitiveWeb.extser.LongPacker;
+
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
 import com.bigdata.objndx.BatchContains;
@@ -161,10 +169,11 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * Create an isolatable btree using a default branching factor.
      * 
      * @param store
+     * @param indexUUID
      */
-    public UnisolatedBTree(IRawStore store) {
+    public UnisolatedBTree(IRawStore store, UUID indexUUID) {
         
-        this(store, DEFAULT_BRANCHING_FACTOR, null);
+        this(store, DEFAULT_BRANCHING_FACTOR, indexUUID, null);
         
     }
 
@@ -173,11 +182,12 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * specified {@link IConflictResolver}.
      * 
      * @param store
+     * @param indexUUID
      * @param conflictResolver
      */
-    public UnisolatedBTree(IRawStore store, IConflictResolver conflictResolver) {
+    public UnisolatedBTree(IRawStore store, UUID indexUUID, IConflictResolver conflictResolver) {
         
-        this(store, DEFAULT_BRANCHING_FACTOR, conflictResolver);
+        this(store, DEFAULT_BRANCHING_FACTOR, indexUUID, conflictResolver);
         
     }
 
@@ -186,10 +196,11 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * 
      * @param store
      * @param branchingFactor
+     * @param indexUUID
      */
-    public UnisolatedBTree(IRawStore store, int branchingFactor) {
+    public UnisolatedBTree(IRawStore store, int branchingFactor, UUID indexUUID) {
         
-        this(store, branchingFactor, null);
+        this(store, branchingFactor, indexUUID, null);
         
     }
         
@@ -209,9 +220,10 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      *            capable of validating the greatest number of interleavings of
      *            transactions (aka serialization orders).
      */
-    public UnisolatedBTree(IRawStore store, int branchingFactor, IConflictResolver conflictResolver ) {
+    public UnisolatedBTree(IRawStore store, int branchingFactor,
+            UUID indexUUID, IConflictResolver conflictResolver) {
        
-        super(store, branchingFactor, Value.Serializer.INSTANCE );
+        super(store, branchingFactor, indexUUID, Value.Serializer.INSTANCE );
         
         this.conflictResolver = conflictResolver;
         
@@ -228,7 +240,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
         super(store,metadata);
         
-        this.conflictResolver = ((UnisolatedBTreeMetadata) metadata).conflictResolver;
+        this.conflictResolver = ((UnisolatedBTreeMetadata) metadata).getConflictResolver();
         
     }
 
@@ -244,11 +256,24 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class UnisolatedBTreeMetadata extends BTreeMetadata {
+    public static class UnisolatedBTreeMetadata extends BTreeMetadata implements Externalizable {
 
         private static final long serialVersionUID = -4938674944860230200L;
 
-        public final IConflictResolver conflictResolver;
+        private IConflictResolver conflictResolver;
+        
+        public IConflictResolver getConflictResolver() {
+            
+            return conflictResolver;
+            
+        }
+        
+        /**
+         * De-serialization constructor.
+         */
+        public UnisolatedBTreeMetadata() {
+            
+        }
         
         /**
          * @param btree
@@ -258,6 +283,34 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
             super(btree);
             
             this.conflictResolver = btree.conflictResolver;
+            
+        }
+
+        private static final transient int VERSION0 = 0x0;
+        
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+            super.readExternal(in);
+            
+            final int version = (int)LongPacker.unpackLong(in);
+            
+            if (version != VERSION0) {
+
+                throw new IOException("Unknown version: version=" + version);
+                
+            }
+            
+            conflictResolver = (IConflictResolver) in.readObject();
+            
+        }
+        
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            LongPacker.packLong(out,VERSION0);
+
+            out.writeObject(conflictResolver);
             
         }
 

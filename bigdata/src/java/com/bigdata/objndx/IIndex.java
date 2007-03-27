@@ -47,6 +47,8 @@
 
 package com.bigdata.objndx;
 
+import java.util.UUID;
+
 /**
  * <p>
  * Interface for mutable B+-Tree mapping arbitrary non-null keys to arbitrary
@@ -57,5 +59,15 @@ package com.bigdata.objndx;
  * @version $Id$
  */
 public interface IIndex extends ISimpleBTree, IBatchBTree {
+    
+    /**
+     * The unique identifier for the index whose data is stored in this B+Tree
+     * data structure. When using a scale-out index the same <i>indexUUID</i>
+     * MUST be assigned to each mutable and immutable B+Tree having data for any
+     * partition of that scale-out index. This makes it possible to work
+     * backwards from the B+Tree data structures and identify the index to which
+     * they belong.
+     */
+    public UUID getIndexUUID();
     
 }

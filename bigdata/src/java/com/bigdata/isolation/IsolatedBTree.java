@@ -138,7 +138,8 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      */
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
-        super(store, src.getBranchingFactor(), src.getConflictResolver());
+        super(store, src.getBranchingFactor(), src.getIndexUUID(), src
+                .getConflictResolver());
         
         this.src = src;
         
@@ -514,6 +515,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
 
                         tmp = new BTree(getStore(), // same store.
                                 getBranchingFactor(), // same branching factor
+                                src.getIndexUUID(), // same indexUUID.
                                 ByteArrayValueSerializer.INSTANCE // byte[] values.
                                 );
 

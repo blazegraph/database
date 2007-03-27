@@ -51,6 +51,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
@@ -491,7 +492,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         final int nscan = 10;
 
-        BTree btree = new BTree(store, branchingFactor,
+        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan),
                 SimpleEntry.Serializer.INSTANCE, null // no record compressor
@@ -1552,6 +1553,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assert expected != null;
         
         assert actual != null;
+        
+        assertEquals("indexUUID",expected.getIndexUUID(), actual.getIndexUUID());
         
         // The #of entries must agree.
         assertEquals("entryCount",expected.getEntryCount(), actual.getEntryCount());

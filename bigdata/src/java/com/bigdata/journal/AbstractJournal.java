@@ -1535,7 +1535,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      */
     public IIndex registerIndex(String name) {
         
-        return registerIndex( name, new UnisolatedBTree(this));
+        return registerIndex(name, new UnisolatedBTree(this, UUID.randomUUID()));
         
     }
     

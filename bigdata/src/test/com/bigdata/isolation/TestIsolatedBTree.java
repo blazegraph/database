@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import java.util.UUID;
+
 import com.bigdata.journal.TestTx;
 import com.bigdata.objndx.AbstractBTreeTestCase;
 import com.bigdata.objndx.BTreeMetadata;
@@ -123,7 +125,8 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
         IConflictResolver conflictResolver = new NoConflictResolver();
         {
             
-            UnisolatedBTree src = new UnisolatedBTree(store,branchingFactor,null);
+            UnisolatedBTree src = new UnisolatedBTree(store, branchingFactor,
+                    UUID.randomUUID(), null);
 
             IsolatedBTree btree = new IsolatedBTree(store,src);
             
@@ -145,7 +148,7 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
         {
             
             UnisolatedBTree src = new UnisolatedBTree(store, branchingFactor,
-                    conflictResolver);
+                    UUID.randomUUID(), conflictResolver);
 
             IsolatedBTree btree = new IsolatedBTree(store,src);
 
@@ -185,7 +188,7 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
          * Setup the index that will be isolated.
          */
         UnisolatedBTree src = new UnisolatedBTree(new SimpleMemoryRawStore(),
-                3, null);
+                3, UUID.randomUUID(), null);
 
         src.insert(k3, v3);
         src.insert(k3, v3a);
