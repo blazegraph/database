@@ -60,14 +60,6 @@ import com.bigdata.scaleup.MetadataIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Tag each index with a UUID. The UUID needs to appear in the index
- * metadata record for each journal and index segment. When it is an named
- * (scale-out) index, the UUID of the scale-out index must be used for each
- * B+Tree metadata record having data for that index. This allows us to map
- * backwards from the data structures to the metadata index. Document this in
- * the UML model. (I still need to get the correct index UUID to each BTree
- * constuctor since they are all using a Random UUID right now.)
- * 
  * @todo Provide a means to reconstruct the metadata index from the journal and
  *       index segment data files. We tag each journal and index segment with a
  *       UUID. Each index is also tagged with a UUID, and that UUID is written

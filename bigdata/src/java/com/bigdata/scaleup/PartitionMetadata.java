@@ -45,15 +45,20 @@ package com.bigdata.scaleup;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.util.UUID;
 
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.IndexSegment;
 
 /**
- * A description of the {@link IndexSegment}s containing the user data for
- * a partition.
- *  
+ * A description of the {@link IndexSegment}s containing the user data for a
+ * partition.
+ * 
+ * FIXME add ordered UUID[] of the data services on which the index partition
+ * has been mapped.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -266,6 +271,11 @@ public class PartitionMetadata {
     /**
      * Serialization for an index segment metadata entry.
      * 
+     * FIXME implement {@link Externalizable} and use explicit versioning.
+     * 
+     * FIXME assumes that resources are {@link IndexSegment}s rather than
+     * either index segments or journals.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -306,6 +316,10 @@ public class PartitionMetadata {
 
                     os.writeInt(segmentMetadata.state.valueOf());
 
+                    os.writeLong(segmentMetadata.uuid.getMostSignificantBits());
+                    
+                    os.writeLong(segmentMetadata.uuid.getLeastSignificantBits());
+
                 }
 
             }
@@ -335,7 +349,9 @@ public class PartitionMetadata {
                     ResourceState state = ResourceState
                             .valueOf(is.readInt());
 
-                    val.segs[j] = new SegmentMetadata(filename, nbytes, state);
+                    UUID uuid = new UUID(is.readLong()/*MSB*/,is.readLong()/*LSB*/);
+
+                    val.segs[j] = new SegmentMetadata(filename, nbytes, state, uuid);
 
                 }
 

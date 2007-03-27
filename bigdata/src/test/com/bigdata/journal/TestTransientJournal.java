@@ -138,7 +138,7 @@ public class TestTransientJournal extends AbstractTestCase {
         assertTrue("isFullyBuffered",bufferStrategy.isFullyBuffered());
         assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getExtent());
-        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+        assertEquals(Options.MAXIMUM_EXTENT, 0L/*soft limit for transient mode*/,
                 bufferStrategy.getMaximumExtent());
         assertEquals(Options.BUFFER_MODE, BufferMode.Transient, bufferStrategy
                 .getBufferMode());

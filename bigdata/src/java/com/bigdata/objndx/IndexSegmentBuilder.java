@@ -198,14 +198,23 @@ public class IndexSegmentBuilder {
     final protected RecordCompressor recordCompressor;
 
     /**
+     * The unique identifier for the generated {@link IndexSegment} resource.
+     * 
+     * @see #indexUUID
+     */
+    final public UUID segmentUUID;
+    
+    /**
      * The unique identifier for the index whose data is stored in this B+Tree
      * data structure. When using a scale-out index the same <i>indexUUID</i>
      * MUST be assigned to each mutable and immutable B+Tree having data for any
      * partition of that scale-out index. This makes it possible to work
      * backwards from the B+Tree data structures and identify the index to which
      * they belong.
+     * 
+     * @see #segmentUUID
      */
-    final protected UUID indexUUID;
+    final public UUID indexUUID;
     
     /**
      * Used to serialize the nodes and leaves of the output tree.
@@ -223,12 +232,6 @@ public class IndexSegmentBuilder {
      * The bloom filter iff we build one (errorRate != 0.0).
      */
     final BloomFilter bloomFilter;
-    
-//    /**
-//     * When non-null, a map containing extension metadata.  This is set by the
-//     * constructor.
-//     */
-//    final Map<String, Serializable> metadataMap;
     
     /**
      * The offset in the output file of the last leaf written onto that file.
@@ -469,17 +472,11 @@ public class IndexSegmentBuilder {
      * 
      * @throws IOException
      */
-//    * @param metadataMap
-//    *            An optional serializable map containing application defined
-//    *            extension metadataMap. The map will be serialized with the
-//    *            {@link IndexSegmentExtensionMetadata} object as part of the
-//    *            {@link IndexSegmentFileStore}.
     public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
             IEntryIterator entryIterator, final int m,
             IValueSerializer valueSerializer, boolean useChecksum,
             RecordCompressor recordCompressor, final double errorRate,
             final UUID indexUUID
-//          , final Map<String, Serializable> metadataMap
             )
             throws IOException {
 
@@ -493,6 +490,7 @@ public class IndexSegmentBuilder {
         
         this.useChecksum = useChecksum;
         this.recordCompressor = recordCompressor;
+        this.segmentUUID = UUID.randomUUID();
         this.indexUUID = indexUUID;
 
         final long begin = System.currentTimeMillis();
@@ -563,8 +561,6 @@ public class IndexSegmentBuilder {
 
             }
 
-//            this.metadataMap = metadataMap;
-            
             // Used to serialize the nodes and leaves for the output tree.
             nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
                     m,
@@ -1439,7 +1435,6 @@ public class IndexSegmentBuilder {
              */
             IndexSegmentExtensionMetadata extensionMetadata = new IndexSegmentExtensionMetadata(
                     cl, nodeSer.valueSerializer, nodeSer.recordCompressor);
-//                    metadataMap);
 
             final byte[] extensionMetadataBytes = SerializerUtil
                     .serialize(extensionMetadata);
@@ -1474,7 +1469,7 @@ public class IndexSegmentBuilder {
                     plan.height, useChecksum, plan.nleaves, nnodesWritten,
                     plan.nentries, maxNodeOrLeafLength, addrLeaves, addrNodes,
                     addrRoot, addrExtensionMetadata, addrBloom, errorRate, out
-                            .length(), indexUUID, now);
+                            .length(), segmentUUID, indexUUID, now);
 
             md.write(out);
             

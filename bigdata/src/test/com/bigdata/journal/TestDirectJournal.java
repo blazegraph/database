@@ -142,7 +142,7 @@ public class TestDirectJournal extends AbstractTestCase {
 //                bufferStrategy.file.toString());
         assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getInitialExtent());
-        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+        assertEquals(Options.MAXIMUM_EXTENT, 0L /*soft limit for Direct buffer*/,
                 bufferStrategy.getMaximumExtent());
         assertNotNull("raf", bufferStrategy.raf);
         assertEquals("bufferMode", BufferMode.Direct, bufferStrategy

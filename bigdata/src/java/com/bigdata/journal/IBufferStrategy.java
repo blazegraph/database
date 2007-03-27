@@ -35,8 +35,30 @@ public interface IBufferStrategy extends IRawStore, IMROW {
      */
     public BufferMode getBufferMode();
     
+    /**
+     * The initial extent.
+     */
     public long getInitialExtent();
     
+    /**
+     * The maximum extent allowable before a buffer overflow operation will be
+     * rejected.
+     * <p>
+     * Note: The semantics here differ from those defined by
+     * {@link Options#MAXIMUM_EXTENT}. The latter specifies the threshold at
+     * which a journal will overflow (onto another journal) while this specifies
+     * the maximum size to which a buffer is allowed to grow.
+     * <p>
+     * Note: This is <em>normally</em> zero (0L), which basically means that
+     * the maximum extent is ignored by the {@link IBufferStrategy} but
+     * respected by the {@link AbstractJournal}, resulting in a <i>soft limit</i>
+     * on journal overflow. The primary reason to limit the buffer size is when
+     * an in-memory buffer will be converted to a disk-based buffer -- see
+     * {@link TemporaryRawStore} for an example.
+     * 
+     * @return The maximum extent permitted for the buffer -or- <code>0L</code>
+     *         iff no limit is imposed.
+     */
     public long getMaximumExtent();
     
     /**

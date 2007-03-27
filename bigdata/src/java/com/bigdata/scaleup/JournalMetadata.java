@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.scaleup;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.bigdata.journal.Journal;
 
@@ -60,7 +61,8 @@ public class JournalMetadata implements IResourceMetadata {
 
     protected final String filename;
     protected final ResourceState state;
-    
+    protected final UUID uuid;
+
     public File getFile() {
         return new File(filename);
     }
@@ -77,6 +79,10 @@ public class JournalMetadata implements IResourceMetadata {
         return state;
     }
 
+    public UUID getUUID() {
+        return uuid;
+    }
+    
     public JournalMetadata(Journal journal, ResourceState state) {
         
         if(journal.getFile()==null) {
@@ -88,6 +94,8 @@ public class JournalMetadata implements IResourceMetadata {
         this.filename = journal.getFile().toString();
 
         this.state = state;
+        
+        this.uuid = journal.getRootBlockView().getUUID();
         
     }
     

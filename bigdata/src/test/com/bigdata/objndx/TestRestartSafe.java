@@ -57,6 +57,7 @@ import org.apache.log4j.Level;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -215,6 +216,91 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             
         }
 
+    }
+
+    /**
+     * Test verifies that classes which extend {@link BTree} are correctly
+     * restored by {@link BTree#load(com.bigdata.rawstore.IRawStore, long)}.
+     */
+    public void test_restartSafeSubclass() {
+
+        Journal journal = new Journal(getProperties());
+
+        final int m = 3;
+
+        final long addr1;
+
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v8 = new SimpleEntry(8);
+        Object[] values = new Object[] { v5, v6, v7, v8, v3, v4, v2, v1 };
+
+        {
+
+            final BTree btree = new MyBTree(journal, 3, UUID.randomUUID(),
+                    SimpleEntry.Serializer.INSTANCE);
+
+            byte[][] keys = new byte[][] { new byte[] { 5 }, new byte[] { 6 },
+                    new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
+                    new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
+
+            btree.insert(new BatchInsert(values.length, keys, values));
+
+            assertTrue(btree.dump(Level.DEBUG, System.err));
+
+            // @todo verify in more detail.
+            assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
+                    btree.entryIterator());
+
+            addr1 = btree.write();
+
+            journal.commit();
+
+        }
+
+        /*
+         * restart, re-opening the same file.
+         */
+        {
+
+            journal = reopenStore(journal);
+
+            final MyBTree btree = (MyBTree) BTree.load(journal, addr1);
+
+            assertTrue(btree.dump(Level.DEBUG, System.err));
+
+            // @todo verify in more detail.
+            assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
+                    btree.entryIterator());
+
+            journal.closeAndDelete();
+
+        }
+
+    }
+
+    public static class MyBTree extends BTree {
+
+        public MyBTree(IRawStore store, int branchingFactor, UUID indexUUID,
+                IValueSerializer valSer) {
+            
+            super(store, branchingFactor, indexUUID, valSer);
+            
+        }
+        
+        /**
+         * @param store
+         * @param metadata
+         */
+        public MyBTree(IRawStore store, BTreeMetadata metadata) {
+            super(store, metadata);
+        }
+        
     }
     
 }

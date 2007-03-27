@@ -142,7 +142,9 @@ public class TestMappedJournal extends AbstractTestCase {
 //                bufferStrategy.file.toString());
         assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getInitialExtent());
-        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+        assertEquals(
+                Options.MAXIMUM_EXTENT,
+                Options.DEFAULT_MAXIMUM_EXTENT /* hard limit for mapped mode. */,
                 bufferStrategy.getMaximumExtent());
         assertNotNull("raf", bufferStrategy.raf);
         assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy

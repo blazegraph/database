@@ -141,7 +141,7 @@ public class TestDiskJournal extends AbstractTestCase {
 //                bufferStrategy.file.toString());
         assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
                 bufferStrategy.getInitialExtent());
-        assertEquals(Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+        assertEquals(Options.MAXIMUM_EXTENT, 0L/*soft limit for disk mode*/,
                 bufferStrategy.getMaximumExtent());
         assertNotNull("raf", bufferStrategy.raf);
         assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy
