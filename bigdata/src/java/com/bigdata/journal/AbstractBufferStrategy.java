@@ -6,9 +6,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
-
 
 /**
  * Abstract base class for {@link IBufferStrategy} implementation.
@@ -18,6 +20,11 @@ import com.bigdata.rawstore.Bytes;
  */
 public abstract class AbstractBufferStrategy implements IBufferStrategy {
     
+    /**
+     * Log for btree opeations.
+     */
+    protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
+
     protected final long initialExtent;
     protected final long maximumExtent;
     
@@ -80,6 +87,10 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
     /**
      * (Re-)open a buffer.
      * 
+     * @param initialExtent -
+     *            as defined by {@link #getInitialExtent()}
+     * @param maximumExtent -
+     *            as defined by {@link #getMaximumExtent()}.
      * @param nextOffset
      *            The next offset within the buffer on which a record will be
      *            written. Note that the buffer begins _after_ the root blocks
@@ -96,7 +107,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
 
         this.initialExtent = initialExtent;
         
-        this.maximumExtent = maximumExtent;
+        this.maximumExtent = maximumExtent; // MAY be zero!
         
         this.nextOffset = nextOffset;
         
@@ -128,15 +139,19 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         if ( required > Integer.MAX_VALUE) {
             
             // Would overflow int32 bytes.
+
+            log.error("Would overflow int32 bytes.");
             
             return false;
             
         }
         
-        if( required > maximumExtent ) {
+        if( maximumExtent != 0L && required > maximumExtent ) {
             
-            // Would exceed the maximum extent.
-            
+            // Would exceed the maximum extent (iff a hard limit).
+
+            log.error("Would exceed maximumExtent="+maximumExtent);
+
             return false;
             
         }

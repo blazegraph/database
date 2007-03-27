@@ -44,9 +44,11 @@ Modifications:
 package com.bigdata.scaleup;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.IndexSegment;
+import com.bigdata.objndx.IndexSegmentMetadata;
 
 /**
  * Interface for metadata about a {@link Journal} or {@link IndexSegment}.
@@ -71,6 +73,12 @@ public interface IResourceMetadata {
      */
     public ResourceState state();
 
+    /**
+     * The unique identifier for the resource (the UUID found in either the
+     * journal root block or the {@link IndexSegmentMetadata}).
+     */
+    public UUID getUUID();
+    
 //    public int hashCode();
 //    
 //    public boolean equals(IResourceMetadata o);

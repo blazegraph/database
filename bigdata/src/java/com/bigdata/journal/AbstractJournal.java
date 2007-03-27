@@ -607,7 +607,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             }
 
             _bufferStrategy = new TransientBufferStrategy(initialExtent,
-                    maximumExtent, useDirectBuffers);
+                    0L/* soft limit for maximumExtent */, useDirectBuffers);
 
             /*
              * setup the root blocks.
@@ -648,8 +648,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
-            _bufferStrategy = new DirectBufferStrategy(maximumExtent,
-                    fileMetadata);
+            _bufferStrategy = new DirectBufferStrategy(
+                    0L/* soft limit for maximumExtent */, fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -668,7 +668,12 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
-            _bufferStrategy = new MappedBufferStrategy(maximumExtent,
+            /*
+             * Note: the maximumExtent is a hard limit in this case only since
+             * resize is not supported for mapped files.
+             */
+            _bufferStrategy = new MappedBufferStrategy(
+                    maximumExtent /* hard limit for maximum extent */,
                     fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
@@ -688,7 +693,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
 
-            _bufferStrategy = new DiskOnlyStrategy(maximumExtent, fileMetadata);
+            _bufferStrategy = new DiskOnlyStrategy(
+                    0L/* soft limit for maximumExtent */, fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 

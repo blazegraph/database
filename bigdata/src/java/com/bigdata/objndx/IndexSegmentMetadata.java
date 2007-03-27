@@ -285,7 +285,8 @@ public class IndexSegmentMetadata {
             boolean useChecksum, int nleaves, int nnodes, int nentries,
             int maxNodeOrLeafLength, long addrLeaves, long addrNodes,
             long addrRoot, long addrExtensionMetadata, long addrBloom,
-            double errorRate, long length, UUID indexUUID, long timestamp) {
+            double errorRate, long length, UUID indexUUID, UUID segmentUUID,
+            long timestamp) {
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -326,7 +327,11 @@ public class IndexSegmentMetadata {
         
         assert timestamp != 0L;
         
-        this.segmentUUID = UUID.randomUUID();
+        assert segmentUUID != null;
+        
+        assert indexUUID != null;
+        
+        this.segmentUUID = segmentUUID;
 
         this.branchingFactor = branchingFactor;
 

@@ -89,6 +89,7 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.scaleup.SlaveJournal;
 import com.ibm.icu.text.Collator;
@@ -200,7 +201,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends /*Partitioned*/Journal {
+public class TripleStore extends MasterJournal {
     
     /**
      * The logger for the {@link TripleStore} (shadows the logger for the
@@ -299,7 +300,10 @@ public class TripleStore extends /*Partitioned*/Journal {
     /**
      * Returns and creates iff necessary a scalable restart safe index for RDF
      * {@link _Statement statements}.
-     * @param name The name of the index.
+     * 
+     * @param name
+     *            The name of the index.
+     *
      * @return The index.
      * 
      * @see #name_spo

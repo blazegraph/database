@@ -918,23 +918,23 @@ public class MasterJournal implements IJournal {
 
             File outFile = getSegmentFile(name,pmd.partId,segId);
 
-            new IndexSegmentBuilder(outFile, tmpDir, oldIndex.btree
-                    .getEntryCount(), oldIndex.btree.getRoot().entryIterator(),
-                    mseg, Value.Serializer.INSTANCE, true/* useChecksum */,
+            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+                    tmpDir, oldIndex.btree.getEntryCount(), oldIndex.btree
+                            .getRoot().entryIterator(), mseg,
+                    Value.Serializer.INSTANCE, true/* useChecksum */,
                     null/* new RecordCompressor() */, 0d, oldIndex.btree
                             .getIndexUUID());
 
             /*
              * update the metadata index for this partition.
              */
-            mdi.put(separatorKey,
-                    new PartitionMetadata(0, segId + 1,
-                            new SegmentMetadata[] { new SegmentMetadata(""
-                                    + outFile, outFile.length(),
-                                    ResourceState.Live) }));
+            mdi.put(separatorKey, new PartitionMetadata(0, segId + 1,
+                    new SegmentMetadata[] { new SegmentMetadata("" + outFile,
+                            outFile.length(), ResourceState.Live,
+                            builder.segmentUUID) }));
 
-//            /*
-//             * open and verify the index segment against the btree data.
+// /*
+// * open and verify the index segment against the btree data.
 //             */
 //            seg = new IndexSegment(new IndexSegmentFileStore(outFile01), btree
 //                    .getNodeSerializer().getValueSerializer());
@@ -962,11 +962,12 @@ public class MasterJournal implements IJournal {
                     oldIndex.btree, seg).merge();
 
             // build the merged index segment.
-            new IndexSegmentBuilder(outFile, null, mergeItr.nentries,
-                    new MergedEntryIterator(mergeItr), mseg, oldIndex.btree
-                            .getNodeSerializer().getValueSerializer(),
-                    false/* useChecksum */, null/* recordCompressor */,
-                    0d/* errorRate */, oldIndex.btree.getIndexUUID());
+            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+                    null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
+                    mseg, oldIndex.btree.getNodeSerializer()
+                            .getValueSerializer(), false/* useChecksum */,
+                    null/* recordCompressor */, 0d/* errorRate */,
+                    oldIndex.btree.getIndexUUID());
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but
@@ -1000,10 +1001,10 @@ public class MasterJournal implements IJournal {
             final SegmentMetadata oldSeg = pmd.segs[pmd.segs.length-1];
             
             newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
-                    ResourceState.Dead);
+                    ResourceState.Dead, oldSeg.uuid);
 
-            newSegs[1] = new SegmentMetadata(outFile.toString(), outFile.length(),
-                    ResourceState.Live);
+            newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
+                    .length(), ResourceState.Live, builder.segmentUUID);
 
             mdi.put(separatorKey, new PartitionMetadata(0, segId + 1, newSegs));
 

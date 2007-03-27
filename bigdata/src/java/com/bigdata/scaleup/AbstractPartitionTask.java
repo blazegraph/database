@@ -256,14 +256,14 @@ abstract public class AbstractPartitionTask implements
             
             File outFile = master.getSegmentFile(name, partId, segId);
 
-            new IndexSegmentBuilder(outFile, master.tmpDir, src.rangeCount(
-                    fromKey, toKey), src.rangeIterator(fromKey, toKey),
-                    branchingFactor, valSer, useChecksum, recordCompressor,
-                    errorRate, indexUUID);
+            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+                    master.tmpDir, src.rangeCount(fromKey, toKey), src
+                            .rangeIterator(fromKey, toKey), branchingFactor,
+                    valSer, useChecksum, recordCompressor, errorRate, indexUUID);
 
             IResourceMetadata[] resources = new SegmentMetadata[] { new SegmentMetadata(
-                    "" + outFile, outFile.length(),
-                    ResourceState.New) };
+                    "" + outFile, outFile.length(), ResourceState.New,
+                    builder.segmentUUID) };
 
             updatePartition(resources);
             
@@ -344,9 +344,10 @@ abstract public class AbstractPartitionTask implements
                     tmpFileBranchingFactor, srcs).merge();
 
             // build the merged index segment.
-            new IndexSegmentBuilder(outFile, null, mergeItr.nentries,
-                    new MergedEntryIterator(mergeItr), branchingFactor, valSer,
-                    useChecksum, recordCompressor, errorRate, indexUUID);
+            IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+                    null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
+                    branchingFactor, valSer, useChecksum, recordCompressor,
+                    errorRate, indexUUID);
 
             // close the merged leaf iterator (and release its buffer/file).
             // @todo this should be automatic when the iterator is exhausted but
@@ -387,10 +388,10 @@ abstract public class AbstractPartitionTask implements
             final SegmentMetadata oldSeg = pmd.segs[pmd.segs.length-1];
             
             newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
-                    ResourceState.Dead);
+                    ResourceState.Dead, oldSeg.uuid);
 
-            newSegs[1] = new SegmentMetadata(outFile.toString(), outFile.length(),
-                    ResourceState.Live);
+            newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
+                    .length(), ResourceState.Live, builder.segmentUUID);
             
             mdi.put(fromKey, new PartitionMetadata(0, segId + 1, newSegs));
             

@@ -105,7 +105,7 @@ public enum ForceEnum {
         if( s.equals(No.name)) return No;
         if( s.equals(Force.name)) return Force;
         if( s.equals(ForceMetadata.name)) return ForceMetadata;
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException("Unknown value: "+s);
     }
 
     /**

@@ -165,16 +165,23 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         assertEquals(part1,md.get(key0));
         
-        PartitionMetadata part2 = new PartitionMetadata(partId0,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
+        final UUID segmentUUID_a = UUID.randomUUID();
+        final UUID segmentUUID_b = UUID.randomUUID();
+        
+        PartitionMetadata part2 = new PartitionMetadata(partId0, 1,
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,
+                        ResourceState.Live, segmentUUID_a) });
 
         assertEquals(part1,md.put(key0, part2));
 
         assertEquals(part2,md.get(key0));
         
-        PartitionMetadata part3 = new PartitionMetadata(partId0,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
-                        new SegmentMetadata("b", 20L,ResourceState.Live) });
+        PartitionMetadata part3 = new PartitionMetadata(partId0, 2,
+                new SegmentMetadata[] {
+                        new SegmentMetadata("a", 10L, ResourceState.Live,
+                                segmentUUID_a),
+                        new SegmentMetadata("b", 20L, ResourceState.Live,
+                                segmentUUID_b) });
 
         assertEquals(part2,md.put(key0, part3));
 
@@ -247,16 +254,19 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         assertEquals(null,md.put(key0, part0));
         assertEquals(part0,md.get(key0));
         
+        final UUID segmentUUID_a = UUID.randomUUID();
+        final UUID segmentUUID_b = UUID.randomUUID();
+        
         final int partId1 = 1;
         PartitionMetadata part1 = new PartitionMetadata(partId1,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
         PartitionMetadata part2 = new PartitionMetadata(partId2,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
-                        new SegmentMetadata("b", 20L,ResourceState.Live) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a),
+                        new SegmentMetadata("b", 20L,ResourceState.Live, segmentUUID_b) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2, md.get(key2));
 
@@ -339,17 +349,20 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         PartitionMetadata part0 = new PartitionMetadata(partId0);
         assertEquals(null,md.put(key0, part0));
         assertEquals(part0,md.get(key0));
+
+        final UUID segmentUUID_a = UUID.randomUUID();
+        final UUID segmentUUID_b = UUID.randomUUID();
         
         final int partId1 = 1;
         PartitionMetadata part1 = new PartitionMetadata(partId1,1,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
         PartitionMetadata part2 = new PartitionMetadata(partId2,2,
-                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live),
-                        new SegmentMetadata("b", 20L,ResourceState.Live) });
+                new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a),
+                        new SegmentMetadata("b", 20L,ResourceState.Live, segmentUUID_b) });
         assertEquals(null, md.put(key2, part2));
         assertEquals(part2,md.get(key2));
 
@@ -464,14 +477,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         assertTrue(!outFile.exists() || outFile.delete());
         
-        new IndexSegmentBuilder(outFile,null,btree,100,0d);
+        IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,null,btree,100,0d);
 
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,1,
+        md.put(new byte[] {}, new PartitionMetadata(0, 1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile,
-                        outFile.length(),ResourceState.Live) }));
+                        outFile.length(), ResourceState.Live,
+                        builder.segmentUUID) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -573,14 +587,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         assertTrue(!outFile01.exists() || outFile01.delete());
         
-        new IndexSegmentBuilder(outFile01,null,btree,100,0d);
+        IndexSegmentBuilder builder1 = new IndexSegmentBuilder(outFile01,null,btree,100,0d);
 
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,2,
+        md.put(new byte[] {}, new PartitionMetadata(0, 2,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),ResourceState.Live) }));
+                        outFile01.length(), ResourceState.Live,
+                        builder1.segmentUUID) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -622,11 +637,11 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         MergedLeafIterator mergeItr = new IndexSegmentMerger(100, btree, seg01)
                 .merge();
         
-        new IndexSegmentBuilder(outFile02, null, mergeItr.nentries,
-                new MergedEntryIterator(mergeItr), 100, btree
-                        .getNodeSerializer().getValueSerializer(),
-                false/* useChecksum */, null/* recordCompressor */, 0d/* errorRate */,
-                btree.getIndexUUID());
+        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile02, null,
+                mergeItr.nentries, new MergedEntryIterator(mergeItr), 100,
+                btree.getNodeSerializer().getValueSerializer(),
+                false/* useChecksum */, null/* recordCompressor */,
+                0d/* errorRate */, btree.getIndexUUID());
 
         /*
          * update the metadata index for this partition.
@@ -634,9 +649,12 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * Note: We mark index segment 01 as "Dead" for this partition since it
          * has been replaced by the merged result (index segment 02).
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 3, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),ResourceState.Dead),
-                new SegmentMetadata("" + outFile02, outFile02.length(),ResourceState.Live) }));
+        md.put(new byte[] {}, new PartitionMetadata(0, 3,
+                new SegmentMetadata[] {
+                        new SegmentMetadata("" + outFile01, outFile01.length(),
+                                ResourceState.Dead, builder1.segmentUUID),
+                        new SegmentMetadata("" + outFile02, outFile02.length(),
+                                ResourceState.Live, builder2.segmentUUID) }));
 
         /*
          * open and verify the merged index segment against the total expected
@@ -845,16 +863,15 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 assertTrue(!outFile01.exists() || outFile01.delete());
 
-                new IndexSegmentBuilder(outFile01, null, testData, mseg, 0d);
+                IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile01, null, testData, mseg, 0d);
 
                 /*
                  * update the metadata index for this partition.
                  */
-                md.put(new byte[] {},
-                        new PartitionMetadata(0,2,
-                                new SegmentMetadata[] { new SegmentMetadata(""
-                                        + outFile01, outFile01.length(),
-                                        ResourceState.Live) }));
+                md.put(new byte[] {}, new PartitionMetadata(0, 2,
+                        new SegmentMetadata[] { new SegmentMetadata(""
+                                + outFile01, outFile01.length(),
+                                ResourceState.Live, builder.segmentUUID) }));
 
                 /*
                  * open and verify the index segment against the btree data.
@@ -919,7 +936,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                         new PartitionMetadata(0, nextSegId++,
                         new SegmentMetadata[] {
                                 new SegmentMetadata("" + outFile02, outFile02
-                                        .length(), ResourceState.Live) }));
+                                        .length(), ResourceState.Live, builder.segmentUUID) }));
 
                 /*
                  * open and verify the merged index segment against the total
@@ -1049,14 +1066,14 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         assertTrue(!outFile01.exists() || outFile01.delete());
         
-        new IndexSegmentBuilder(outFile01,null,btree,100,0d);
+        IndexSegmentBuilder builder1 = new IndexSegmentBuilder(outFile01,null,btree,100,0d);
 
         /*
          * update the metadata index for this partition.
          */
         md.put(new byte[] {}, new PartitionMetadata(0,1,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
-                        outFile01.length(),ResourceState.Live) }));
+                        outFile01.length(),ResourceState.Live, builder1.segmentUUID) }));
 
         /*
          * open and verify the index segment against the btree data.
@@ -1093,14 +1110,17 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         assertTrue(!outFile02.exists() || outFile02.delete());
 
-        new IndexSegmentBuilder(outFile02, null, btree, 100, 0d);
+        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile02, null, btree, 100, 0d);
 
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 1, new SegmentMetadata[] {
-                new SegmentMetadata("" + outFile01, outFile01.length(),ResourceState.Live),
-                new SegmentMetadata("" + outFile02, outFile02.length(),ResourceState.Live) }));
+        md.put(new byte[] {}, new PartitionMetadata(0, 1,
+                new SegmentMetadata[] {
+                        new SegmentMetadata("" + outFile01, outFile01.length(),
+                                ResourceState.Live, builder1.segmentUUID),
+                        new SegmentMetadata("" + outFile02, outFile02.length(),
+                                ResourceState.Live, builder2.segmentUUID) }));
 
         /*
          * open and verify the index segment against the btree data.

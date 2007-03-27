@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.scaleup;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.bigdata.objndx.IndexSegment;
 
@@ -70,13 +71,17 @@ public class SegmentMetadata implements IResourceMetadata {
      */
     final public ResourceState state;
     
-    public SegmentMetadata(String filename,long nbytes,ResourceState state) {
+    final public UUID uuid;
+    
+    public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
         this.filename = filename;
         
         this.nbytes = nbytes;
         
         this.state = state;
+        
+        this.uuid = uuid;
         
     }
 
@@ -87,7 +92,9 @@ public class SegmentMetadata implements IResourceMetadata {
         
         SegmentMetadata o2 = (SegmentMetadata)o;
         
-        if(filename.equals(o2.filename) && nbytes==o2.nbytes && state == o2.state) return true;
+        if (filename.equals(o2.filename) && nbytes == o2.nbytes
+                && state == o2.state && uuid.equals(o2.uuid))
+            return true;
         
         return false;
         
@@ -103,6 +110,10 @@ public class SegmentMetadata implements IResourceMetadata {
 
     public ResourceState state() {
         return state;
+    }
+
+    public UUID getUUID() {
+        return uuid;
     }
     
 }
