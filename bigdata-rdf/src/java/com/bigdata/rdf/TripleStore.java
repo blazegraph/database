@@ -201,7 +201,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TripleStore extends MasterJournal {
+public class TripleStore extends /*Master*/Journal {
     
     /**
      * The logger for the {@link TripleStore} (shadows the logger for the
@@ -1065,10 +1065,34 @@ public class TripleStore extends MasterJournal {
         
     }
 
-    public void overflow() {
+//    /**
+//     * FIXME The logic here should be triggered IFF the journal actually
+//     * overflows (that is, iff a new journal is opened and the old journal
+//     * becomes read-only).
+//     * <p>
+//     */
+//    public boolean overflow() {
+//
+//        // invoke the base behavior on the super class.
+//        boolean ret = super.overflow();
+//        
+//        return ret;
+//        
+//    }
 
-        System.err.println("*** Overflow *** ");
-
+    /**
+     * @todo The commit is required to make the new counter restart safe by
+     *       placing an address for it into its root slot.
+     *       <p>
+     *       rather than having multiple commits during overflow, we should
+     *       create a method to which control is handed before and after the
+     *       overflow event processing in the base class which provides the
+     *       opportunity for such maintenance events. we could then just setup
+     *       the new counter and let the overflow handle the commit.
+     * 
+     */
+    protected Object willOverflow() {
+        
         // the current state.
         final long counter = getCounter().getCounter();
         
@@ -1079,9 +1103,14 @@ public class TripleStore extends MasterJournal {
         ndx_pos = null;
         ndx_osp = null;
         this.counter = null;
+
+        return counter;
+
+    }
+
+    protected void didOverflow(Object state) {
         
-        // invoke the base behavior on the super class.
-        super.overflow();
+        final long counter = (Long)state;
         
         // create a new counter that will be persisted on the new slave journal.
         this.counter = new AutoIncCounter(this,counter);
@@ -1089,15 +1118,6 @@ public class TripleStore extends MasterJournal {
         // setup the counter as a committer on the new slave journal.
         setCommitter( ROOT_COUNTER, this.counter );
         
-        /*
-         * @todo this commit is required to make the new counter restart safe by
-         * placing an address for it into its root slot. rather than having
-         * multiple commits during overflow, we should create a method to which
-         * control is handed before and after the overflow event processing in
-         * the base class which provides the opportunity for such maintenance
-         * events. we could then just setup the new counter and let the overflow
-         * handle the commit.
-         */
         commit();
         
     }

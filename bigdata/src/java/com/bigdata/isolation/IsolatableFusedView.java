@@ -48,15 +48,41 @@ Modifications:
 package com.bigdata.isolation;
 
 import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.objndx.IBatchBTree;
+import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.ReadOnlyFusedView;
+import com.bigdata.scaleup.PartitionedIndexView;
 
 /**
- * An {@link IFusedView} that understands how to process delete markers.
+ * An read-only {@link IFusedView} that supports transactions and deletion
+ * markers.
+ * <p>
+ * Processing deletion markers requires that the source(s) for an index
+ * partition view are read in order from the most recent to the earliest
+ * historical resource. The first entry for the key in any source is the value
+ * that will be reported on a read. If the entry is deleted, then the read will
+ * report that no entry exists for that key.
+ * <p>
+ * Note that deletion markers can exist in both historical journals and index
+ * segments having data for the view. Deletion markers are expunged from index
+ * segments only by a full compacting merge of all index segments having life
+ * data for the partition.
+ * <p>
+ * Implementation note: the {@link IBatchBTree} operations are inherited from
+ * the base class. Only non-batch read operations are overriden by this class.
+ * 
+ * FIXME implement; support processing of delete markers (including handling of
+ * the merge rule) - basically they have to be processed on read so that a
+ * delete on the mutable btree overrides an historical value, and a deletion
+ * marker in a more recent index segment overrides a deletion marker in an
+ * earlier index segment. Deletion markers can exist in the both mutable btree
+ * and in index segments that are not either a clean first eviction or a full
+ * compacting merge (e.g., they can still exist in a compacting merge if there
+ * are other index segments or btrees that are part of a partition but are not
+ * partitipating in the compacting merge).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo refactor to isolate and override the merge rule.
  */
 public class IsolatableFusedView extends ReadOnlyFusedView implements IIsolatableIndex {
 
@@ -73,6 +99,30 @@ public class IsolatableFusedView extends ReadOnlyFusedView implements IIsolatabl
      */
     public IsolatableFusedView(AbstractBTree[] srcs) {
         super(srcs);
+    }
+
+    public boolean contains(byte[] key) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    public Object lookup(Object key) {
+        
+        throw new UnsupportedOperationException();
+
+    }
+
+    public int rangeCount(byte[] fromKey, byte[] toKey) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        
+        throw new UnsupportedOperationException();
+        
     }
 
 }

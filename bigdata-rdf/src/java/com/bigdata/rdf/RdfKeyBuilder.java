@@ -176,6 +176,7 @@ public class RdfKeyBuilder {
     public byte[] plainLiteral2key(String text) {
         
         keyBuilder.reset().append(CODE_LIT);
+        
         return appendString(text).getKey();
         
     }
@@ -185,7 +186,9 @@ public class RdfKeyBuilder {
         assert languageCode.length() == 2;
         
         keyBuilder.reset().append(CODE_LCL);
+        
         appendString(languageCode).appendNul();
+        
         return appendString(text).getKey();
         
     }
@@ -208,6 +211,7 @@ public class RdfKeyBuilder {
     public byte[] datatypeLiteral2key(String datatype, String value) {
         
         keyBuilder.reset().append(CODE_DTL);
+
         appendString(datatype).appendNul();
 
         if(datatype.equals(XmlSchema.INT) || datatype.equals(XmlSchema.INTEGER)) {
@@ -240,12 +244,20 @@ public class RdfKeyBuilder {
         
     }
 
+    /**
+     * The key corresponding to the start of the literals section of the
+     * terms index.
+     */
     public byte[] litStartKey() {
         
         return keyBuilder.reset().append(CODE_LIT).getKey();
         
     }
 
+    /**
+     * The key corresponding to the first key after the literals section of the
+     * terms index.
+     */
     public byte[] litEndKey() {
         
         return keyBuilder.reset().append(CODE_BND).getKey();

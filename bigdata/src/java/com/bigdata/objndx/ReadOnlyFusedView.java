@@ -54,14 +54,16 @@ import java.util.UUID;
 /**
  * <p>
  * A fused view providing read-only operations on multiple B+-Trees mapping
- * variable length unsigned byte[] keys to arbitrary values.
+ * variable length unsigned byte[] keys to arbitrary values. This class does NOT
+ * handle version counters or deletion markers.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo support N sources for a {@link ReadOnlyFusedView} by chaining together multiple
- *       {@link ReadOnlyFusedView} instances if not in a more efficient manner.
+ * @todo support N sources for a {@link ReadOnlyFusedView} by chaining together
+ *       multiple {@link ReadOnlyFusedView} instances if not in a more efficient
+ *       manner.
  */
 public class ReadOnlyFusedView implements IIndex, IFusedView {
 

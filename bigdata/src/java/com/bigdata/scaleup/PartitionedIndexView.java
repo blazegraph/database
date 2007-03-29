@@ -178,11 +178,11 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         
         int n = 0;
         
-        for(int i=0; i<pmd.segs.length; i++) {
+        for(int i=0; i<pmd.resources.length; i++) {
             
-            if(pmd.segs[i].state != ResourceState.Live) continue;
+            if(pmd.resources[i].state() != ResourceState.Live) continue;
             
-            segs[n++] = (IndexSegment) master.getIndex(getName(), pmd.segs[i]);
+            segs[n++] = (IndexSegment) master.getIndex(getName(), pmd.resources[i]);
             
         }
         
@@ -311,9 +311,9 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
         for (int i = 0; i < resources.length; i++) {
 
-            SegmentMetadata seg = pmd.segs[i];
+            IResourceMetadata seg = pmd.resources[i];
 
-            if (seg.state != ResourceState.Live)
+            if (seg.state() != ResourceState.Live)
                 continue;
 
             resources[n++] = seg;

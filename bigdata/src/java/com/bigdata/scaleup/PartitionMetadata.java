@@ -49,6 +49,8 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.Journal;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.IndexSegment;
 
@@ -56,35 +58,45 @@ import com.bigdata.objndx.IndexSegment;
  * A description of the {@link IndexSegment}s containing the user data for a
  * partition.
  * 
- * FIXME add ordered UUID[] of the data services on which the index partition
- * has been mapped.
+ * @todo provide a persistent event log or just integrate the state changes over
+ *       the historical states of the partition description in the metadata
+ *       index?
+ * 
+ * @todo aggregate resource load statistics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionMetadata {
+public class PartitionMetadata /*implements Externalizable*/ {
 
     /**
      * The unique partition identifier.
      */
-    final int partId;
+    final protected int partId;
+
+    /**
+     * The ordered list of data services on which data for this partition will
+     * be written and from which data for this partition may be read.
+     */
+    final protected UUID[] dataServices;
     
     /**
-     * The next unique within partition segment identifier to be assigned.
+     * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
+     * holding live data for this partition. The entries in the array reflect
+     * the creation time of the index segments. The earliest segment is listed
+     * first. The most recently created segment is listed last. Only the
+     * {@link ResourceState#Live} resources must be read in order to provide a
+     * consistent view of the data for the index partition.
+     * {@link ResourceState#Dead} resources will eventually be scheduled for
+     * restart-safe deletion.
+     * 
+     * @see ResourceState
      */
-    final int nextSegId;
+    final protected IResourceMetadata[] resources;
 
-    /**
-     * Zero or more files containing {@link IndexSegment}s holding live
-     * data for this partition. The entries in the array reflect the
-     * creation time of the index segments. The earliest segment is listed
-     * first. The most recently created segment is listed last.
-     */
-    final SegmentMetadata[] segs;
+    public PartitionMetadata(int partId, UUID[] dataServices ) {
 
-    public PartitionMetadata(int partId) {
-
-        this(partId, 0, new SegmentMetadata[] {});
+        this(partId, dataServices, new IResourceMetadata[] {});
 
     }
 
@@ -93,20 +105,58 @@ public class PartitionMetadata {
      * @param partId
      *            The unique partition identifier assigned by the
      *            {@link MetadataIndex}.
-     * @param segs
-     *            A description of each {@link IndexSegment} associated with
-     *            that partition.
+     * @param dataServices
+     *            The ordered array of data service identifiers on which data
+     *            for this partition will be written and from which data for
+     *            this partition may be read.
+     * @param resources
+     *            A description of each {@link Journal} or {@link IndexSegment}
+     *            resource associated with that partition.
      */
-    public PartitionMetadata(int partId, int nextSegId, SegmentMetadata[] segs) {
+    public PartitionMetadata(int partId, UUID[] dataServices,
+            IResourceMetadata[] resources) {
 
-        this.partId = partId;
+        if (dataServices == null)
+            throw new IllegalArgumentException();
 
-        this.nextSegId = nextSegId;
+        if (resources == null)
+            throw new IllegalArgumentException();
         
-        this.segs = segs;
+        this.partId = partId;
+        
+        this.dataServices = dataServices;
+        
+        this.resources = resources;
 
     }
 
+    /**
+     * The #of data services on which the data for this partition will be
+     * written and from which they may be read.
+     * 
+     * @return The replication count for the index partition.
+     */
+    public int getDataServiceCount() {
+        
+        return dataServices.length;
+        
+    }
+    
+    /**
+     * The ordered list of data services on which the data for this partition
+     * will be written and from which the data for this partition may be read.
+     * The first data service is always the primary. Writes SHOULD be pipelined
+     * from the primary to the secondaries in the same order as they appear in
+     * this array.
+     * 
+     * @return A copy of the array of data service identifiers.
+     */
+    public UUID[] getDataServices() {
+        
+        return dataServices.clone();
+        
+    }
+    
     /**
      * The #of live index segments (those having data that must be included
      * to construct a fused view representing the current state of the
@@ -118,9 +168,9 @@ public class PartitionMetadata {
 
         int count = 0;
 
-        for (int i = 0; i < segs.length; i++) {
+        for (int i = 0; i < resources.length; i++) {
 
-            if (segs[i].state == ResourceState.Live)
+            if (resources[i].state() == ResourceState.Live)
                 count++;
 
         }
@@ -140,11 +190,11 @@ public class PartitionMetadata {
 
         int k = 0;
         
-        for (int i = 0; i < segs.length; i++) {
+        for (int i = 0; i < resources.length; i++) {
 
-            if (segs[i].state == ResourceState.Live) {
+            if (resources[i].state() == ResourceState.Live) {
 
-                files[k++] = segs[i].filename;
+                files[k++] = resources[i].getFile();
                 
             }
 
@@ -165,12 +215,22 @@ public class PartitionMetadata {
         if (partId != o2.partId)
             return false;
 
-        if (segs.length != o2.segs.length)
+        if (dataServices.length != o2.dataServices.length)
             return false;
 
-        for (int i = 0; i < segs.length; i++) {
+        if (resources.length != o2.resources.length)
+            return false;
 
-            if (!segs[i].equals(o2.segs[i]))
+        for (int i = 0; i < dataServices.length; i++) {
+
+            if (!dataServices[i].equals(o2.dataServices[i]))
+                return false;
+
+        }
+        
+        for (int i = 0; i < resources.length; i++) {
+
+            if (!resources[i].equals(o2.resources[i]))
                 return false;
 
         }
@@ -185,96 +245,12 @@ public class PartitionMetadata {
 
     }
 
-    //        /**
-    //         * The metadata about an index segment life cycle as served by a
-    //         * specific service instance on some host.
-    //         * 
-    //         * @todo we need to track load information for the service and the host.
-    //         *       however that information probably does not need to be restart
-    //         *       safe so it is easily maintained within a rather small hashmap
-    //         *       indexed by the service address.
-    //         * 
-    //         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-    //         *         Thompson</a>
-    //         * @version $Id$
-    //         */
-    //        public static class IndexSegmentServiceMetadata {
-    //
-    //            /**
-    //             * The service that is handling this index segment. This service
-    //             * typically handles many index segments and multiplexes them on a
-    //             * single journal.
-    //             * 
-    //             * @todo When a client looks up an index segment in the metadata index,
-    //             *       what we send them is the set of key-addr entries from the leaf
-    //             *       in which the index segment was found. If a request by the
-    //             *       client to that service discovers that the service no longer
-    //             *       handles a key range, that the service is dead, etc., then the
-    //             *       client will have to invalidate its cache entry and lookup the
-    //             *       current location of the index segment in the metadata index.
-    //             */
-    //            public InetSocketAddress addr;
-    //            
-    //        }
-    //
-    //        /**
-    //         * An array of the services that are registered as handling this index
-    //         * segment. One of these services is the master and accepts writes from
-    //         * the client. The other services mirror the segment and provide
-    //         * redundency for failover and load balancing. The order in which the
-    //         * segments are listed in this array could reflect the master (at
-    //         * position zero) and the write pipeline from the master to the
-    //         * secondaries could be simply the order of the entries in the array.
-    //         */
-    //        public IndexSegmentServiceMetadata services[];
-    //        
-    //        /**
-    //         * The time that the index segment was started on that service.
-    //         */
-    //        public long startTime;
-    //
-    //        /**
-    //         * A log of events for the index segment. This could just be a linked
-    //         * list of strings that get serialized as a single string. Each event is
-    //         * then a semi-structured string, typically generated by a purpose
-    //         * specific logging appender.
-    //         */
-    //        public Vector<Event> eventLog;
-    //        
-    //        public PartitionMetadata(InetSocketAddress addr) {
-    //        }
-    //
-    //        /**
-    //         * An event for an index segment.
-    //         * 
-    //         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-    //         * @version $Id$
-    //         */
-    //        public static class Event {
-    //        
-    ////            public long timestamp;
-    //            
-    //            public String msg;
-    //            
-    //            /**
-    //             * Serialization for an event.
-    //             * 
-    //             * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-    //             * @version $Id$
-    //             */
-    //            public static class Serializer /*implements ...*/{
-    //                
-    //            }
-    //            
-    //        }
-
     /**
      * Serialization for an index segment metadata entry.
      * 
-     * FIXME implement {@link Externalizable} and use explicit versioning.
-     * 
-     * FIXME assumes that resources are {@link IndexSegment}s rather than
-     * either index segments or journals.
+     * FIXME convert to use {@link UnisolatedBTree} (so byte[] values that we
+     * (de-)serialize one a one-by-one basis ourselves), implement
+     * {@link Externalizable} and use explicit versioning and packed integers.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -288,37 +264,55 @@ public class PartitionMetadata {
 
         public transient static final PartitionMetadata.Serializer INSTANCE = new Serializer();
 
+//        private static final transient int VERSION0 = 0x0;
+        
         public Serializer() {
         }
 
         public void putValues(DataOutputStream os, Object[] values, int nvals)
                 throws IOException {
-
+            
             for (int i = 0; i < nvals; i++) {
 
                 PartitionMetadata val = (PartitionMetadata) values[i];
 
-                final int nsegs = val.segs.length;
-
+                final int nservices = val.dataServices.length;
+                
+                final int nresources = val.resources.length;
+                
                 os.writeInt(val.partId);
+                
+                os.writeInt(nservices);
 
-                os.writeInt(val.nextSegId);
+                os.writeInt(nresources);
 
-                os.writeInt(nsegs);
-
-                for (int j = 0; j < nsegs; j++) {
-
-                    SegmentMetadata segmentMetadata = val.segs[j];
-
-                    os.writeUTF(segmentMetadata.filename);
-
-                    os.writeLong(segmentMetadata.nbytes);
-
-                    os.writeInt(segmentMetadata.state.valueOf());
-
-                    os.writeLong(segmentMetadata.uuid.getMostSignificantBits());
+                for( int j=0; j<nservices; j++) {
                     
-                    os.writeLong(segmentMetadata.uuid.getLeastSignificantBits());
+                    final UUID serviceUUID = val.dataServices[j];
+                    
+                    os.writeLong(serviceUUID.getMostSignificantBits());
+                    
+                    os.writeLong(serviceUUID.getLeastSignificantBits());
+                    
+                }
+                
+                for (int j = 0; j < nresources; j++) {
+
+                    IResourceMetadata rmd = val.resources[j];
+
+                    os.writeBoolean(rmd.isIndexSegment());
+                    
+                    os.writeUTF(rmd.getFile());
+
+                    os.writeLong(rmd.size());
+
+                    os.writeInt(rmd.state().valueOf());
+
+                    final UUID resourceUUID = rmd.getUUID();
+                    
+                    os.writeLong(resourceUUID.getMostSignificantBits());
+                    
+                    os.writeLong(resourceUUID.getLeastSignificantBits());
 
                 }
 
@@ -333,29 +327,39 @@ public class PartitionMetadata {
 
                 final int partId = is.readInt();
 
-                final int nextSegId = is.readInt();
-
-                final int nsegs = is.readInt();
+                final int nservices = is.readInt();
                 
-                PartitionMetadata val = new PartitionMetadata(partId,
-                        nextSegId, new SegmentMetadata[nsegs]);
+                final int nresources = is.readInt();
+                
+                final UUID[] services = new UUID[nservices];
+                
+                final IResourceMetadata[] resources = new IResourceMetadata[nresources];
 
-                for (int j = 0; j < nsegs; j++) {
+                for (int j = 0; j < nservices; j++) {
 
+                    services[j] = new UUID(is.readLong()/*MSB*/,is.readLong()/*LSB*/);
+                    
+                }
+                
+                for (int j = 0; j < nresources; j++) {
+
+                    boolean isIndexSegment = is.readBoolean();
+                    
                     String filename = is.readUTF();
 
                     long nbytes = is.readLong();
 
-                    ResourceState state = ResourceState
-                            .valueOf(is.readInt());
+                    ResourceState state = ResourceState.valueOf(is.readInt());
 
                     UUID uuid = new UUID(is.readLong()/*MSB*/,is.readLong()/*LSB*/);
 
-                    val.segs[j] = new SegmentMetadata(filename, nbytes, state, uuid);
+                    resources[j] = (isIndexSegment ? new SegmentMetadata(
+                            filename, nbytes, state, uuid)
+                            : new JournalMetadata(filename, nbytes, state, uuid));
 
                 }
 
-                values[i] = val;
+                values[i] = new PartitionMetadata(partId, services, resources);
 
             }
 

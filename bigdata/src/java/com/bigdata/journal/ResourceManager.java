@@ -217,7 +217,7 @@ public class ResourceManager {
      * @todo the index name is not being reported since it is not part of the
      *       extension metadata record at this time. this means that we can not
      *       aggregate events for index segments for a given named index at this
-     *       time.
+     *       time (actually, we can aggregate them by the indexUUID).
      */
     static public void openIndexSegment(String name, String filename, long nbytes) {
         

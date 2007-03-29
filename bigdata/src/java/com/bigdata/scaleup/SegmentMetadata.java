@@ -43,7 +43,6 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.objndx.IndexSegment;
@@ -53,6 +52,8 @@ import com.bigdata.objndx.IndexSegment;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo make fields protected/private.
  */
 public class SegmentMetadata implements IResourceMetadata {
 
@@ -72,6 +73,18 @@ public class SegmentMetadata implements IResourceMetadata {
     final public ResourceState state;
     
     final public UUID uuid;
+    
+    public final boolean isIndexSegment() {
+        
+        return true;
+        
+    }
+    
+    public final boolean isJournal() {
+        
+        return false;
+        
+    }
     
     public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
@@ -100,8 +113,8 @@ public class SegmentMetadata implements IResourceMetadata {
         
     }
 
-    public File getFile() {
-        return new File(filename);
+    public String getFile() {
+        return filename;
     }
 
     public long size() {

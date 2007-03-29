@@ -50,6 +50,7 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
@@ -69,8 +70,11 @@ import com.ibm.icu.text.UnicodeDecompressor;
  *       reduce heap allocation as well during (de-)serialization. Without
  *       optimization, UTF compression is just slightly slower on write.
  * 
- * @todo use a per-leaf dictionary to factor out common strings as codes,
- *       e.g., Hamming codes.
+ * @todo use a per-leaf dictionary to factor out common strings as codes, e.g.,
+ *       Hamming codes. This should be done in the basic btree package.
+ * 
+ * @todo pass reference to the {@link IIndex} object so that we can version the
+ *       per value serialization?
  */
 public class RdfValueSerializer implements IValueSerializer {
 

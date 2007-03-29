@@ -86,7 +86,9 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
             properties = super.getProperties();
 
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
-            properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
+            if(properties.getProperty(Options.BUFFER_MODE)==null) {
+                properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
+            }
 //            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
             
             properties.setProperty(Options.FORCE_WRITES,ForceEnum.No.toString());
@@ -162,9 +164,16 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
         
     }
     
+    /**
+     * If the store is open, then closes and deletes the store.
+     */
     public void tearDown() {
 
-        if(store.isOpen()) store.closeAndDelete();
+        if(store.isOpen()) {
+            
+            store.closeAndDelete();
+            
+        }
         
     }
     

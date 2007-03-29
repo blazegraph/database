@@ -43,7 +43,6 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.journal.Journal;
@@ -60,27 +59,51 @@ import com.bigdata.journal.Journal;
 public class JournalMetadata implements IResourceMetadata {
 
     protected final String filename;
+    protected final long nbytes;
     protected final ResourceState state;
     protected final UUID uuid;
 
-    public File getFile() {
-        return new File(filename);
+    public final boolean isIndexSegment() {
+        
+        return false;
+        
+    }
+    
+    public final boolean isJournal() {
+        
+        return true;
+        
+    }
+    
+    public final String getFile() {
+        
+        return filename;
+        
     }
 
     /**
-     * Always returns ZERO (0L) since we can not accurately estimate the #of
-     * bytes on the journal dedicated to a given partition of a named index.
+     * Note: this value is typically zero (0L) since we can not accurately
+     * estimate the #of bytes on the journal dedicated to a given partition of a
+     * named index. The value is originally set to zero (0L) by the
+     * {@link JournalMetadata#JournalMetadata(Journal, ResourceState)}
+     * constructor.
      */
-    public long size() {
-        return 0L;
+    public final long size() {
+        
+        return nbytes;
+        
     }
 
-    public ResourceState state() {
+    public final ResourceState state() {
+        
         return state;
+        
     }
 
-    public UUID getUUID() {
+    public final UUID getUUID() {
+        
         return uuid;
+        
     }
     
     public JournalMetadata(Journal journal, ResourceState state) {
@@ -93,9 +116,33 @@ public class JournalMetadata implements IResourceMetadata {
         
         this.filename = journal.getFile().toString();
 
+        /*
+         * Note: 0L since we can not easily estimate the #of bytes on the
+         * journal that are dedicated to an index partition.
+         */
+        this.nbytes = 0L;
+        
         this.state = state;
         
         this.uuid = journal.getRootBlockView().getUUID();
+        
+    }
+    
+    public JournalMetadata(String file, long nbytes, ResourceState state, UUID uuid) {
+        
+        if(file == null) throw new IllegalArgumentException();
+
+        if(state == null) throw new IllegalArgumentException();
+        
+        if(uuid == null) throw new IllegalArgumentException();
+        
+        this.filename = file;
+        
+        this.nbytes = nbytes;
+        
+        this.state = state;
+        
+        this.uuid = uuid;
         
     }
     

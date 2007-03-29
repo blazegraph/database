@@ -82,8 +82,12 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
      * percentage of its maximum capacity during a {@link #commit()}. If this
      * event is not handled then the journal will automatically extent itself
      * until it either runs out of address space (int32) or other resources.
+     * 
+     * @return true iff the overflow event was handled (e.g., if a new journal
+     *         was created to absorb subsequent writes). if a new journal is NOT
+     *         opened then this method should return false.
      */
-    public void overflow();
+    public boolean overflow();
     
     /**
      * Return the named index which MAY may be invalidated by a

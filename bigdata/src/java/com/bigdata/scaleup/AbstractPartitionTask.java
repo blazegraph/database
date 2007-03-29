@@ -47,7 +47,6 @@ import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.isolation.Value;
 import com.bigdata.objndx.AbstractBTree;
@@ -55,7 +54,6 @@ import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.objndx.IndexSegmentMerger;
-import com.bigdata.objndx.IndexSegmentMetadata;
 import com.bigdata.objndx.RecordCompressor;
 import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
 import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
@@ -88,11 +86,6 @@ import com.bigdata.rawstore.Bytes;
  *       restart safe manner.
  * 
  * @todo parameterize useChecksum, recordCompressor.
- * 
- * @todo assiging sequential segment identifiers may impose an unnecessary
- *       message overhead since we can just use the temporary file mechanism
- *       and the inspect the {@link IndexSegmentMetadata} to learn more
- *       about a given store file.
  * 
  * @todo try performance with and without checksums and with and without
  *       record compression.
@@ -128,12 +121,7 @@ abstract public class AbstractPartitionTask implements
      * output {@link IndexSegment}.
      */
     protected final RecordCompressor recordCompressor = null;
-    
-    /**
-     * The serializer used by all {@link IIsolatableIndex}s.
-     */
-    static protected final IValueSerializer valSer = Value.Serializer.INSTANCE;
-    
+        
     /**
      * 
      * @param master
@@ -219,26 +207,21 @@ abstract public class AbstractPartitionTask implements
     public static class BuildTask extends AbstractPartitionTask {
 
         private final IResourceMetadata src;
-        private final int segId;
         
         /**
          * 
          * @param src
          *            The source for the build operation. Only those entries in
          *            the described key range will be used.
-         * @param segId
-         *            The output segment identifier.
          */
         public BuildTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
-                byte[] fromKey, byte[] toKey, IResourceMetadata src, int segId) {
+                byte[] fromKey, byte[] toKey, IResourceMetadata src) {
             
             super(master, name, indexUUID, branchingFactor, errorRate, partId,
                     fromKey, toKey);
             
             this.src = src;
-            
-            this.segId = segId;
             
         }
         
@@ -254,12 +237,13 @@ abstract public class AbstractPartitionTask implements
 
             AbstractBTree src = master.getIndex(name,this.src);
             
-            File outFile = master.getSegmentFile(name, partId, segId);
+            File outFile = master.getSegmentFile(name, partId);
 
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     master.tmpDir, src.rangeCount(fromKey, toKey), src
                             .rangeIterator(fromKey, toKey), branchingFactor,
-                    valSer, useChecksum, recordCompressor, errorRate, indexUUID);
+                    src.getNodeSerializer().getValueSerializer(), useChecksum,
+                    recordCompressor, errorRate, indexUUID);
 
             IResourceMetadata[] resources = new SegmentMetadata[] { new SegmentMetadata(
                     "" + outFile, outFile.length(), ResourceState.New,
@@ -281,7 +265,6 @@ abstract public class AbstractPartitionTask implements
      */
     abstract static class AbstractMergeTask extends AbstractPartitionTask {
 
-        protected final int segId;
         protected final boolean fullCompactingMerge;
 
         /**
@@ -295,13 +278,11 @@ abstract public class AbstractPartitionTask implements
          */
         protected AbstractMergeTask(MasterJournal master, String name,
                 UUID indexUUID, int branchingFactor, double errorRate,
-                int partId, byte[] fromKey, byte[] toKey, int segId,
+                int partId, byte[] fromKey, byte[] toKey,
                 boolean fullCompactingMerge) {
             
             super(master, name, indexUUID, branchingFactor, errorRate, partId,
                     fromKey, toKey);
-            
-            this.segId = segId;
             
             this.fullCompactingMerge = fullCompactingMerge;
             
@@ -325,7 +306,7 @@ abstract public class AbstractPartitionTask implements
             tmpFile.deleteOnExit();
 
             // output file for the merged segment.
-            File outFile = master.getSegmentFile(name, partId, segId);
+            File outFile = master.getSegmentFile(name, partId);
 
             IResourceMetadata[] resources = getResources();
             
@@ -338,11 +319,14 @@ abstract public class AbstractPartitionTask implements
                 
             }
             
+            final IValueSerializer valSer = srcs[0].getNodeSerializer()
+                    .getValueSerializer();
+            
             // merge the data from the btree on the slave and the index
             // segment.
             MergedLeafIterator mergeItr = new IndexSegmentMerger(
                     tmpFileBranchingFactor, srcs).merge();
-
+            
             // build the merged index segment.
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
@@ -382,10 +366,10 @@ abstract public class AbstractPartitionTask implements
             if(liveCount!=1) throw new UnsupportedOperationException();
             
             // new segment definitions.
-            final SegmentMetadata[] newSegs = new SegmentMetadata[2];
+            final IResourceMetadata[] newSegs = new IResourceMetadata[2];
 
             // assume only the last segment is live.
-            final SegmentMetadata oldSeg = pmd.segs[pmd.segs.length-1];
+            final SegmentMetadata oldSeg = (SegmentMetadata)pmd.resources[pmd.resources.length-1];
             
             newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
                     ResourceState.Dead, oldSeg.uuid);
@@ -393,7 +377,7 @@ abstract public class AbstractPartitionTask implements
             newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
                     .length(), ResourceState.Live, builder.segmentUUID);
             
-            mdi.put(fromKey, new PartitionMetadata(0, segId + 1, newSegs));
+            mdi.put(fromKey, new PartitionMetadata(0, pmd.dataServices, newSegs));
             
             return null;
             
@@ -435,11 +419,11 @@ abstract public class AbstractPartitionTask implements
          */
         public MergeTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
-                byte[] fromKey, byte[] toKey, IResourceMetadata[] resources,
-                int segId) {
+                byte[] fromKey, byte[] toKey, IResourceMetadata[] resources
+                ) {
 
             super(master, name, indexUUID, branchingFactor, errorRate, partId,
-                    fromKey, toKey, segId, false);
+                    fromKey, toKey, false);
             
             this.resources = resources;
             
@@ -489,10 +473,10 @@ abstract public class AbstractPartitionTask implements
          */
         public FullMergeTask(MasterJournal master, String name, UUID indexUUID,
                 int branchingFactor, double errorRate, int partId,
-                byte[] fromKey, byte[] toKey, long commitTime, int segId) {
+                byte[] fromKey, byte[] toKey, long commitTime) {
 
             super(master, name, indexUUID, branchingFactor, errorRate, partId,
-                    fromKey, toKey, segId, true);
+                    fromKey, toKey, true);
 
             this.commitTime = commitTime;
 

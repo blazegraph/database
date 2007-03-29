@@ -49,10 +49,8 @@ import java.util.UUID;
 
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
@@ -60,11 +58,13 @@ import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Addr;
 
 /**
- * Class delegates the {@link #overflow()} event to a master
- * {@link IJournal}.
+ * Class delegates the {@link #overflow()} event to a {@link MasterJournal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME refactor the metadata index so that it may be run as an embedded
+ * process or remote service.
  */
 public class SlaveJournal extends Journal {
     
@@ -105,12 +105,12 @@ public class SlaveJournal extends Journal {
     /**
      * The overflow event is delegated to the master.
      */
-    public void overflow() {
+    public boolean overflow() {
     
         // handles event reporting.
         super.overflow();
         
-        master.overflow();
+        return master.overflow();
         
     }
 
@@ -232,17 +232,34 @@ public class SlaveJournal extends Journal {
         }
 
         /*
-         * @todo the assigned random UUID for the metadata index must be used by
-         * all B+Tree objects having data for the metadata index so once we
-         * support partitions in the metadata index itself this UUID must be
-         * propagated to all of those downstream objects.
+         * Note: there are two UUIDs here - the UUID for the metadata index
+         * describing the partitions of the named scale-out index and the UUID
+         * of the named scale-out index. The metadata index UUID MUST be used by
+         * all B+Tree objects having data for the metadata index (its mutable
+         * btrees on journals and its index segments) while the managed named
+         * index UUID MUST be used by all B+Tree objects having data for the
+         * named index (its mutable btrees on journals and its index segments).
          */
-        MetadataIndex mdi = new MetadataIndex(this,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(), btree
-                        .getIndexUUID(), name);
         
-        // create the initial partition which can accept any key.
-        mdi.put(new byte[]{}, new PartitionMetadata(0));
+        final UUID metadataIndexUUID = UUID.randomUUID();
+        
+        final UUID managedIndexUUID = btree.getIndexUUID();
+        
+        MetadataIndex mdi = new MetadataIndex(this,
+                BTree.DEFAULT_BRANCHING_FACTOR, metadataIndexUUID,
+                managedIndexUUID, name);
+        
+        /*
+         * Create the initial partition which can accept any key.
+         * 
+         * @todo specify the DataSerivce(s) that will accept writes for this
+         * index partition.  This should be done as part of refactoring the
+         * metadata index into a first level service.
+         */
+        
+        final UUID[] dataServices = new UUID[]{};
+        
+        mdi.put(new byte[]{}, new PartitionMetadata(0, dataServices ));
         
         // add to the persistent name map.
         name2MetadataAddr.add(name, mdi);
@@ -362,16 +379,20 @@ public class SlaveJournal extends Journal {
 
             final PartitionMetadata pmd = (PartitionMetadata) itr.next();
 
-            for (int i = 0; i < pmd.segs.length; i++) {
+            for (int i = 0; i < pmd.resources.length; i++) {
 
-                SegmentMetadata smd = pmd.segs[i];
+                IResourceMetadata rmd = pmd.resources[i];
 
-                File file = new File(smd.filename);
+                if (rmd.isIndexSegment()) {
 
-                if (file.exists() && !file.delete()) {
+                    File file = new File(rmd.getFile());
 
-                    log.warn("Could not remove file: "
-                            + file.getAbsolutePath());
+                    if (file.exists() && !file.delete()) {
+
+                        log.warn("Could not remove file: "
+                                + file.getAbsolutePath());
+
+                    }
 
                 }
 

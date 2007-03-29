@@ -57,7 +57,9 @@ import junit.framework.TestCase2;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.objndx.AbstractBTreeTestCase;
+import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BatchInsert;
+import com.bigdata.objndx.ByteArrayValueSerializer;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -126,10 +128,76 @@ public class TestPartitionedJournal extends TestCase2 {
     }
     
     /**
-     * Test the ability to register and use named index, including whether the
-     * named index is restart safe.
+     * Test the ability to register and use a named index that does NOT support
+     * transactional isolation, including whether the named index is restart
+     * safe.
      */
-    public void test_registerAndUse() {
+    public void test_registerAndUse_noIsolation() {
+
+        Properties properties = getProperties();
+
+        properties.setProperty(Options.DELETE_ON_CLOSE, "false");
+                
+        properties.setProperty(Options.BASENAME,getName());
+        
+        MasterJournal journal = new MasterJournal(properties);
+        
+        final String name = "abc";
+        
+        IIndex index = new BTree(journal, 3, UUID.randomUUID(), ByteArrayValueSerializer.INSTANCE);
+        
+        assertNull(journal.getIndex(name));
+        
+        index = journal.registerIndex(name, index);
+        
+        assertTrue(journal.getIndex(name) instanceof PartitionedIndexView);
+        
+        assertEquals("name", name, ((PartitionedIndexView) journal.getIndex(name))
+                .getName());
+        
+        MetadataIndex mdi = journal.getSlave().getMetadataIndex(name);
+        
+        assertEquals("mdi.entryCount", 1, mdi.getEntryCount());
+        
+        final byte[] k0 = new byte[]{0};
+        final byte[] v0 = new byte[]{0};
+        
+        index.insert( k0, v0);
+
+        /*
+         * commit and close the journal
+         */
+        journal.commit();
+        
+        journal.close();
+        
+        if (journal.isStable()) {
+
+            /*
+             * re-open the journal and test restart safety.
+             */
+            journal = new MasterJournal(properties);
+
+            index = (PartitionedIndexView) journal.getIndex(name);
+
+            assertNotNull("btree", index);
+            assertEquals("entryCount", 1, ((PartitionedIndexView)index).getBTree().getEntryCount());
+            assertEquals(v0, (byte[])index.lookup(k0));
+
+            journal.dropIndex(name);
+            
+            journal.close();
+
+        }
+
+    }
+
+    /**
+     * Test the ability to register and use a named index that supports
+     * transactional isolation, including whether the named index is restart
+     * safe.
+     */
+    public void test_registerAndUse_isolation() {
 
         Properties properties = getProperties();
 
@@ -258,7 +326,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         assertEquals("#partitions",1,mdi.getEntryCount());
         
-        assertEquals("#segments",0,mdi.get(new byte[]{}).segs.length);
+        assertEquals("#segments",0,mdi.get(new byte[]{}).resources.length);
         
         /*
          * verify that the data are there.
@@ -307,7 +375,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         assertEquals("#partitions",1,mdi.getEntryCount());
         
-        assertEquals("#segments",1,mdi.get(new byte[]{}).segs.length);
+        assertEquals("#segments",1,mdi.get(new byte[]{}).resources.length);
         
         /*
          * Verify that the data there.
@@ -386,19 +454,17 @@ public class TestPartitionedJournal extends TestCase2 {
             
             assertEquals("partId",0,pmd.partId);
             
-            assertEquals("nextSegId",trial+1,pmd.nextSegId);
-            
             assertEquals("#segments", 1, pmd.getLiveCount());
             
-            if(pmd.segs.length>1) {
+            if(pmd.resources.length>1) {
                 
-                assertEquals("#segments",2,pmd.segs.length);
+                assertEquals("#segments",2,pmd.resources.length);
                 
                 assertEquals("state", ResourceState.Dead,
-                        pmd.segs[0].state);
+                        pmd.resources[0].state());
                 
                 assertEquals("state", ResourceState.Live,
-                        pmd.segs[1].state);
+                        pmd.resources[1].state());
                 
             }
 
