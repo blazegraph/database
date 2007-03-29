@@ -183,6 +183,8 @@ public class IndexSegmentMerger {
      */
     public IndexSegmentMerger(int m, AbstractBTree[] srcs) throws IOException {
     
+        // @todo validate sources for the same indexUUID.
+        
         throw new UnsupportedOperationException();
     
     }

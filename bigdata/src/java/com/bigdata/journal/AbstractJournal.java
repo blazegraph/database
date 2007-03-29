@@ -307,7 +307,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      */
     public AbstractJournal(Properties properties) {
 
-//        int segmentId;
         long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
         long maximumExtent = Options.DEFAULT_MAXIMUM_EXTENT;
         boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
@@ -336,11 +335,16 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         val = properties.getProperty(Options.BUFFER_MODE);
 
-        if (val == null)
+        if (val == null) {
+
             val = BufferMode.Direct.toString();
+            
+        }
 
         BufferMode bufferMode = BufferMode.parse(val);
 
+        System.err.println(Options.BUFFER_MODE+"="+bufferMode);
+        
         /*
          * "useDirectBuffers"
          */
@@ -409,7 +413,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             if (maximumExtent < initialExtent) {
 
                 throw new RuntimeException("The '" + Options.MAXIMUM_EXTENT
-                        + "' is less than the initial extent.");
+                        + "' (" + maximumExtent
+                        + ") is less than the initial extent ("+initialExtent+").");
 
             }
 
@@ -1153,9 +1158,29 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             final int nextOffset = _bufferStrategy.getNextOffset();
 
-            if (nextOffset > .9 * maximumExtent) {
+            /*
+             * Choose maximum of the target maximum extent and the current user
+             * data extent so that we do not re-trigger overflow immediately if
+             * the buffer has been extended beyond the target maximum extent.
+             * Among other things this lets you run the buffer up to a
+             * relatively large extent (if you use a disk-only mode since you
+             * will run out of memory if you use a fully buffered mode).
+             */
+            final long limit = Math.max(maximumExtent, _bufferStrategy
+                    .getUserExtent());
+            
+            if (nextOffset > .9 * limit) {
 
-                overflow();
+                if( overflow() ) {
+                    
+                    /*
+                     * Someone handled the overflow event by opening a new
+                     * journal to absorb further writes.
+                     */
+                    ResourceManager.overflowJournal(getFile() == null ? null
+                            : getFile().toString(), size());
+                    
+                }
 
             }
 
@@ -1167,14 +1192,16 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
     /**
      * Note: This implementation does not handle overflow of the journal. The
-     * journal capacity will simply be extended until the available resources
-     * are exhausted.
+     * journal capacity will simply be extended by {@link #write(ByteBuffer)}
+     * until the available resources are exhausted.
+     * 
+     * @return This implementation returns <code>false</code> since it does
+     *         NOT open a new journal.
      */
-    public void overflow() {
+    public boolean overflow() {
 
-        ResourceManager.overflowJournal(getFile() == null ? null : getFile()
-                .toString(), size());
-
+        return false;
+        
     }
 
     public void force(boolean metadata) {
@@ -1623,7 +1650,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         name2Addr.dropIndex(name);
 
         // report event.
-        ResourceManager.openUnisolatedBTree(name);
+        ResourceManager.dropUnisolatedBTree(name);
 
     }
 

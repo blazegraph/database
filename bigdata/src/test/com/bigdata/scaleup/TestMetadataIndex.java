@@ -158,8 +158,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final byte[] key0 = new byte[] {};
 
         final int partId0 = 0;
-        
-        PartitionMetadata part1 = new PartitionMetadata(partId0);
+
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+
+        PartitionMetadata part1 = new PartitionMetadata(partId0,dataServices);
 
         assertEquals(null,md.put(key0, part1));
 
@@ -168,7 +170,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID segmentUUID_a = UUID.randomUUID();
         final UUID segmentUUID_b = UUID.randomUUID();
         
-        PartitionMetadata part2 = new PartitionMetadata(partId0, 1,
+        PartitionMetadata part2 = new PartitionMetadata(partId0, dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("a", 10L,
                         ResourceState.Live, segmentUUID_a) });
 
@@ -176,7 +178,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         assertEquals(part2,md.get(key0));
         
-        PartitionMetadata part3 = new PartitionMetadata(partId0, 2,
+        PartitionMetadata part3 = new PartitionMetadata(partId0, dataServices,
                 new SegmentMetadata[] {
                         new SegmentMetadata("a", 10L, ResourceState.Live,
                                 segmentUUID_a),
@@ -250,7 +252,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * create three partitions.
          */
         final int partId0 = 0;
-        PartitionMetadata part0 = new PartitionMetadata(partId0);
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+        PartitionMetadata part0 = new PartitionMetadata(partId0,dataServices);
         assertEquals(null,md.put(key0, part0));
         assertEquals(part0,md.get(key0));
         
@@ -258,13 +261,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID segmentUUID_b = UUID.randomUUID();
         
         final int partId1 = 1;
-        PartitionMetadata part1 = new PartitionMetadata(partId1,1,
+        PartitionMetadata part1 = new PartitionMetadata(partId1,dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
-        PartitionMetadata part2 = new PartitionMetadata(partId2,2,
+        PartitionMetadata part2 = new PartitionMetadata(partId2,dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a),
                         new SegmentMetadata("b", 20L,ResourceState.Live, segmentUUID_b) });
         assertEquals(null, md.put(key2, part2));
@@ -346,7 +349,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * create three partitions.
          */
         final int partId0 = 0;
-        PartitionMetadata part0 = new PartitionMetadata(partId0);
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+        PartitionMetadata part0 = new PartitionMetadata(partId0,dataServices);
         assertEquals(null,md.put(key0, part0));
         assertEquals(part0,md.get(key0));
 
@@ -354,13 +358,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID segmentUUID_b = UUID.randomUUID();
         
         final int partId1 = 1;
-        PartitionMetadata part1 = new PartitionMetadata(partId1,1,
+        PartitionMetadata part1 = new PartitionMetadata(partId1,dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a) });
         assertEquals(null,md.put(key1, part1));
         assertEquals(part1,md.get(key1));
         
         final int partId2 = 2;
-        PartitionMetadata part2 = new PartitionMetadata(partId2,2,
+        PartitionMetadata part2 = new PartitionMetadata(partId2,dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("a", 10L,ResourceState.Live, segmentUUID_a),
                         new SegmentMetadata("b", 20L,ResourceState.Live, segmentUUID_b) });
         assertEquals(null, md.put(key2, part2));
@@ -428,6 +432,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+
         final UUID indexUUID = UUID.randomUUID();
         
         final UUID managedIndexUUID = UUID.randomUUID();  
@@ -437,7 +443,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
-        md.put(new byte[]{}, new PartitionMetadata(0));
+        md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
         BTree btree = new BTree(store, 3, managedIndexUUID,
@@ -482,7 +488,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 1,
+        md.put(new byte[] {}, new PartitionMetadata(0, dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile,
                         outFile.length(), ResourceState.Live,
                         builder.segmentUUID) }));
@@ -536,6 +542,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+        
         final UUID indexUUID = UUID.randomUUID();
         
         final UUID managedIndexUUID = UUID.randomUUID();  
@@ -545,7 +553,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
-        md.put(new byte[]{}, new PartitionMetadata(0));
+        md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
         BTree btree = new BTree(store, 3, managedIndexUUID,
@@ -592,7 +600,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 2,
+        md.put(new byte[] {}, new PartitionMetadata(0, dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
                         outFile01.length(), ResourceState.Live,
                         builder1.segmentUUID) }));
@@ -649,7 +657,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * Note: We mark index segment 01 as "Dead" for this partition since it
          * has been replaced by the merged result (index segment 02).
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 3,
+        md.put(new byte[] {}, new PartitionMetadata(0, dataServices,
                 new SegmentMetadata[] {
                         new SegmentMetadata("" + outFile01, outFile01.length(),
                                 ResourceState.Dead, builder1.segmentUUID),
@@ -718,6 +726,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+
         final UUID indexUUID = UUID.randomUUID();
         
         final UUID managedIndexUUID = UUID.randomUUID();  
@@ -727,7 +737,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
-        md.put(new byte[]{}, new PartitionMetadata(0));
+        md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         /*
          * In each trial we randomly modify the state of the tree.
@@ -868,7 +878,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 /*
                  * update the metadata index for this partition.
                  */
-                md.put(new byte[] {}, new PartitionMetadata(0, 2,
+                md.put(new byte[] {}, new PartitionMetadata(0, dataServices,
                         new SegmentMetadata[] { new SegmentMetadata(""
                                 + outFile01, outFile01.length(),
                                 ResourceState.Live, builder.segmentUUID) }));
@@ -933,7 +943,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * segments after a suitable grace period. 
                  */
                 PartitionMetadata oldpart = md.put(new byte[] {},
-                        new PartitionMetadata(0, nextSegId++,
+                        new PartitionMetadata(0, dataServices,
                         new SegmentMetadata[] {
                                 new SegmentMetadata("" + outFile02, outFile02
                                         .length(), ResourceState.Live, builder.segmentUUID) }));
@@ -957,7 +967,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  */
                 seg.close();
                 
-                new File(oldpart.segs[0].filename).delete();
+                new File(oldpart.resources[0].getFile()).delete();
 
                 // this is now the current index segment.
                 seg = seg02;
@@ -984,7 +994,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         seg.close();
 
-        new File(md.get(new byte[]{}).segs[0].filename).delete();
+        new File(md.get(new byte[]{}).resources[0].getFile()).delete();
 
         System.err.println("End of stress test: ntrial="+ntrials+", nops="+nops);
 
@@ -1016,6 +1026,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
+        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+
         final UUID indexUUID = UUID.randomUUID();
         
         final UUID managedIndexUUID = UUID.randomUUID();  
@@ -1025,7 +1037,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
-        md.put(new byte[]{}, new PartitionMetadata(0));
+        md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
         BTree btree = new BTree(store, 3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
@@ -1071,7 +1083,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0,1,
+        md.put(new byte[] {}, new PartitionMetadata(0,dataServices,
                 new SegmentMetadata[] { new SegmentMetadata("" + outFile01,
                         outFile01.length(),ResourceState.Live, builder1.segmentUUID) }));
 
@@ -1115,7 +1127,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * update the metadata index for this partition.
          */
-        md.put(new byte[] {}, new PartitionMetadata(0, 1,
+        md.put(new byte[] {}, new PartitionMetadata(0, dataServices,
                 new SegmentMetadata[] {
                         new SegmentMetadata("" + outFile01, outFile01.length(),
                                 ResourceState.Live, builder1.segmentUUID),

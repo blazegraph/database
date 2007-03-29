@@ -59,9 +59,23 @@ import com.bigdata.objndx.IndexSegmentMetadata;
 public interface IResourceMetadata {
 
     /**
-     * The store file.
+     * True iff this resource is an {@link IndexSegment}. Each
+     * {@link IndexSegment} contains historical read-only data for exactly one
+     * partition of a scale-out index.
      */
-    public File getFile();
+    public boolean isIndexSegment();
+    
+    /**
+     * True iff this resource is a {@link Journal}. When the resource is a
+     * {@link Journal}, there will be a named mutable btree on the journal that
+     * is absorbing writes for one or more index partition of a scale-out index.
+     */
+    public boolean isJournal();
+    
+    /**
+     * The name of the file containing the resource.
+     */
+    public String getFile();
     
     /**
      * The #of bytes in the store file.

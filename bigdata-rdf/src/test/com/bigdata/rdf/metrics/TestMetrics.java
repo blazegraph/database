@@ -61,6 +61,7 @@ import java.util.TreeMap;
 
 import org.CognitiveWeb.util.PropertyUtil;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.TripleStore.LoadStats;
 
 /**
@@ -339,6 +340,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * <dt>literalsInStore</dt>
      * <dd>The total #of literals in the store or zero if not using the GOM
      * SAIL.</dd>
+     * <dt>totalMemory</dt>
+     * <dd>The total VM memory (in Megabytes) as reported by
+     * {@link Runtime#totalMemory()}.</dd>
      * <dt>error</dt>
      * <dd>This column is <code>Ok</code> if there was no error. Otherwise
      * this column will contain the error message and the <i>toldTriplesLoaded</i>
@@ -354,13 +358,13 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * </p>
      * 
      * <pre>
-     *  triplesInStore    - #of triples in the repository
-     *  inferencesInStore - #of inferences in the repository
-     *  proofsInStore     - #of proofs in the repository.
-     *  urisInStore       - #of URIs in the repository.
-     *  bnodesInStore     - #of blank nodes in the repository.
-     *  literalsInStore   - #of literals in the repository.
-     *  sizeOnDisk        - #of bytes, MB, GB on disk for the repository.
+     *   triplesInStore    - #of triples in the repository
+     *   inferencesInStore - #of inferences in the repository
+     *   proofsInStore     - #of proofs in the repository.
+     *   urisInStore       - #of URIs in the repository.
+     *   bnodesInStore     - #of blank nodes in the repository.
+     *   literalsInStore   - #of literals in the repository.
+     *   sizeOnDisk        - #of bytes, MB, GB on disk for the repository.
      * </pre>
      * 
      * @param trial
@@ -445,7 +449,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
         metricsWriter.write(""+t.uriCount1+", ");
         metricsWriter.write(""+t.bnodeCount1+", ");
         metricsWriter.write(""+t.literalCount1+", ");
-        
+
+        // total VM memory (in MB).
+        metricsWriter.write(""+Runtime.getRuntime().totalMemory()/Bytes.megabyte+", ");
         // error
         metricsWriter.write(""+(t.error == null?"Ok":t.error.getMessage())+", ");
         // filename
@@ -536,6 +542,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         metricsWriter.write("urisInStore, ");
         metricsWriter.write("bnodesInStore, ");
         metricsWriter.write("literalsInStore, ");
+        metricsWriter.write("totalMemory, ");
         metricsWriter.write("error, ");
         metricsWriter.write("filename\n");
         
@@ -1059,9 +1066,15 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
         }
         
-        testMetrics.loadFiles();
-        
-        testMetrics.tearDown();
+        try {
+
+            testMetrics.loadFiles();
+            
+        } finally {
+            
+            testMetrics.tearDown();
+            
+        }
         
     }
     

@@ -130,7 +130,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      * @return true if the capacity of the store was extended and the write
      *         operation should be retried.
      */
-    public boolean overflow(int needed) {
+    final public boolean overflow(int needed) {
 
         final long userExtent = getUserExtent();
         

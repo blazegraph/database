@@ -48,80 +48,59 @@ Modifications:
 package com.bigdata.scaleup;
 
 import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.isolation.IsolatableFusedView;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.objndx.IBatchBTree;
 import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.objndx.ReadOnlyFusedView;
 
 /**
  * A {@link PartitionedIndexView} that supports transactions and deletion
- * markers.
+ * markers. Write operations are passed through to the base class, which in turn
+ * delegates them to the {@link UnisolatedBTree} identified to the constructor.
+ * Read operations understand deletion markers. Processing deletion markers
+ * requires that the source(s) for an index partition view are read in order
+ * from the most recent (the mutable btree that is absorbing writes for the
+ * index partition) to the earliest historical resource. The first entry for the
+ * key in any source is the value that will be reported on a read. If the entry
+ * is deleted, then the read will report that no entry exists for that key.
+ * <p>
+ * Note that deletion markers can exist in both the mutable btree absorbing
+ * writes and in historical journals and index segments having data for the
+ * partition view. Deletion markers are expunged from index segments only by a
+ * full compacting merge of all index segments having life data for the
+ * partition.
+ * <p>
+ * Implementation note: both the write operations and the {@link IBatchBTree}
+ * operations are inherited from the base class. Only non-batch read operations
+ * are overriden by this class.
+ * 
+ * FIXME implement; support processing of delete markers - basically they have
+ * to be processed on read so that a delete on the mutable btree overrides an
+ * historical value, and a deletion marker in a more recent index segment
+ * overrides a deletion marker in an earlier index segment. Deletion markers can
+ * exist in the both mutable btree and in index segments that are not either a
+ * clean first eviction or a full compacting merge (e.g., they can still exist
+ * in a compacting merge if there are other index segments or btrees that are
+ * part of a partition but are not partitipating in the compacting merge).
+ * 
+ * @see IsolatableFusedView
+ * @see ReadOnlyFusedView
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME implement; support processing of delete markers. They can exist in the mutable
- * btree and in index segments that are not either a clean first eviction or a
- * full compacting merge (e.g., they can still exist in a compacting merge if
- * there are other index segments or btrees that are part of a partition but are
- * not partitipating in the compacting merge).
  */
 public class IsolatablePartitionedIndexView extends PartitionedIndexView implements IIsolatableIndex {
 
     /**
      * @param btree
+     *            The btree that will absorb writes for the index partitions.
      * @param mdi
+     *            The metadata index.
      */
     public IsolatablePartitionedIndexView(UnisolatedBTree btree, MetadataIndex mdi) {
+        
         super(btree, mdi);
-//        throw new UnsupportedOperationException();
-    }
-
-    public boolean contains(byte[] key) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public Object insert(Object key, Object value) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public Object lookup(Object key) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public Object remove(Object key) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public void contains(int ntuples, byte[][] keys, boolean[] contains) {
-        // TODO Auto-generated method stub
-
-    }
-
-    public void insert(int ntuples, byte[][] keys, Object[] values) {
-        // TODO Auto-generated method stub
-
-    }
-
-    public void lookup(int ntuples, byte[][] keys, Object[] values) {
-        // TODO Auto-generated method stub
-
-    }
-
-    public void remove(int ntuples, byte[][] keys, Object[] values) {
-        // TODO Auto-generated method stub
 
     }
 

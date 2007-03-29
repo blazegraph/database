@@ -370,7 +370,7 @@ public class MasterJournal implements IJournal {
         /**
          * <code>segment.dir</code> - The property whose value is the name of
          * the top level directory beneath which new segment files will be
-         * created. When not specified the default is a directory named "<i>segs"
+         * created. When not specified the default is a directory named "<i>resources"
          * in the directory named by the {@link #JOURNAL_DIR} property.
          */
         public static final String SEGMENT_DIR = "segment.dir";
@@ -443,7 +443,7 @@ public class MasterJournal implements IJournal {
         // "segment.dir"
         val = properties.getProperty(Options.SEGMENT_DIR);
         
-        segmentDir = val == null?new File(journalDir,"segs"):new File(val);
+        segmentDir = val == null?new File(journalDir,"resources"):new File(val);
 
         if(segmentDir.exists() && !segmentDir.isDirectory()) {
             
@@ -522,7 +522,7 @@ public class MasterJournal implements IJournal {
         this.mergePolicy = mergePolicy;
         
         /* 
-         * Create the initial slave slave.
+         * Create the initial slave journal.
          */
         this.slave = createSlave(this,properties);
 
@@ -630,8 +630,12 @@ public class MasterJournal implements IJournal {
      *       partition of ~100M. Splitting and joining partitions is atomic and
      *       respects transaction isolation.
      */
-    public void overflow() {
-               
+    public boolean overflow() {
+            
+        System.err.println("*** Overflow *** ");
+
+        final Object state = willOverflow();
+        
         /* 
          * Create the new buffer.
          */
@@ -674,9 +678,18 @@ public class MasterJournal implements IJournal {
 
         // immediate shutdown of the old journal.
         oldJournal.closeAndDelete();
+
+        didOverflow(state);
+        
+        // handled overflow by opening a new journal.
+        return true;
         
     }
 
+    protected Object willOverflow() {return null;}
+
+    protected void didOverflow(Object state) {}
+    
     /**
      * Does not queue indices for eviction, forcing the old journal to remain
      * active. The old journal is re-opened using {@link BufferMode#Disk} in
@@ -900,9 +913,6 @@ public class MasterJournal implements IJournal {
         
         final PartitionMetadata pmd = mdi.get(separatorKey);
         
-        // the next segment identifier to be assigned.
-        final int segId = pmd.nextSegId;
-        
         if (pmd.getLiveCount()==0) {
 
             /*
@@ -916,19 +926,20 @@ public class MasterJournal implements IJournal {
              * we will see IValue objects when processing an UnisolatedBTree.
              */
 
-            File outFile = getSegmentFile(name,pmd.partId,segId);
+            File outFile = getSegmentFile(name,pmd.partId);
 
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     tmpDir, oldIndex.btree.getEntryCount(), oldIndex.btree
-                            .getRoot().entryIterator(), mseg,
-                    Value.Serializer.INSTANCE, true/* useChecksum */,
+                            .getRoot().entryIterator(), mseg, oldIndex
+                            .getBTree().getNodeSerializer()
+                            .getValueSerializer(), true/* useChecksum */,
                     null/* new RecordCompressor() */, 0d, oldIndex.btree
                             .getIndexUUID());
 
             /*
              * update the metadata index for this partition.
              */
-            mdi.put(separatorKey, new PartitionMetadata(0, segId + 1,
+            mdi.put(separatorKey, new PartitionMetadata(0, pmd.dataServices,
                     new SegmentMetadata[] { new SegmentMetadata("" + outFile,
                             outFile.length(), ResourceState.Live,
                             builder.segmentUUID) }));
@@ -954,7 +965,7 @@ public class MasterJournal implements IJournal {
             final IndexSegment seg = (IndexSegment)view.getSources()[1];
 
             // output file for the merged segment.
-            File outFile = getSegmentFile(name, pmd.partId, segId);
+            File outFile = getSegmentFile(name, pmd.partId);
 
             // merge the data from the btree on the slave and the index
             // segment.
@@ -964,7 +975,7 @@ public class MasterJournal implements IJournal {
             // build the merged index segment.
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     null, mergeItr.nentries, new MergedEntryIterator(mergeItr),
-                    mseg, oldIndex.btree.getNodeSerializer()
+                    mseg, oldIndex.getBTree().getNodeSerializer()
                             .getValueSerializer(), false/* useChecksum */,
                     null/* recordCompressor */, 0d/* errorRate */,
                     oldIndex.btree.getIndexUUID());
@@ -998,7 +1009,7 @@ public class MasterJournal implements IJournal {
             final SegmentMetadata[] newSegs = new SegmentMetadata[2];
 
             // assume only the last segment is live.
-            final SegmentMetadata oldSeg = pmd.segs[pmd.segs.length-1];
+            final SegmentMetadata oldSeg = (SegmentMetadata)pmd.resources[pmd.resources.length-1];
             
             newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
                     ResourceState.Dead, oldSeg.uuid);
@@ -1006,7 +1017,7 @@ public class MasterJournal implements IJournal {
             newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
                     .length(), ResourceState.Live, builder.segmentUUID);
 
-            mdi.put(separatorKey, new PartitionMetadata(0, segId + 1, newSegs));
+            mdi.put(separatorKey, new PartitionMetadata(0, pmd.dataServices, newSegs));
 
 // /*
 // * open the merged index segment
@@ -1025,9 +1036,9 @@ public class MasterJournal implements IJournal {
 //            seg.close();
 
             // assuming at most one dead and one live segment.
-            if(pmd.segs.length>1) {
+            if(pmd.resources.length>1) {
                 
-                final SegmentMetadata deadSeg = pmd.segs[0];
+                final SegmentMetadata deadSeg = (SegmentMetadata)pmd.resources[0];
                 
                 if(deadSeg.state!=ResourceState.Dead) {
                     
@@ -1067,8 +1078,6 @@ public class MasterJournal implements IJournal {
      * @param partId
      *            The unique within index partition identifier - see
      *            {@link PartitionMetadata#partId}.
-     * @param segId
-     *            The unique within partition segment identifier.
      * 
      * @todo munge the index name so that we can support unicode index names in
      *       the filesystem.
@@ -1076,7 +1085,7 @@ public class MasterJournal implements IJournal {
      * @todo use leading zero number format for the partitionId and the
      *       segmentId in the filenames.
      */
-    protected File getSegmentFile(String name,int partId,int segId) {
+    protected File getSegmentFile(String name,int partId) {
 
         File parent = getPartitionDirectory(name,partId);
         
@@ -1086,9 +1095,15 @@ public class MasterJournal implements IJournal {
             
         }
         
-        File file = new File(parent, segId + SEG);
-        
-        return file;
+        try {
+
+            return File.createTempFile(name, SEG, parent);
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
     
@@ -1319,7 +1334,7 @@ public class MasterJournal implements IJournal {
 
             // open the file.
             IndexSegmentFileStore fileStore = new IndexSegmentFileStore(
-                    resource.getFile());
+                    new File(resource.getFile()));
             
             // load the btree.
             seg = fileStore.load();

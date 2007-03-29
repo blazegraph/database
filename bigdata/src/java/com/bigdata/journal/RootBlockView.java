@@ -391,7 +391,7 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+Addr.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+Addr.toString(getCommitRecordIndexAddr()));
-        sb.append(", segmentUUID="+getUUID());
+        sb.append(", uuid="+getUUID());
         
         sb.append("}");
         
