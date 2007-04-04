@@ -7,11 +7,13 @@ package com.bigdata.objndx;
  * @version $Id$
  * 
  * @todo add nano timers and track storage used by the index. The goal is to
- *       know how much of the time of the server is consumed by the index,
- *       what percentage of the store is dedicated to the index, how
- *       expensive it is to do some scan-based operations (merge down,
- *       delete of transactional isolated persistent index), and evaluate
- *       the buffer strategy by comparing accesses with IOs.
+ *       know how much of the time of the server is consumed by the index, what
+ *       percentage of the store is dedicated to the index, how expensive it is
+ *       to do some scan-based operations (merge down, delete of transactional
+ *       isolated persistent index), and evaluate the buffer strategy by
+ *       comparing accesses with IOs.
+ * 
+ * @todo expose more of the counters using property access methods.
  */
 public class Counters {
 
@@ -46,6 +48,42 @@ public class Counters {
     int leavesWritten = 0;
     long bytesRead = 0L;
     long bytesWritten = 0L;
+    
+    /**
+     * The #of nodes written on the backing store.
+     */
+    final public int getNodesWritten() {
+        
+        return nodesWritten;
+        
+    }
+    
+    /**
+     * The #of leaves written on the backing store.
+     */
+    final public int getLeavesWritten() {
+        
+        return leavesWritten;
+        
+    }
+    
+    /**
+     * The number of bytes read from the backing store.
+     */
+    final public long getBytesRead() {
+        
+        return bytesRead;
+        
+    }
+    
+    /**
+     * The number of bytes written onto the backing store.
+     */
+    final public long getBytesWritten() {
+        
+        return bytesWritten;
+        
+    }
 
     // @todo consider changing to logging so that the format will be nicer
     // or just improve the formatting.
