@@ -811,10 +811,10 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         TestSuite suite = new TestSuite("Benchmark Journal Write Rates");
         
-//        suite.addTestSuite( BenchmarkTransientJournal.class );
-//        suite.addTestSuite( BenchmarkDirectJournal.class );
-////        suite.addTestSuite( BenchmarkMappedJournal.class );
-//        suite.addTestSuite( BenchmarkDiskJournal.class );
+        suite.addTestSuite( BenchmarkTransientJournal.class );
+        suite.addTestSuite( BenchmarkDirectJournal.class );
+//        suite.addTestSuite( BenchmarkMappedJournal.class );
+        suite.addTestSuite( BenchmarkDiskJournal.class );
         suite.addTestSuite( BenchmarkSmallRecordOptimium.class );
         suite.addTestSuite( BenchmarkBlockBasedOptimium.class );
         suite.addTestSuite( BenchmarkSustainedTransferOptimium.class );
