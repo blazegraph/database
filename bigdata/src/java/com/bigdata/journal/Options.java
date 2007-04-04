@@ -132,9 +132,11 @@ public class Options {
      * forceMetadata} that determines whether the journal will be opened in a
      * mode that writes through synchronously to stable storage (default
      * <code>No</code>). This option does NOT effect the stability of the
-     * data on disk but may be used to tweak the file system buffering.
+     * data on disk but may be used to tweak the file system buffering (forcing
+     * writes is generally MUCH slower and is turned off by default).
      * 
      * @see #FORCE_ON_COMMIT, which controls the stability of the data on disk.
+     * @see #DEFAULT_FORCE_WRITES
      * @see ForceEnum
      */
     public static final String FORCE_WRITES = "forceWrites";

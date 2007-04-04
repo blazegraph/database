@@ -136,7 +136,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * Counters tracking various aspects of the btree.
      */
-    protected final Counters counters = new Counters(this);
+    /*protected*/ public final Counters counters = new Counters(this);
 
     /**
      * The persistence store.

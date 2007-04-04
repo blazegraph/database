@@ -131,7 +131,22 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments and journals based on LRU policy and timeout; in a distributed
  * solution resources would be migrated to other hosts to reduce the total
  * sustained resource load).</li>
- * <li> Concurrent load for RDFS w/o rollback.</li>
+ * <li> Concurrent load for RDFS w/o rollback. There should also be an
+ * unisolated read mode that does "read-behind", i.e., reading from the last
+ * committed state on the store. The purpose of this is to permit fully
+ * concurrent readers with the writer in an unisolated mode. If concurrent
+ * readers actually read from the same btree instance as the writer then
+ * exceptions would arise from concurrent modification. This problem is
+ * trivially avoided maintaining a distinction between a concurrent read-only
+ * btree emerging from the last committed state and a single non-concurrent
+ * access btree for the writer. In this manner readers may read from the
+ * unisolated state of the database with concurrent modification -- to another
+ * instance of the btree. Once the writer commits, any new readers will read
+ * from its committed state and the older btree objects will be flushed from
+ * cache soon after their readers terminate -- thereby providing a consistent
+ * view to a reader (or the reader could always switch to read from the then
+ * current btree after a commit - just like the distinction between an isolated
+ * reader and a read-committed reader).</li>
  * <li> Network api (data service).</li>
  * <li> Group commit for higher transaction throughput.<br>
  * Note: For short transactions, TPS is basically constant for a given

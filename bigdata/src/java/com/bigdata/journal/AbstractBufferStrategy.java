@@ -148,9 +148,14 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         
         if( maximumExtent != 0L && required > maximumExtent ) {
             
-            // Would exceed the maximum extent (iff a hard limit).
+            /*
+             * Would exceed the maximum extent (iff a hard limit).
+             * 
+             * Note: this will show up for transactions that whose write set
+             * overflows the in-memory buffer onto the disk.
+             */
 
-            log.error("Would exceed maximumExtent="+maximumExtent);
+            log.warn("Would exceed maximumExtent="+maximumExtent);
 
             return false;
             

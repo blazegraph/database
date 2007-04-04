@@ -88,3 +88,4 @@ the #of clients is not a strong influence on performance.  The big
 wins are Transient and Force := No since neither conditions synchs to
 disk.  This suggests that the big win for TPS throughput is going to
 be group commit.
+
