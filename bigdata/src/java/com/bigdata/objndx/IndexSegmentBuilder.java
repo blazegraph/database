@@ -1469,7 +1469,7 @@ public class IndexSegmentBuilder {
                     plan.height, useChecksum, plan.nleaves, nnodesWritten,
                     plan.nentries, maxNodeOrLeafLength, addrLeaves, addrNodes,
                     addrRoot, addrExtensionMetadata, addrBloom, errorRate, out
-                            .length(), segmentUUID, indexUUID, now);
+                            .length(), indexUUID, segmentUUID, now);
 
             md.write(out);
             

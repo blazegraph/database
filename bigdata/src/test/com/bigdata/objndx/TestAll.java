@@ -33,7 +33,14 @@ public class TestAll extends TestCase {
     {
 
         TestSuite suite = new TestSuite("BTree");
-
+        
+        /*
+         * test fast DataOutput and DataInput implementations.
+         */
+        suite.addTestSuite(TestDataOutputBuffer.class);
+        suite.addTestSuite(TestShortPacker.class);
+        suite.addTestSuite(TestLongPacker.class);
+        
         /*
          * test key encoding and comparison support.
          */

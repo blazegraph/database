@@ -48,6 +48,7 @@
 package com.bigdata.objndx;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.UUID;
@@ -131,12 +132,12 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * flag turns on some more expensive assertions.
      */
-    final protected boolean debug = DEBUG||true;
+    final protected boolean debug = DEBUG || true;
 
     /**
      * Counters tracking various aspects of the btree.
      */
-    /*protected*/ public final Counters counters = new Counters(this);
+    /* protected */public final Counters counters = new Counters(this);
 
     /**
      * The persistence store.
@@ -152,7 +153,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * they belong.
      */
     final protected UUID indexUUID;
-    
+
     /**
      * The branching factor for the btree.
      */
@@ -174,7 +175,32 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * for the {@link AbstractBTree}.
      */
     protected AbstractNode root;
-    
+
+//    /**
+//     * The finger is a trial feature. The purpose is to remember the last
+//     * leaf(s) in the tree that was visited by a search operation and to
+//     * pre-test that those leaf(s) on the next search operation.
+//     * <p>
+//     * Fingers can do wonders by reducing search in common cases where the same
+//     * leaf is visited by a sequence of operations, e.g., sequential insert or
+//     * conditional insert realized by lookup + insert. Multiple fingers may be
+//     * required if the tree is used by concurrent readers (and the finger might
+//     * be part of the reader state) while a single finger would do for a tree
+//     * being used by a writer (since concurrent modification is not supported).
+//     * <p>
+//     * The finger is set each time a leaf is found as the result of a search. It
+//     * is tested by each search operation before walking the tree. The finger is
+//     * a {@link WeakReference} so that we do not need to worry about having a
+//     * hard reference to an arbitrary part of the tree.
+//     * 
+//     * @todo Does the finger need to encapsulate the hard references for the
+//     *       parents in order to ensure that the parents remain strongly
+//     *       reachable? (Parents are only weakly reachable from their children.)
+//     */
+//    private WeakReference<Leaf> finger;
+//
+//    final private boolean useFinger = false;
+
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree.
      */
@@ -192,7 +218,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * in use.
      */
     public int referenceCount = 0;
-    
+
     /**
      * Leaves (and nodes) are added to a hard reference queue when they are
      * created or read from the store. On eviction from the queue a dirty leaf
@@ -342,8 +368,9 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         assert nodeFactory != null;
 
-        if(indexUUID == null) throw new IllegalArgumentException("indexUUID");
-        
+        if (indexUUID == null)
+            throw new IllegalArgumentException("indexUUID");
+
         this.store = store;
 
         this.branchingFactor = branchingFactor;
@@ -355,7 +382,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
                 valueSer, recordCompressor, useChecksum);
 
         this.indexUUID = indexUUID;
-        
+
     }
 
     /**
@@ -365,7 +392,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * at any time (conditional on the continued availability of the backing
      * store). The index reference remains valid after a {@link #close()}. A
      * closed index is transparently restored by either {@link #getRoot()} or
-     * {@link #reopen()}. 
+     * {@link #reopen()}.
      * <p>
      * This implementation clears the hard reference queue (releasing all node
      * references), releases the hard reference to the root node, and releases
@@ -388,36 +415,36 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     public void close() {
 
-        if(root==null) {
+        if (root == null) {
 
             throw new IllegalStateException("Already closed");
-            
+
         }
 
         if (root.dirty) {
-            
+
             throw new IllegalStateException("Root node is dirty");
-            
+
         }
-        
+
         /*
          * Release buffers.
          */
         nodeSer.close();
-        
+
         /*
          * Clear the hard reference queue (this will not trigger any writes
          * since we know as a pre-condition that the root node is clean).
          */
         leafQueue.evictAll(true);
-        
+
         /*
          * Clear the reference to the root node (permits GC).
          */
         root = null;
-        
+
     }
-    
+
     /**
      * This is part of a {@link #close()}/{@link #reopen()} protocol that may
      * be used to reduce the resource burden of an {@link AbstractBTree}. The
@@ -431,7 +458,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * @see #getRoot()
      */
     abstract protected void reopen();
-    
+
     /**
      * An "open" index has its buffers and root node in place rather than having
      * to reallocate buffers or reload the root node from the store.
@@ -443,11 +470,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * @see #getRoot()
      */
     final public boolean isOpen() {
-        
+
         return root != null;
-        
+
     }
-    
+
     /**
      * The backing store.
      */
@@ -514,11 +541,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * they belong.
      */
     final public UUID getIndexUUID() {
-        
+
         return indexUUID;
-        
+
     }
-    
+
     /**
      * The root of the btree. This is initially a leaf until the leaf is split,
      * at which point it is replaced by a node. The root is also replaced each
@@ -531,8 +558,9 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     final public AbstractNode getRoot() {
 
         // make sure that the root is defined.
-        if(root == null) reopen();
-        
+        if (root == null)
+            reopen();
+
         return root;
 
     }
@@ -549,25 +577,27 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *                if src is this btree.
      */
     public void addAll(AbstractBTree src) {
-        
-        if(src==null) throw new IllegalArgumentException();
-        
-        if(src==this) throw new IllegalArgumentException();
-        
+
+        if (src == null)
+            throw new IllegalArgumentException();
+
+        if (src == this)
+            throw new IllegalArgumentException();
+
         IEntryIterator itr = src.entryIterator();
-        
-        while(itr.hasNext()) {
-        
+
+        while (itr.hasNext()) {
+
             Object val = itr.next();
-            
+
             byte[] key = itr.getKey();
-            
-            insert(key,val);
-            
+
+            insert(key, val);
+
         }
-        
+
     }
-    
+
     public void insert(BatchInsert op) {
 
         final int ntuples = op.ntuples;
@@ -638,10 +668,10 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
 
     public void contains(BatchContains op) {
-        
+
         final int ntuples = op.ntuples;
-        
-        while( op.tupleIndex < ntuples ) {
+
+        while (op.tupleIndex < ntuples) {
 
             // skip tuples already marked as true.
             if (op.contains[op.tupleIndex]) {
@@ -668,10 +698,10 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
 
     public void remove(BatchRemove op) {
-        
+
         final int ntuples = op.ntuples;
-        
-        while( op.tupleIndex < ntuples) {
+
+        while (op.tupleIndex < ntuples) {
 
             /*
              * Each call MAY process more than one tuple.
@@ -709,9 +739,83 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *             as soon as I update the test suites.
      */
     final protected byte[] unbox(Object key) {
-     
+
         return keyBuilder.reset().append(((Integer) key).intValue()).getKey();
-        
+
+    }
+
+    /**
+     * Returns the node or leaf to be used for search. This implementation is
+     * aware of the {@link #finger} and will return it if the key lies within
+     * the finger.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return Either the root node of the tree or a recently touched leaf that
+     *         is known to span the key.
+     */
+    protected AbstractNode getRootOrFinger(byte[] key) {
+
+        return getRoot();
+//        
+//        if (finger == null)
+//            return getRoot();
+//
+//        Leaf leaf = finger.get();
+//
+//        if (leaf == null || leaf.deleted) {
+//
+//            // @todo clear finger on delete/copyOnWrite
+//
+//            return getRoot();
+//
+//        }
+//
+//        int entryIndex = leaf.keys.search(key);
+//
+//        if (entryIndex >= 0) {
+//
+//            /*
+//             * There is an exact match on the finger so we know that this key
+//             * belongs in this leaf.
+//             */
+//
+//            return leaf;
+//
+//        }
+//
+//        if (entryIndex < 0) {
+//
+//            // Convert the position to obtain the insertion point.
+//            entryIndex = -entryIndex - 1;
+//
+//            if (entryIndex > 0 && entryIndex < leaf.nkeys - 1) {
+//
+//                /*
+//                 * The key belongs somewhere in between the first and the last
+//                 * key in the leaf. For all those positions, we are again
+//                 * guarenteed that this key belongs within this leaf.
+//                 */
+//
+//                return leaf;
+//
+//            }
+//
+//        }
+//
+//        /*
+//         * The key might belong in the leaf, but we are not sure since it lies
+//         * on either the low or the high edge of the leaf.
+//         * 
+//         * @todo We could disambiguate this using the actual value of the
+//         * separator keys on the parent. If the key is greater than or equal to
+//         * the separatorKey for this leaf and strictly less than the
+//         * separatorKey for the rightSibling, then it belongs in this leaf.
+//         */
+//
+//        return getRoot();
+
     }
 
     public Object insert(Object key, Object value) {
@@ -721,16 +825,14 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.ninserts++;
 
-        if (key instanceof byte[]) {
-        
-            return getRoot().insert((byte[]) key,value);
-            
-        } else {
-            
-            return getRoot().insert( unbox(key), value );
-            
+        if (!(key instanceof byte[])) {
+
+            key = unbox(key);
+
         }
-        
+
+        return getRootOrFinger((byte[]) key).insert((byte[]) key, value);
+
     }
 
     public Object lookup(Object key) {
@@ -740,15 +842,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nfinds++;
 
-        if (key instanceof byte[]) {
+        if (!(key instanceof byte[])) {
 
-            return getRoot().lookup((byte[])key);
-            
-        } else {
-            
-            return getRoot().lookup(unbox(key));
-            
+            key = unbox(key);
+
         }
+
+        return getRootOrFinger((byte[]) key).lookup((byte[]) key);
 
     }
 
@@ -758,8 +858,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             throw new IllegalArgumentException();
 
         counters.nfinds++;
-        
-        return getRoot().contains((byte[])key);
+
+        return getRootOrFinger((byte[]) key).contains((byte[]) key);
 
     }
 
@@ -770,15 +870,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nremoves++;
 
-        if (key instanceof byte[]) {
-        
-            return getRoot().remove((byte[])key);
-            
-        } else {
-            
-            return getRoot().remove(unbox(key));
-            
+        if (!(key instanceof byte[])) {
+
+            key = unbox(key);
+
         }
+
+        return getRootOrFinger((byte[]) key).remove((byte[]) key);
 
     }
 
@@ -789,7 +887,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nindexOf++;
 
-        int index = getRoot().indexOf(key);
+        int index = getRootOrFinger((byte[]) key).indexOf(key);
 
         return index;
 
@@ -838,7 +936,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
         AbstractNode root = getRoot();
-        
+
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
         int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
@@ -982,10 +1080,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         }
 
         if (root != null) {
-            
+
             return root.dump(level, out, 0, true);
-            
-        } else return true;
+
+        } else
+            return true;
 
     }
 
@@ -1058,6 +1157,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
              * 
              * Also see {@link DefaultEvictionListener}.
              */
+
             if (node.referenceCount == 1) {
 
                 ndistinctOnQueue++;
@@ -1065,6 +1165,16 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             }
 
         }
+
+//        if (useFinger && node instanceof ILeafData) {
+//
+//            if (finger == null || finger.get() != node) {
+//
+//                finger = new WeakReference<Leaf>((Leaf) node);
+//
+//            }
+//
+//        }
 
     }
 
@@ -1266,12 +1376,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected AbstractNode readNodeOrLeaf(long addr) {
 
-//        /*
-//         * offer the node serializer's buffer to the IRawStore. it will be used
-//         * iff it is large enough and the store does not prefer to return a
-//         * read-only slice.
-//         */
-//        ByteBuffer tmp = store.read(addr, nodeSer._buf);
+        // /*
+        // * offer the node serializer's buffer to the IRawStore. it will be
+        // used
+        // * iff it is large enough and the store does not prefer to return a
+        // * read-only slice.
+        // */
+        // ByteBuffer tmp = store.read(addr, nodeSer._buf);
         ByteBuffer tmp = store.read(addr);
         assert tmp.position() == 0;
         assert tmp.limit() == Addr.getByteCount(addr);

@@ -157,12 +157,15 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts. </li>
  * <li> Scale-up database (automatic re-partitioning of indices and processing
- * of deletion markers).</li>
- * <li> AIO for the Direct and Disk modes.</li>
+ * of deletion markers). Note that the split point must be choosen with some
+ * awareness of the application keys in order to provide an atomic row update
+ * guarentee when using keys formed as { primaryKey, columnName, timestamp }.</li>
+ * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration, including: support for primary key (clustered) indices;
  * using queues from GOM to journal/database segment server supporting both
  * embedded and remote scenarios; and using state-based conflict resolution to
- * obtain high concurrency for generic objects, link set metadata, and indices.</li>
+ * obtain high concurrency for generic objects, link set metadata, indices, and
+ * distributed split cache and hot cache support.</li>
  * <li> Scale-out database, including:
  * <ul>
  * <li> Data server (mixture of journal server and read-optimized database
@@ -175,6 +178,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * Hadoop integration point).</li>
  * </ul>
  * </ol>
+ * 
+ * @todo Move Addr methods onto IRawStore and store the bitsplit point in the
+ *       root block. This will let us provision the journal to have more
+ *       distinct offsets at which records can be written (e.g., 35 bits for
+ *       that vs 32) by accepting a maximum record length with fewer bytes (29
+ *       vs 32). The bitsplit point can be choosen differently for each store.
  * 
  * @todo Define distributed transaction protocol. Pay attention to 2-phase or
  *       3-phase commits when necessary, but take advantage of locality when
@@ -189,11 +198,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo Define distributed protocol for robust startup, operation, and
  *       failover.
  * 
- * @todo I need to revisit the assumptions for very large objects in the face of
- *       the recent / planned redesign. I expect that using an index with a key
- *       formed as [URI][chuck#] would work just fine. Chunks would then be
- *       limited to 32k or so. Writes on such indices should probably be
- *       directed to a journal using a disk-only mode.
+ * @todo I need to revisit the assumptions for very large objects. I expect that
+ *       using an index with a key formed as [URI][chuck#] would work just fine.
+ *       Chunks would then be limited to 32k or so. Writes on such indices
+ *       should probably be directed to a journal using a disk-only mode.
  * 
  * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
  *       or other persistence capable data structure basis. It is nice to be

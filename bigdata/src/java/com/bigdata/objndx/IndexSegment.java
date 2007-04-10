@@ -99,10 +99,6 @@ public class IndexSegment extends AbstractBTree {
                 BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
                 BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
 
-        // report on the event.
-        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
-                .toString(), fileStore.size());
-
     }
 
     /**
@@ -140,6 +136,10 @@ public class IndexSegment extends AbstractBTree {
         this.fileStore = (IndexSegmentFileStore) fileStore;
 
         _open();
+
+        // report on the event.
+        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
+                .toString(), fileStore.size());
 
     }
 
@@ -310,6 +310,7 @@ public class IndexSegment extends AbstractBTree {
                 _key = (byte[]) key;
 
             } else {
+                
                 _key = unbox(key);
 
             }

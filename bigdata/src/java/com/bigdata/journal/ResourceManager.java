@@ -52,6 +52,7 @@ import java.text.NumberFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.objndx.AbstractBTree;
 import com.bigdata.objndx.IndexSegment;
 import com.bigdata.objndx.IndexSegmentBuilder;
 import com.bigdata.rawstore.Bytes;
@@ -178,6 +179,8 @@ public class ResourceManager {
      *       not really able to differentiate the nature of the index when it is
      *       finalized (unisolated vs isolated vs index segment can be
      *       identified based on their interfaces).
+     * 
+     * @todo add reporting for {@link AbstractBTree#reopen()}.
      */
     static public void closeUnisolatedBTree(String name) {
 
