@@ -47,6 +47,7 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 
@@ -774,7 +775,7 @@ public class Leaf extends AbstractNode implements ILeafData {
     public Object lookup(byte[] searchKey) {
 
         btree.touch(this);
-        
+
         final int entryIndex = keys.search(searchKey);
 
         if (entryIndex < 0) {
@@ -794,7 +795,7 @@ public class Leaf extends AbstractNode implements ILeafData {
     /**
      * Looks up one or more tuples and reports whether or not they exist.
      * 
--     * @return The #of tuples processed.
+     * @return The #of tuples processed.
      * 
      * @todo optimize batch lookup here (also when bloom filter is available on
      *       an IndexSegment).

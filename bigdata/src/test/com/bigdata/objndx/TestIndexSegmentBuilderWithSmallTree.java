@@ -416,7 +416,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      */
     public void test_problem3_buildOrder3() throws IOException {
 
-        BTree btree = getProblem3();
+        final BTree btree = getProblem3();
 
         btree.dump(Level.DEBUG,System.err);
         

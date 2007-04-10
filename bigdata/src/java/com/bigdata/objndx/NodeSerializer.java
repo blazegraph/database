@@ -46,7 +46,9 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -96,6 +98,7 @@ import com.bigdata.util.ChecksumUtility;
  * compression or packing techniques within the implementations of this
  * interfaces is encouraged.
  * </p>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 

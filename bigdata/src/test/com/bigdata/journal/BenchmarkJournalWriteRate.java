@@ -59,8 +59,11 @@ import junit.framework.Test;
 import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.objndx.BTree;
+import com.bigdata.objndx.ByteArrayValueSerializer;
+import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -209,6 +212,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      */
     protected int getBranchingFactor() {
         
+//        return 16;
         return 256;
         
     }
@@ -285,8 +289,32 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     }
     
     /**
-     * Test the index write rate without transactional isolation using 32 bit
-     * integer keys and 128 byte values for the index entries.
+     * Test the index write rate using an index that does NOT support
+     * transactional isolation using 32 bit integer keys and 128 byte values for
+     * the index entries.
+     */
+    public void testNonIsolatableIndexWriteRate() throws IOException {
+        
+        // register named index that does NOT support isolation.
+        String name = "abc";
+
+        journal.registerIndex(name, new BTree(journal, getBranchingFactor(),
+                UUID.randomUUID(), ByteArrayValueSerializer.INSTANCE));
+
+        journal.commit();
+
+        // NOT isolated.
+        long tx = 0L;
+
+        // run test.
+        doIndexWriteRateTest(name, tx, 128);
+        
+    }
+
+    /**
+     * Test the index write rate using an index that supports transactional
+     * isolation but without transactional isolation using 32 bit integer keys
+     * and 128 byte values for the index entries.
      */
     public void testUnisolatedIndexWriteRate() throws IOException {
         
@@ -417,33 +445,41 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         KeyBuilder keyBuilder = new KeyBuilder();
         
+        IIndex ndx = (tx == 0 ? journal.getIndex(name)
+                : journal.getTx(tx).getIndex(name));
+
         System.err.println("Begin: index write rate, isolated="
-                + (tx == 0 ? "no" : "yes") + ", bufferMode="
+                + (tx == 0 ? "no" : "yes") + ", isolatable="
+                + (ndx instanceof IIsolatableIndex) + ", bufferMode="
                 + journal._bufferStrategy.getBufferMode());
 
-        UnisolatedBTree ndx = (UnisolatedBTree) (tx == 0 ? journal
-                .getIndex(name) : journal.getTx(tx).getIndex(name));
-        
         // target percentage full to avoid journal overflow.
         final double percentFull = .90;
 
         // #of entries to insert into the index.
         final int nwrites = (int) (journal._bufferStrategy.getExtent()
                 * percentFull / valueSize);
-                
-        final long begin = System.currentTimeMillis();
 
-        for( int i=0; i<nwrites; i++ ) {
+        final long begin;
 
-            // key[] is new on each insert; keys are monotonically increasing.
-            final byte[] key = keyBuilder.reset().append(i).getKey();
-            
-            // value[] is new on each insert.
-            final byte[] value = new byte[valueSize];
-            
-            value[0] = (byte)i; // at least one non-zero byte.
-            
-            ndx.insert(key,value);
+        {
+
+            begin = System.currentTimeMillis();
+
+            for (int i = 0; i < nwrites; i++) {
+
+                // key[] is new on each insert; keys are monotonically
+                // increasing.
+                final byte[] key = keyBuilder.reset().append(i).getKey();
+
+                // value[] is new on each insert.
+                final byte[] value = new byte[valueSize];
+
+                value[0] = (byte) i; // at least one non-zero byte.
+
+                ndx.insert(key, value);
+
+            }
             
         }
 
@@ -501,7 +537,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         final long elapsed = System.currentTimeMillis() - begin;
 
         // The unisolated btree on which the data were actually written.
-        final UnisolatedBTree btree = (UnisolatedBTree)journal.getIndex(name);
+        final BTree btree = (BTree)journal.getIndex(name);
         
         final int nodesWritten = btree.counters.getNodesWritten();
         
@@ -802,7 +838,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
     
     /**
      * Runs the tests that have not been commented out :-)
-     * 
+     * <p>
      * Note: Running all benchmarks together can challange the VM by running low
      * on heap, native memory given over to direct buffers - and things can actually
      * slow down with more memory.
@@ -820,6 +856,41 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         suite.addTestSuite( BenchmarkSustainedTransferOptimium.class );
 
         return suite;
+        
+    }
+    
+    /**
+     * Main routine can be used for running the test under a performance
+     * analyzer.
+     * 
+     * @param args
+     *            Not used.
+     * 
+     * @throws Exception
+     */
+    public static void main(String[] args) throws Exception {
+        
+        BenchmarkTransientJournal test = new BenchmarkTransientJournal();
+        
+        test.setUp();
+        
+        try {
+
+            /*
+             * Choose one test to run. (You must setUp/tearDown for each test).
+             */
+            test.testNonIsolatableIndexWriteRate();
+
+//          test.testUnisolatedIndexWriteRate();
+
+//            test.testIsolatedIndexWriteRate();
+
+        }
+        finally {
+            
+            test.tearDown();
+            
+        }
         
     }
     

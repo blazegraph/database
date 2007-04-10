@@ -1554,10 +1554,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assert actual != null;
         
-        assertEquals("indexUUID",expected.getIndexUUID(), actual.getIndexUUID());
+        // Must be the same "index".
+        assertEquals("indexUUID", expected.getIndexUUID(), actual
+                .getIndexUUID());
         
         // The #of entries must agree.
-        assertEquals("entryCount",expected.getEntryCount(), actual.getEntryCount());
+        assertEquals("entryCount", expected.getEntryCount(), actual
+                .getEntryCount());
         
         // verify the entry iterator.
         doEntryIteratorTest(actual,expected);

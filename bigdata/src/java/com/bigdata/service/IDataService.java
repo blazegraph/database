@@ -92,12 +92,15 @@ import com.bigdata.service.DataService.RangeQueryResult;
 public interface IDataService extends IRemoteTxCommitProtocol {
 
     /**
+     * <p>
      * Used by the client to submit a batch operation on a named B+Tree
      * (synchronous).
+     * </p>
      * <p>
      * Unisolated operations SHOULD be used to achieve "auto-commit" semantics.
      * Fully isolated transactions are useful IFF multiple operations must be
      * composed into a ACID unit.
+     * </p>
      * <p>
      * While unisolated batch operations on a single data service are ACID,
      * clients are required to locate all index partitions for the logical
@@ -110,6 +113,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * low system overhead, clients interested in the higher possible total
      * throughput SHOULD choose unisolated read operations in preference to a
      * read-committed transaction.
+     * </p>
      * <p>
      * This method is thread-safe. It will block for each operation. It should
      * be invoked within a pool request handler threads servicing a network
@@ -117,6 +121,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * requests. When using as part of an embedded database, the client
      * operations MUST be buffered by a thread pool with a FIFO policy so that
      * client requests may be decoupled from data service operations.
+     * </p>
      * 
      * @param tx
      *            The transaction identifier -or- zero (0L) IFF the operation is
@@ -133,55 +138,35 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
+     * 
+     * @todo it is possible to have concurrent execution of batch operations for
+     *       distinct indices. In order to support this, the write thread would
+     *       have to become a pool of N worker threads fed from a queue of
+     *       operations. Concurrent writers can execute as long as they are
+     *       writing on different indices. (Concurrent readers can execute as
+     *       long as they are reading from a historical commit time.)
      */
     public void batchOp(long tx, String name, IBatchOp op)
             throws InterruptedException, ExecutionException, IOException;
-
-    /**
-     * Submit a procedure.
-     * <p>
-     * <p>
-     * Unisolated operations SHOULD be used to achieve "auto-commit" semantics.
-     * Fully isolated transactions are useful IFF multiple operations must be
-     * composed into a ACID unit.
-     * <p>
-     * While unisolated batch operations on a single data service are ACID,
-     * clients are required to locate all index partitions for the logical
-     * operation and distribute their operation across the distinct data service
-     * instances holding the affected index partitions. In practice, this means
-     * that contract for ACID unisolated operations is limited to operations
-     * where the data is located on a single data service instance. For ACID
-     * operations that cross multiple data service instances the client MUST use
-     * a fully isolated transaction. While read-committed transactions impose
-     * low system overhead, clients interested in the higher possible total
-     * throughput SHOULD choose unisolated read operations in preference to a
-     * read-committed transaction.
-     * 
-     * @param tx
-     *            The transaction identifier -or- zero (0L) IFF the operation is
-     *            NOT isolated by a transaction.
-     * @param proc
-     *            The procedure to be executed.
-     *            
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void submit(long tx, IProcedure proc) throws InterruptedException,
-            ExecutionException, IOException;
     
     /**
-     * Streaming traversal of keys and/or values in a given key range.
      * <p>
-     * Note: The rangeQuery operation is NOT allowed for either unisolated reads
-     * or read-committed transactions (the underlying constraint is that the
-     * {@link BTree} does NOT support traversal under concurrent modification
-     * this operation is limited to read-only or fully isolated transactions).
+     * Streaming traversal of keys and/or values in a given key range.
+     * </p>
+     * <p>
+     * Note: The rangeQuery operation is NOT allowed for read-committed
+     * transactions (the underlying constraint is that the {@link BTree} does
+     * NOT support traversal under concurrent modification so this operation is
+     * limited to read-only or fully isolated transactions or to unisolated
+     * reads against a historical commit time).
+     * </p>
      * 
      * @param tx
      * @param name
      * @param fromKey
      * @param toKey
-     * @param flags (@todo define flags: count yes/no, keys yes/no, values yes/no)
+     * @param flags
+     *            (@todo define flags: count yes/no, keys yes/no, values yes/no)
      * 
      * @exception InterruptedException
      *                if the operation was interrupted (typically by
@@ -194,10 +179,50 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                If the tx is zero (0L) (indicating an unisolated
      *                operation) -or- if the identifed transaction is
      *                {@link IsolationEnum#ReadCommitted}.
+     * 
+     * FIXME support filters. there are a variety of use cases from clients that
+     * are aware of version counters and delete markers to clients that encode a
+     * column name and datum or write time into the key to those that will
+     * filter based on inspection of the value associated with the key, e.g.,
+     * only values having some attribute.
      */
     public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey,
             byte[] toKey, int flags) throws InterruptedException,
             ExecutionException, IOException, IOException;
+    /**
+     * <p>
+     * Submit a procedure.
+     * </p>
+     * <p>
+     * Unisolated operations SHOULD be used to achieve "auto-commit" semantics.
+     * Fully isolated transactions are useful IFF multiple operations must be
+     * composed into a ACID unit.
+     * </p>
+     * <p>
+     * While unisolated batch operations on a single data service are ACID,
+     * clients are required to locate all index partitions for the logical
+     * operation and distribute their operation across the distinct data service
+     * instances holding the affected index partitions. In practice, this means
+     * that contract for ACID unisolated operations is limited to operations
+     * where the data is located on a single data service instance. For ACID
+     * operations that cross multiple data service instances the client MUST use
+     * a fully isolated transaction. While read-committed transactions impose
+     * low system overhead, clients interested in the higher possible total
+     * throughput SHOULD choose unisolated read operations in preference to a
+     * read-committed transaction.
+     * </p>
+     * 
+     * @param tx
+     *            The transaction identifier -or- zero (0L) IFF the operation is
+     *            NOT isolated by a transaction.
+     * @param proc
+     *            The procedure to be executed.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void submit(long tx, IProcedure proc) throws InterruptedException,
+            ExecutionException, IOException;
 
 //    /**
 //     * Execute a map worker task against all key/value pairs in a key range,
