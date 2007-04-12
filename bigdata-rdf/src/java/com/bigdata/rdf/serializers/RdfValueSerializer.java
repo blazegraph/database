@@ -43,13 +43,14 @@ Modifications:
 */
 package com.bigdata.rdf.serializers;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.rdf.RdfKeyBuilder;
@@ -88,13 +89,14 @@ public class RdfValueSerializer implements IValueSerializer {
     
     public RdfValueSerializer() {}
     
-    protected void writeUTF(DataOutputStream os,String s) throws IOException {
+    protected void writeUTF(DataOutputBuffer os,String s) throws IOException {
         
         if (utfCompression) {
 
             byte[] data = UnicodeCompressor.compress(s);
 
-            LongPacker.packLong(os, data.length);
+//            LongPacker.packLong(os, data.length);
+            os.packLong(data.length);
 
             os.write(data);
 
@@ -106,7 +108,7 @@ public class RdfValueSerializer implements IValueSerializer {
         
     }
     
-    protected String readUTF(DataInputStream is) throws IOException {
+    protected String readUTF(DataInput is) throws IOException {
         
         if(utfCompression) {
         
@@ -126,7 +128,7 @@ public class RdfValueSerializer implements IValueSerializer {
         
     }
     
-    public void getValues(DataInputStream is, Object[] vals, int n)
+    public void getValues(DataInput is, Object[] vals, int n)
             throws IOException {
 
         final int version = (int)LongPacker.unpackLong(is);
@@ -167,7 +169,7 @@ public class RdfValueSerializer implements IValueSerializer {
         
     }
 
-    public void putValues(DataOutputStream os, Object[] vals, int n)
+    public void putValues(DataOutputBuffer os, Object[] vals, int n)
             throws IOException {
 
         LongPacker.packLong(os, VERSION0);

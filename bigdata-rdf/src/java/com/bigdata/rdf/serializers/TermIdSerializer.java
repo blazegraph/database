@@ -43,12 +43,12 @@ Modifications:
 */
 package com.bigdata.rdf.serializers;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IValueSerializer;
 
 /**
@@ -72,7 +72,7 @@ public class TermIdSerializer implements IValueSerializer {
     
     public TermIdSerializer() {}
     
-    public void getValues(DataInputStream is, Object[] values, int n)
+    public void getValues(DataInput is, Object[] values, int n)
             throws IOException {
 
         for(int i=0; i<n; i++) {
@@ -91,14 +91,15 @@ public class TermIdSerializer implements IValueSerializer {
         
     }
 
-    public void putValues(DataOutputStream os, Object[] values, int n)
+    public void putValues(DataOutputBuffer os, Object[] values, int n)
             throws IOException {
 
         for(int i=0; i<n; i++) {
 
             if(packedLongs) {
 
-                LongPacker.packLong(os, ((Long) values[i]).longValue());
+//                LongPacker.packLong(os, ((Long) values[i]).longValue());
+                os.packLong(((Long) values[i]).longValue());
                 
             } else {
 

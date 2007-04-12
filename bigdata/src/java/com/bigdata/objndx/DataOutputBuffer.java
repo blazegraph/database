@@ -161,14 +161,34 @@ public class DataOutputBuffer implements DataOutput {
     }
 
     /**
-     * The #of bytes of data in the key.
+     * The current position in the buffer.
      */
-    final public int getLength() {
+    final public int position() {
         
         return len;
         
     }
 
+    /**
+     * Set the position in the buffer.
+     * 
+     * @param pos
+     *            The new position, must be in [0:capacity).
+     * 
+     * @return The old position.
+     */
+    final public int position(int pos) {
+
+        if(pos<0 || pos>=buf.length) throw new IllegalArgumentException();
+        
+        int v = this.len;
+        
+        this.len = pos;
+        
+        return v;
+        
+    }
+    
     /**
      * Ensure that at least <i>len</i> bytes are free in the buffer. The
      * {@link #buf buffer} may be grown by this operation but it will not be
@@ -233,7 +253,12 @@ public class DataOutputBuffer implements DataOutput {
      */
     protected int extend(int required) {
 
-        return Math.max(required, buf.length * 2);
+        int capacity = Math.max(required, buf.length * 2);
+
+        System.err.println("Extending buffer to capacity=" + capacity
+                + " bytes.");
+
+        return capacity;
         
     }
 
@@ -450,12 +475,15 @@ public class DataOutputBuffer implements DataOutput {
     }
     
     /**
-     * Note: This is not wildly efficient (it would be fine if
-     * DataOutputStream#writeUTF(String str, DataOutput out)} was public) but
-     * the use cases for serializing the nodes and leaves of a btree do not
-     * suggest any requirement for Unicode (if you assume that the application
-     * values are already being serialized as byte[]s - which is always true
-     * when there is a client-server divide).
+     * @todo This is not wildly efficient (it would be fine if
+     *       DataOutputStream#writeUTF(String str, DataOutput out)} was public)
+     *       but the use cases for serializing the nodes and leaves of a btree
+     *       do not suggest any requirement for Unicode (if you assume that the
+     *       application values are already being serialized as byte[]s - which
+     *       is always true when there is a client-server divide). The RDF value
+     *       serializer does use this method right now, but that will be client
+     *       side code as soon we as refactor to isolate the client and the
+     *       server.
      */
     public void writeUTF(String str) throws IOException {
         

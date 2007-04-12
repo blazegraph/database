@@ -354,6 +354,13 @@ public class InferenceEngine extends TripleStore {
 
     }
     
+    /**
+     * Copies the entailments from the temporary store into the main store.
+     * 
+     * @param entailments
+     * 
+     * @return The #of entailments inserted into the main store.
+     */
     private int transferBTrees( TempTripleStore entailments ) {
         
         int numInserted = 0;
@@ -402,7 +409,7 @@ public class InferenceEngine extends TripleStore {
 
         final int n = ndx.rangeCount(fromKey, toKey);
 
-        // bufferQueue for storing the extracted s:p:o data.
+        // buffer for storing the extracted s:p:o data.
         SPO[] ids = new SPO[n];
 
         IEntryIterator itr1 = ndx.rangeIterator(fromKey, toKey);
@@ -438,6 +445,9 @@ public class InferenceEngine extends TripleStore {
      *                if query is null.
      * @exception IllegalArgumentException
      *                if query is a fact (no variables).
+     * 
+     * FIXME Magic sets has NOT been implemented -- this method does NOT
+     * function.
      */
     public TripleStore query(Triple query, Rule[] rules) throws IOException {
 

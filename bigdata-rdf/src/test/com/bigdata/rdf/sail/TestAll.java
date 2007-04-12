@@ -41,53 +41,45 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-/*
- * Created on Nov 20, 2006
- */
+package com.bigdata.rdf.sail;
 
-package com.bigdata.objndx;
-
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.io.Serializable;
-
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * (De-)serialize the values in a {@link Leaf}.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IValueSerializer extends Serializable {
+public class TestAll extends TestCase {
 
     /**
-     * De-serialize the values.
      * 
-     * @param is
-     *            The input stream.
-     * @param values
-     *            The array into which the values must be written.
-     * @param nvals
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be read from the buffer and
-     *            written on the array.
      */
-    public void getValues(DataInput is, Object[] values, int nvals)
-            throws IOException;
+    public TestAll() {
+    }
 
     /**
-     * Serialize the values.
-     * 
-     * @param os
-     *            The output stream.
-     * @param values
-     *            The array of values from the {@link Leaf}.
-     * @param nvals
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be written.
+     * @param arg0
      */
-    public void putValues(DataOutputBuffer os, Object[] values, int nvals)
-            throws IOException;
+    public TestAll(String arg0) {
+        super(arg0);
+    }
 
+    /**
+     * Returns a test that will run test suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("SAIL");
+
+        suite.addTestSuite( TestSimpleRdfRepository.class );
+     
+        return suite;
+        
+    }
+    
 }

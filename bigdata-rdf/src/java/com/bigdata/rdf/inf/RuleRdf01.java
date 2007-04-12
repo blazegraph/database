@@ -98,7 +98,7 @@ public class RuleRdf01 extends AbstractRuleRdf {
             }
             
         }
-        dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
+        if(debug)dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
         
         stats.computeTime = System.currentTimeMillis() - computeStart;
         

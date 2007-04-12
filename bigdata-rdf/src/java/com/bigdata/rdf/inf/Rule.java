@@ -68,6 +68,8 @@ import com.bigdata.rdf.TempTripleStore;
  */
 abstract public class Rule {
 
+    static protected final boolean debug = false; 
+    
     /**
      * The inference engine.
      */

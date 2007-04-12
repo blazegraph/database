@@ -48,14 +48,14 @@ Modifications:
 package com.bigdata.isolation;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
+
+import com.bigdata.objndx.DataOutputBuffer;
 
 /**
  * Test suite for {@link Value.Serializer}.
@@ -183,15 +183,17 @@ public class TestValueSerializer extends TestCase2 {
             
             final byte[] data;
             {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-            DataOutputStream dos = new DataOutputStream(baos);
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//
+//            DataOutputStream dos = new DataOutputStream(baos);
+                
+                DataOutputBuffer dos = new DataOutputBuffer();
 
             ser.putValues(dos, values, values.length);
             
-            dos.flush();
+//            dos.flush();
             
-            data = baos.toByteArray();
+            data = dos.toByteArray();
             }
 
             Value[] actual = new Value[values.length];

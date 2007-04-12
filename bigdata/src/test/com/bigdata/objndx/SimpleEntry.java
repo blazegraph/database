@@ -46,7 +46,9 @@ Modifications:
  */
 package com.bigdata.objndx;
 
+import java.io.DataInput;
 import java.io.DataInputStream;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
@@ -118,7 +120,7 @@ public class SimpleEntry {
         
         public Serializer() {}
 
-        public void putValues(DataOutputStream os, Object[] values, int n)
+        public void putValues(DataOutputBuffer os, Object[] values, int n)
                 throws IOException {
 
             for (int i = 0; i < n; i++) {
@@ -129,7 +131,7 @@ public class SimpleEntry {
 
         }
 
-        public void getValues(DataInputStream is, Object[] values, int n)
+        public void getValues(DataInput is, Object[] values, int n)
                 throws IOException {
 
             for (int i = 0; i < n; i++) {
@@ -161,13 +163,13 @@ public class SimpleEntry {
         
         public NoSerializer() {}
         
-        public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
+        public void getValues(DataInput is, Object[] values, int n) throws IOException {
 
             throw new UnsupportedOperationException();
  
         }
 
-        public void putValues(DataOutputStream os, Object[] values, int n) throws IOException {
+        public void putValues(DataOutputBuffer os, Object[] values, int n) throws IOException {
 
             throw new UnsupportedOperationException();
 

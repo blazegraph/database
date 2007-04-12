@@ -51,9 +51,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.BufferOverflowException;
 
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
+
+import com.bigdata.rdf.TripleStore.LoadStats;
 
 /**
  * @todo update javadoc.
@@ -187,9 +190,9 @@ public class TaskATest
     {
 
         /*
-         * Load the data.
+         * Load the data. Sets some instance variables from various counters.
          */
-        long elapsedLoad = loadData();
+        loadData();
         
     }
 
@@ -264,7 +267,7 @@ public class TaskATest
 //    }
     
     /**
-     * Load each RDF source in turn and perform RDFS closure on the data.
+     * Load each RDF source in turn.
      * 
      * @return The elasped time to load the data and perform closure.
      */
@@ -277,7 +280,7 @@ public class TaskATest
         
         for(int i=0; i<filename.length; i++) {
          
-            store.loadData(new File(filename[i]), baseURI[i]);
+            loadStats = store.loadData(new File(filename[i]), baseURI[i], true);
             
         }
 
@@ -288,6 +291,11 @@ public class TaskATest
         return elapsed;
 
     }
+    
+    /**
+     * Set by {@link #loadData()}.
+     */
+    protected LoadStats loadStats;
 
     /**
      * Datasets to load - in order by size. Each dataset described by three (3)
@@ -417,6 +425,8 @@ public class TaskATest
             
         }
 
+        LoadStats[] loadStats = new LoadStats[ all_sources.length ];
+
         for( int i=0, run=0; i<all_sources.length; i+=3, run++ ) {
             
             String desc = all_sources[ i ];
@@ -434,6 +444,7 @@ public class TaskATest
                 try {
                     test.testFilesExist();
                     test.testOntology();
+                    loadStats[run] = test.loadStats;
 //                    test.testReadPerformance();
                     w.println( "SUCCESS" );
                     nok++;
@@ -461,11 +472,16 @@ public class TaskATest
 
         System.out.println( "\n\n\n"+nok+" out of "+nruns+" Ok.");
         
+        System.out.println("name, status, triplesPerSecond, loadTime(s), commitTime(ms)");
+        
         for( int run=0; run<nruns; run++ ) {
             
-            System.out.println( all_sources[ run * 3 ]+ " : " +
+            System.out.println( all_sources[ run * 3 ]+ ", " +
                     ( errors[ run ] == null
-                      ? "Ok"
+                      ? "Ok, "
+                            + loadStats[run].triplesPerSecond() + ", "
+                            + loadStats[run].loadTime / 1000 + ", "
+                            + loadStats[run].commitTime
                       : errors[ run ].getMessage()
                       )
                     );

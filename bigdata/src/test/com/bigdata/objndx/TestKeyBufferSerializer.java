@@ -122,17 +122,18 @@ public class TestKeyBufferSerializer extends TestAbstractKeyBuffer {
         
         // serialize.
         
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        
-        DataOutputStream dos = new DataOutputStream(baos);
+//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        
+//        DataOutputStream dos = new DataOutputStream(baos);
+        DataOutputBuffer dos = new DataOutputBuffer();
         
         KeyBufferSerializer.INSTANCE.putKeys(dos, expected);
         
-        dos.flush();
+//        dos.flush();
 
         // de-serialize.
         
-        ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+        ByteArrayInputStream bais = new ByteArrayInputStream(dos.buf);
 
         DataInputStream dis = new DataInputStream(bais);
 
@@ -151,17 +152,17 @@ public class TestKeyBufferSerializer extends TestAbstractKeyBuffer {
         
         // serialize the mutable key buffer.
         
-        baos = new ByteArrayOutputStream();
+//        baos = new ByteArrayOutputStream();
         
-        dos = new DataOutputStream(baos);
+        dos = new DataOutputBuffer();
         
         KeyBufferSerializer.INSTANCE.putKeys(dos, expected2);
         
-        dos.flush();
+//        dos.flush();
 
         // de-serialize again.
         
-        bais = new ByteArrayInputStream(baos.toByteArray());
+        bais = new ByteArrayInputStream(dos.buf);
 
         dis = new DataInputStream(bais);
 

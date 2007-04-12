@@ -43,15 +43,14 @@ Modifications:
 */
 package com.bigdata.isolation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
 import java.io.IOException;
 import java.util.Arrays;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IValueSerializer;
 
 /**
@@ -159,7 +158,7 @@ public class Value implements IValue {
         
         public Serializer() {}
 
-        public void getValues(DataInputStream is, Object[] values, int n)
+        public void getValues(DataInput is, Object[] values, int n)
         throws IOException {
 
             final int version = (int)LongPacker.unpackLong(is);
@@ -205,13 +204,13 @@ public class Value implements IValue {
                 
                 if( value.deleted || value.datum==null) continue;
                 
-                is.read(value.datum, 0, value.datum.length);
+                is.readFully(value.datum, 0, value.datum.length);
                 
             }
             
         }
 
-        public void putValues(DataOutputStream os, Object[] values, int n)
+        public void putValues(DataOutputBuffer os, Object[] values, int n)
                 throws IOException {
 
             /*
@@ -222,19 +221,22 @@ public class Value implements IValue {
              */
             {
 
-                final int size = 2 + n * 2 + n * 4; // est of buffer capacity.
+//                final int size = 2 + n * 2 + n * 4; // est of buffer capacity.
+//                
+//                ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
+//
+//                DataOutputStream dbaos = new DataOutputStream(baos);
+//
+//                LongPacker.packLong(dbaos, VERSION0);
                 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
-
-                DataOutputStream dbaos = new DataOutputStream(baos);
-
-                LongPacker.packLong(dbaos, VERSION0);
+                os.packLong(VERSION0);
 
                 for (int i = 0; i < n; i++) {
 
                     Value value = (Value) values[i];
 
-                    ShortPacker.packShort(dbaos,value.versionCounter);
+//                    ShortPacker.packShort(dbaos,value.versionCounter);
+                    os.packShort(value.versionCounter);
                     
                     final long len;
                     
@@ -252,13 +254,14 @@ public class Value implements IValue {
 
                     // Note: we add (2) so that the length is always
                     // non-negative so that we can pack it.
-                    LongPacker.packLong(dbaos,len+2);
+//                    LongPacker.packLong(dbaos,len+2);
+                    os.packLong(len+2);
                     
                 }
 
-                dbaos.flush();
-                
-                os.write(baos.toByteArray());
+//                dbaos.flush();
+//                
+//                os.write(baos.toByteArray());
                 
             }
 

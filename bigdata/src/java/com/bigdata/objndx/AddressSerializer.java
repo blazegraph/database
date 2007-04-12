@@ -47,14 +47,16 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import com.bigdata.rawstore.Bytes;
 
 /**
  * Serializes each address as an unpacked long integer.
+ * 
+ * @see PackedAddressSerializer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -74,7 +76,7 @@ public class AddressSerializer implements IAddressSerializer {
         
     }
 
-    public void putChildAddresses(DataOutputStream os, long[] childAddr,
+    public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
             int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
@@ -97,7 +99,7 @@ public class AddressSerializer implements IAddressSerializer {
 
     }
 
-    public void getChildAddresses(DataInputStream is, long[] childAddr,
+    public void getChildAddresses(DataInput is, long[] childAddr,
             int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {

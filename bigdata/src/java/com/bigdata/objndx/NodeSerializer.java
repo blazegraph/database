@@ -46,7 +46,6 @@ Modifications:
  */
 package com.bigdata.objndx;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
@@ -101,6 +100,8 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo modify deserialization to use a fast DataInput wrapping a byte[]?
  * 
  * @todo automatically resize the decompression buffers as required and start
  *       with a smaller buffer.
@@ -175,7 +176,7 @@ public class NodeSerializer {
      * If the buffer overflows it is re-allocated and the operation will be
      * retried.
      */
-    protected ByteBuffer _buf;
+    protected DataOutputBuffer _buf;
     
     /**
      * Used to (de-)compress serialized records (optional).
@@ -471,7 +472,7 @@ public class NodeSerializer {
      * 
      * @return The buffer.
      */
-    static protected ByteBuffer alloc(int capacity) {
+    static protected DataOutputBuffer alloc(int capacity) {
         
 //        return (true || capacity < Bytes.kilobyte32 * 8 )? ByteBuffer
 //                .allocate(capacity) : ByteBuffer
@@ -489,35 +490,37 @@ public class NodeSerializer {
          * is transient or direct.
          */
 
-        return ByteBuffer.allocate(capacity);
+//        return ByteBuffer.allocate(capacity);
+        
+        return new DataOutputBuffer(capacity);
         
     }
 
-    /**
-     * Extends the internal buffer used to serialize nodes and leaves.
-     * <p>
-     * Note: large buffer requirements are not at all uncommon so we grow the
-     * buffer rapidly to avoid multiple resizing and the expense of a too large
-     * buffer.
-     * 
-     * FIXME We can encapsulate the extension of the buffer within a class
-     * derived from or using the {@link ByteBufferOutputStream} and simply copy
-     * the data when we need to extend the buffer rather than restarting
-     * serialization. This will make underestimates of the required buffer
-     * capacity much less costly.
-     */
-    protected void extendBuffer() {
-
-        int capacity = _buf.capacity();
-        
-        capacity *= 2;
-
-        System.err.println("Extending buffer to capacity=" + capacity
-                + " bytes.");
-
-        _buf = alloc(capacity);
-
-    }
+//    /**
+//     * Extends the internal buffer used to serialize nodes and leaves.
+//     * <p>
+//     * Note: large buffer requirements are not at all uncommon so we grow the
+//     * buffer rapidly to avoid multiple resizing and the expense of a too large
+//     * buffer.
+//     * 
+//     * FIXME We can encapsulate the extension of the buffer within a class
+//     * derived from or using the {@link ByteBufferOutputStream} and simply copy
+//     * the data when we need to extend the buffer rather than restarting
+//     * serialization. This will make underestimates of the required buffer
+//     * capacity much less costly.
+//     */
+//    protected void extendBuffer() {
+//
+//        int capacity = _buf.capacity();
+//        
+//        capacity *= 2;
+//
+//        System.err.println("Extending buffer to capacity=" + capacity
+//                + " bytes.");
+//
+//        _buf = alloc(capacity);
+//
+//    }
 
     /**
      * De-serialize a node or leaf. This method is used when the caller does not
@@ -657,23 +660,28 @@ public class NodeSerializer {
             
         }
         
-        while (true) {
-
+//        while (true) {
+//
             try {
 
                 return putNode(_buf, node);
-
+//
+            } catch (IOException ex) {
+                
+                throw new RuntimeException(ex); // exception is not expected.
+                
             } catch (BufferOverflowException ex) {
 
-                extendBuffer();
+                throw ex; // exception is not expected.
+//                extendBuffer();
 
             }
-
-        }
+//
+//        }
 
     }
     
-    private ByteBuffer putNode(ByteBuffer buf, INodeData node) {
+    private ByteBuffer putNode(DataOutputBuffer buf, INodeData node) throws IOException {
 
         assert buf != null;
         assert node != null;
@@ -689,55 +697,55 @@ public class NodeSerializer {
          * fixed length node header.
          */
 
-        buf.clear();
+        buf.reset();
         
         final int pos0 = buf.position();
 
         // checksum
-        buf.putInt(0); // will overwrite below with the checksum.
+        buf.writeInt(0); // will overwrite below with the checksum.
 
         // #bytes
-        buf.putInt(0); // will overwrite below with the actual value.
+        buf.writeInt(0); // will overwrite below with the actual value.
         
         // nodeType
-        buf.put(TYPE_NODE); // this is a non-leaf node.
+        buf.writeByte(TYPE_NODE); // this is a non-leaf node.
 
         // version
-        buf.putShort(VERSION0);
+        buf.writeShort(VERSION0);
         
-        /*
-         * Setup output stream over the buffer.
-         * 
-         * Note: I have tested the use of a {@link BufferedOutputStream} here
-         * and in putLeaf() and it actually slows things down a smidge.
-         */
-        DataOutputStream os = new DataOutputStream(//
-                new ByteBufferOutputStream(buf)
-//              new BufferedOutputStream(new ByteBufferOutputStream(buf))
-                );
+//        /*
+//         * Setup output stream over the buffer.
+//         * 
+//         * Note: I have tested the use of a {@link BufferedOutputStream} here
+//         * and in putLeaf() and it actually slows things down a smidge.
+//         */
+//        DataOutputStream os = new DataOutputStream(//
+//                new ByteBufferOutputStream(buf)
+////              new BufferedOutputStream(new ByteBufferOutputStream(buf))
+//                );
         
         try {
 
             // branching factor.
-            LongPacker.packLong(os, branchingFactor);
+            buf.packLong( branchingFactor);
 
             // #of spanned entries.
-            LongPacker.packLong(os, nentries);
+            buf.packLong( nentries);
             
 //            // #of keys
 //            LongPacker.packLong(os, nkeys);
 
             // keys.
-            keySerializer.putKeys(os, keys);
+            keySerializer.putKeys(buf, keys);
 
             // addresses.
-            addrSerializer.putChildAddresses(os, childAddr, nkeys+1);
+            addrSerializer.putChildAddresses(buf, childAddr, nkeys+1);
 
             // #of entries spanned per child.
-            putChildEntryCounts(os,childEntryCounts,nkeys+1);
+            putChildEntryCounts(buf,childEntryCounts,nkeys+1);
             
-            // Done using the DataOutputStream so flush to the ByteBuffer.
-            os.flush();
+//            // Done using the DataOutputStream so flush to the ByteBuffer.
+//            os.flush();
 
         }
 
@@ -745,7 +753,9 @@ public class NodeSerializer {
 
             /*
              * Masquerade the EOFException as a buffer overflow since that is
-             * what it really represents.
+             * what it really represents (@todo since ByteBuffer is not used
+             * anymore we do not need to masquerade this and the javadoc should
+             * be updated).
              */
             RuntimeException ex2 = new BufferOverflowException();
 
@@ -769,24 +779,31 @@ public class NodeSerializer {
         // #of bytes actually written.
         final int nbytes = buf.position() - pos0;
         assert nbytes > SIZEOF_NODE_HEADER;
+        
+        ByteBuffer buf2 = ByteBuffer.wrap(buf.buf,0,nbytes);
 
         // patch #of bytes written on the record format.
-        buf.putInt(pos0 + OFFSET_NBYTES, nbytes);
+        buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
 
         // compute checksum for data written.
-        final int checksum = useChecksum ? chk.checksum(buf, pos0
+        final int checksum = useChecksum ? chk.checksum(buf2, pos0
                 + SIZEOF_CHECKSUM, pos0 + nbytes) : 0;
 
         // System.err.println("computed node checksum: "+checksum);
 
         // write the checksum into the buffer.
-        buf.putInt(pos0, checksum);
+        buf2.putInt(pos0, checksum);
 
-        // flip the buffer to prepare for reading.
-        buf.flip();
+        /*
+         * Note: The position will be zero(0). The limit will be the #of bytes
+         * in the buffer.
+         */
+        
+//        // flip the buffer to prepare for reading.
+//        buf2.flip();
 
         // optionally compresses the record.
-        return compress( buf );
+        return compress( buf2 );
                 
     }
 
@@ -973,23 +990,29 @@ public class NodeSerializer {
             
         }
         
-        while (true) {
+//        while (true) {
 
             try {
 
                 return putLeaf(_buf,leaf);
 
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex); // exception is not expected.
+                
             } catch (BufferOverflowException ex) {
 
-                extendBuffer();
+                throw ex; // exception is not expected.
+                
+//                extendBuffer();
 
             }
 
-        }
+//        }
         
     }
      
-    private ByteBuffer putLeaf(ByteBuffer buf, ILeafData leaf) {
+    private ByteBuffer putLeaf(DataOutputBuffer buf, ILeafData leaf) throws IOException {
 
         assert buf != null;
         assert leaf != null;
@@ -999,7 +1022,7 @@ public class NodeSerializer {
         final IKeyBuffer keys = leaf.getKeys();
         final Object[] vals = leaf.getValues();
         
-        buf.clear();
+        buf.reset();
         
         /*
          * common data.
@@ -1007,43 +1030,43 @@ public class NodeSerializer {
         final int pos0 = buf.position();
 
         // checksum
-        buf.putInt(0); // will overwrite below with the checksum.
+        buf.writeInt(0); // will overwrite below with the checksum.
         
         // nbytes
-        buf.putInt(0); // will overwrite below with the actual value.
+        buf.writeInt(0); // will overwrite below with the actual value.
         
         // nodeType
-        buf.put(TYPE_LEAF); // this is a leaf node.
+        buf.writeByte(TYPE_LEAF); // this is a leaf node.
 
         // version
-        buf.putShort(VERSION0);
+        buf.writeShort(VERSION0);
         
         /*
          * Setup output stream over the buffer.
          * 
          * Note: wrapping this with a BufferedOutputStream is slightly slower.
          */
-        DataOutputStream os = new DataOutputStream(//
-                new ByteBufferOutputStream(buf)
-//                new BufferedOutputStream(new ByteBufferOutputStream(buf))
-                );
+//        DataOutputStream os = new DataOutputStream(//
+//                new ByteBufferOutputStream(buf)
+////                new BufferedOutputStream(new ByteBufferOutputStream(buf))
+//                );
 
         try {
             
             // branching factor.
-            LongPacker.packLong(os, branchingFactor);
+            buf.packLong( branchingFactor);
 
 //            // #of keys
 //            LongPacker.packLong(os, nkeys);
 
             // keys.
-            keySerializer.putKeys(os, keys);
+            keySerializer.putKeys(buf, keys);
 
             // values.
-            valueSerializer.putValues(os, vals, nkeys);
+            valueSerializer.putValues(buf, vals, nkeys);
 
-            // Done using the DataOutputStream so flush to the ByteBuffer.
-            os.flush();
+//            // Done using the DataOutputStream so flush to the ByteBuffer.
+//            os.flush();
             
         }
 
@@ -1051,7 +1074,8 @@ public class NodeSerializer {
 
             /*
              * Masquerade the EOFException as a buffer overflow since that is
-             * what it really represents.
+             * what it really represents (@todo we do not need to masquerade
+             * this exception since we are not using ByteBuffer anymore).
              */
             RuntimeException ex2 = new BufferOverflowException();
 
@@ -1076,25 +1100,32 @@ public class NodeSerializer {
         final int nbytes = buf.position() - pos0;
         assert nbytes > SIZEOF_LEAF_HEADER;
 
+        ByteBuffer buf2 = ByteBuffer.wrap(buf.buf,0,nbytes);
+        
         // patch #of bytes written on the record format.
-        buf.putInt(pos0 + OFFSET_NBYTES, nbytes);
+        buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
 
-        // compute checksum
-        final int checksum = (useChecksum ? chk.checksum(buf, pos0
+        // compute checksum.
+        final int checksum = (useChecksum ? chk.checksum(buf2, pos0
                 + SIZEOF_CHECKSUM, pos0 + nbytes) : 0);
         // System.err.println("computed leaf checksum: "+checksum);
 
         // write checksum on buffer.
-        buf.putInt(pos0, checksum);
-
+        buf2.putInt(pos0, checksum);
+        
         /*
-         * Flip the buffer to prepare it for reading. The position will be zero
-         * and the limit will be the #of bytes in the serialized record.
+         * Note: The position will be zero(0).  The limit will be the #of bytes
+         * in the buffer.
          */
-        buf.flip();
+
+//        /*
+//         * Flip the buffer to prepare it for reading. The position will be zero
+//         * and the limit will be the #of bytes in the serialized record.
+//         */
+//        buf2.flip();
         
         // optionally compresses the record.
-        return compress( buf );
+        return compress( buf2 );
                 
     }
 
@@ -1253,13 +1284,14 @@ public class NodeSerializer {
      * node.
      * 
      * @param os
+     *            The output stream.
      * @param childEntryCounts
      *            The #of entries spanned by each direct child.
      * @param nchildren
      *            The #of elements of that array that are defined.
      * @throws IOException
      */
-    protected void putChildEntryCounts(DataOutputStream os,
+    protected void putChildEntryCounts(DataOutput os,
             int[] childEntryCounts, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {

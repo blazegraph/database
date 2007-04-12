@@ -68,4 +68,57 @@ public enum KeyOrder {
         this.order = order;
     }
     
+    private static final long NULL = TripleStore.NULL;
+    
+    /**
+     * Return the access path that should be used for the triple pattern.
+     * 
+     * @param s
+     *            The optional subject identifier or {@link TripleStore#NULL}.
+     * @param p
+     *            The optional subject identifier or {@link TripleStore#NULL}.
+     * @param o
+     *            The optional subject identifier or {@link TripleStore#NULL}.
+     * 
+     * @return The KeyOrder that identifies the index to use for that triple
+     *         pattern.
+     */
+    public static KeyOrder getKeyOrder(long s, long p, long o) {
+
+        if (s != NULL && p != NULL && o != NULL) {
+
+            return SPO;
+
+        } else if (s != NULL && p != NULL) {
+
+            return SPO;
+
+        } else if (s != NULL && o != NULL) {
+
+            return OSP;
+
+        } else if (p != NULL && o != NULL) {
+
+            return POS;
+
+        } else if (s != NULL) {
+
+            return SPO;
+
+        } else if (p != NULL) {
+
+            return POS;
+
+        } else if (o != NULL) {
+
+            return OSP;
+
+        } else {
+
+            return SPO;
+
+        }
+
+    }
+    
 }

@@ -47,7 +47,8 @@ Modifications:
 package com.bigdata.objndx;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
@@ -73,20 +74,22 @@ public class ByteArrayValueSerializer implements IValueSerializer {
     
     public static final transient int VERSION0 = 0x0;
 
-    public void putValues(DataOutputStream os, Object[] values, int n) throws IOException {
+    public void putValues(DataOutputBuffer os, Object[] values, int n) throws IOException {
 
         /*
          * Buffer lots of single byte operations.
          */
         {
 
-            final int size = 2 + n * 2; // est of buffer capacity.
+//            final int size = 2 + n * 2; // est of buffer capacity.
+//            
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
+//
+//            DataOutputStream dbaos = new DataOutputStream(baos);
+//
+//            LongPacker.packLong(dbaos,VERSION0);
             
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
-
-            DataOutputStream dbaos = new DataOutputStream(baos);
-
-            LongPacker.packLong(dbaos,VERSION0);
+            os.packLong(VERSION0);
             
             for (int i = 0; i < n; i++) {
 
@@ -96,13 +99,14 @@ public class ByteArrayValueSerializer implements IValueSerializer {
 
                 // Note: we add (1) so that the length is always
                 // non-negative so that we can pack it.
-                LongPacker.packLong(dbaos,len+1);
+//                LongPacker.packLong(dbaos,len+1);
+                os.packLong(len+1);
                 
             }
 
-            dbaos.flush();
-            
-            os.write(baos.toByteArray());
+//            dbaos.flush();
+//            
+//            os.write(baos.toByteArray());
             
         }
 
@@ -123,7 +127,7 @@ public class ByteArrayValueSerializer implements IValueSerializer {
         
     }
     
-    public void getValues(DataInputStream is, Object[] values, int n) throws IOException {
+    public void getValues(DataInput is, Object[] values, int n) throws IOException {
 
         final int version = (int)LongPacker.unpackLong(is);
 
@@ -158,7 +162,7 @@ public class ByteArrayValueSerializer implements IValueSerializer {
             
             if( value==null) continue;
             
-            is.read(value, 0, value.length);
+            is.readFully(value, 0, value.length);
             
         }
 

@@ -71,10 +71,12 @@ import com.bigdata.journal.Tx;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.Errors;
 import com.bigdata.objndx.IBatchOp;
+import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.objndx.IIndex;
 import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -552,28 +554,413 @@ public class TripleStore extends /*Master*/Journal {
 
     /**
      * Return true if the statement exists in the store (non-batch API).
+     * 
+     * @param s
+     *            Optional subject.
+     * @param p
+     *            Optional predicate.
+     * @param o
+     *            Optional object.
      */
     public boolean containsStatement(Resource s, URI p, Value o) {
 
         long _s, _p, _o;
+
+        _s = (s == null ? NULL : getTermId(s));
+        _p = (p == null ? NULL : getTermId(p));
+        _o = (o == null ? NULL : getTermId(o));
+
+        /*
+         * If a value was specified and it is not in the terms index then the
+         * statement can not exist in the KB.
+         */
+        if (_s == NULL && s != null)
+            return false;
+        if (_p == NULL && p != null)
+            return false;
+        if (_o == NULL && o != null)
+            return false;
         
-        if( (_s = getTermId(s)) == 0L ) return false;
-        if( (_p = getTermId(p)) == 0L ) return false;
-        if( (_o = getTermId(o)) == 0L ) return false;
+        /*
+         * if all bound, then a slight optimization.
+         */
+        if (_s != NULL && _p != NULL && _o != NULL) {
+
+            return getSPOIndex().contains(keyBuilder.statement2Key(_s, _p, _o));
+            
+        }
         
-        return getSPOIndex().contains(keyBuilder.statement2Key(_s, _p, _o));
+        /*
+         * Choose the access path and test to see if any statements would be
+         * visited for that triple pattern.
+         */
+        return rangeQuery(_s,_p,_o).hasNext();
         
     }
 
     /**
+     * Return a range query iterator that will visit the statements matching the
+     * triple pattern using the best access path given the triple pattern.
+     * 
+     * @param s
+     *            An optional term identifier for the subject role or
+     *            {@link #NULL}.
+     * @param p
+     *            An optional term identifier for the predicate role or
+     *            {@link #NULL}.
+     * @param o
+     *            An optional term identifier for the object role or
+     *            {@link #NULL}.
+     * 
+     * @return The range query iterator.
+     * 
+     * @todo write tests.
+     */
+    public IEntryIterator rangeQuery(long s, long p, long o) {
+
+        if (s != NULL && p != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, p, o);
+
+            byte[] toKey = keyBuilder.statement2Key(s, p, o + 1);
+
+            return getSPOIndex().rangeIterator(fromKey, toKey);
+
+        } else if (s != NULL && p != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, p, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(s, p + 1, NULL);
+
+            return getSPOIndex().rangeIterator(fromKey, toKey);
+
+        } else if (s != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(o, s, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(o, s + 1, NULL);
+
+            return getOSPIndex().rangeIterator(fromKey, toKey);
+
+        } else if (p != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(p, o, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(p, o + 1, NULL);
+
+            return getPOSIndex().rangeIterator(fromKey, toKey);
+
+        } else if (s != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(s + 1, NULL, NULL);
+
+            return getSPOIndex().rangeIterator(fromKey, toKey);
+
+        } else if (p != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(p, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(p + 1, NULL, NULL);
+
+            return getPOSIndex().rangeIterator(fromKey, toKey);
+
+        } else if (o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(o, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(o + 1, NULL, NULL);
+
+            return getOSPIndex().rangeIterator(fromKey, toKey);
+
+        } else {
+
+            return getSPOIndex().rangeIterator(null, null);
+
+        }
+
+    }
+    
+    /**
+     * Return the #of statements matching the triple pattern using the best
+     * access path given the triple pattern (the count will be approximate if
+     * partitioned indices are being used).
+     * 
+     * @param s
+     *            An optional term identifier for the subject role or
+     *            {@link #NULL}.
+     * @param p
+     *            An optional term identifier for the predicate role or
+     *            {@link #NULL}.
+     * @param o
+     *            An optional term identifier for the object role or
+     *            {@link #NULL}.
+     * 
+     * @return The range count.
+     * 
+     * @todo write tests.
+     */
+    public int rangeCount(long s, long p, long o) {
+
+        if (s != NULL && p != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, p, o);
+
+            byte[] toKey = keyBuilder.statement2Key(s, p, o + 1);
+
+            return getSPOIndex().rangeCount(fromKey, toKey);
+
+        } else if (s != NULL && p != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, p, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(s, p + 1, NULL);
+
+            return getSPOIndex().rangeCount(fromKey, toKey);
+
+        } else if (s != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(o, s, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(o, s + 1, NULL);
+
+            return getOSPIndex().rangeCount(fromKey, toKey);
+
+        } else if (p != NULL && o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(p, o, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(p, o + 1, NULL);
+
+            return getPOSIndex().rangeCount(fromKey, toKey);
+
+        } else if (s != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(s, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(s + 1, NULL, NULL);
+
+            return getSPOIndex().rangeCount(fromKey, toKey);
+
+        } else if (p != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(p, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(p + 1, NULL, NULL);
+
+            return getPOSIndex().rangeCount(fromKey, toKey);
+
+        } else if (o != NULL) {
+
+            byte[] fromKey = keyBuilder.statement2Key(o, NULL, NULL);
+
+            byte[] toKey = keyBuilder.statement2Key(o + 1, NULL, NULL);
+
+            return getOSPIndex().rangeCount(fromKey, toKey);
+
+        } else {
+
+            return getSPOIndex().rangeCount(null, null);
+
+        }
+
+    }
+    
+    /**
+     * Removes statements matching the triple pattern.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * 
+     * @return The #of statements removed.
+     * 
+     * @todo write tests.
+     */
+    public int removeStatements(Resource s,URI p,Value o) {
+
+        /*
+         * convert our object types to internal identifiers.
+         */
+        long _s, _p, _o;
+
+        _s = (s == null ? NULL : getTermId(s));
+        _p = (p == null ? NULL : getTermId(p));
+        _o = (o == null ? NULL : getTermId(o));
+
+        /*
+         * If a value was specified and it is not in the terms index then the
+         * statement can not exist in the KB.
+         */
+        if (_s == NULL && s != null) {
+
+            return 0;
+            
+        }
+        
+        if (_p == NULL && p != null) {
+        
+            return 0;
+            
+        }
+        
+        if (_o == NULL && o != null) {
+            
+            return 0;
+            
+        }
+    
+        return removeStatements(_s,_p,_o);
+        
+    }
+    
+    /**
+     * Remove statements matching the triple pattern.
+     * <p>
+     * Since the indices do not support modification with concurrent traversal
+     * the statements are materialized before they are deleted.
+     * 
+     * @param _s
+     * @param _p
+     * @param _o
+     * 
+     * @return The #of statements removed.
+     * 
+     * @todo the {@link #keyBuilder} is, which means that this is NOT thread
+     *       safe.
+     * 
+     * @todo this is not using the batch btree api.
+     * 
+     * @todo write tests.
+     */
+    public int removeStatements(long _s, long _p, long _o) {
+    
+        /*
+         * if all bound, then a slight optimization.
+         */
+        if (_s != NULL && _p != NULL && _o != NULL) {
+
+            byte[] key = keyBuilder.statement2Key(_s, _p, _o);
+
+            if (getSPOIndex().contains(key)) {
+
+                getSPOIndex().remove(key);
+
+                return 1;
+                
+            } else {
+                
+                return 0;
+                
+            }
+            
+        }
+        
+        /*
+         * Choose the access path, count the #of statements that match the
+         * triple pattern, and the materalize those statements (since traversal
+         * with concurrent modification is not supported).
+         */
+        
+        KeyOrder keyOrder = KeyOrder.getKeyOrder(_s, _p, _o);
+        
+        // #of matching statements.
+        int rangeCount = rangeCount(_s, _p, _o);
+        
+        SPO[] stmts = new SPO[rangeCount];
+
+        // materialize the matching statements.
+        {
+            IEntryIterator itr1 = rangeQuery(_s, _p, _o);
+
+            int i = 0;
+
+            while (itr1.hasNext()) {
+
+                itr1.next();
+
+                stmts[i++] = new SPO(keyOrder, keyBuilder, itr1.getKey());
+
+            }
+
+            assert i == rangeCount;
+        }
+
+        /*
+         * Remove the statements from each of the access paths.
+         */
+        {
+
+            {
+                IIndex ndx = getSPOIndex();
+
+                // Place statements in SPO order.
+                Arrays.sort(stmts, com.bigdata.rdf.inf.SPOComparator.INSTANCE);
+
+                // remove statements from SPO index.
+                for (int i = 0; i < stmts.length; i++) {
+
+                    SPO spo = stmts[i];
+
+                    ndx.remove(keyBuilder.statement2Key(spo.s, spo.p, spo.o));
+
+                }
+            }
+
+            {
+
+                IIndex ndx = getPOSIndex();
+                // Place statements in POS order.
+                Arrays.sort(stmts, com.bigdata.rdf.inf.POSComparator.INSTANCE);
+
+                // Remove statements from POS index.
+                for (int i = 0; i < stmts.length; i++) {
+
+                    SPO spo = stmts[i];
+
+                    ndx.remove(keyBuilder.statement2Key(spo.p, spo.o, spo.s));
+
+                }
+            }
+
+            {
+
+                IIndex ndx = getOSPIndex();
+
+                // Place statements in OSP order.
+                Arrays.sort(stmts, com.bigdata.rdf.inf.OSPComparator.INSTANCE);
+
+                // Remove statements from OSP index.
+                for (int i = 0; i < stmts.length; i++) {
+
+                    SPO spo = stmts[i];
+
+                    ndx.remove(keyBuilder.statement2Key(spo.o, spo.s, spo.p));
+
+                }
+
+            }
+            
+        }
+
+        return rangeCount;
+
+    }
+
+    /**
+     * Value used for a "NULL" term identifier.
+     */
+    public static final long NULL = 0L;
+
+    /**
      * Adds the statements to each index (batch api).
-     * <p> 
+     * <p>
      * Note: this is not sorting by the generated keys so the sort order may not
-     *       perfectly reflect the natural order of the index. however, i
-     *       suspect that it simply creates a few partitions out of the natural
-     *       index order based on the difference between signed and unsigned
-     *       interpretations of the termIds when logically combined into a
-     *       statement identifier.
+     * perfectly reflect the natural order of the index. however, i suspect that
+     * it simply creates a few partitions out of the natural index order based
+     * on the difference between signed and unsigned interpretations of the
+     * termIds when logically combined into a statement identifier.
      * 
      * @param stmts
      *            An array of statements
@@ -1192,6 +1579,27 @@ public class TripleStore extends /*Master*/Journal {
         public long loadTime;
         public long commitTime;
         
+        public long triplesPerSecond() {
+            
+            return ((long)( ((double)toldTriples) / ((double)totalTime) * 1000d ));
+            
+        }
+        
+        /**
+         * Human readable representation.
+         */
+        public String toString() {
+
+            return toldTriples+" stmts added in " + 
+                    ((double)loadTime) / 1000d +
+                    " secs, rate= " + 
+                    triplesPerSecond()+
+                    ", commitLatency="+
+                    commitTime+"ms" 
+                    ;
+
+        }
+        
     }
     
     /**
@@ -1269,7 +1677,7 @@ public class TripleStore extends /*Master*/Journal {
                     " stmts added in " + 
                     ((double)loader.getInsertTime()) / 1000d +
                     " secs, rate= " + 
-                    loader.getInsertRate() 
+                    loader.getInsertRate()
                     );
 
             return stats;
