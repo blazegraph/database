@@ -52,11 +52,9 @@ import com.bigdata.objndx.IIndex;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 
-
 public abstract class AbstractRuleRdf extends Rule {
 
     protected final int BUFFER_SIZE = 10*1024*1024;
-    
     
     public AbstractRuleRdf(InferenceEngine store, Triple head, Pred[] body) {
 

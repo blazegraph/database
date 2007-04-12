@@ -79,13 +79,10 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
     public void testFullForwardClosure01() throws IOException {
 
         /*
-         * @todo this is committing the data first we do not want to do if we
-         * know that we are closing the store.
-         * 
          * @todo use a dataset that we can add to CVS for a performance test and
          * hand-crafted data sets to test the rule implementations.
          */
-        store.loadData(new File("data/alibaba_v41.rdf"),"");
+        store.loadData(new File("data/alibaba_v41.rdf"),"",false);
 //        store.loadData(new File("data/nciOncology.owl"),"");
 
         store.fullForwardClosure();

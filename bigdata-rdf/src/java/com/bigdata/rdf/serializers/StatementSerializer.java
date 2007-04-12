@@ -43,10 +43,10 @@ Modifications:
 */
 package com.bigdata.rdf.serializers;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
 import java.io.IOException;
 
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IValueSerializer;
 
 /**
@@ -66,12 +66,12 @@ public class StatementSerializer implements IValueSerializer {
     public StatementSerializer() {
     }
 
-    public void getValues(DataInputStream is, Object[] values, int n)
+    public void getValues(DataInput is, Object[] values, int n)
             throws IOException {
         return;
     }
 
-    public void putValues(DataOutputStream os, Object[] values, int n)
+    public void putValues(DataOutputBuffer os, Object[] values, int n)
             throws IOException {
         return;
     }

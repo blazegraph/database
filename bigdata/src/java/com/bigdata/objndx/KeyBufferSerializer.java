@@ -1,11 +1,13 @@
 package com.bigdata.objndx;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 
 /**
  * Compact serialization for the key buffer.
@@ -24,13 +26,13 @@ public class KeyBufferSerializer implements IKeySerializer {
      */
     private static final long serialVersionUID = 7361581167520945586L;
 
-    public static final transient int VERSION0 = 0x0;
+    public static final transient short VERSION0 = 0x0;
     
     public static final transient IKeySerializer INSTANCE = new KeyBufferSerializer();
     
-    public IKeyBuffer getKeys(DataInputStream is) throws IOException {
+    public IKeyBuffer getKeys(DataInput is) throws IOException {
 
-        final int version = is.readInt();
+        final short version = ShortPacker.unpackShort(is);
         
         if (version != VERSION0)
             throw new IOException("Unknown version=" + version);
@@ -71,9 +73,9 @@ public class KeyBufferSerializer implements IKeySerializer {
         
     }
 
-    public void putKeys(DataOutputStream os, IKeyBuffer keys) throws IOException {
+    public void putKeys(DataOutputBuffer os, IKeyBuffer keys) throws IOException {
 
-        os.writeInt(VERSION0);
+        os.packShort(VERSION0);
         
         if(keys instanceof ImmutableKeyBuffer ) {
 
@@ -87,20 +89,23 @@ public class KeyBufferSerializer implements IKeySerializer {
         
     }
     
-    protected void putKeys2(DataOutputStream os, ImmutableKeyBuffer keys) throws IOException {
+    protected void putKeys2(DataOutputBuffer os, ImmutableKeyBuffer keys) throws IOException {
         
         final int nkeys = keys.nkeys;
 
         final int bufferLength = keys.buf.length;
 
         // #of keys in the node or leaf.
-        LongPacker.packLong(os, nkeys);
+//        LongPacker.packLong(os, nkeys);
+        os.packLong(nkeys);
 
         // maximum #of keys allowed in the node or leaf.
-        LongPacker.packLong(os, keys.maxKeys);
+//        LongPacker.packLong(os, keys.maxKeys);
+        os.packLong(keys.maxKeys);       
 
         // length of the byte[] buffer containing the prefix and remainder for each key.
-        LongPacker.packLong(os, bufferLength);
+//        LongPacker.packLong(os, bufferLength);
+        os.packLong(bufferLength);
         
         /*
          * Write out deltas between offsets.
@@ -113,13 +118,15 @@ public class KeyBufferSerializer implements IKeySerializer {
             
             int delta = offset - lastOffset;
             
-            LongPacker.packLong(os, delta);
+//            LongPacker.packLong(os, delta);
+            os.packLong(delta);
             
             lastOffset = offset;
             
         }
         
-        os.write(keys.buf);
+//        os.write(keys.buf);
+        os.write(keys.buf, 0, bufferLength);
         
     }
 
@@ -133,7 +140,7 @@ public class KeyBufferSerializer implements IKeySerializer {
      * @param keys
      * @throws IOException
      */
-    protected void putKeys2(DataOutputStream os, MutableKeyBuffer keys) throws IOException {
+    protected void putKeys2(DataOutputBuffer os, MutableKeyBuffer keys) throws IOException {
         
         final int nkeys = keys.nkeys;
         
@@ -159,25 +166,28 @@ public class KeyBufferSerializer implements IKeySerializer {
         }
         
         // #of keys in the node or leaf.
-        LongPacker.packLong(os, nkeys);
+//        LongPacker.packLong(os, nkeys);
+        os.packLong(nkeys);
 
         // maximum #of keys allowed in the node or leaf.
-        LongPacker.packLong(os, keys.getMaxKeys());
+//        LongPacker.packLong(os, keys.getMaxKeys());
+        os.packLong(keys.getMaxKeys());
 
         // length of the byte[] buffer containing the prefix and remainder for each key.
-        LongPacker.packLong(os, bufferLength);
+//        LongPacker.packLong(os, bufferLength);
+        os.packLong(bufferLength);
         
         /*
          * Write out deltas between offsets.
          * 
-         * FIXME this is 60% of the cost of this method. This is not pack long
+         * Note: this is 60% of the cost of this method. This is not pack long
          * so much as doing individual byte put operations on the output stream
          * (which is over a ByteBuffer).  Just using a BAOS here doubles the 
          * index segment build throughput.
          */
         {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(nkeys*8);
-            DataOutputStream dbaos = new DataOutputStream(baos);
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream(nkeys*8);
+//            DataOutputStream dbaos = new DataOutputStream(baos);
 
             int lastOffset = 0;
         
@@ -187,15 +197,16 @@ public class KeyBufferSerializer implements IKeySerializer {
             
             int delta = offset - lastOffset;
             
-            LongPacker.packLong(dbaos, delta);
+//            LongPacker.packLong(dbaos, delta);
+            os.packLong(delta);
             
             lastOffset = offset;
             
         }
         
-        dbaos.flush();
-        
-        os.write(baos.toByteArray());
+//        dbaos.flush();
+//        
+//        os.write(baos.toByteArray());
         }
         
         /*

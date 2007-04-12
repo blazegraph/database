@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
 
@@ -68,7 +68,7 @@ public interface IKeySerializer extends Serializable {
      * 
      * @return The keys.
      */
-    public IKeyBuffer getKeys(DataInputStream is) throws IOException;
+    public IKeyBuffer getKeys(DataInput is) throws IOException;
 
     /**
      * Serialize the keys onto the buffer.
@@ -79,7 +79,7 @@ public interface IKeySerializer extends Serializable {
      * @param keys
      *            The keys from a {@link Leaf} or {@link Node}.
      */
-    public void putKeys(DataOutputStream os, IKeyBuffer keys)
+    public void putKeys(DataOutputBuffer os, IKeyBuffer keys)
             throws IOException;
 
 }

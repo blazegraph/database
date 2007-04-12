@@ -1,16 +1,17 @@
 package com.bigdata.journal;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
 import java.io.IOException;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.objndx.BTree;
 import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Addr;
@@ -364,31 +365,33 @@ public class CommitRecordIndex extends BTree {
 
         public static transient final IValueSerializer INSTANCE = new ValueSerializer();
 
-        final public static transient int VERSION0 = 0x0;
+        final public static transient short VERSION0 = 0x0;
 
         public ValueSerializer() {
         }
 
-        public void putValues(DataOutputStream os, Object[] values, int n)
+        public void putValues(DataOutputBuffer os, Object[] values, int n)
                 throws IOException {
 
-            os.writeInt(VERSION0);
+            os.packShort(VERSION0);
             
             for (int i = 0; i < n; i++) {
 
                 Entry entry = (Entry) values[i];
 
-                LongPacker.packLong(os, entry.commitTime);
-                LongPacker.packLong(os, entry.addr);
+//                LongPacker.packLong(os, entry.commitTime);
+//                LongPacker.packLong(os, entry.addr);
+                os.packLong(entry.commitTime);
+                os.packLong(entry.addr);
                 
             }
 
         }
         
-        public void getValues(DataInputStream is, Object[] values, int n)
+        public void getValues(DataInput is, Object[] values, int n)
                 throws IOException {
 
-            final int version = is.readInt();
+            final short version = ShortPacker.unpackShort(is);
             
             if (version != VERSION0)
                 throw new RuntimeException("Unknown version: " + version);

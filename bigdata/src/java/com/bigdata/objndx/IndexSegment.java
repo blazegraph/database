@@ -1,7 +1,7 @@
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -605,7 +605,7 @@ public class IndexSegment extends AbstractBTree {
          * Packs the addresses, which MUST already have been encoded according
          * to the conventions of this class.
          */
-        public void putChildAddresses(DataOutputStream os, long[] childAddr,
+        public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
                 int nchildren) throws IOException {
 
             for (int i = 0; i < nchildren; i++) {
@@ -636,10 +636,12 @@ public class IndexSegment extends AbstractBTree {
                         : ((offset << 1) | 1));
 
                 // write the adjusted offset (requires decoding).
-                LongPacker.packLong(os, adjustedOffset);
+//                LongPacker.packLong(os, adjustedOffset);
+                os.packLong(adjustedOffset);
 
                 // write the #of bytes (does not require decoding).
-                LongPacker.packLong(os, nbytes);
+//                LongPacker.packLong(os, nbytes);
+                os.packLong(nbytes);
 
             }
 
@@ -648,7 +650,7 @@ public class IndexSegment extends AbstractBTree {
         /**
          * Unpacks and decodes the addresses.
          */
-        public void getChildAddresses(DataInputStream is, long[] childAddr,
+        public void getChildAddresses(DataInput is, long[] childAddr,
                 int nchildren) throws IOException {
 
             // check that we know the offset for deserialization.

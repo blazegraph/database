@@ -166,15 +166,17 @@ public class TestByteArrayValueSerializer extends TestCase2 {
             
             final byte[] data;
             {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-            DataOutputStream dos = new DataOutputStream(baos);
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//
+//            DataOutputStream dos = new DataOutputStream(baos);
+                
+                DataOutputBuffer dos = new DataOutputBuffer();
 
             ser.putValues(dos, values, values.length);
             
-            dos.flush();
+//            dos.flush();
             
-            data = baos.toByteArray();
+            data = dos.buf;
             }
 
             byte[][] actual = new byte[values.length][];

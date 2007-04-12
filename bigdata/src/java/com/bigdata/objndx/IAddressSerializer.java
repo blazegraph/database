@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.objndx;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 /**
@@ -84,7 +84,7 @@ public interface IAddressSerializer {
      *            [0:n-1] are defined and must be read from the buffer and
      *            written on the array.
      */
-    public void getChildAddresses(DataInputStream is, long[] childAddr,
+    public void getChildAddresses(DataInput is, long[] childAddr,
             int nchildren) throws IOException;
 
     /**
@@ -98,7 +98,7 @@ public interface IAddressSerializer {
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be written.
      */
-    public void putChildAddresses(DataOutputStream os, long[] childAddr,
+    public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
             int nchildren) throws IOException;
 
 }

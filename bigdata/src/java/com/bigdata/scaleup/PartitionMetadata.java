@@ -43,14 +43,15 @@
  */
 package com.bigdata.scaleup;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.util.UUID;
 
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
+import com.bigdata.objndx.DataOutputBuffer;
 import com.bigdata.objndx.IValueSerializer;
 import com.bigdata.objndx.IndexSegment;
 
@@ -269,7 +270,7 @@ public class PartitionMetadata /*implements Externalizable*/ {
         public Serializer() {
         }
 
-        public void putValues(DataOutputStream os, Object[] values, int nvals)
+        public void putValues(DataOutputBuffer os, Object[] values, int nvals)
                 throws IOException {
             
             for (int i = 0; i < nvals; i++) {
@@ -320,7 +321,7 @@ public class PartitionMetadata /*implements Externalizable*/ {
 
         }
 
-        public void getValues(DataInputStream is, Object[] values, int nvals)
+        public void getValues(DataInput is, Object[] values, int nvals)
                 throws IOException {
 
             for (int i = 0; i < nvals; i++) {

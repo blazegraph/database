@@ -70,6 +70,56 @@ import com.bigdata.rdf.TripleStore;
 
 public class OptimizedValueFactory implements ValueFactory {
 
+    /**
+     * Converts a {@link Value} for a different {@link ValueFactory} into a
+     * {@link _Value}.
+     * 
+     * @param v
+     *            The value.
+     * 
+     * @return The value iff it is a {@link _Value} and otherwise a
+     *         {@link _Value} with the same data.
+     */
+    public Value toNativeValue( Value v ) {
+        
+        if( v == null ) throw new IllegalArgumentException();
+        
+        if( v instanceof URI && ! ( v instanceof _URI) ) {
+            
+            v = createURI(v.toString());
+            
+        } else if( v instanceof Literal && ! ( v instanceof _Literal )) {
+            
+            String label = ((Literal)v).getLabel();
+            
+            String language = ((Literal)v).getLanguage();
+            
+            URI datatype = ((Literal)v).getDatatype();
+            
+            if( language != null ) {
+
+                v = createLiteral(label,language);
+                
+            } else if( datatype != null ) {
+                
+                v = createLiteral(label,createURI(datatype.toString()));
+                
+            } else {
+                
+                v = createLiteral(label);
+                
+            }
+            
+        } else if( v instanceof BNode && ! ( v instanceof _BNode )) {
+
+            v = createBNode( ((BNode)v).getID() );
+            
+        }
+        
+        return v;
+        
+    }
+    
     public BNode createBNode() {
 
         return new _BNode();
