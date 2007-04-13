@@ -44,11 +44,9 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
-import java.util.Vector;
 
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
-
 
 public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
@@ -62,64 +60,86 @@ public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( TempTripleStore entailments ) {
-
-        Stats stats = new Stats();
+    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore ) {
         
-        long computeStart = System.currentTimeMillis();
+        final long computeStart = System.currentTimeMillis();
         
-        // create a place to hold the entailments
-        Vector<SPO> stmts3 = new Vector<SPO>(BUFFER_SIZE);
-
         SPO[] stmts1 = getStmts1();
-        for ( int i = 0; i < stmts1.length; i++ ) {
-            SPO[] stmts2 = getStmts2( stmts1[i] );
-            for ( int j = 0; j < stmts2.length; j++ ) {
-                if (stmts3.size() == BUFFER_SIZE) {
-                    dumpBuffer
-                        ( stmts3.toArray( new SPO[stmts3.size()] ),
-                          entailments
-                          );
-                    stmts3.clear();
-                }
-                stmts3.add( buildStmt3( stmts1[i], stmts2[j] ) );
-                stats.numComputed++;
-            }
-        }
-        if(debug) dumpBuffer( stmts3.toArray( new SPO[stmts3.size()] ), entailments );
         
-        stats.computeTime = System.currentTimeMillis() - computeStart;
+        stats.stmts1 += stmts1.length;
+        
+        int n = 0;
+        
+        for (int i = 0; i < stmts1.length; i++) {
+        
+            SPO[] stmts2 = getStmts2(stmts1[i]);
+            
+            stats.stmts2 += stmts2.length;
+            
+            for (int j = 0; j < stmts2.length; j++) {
+            
+                buffer[n++] = buildStmt3(stmts1[i], stmts2[j]);
+                
+                if (n == buffer.length) {
+                
+                    insertStatements(buffer, n, tmpStore);
+                    
+                    n = 0;
+                    
+                }
+                
+                stats.numComputed++;
+                
+            }
+            
+        }
+        
+        insertStatements(buffer, n, tmpStore);
+        
+        stats.computeTime += System.currentTimeMillis() - computeStart;
 
         return stats;
 
     }
     
-    // default behavior is to use POS index to match body[0] and then sort
-    // using POSComparator since the default for body[1] is the POS index
-    // again (is the sort even necessary?)
+    /**
+     * default behavior is to use POS index to match body[0] and then sort using
+     * POSComparator since the default for body[1] is the POS index again (is
+     * the sort even necessary?)
+     */
     protected SPO[] getStmts1() {
         
         // use the POS index to look up the matches for body[0], the more
         // constrained triple
+        
         byte[] fromKey = store.keyBuilder.statement2Key( body[0].p.id, 0, 0 );
+        
         byte[] toKey = store.keyBuilder.statement2Key( body[0].p.id+1, 0, 0 );
-        SPO[] stmts1 = store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
+        
+        SPO[] stmts1 = store.getStatements(store.getPOSIndex(), KeyOrder.POS,
+                fromKey, toKey);
 
         // make sure the statements are in POS order, since we are going to be
         // doing lookups against the POS index in a moment
+        
         Arrays.sort(stmts1,POSComparator.INSTANCE);
         
         return stmts1;
         
     }
     
-    // default behavior is to join the subject of stmt1 with the predicate
-    // of body[1] using the POS index
+    /**
+     * default behavior is to join the subject of stmt1 with the predicate of
+     * body[1] using the POS index.
+     */
     protected SPO[] getStmts2( SPO stmt1 ) {
         
         byte[] fromKey = store.keyBuilder.statement2Key(stmt1.s, 0, 0);
+        
         byte[] toKey = store.keyBuilder.statement2Key(stmt1.s+1, 0, 0);
-        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
+        
+        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey,
+                toKey);
     
     }
     

@@ -46,6 +46,11 @@ package com.bigdata.rdf.inf;
 import com.bigdata.rdf.KeyOrder;
 
 
+/**
+ * <pre>
+ *  &lt;u rdfs:subClassOf x&gt; AND &lt;v rdf:type u&gt; IMPLIES &lt;v rdf:type x&gt;
+ * </pre>
+ */
 public class RuleRdfs09 extends AbstractRuleRdfs2379 {
 
     public RuleRdfs09( InferenceEngine store, Var u, Var x, Var v ) {
@@ -60,16 +65,21 @@ public class RuleRdfs09 extends AbstractRuleRdfs2379 {
     
     protected SPO[] getStmts2( SPO stmt1 ) {
         
-        byte[] fromKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s,0);
-        byte[] toKey = 
-            store.keyBuilder.statement2Key(store.rdfType.id,stmt1.s+1,0);
-        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey, toKey);
+        byte[] fromKey = store.keyBuilder.statement2Key(store.rdfType.id,
+                stmt1.s, 0);
+
+        byte[] toKey = store.keyBuilder.statement2Key(store.rdfType.id,
+                stmt1.s + 1, 0);
+
+        return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey,
+                toKey);
     
     }
     
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+        
         return new SPO( stmt2.s, store.rdfType.id, stmt1.o );
+        
     }
 
 }

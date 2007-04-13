@@ -44,11 +44,9 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
-import java.util.Vector;
 
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.inf.Rule.Stats;
 
 
 public class AbstractRuleRdfs511 extends AbstractRuleRdf {
@@ -63,11 +61,9 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( TempTripleStore entailments ) {
+    public Stats apply( final Stats stats, SPO[] buffer, TempTripleStore tmpStore ) {
         
-        Stats stats = new Stats();
-        
-        long computeStart = System.currentTimeMillis();
+        final long computeStart = System.currentTimeMillis();
         
         // the predicate is fixed for all parts of the rule.
         final long p = head.p.id;
@@ -90,33 +86,50 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
          */
 
         // in POS order.
-        SPO[] stmts1 = store.getStatements(store.getPOSIndex(), KeyOrder.POS, pkey, pkey1);
+        final SPO[] stmts1 = store.getStatements(store.getPOSIndex(),
+                KeyOrder.POS, pkey, pkey1);
+        
+        stats.stmts1 += stmts1.length;
+        
         // in SPO order.
         Arrays.sort(stmts1,SPOComparator.INSTANCE);
+        
         // a clone of the answer set
-        SPO[] stmts2 = stmts1.clone();
+//        SPO[] stmts2 = stmts1.clone();
+        final SPO[] stmts2 = stmts1;
 
-        Vector<SPO> stmts3 = new Vector<SPO>(BUFFER_SIZE);
+        stats.stmts2 += stmts2.length;
+
+        int n = 0;
+
         // the simplest n^2 algorithm
-        for( int i = 0; i < stmts1.length; i++ ) {
+        for (int i = 0; i < stmts1.length; i++) {
+
             // printStatement(stmts1[i]);
-            for ( int j = 0; j < stmts2.length; j++ ) {
-                if ( stmts1[i].o == stmts2[j].s ) {
-                    if (stmts3.size() == BUFFER_SIZE) {
-                        dumpBuffer
-                            ( stmts3.toArray( new SPO[stmts3.size()] ), 
-                              entailments
-                              );
-                        stmts3.clear();
+
+            for (int j = 0; j < stmts2.length; j++) {
+
+                if (stmts1[i].o == stmts2[j].s) {
+
+                    buffer[n++] = new SPO(stmts1[i].s, p, stmts2[j].o);
+
+                    if (n == buffer.length) {
+
+                        insertStatements(buffer, n, tmpStore);
+
+                        n = 0;
                     }
-                    stmts3.add( new SPO(stmts1[i].s, p, stmts2[j].o) );
+
                     stats.numComputed++;
                 }
+
             }
+
         }
-        if(debug)dumpBuffer( stmts3.toArray( new SPO[stmts3.size()] ), entailments );
+
+        insertStatements( buffer, n, tmpStore );
         
-        stats.computeTime = System.currentTimeMillis() - computeStart;
+        stats.computeTime += System.currentTimeMillis() - computeStart;
 
         return stats;
         

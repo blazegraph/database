@@ -53,15 +53,17 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 
 /**
  * Adds support for RDFS inference.
-  * <p>
+ * <p>
  * A fact always has the form:
  * 
  * <pre>
@@ -268,20 +270,62 @@ public class InferenceEngine extends TripleStore {
     }
 
     /**
-     * Compute the complete forward closure of the store using a
-     * set-at-a-time inference strategy.
+     * Compute the complete forward closure of the store using a set-at-a-time
+     * inference strategy.
+     * <p>
+     * The general approach is a series of rounds in which each rule is applied
+     * to all data in turn. The rules directly embody queries that cause only
+     * the statements which can trigger the rule to be visited. Since most rules
+     * require two antecedents, this typically means that the rules are running
+     * two range queries and performing a join operation in order to identify
+     * the set of rule firings. Entailments computed in each round are fed back
+     * into the source against which the rules can match their preconditions, so
+     * derived entailments may be computed in a succession of rounds. The
+     * process halts when no new entailments are computed in a given round.
+     * <p>
      * 
-     * @todo refactor so that we can close a document that we are loading
-     *       before it is inserted into the main database.
+     * @todo Rules can be computed in parallel using a pool of worker threads.
+     *       The round ends when the queue of rules to process is empty and all
+     *       workers are done.
      * 
-     * @todo can the dependency array among the rules be of use to us when
-     *       we are computing full foward closure as opposed to using magic
-     *       sets to answer a specific query?
+     * @todo The entailments computed in each round are inserted back into the
+     *       primary triple store at the end of the round. The purpose of this
+     *       is to read from a fused view of the triples already in the primary
+     *       store and those that have been computed by the last application of
+     *       the rules. This is necessary in order for derived entailments to be
+     *       computed. However, an alternative approach would be to explicitly
+     *       read from a fused view of the indices in the temporary store and
+     *       those in the primary store (or simply combining their iterators in
+     *       the rules). This could have several advantages and an approach like
+     *       this is necessary in order to compute entailments at query time
+     *       that are not to be inserted back into the kb.
+     * 
+     * @todo can the dependency array among the rules be of use to us when we
+     *       are computing full foward closure as opposed to using magic sets to
+     *       answer a specific query?
+     * 
+     * @todo The SPO[] buffer might be better off as a more interesting
+     *       structure that only accepted the distinct statements. This was a
+     *       big win for the batch oriented parser and would probably eliminate
+     *       even more duplicates in the context of the inference engine.
      */
     public void fullForwardClosure() {
 
+        /*
+         * @todo configuration paramater.
+         * 
+         * There is a factor of 2 performance difference for a sample data set
+         * from a buffer size of one (unordered inserts) to a buffer size of
+         * 10k.
+         */
+        final int BUFFER_SIZE = 100 * Bytes.kilobyte32;
+
         final Rule[] rules = this.rules;
 
+        final long[] timePerRule = new long[rules.length];
+        
+        final int[] entailmentsPerRule = new int[rules.length];
+        
         final int nrules = rules.length;
 
         final int firstStatementCount = getStatementCount();
@@ -293,29 +337,91 @@ public class InferenceEngine extends TripleStore {
 
         int round = 0;
         
+        /*
+         * This is a buffer that is used to hold entailments so that we can
+         * insert them into the indices using ordered insert operations (much
+         * faster than random inserts). The buffer is reused by each rule. The
+         * rule assumes that the buffer is empty and just keeps a local counter
+         * of the #of entailments that it has inserted into the buffer. When the
+         * buffer overflows, those entailments are transfered enmass into the
+         * tmp store.
+         */
+        final SPO[] buffer = new SPO[BUFFER_SIZE];
+
+        /*
+         * The temporary store used to accumulate the entailments.
+         */
         TempTripleStore entailments = new TempTripleStore(); 
 
+        Stats totalStats = new Stats();
+        
         while (true) {
 
-            int numComputed = 0;
-            
-            long computeTime = 0;
-            
-            int numEntailmentsBefore = entailments.getStatementCount();
+            final int numEntailmentsBefore = entailments.getStatementCount();
             
             for (int i = 0; i < nrules; i++) {
 
+                Stats ruleStats = new Stats();
+                
                 Rule rule = rules[i];
 
-                Rule.Stats stats = rule.apply( entailments );
+                int nbefore = ruleStats.numComputed;
                 
-                numComputed += stats.numComputed;
+                rule.apply( ruleStats, buffer, entailments );
+                
+                int nnew = ruleStats.numComputed - nbefore;
 
-                computeTime += stats.computeTime;
+                // #of statements examined by the rule.
+                int nstmts = ruleStats.stmts1 + ruleStats.stmts2;
+                
+                long elapsed = ruleStats.computeTime;
+                
+                timePerRule[i] += elapsed;
+                
+                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
+                
+                long stmtsPerSec = (nstmts == 0 || elapsed == 0L ? 0
+                        : ((long) (((double) nstmts) / ((double) elapsed) * 1000d)));
+                                
+                if (DEBUG||true) {
+                    log.debug("round# " + round + ", "
+                            + rule.getClass().getSimpleName()
+                            + ", entailments=" + nnew + ", #stmts1="
+                            + ruleStats.stmts1 + ", #stmts2="
+                            + ruleStats.stmts2 + ", #stmtsExaminedPerSec="
+                            + stmtsPerSec
+                            );
+                }
+                
+                totalStats.numComputed += ruleStats.numComputed;
+                
+                totalStats.computeTime += ruleStats.computeTime;
+                
+            }
+
+            if(true) {
+            
+                /*
+                 * Show times for each rule so far.
+                 */
+                System.err.println("rule    \tms\t#entms\tentms/ms");
+                
+                for(int i=0; i<timePerRule.length; i++) {
+                    
+                    System.err.println(rules[i].getClass().getSimpleName()
+                            + "\t"
+                            + timePerRule[i]
+                            + "\t"
+                            + entailmentsPerRule[i]
+                            + "\t"
+                            + (timePerRule[i] == 0 ? 0 : entailmentsPerRule[i]
+                                    / timePerRule[i]));
+                    
+                }
                 
             }
             
-            int numEntailmentsAfter = entailments.getStatementCount();
+            final int numEntailmentsAfter = entailments.getStatementCount();
             
             if ( numEntailmentsBefore == numEntailmentsAfter ) {
                 
@@ -324,17 +430,21 @@ public class InferenceEngine extends TripleStore {
                 
             }
             
-            long insertStart = System.currentTimeMillis();
-            
-            int numInserted = transferBTrees( entailments );
-            
-            long insertTime = System.currentTimeMillis() - insertStart;
-            
-            if(DEBUG){
+            /*
+             * Transfer the entailments into the primary store so that derived
+             * entailments may be computed.
+             */
+            final long insertStart = System.currentTimeMillis();
+
+            final int numInserted = transferBTrees(entailments);
+
+            final long insertTime = System.currentTimeMillis() - insertStart;
+
+            if (DEBUG) {
             StringBuilder debug = new StringBuilder();
             debug.append( "round #" ).append( round++ ).append( ": " );
-            debug.append( numComputed ).append( " computed in " );
-            debug.append( computeTime ).append( " millis, " );
+            debug.append( totalStats.numComputed ).append( " computed in " );
+            debug.append( totalStats.computeTime ).append( " millis, " );
             debug.append( numInserted ).append( " inserted in " );
             debug.append( insertTime ).append( " millis " );
             log.debug( debug.toString() );
@@ -346,10 +456,21 @@ public class InferenceEngine extends TripleStore {
 
         final int lastStatementCount = getStatementCount();
 
-        if(INFO) {
-        log.info("Closed store in " + elapsed + "ms yeilding "
-                + lastStatementCount + " statements total, " + 
-                (lastStatementCount - firstStatementCount) + " inferences");
+        if (INFO) {
+        
+            final int inferenceCount = lastStatementCount - firstStatementCount;
+            
+            log.info("Computed closure of store in "
+                            + elapsed
+                            + "ms yeilding "
+                            + lastStatementCount
+                            + " statements total, "
+                            + (inferenceCount)
+                            + " inferences"
+                            + ", entailmentsPerSec="
+                            + ((long) (((double) inferenceCount)
+                                    / ((double) elapsed) * 1000d)));
+
         }
 
     }
@@ -357,15 +478,15 @@ public class InferenceEngine extends TripleStore {
     /**
      * Copies the entailments from the temporary store into the main store.
      * 
-     * @param entailments
+     * @param tmpStore
      * 
      * @return The #of entailments inserted into the main store.
      */
-    private int transferBTrees( TempTripleStore entailments ) {
+    private int transferBTrees( TempTripleStore tmpStore ) {
         
         int numInserted = 0;
         
-        IEntryIterator it = entailments.getSPOIndex().rangeIterator(null, null);
+        IEntryIterator it = tmpStore.getSPOIndex().rangeIterator(null, null);
         while (it.hasNext()) {
             it.next();
             byte[] key = it.getKey();
@@ -375,7 +496,7 @@ public class InferenceEngine extends TripleStore {
             }
         }
         
-        it = entailments.getPOSIndex().rangeIterator(null, null);
+        it = tmpStore.getPOSIndex().rangeIterator(null, null);
         while (it.hasNext()) {
             it.next();
             byte[] key = it.getKey();
@@ -384,7 +505,7 @@ public class InferenceEngine extends TripleStore {
             }
         }
         
-        it = entailments.getOSPIndex().rangeIterator(null, null);
+        it = tmpStore.getOSPIndex().rangeIterator(null, null);
         while (it.hasNext()) {
             it.next();
             byte[] key = it.getKey();

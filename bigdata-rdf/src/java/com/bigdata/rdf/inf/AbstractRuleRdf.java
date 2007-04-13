@@ -47,14 +47,10 @@ import java.util.Arrays;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 
 public abstract class AbstractRuleRdf extends Rule {
-
-    protected final int BUFFER_SIZE = 10*1024*1024;
     
     public AbstractRuleRdf(InferenceEngine store, Triple head, Pred[] body) {
 
@@ -62,15 +58,25 @@ public abstract class AbstractRuleRdf extends Rule {
 
     }
     
-    public abstract Stats apply( TempTripleStore entailments );
-
-    protected void dumpBuffer( SPO[] stmts, TempTripleStore btree ) {
+    /**
+     * Copies the entailments from the array into the {@link TempTripleStore}.
+     * 
+     * @param stmts
+     *            The source statements.
+     * 
+     * @param n
+     *            The #of statements in the buffer.
+     * 
+     * @param store
+     *            The target store.
+     */
+    protected void insertStatements(SPO[] stmts, int n, TempTripleStore store) {
         
         // deal with the SPO index
-        IIndex spo = btree.getSPOIndex();
-        Arrays.sort(stmts,SPOComparator.INSTANCE);
-        for ( int i = 0; i < stmts.length; i++ ) {
-            byte[] key = btree.keyBuilder.statement2Key
+        IIndex spo = store.getSPOIndex();
+        Arrays.sort(stmts,0,n,SPOComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = store.keyBuilder.statement2Key
                 ( stmts[i].s, stmts[i].p, stmts[i].o
                   );
             if ( !spo.contains(key) ) {
@@ -79,10 +85,10 @@ public abstract class AbstractRuleRdf extends Rule {
         }
 
         // deal with the POS index
-        IIndex pos = btree.getPOSIndex();
-        Arrays.sort(stmts,POSComparator.INSTANCE);
-        for ( int i = 0; i < stmts.length; i++ ) {
-            byte[] key = btree.keyBuilder.statement2Key
+        IIndex pos = store.getPOSIndex();
+        Arrays.sort(stmts,0,n,POSComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = store.keyBuilder.statement2Key
                 ( stmts[i].p, stmts[i].o, stmts[i].s
                   );
             if ( !pos.contains(key) ) {
@@ -91,10 +97,10 @@ public abstract class AbstractRuleRdf extends Rule {
         }
 
         // deal with the OSP index
-        IIndex osp = btree.getOSPIndex();
-        Arrays.sort(stmts,OSPComparator.INSTANCE);
-        for ( int i = 0; i < stmts.length; i++ ) {
-            byte[] key = btree.keyBuilder.statement2Key
+        IIndex osp = store.getOSPIndex();
+        Arrays.sort(stmts,0,n,OSPComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = store.keyBuilder.statement2Key
                 ( stmts[i].o, stmts[i].s, stmts[i].p
                   );
             if ( !osp.contains(key) ) {
@@ -104,57 +110,69 @@ public abstract class AbstractRuleRdf extends Rule {
         
     }
     
-    protected int insertEntailments( SPO[] entailments ) {
-        
-        int numAdded = 0;
-        
-        // deal with the SPO index
-        IIndex spo = store.getSPOIndex();
-        Arrays.sort(entailments,SPOComparator.INSTANCE);
-        for ( int i = 0; i < entailments.length; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( entailments[i].s, entailments[i].p, entailments[i].o
-                  );
-            if ( !spo.contains(key) ) {
-                spo.insert(key, null);
-                numAdded++;
-            }
-        }
-
-        // deal with the POS index
-        IIndex pos = store.getPOSIndex();
-        Arrays.sort(entailments,POSComparator.INSTANCE);
-        for ( int i = 0; i < entailments.length; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( entailments[i].p, entailments[i].o, entailments[i].s
-                  );
-            if ( !pos.contains(key) ) {
-                pos.insert(key, null);
-            }
-        }
-
-        // deal with the OSP index
-        IIndex osp = store.getOSPIndex();
-        Arrays.sort(entailments,OSPComparator.INSTANCE);
-        for ( int i = 0; i < entailments.length; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( entailments[i].o, entailments[i].s, entailments[i].p
-                  );
-            if ( !osp.contains(key) ) {
-                osp.insert(key, null);
-            }
-        }
-
-        return numAdded;
-        
-    }
+//    /**
+//     * Copies the statements into the primary store.
+//     * 
+//     * @todo refactor for common code and #of statements parameters with
+//     *       {@link #dumpBuffer(SPO[], int, TempTripleStore)}, which copies the
+//     *       statements into the temporary store.
+//     * 
+//     * @param entailments
+//     *            The statements.
+//     * 
+//     * @return The #of statements actually added to the store.
+//     */
+//    protected int insertEntailments( SPO[] entailments ) {
+//        
+//        int numAdded = 0;
+//        
+//        // deal with the SPO index
+//        IIndex spo = store.getSPOIndex();
+//        Arrays.sort(entailments,SPOComparator.INSTANCE);
+//        for ( int i = 0; i < entailments.length; i++ ) {
+//            byte[] key = store.keyBuilder.statement2Key
+//                ( entailments[i].s, entailments[i].p, entailments[i].o
+//                  );
+//            if ( !spo.contains(key) ) {
+//                spo.insert(key, null);
+//                numAdded++;
+//            }
+//        }
+//
+//        // deal with the POS index
+//        IIndex pos = store.getPOSIndex();
+//        Arrays.sort(entailments,POSComparator.INSTANCE);
+//        for ( int i = 0; i < entailments.length; i++ ) {
+//            byte[] key = store.keyBuilder.statement2Key
+//                ( entailments[i].p, entailments[i].o, entailments[i].s
+//                  );
+//            if ( !pos.contains(key) ) {
+//                pos.insert(key, null);
+//            }
+//        }
+//
+//        // deal with the OSP index
+//        IIndex osp = store.getOSPIndex();
+//        Arrays.sort(entailments,OSPComparator.INSTANCE);
+//        for ( int i = 0; i < entailments.length; i++ ) {
+//            byte[] key = store.keyBuilder.statement2Key
+//                ( entailments[i].o, entailments[i].s, entailments[i].p
+//                  );
+//            if ( !osp.contains(key) ) {
+//                osp.insert(key, null);
+//            }
+//        }
+//
+//        return numAdded;
+//        
+//    }
     
-    protected int insertEntailments2( TempTripleStore entailments ) {
-        
-        return insertEntailments( convert( entailments ) );
-        
-    }
-        
+//    protected int insertEntailments2( TempTripleStore entailments ) {
+//        
+//        return insertEntailments( getStatements( entailments ) );
+//        
+//    }
+
     protected void printStatement( SPO stmt ) {
         
         IIndex ndx = store.getIdTermIndex();
@@ -175,40 +193,48 @@ public abstract class AbstractRuleRdf extends Rule {
         
     }
     
-    protected TempTripleStore convert( SPO[] stmts ) {
-        
-        TempTripleStore tts = new TempTripleStore();
-        
-        for ( int i = 0; i < stmts.length; i++ ) {
-            
-            tts.addStatement( stmts[i].s, stmts[i].p, stmts[i].o );
-            
-        }
-        
-        return tts;
-        
-    }
+//    protected TempTripleStore convert( SPO[] stmts ) {
+//        
+//        TempTripleStore tts = new TempTripleStore();
+//        
+//        for ( int i = 0; i < stmts.length; i++ ) {
+//            
+//            tts.addStatement( stmts[i].s, stmts[i].p, stmts[i].o );
+//            
+//        }
+//        
+//        return tts;
+//        
+//    }
     
-    protected SPO[] convert( TempTripleStore tts ) {
-        
-        SPO[] stmts = new SPO[tts.getStatementCount()];
-        
-        int i = 0;
-        
-        IIndex ndx_spo = tts.getSPOIndex();
-        
-        IEntryIterator it = ndx_spo.rangeIterator(null, null);
-        
-        while ( it.hasNext() ) {
-            
-            it.next();
-            
-            stmts[i++] = new SPO(KeyOrder.SPO, tts.keyBuilder, it.getKey());
-            
-        }
-        
-        return stmts;
-        
-    }
+//    /**
+//     * Extracts all statements in the store into an {@link SPO}[].
+//     * 
+//     * @param store
+//     *            The store.
+//     * 
+//     * @return The array of statements.
+//     */
+//    protected SPO[] getStatements( TempTripleStore store ) {
+//        
+//        SPO[] stmts = new SPO[store.getStatementCount()];
+//        
+//        int i = 0;
+//        
+//        IIndex ndx_spo = store.getSPOIndex();
+//        
+//        IEntryIterator it = ndx_spo.rangeIterator(null, null);
+//        
+//        while ( it.hasNext() ) {
+//            
+//            it.next();
+//            
+//            stmts[i++] = new SPO(KeyOrder.SPO, store.keyBuilder, it.getKey());
+//            
+//        }
+//        
+//        return stmts;
+//        
+//    }
     
 }
