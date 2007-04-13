@@ -38,14 +38,14 @@ public class BytesUtil {
 
     static {
 
-//        try {
-//            System.loadLibrary("BytesUtil");
-//            System.err.println("BytesUtil JNI linked");
-//            linked = true;
-//        } catch (UnsatisfiedLinkError ex) {
-//            System.err.println("BytesUtil JNI NOT linked: " + ex);
-//            linked = false;
-//        }
+        try {
+            System.loadLibrary("BytesUtil");
+            System.err.println("BytesUtil JNI linked");
+            linked = true;
+        } catch (UnsatisfiedLinkError ex) {
+            System.err.println("BytesUtil JNI NOT linked: " + ex);
+            linked = false;
+        }
         
         /*
          * Strangly it appears that java is faster than JNI + C for byte[]
@@ -624,6 +624,8 @@ public class BytesUtil {
             
         }
 
+        System.err.println("JNI library routines Ok.");
+        
     }
     
 }
