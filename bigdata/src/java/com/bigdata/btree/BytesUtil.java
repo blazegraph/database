@@ -2,6 +2,8 @@ package com.bigdata.btree;
 
 import java.util.Comparator;
 
+import org.apache.log4j.Logger;
+
 /**
  * Class supporting operations on variable length byte[] keys.
  * <p>
@@ -12,19 +14,35 @@ import java.util.Comparator;
  * immutable keys are stored in a single byte[] and an index into starting
  * positions in that byte[] is maintained.
  * <p>
- * See {@link #main(String[])} which provides a test for the JNI integration.
+ * JNI methods are provided for unsigned byte[] comparison. However, note that
+ * the JNI methods do not appear to be as fast as the pure Java methods -
+ * presumably because of the overhead of going from Java to C. In order to
+ * execute using the JNI methods you MUST define the optional boolean system
+ * property, e.g.,
+ * 
+ * <pre>
+ * java -Dcom.bigdata.btree.BytesUtil.jni=true ...
+ * </pre>
+ * 
+ * See BytesUtil.c in this package for instructions on compiling the JNI
+ * methods.
+ * </p>
+ * See {@link #main(String[])} which provides a test for the JNI integration and
+ * some pointers on how to get this running on your platform.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class BytesUtil {
 
+    protected static final Logger log = Logger.getLogger(BytesUtil.class);
+
     /**
      * Flag set iff JNI linking succeeds.  When this flag is false we run with
      * the pure Java implementations of these methods.  When the flag is true,
      * the JNI versions are used.
      */
-    static boolean linked;
+    static boolean linked = false;
 
     /**
      * JNI routines are not invoked unless we will compare byte[]s with at least
@@ -38,23 +56,70 @@ public class BytesUtil {
 
     static {
 
-        try {
-            System.loadLibrary("BytesUtil");
-            System.err.println("BytesUtil JNI linked");
-            linked = true;
-        } catch (UnsatisfiedLinkError ex) {
-            System.err.println("BytesUtil JNI NOT linked: " + ex);
-            linked = false;
+        final boolean jni;
+
+        String val = System.getProperty("com.bigdata.btree.BytesUtil.jni");
+
+        if (val != null) {
+
+            jni = Boolean.parseBoolean(val);
+
+        } else {
+
+            jni = false; // Note: We will not even try to use JNI by default!
+
         }
-        
-        /*
-         * Strangly it appears that java is faster than JNI + C for byte[]
-         * comparisons!
-         */
-        linked = false;
+
+        if (jni) {
+
+            /*
+             * Attempt to load the JNI library.
+             */
+            
+            loadJNILibrary();
+            
+        }
         
     }
 
+    /**
+     * Attempt to load the JNI library.
+     * <p>
+     * Note: this is done automatically if the optional boolean system property
+     * <code>com.bigdata.btree.BytesUtil.jni=true</code> is specified, e.g.,
+     * using
+     * 
+     * <pre>
+     *    java -Dcom.bigdata.btree.BytesUtil.jni=true ...
+     * </pre>
+     * 
+     * @return True iff the JNI library was successfully linked.
+     */
+    public static boolean loadJNILibrary() {
+
+        if (!linked) {
+            
+            try {
+
+                System.loadLibrary("BytesUtil");
+
+                log.info("BytesUtil JNI linked");
+
+                linked = true;
+
+            } catch (UnsatisfiedLinkError ex) {
+
+                log.warn("BytesUtil JNI NOT linked: " + ex);
+
+                linked = false;
+
+            }
+        }
+
+        return linked;
+
+    }
+    
     /**
      * True iff the two arrays compare as equal. This is somewhat optimized in
      * that it tests the array lengths first, assumes that it is being used on
@@ -579,20 +644,16 @@ public class BytesUtil {
     }
     
     /**
-     * This method tries to execute the JNI methods.
-     * 
-     * See BytesUtil.c in this package for instructions on compiling the JNI
-     * methods. However, note that the JNI methods do not appear to be as fast
-     * as the pure Java methods - presumably because of the overhead of going
-     * from Java to C.
+     * This method forces the load of the JNI library and tries to execute the
+     * JNI methods.
      * <p>
      * In order to use the JNI library under Windows, you must specify the JNI
      * library location using the PATH environment variable, e.g.,
      * 
      * <pre>
-     *  cd bigdata
-     *  set PATH=%PATH%;lib
-     *  java -cp bin com.bigdata.btree.BytesUtil
+     *   cd bigdata
+     *   set PATH=%PATH%;lib
+     *   java -cp bin com.bigdata.btree.BytesUtil
      * </pre>
      * 
      * <p>
@@ -600,7 +661,7 @@ public class BytesUtil {
      * library location
      * 
      * <pre>
-     *   java -Djava.library.path=lib com.bigdata.btree.BytesUtil
+     *    java -Djava.library.path=lib com.bigdata.btree.BytesUtil
      * </pre>
      * 
      * @param args
@@ -612,6 +673,9 @@ public class BytesUtil {
      */
     public static void main(String[] args) {
  
+        // Force load of the JNI library.
+        loadJNILibrary();
+        
         if( 0 != BytesUtil._compareBytes(3, new byte[]{1,2,3}, 3, new byte[]{1,2,3}) ) {
             
             throw new AssertionError();
