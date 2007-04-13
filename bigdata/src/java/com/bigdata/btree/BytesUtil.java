@@ -12,10 +12,7 @@ import java.util.Comparator;
  * immutable keys are stored in a single byte[] and an index into starting
  * positions in that byte[] is maintained.
  * <p>
- * See BytesUtil.c in this package for instructions on compiling the JNI
- * methods. However, note that the JNI methods do not appear to be as fast as
- * the pure Java methods - presumably because of the overhead of going from Java
- * to C.
+ * See {@link #main(String[])} which provides a test for the JNI integration.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -583,6 +580,28 @@ public class BytesUtil {
     
     /**
      * This method tries to execute the JNI methods.
+     * 
+     * See BytesUtil.c in this package for instructions on compiling the JNI
+     * methods. However, note that the JNI methods do not appear to be as fast
+     * as the pure Java methods - presumably because of the overhead of going
+     * from Java to C.
+     * <p>
+     * In order to use the JNI library under Windows, you must specify the JNI
+     * library location using the PATH environment variable, e.g.,
+     * 
+     * <pre>
+     *  cd bigdata
+     *  set PATH=%PATH%;lib
+     *  java -cp bin com.bigdata.btree.BytesUtil
+     * </pre>
+     * 
+     * <p>
+     * In order to use the JNI library under un*x, you must specify the JNI
+     * library location
+     * 
+     * <pre>
+     *   java -Djava.library.path=lib com.bigdata.btree.BytesUtil
+     * </pre>
      * 
      * @param args
      * 
