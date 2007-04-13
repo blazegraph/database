@@ -35,7 +35,7 @@ java -classpath src/java com.bigdata.btree.BytesUtil
  * On Win32, the following command builds a dynamic link library (DLL)
  * using the Microsoft Visual C++ compiler:
 
-cl "-I%JAVA_HOME%\include" "-I%JAVA_HOME%\include\win32" -LD BytesUtil.c -FeBytesUtil.dll
+cl -I. "-I%JAVA_HOME%\include" "-I%JAVA_HOME%\include\win32" -LD src/java/com/bigdata/btree/BytesUtil.c -FeBytesUtil.dll
 
 other things tried, some of which may work or have useful optimizations:
 
