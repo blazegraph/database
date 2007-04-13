@@ -43,8 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Vector;
-
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
@@ -62,13 +60,9 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( TempTripleStore btree ) {
+    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore ) {
         
-        Stats stats = new Stats();
-        
-        long computeStart = System.currentTimeMillis();
-        
-        Vector<SPO> entailments = new Vector<SPO>(BUFFER_SIZE);
+        final long computeStart = System.currentTimeMillis();
         
         byte[] startKey = store.keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id, 0
@@ -78,32 +72,40 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
             ( body[0].p.id, body[0].o.id+1, 0
               );
         
-        IEntryIterator it = store.getPOSIndex().rangeIterator(startKey,endKey); 
+        IEntryIterator it = store.getPOSIndex().rangeIterator(startKey, endKey); 
+        
+        int n = 0;
         
         while ( it.hasNext() ) {
             
             it.next();
-            SPO stmt = 
-                new SPO(KeyOrder.POS,store.keyBuilder,it.getKey());
             
+            stats.stmts1++;
+
+            SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
+            
+            // @todo review -- should this be substituting stmt.s in each case?
             long _s = head.s.isVar() ? stmt.s : head.s.id;
             long _p = head.p.isVar() ? stmt.s : head.p.id;
             long _o = head.o.isVar() ? stmt.s : head.o.id;
         
-            if (entailments.size() == BUFFER_SIZE) {
-                dumpBuffer
-                    ( entailments.toArray( new SPO[entailments.size()] ),
-                      btree
-                      );
-                entailments.clear();
+            buffer[n++] = new SPO(_s, _p, _o);
+            
+            if (n == buffer.length) {
+
+                insertStatements(buffer, n, tmpStore);
+
+                n = 0;
+
             }
-            entailments.add( new SPO(_s, _p, _o) );
+
             stats.numComputed++;
             
         }
-        if(debug)dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
         
-        stats.computeTime = System.currentTimeMillis() - computeStart;
+        insertStatements( buffer, n, tmpStore );
+        
+        stats.computeTime += System.currentTimeMillis() - computeStart;
         
         return stats;
         

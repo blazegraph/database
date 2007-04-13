@@ -43,8 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Vector;
-
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
@@ -61,15 +59,13 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
     }
 
-    public Stats apply( TempTripleStore btree ) {
+    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore btree ) {
         
-        Stats stats = new Stats();
-        
-        long computeStart = System.currentTimeMillis();
-        
-        Vector<SPO> entailments = new Vector<SPO>(BUFFER_SIZE);
+        final long computeStart = System.currentTimeMillis();
         
         long lastP = -1;
+        
+        int n = 0;
         
         IEntryIterator it = store.getPOSIndex().rangeIterator(null,null); 
         
@@ -77,30 +73,34 @@ public class RuleRdf01 extends AbstractRuleRdf {
             
             it.next();
             
-            SPO stmt = 
-                new SPO(KeyOrder.POS,store.keyBuilder,it.getKey());
+            stats.stmts1++;
+            
+            SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
             
             if ( stmt.p != lastP ) {
                 
                 lastP = stmt.p;
+
+                buffer[n++] = new SPO(stmt.p, store.rdfType.id,
+                        store.rdfProperty.id);
                 
-                if (entailments.size() == BUFFER_SIZE) {
-                    dumpBuffer
-                        ( entailments.toArray( new SPO[entailments.size()] ),
-                          btree
-                          );
-                    entailments.clear();
+                if (n == buffer.length) {
+
+                    insertStatements(buffer, n, btree);
+                    
+                    n = 0;
+                    
                 }
-                entailments.add
-                    ( new SPO(stmt.p, store.rdfType.id, store.rdfProperty.id) );
+                
                 stats.numComputed++;
                 
             }
             
         }
-        if(debug)dumpBuffer( entailments.toArray( new SPO[entailments.size()] ), btree );
         
-        stats.computeTime = System.currentTimeMillis() - computeStart;
+        insertStatements( buffer, n, btree );
+        
+        stats.computeTime += System.currentTimeMillis() - computeStart;
         
         return stats;
         

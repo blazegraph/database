@@ -43,8 +43,11 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-
-
+/**
+ * <pre>
+ * &lt;a rdfs:subPropertyOf b&gt; AND &lt;u a y&gt; IMPLIES &lt;u b y&gt; 
+ * </pre>
+ */
 public class RuleRdfs07 extends AbstractRuleRdfs2379 {
 
     public RuleRdfs07( InferenceEngine store, Var a, Var b, Var u, Var y ) {
@@ -58,7 +61,9 @@ public class RuleRdfs07 extends AbstractRuleRdfs2379 {
     }
     
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+
         return new SPO( stmt2.s, stmt1.o, stmt2.o );
+        
     }
 
 }

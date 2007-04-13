@@ -68,8 +68,6 @@ import com.bigdata.rdf.TempTripleStore;
  */
 abstract public class Rule {
 
-    static protected final boolean debug = false; 
-    
     /**
      * The inference engine.
      */
@@ -101,26 +99,31 @@ abstract public class Rule {
     }
     
     /**
-     * Apply the rule to the statement in the store.
+     * Apply the rule, creating entailments that are inserted into the temporary
+     * store.
      * 
-     * @param entailments
-     *            The temporary triple store used to hold entailments.
+     * @param stats
+     *            Returns statistics on the rule application as a side effect.
+     * @param buffer
+     *            Used to buffer entailments so that we can perform batch btree
+     *            operations.
+     * @param tmpStore
+     *            The temporary store into which the entailments are placed.
      * 
-     * @return Statistics related to what the rule did.
+     * @return The statistics object.
      * 
-     * @todo support conditional insert in the btree so that we do not have
-     *       to do a lookup/insert combination.
+     * @todo support conditional insert in the btree so that we do not have to
+     *       do a lookup/insert combination.
      * 
-     * @todo we could store proofs in the value for a statement or in a
-     *       proofs index. doing that efficiently would require a
-     *       concatenation operation variant for insert.
+     * @todo we could store proofs in the value for a statement or in a proofs
+     *       index. doing that efficiently would require a concatenation
+     *       operation variant for insert.
      * 
      * @todo the btree class is NOT safe for concurrent modification under
      *       traversal so implementations of this method need to bufferQueue the
      *       statements that they will insert.
      */
-    abstract public Stats apply( TempTripleStore entailments );
-    
+    public abstract Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore );
     
     /**
      * Statistics about what the Rule did during {@link Rule#apply()}.
@@ -129,8 +132,31 @@ abstract public class Rule {
      */
     public static class Stats {
 
+        /**
+         * #of matches for the triple pattern for the first antecedent of the rule.
+         */
+        public int stmts1;
+
+        /**
+         * #of matches for the triple pattern for the second antecedent of the
+         * rule (if there are two).
+         */
+        public int stmts2;
+        
+        /**
+         * #of statements considered.
+         */
+        public int numConsidered;
+        
+        /**
+         * #of entailments computed.
+         */
         public int numComputed;
         
+        /**
+         * Time to compute the entailments and store them within the
+         * {@link TempTripleStore} in milliseconds.
+         */
         long computeTime;
         
     }
