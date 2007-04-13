@@ -581,15 +581,25 @@ public class BytesUtil {
         
     }
     
+    /**
+     * This method tries to execute the JNI methods.
+     * 
+     * @param args
+     * 
+     * @exception UnsatisfiedLinkError
+     *                if the JNI methods can not be resolved.
+     * @exception AssertionError
+     *                if the JNI methods do not produce the expected answers.
+     */
     public static void main(String[] args) {
  
-        if( 0 != BytesUtil.compareBytes(new byte[]{1,2,3}, new byte[]{1,2,3}) ) {
+        if( 0 != BytesUtil._compareBytes(3, new byte[]{1,2,3}, 3, new byte[]{1,2,3}) ) {
             
             throw new AssertionError();
             
         }
 
-        if( 0 != BytesUtil.compareBytesWithLenAndOffset(0, 3, new byte[]{1,2,3}, 0, 3, new byte[]{1,2,3}) ) {
+        if( 0 != BytesUtil._compareBytesWithOffsetAndLen(0, 3, new byte[]{1,2,3}, 0, 3, new byte[]{1,2,3}) ) {
 
             throw new AssertionError();
             
