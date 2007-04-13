@@ -53,6 +53,16 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Properties;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IFusedView;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentMerger;
+import com.bigdata.btree.IndexSegmentMerger.MergedEntryIterator;
+import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -66,16 +76,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IFusedView;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentBuilder;
-import com.bigdata.objndx.IndexSegmentFileStore;
-import com.bigdata.objndx.IndexSegmentMerger;
-import com.bigdata.objndx.IndexSegmentMerger.MergedEntryIterator;
-import com.bigdata.objndx.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.rawstore.Bytes;
 
 /**

@@ -45,7 +45,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Vector;
 
-import com.bigdata.objndx.IEntryIterator;
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 

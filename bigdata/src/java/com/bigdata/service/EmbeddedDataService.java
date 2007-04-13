@@ -53,8 +53,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.objndx.IBatchOp;
 import com.bigdata.service.DataService.RangeQueryResult;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 

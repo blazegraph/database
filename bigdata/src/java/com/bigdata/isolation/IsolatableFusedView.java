@@ -47,10 +47,10 @@ Modifications:
 
 package com.bigdata.isolation;
 
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.IBatchBTree;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.ReadOnlyFusedView;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.scaleup.PartitionedIndexView;
 
 /**

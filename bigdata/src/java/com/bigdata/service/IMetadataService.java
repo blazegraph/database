@@ -62,6 +62,8 @@ import java.rmi.Remote;
  * Note: methods on this interface MUST throw {@link IOException} in order to be
  * compatible with RMI.
  * 
+ * @todo extend IDataService
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

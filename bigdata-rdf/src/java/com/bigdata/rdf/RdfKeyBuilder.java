@@ -54,7 +54,7 @@ import org.openrdf.model.Value;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.XmlSchema;
 
-import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.btree.KeyBuilder;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and

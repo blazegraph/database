@@ -50,7 +50,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.bigdata.objndx.BTreeMetadata;
+import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.TimestampFactory;

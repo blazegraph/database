@@ -43,7 +43,7 @@ Modifications:
 */
 package com.bigdata.isolation;
 
-import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.btree.AbstractBTree;
 
 /**
  * Interface for values in an {@link AbstractBTree} supporting deletion markers

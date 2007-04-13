@@ -56,8 +56,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.NoSuccessorException;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.NoSuccessorException;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.TripleStore;

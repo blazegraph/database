@@ -55,7 +55,7 @@ import java.util.Random;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.objndx.DataOutputBuffer;
+import com.bigdata.btree.DataOutputBuffer;
 
 /**
  * Test suite for {@link Value.Serializer}.

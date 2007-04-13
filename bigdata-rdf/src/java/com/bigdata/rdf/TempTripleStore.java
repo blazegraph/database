@@ -52,11 +52,11 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;

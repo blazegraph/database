@@ -12,12 +12,12 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.DataOutputBuffer;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 

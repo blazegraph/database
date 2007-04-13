@@ -52,8 +52,8 @@ import junit.framework.TestCase2;
 import org.openrdf.model.Value;
 import org.openrdf.vocabulary.XmlSchema;
 
-import com.bigdata.objndx.BytesUtil;
-import com.bigdata.objndx.KeyBuilder;
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.KeyBuilder;
 
 /**
  * Test suite for construction of variable length unsigned byte[] keys from RDF

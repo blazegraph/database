@@ -6,9 +6,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.UserDefinedFunction;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.objndx.UserDefinedFunction;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.rio.BulkRioLoader;
 

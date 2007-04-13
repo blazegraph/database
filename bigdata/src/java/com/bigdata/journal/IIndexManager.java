@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IIndex;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndex;
 
 /**
  * Interface for managing named indices.

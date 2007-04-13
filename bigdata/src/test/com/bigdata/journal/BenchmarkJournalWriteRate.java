@@ -59,12 +59,12 @@ import junit.framework.Test;
 import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.ByteArrayValueSerializer;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 

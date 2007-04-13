@@ -52,7 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.objndx.IndexSegmentBuilder;
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;

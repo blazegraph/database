@@ -47,14 +47,14 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentExtensionMetadata;
+import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.isolation.UnisolatedBTree.DeletedEntryFilter;
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.BatchContains;
-import com.bigdata.objndx.BatchLookup;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentExtensionMetadata;
-import com.bigdata.objndx.IndexSegmentFileStore;
 
 /**
  * <p>

@@ -47,7 +47,7 @@ Modifications:
 
 package com.bigdata.isolation;
 
-import com.bigdata.objndx.ReadOnlyIndex;
+import com.bigdata.btree.ReadOnlyIndex;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

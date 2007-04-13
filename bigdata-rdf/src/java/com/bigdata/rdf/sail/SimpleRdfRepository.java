@@ -79,9 +79,9 @@ import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.InferenceEngine;

@@ -64,7 +64,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.sesame.sail.StatementIterator;
 
-import com.bigdata.objndx.BytesUtil;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.TripleStore;
 

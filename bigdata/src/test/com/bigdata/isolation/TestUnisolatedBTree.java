@@ -49,11 +49,11 @@ package com.bigdata.isolation;
 
 import java.util.UUID;
 
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IBatchOp;
-import com.bigdata.objndx.IRangeQuery;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -370,7 +370,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
     /**
      * @todo test the batch apis. all methods must work with {@link Value}s
      *       (the test for this could be a test of the
-     *       {@link IBatchOp#apply(com.bigdata.objndx.ISimpleBTree)}
+     *       {@link IBatchOp#apply(com.bigdata.btree.ISimpleBTree)}
      *       implementations in the btree package since we apply that method in
      *       a trivial manner to support the batch api.
      */

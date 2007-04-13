@@ -46,8 +46,8 @@ package com.bigdata.rdf.serializers;
 import java.io.DataInput;
 import java.io.IOException;
 
-import com.bigdata.objndx.DataOutputBuffer;
-import com.bigdata.objndx.IValueSerializer;
+import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.btree.IValueSerializer;
 
 /**
  * Note: There is no additional data serialized with a statement at this time so

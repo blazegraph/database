@@ -47,9 +47,9 @@ Modifications:
 
 package com.bigdata.journal;
 
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.IndexSegment;
 
 /**
  * A client-facing interface for managing transaction life cycles.

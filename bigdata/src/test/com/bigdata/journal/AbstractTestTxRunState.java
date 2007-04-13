@@ -52,8 +52,8 @@ import java.util.UUID;
 
 import junit.framework.TestSuite;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.IIndex;
 
 /**
  * Test suite for the state machine governing the transaction {@link RunState}

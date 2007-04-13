@@ -47,10 +47,10 @@ Modifications:
 
 package com.bigdata.scaleup;
 
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.btree.IndexSegmentMerger;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.IndexSegmentBuilder;
-import com.bigdata.objndx.IndexSegmentMerger;
 
 /**
  * Test suite for {@link PartitionedIndexView}.

@@ -49,10 +49,10 @@ package com.bigdata.rdf;
 
 import java.util.Arrays;
 
-import com.bigdata.objndx.Errors;
-import com.bigdata.objndx.IBatchOp;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.ISimpleBTree;
+import com.bigdata.btree.Errors;
+import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;

@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.objndx.IIndex;
+import com.bigdata.btree.IIndex;
 
 /**
  * <p>

@@ -47,7 +47,7 @@
 
 package com.bigdata.journal;
 
-import com.bigdata.objndx.IIndex;
+import com.bigdata.btree.IIndex;
 
 /**
  * Interface for reading and writing persistent data using one or more named

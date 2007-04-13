@@ -50,8 +50,8 @@ package com.bigdata.rawstore;
 import java.io.File;
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.BTree;
 
 /**
  * <p>

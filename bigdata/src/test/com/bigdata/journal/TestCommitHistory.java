@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.objndx.BTree;
+import com.bigdata.btree.BTree;
 
 /**
  * Test the ability to get (exact match) and find (most recent less than or

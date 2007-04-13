@@ -49,9 +49,9 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.ByteArrayValueSerializer;
-import com.bigdata.objndx.IIndex;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Addr;
 
 /**

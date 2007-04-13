@@ -52,9 +52,9 @@ import java.text.NumberFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentBuilder;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.MasterJournal;
 
