@@ -45,7 +45,7 @@ package com.bigdata.scaleup;
 
 import java.util.UUID;
 
-import com.bigdata.objndx.IndexSegment;
+import com.bigdata.btree.IndexSegment;
 
 /**
  * Metadata for a single {@link IndexSegment}.

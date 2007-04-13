@@ -8,7 +8,7 @@ import java.text.NumberFormat;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.objndx.AbstractBTree;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 

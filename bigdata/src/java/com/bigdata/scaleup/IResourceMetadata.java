@@ -46,9 +46,9 @@ package com.bigdata.scaleup;
 import java.io.File;
 import java.util.UUID;
 
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentMetadata;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentMetadata;
 
 /**
  * Interface for metadata about a {@link Journal} or {@link IndexSegment}.

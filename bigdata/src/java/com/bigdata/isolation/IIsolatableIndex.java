@@ -47,16 +47,16 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentMerger;
+import com.bigdata.btree.Leaf;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.ValueSerializer;
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IBatchBTree;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.IndexSegmentMerger;
-import com.bigdata.objndx.Leaf;
 import com.bigdata.scaleup.IsolatablePartitionedIndexView;
 
 /**

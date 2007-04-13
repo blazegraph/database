@@ -47,8 +47,8 @@
 
 package com.bigdata.journal;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedBTree;
-import com.bigdata.objndx.IIndex;
 
 /**
  * Interface for transactional reading and writing of persistent data.

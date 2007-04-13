@@ -49,8 +49,8 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.SimpleEntry;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.SimpleEntry;
 import com.bigdata.scaleup.MasterJournal;
 
 /**

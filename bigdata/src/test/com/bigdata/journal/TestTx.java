@@ -49,9 +49,9 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.IIndex;
 
 /**
  * Test suite for fully-isolated read-write transactions.

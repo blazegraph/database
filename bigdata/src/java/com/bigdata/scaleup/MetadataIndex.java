@@ -51,13 +51,13 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
 
 /**

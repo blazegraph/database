@@ -47,7 +47,7 @@ import java.io.File;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
-import com.bigdata.objndx.IndexSegment;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 
 /**

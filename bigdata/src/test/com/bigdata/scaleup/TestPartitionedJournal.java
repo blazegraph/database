@@ -54,14 +54,14 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.ByteArrayValueSerializer;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.scaleup.MasterJournal.MergePolicy;
 import com.bigdata.scaleup.MasterJournal.Options;

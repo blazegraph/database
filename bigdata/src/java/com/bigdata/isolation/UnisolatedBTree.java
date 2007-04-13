@@ -55,17 +55,17 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.BatchContains;
-import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.BatchLookup;
-import com.bigdata.objndx.BatchRemove;
-import com.bigdata.objndx.IBatchOp;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.ISimpleBTree;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.EntryIterator.EntryFilter;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.EntryIterator.EntryFilter;
 import com.bigdata.rawstore.IRawStore;
 
 /**

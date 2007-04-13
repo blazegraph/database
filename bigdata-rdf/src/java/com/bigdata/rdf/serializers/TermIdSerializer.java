@@ -48,8 +48,8 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.objndx.DataOutputBuffer;
-import com.bigdata.objndx.IValueSerializer;
+import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.btree.IValueSerializer;
 
 /**
  * The value is a <code>long</code> integer that is the term identifier.

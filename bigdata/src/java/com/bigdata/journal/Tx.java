@@ -51,12 +51,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatedIndex;
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.PartitionedIndexView;
 

@@ -47,15 +47,15 @@ Modifications:
 
 package com.bigdata.isolation;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BTreeMetadata;
-import com.bigdata.objndx.ByteArrayValueSerializer;
-import com.bigdata.objndx.IBatchBTree;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.ILinearList;
-import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.rawstore.IRawStore;
 
 /**

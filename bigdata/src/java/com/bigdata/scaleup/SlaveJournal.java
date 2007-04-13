@@ -47,14 +47,14 @@ import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
 import com.bigdata.rawstore.Addr;
 
 /**

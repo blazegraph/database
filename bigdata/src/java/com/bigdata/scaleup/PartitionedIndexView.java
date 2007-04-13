@@ -53,20 +53,20 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.EmptyEntryIterator;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IFusedView;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.AbstractBTree;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BatchContains;
-import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.BatchLookup;
-import com.bigdata.objndx.BatchRemove;
-import com.bigdata.objndx.EmptyEntryIterator;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IFusedView;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.IndexSegment;
-import com.bigdata.objndx.ReadOnlyFusedView;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key

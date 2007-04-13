@@ -50,11 +50,11 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITxCommitProtocol;
 import com.bigdata.journal.IsolationEnum;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.IBatchOp;
 import com.bigdata.service.DataService.RangeQueryResult;
 
 /**
@@ -88,6 +88,11 @@ import com.bigdata.service.DataService.RangeQueryResult;
  *       might include emitting asynchronous messages. transactional triggers
  *       can have more flexibility since they are under less of a latency
  *       constraint.
+ * 
+ * @todo add protocol / service version information to this interface and
+ *       provide for life switch-over from service version to service version so
+ *       that you can update or rollback the installed service versions with
+ *       100% uptime.
  */
 public interface IDataService extends IRemoteTxCommitProtocol {
 

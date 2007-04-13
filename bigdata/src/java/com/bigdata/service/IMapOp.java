@@ -1,6 +1,6 @@
 package com.bigdata.service;
 
-import com.bigdata.objndx.BytesUtil;
+import com.bigdata.btree.BytesUtil;
 
 /**
  * Interface for client-defined mapped operators.

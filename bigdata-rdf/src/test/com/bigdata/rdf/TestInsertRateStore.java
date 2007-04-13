@@ -54,8 +54,8 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 

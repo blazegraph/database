@@ -49,7 +49,7 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.objndx.IndexSegmentBuilder;
+import com.bigdata.btree.IndexSegmentBuilder;
 
 /**
  * An address encodes both an int32 length and an int32 offset into a single

@@ -43,7 +43,7 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import com.bigdata.objndx.IndexSegment;
+import com.bigdata.btree.IndexSegment;
 
 /**
  * Interface for a scheduleable task that produces one or more

@@ -49,10 +49,10 @@ import java.util.Properties;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.TripleStore;

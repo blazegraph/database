@@ -47,12 +47,12 @@ Modifications:
 
 package com.bigdata.scaleup;
 
+import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IsolatableFusedView;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.objndx.IBatchBTree;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.ReadOnlyFusedView;
 
 /**
  * A {@link PartitionedIndexView} that supports transactions and deletion

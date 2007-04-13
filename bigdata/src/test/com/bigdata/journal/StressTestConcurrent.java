@@ -62,9 +62,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ComparisonTestDriver.IComparisonTest;
-import com.bigdata.objndx.IIndex;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

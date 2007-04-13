@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.objndx.BTree;
+import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 

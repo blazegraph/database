@@ -50,9 +50,9 @@ package com.bigdata.journal;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.objndx.AbstractBTreeTestCase;
-import com.bigdata.objndx.BTree;
-import com.bigdata.objndx.SimpleEntry;
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.SimpleEntry;
 
 /**
  * Stress tests of the {@link BTree} writing on the {@link Journal}. This suite

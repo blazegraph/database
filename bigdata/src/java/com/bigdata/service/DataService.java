@@ -56,21 +56,21 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.IReadOnlyBatchOp;
+import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.BatchContains;
-import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.BatchLookup;
-import com.bigdata.objndx.BatchRemove;
-import com.bigdata.objndx.IBatchBTree;
-import com.bigdata.objndx.IBatchOp;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
-import com.bigdata.objndx.ILinearList;
-import com.bigdata.objndx.IReadOnlyBatchOp;
-import com.bigdata.objndx.ISimpleBTree;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

@@ -43,7 +43,7 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import com.bigdata.objndx.IndexSegment;
+import com.bigdata.btree.IndexSegment;
 
 /**
  * Enumeration of life-cycle states for {@link IndexSegment}s in a

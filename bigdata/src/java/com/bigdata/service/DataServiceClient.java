@@ -51,8 +51,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.objndx.IBatchOp;
 import com.bigdata.service.DataService.RangeQueryResult;
 
 /**

@@ -49,11 +49,11 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
-import com.bigdata.objndx.DataOutputBuffer;
-import com.bigdata.objndx.IValueSerializer;
-import com.bigdata.objndx.IndexSegment;
 
 /**
  * A description of the {@link IndexSegment}s containing the user data for a

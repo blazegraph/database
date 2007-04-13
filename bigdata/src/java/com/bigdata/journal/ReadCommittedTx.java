@@ -49,14 +49,14 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IIsolatedIndex;
-import com.bigdata.objndx.BatchContains;
-import com.bigdata.objndx.BatchInsert;
-import com.bigdata.objndx.BatchLookup;
-import com.bigdata.objndx.BatchRemove;
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
 
 /**
  * A read-committed transaction provides a read-only view onto the current

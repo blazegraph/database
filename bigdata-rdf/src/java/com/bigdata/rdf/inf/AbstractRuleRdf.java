@@ -47,8 +47,8 @@ import java.util.Arrays;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.objndx.IEntryIterator;
-import com.bigdata.objndx.IIndex;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TempTripleStore;
 
