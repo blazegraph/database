@@ -319,6 +319,12 @@ public class InferenceEngine extends TripleStore {
          * 10k.
          */
         final int BUFFER_SIZE = 100 * Bytes.kilobyte32;
+        
+        /*
+         * Note: Unlike the parser buffer, making statements distinct appears
+         * to slow things down significantly (2x slower!).
+         */
+        final boolean distinct = false;
 
         final Rule[] rules = this.rules;
 
@@ -336,7 +342,12 @@ public class InferenceEngine extends TripleStore {
                 + " statements");
 
         int round = 0;
-        
+
+        /*
+         * The temporary store used to accumulate the entailments.
+         */
+        TempTripleStore tmpStore = new TempTripleStore(); 
+
         /*
          * This is a buffer that is used to hold entailments so that we can
          * insert them into the indices using ordered insert operations (much
@@ -346,18 +357,13 @@ public class InferenceEngine extends TripleStore {
          * buffer overflows, those entailments are transfered enmass into the
          * tmp store.
          */
-        final SPO[] buffer = new SPO[BUFFER_SIZE];
-
-        /*
-         * The temporary store used to accumulate the entailments.
-         */
-        TempTripleStore entailments = new TempTripleStore(); 
-
+        final SPOBuffer buffer = new SPOBuffer(tmpStore, BUFFER_SIZE, distinct);
+        
         Stats totalStats = new Stats();
         
         while (true) {
 
-            final int numEntailmentsBefore = entailments.getStatementCount();
+            final int numEntailmentsBefore = tmpStore.getStatementCount();
             
             for (int i = 0; i < nrules; i++) {
 
@@ -367,7 +373,7 @@ public class InferenceEngine extends TripleStore {
 
                 int nbefore = ruleStats.numComputed;
                 
-                rule.apply( ruleStats, buffer, entailments );
+                rule.apply( ruleStats, buffer );
                 
                 int nnew = ruleStats.numComputed - nbefore;
 
@@ -421,7 +427,12 @@ public class InferenceEngine extends TripleStore {
                 
             }
             
-            final int numEntailmentsAfter = entailments.getStatementCount();
+            /*
+             * Flush the statements in the buffer to the temporary store. 
+             */
+            buffer.flush();
+
+            final int numEntailmentsAfter = tmpStore.getStatementCount();
             
             if ( numEntailmentsBefore == numEntailmentsAfter ) {
                 
@@ -436,7 +447,7 @@ public class InferenceEngine extends TripleStore {
              */
             final long insertStart = System.currentTimeMillis();
 
-            final int numInserted = transferBTrees(entailments);
+            final int numInserted = copyStatements(tmpStore);
 
             final long insertTime = System.currentTimeMillis() - insertStart;
 
@@ -476,13 +487,15 @@ public class InferenceEngine extends TripleStore {
     }
     
     /**
-     * Copies the entailments from the temporary store into the main store.
+     * Copies the statements from the temporary store into the main store.
      * 
      * @param tmpStore
      * 
-     * @return The #of entailments inserted into the main store.
+     * @return The #of statements inserted into the main store (the count only
+     *         reports those statements that were not already in the main
+     *         store).
      */
-    private int transferBTrees( TempTripleStore tmpStore ) {
+    public int copyStatements( TempTripleStore tmpStore ) {
         
         int numInserted = 0;
         

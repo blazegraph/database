@@ -160,11 +160,11 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /**
          * Applies the base rule iff the {@link Magic} is matched.
          */
-        public Rule.Stats apply( Stats stats, SPO[] buffer, TempTripleStore tmpStore ) {
+        public Rule.Stats apply( Stats stats, SPOBuffer buffer) {
 
             if(match()) { 
             
-                return rule.apply( stats, buffer, tmpStore );
+                return rule.apply( stats, buffer );
             
             }
             

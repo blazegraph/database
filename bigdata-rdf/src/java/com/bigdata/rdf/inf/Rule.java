@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.rdf.TempTripleStore;
 
 
@@ -101,14 +102,17 @@ abstract public class Rule {
     /**
      * Apply the rule, creating entailments that are inserted into the temporary
      * store.
+     * <p>
+     * Note: the {@link BTree} class is NOT safe for concurrent modification
+     * under traversal so implementations of this method need to buffer the
+     * statements that they will insert. See {@link SPOBuffer}
      * 
      * @param stats
      *            Returns statistics on the rule application as a side effect.
      * @param buffer
      *            Used to buffer entailments so that we can perform batch btree
-     *            operations.
-     * @param tmpStore
-     *            The temporary store into which the entailments are placed.
+     *            operations. Entailments are batch inserted into the backing
+     *            store (for the buffer) when the buffer overflows.
      * 
      * @return The statistics object.
      * 
@@ -119,11 +123,8 @@ abstract public class Rule {
      *       index. doing that efficiently would require a concatenation
      *       operation variant for insert.
      * 
-     * @todo the btree class is NOT safe for concurrent modification under
-     *       traversal so implementations of this method need to bufferQueue the
-     *       statements that they will insert.
      */
-    public abstract Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore );
+    public abstract Stats apply( final Stats stats, final SPOBuffer buffer );
     
     /**
      * Statistics about what the Rule did during {@link Rule#apply()}.
