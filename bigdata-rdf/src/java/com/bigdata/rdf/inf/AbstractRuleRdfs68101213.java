@@ -45,7 +45,6 @@ package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TempTripleStore;
 
 
 public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
@@ -60,7 +59,7 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore ) {
+    public Stats apply( final Stats stats, final SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
@@ -89,21 +88,11 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
             long _p = head.p.isVar() ? stmt.s : head.p.id;
             long _o = head.o.isVar() ? stmt.s : head.o.id;
         
-            buffer[n++] = new SPO(_s, _p, _o);
-            
-            if (n == buffer.length) {
-
-                insertStatements(buffer, n, tmpStore);
-
-                n = 0;
-
-            }
+            buffer.add( new SPO(_s, _p, _o) );
 
             stats.numComputed++;
             
         }
-        
-        insertStatements( buffer, n, tmpStore );
         
         stats.computeTime += System.currentTimeMillis() - computeStart;
         

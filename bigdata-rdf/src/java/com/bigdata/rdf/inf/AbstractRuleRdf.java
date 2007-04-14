@@ -43,12 +43,9 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Arrays;
-
 import org.openrdf.model.URI;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.rdf.TempTripleStore;
 
 public abstract class AbstractRuleRdf extends Rule {
     
@@ -56,58 +53,6 @@ public abstract class AbstractRuleRdf extends Rule {
 
         super(store, head, body);
 
-    }
-    
-    /**
-     * Copies the entailments from the array into the {@link TempTripleStore}.
-     * 
-     * @param stmts
-     *            The source statements.
-     * 
-     * @param n
-     *            The #of statements in the buffer.
-     * 
-     * @param store
-     *            The target store.
-     */
-    protected void insertStatements(SPO[] stmts, int n, TempTripleStore store) {
-        
-        // deal with the SPO index
-        IIndex spo = store.getSPOIndex();
-        Arrays.sort(stmts,0,n,SPOComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( stmts[i].s, stmts[i].p, stmts[i].o
-                  );
-            if ( !spo.contains(key) ) {
-                spo.insert(key, null);
-            }
-        }
-
-        // deal with the POS index
-        IIndex pos = store.getPOSIndex();
-        Arrays.sort(stmts,0,n,POSComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( stmts[i].p, stmts[i].o, stmts[i].s
-                  );
-            if ( !pos.contains(key) ) {
-                pos.insert(key, null);
-            }
-        }
-
-        // deal with the OSP index
-        IIndex osp = store.getOSPIndex();
-        Arrays.sort(stmts,0,n,OSPComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = store.keyBuilder.statement2Key
-                ( stmts[i].o, stmts[i].s, stmts[i].p
-                  );
-            if ( !osp.contains(key) ) {
-                osp.insert(key, null);
-            }
-        }
-        
     }
     
 //    /**
@@ -173,26 +118,6 @@ public abstract class AbstractRuleRdf extends Rule {
 //        
 //    }
 
-    protected void printStatement( SPO stmt ) {
-        
-        IIndex ndx = store.getIdTermIndex();
-        
-        URI s = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.s));
-         
-        URI p = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.p));
-         
-        URI o = (URI) ndx.lookup(store.keyBuilder.id2key(stmt.o));
-         
-        System.err.println(abbrev(s)+","+abbrev(p)+","+abbrev(o));
-        
-    }
-    
-    protected String abbrev( URI uri ) {
-        
-        return uri.getURI().substring(uri.getURI().lastIndexOf('#'));
-        
-    }
-    
 //    protected TempTripleStore convert( SPO[] stmts ) {
 //        
 //        TempTripleStore tts = new TempTripleStore();

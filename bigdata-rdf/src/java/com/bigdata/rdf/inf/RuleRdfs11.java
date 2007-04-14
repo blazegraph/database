@@ -51,7 +51,7 @@ package com.bigdata.rdf.inf;
  * <pre>
  *       triple(?u,rdfs:subClassOf,?x) :-
  *          triple(?u,rdfs:subClassOf,?v),
- *          triple(?v,rdf:subClassOf,?x). 
+ *          triple(?v,rdfs:subClassOf,?x). 
  * </pre>
  */
 public class RuleRdfs11 extends AbstractRuleRdfs511 {

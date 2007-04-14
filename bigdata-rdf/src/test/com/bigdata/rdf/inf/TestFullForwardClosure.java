@@ -70,7 +70,7 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
     public TestFullForwardClosure(String name) {
         super(name);
     }
-        
+    
     /**
      * Test of full forward closure.
      * 
@@ -82,8 +82,8 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
          * @todo use a dataset that we can add to CVS for a performance test and
          * hand-crafted data sets to test the rule implementations.
          */
-//        store.loadData(new File("data/alibaba_v41.rdf"),"",false);
-        store.loadData(new File("data/nciOncology.owl"),"",false);
+        store.loadData(new File("data/alibaba_v41.rdf"),"",false);
+//        store.loadData(new File("data/nciOncology.owl"),"",false);
 
         store.fullForwardClosure();
         

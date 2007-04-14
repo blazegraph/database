@@ -45,6 +45,7 @@ package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.RdfKeyBuilder;
+import com.bigdata.rdf.TripleStore;
 
 /**
  * Represents a triple.
@@ -128,4 +129,104 @@ public class SPO {
 
     }
 
+    /**
+     * The #of times this SPO is encountered in an {@link SPOBuffer}.
+     * 
+     * @todo drop this field if making {@link SPO}s distinct in the
+     *       {@link SPOBuffer} does not prove cost effective.
+     */
+    int count = 0;
+    
+//    private int hashCode = 0;
+//    
+//    /**
+//     * @todo validate the manner in which we are combining the hash codes for
+//     *       the individual components of the triple (each component uses the
+//     *       same hash code algorithm as {@link Long#hashCode()}).
+//     */
+//    public int hashCode() {
+//        
+//        if(hashCode==0) {
+//
+//            // compute and cache.
+//            hashCode = (int) ((s ^ (s >>> 32)) | (p ^ (p >>> 32)) | (o ^ (o >>> 32))); 
+//            
+//        }
+//        
+//        return hashCode;
+//        
+//    }
+    
+    /**
+     * Imposes s:p:o ordering based on termIds.
+     */
+    public int compareTo(Object other) {
+
+        if (other == this) {
+
+            return 0;
+
+        }
+
+        final SPO stmt1 = this;
+        
+        final SPO stmt2 = (SPO) other;
+        
+        /*
+         * Note: logic avoids possible overflow of [long] by not computing the
+         * difference between two longs.
+         */
+        int ret;
+
+        ret = stmt1.code - stmt2.code;
+
+        if (ret == 0) {
+
+            ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
+
+            if (ret == 0) {
+
+                ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
+
+                if (ret == 0) {
+
+                    ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
+
+                }
+
+            }
+
+        }
+
+        return ret;
+
+    }
+    
+    /**
+     * True iff the statements are the same object or if they have the code and
+     * the same same term identifiers assigned for the subject, predicate and
+     * object positions.
+     */
+    public boolean equals(SPO stmt2) {
+
+        if (stmt2 == this)
+            return true;
+
+        return this.code == stmt2.code && this.s == stmt2.s
+                && this.p == stmt2.p && this.o == stmt2.o;
+
+    }
+
+    /**
+     * Return a representation of the statement using the term identifiers (the
+     * identifers are NOT resolved to terms).
+     * 
+     * @see TripleStore#toString(long, long, long)
+     */
+    public String toString() {
+        
+        return (""+s+","+p+","+o);
+        
+    }
+    
 }

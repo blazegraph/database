@@ -45,7 +45,6 @@ package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TempTripleStore;
 
 
 public class RuleRdf01 extends AbstractRuleRdf {
@@ -59,13 +58,11 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
     }
 
-    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore btree ) {
+    public Stats apply( final Stats stats, final SPOBuffer buffer ) {
         
         final long computeStart = System.currentTimeMillis();
         
         long lastP = -1;
-        
-        int n = 0;
         
         IEntryIterator it = store.getPOSIndex().rangeIterator(null,null); 
         
@@ -81,24 +78,14 @@ public class RuleRdf01 extends AbstractRuleRdf {
                 
                 lastP = stmt.p;
 
-                buffer[n++] = new SPO(stmt.p, store.rdfType.id,
-                        store.rdfProperty.id);
-                
-                if (n == buffer.length) {
-
-                    insertStatements(buffer, n, btree);
-                    
-                    n = 0;
-                    
-                }
+                buffer.add(new SPO(stmt.p, store.rdfType.id,
+                        store.rdfProperty.id));
                 
                 stats.numComputed++;
                 
             }
             
         }
-        
-        insertStatements( buffer, n, btree );
         
         stats.computeTime += System.currentTimeMillis() - computeStart;
         

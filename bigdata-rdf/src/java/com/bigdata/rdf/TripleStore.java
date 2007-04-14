@@ -65,11 +65,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.Errors;
-import com.bigdata.btree.IBatchOp;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
@@ -91,7 +88,6 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.scaleup.SlaveJournal;
 import com.ibm.icu.text.Collator;
@@ -552,6 +548,36 @@ public class TripleStore extends /*Master*/Journal {
         
     }
 
+    /**
+     * Externalizes a statement using an appreviated syntax.
+     */
+    public String toString( long s, long p, long o ) {
+        
+        IIndex ndx = getIdTermIndex();
+        
+        URI s1 = (URI) ndx.lookup(keyBuilder.id2key(s));
+         
+        URI p1 = (URI) ndx.lookup(keyBuilder.id2key(p));
+         
+        URI o1 = (URI) ndx.lookup(keyBuilder.id2key(o));
+         
+        return ("< "+abbrev(s1)+", "+abbrev(p1)+", "+abbrev(o1)+" >");
+        
+    }
+    
+    // @todo substitute in well know namespaces (rdf, rdfs, etc).
+    private String abbrev( URI uri ) {
+        
+        String t = uri.getURI();
+        
+        int index = t.lastIndexOf('#');
+        
+        if(index==-1) return t;
+        
+        return t.substring(index);
+        
+    }
+    
     /**
      * Return true if the statement exists in the store (non-batch API).
      * 

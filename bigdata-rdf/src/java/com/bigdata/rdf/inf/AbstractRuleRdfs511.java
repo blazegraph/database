@@ -46,9 +46,26 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 
 import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TempTripleStore;
+import com.bigdata.rdf.TripleStore;
 
-
+/**
+ * Abstract rule for chain triple patterns where the object position in the
+ * first triple pattern is the same variable as the subject position in the
+ * second triple pattern and where the predicate is bound to the same constant
+ * for both triple patterns and also appears in the predicate position in the
+ * entailed triple.
+ * 
+ * <pre>
+ *  triple(?u,C,?x) :-
+ *           triple(?u,C,?v),
+ *           triple(?v,C,?x).
+ * </pre>
+ * 
+ * where C is a constant.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class AbstractRuleRdfs511 extends AbstractRuleRdf {
 
     public AbstractRuleRdfs511
@@ -61,7 +78,7 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( final Stats stats, SPO[] buffer, TempTripleStore tmpStore ) {
+    public Stats apply( final Stats stats, SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
@@ -88,7 +105,7 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
         // in POS order.
         final SPO[] stmts1 = store.getStatements(store.getPOSIndex(),
                 KeyOrder.POS, pkey, pkey1);
-        
+
         stats.stmts1 += stmts1.length;
         
         // in SPO order.
@@ -96,38 +113,49 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
         
         // a clone of the answer set
 //        SPO[] stmts2 = stmts1.clone();
-        final SPO[] stmts2 = stmts1;
+//        final SPO[] stmts2 = stmts1;
 
-        stats.stmts2 += stmts2.length;
-
-        int n = 0;
+//        stats.stmts2 += stmts2.length;
 
         // the simplest n^2 algorithm
         for (int i = 0; i < stmts1.length; i++) {
 
+            SPO left = stmts1[i];
+            
             // printStatement(stmts1[i]);
 
-            for (int j = 0; j < stmts2.length; j++) {
+            /*
+             * Search for the index of the first statement having left.s as its
+             * subject. Note that the object is NULL, so this should always
+             * return a negative index which we then convert to the insert
+             * position. The insert position is the first index at which a
+             * matching statement would be found. We then scan statements from
+             * that point. As soon as there is no match (and it may be that
+             * there is no match even on the first statement tested) we break
+             * out of the inner loop and continue with the outer loop.
+             */ 
+            int j = Arrays.binarySearch(stmts1, new SPO(left.o, p,
+                    TripleStore.NULL), SPOComparator.INSTANCE);
 
-                if (stmts1[i].o == stmts2[j].s) {
+            if (j < 0) {
 
-                    buffer[n++] = new SPO(stmts1[i].s, p, stmts2[j].o);
+                // Convert the position to obtain the insertion point.
+                j = -j - 1;
+                
+            }
+            
+            // process only the stmts with left.s as their subject.
+            for (; j < stmts1.length; j++) {
 
-                    if (n == buffer.length) {
+                if (left.o != stmts1[j].s) break;
+                
+                buffer.add(new SPO(left.s, p, stmts1[j].o));
 
-                        insertStatements(buffer, n, tmpStore);
-
-                        n = 0;
-                    }
-
-                    stats.numComputed++;
-                }
-
+                stats.numComputed++;
+                
             }
 
         }
-
-        insertStatements( buffer, n, tmpStore );
         
         stats.computeTime += System.currentTimeMillis() - computeStart;
 

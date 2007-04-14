@@ -84,19 +84,18 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
 
             properties = super.getProperties();
 
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
-//                    .toString());
-            properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
-//                    .toString());
-//            properties.setProperty(Options.SLOT_SIZE, ""+Bytes.kilobyte32);
+            if(properties.getProperty(Options.BUFFER_MODE)==null) {
+             
+                // override if not specified.
+                properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
+                
+            }
             if(properties.getProperty(Options.FILE)==null) {
                 properties.setProperty(Options.FILE, getName()+".jnl");
             }
             if(properties.getProperty(Options.BASENAME)==null) {
                 properties.setProperty(Options.BASENAME, getName());
             }
-//            properties.setProperty(Options.INITIAL_EXTENT,""+getInitialExtent());
 
         }
 
@@ -117,7 +116,7 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
      */
     protected BufferMode getBufferMode() {
         
-        return BufferMode.Direct;
+        return BufferMode.Transient;
         
     }
     

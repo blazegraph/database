@@ -46,7 +46,6 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 
 import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TempTripleStore;
 
 public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
@@ -60,15 +59,13 @@ public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
 
     }
     
-    public Stats apply( final Stats stats, final SPO[] buffer, TempTripleStore tmpStore ) {
+    public Stats apply( final Stats stats, final SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
         SPO[] stmts1 = getStmts1();
         
         stats.stmts1 += stmts1.length;
-        
-        int n = 0;
         
         for (int i = 0; i < stmts1.length; i++) {
         
@@ -78,23 +75,13 @@ public abstract class AbstractRuleRdfs2379 extends AbstractRuleRdf {
             
             for (int j = 0; j < stmts2.length; j++) {
             
-                buffer[n++] = buildStmt3(stmts1[i], stmts2[j]);
-                
-                if (n == buffer.length) {
-                
-                    insertStatements(buffer, n, tmpStore);
-                    
-                    n = 0;
-                    
-                }
+                buffer.add(buildStmt3(stmts1[i], stmts2[j]));
                 
                 stats.numComputed++;
                 
             }
             
         }
-        
-        insertStatements(buffer, n, tmpStore);
         
         stats.computeTime += System.currentTimeMillis() - computeStart;
 
