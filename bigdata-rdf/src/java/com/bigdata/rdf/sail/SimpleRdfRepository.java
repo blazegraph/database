@@ -365,6 +365,10 @@ public class SimpleRdfRepository implements RdfRepository {
 
         }
 
+        /*
+         * @todo make closure optional? Is closure required by the Sesame test
+         * suite?  Mark entailments in the KB using the btree entry value?
+         */
         tripleStore.fullForwardClosure();
         
         tripleStore.commit();
