@@ -3,9 +3,11 @@
   <id>bigdata</id>
   <name>bigdata</name>
   <package>com.bigdata</package>
-  <extends>../cweb/project.xml</extends>
+  <extends>../bigdata-master-pom/project.xml</extends>
   <groupId>bigdata</groupId>
   <currentVersion>0.1-b1-dev</currentVersion>
+
+  <!-- @todo "master" project, CVSROOT (permissions). -->
 
   <organization>
     <name>SYSTAP, LLC</name>
@@ -191,6 +193,29 @@
   	  your data center.  bigtable makes an effort throughout its architecture to
   	  only perform sustained IOs.  This means that it can be a very efficient user
   	  of both local file systems and networked file systems.
+  
+  </p>
+
+  <h2>License</h2>
+  
+  <p>
+  
+  	  bigdata is currently being released under GPL (version 2).  However, it is
+  	  our intention to make bigdata usable by non-GPL Free/Libre and Open Source
+  	  Software (FLOSS) projects.  To this end, we are considering either a FLOSS
+  	  exclusion (such as MySQL AB has issued) or a license change to something
+  	  with the same semantics as the SleepyCat License.  Please bear with us
+  	  while we work through this issue.  If you have any questions concerning the
+  	  license, write licenses@bigdata.com.
+  
+  </p>
+  
+  <p>
+  
+  	  SYSTAP, LLC will offer commercial licenses for customers who either want the
+  	  value add (warrenty, technical support, additional regression testing), who
+  	  want to redistribute bigdata with their own commercial products, or who are
+  	  not "comfortable" with the GPL license.
   
   </p>
 
