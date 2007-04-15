@@ -94,6 +94,11 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo add a restart safe data counter for each index partition that may be
+ *       used to assign 64-bit unique identifiers in conjunction with the 32-bit
+ *       unique (within index) partition identifier assigned by the
+ *       {@link MetadataIndex} to each index partition.
+ * 
  * @todo add a restart safe data structure tracking each partition for which
  *       writes have been absorbed on the {@link Journal}. this could be just
  *       an ordered set of partition identifiers for which writes have been

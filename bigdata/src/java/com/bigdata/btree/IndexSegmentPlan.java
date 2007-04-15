@@ -1,8 +1,5 @@
 package com.bigdata.btree;
 
-import com.bigdata.btree.TestIndexSegmentBuilderWithSmallTree;
-import com.bigdata.btree.TestIndexSegmentPlan;
-
 /**
  * A plan for building a B+-Tree based on an input branching factor and #of
  * entries.

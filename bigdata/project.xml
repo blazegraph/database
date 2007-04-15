@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <project>
-  <id>cweb-bigdata</id>
+  <id>bigdata</id>
   <name>bigdata</name>
-  <package>org.CognitiveWeb</package>
+  <package>com.bigdata</package>
   <extends>../cweb/project.xml</extends>
-  <groupId>org.CognitiveWeb</groupId>
+  <groupId>bigdata</groupId>
   <currentVersion>0.1-b1-dev</currentVersion>
 
   <organization>
-    <name>CognitiveWeb</name>
-    <url>http://www.cognitiveweb.org/</url>
-    <logo>http://www.cognitiveweb.org/Images/cogweb-logo.jpg</logo>
+    <name>SYSTAP, LLC</name>
+    <url>http://www.bigdata.com/</url>
+    <!--logo>url goes here</logo-->
   </organization>
 
   <!-- required per-POM metadata. -->
-  <inceptionYear>2002</inceptionYear>
-  <url>http://www.cognitiveweb.org/</url>
-  <logo>http://www.cognitiveweb.org/Images/tagline.gif</logo>
+  <inceptionYear>2006</inceptionYear>
+  <url>http://www.bigdata.com/</url>
+  <!--logo>url goes here</logo-->
 
   <!-- The short description is used in the JAR manifest.  For -->
   <!-- compatibility reasons, no leading/trailing newlines and -->
@@ -30,9 +30,168 @@
 
   <p>
 
-	  bigdata is a distributed storage platform designed for high performance
-	  and scale out on commodity hardware.
+	  bigdata is a scale-out data and computing fabric designed for commodity hardware.
 
+  </p>
+  <p>
+
+	  The bigdata architecture provides named scale-out indices that are transparently
+	  partitioned and distributed across a cluster or grid of commodity server platforms.
+	  Atomic "row" operations are supported for very high concurrency.  However, full
+	  transactions are also available for applications needing less concurrency but
+	  requiring atomic operations that read or write on more than one row, index partition,
+	  or index.  The scale-out indices are B+Trees and remain balanced under insert and
+	  removal operations.  Keys and values for btrees are variable length byte[]s (the
+	  keys are interpreted as unsigned byte[]s).  Writes are absorbed on mutable btree instances in append only
+	  "journals" of ~200M capacity.  On overflow, data in a journal is evicted onto read-
+	  optimized, immutable "index segments".  The metadata service manages the index 
+	  definitions, the index partitions, and the assignment of index partitions to data
+	  services.  A data service encapsulates a journal to zero or more index partitions
+	  have been assigned, including the logic to handle overflow.  A deployment is made
+	  up of one logical metadata service (with failover redundency) and many distinct
+	  data services.  bigdata can provide data redundency internally (by pipelining
+	  writes bound for a partition across primary, secondary, ... data service instances
+	  for that partition) or it can be deployed over distributed RAID.  bigdata itself
+	  is 100% Java and requires a 1.5 or better JVM.
+	  
+  </p>
+  
+  <h2>Status</h2>
+  
+  <p>
+  	  
+  	  bigdata is currently in pre-release.  We are seeking beta users to
+  	  vet the architecture and work through robust scaling.  The basic index structures (mutable and
+  	  immutable btrees and bulk index build operations) and the persistent store
+  	  structure (the journal) have all been implemented and tested.  Current work
+  	  is focused on the distributed services architecture.  Aside from the test suite,
+  	  there is an RDF database application layer (bigdata-rdf) that is being used to
+  	  benchmark and tune the bigdata implementation. We have plans to provide an
+  	  transactional OODBMS integration (based on the Generic Object Model) as well
+  	  as a media index and search service (based on Lucene).
+  	  
+  </p>
+  
+  <h2>Architecture</h2>
+  
+  <p>
+  
+  	  The bigdata SOA defines two essential services and some additional services.  The
+  	  essential services are the metadata service (provides a locator service for index
+  	  partitions on data services) and the data service (provides read, write, and concurrency
+  	  control for index partitions). Optional services include a transaction manager (transactions
+  	  are NOT required, so you can use bigdata as a scale-out row store ) and a job scheduler (the
+  	  integration point for map/reduce style distributed functional programming).  
+  
+  </p>
+  
+  <p>
+  
+  	  While other service fabric architectures are contemplated, bigdata services
+  	  today use JINI 2.x to advertise themselves and do perform service discovery.
+  	  This means that you must be running a JINI registrar in order for services to be
+  	  able to register themselves or discover other services.
+  
+  </p>
+  
+  <p>
+  
+  	  The main building blocks for the bigdata architecture are the journal (append-only
+  	  persistence store), the mutable B+Tree (used to absorb writes), and the read-optimized
+  	  immutable B+Tree (aka the index segment).  Highly efficient bulk index builds are used
+  	  to transfer data absorbed by a mutable B+Tree on a journal into index segment files.
+  	  Each for index segment contains data for a single partition of a scale-out index.  In
+  	  order to read from an index partition, a consistent view is created by dynamically
+  	  fusing data for that index partition, including any recent writes on the current
+  	  journal, any historical writes that are in the process of being transferred onto
+  	  index segments, and any historical index segments that also contain data for that
+  	  view.  Periodically, index segments are merged together.  Both merging index segments
+  	  and overflow of a journal onto index segments cause historical states of the database
+  	  to be purged in favor of the current state.  Periodically, the metadata service will
+  	  direct data services to physically delete old journals and index segments, thereby
+  	  releasing the local disk resources.  (An immortal or temporal database can be
+	  realized by choosing not to delete old journals, since journals have all committed
+  	  states for the distributed database.) 
+  
+  </p>
+  
+  <h2>Sparse row store</h2>
+  
+  <p>
+  
+ 	  People familiar with Google's bigtable architecture will recognize the similarity.
+ 	  bigtable provides very high concurrency with atomic "row" updates and a space data
+ 	  model.  In fact, it is trivial to realize bigtable semantics with bigdata - you 
+ 	  need to exercise a specific protocol when forming the keys for your scale-out
+ 	  indices and you simply choose to NOT use transactions.  A bigtable style key-value
+ 	  is formed as:
+
+  </p>
+  
+  <pre>
+  
+      {columnFamily \0 primaryKey \0 columnName \0 timestamp} : {value}
+  
+  </pre>
+  
+  <p>
+ 	  
+ 	  By placing the column family identifier up front, all data in the same column
+ 	  family will be clustered together by the index.  The next component is the "row"
+ 	  identifier, what you would think of as the primary key in a relational table.
+ 	  The column name comes next - only column names for non-null columns are written
+ 	  into the index.  Finally, there is a timestamp column that is used either to
+ 	  record a timestamp specified by the application or a datum write time.  The
+ 	  value associated with the key is simply the datum for that column in that row.
+ 	  The use of nul byte separators makes it possible to parse the key, which is
+ 	  required for various operations including index partition splits and filtering
+ 	  key scans based on column names or timestamps.
+ 	  See the KeyBuilder class
+ 	  in com.bigdata.btree for utilities that may be used to construct keys from a variety
+ 	  of components.
+  
+  </p>
+  
+  <p>
+  
+      Filter row scans are realized using the filter mechanism on the key scan
+      interface of the data service.  The history policy is specified when the
+      index is created and is applied during compacting merges of index segments,
+      effectively removing entries for the index partition that do not pass the
+      history filter.
+  
+  </p>
+
+  <h2>Map/reduce</h2>
+  
+  <p>
+  
+  	  Google's map/reduce architecture has received a lot of attention, along with
+  	  its bigtable architecture.  Map/reduce provides a means to transparently
+  	  decompose processing across a cluster.  The "map" process examines a series
+  	  of key-value pair, emitting a set of intermediate key-value pairs for each
+  	  input.  Those intermediate key-values are then hashed (module R) onto R reduce
+  	  processes.  The inputs for the reduce processes are pre-sorted.  The reduce
+  	  process then runs some arbitrary operation on the sorted data, such as computing
+  	  an inverted index file or loading the data into a scale-out index.
+  
+  </p>
+
+  <h2>Data Replication</h2>
+  
+  <p>
+  
+  	  If you know much about Google's architecture, you know that they deploy on
+  	  a distributed file system named "GFS" (Google File System).  bigdata is
+  	  designed to provide its own data replication using pipelining of writes
+  	  across multiple data services, such that each index partition has some
+  	  target #of replicated indices.  However, an alternative deployment strategy
+  	  is to deploy on a distributed file system or using NAS with built in RAID.
+  	  The best deployment configuration undoubtedly depends on the specifics of
+  	  your data center.  bigtable makes an effort throughout its architecture to
+  	  only perform sustained IOs.  This means that it can be a very efficient user
+  	  of both local file systems and networked file systems.
+  
   </p>
 
 ]]>
@@ -51,67 +210,73 @@
   </versions>
 
   <!-- copy down inheritance applies. -->
-  <siteAddress>www.cognitiveweb.org</siteAddress>
+  <siteAddress>www.bigdata.com</siteAddress>
   <siteDirectory>
-    /home/groups/c/cw/cweb/htdocs/technology/projects/${pom.artifactId}
+    /home/groups/b/bi/bigd/htdocs/technology/projects/${pom.artifactId}
   </siteDirectory>
 
   <!-- copy down inheritance applies. -->
   <distributionSite>www.sourceforge.net</distributionSite>
-  <distributionDirectory>/projects/cweb</distributionDirectory>
+  <distributionDirectory>/projects/bigdata</distributionDirectory>
 
   <!-- copy down inheritance applies. -->
+  <!--
   <issueTrackingUrl>
-  http://jira.cognitiveweb.org/browse/BigData
+  http://jira.bigdata.com/browse/bigdata
+  </issueTrackingUrl>
+  -->
+  <issueTrackingUrl>
+  http://sourceforge.net/tracker/?group_id=191861
   </issueTrackingUrl>
 
   <!-- copy down inheritance applies. -->
   <repository>
     <connection>
-    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/cweb:bigdata
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata
     </connection>
     <developerConnection>
-    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/cweb:bigdata
+    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata
     </developerConnection>
-    <url>http://cweb.cvs.sourceforge.net/cweb/bigdata</url>
+    <url>http://bigdata.cvs.sourceforge.net/bigdata/bigdata</url>
   </repository>
 
   <!-- copy down inheritance applies. -->
   <licenses>
     <license>
-      <name>CognitiveWeb Open Source License</name>
-      <url>http://www.cognitiveweb.org/legal/license/</url>
+      <name>GPL (version 2)</name>
+      <url>http://www.opensource.org/licenses/gpl-license.php</url>
       <distribution>manual</distribution>
     </license>
   </licenses>
 
-  <!-- copy down inheritance applies. -->
+  <!-- copy down inheritance applies.
   <mailingLists>
     <mailingList>
       <name>Announce List</name>
       <subscribe>
-        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
       </subscribe>
       <unsubscribe>
-        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
       </unsubscribe>
       <archive>
-        http://sourceforge.net/mailarchive/forum.php?forum=cweb-announce
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-announce
       </archive>
     </mailingList>
     <mailingList>
       <name>Developer List</name>
       <subscribe>
-        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
       </subscribe>
       <unsubscribe>
-        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
       </unsubscribe>
       <archive>
-        http://sourceforge.net/mailarchive/forum.php?forum=cweb-developer
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-developer
       </archive>
     </mailingList>
   </mailingLists>
+  -->
 
   <!-- copy down inheritance applies. -->
   <developers>
@@ -123,6 +288,15 @@
       <organization>SYSTAP, LLC.</organization>
       <!-- East coast. -->
       <timezone>-5</timezone>
+    </developer>
+
+    <developer>
+      <name>Mike Personick</name>
+      <id>mike</id>
+      <email>mrpersonick@users.sourceforge.net</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- US Mountain. -->
+      <timezone>-7</timezone>
     </developer>
 
   </developers>
@@ -141,6 +315,8 @@
   <!-- project-specific data. -->
   <dependencies>
 
+	<!-- Note: Dependencies are bundled in CVS. -->
+
     <!-- log4j integration. -->
     <dependency> 
       <id>log4j</id> 
@@ -148,18 +324,100 @@
       <url>http://logging.apache.org</url>
     </dependency>
 
-    <!-- junit extensions. -->
+    <!-- junit (tests only). -->
     <dependency> 
       <id>junit</id> 
       <version>3.8.1</version> 
       <url>http://www.junit.org/</url>
     </dependency>
 
+	<!-- junit extensions (tests only). -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-junit-ext</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+	<!-- cweb utility classes. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-commons</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+	<!-- Extensible Serialization framework. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-extser</artifactId>
+      <version>0.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
     <!-- LGPL utility classes. -->
     <dependency> 
-      <id>lgpl-util</id> 
-      <!--<version>3.8.1</version>-->
-      <url>http://cweb.cvs.sourceforge.net/cweb/lgpl-utils/</url>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>1.0-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+    <!-- Striterator support. -->
+    <!-- Note: The jar name reflects the date when I downloaded it -->
+    <!-- and makes it possible for me to rollback to historical CTC -->
+    <!-- versions.  Any recent "ctc_utils.jar" SHOULD work.  Just -->
+    <!-- extract the JAR and rename it. -->
+    <dependency>
+      <groupId>ctc</groupId>
+      <artifactId>utils</artifactId>
+      <jar>ctc_utils-5-4-2005.jar</jar>
+      <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
+    </dependency>
+
+    <!--      -->
+    <!-- Jini -->
+    <!--      -->
+    <dependency> 
+	  <groupId>jini</groupId>
+	  <artifactId>jini-core</artifactId>
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>jini-ext</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>reggie</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>sun-util</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>start</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+
+    <!--     -->
+	<!-- ICU -->
+    <!--     -->
+	<!-- Unicode support (compressed sort keys). -->
+    <dependency>
+      <groupId>icu</groupId>
+      <artifactId>icu4j</artifactId> 
+      <version>3_6</version> 
+      <url>http://sourceforge.net/projects/icu/</url>
     </dependency>
 
   </dependencies>
@@ -181,7 +439,7 @@
     <unitTest>
 
       <includes>
-        <include>org/CognitiveWeb/dbcache/TestAll.java</include>
+        <include>com/bigdata/TestAll.java</include>
       </includes>
 
       <!-- Resources for test cases are declared here. -->
