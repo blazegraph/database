@@ -137,10 +137,20 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       need to go back and think this one through some more and figure out
  *       whether or not we need to abort a transaction in this case.
  * 
+ * @todo bnodes do not need to be store in the terms or ids indices if we
+ *       presume that an unknown identifier is a bnode. however, we still need
+ *       to ensure that bnode identifiers are distinct or the same when and
+ *       where appropriate, so we need to assign identifiers to bnodes in a
+ *       restart-safe manner even if we "forget" the term-id mapping.
+ *       
+ * @todo modify the term identifier assignment mechanism to be compatible with
+ *       the scale-out index partitions (32-bit unique within index partition
+ *       identified plus a restart-safe counter for each index partition). 
+ * 
  * @todo Refactor to use a delegation mechanism so that we can run with or
  *       without partitioned indices? (All you have to do now is change the
- *       class that is being extended from Journal to MasterJournal and
- *       handle some different initialization properties.)
+ *       class that is being extended from Journal to MasterJournal and handle
+ *       some different initialization properties.)
  * 
  * @todo the only added cost for a quad store is the additional statement
  *       indices. There are only three more statement indices in a quad store.
