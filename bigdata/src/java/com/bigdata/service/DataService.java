@@ -144,8 +144,20 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       directory.
  * 
  * @todo all of the interfaces implemented by this class need to extend
- *       {@link Remote} in order to be made visible on the proxy object
- *       exported by JERI.
+ *       {@link Remote} in order to be made visible on the proxy object exported
+ *       by JERI.
+ * 
+ * @todo Write benchmark test to measure interhost transfer rates. Should be
+ *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
+ *       duplex in the network and the protocol, that rate should be
+ *       bidirectional. Can that rate be sustained with a fully connected
+ *       bi-directional transfer?
+ * 
+ * @todo We will use non-blocking I/O for the page transfer protocol. Review
+ *       options to secure that protocol since we can not use JERI for that
+ *       purpose. For example, using SSL or an SSH tunnel. For most purposes I
+ *       expect bigdata to operate on a private network, but replicate across
+ *       gateways is also a common use case. Do we have to handle it specially?
  */
 public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
