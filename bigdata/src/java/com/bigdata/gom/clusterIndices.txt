@@ -1,3 +1,23 @@
+x. Support distributed link sets so that we can efficiently parallize
+   link set scans across multiple segments and leverage bigtable row
+   scans to scan link sets in parallel. Link set jump tables need to
+   identify the head/tail/count of each segment in the database in
+   which there are members for that link set.  A distributed link set
+   partitions the link set into a link set generic objects (one per
+   segment), each of which maintains the link set members for that
+   segment.  A two level iterator can scan the top-level link set and
+   assign the nexted link sets to workers in a thread pool.  With 20
+   workers, you can scan 20 segments in parallel.  When workers become
+   free they are assigned to the next nexted link set.  All of this
+   should be more or less transparent.  Some declarative options can
+   be placed on the top-level link set indicating the degree of
+   scatter that is desired and a data distribution policy.  Iterators
+   of the top level link set will transparently traverse the nexted
+   link sets.  If the iterator is written to perform an operation in
+   place then we do not even need to send objects or data back to the
+   client that requested the iterator.
+
+x. Support schema constraints on link sets and generic objects in GOM.
 
 @todo Clustered indices.  A clustered index is where the rows are
 organized on disk according to some key found in or computed for each
