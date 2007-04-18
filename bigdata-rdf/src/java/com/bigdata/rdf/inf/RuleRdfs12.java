@@ -43,7 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-public class RuleRdfs12 extends AbstractRuleRdfs68101213 {
+public class RuleRdfs12 extends AbstractRuleRdfs_6_8_10_12_13 {
 
     public RuleRdfs12(InferenceEngine store, Var u, Var v, Var x) {
 

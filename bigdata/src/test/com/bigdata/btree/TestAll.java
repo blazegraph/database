@@ -137,6 +137,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestLinearListMethods.class );
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
+        // test delete semantics (also see the isolation package).
+        suite.addTestSuite( TestRemoveAll.class );
         // test contract for BTree#touch(node) w/o IO.
         suite.addTestSuite( TestTouch.class );
         // stress test basic tree operations w/o IO.

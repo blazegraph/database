@@ -246,7 +246,12 @@ public class BTreeMetadata implements Serializable, Externalizable {
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
-        return (BTreeMetadata) SerializerUtil.deserialize(store.read(addr));
+        BTreeMetadata metadata = (BTreeMetadata) SerializerUtil.deserialize(store.read(addr));
+        
+        // save the address from which the metadata record was loaded.
+        metadata.addrMetadata = addr;
+        
+        return metadata;
         
     }
 

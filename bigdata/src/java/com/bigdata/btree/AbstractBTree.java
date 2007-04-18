@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.PrintStream;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.UUID;

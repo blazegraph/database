@@ -49,6 +49,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+import org.openrdf.sesame.constants.RDFFormat;
+
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
@@ -188,7 +190,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             try {
                 
                 // @todo no baseURI here.
-                loader.loadRdfXml( reader, "" );
+                loader.loadRdf( reader, "" );
                 
                 long nstmts = loader.getStatementsAdded();
                 
@@ -242,8 +244,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     public void test_loadFile_presortRioLoader() throws IOException {
 
-        doTest(new PresortRioLoader(store,
-                PresortRioLoader.DEFAULT_BUFFER_SIZE, true), testData);
+        doTest(new PresortRioLoader(store), testData);
 
         assertDataLoaded();
         
@@ -253,8 +254,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
         String[] testData = new String[]{"data/wikipedia/enwiki/20060306.rdf"};
         
-        doTest(new PresortRioLoader(store,
-                PresortRioLoader.DEFAULT_BUFFER_SIZE, true), testData);
+        doTest(new PresortRioLoader(store), testData);
         
 
     }

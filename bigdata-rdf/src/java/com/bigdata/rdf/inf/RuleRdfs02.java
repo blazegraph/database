@@ -45,7 +45,7 @@ package com.bigdata.rdf.inf;
 
 
 
-public class RuleRdfs02 extends AbstractRuleRdfs2379 {
+public class RuleRdfs02 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs02( InferenceEngine store, Var a, Var x, Var u, Var y ) {
 

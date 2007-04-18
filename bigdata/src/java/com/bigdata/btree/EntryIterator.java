@@ -272,6 +272,21 @@ public class EntryIterator implements IEntryIterator {
     }
     
     /**
+     * FIXME Support removal. This is tricky because we have to invoke
+     * copy-on-write if the leaf is not dirty. Since copy-on-write can cause the
+     * leaf and its parents to be cloned, and since the entry must be removed in
+     * the mutable copy, this means that the {@link Leaf} that we have may be
+     * the wrong object. The simplest way to handle that is to re-start the
+     * iterator from the current key and then invoke delete on that entry.
+     * However, that is not that simple :-) <br>
+     * The other twist with removal is that it can cause the leaf to underflow,
+     * which results in a structural change in the btree.
+     * 
+     * @todo Also support update of the value during traversal. This is simpler
+     *       since it does not lead to structural changes (the #of entries in
+     *       the leaf does not change), but it has the same problems with
+     *       needing to invoke copy-on-write if the leaf is not dirty.
+     * 
      * @exception UnsupportedOperationException
      */
     public void remove() {
@@ -291,7 +306,9 @@ public class EntryIterator implements IEntryIterator {
         protected final Object state;
 
         public EntryFilter() {
-            this.state = null;
+            
+            this( null );
+            
         }
 
         /**
@@ -302,7 +319,9 @@ public class EntryIterator implements IEntryIterator {
          *            The user defined object.
          */
         public EntryFilter(Object state) {
+            
             this.state = state;
+            
         }
 
         /**
@@ -316,7 +335,7 @@ public class EntryIterator implements IEntryIterator {
         abstract public boolean isValid(Object value);
         
         /**
-         * Resolve the value that the iterator would visit This can be used to
+         * Resolve the value that the iterator would visit. This can be used to
          * return an application value encapsulated by an {@link IValue}, to
          * de-serialize application values, etc. The default implementation is a
          * NOP. This method is applied <em>after</em> {@link #isValid(Object)}.

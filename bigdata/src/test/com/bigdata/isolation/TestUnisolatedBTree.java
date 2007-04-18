@@ -51,8 +51,11 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.EntryIterator;
 import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -380,6 +383,58 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
         
     }
 
+    /**
+     * Test verifies that {@link UnisolatedBTree#removeAll()} causes deletion
+     * markers to be written for each undeleted entry in the B+Tree.
+     * <p>
+     * Note: This test only tests removal with a root leaf and therefore relies
+     * on the underlying iterator to correctly support removal or update of an
+     * entry in the btree in any leaf regardless of the height of the btree.
+     * 
+     * FIXME This test currently fails since the {@link IEntryIterator} does not
+     * support removal or update of entries. See {@link AbstractNode} and
+     * {@link EntryIterator#remove()} for this issue.
+     */
+    public void test_removeAll_rootLeaf() {
+        
+        IRawStore store = new SimpleMemoryRawStore();
+
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+
+        UnisolatedBTree btree = new UnisolatedBTree(store, 3, UUID.randomUUID(), null);
+        
+        /*
+         * fill the root leaf.
+         */
+        btree.insert(k3,v3);
+        btree.insert(k5,v5);
+        btree.insert(k7,v7);
+
+        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+
+        /*
+         * remove all un-deleted entries by writing deletion markers.
+         */
+        btree.removeAll();
+        
+        assertSameIterator(new Object[]{},btree.entryIterator());
+
+        /*
+         * verify presence of deletion markers using the root node to test the
+         * actual value in the tree.
+         */
+        assertEquals(new Value((short) 2, true, null), (Value) btree.getRoot().lookup(k3));
+        assertEquals(new Value((short) 2, true, null), (Value) btree.getRoot().lookup(k5));
+        assertEquals(new Value((short) 2, true, null), (Value) btree.getRoot().lookup(k7));
+
+    }
+    
     /**
      * Tests restart-safety of data, including deletion markers.
      */

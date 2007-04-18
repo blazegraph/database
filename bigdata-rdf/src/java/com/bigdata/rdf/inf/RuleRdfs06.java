@@ -43,7 +43,17 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-public class RuleRdfs06 extends AbstractRuleRdfs68101213 {
+/**
+ * rdfs6:
+ * <pre>
+ * triple( ?u rdfs:subPropertyOf ?u ) :-
+ *    triple( ?u rdf:type rdf:Property ). 
+ * </pre>
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class RuleRdfs06 extends AbstractRuleRdfs_6_8_10_12_13 {
 
     public RuleRdfs06(InferenceEngine store, Var u, Var v, Var x) {
 

@@ -46,7 +46,14 @@ package com.bigdata.rdf.inf;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 
-
+/**
+ * Rdf1:
+ * 
+ * <pre>
+ *   triple(?v rdf:type rdf:Property) :-
+ *      triple( ?u ?v ?x ).
+ * </pre>
+ */
 public class RuleRdf01 extends AbstractRuleRdf {
 
     public RuleRdf01(InferenceEngine store, Var u, Var v, Var x) {
@@ -64,6 +71,20 @@ public class RuleRdf01 extends AbstractRuleRdf {
         
         long lastP = -1;
         
+        /*
+         * This is essentially doing a "select distinct predicate".
+         * 
+         * FIXME there should be a lighter weight way of achieving this result.
+         * One way would be to create a "predicates" index that had each
+         * distinct predicate (further denormalizing the schema and requiring
+         * maintenance). Another approach is to restart the iterator each time a
+         * predicate [p] is found by computing the fromKey as [p+1] thereby
+         * skipping over all intervening statements in the index (consider how
+         * to distribute that query in parallel).
+         * 
+         * @todo write a test for this rule and then write an optimized variant
+         * using the incremented toKey approach.
+         */
         IEntryIterator it = store.getPOSIndex().rangeIterator(null,null); 
         
         while ( it.hasNext() ) {

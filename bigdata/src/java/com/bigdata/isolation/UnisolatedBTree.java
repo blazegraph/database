@@ -51,10 +51,12 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Iterator;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BatchContains;
@@ -107,6 +109,8 @@ import com.bigdata.rawstore.IRawStore;
  *  addAll() - ok as implemented.  values will be wrapped in {@link IValue} objects
  *  as they are inserted.  if the source is also an {@link UnisolatedBTree} then the
  *  application values will be inserted into this tree, not the {@link IValue} objects.
+ *  
+ *  removeAll() - override to write deletion markers for each entry.
  *  
  *  indexOf() - ok as implemented (counts deleted entries).
  *  keyAt() - ok as implemented, but will return keys for deleted entries.
@@ -454,6 +458,28 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
                 (byte[]) val));
         
         return value.datum;
+        
+    }
+    
+    /**
+     * Overriden to write deletion markers for each non-deleted entry. When the
+     * transaction commits, those delete markers will have to validate against
+     * the global state of the tree. If the transaction validates, then the
+     * merge down onto the global state will cause the corresponding entries to
+     * be removed from the global tree.
+     * 
+     * FIXME This method throws an exception since the iterator does not support
+     * {@link Iterator#remove()}.  This issue is noted in {@link AbstractNode}.
+     */
+    public void removeAll() {
+        
+        IEntryIterator itr = entryIterator();
+        
+        while(itr.hasNext()) {
+            
+            itr.remove();
+            
+        }
         
     }
 

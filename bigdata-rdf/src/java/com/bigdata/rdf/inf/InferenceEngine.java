@@ -70,14 +70,13 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * triple(s, p, o)
  * </pre>
  * 
- * where s, p, and or are identifiers for RDF values in the terms index.
- * Facts are stored either in the long-term database or in a per-query answer
- * set.
+ * where s, p, and or are identifiers for RDF values in the terms index. Facts
+ * are stored either in the long-term database or in a per-query answer set.
  * <p>
  * A rule always has the form:
  * 
  * <pre>
- *   pred :- pred*.
+ *    pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -112,21 +111,30 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * rdfs9 is represented as:
  * 
  * <pre>
- *    triple(?v,rdf:type,?x) :-
- *       triple(?u,rdfs:subClassOf,?x),
- *       triple(?v,rdf:type,?u). 
+ *     triple(?v,rdf:type,?x) :-
+ *        triple(?u,rdfs:subClassOf,?x),
+ *        triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *    triple(?u,rdfs:subClassOf,?x) :-
- *       triple(?u,rdfs:subClassOf,?v),
- *       triple(?v,rdf:subClassOf,?x). 
+ *     triple(?u,rdfs:subClassOf,?x) :-
+ *        triple(?u,rdfs:subClassOf,?v),
+ *        triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo experiment with use of a bloom filter
+ * 
+ * @todo provide fixed point transitive closure for "chain" rules (subClassOf)
+ * 
+ * @todo examine ways to prune the search space and avoid re-triggering rules or
+ *       being more selective with rule triple patterns as a consequence of new
+ *       entailments (avoid re-computing all entailments already proven in each
+ *       pass).
  */
 public class InferenceEngine extends TripleStore {
 
@@ -208,6 +216,8 @@ public class InferenceEngine extends TripleStore {
      * Resolves or defines well-known RDF values.
      * 
      * @see #rdfType and friends which are initialized by this method.
+     * 
+     * @todo make this into a batch operation.
      */
     protected void setupIds() {
 
@@ -308,6 +318,9 @@ public class InferenceEngine extends TripleStore {
      *       structure that only accepted the distinct statements. This was a
      *       big win for the batch oriented parser and would probably eliminate
      *       even more duplicates in the context of the inference engine.
+     * 
+     * @todo support closure of a document against an ontology and then bulk
+     *       load the result into the store.
      */
     public void fullForwardClosure() {
 
@@ -394,9 +407,9 @@ public class InferenceEngine extends TripleStore {
                             + rule.getClass().getSimpleName()
                             + ", entailments=" + nnew + ", #stmts1="
                             + ruleStats.stmts1 + ", #stmts2="
-                            + ruleStats.stmts2 + ", #stmtsExaminedPerSec="
-                            + stmtsPerSec
-                            );
+                            + ruleStats.stmts2 + ", #subqueries="
+                            + ruleStats.numSubqueries
+                            + ", #stmtsExaminedPerSec=" + stmtsPerSec);
                 }
                 
                 totalStats.numComputed += ruleStats.numComputed;
@@ -472,6 +485,7 @@ public class InferenceEngine extends TripleStore {
             final int inferenceCount = lastStatementCount - firstStatementCount;
             
             log.info("Computed closure of store in "
+                            + round + " rounds and "
                             + elapsed
                             + "ms yeilding "
                             + lastStatementCount

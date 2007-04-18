@@ -46,10 +46,9 @@ package com.bigdata.rdf.inf;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.KeyOrder;
 
+public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
 
-public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
-
-    public AbstractRuleRdfs68101213
+    public AbstractRuleRdfs_6_8_10_12_13
         ( InferenceEngine store, 
           Triple head, 
           Triple body
@@ -72,8 +71,6 @@ public class AbstractRuleRdfs68101213 extends AbstractRuleRdf {
               );
         
         IEntryIterator it = store.getPOSIndex().rangeIterator(startKey, endKey); 
-        
-        int n = 0;
         
         while ( it.hasNext() ) {
             

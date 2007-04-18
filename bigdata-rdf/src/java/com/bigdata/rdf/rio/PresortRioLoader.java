@@ -43,7 +43,11 @@ Modifications:
 */
 package com.bigdata.rdf.rio;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
+import java.net.URL;
 import java.util.Iterator;
 import java.util.Vector;
 
@@ -51,9 +55,13 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
+import org.openrdf.rio.ntriples.NTriplesParser;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
+import org.openrdf.rio.turtle.TurtleParser;
+import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
@@ -63,9 +71,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * in batches and inserts ordered batches into the {@link TripleStore}.  The
  * default batch size is large enough to absorb many ontologies in a single
  * batch.
- * 
- * @todo try optimization using async IO to write data buffered on the journal
- *       to disk.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -85,6 +90,16 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * Terms and statements are inserted into this store.
      */
     protected final TripleStore store;
+    
+    /**
+     * The RDF syntax to be parsed.
+     */
+    protected final RDFFormat rdfFormat;
+
+    /**
+     * Controls the {@link Parser#setVerifyData(boolean)} option.
+     */
+    protected final boolean verifyData;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
@@ -112,20 +127,69 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * the RDF parser.
      */
     Buffer buffer;
+
+    /**
+     * Used as the value factory for the {@link Parser}.
+     */
+    OptimizedValueFactory valueFac = new OptimizedValueFactory();
     
-    public PresortRioLoader( TripleStore store ) {
-    
-        this(store, DEFAULT_BUFFER_SIZE, true );
+    /**
+     * Sets up parser to load RDF/XML - {@link #verifyData} is NOT enabled.
+     * 
+     * @param store
+     *            The store into which to insert the loaded statements.
+     */
+    public PresortRioLoader(TripleStore store) {
+        
+        this(store, RDFFormat.RDFXML, false /*verifyData*/);
         
     }
     
-    public PresortRioLoader(TripleStore store, int capacity, boolean distinct) {
+    /**
+     * Sets up parser to load the indicated RDF interchange syntax.
+     * 
+     * @param store
+     *            The store into which to insert the loaded statements.
+     * @param rdfFormat
+     *            The RDF interchange syntax to be parsed.
+     * @param verifyData
+     *            Controls the {@link Parser#setVerifyData(boolean)} option.
+     */
+    public PresortRioLoader( TripleStore store, RDFFormat rdfFormat, boolean verifyData ) {
+    
+        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true);
+        
+    }
+
+    /**
+     * Sets up parser to load RDF.
+     * 
+     * @param store
+     *            The store into which to insert the loaded statements.
+     * @param rdfFormat
+     *            The RDF interchange syntax to be parsed.
+     * @param verifyData
+     *            Controls the {@link Parser#setVerifyData(boolean)} option.
+     * @param capacity
+     *            The capacity of the buffer.
+     * @param distinct
+     *            Whether or not terms and statements are made distinct in the
+     *            buffer.
+     */
+    public PresortRioLoader(TripleStore store, RDFFormat rdfFormat,
+            boolean verifyData, int capacity, boolean distinct) {
 
         assert store != null;
+
+        assert rdfFormat != null;
         
         assert capacity > 0;
 
         this.store = store;
+        
+        this.rdfFormat = rdfFormat;
+        
+        this.verifyData = verifyData;
         
         this.capacity = capacity;
         
@@ -195,6 +259,77 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     }
     
     /**
+     * Choose the parser based on the {@link RDFFormat} specified to the
+     * constructor.
+     * 
+     * @param valFactory
+     *            The value factory.
+     * 
+     * @return The parser.
+     */
+    protected Parser newParser(ValueFactory valFactory) {
+
+        final Parser parser;
+        
+        if (RDFFormat.RDFXML.equals(rdfFormat)) {
+            
+            parser = new RdfXmlParser(valFactory);
+            
+        } else if (RDFFormat.NTRIPLES.equals(rdfFormat)) {
+            
+            parser = new NTriplesParser(valFactory);
+            
+        } else if (RDFFormat.TURTLE.equals(rdfFormat)) {
+            
+            parser = new TurtleParser(valFactory);
+            
+        } else {
+            
+            throw new IllegalArgumentException("Format not supported: "
+                    + rdfFormat);
+            
+        }
+        
+        parser.setVerifyData( verifyData );
+        
+        parser.setStatementHandler( this );
+        
+        return parser;
+
+    }
+    
+//    InputStream rdfStream = getClass().getResourceAsStream(ontology);
+//
+//    if (rdfStream == null) {
+//
+//        /*
+//         * If we do not find as a Resource then try as a URL.
+//         * 
+//         */
+//        try {
+//            
+//            rdfStream = new URL(ontology).openConnection().getInputStream();
+//            
+//        } catch (IOException ex) {
+//            
+//            ex.printStackTrace(System.err);
+//            
+//            return false;
+//            
+//        }
+//        
+//    }
+//
+//    rdfStream = new BufferedInputStream(rdfStream);
+//
+//    ...
+//    
+//    finally {
+//    rdfStream.close();
+//    }
+//    
+    
+    /**
      * We need to collect two (three including bnode) term arrays and one
      * statement array. These should be buffers of a settable size.
      * <p>
@@ -213,16 +348,9 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param baseURI
      *            The baseURI or "" if none is known.
      */
-
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
+    public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
-        OptimizedValueFactory valueFac = new OptimizedValueFactory();
-        
-        Parser parser = new RdfXmlParser( valueFac );
-        
-        parser.setVerifyData( false );
-        
-        parser.setStatementHandler( this );
+        Parser parser = newParser(valueFac);
         
         // Note: reset to that rates reflect load times not clock times.
         insertStart = System.currentTimeMillis();

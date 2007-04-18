@@ -54,7 +54,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -63,6 +65,12 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.rio.Parser;
+import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.vocabulary.OWL;
+import org.openrdf.vocabulary.RDF;
+import org.openrdf.vocabulary.RDFS;
+import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
@@ -95,6 +103,8 @@ import com.ibm.icu.text.RuleBasedCollator;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
+ * 
+ * @todo verify that re-loading the same data does not cause index writes.
  * 
  * @todo Refactor to support transactions and concurrent load/query and test
  *       same.
@@ -405,6 +415,12 @@ public class TripleStore extends /*Master*/Journal {
         // setup key builder for RDF Values and Statements.
         keyBuilder = new RdfKeyBuilder(_keyBuilder);
 
+        // setup namespace mapping for serialization utility methods.
+        addNamespace(RDF.NAMESPACE, "rdf");
+        addNamespace(RDFS.NAMESPACE, "rdfs");
+        addNamespace(OWL.NAMESPACE, "owl");
+        addNamespace(XmlSchema.NAMESPACE, "xsd");
+
     }
 
     /**
@@ -554,8 +570,29 @@ public class TripleStore extends /*Master*/Journal {
 
         getSPOIndex().insert(keyBuilder.statement2Key(_s, _p, _o),null);
         getPOSIndex().insert(keyBuilder.statement2Key(_p, _o, _s),null);
-        getOSPIndex().insert(keyBuilder.statement2Key(_p, _s, _p),null);
+        getOSPIndex().insert(keyBuilder.statement2Key(_o, _s, _p),null);
         
+    }
+    
+    /*
+     * @todo move this serialization stuff into a utility class.
+     */
+    
+    // namespace to prefix.
+    private final Map<String, String> uriToPrefix = new HashMap<String, String>();
+    
+    /**
+     * Defines a transient mapping from a URI to a namespace prefix that will be
+     * used for that URI by {@link #toString()}.
+     * 
+     * @param namespace
+     * 
+     * @param prefix
+     */
+    protected void addNamespace(String namespace, String prefix) {
+    
+        uriToPrefix.put(namespace, prefix);
+
     }
 
     /**
@@ -565,28 +602,74 @@ public class TripleStore extends /*Master*/Journal {
         
         IIndex ndx = getIdTermIndex();
         
-        URI s1 = (URI) ndx.lookup(keyBuilder.id2key(s));
+        Resource s1 = (Resource) ndx.lookup(keyBuilder.id2key(s));
          
         URI p1 = (URI) ndx.lookup(keyBuilder.id2key(p));
          
-        URI o1 = (URI) ndx.lookup(keyBuilder.id2key(o));
+        Value o1 = (Value) ndx.lookup(keyBuilder.id2key(o));
          
-        return ("< "+abbrev(s1)+", "+abbrev(p1)+", "+abbrev(o1)+" >");
+        return ("< " + (s1 instanceof URI ? abbrev((URI) s1) : s1) + ", "
+                + abbrev(p1) + ", "
+                + (o1 instanceof URI ? abbrev((URI) o1) : o1) + " >");
         
     }
     
-    // @todo substitute in well know namespaces (rdf, rdfs, etc).
+    /**
+     * Substitutes in well know namespaces (rdf, rdfs, etc).
+     */
     private String abbrev( URI uri ) {
         
-        String t = uri.getURI();
+        String uriString = uri.getURI();
         
-        int index = t.lastIndexOf('#');
+//        final int index = uriString.lastIndexOf('#');
+//        
+//        if(index==-1) return uriString;
+//
+//        final String namespace = uriString.substring(0, index);
         
-        if(index==-1) return t;
+        final String namespace = uri.getNamespace();
         
-        return t.substring(index);
+        final String prefix = uriToPrefix.get(namespace);
+        
+        if(prefix != null) {
+            
+            return prefix+":"+uri.getLocalName();
+            
+        } else return uriString;
         
     }
+
+    /**
+     * Utility method dumps the statements in the store onto {@link System#err}
+     * using the SPO index (subject order).
+     */
+    public void dumpStore() {
+
+        final int nstmts = getStatementCount();
+        
+        System.err.println("#statements="+nstmts);
+        
+        IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
+
+        int i = 0;
+        
+        while (itr.hasNext()) {
+
+            itr.next();
+            
+            i++;
+            
+            SPO spo = new SPO(KeyOrder.SPO,keyBuilder,itr.getKey());
+
+            System.err.println("#" + i + "\t" + toString(spo.s, spo.p, spo.o));
+            
+        }
+        
+    }
+    
+    /*
+     * 
+     */
     
     /**
      * Return true if the statement exists in the store (non-batch API).
@@ -863,8 +946,8 @@ public class TripleStore extends /*Master*/Journal {
      * 
      * @return The #of statements removed.
      * 
-     * @todo the {@link #keyBuilder} is, which means that this is NOT thread
-     *       safe.
+     * @todo the {@link #keyBuilder} is being used, which means that this is NOT
+     *       thread safe.
      * 
      * @todo this is not using the batch btree api.
      * 
@@ -882,7 +965,9 @@ public class TripleStore extends /*Master*/Journal {
             if (getSPOIndex().contains(key)) {
 
                 getSPOIndex().remove(key);
-
+                getPOSIndex().remove(keyBuilder.statement2Key(_p, _o, _s));
+                getOSPIndex().remove(keyBuilder.statement2Key(_o, _s, _p));
+                
                 return 1;
                 
             } else {
@@ -958,6 +1043,7 @@ public class TripleStore extends /*Master*/Journal {
                     ndx.remove(keyBuilder.statement2Key(spo.p, spo.o, spo.s));
 
                 }
+                
             }
 
             {
@@ -986,6 +1072,9 @@ public class TripleStore extends /*Master*/Journal {
 
     /**
      * Value used for a "NULL" term identifier.
+     * 
+     * @todo use this throughout rather than "0" since the value should really
+     *       be an <em>unsigned long</em>).
      */
     public static final long NULL = 0L;
 
@@ -1455,6 +1544,8 @@ public class TripleStore extends /*Master*/Journal {
      * 
      * @return The pre-assigned termId -or- 0L iff the term is not known to the
      *         database.
+     * 
+     * @todo cache some well-known values?  E.g., this defined by the InferenceEngine.
      */
     public long getTermId(Value value) {
 
@@ -1586,21 +1677,6 @@ public class TripleStore extends /*Master*/Journal {
         }
         
     }
-    
-    /**
-     * Load a file into the triple store.
-     *
-     * @param file The file.
-     * 
-     * @param baseURI The baseURI or "" if none is known.
-     * 
-     * @throws IOException
-     */
-    public void loadData(File file, String baseURI ) throws IOException {
-        
-        loadData(file,baseURI,true);
-        
-    }
 
     /**
      * Used to report statistics when loading data.
@@ -1638,24 +1714,42 @@ public class TripleStore extends /*Master*/Journal {
         
     }
     
+//  /**
+//   * Load a file into the triple store.
+//   *
+//   * @param file The file.
+//   * 
+//   * @param baseURI The baseURI or "" if none is known.
+//   * 
+//   * @throws IOException
+//   */
+//  public void loadData(File file, String baseURI ) throws IOException {
+//      
+//      loadData(file,baseURI,true);
+//      
+//  }
+
     /**
-     * Load a file into the triple store.
+     * Load data into the triple store.
      * 
      * @param file
      *            The file.
      * @param baseURI
-     *            The baseURI or "" if none is known.
+     *            The baseURI or <code>""</code> if none is known.
+     * @param rdfFormat
+     *            The RDF interchange syntax to be parsed.
+     * @param verifyData
+     *            Controls the {@link Parser#setVerifyData(boolean)} option.
      * @param commit
      *            A {@link #commit()} will be performed IFF true.
      * 
-     * @return Statistics about the file load operation.
+     * @return Statistics about the data load operation.
      * 
-     * @todo add a parameter for the batch size. large buffers for lots of small
-     *       files probably means lots of heap churn.
-     *
      * @throws IOException
+     *             if there is a problem when parsing the data.
      */
-    public LoadStats loadData(File file, String baseURI, boolean commit ) throws IOException {
+    public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat,
+            boolean verifyData, boolean commit) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
@@ -1663,10 +1757,7 @@ public class TripleStore extends /*Master*/Journal {
         
         log.debug( "loading: " + file.getAbsolutePath() );
         
-        Reader reader = new BufferedReader(new InputStreamReader(
-                new FileInputStream(file)));
-
-        IRioLoader loader = new PresortRioLoader( this );
+        IRioLoader loader = new PresortRioLoader( this, rdfFormat, verifyData );
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             
@@ -1684,9 +1775,17 @@ public class TripleStore extends /*Master*/Journal {
             
         });
         
+        /*
+         * @todo change to use correct Parser method depending on Reader vs
+         * InputStream (SAX Source).  Changing this means updating all of
+         * the parser implementations, not just the PresortRioLoader.
+         */
+        Reader reader = new BufferedReader(new InputStreamReader(
+                new FileInputStream(file)));
+        
         try {
             
-            loader.loadRdfXml( reader, baseURI );
+            loader.loadRdf( reader, baseURI );
             
             long nstmts = loader.getStatementsAdded();
             

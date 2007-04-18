@@ -60,14 +60,14 @@ import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Options;
 
 /**
- * Test suite for {@link SimpleRdfRepository}.
+ * Test suite for {@link SimpleRdfRepository} that verifies the
+ * {@link RdfRepository} implementation (no entailments).
  * <p>
- * Note: This class has a dependency on the openrdf test suite.  If you are not
- * trying to run the test suites, then can simply ignore compile errors in this
- * class.
+ * Note: This class has a dependency on the openrdf test suite since it extends
+ * a test class defined by that project. If you are not trying to run the test
+ * suites, then can simply ignore compile errors in this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -168,11 +168,6 @@ public class TestSimpleRdfRepository extends org.openrdf.sesame.sail.RdfReposito
         
         Properties params = new Properties();
         
-//        Map params = System.getProperties();
-//
-//        // Clone the system properties.
-//        params = new java.util.HashMap( params );
-//        
 //        if(params.get(Options.BUFFER_MODE)==null) {
 //            
 //            /*
@@ -182,6 +177,16 @@ public class TestSimpleRdfRepository extends org.openrdf.sesame.sail.RdfReposito
 //            
 //        }
         
+        /*
+         * Note: This test suite requires that the RDFS closure is NOT
+         * maintained since some of the tests require RDF-only semantics and
+         * will trip up on the entailments inserted into the RDF model by
+         * closure, e.g., the axoims. For example, an empty repository is not
+         * empty after closure.
+         */
+
+        params.put(Options.RDFS_CLOSURE, "false");
+            
         try {
             
             repo.initialize( params );

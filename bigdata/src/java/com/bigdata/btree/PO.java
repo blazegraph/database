@@ -51,9 +51,6 @@ package com.bigdata.btree;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo This abstract class is only used by the {@link BTree}. Modify it so
- *       that we directly test the member fields for better performance.
  */
 abstract public class PO implements IIdentityAccess, IDirty {
 

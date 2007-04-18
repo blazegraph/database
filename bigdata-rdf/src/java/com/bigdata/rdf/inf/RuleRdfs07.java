@@ -44,11 +44,14 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 /**
+ * rdfs7:
  * <pre>
- * &lt;a rdfs:subPropertyOf b&gt; AND &lt;u a y&gt; IMPLIES &lt;u b y&gt; 
+ *       triple(?u,?b,?y) :-
+ *          triple(?a,rdfs:subPropertyOf,?b),
+ *          triple(?u,?a,?y).
  * </pre>
  */
-public class RuleRdfs07 extends AbstractRuleRdfs2379 {
+public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs07( InferenceEngine store, Var a, Var b, Var u, Var y ) {
 

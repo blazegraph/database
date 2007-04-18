@@ -249,7 +249,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      *                  the RDF/XML source
      */
 
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
+    public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();
         

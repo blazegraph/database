@@ -248,7 +248,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * @param reader
      *                  the RDF/XML source
      */
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
+    public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
         OptimizedValueFactory valueFac = new OptimizedValueFactory();
         

@@ -66,9 +66,9 @@ import com.bigdata.rdf.TripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractRuleRdfs511 extends AbstractRuleRdf {
+public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
 
-    public AbstractRuleRdfs511
+    public AbstractRuleRdfs_5_11
         ( InferenceEngine store, 
           Triple head, 
           Pred[] body
@@ -117,7 +117,7 @@ public class AbstractRuleRdfs511 extends AbstractRuleRdf {
 
 //        stats.stmts2 += stmts2.length;
 
-        // the simplest n^2 algorithm
+        // self-join using binary search.
         for (int i = 0; i < stmts1.length; i++) {
 
             SPO left = stmts1[i];

@@ -41,15 +41,28 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+/*
+ * Created on Apr 17, 2007
+ */
 
-public class RuleRdfs10 extends AbstractRuleRdfs_6_8_10_12_13 {
+package com.bigdata.rdf.sail;
 
-    public RuleRdfs10(InferenceEngine store, Var u, Var v, Var x) {
+import com.bigdata.rdf.TripleStore;
 
-        super(store, new Triple(u, store.rdfsSubClassOf, u), 
-                     new Triple(u, store.rdfType, store.rdfsClass));
+/**
+ * Additional parameters understood by the Sesame 1.x SAIL implementation.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class Options extends com.bigdata.journal.Options {
 
-    }
+    /**
+     * This optional boolean property may be used to specify whether or not RDFS
+     * entailments are maintained by eager closure of the knowledge base
+     * (default false).
+     */
+    public static final String RDFS_CLOSURE = "rdfsClosure"; 
     
 }
+

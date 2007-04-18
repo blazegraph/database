@@ -54,6 +54,7 @@ import java.io.PrintWriter;
 import java.nio.BufferOverflowException;
 
 import org.openrdf.sesame.admin.UpdateException;
+import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 
 import com.bigdata.rdf.TripleStore.LoadStats;
@@ -280,7 +281,9 @@ public class TaskATest
         
         for(int i=0; i<filename.length; i++) {
          
-            loadStats = store.loadData(new File(filename[i]), baseURI[i], true);
+            loadStats = store
+                    .loadData(new File(filename[i]), baseURI[i],
+                            RDFFormat.RDFXML, false/* verifyData */, true/* commit */);
             
         }
 

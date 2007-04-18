@@ -45,13 +45,18 @@ package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.KeyOrder;
 
-
 /**
+ * rdfs9:
+ * <pre>
+ *       triple(?v,rdf:type,?x) :-
+ *          triple(?u,rdfs:subClassOf,?x),
+ *          triple(?v,rdf:type,?u). 
+ * </pre>
  * <pre>
  *  &lt;u rdfs:subClassOf x&gt; AND &lt;v rdf:type u&gt; IMPLIES &lt;v rdf:type x&gt;
  * </pre>
  */
-public class RuleRdfs09 extends AbstractRuleRdfs2379 {
+public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs09( InferenceEngine store, Var u, Var x, Var v ) {
 
@@ -63,6 +68,11 @@ public class RuleRdfs09 extends AbstractRuleRdfs2379 {
 
     }
     
+    /**
+     * Overriden to be two bound (more selective), but otherwise also returning
+     * data in POS order. The query is formed from triple(?v,rdf:type,stmt1.s)
+     * and expressed in POS order as { rdf:type, stmt1.s, ?v }.
+     */
     protected SPO[] getStmts2( SPO stmt1 ) {
         
         byte[] fromKey = store.keyBuilder.statement2Key(store.rdfType.id,

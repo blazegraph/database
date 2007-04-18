@@ -45,6 +45,7 @@ package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rdf.TempTripleStore;
+import com.bigdata.rdf.TripleStore;
 
 
 /**
@@ -85,6 +86,14 @@ abstract public class Rule {
      */
     final public Pred[] body;
 
+    /**
+     * The 64-bit long integer that represents an unassigned term identifier
+     * 
+     * @todo use this throughout rather than "0" since the value should really
+     *       be an <em>unsigned long</em>.
+     */
+    final public long NULL = TripleStore.NULL;
+    
     public Rule(InferenceEngine store, Pred head, Pred[] body) {
 
         assert store != null;
@@ -143,6 +152,14 @@ abstract public class Rule {
          * rule (if there are two).
          */
         public int stmts2;
+        
+        /**
+         * If the rule performs a JOIN, this is the #of distinct queries that
+         * are made for the 2nd triple pattern.  For some rules, we can reorder
+         * the results from the first triple pattern in order to reduce the #of
+         * subqueries.
+         */
+        public int numSubqueries;
         
         /**
          * #of statements considered.

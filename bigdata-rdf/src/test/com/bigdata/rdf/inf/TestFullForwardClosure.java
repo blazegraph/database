@@ -50,6 +50,8 @@ package com.bigdata.rdf.inf;
 import java.io.File;
 import java.io.IOException;
 
+import org.openrdf.sesame.constants.RDFFormat;
+
 /**
  * Test suite for full forward closure.
  * 
@@ -83,15 +85,48 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
          * hand-crafted data sets to test the rule implementations.
          */
 
-        store.loadData(new File("data/alibaba_v41.rdf"),"",false);
-        
-        store.loadData(new File("data/nciOncology.owl"),"",false);
+        /*
+rule        ms  #entms  entms/ms
+RuleRdf01   140 38  0
+RuleRdfs02  0   0   0
+RuleRdfs03  0   0   0
+RuleRdfs05  0   592 0
+RuleRdfs06  0   202 0
+RuleRdfs07  110 97801   889
+RuleRdfs08  0   330 0
+RuleRdfs09  1687    31680   18
+RuleRdfs10  0   330 0
+RuleRdfs11  16  990 61
+RuleRdfs12  0   0   0
+RuleRdfs13  0   0   0
+
+rule        ms  #entms  entms/ms
+RuleRdf01   172 38  0
+RuleRdfs02  0   0   0
+RuleRdfs03  0   0   0
+RuleRdfs05  0   592 0
+RuleRdfs06  0   202 0
+RuleRdfs07  109 97801   897
+RuleRdfs08  0   330 0
+RuleRdfs09  1687    31680   18
+RuleRdfs10  0   330 0
+RuleRdfs11  16  990 61
+RuleRdfs12  0   0   0
+RuleRdfs13  0   0   0
+         */
+        store.loadData(new File("data/alibaba_v41.rdf"), "", RDFFormat.RDFXML,
+                false/* verifyData */, false/* commit */);
+
+//        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+//                false/* verifyData */, false/*commit*/);
 
         /*
          * Wordnet schema + nouns (two source files).
          */
-//        store.loadData(new File("data/wordnet-20000620.rdfs"), "", false);
-//        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "", false);
+//        store.loadData(new File("data/wordnet-20000620.rdfs"), "",
+//                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
+//        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "",
+//                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
         
         store.fullForwardClosure();
         
