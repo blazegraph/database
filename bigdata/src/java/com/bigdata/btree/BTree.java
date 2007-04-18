@@ -51,6 +51,8 @@ import java.util.UUID;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -433,7 +435,21 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
          * succeed. That limit does not apply for an immutable btree.
          */
         assert hardReferenceQueue.capacity() >= MINIMUM_LEAF_QUEUE_CAPACITY;
+
+        /*
+         * Setup the initial root leaf.
+         */
+        newRootLeaf();
         
+    }
+
+    /**
+     * Creates and sets new root {@link Leaf} on the B+Tree and (re)sets the
+     * various counters to be consistent with that root.  This is used both
+     * by the constructor for a new {@link BTree} and by {@link #removeAll()}.
+     */
+    private void newRootLeaf() {
+
         this.height = 0;
 
         this.nnodes = 0;
@@ -443,8 +459,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         this.root = new Leaf(this);
         
         this.nleaves = 1; 
-    }
 
+    }
+    
     /**
      * Load an existing B+Tree from the store.
      * 
@@ -673,35 +690,37 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     }
     
     /**
-     * Not implement yet.
-     * 
-     * @todo Define the semantics for deleting the btree. If the delete is on an
-     *       unisolated btree then all we need to do is replace the root with an
-     *       empty root leaf. Old nodes and leaves will be swept from the store
-     *       eventually when the journal overflows.
-     *       <p>
-     *       If the delete occurs during a transaction the isolation means that
-     *       we have to delete all of the keys, causing "delete" entries to
-     *       spring into existance for each key in the tree. When the
-     *       transaction commits, those delete markers will have to validate
-     *       against the global state of the tree. If the transaction validates,
-     *       then the merge down onto the global state will cause the
-     *       corresponding entries to be removed from the global tree.
-     *       <p>
-     *       Note that if there are persistent nodes in the tree, then
-     *       copy-on-write is triggered during traversal. In order for us to
-     *       write an iterator-based delete of the existing keys (causing them
-     *       to become "delete" markers) we need the iterator to handle
-     *       concurrent modification, at least to the extent that it can follow
-     *       the change from the persistent reference for a node to the new
-     *       mutable reference for that node.
-     *       <p>
-     *       Note that there is probably processing order that is more efficient
-     *       for delete, e.g., left-to-right vs right-to-left.
+     * Remove all entries in the B+Tree.
+     * <p>
+     * This implementation simply replaces the root with a new root leaf and
+     * resets the counters (height, #of nodes, #of leaves, etc). to be
+     * consistent with that new root. If the btree is then made restart-safe by
+     * the commit protocol of the backing store then the effect is as if all
+     * entries had been deleted. Old nodes and leaves will be swept from the
+     * store eventually when the journal overflows.
+     * <p>
+     * Note: This implementation simply replaces the root node with a new root
+     * leaf and does not release storage for nodes and leaves in the B+Tree.
+     * This is because the overall design for bigdata combines an append only
+     * {@link IJournal} with overflow onto read-only {@link IndexSegment}s. Old
+     * journals are simply deleted, thereby reclaiming the storage on the file
+     * system.
+     * <p>
+     * Note: This implementation is overriden in the
+     * <code>com.btree.isolation</code> package since isolation requires
+     * writing explicit delete markers for each entry in the B+Tree.
+     * <p>
+     * Note: The {@link IIndexManager} defines methods for registering (adding)
+     * and dropping indices. The {@link IIndexManager#dropIndex(String)} method
+     * should be used to remove a scale-out partitioned index.
      */
-    public void delete() {
+    public void removeAll() {
 
-        throw new UnsupportedOperationException();
+        /*
+         * Replace the root with a new root leaf.
+         */
+ 
+        newRootLeaf();
         
     }
 

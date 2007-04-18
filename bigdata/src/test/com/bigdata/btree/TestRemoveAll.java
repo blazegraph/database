@@ -42,62 +42,75 @@ Modifications:
 
 */
 /*
- * Created on Apr 13, 2007
+ * Created on Apr 17, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.btree;
 
-import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDFS;
-
-import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.inf.Rule.Stats;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import org.apache.log4j.Level;
 
 /**
- * @see RuleRdfs11
+ * Test suite for {@link BTree#removeAll()}.
+ * 
+ * @see TestRestartSafe#test_restartSafe01()
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleRdfs11 extends AbstractRuleTestCase {
+public class TestRemoveAll extends AbstractBTreeTestCase {
 
     /**
      * 
      */
-    public TestRuleRdfs11() {
+    public TestRemoveAll() {
     }
 
     /**
      * @param name
      */
-    public TestRuleRdfs11(String name) {
+    public TestRemoveAll(String name) {
         super(name);
     }
 
-    public void test_rdfs11() {
+    /**
+     *
+     */
+    public void test_removeAll() {
 
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
+        final int m = 3;
 
-        URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-
-        store.addStatement(A, rdfsSubClassOf, B);
-        store.addStatement(B, rdfsSubClassOf, C);
-
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertFalse(store.containsStatement(A, rdfsSubClassOf, C));
-
-        applyRule(store.rdfs11, 1/* numComputed */, 1/* numCopied */);
+        BTree btree = getBTree( m );
         
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, C));
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v8 = new SimpleEntry(8);
+        Object[] values = new Object[]{v5,v6,v7,v8,v3,v4,v2,v1};
+
+        {
+            
+            byte[][] keys = new byte[][] { new byte[] { 5 }, new byte[] { 6 },
+                    new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
+                    new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
+            
+            btree.insert(new BatchInsert(values.length, keys, values));
+            
+            assertTrue(btree.dump(Level.DEBUG,System.err));
+    
+            assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
+                    btree.entryIterator());
+
+            btree.removeAll();
+
+            assertTrue(btree.dump(Level.DEBUG,System.err));
+            
+            assertSameIterator(new Object[] {}, btree.entryIterator());
+            
+        }
 
     }
     

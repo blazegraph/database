@@ -578,6 +578,17 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * 
      * FIXME when using an {@link IndexSegment} provide for direct leaf
      * successor scans.
+     * 
+     * FIXME Support update of the current value for an entry, delete of the
+     * entry, and insert of an entry into the current leaf.
+     * <p>
+     * <p>
+     * Note that if there are persistent nodes in the tree, then copy-on-write
+     * is triggered during traversal. In order for us to write an iterator-based
+     * delete of the existing keys (causing them to become "delete" markers) we
+     * need the iterator to handle concurrent modification, at least to the
+     * extent that it can follow the change from the persistent reference for a
+     * node to the new mutable reference for that node.
      */
     private static class PostOrderEntryIterator extends Striterator implements IEntryIterator {
         

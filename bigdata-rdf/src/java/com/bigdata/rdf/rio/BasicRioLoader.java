@@ -131,7 +131,7 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception {
+    public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
         Parser parser = new RdfXmlParser();
         

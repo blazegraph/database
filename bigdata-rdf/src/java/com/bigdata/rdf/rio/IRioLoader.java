@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
+import java.io.InputStream;
 import java.io.Reader;
 
 import org.apache.log4j.Logger;
@@ -69,6 +70,8 @@ public interface IRioLoader {
     
     public void removeRioLoaderListener( RioLoaderListener l );
 
-    public void loadRdfXml( Reader reader, String baseURI ) throws Exception;
+    public void loadRdf( Reader reader, String baseURI ) throws Exception;
+
+//    public void loadRdf( InputStream is, String baseURI ) throws Exception;
     
 }

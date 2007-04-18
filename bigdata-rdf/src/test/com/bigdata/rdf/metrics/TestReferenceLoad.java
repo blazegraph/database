@@ -50,6 +50,8 @@ package com.bigdata.rdf.metrics;
 import java.io.File;
 import java.io.IOException;
 
+import org.openrdf.sesame.constants.RDFFormat;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -75,7 +77,8 @@ public class TestReferenceLoad extends AbstractMetricsTestCase {
         
         for(int i=0; i<files.length; i++) {
          
-            store.loadData(new File(files[i]),"");
+            store.loadData(new File(files[i]), "", RDFFormat.RDFXML,
+                    false/* verifyData */, false/*commit*/);
             
         }
         

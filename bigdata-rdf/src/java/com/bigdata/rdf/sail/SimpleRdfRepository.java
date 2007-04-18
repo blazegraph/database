@@ -50,9 +50,14 @@ package com.bigdata.rdf.sail;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.Vector;
 
 import org.CognitiveWeb.util.PropertyUtil;
@@ -72,16 +77,27 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailInternalException;
 import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.sesame.sail.StatementIterator;
+import org.openrdf.sesame.sail.query.BooleanExpr;
+import org.openrdf.sesame.sail.query.DirectSubClassOf;
+import org.openrdf.sesame.sail.query.DirectSubPropertyOf;
+import org.openrdf.sesame.sail.query.DirectType;
+import org.openrdf.sesame.sail.query.GraphPattern;
+import org.openrdf.sesame.sail.query.GraphPatternQuery;
+import org.openrdf.sesame.sail.query.PathExpression;
 import org.openrdf.sesame.sail.query.Query;
 import org.openrdf.sesame.sail.query.QueryOptimizer;
+import org.openrdf.sesame.sail.query.SetOperator;
+import org.openrdf.sesame.sail.query.TriplePattern;
+import org.openrdf.sesame.sail.query.ValueCompare;
+import org.openrdf.sesame.sail.query.ValueExpr;
 import org.openrdf.sesame.sail.query.Var;
 import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
 import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.InferenceEngine;
@@ -110,7 +126,11 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * <p>
  * A custom integration is provided for directly loading data into the triple
  * store with throughput of 20,000+ triples per second - see
- * {@link #loadData(java.io.File, String, boolean)}.
+ * {@link TripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}.
+ * This method lies outside of the SAIL and does NOT rely on the SAIL
+ * "transaction" mechanisms. This method does NOT perform RDFS closure - you
+ * must explicitly request that yourself, e.g., by specifying
+ * <code>commit:=false</code> and then invoking {@link #fullForwardClosure()}.
  * <p>
  * <em>THIS CLASS IS NOT THREAD SAFE</em>
  * <p>
@@ -133,15 +153,34 @@ public class SimpleRdfRepository implements RdfRepository {
      */
     protected static final long NULL = TripleStore.NULL;
     
-    private OptimizedValueFactory valueFactory;
-    private InferenceEngine tripleStore;
-    private Properties properties;
+    protected OptimizedValueFactory valueFactory;
+    protected InferenceEngine tripleStore;
+    protected Properties properties;
+    
+    /**
+     * When true, the RDFS closure will be maintained.
+     */
+    private boolean rdfsClosure;
+    
+    /**
+     * When true, the RDFS closure will be maintained by the <em>SAIL</em>
+     * implementation (but not by methods that go around the SAIL).
+     */
+    public boolean isRdfsClosure() {
+        
+        return rdfsClosure;
+        
+    }
+    
+    /**
+     * When true, a SAIL "transaction" is running.
+     */
     private boolean transactionStarted;
     
     /**
      * The implementation object.
      */
-    public TripleStore getTripleStore() {
+    public InferenceEngine getTripleStore() {
         
         return tripleStore;
         
@@ -282,19 +321,21 @@ public class SimpleRdfRepository implements RdfRepository {
     }
 
     /**
-     * Note: This is not implemented. Since there is only one RdfRepository per
-     * persistence store, the easiest way to achive this end is to delete the
-     * persistence store and open/create a new one.
+     * Note: Since there is only one RdfRepository per persistence store, the
+     * easiest way to achive this end is to delete the persistence store and
+     * open/create a new one.
      */
     public void clearRepository() throws SailUpdateException {
 
         assertTransactionStarted();
 
-        // TODO Auto-generated method stub
+        ((BTree)tripleStore.getTermIdIndex()).removeAll();
+        ((BTree)tripleStore.getIdTermIndex()).removeAll();
+        ((BTree)tripleStore.getSPOIndex()).removeAll();
+        ((BTree)tripleStore.getPOSIndex()).removeAll();
+        ((BTree)tripleStore.getOSPIndex()).removeAll();
         
         m_stmtRemoved = true;
-        
-        throw new UnsupportedOperationException();
         
     }
 
@@ -366,12 +407,21 @@ public class SimpleRdfRepository implements RdfRepository {
         }
 
         /*
-         * @todo make closure optional? Is closure required by the Sesame test
-         * suite?  Mark entailments in the KB using the btree entry value?
+         * Optionally compute the full forward closure over the store.
+         * 
+         * @todo In order to handle closure properly we should delete the
+         * closure if any statements are removed from the store (the entailments
+         * are not explicitly marked so this SAIL does not do this).
          */
-        tripleStore.fullForwardClosure();
+        if (rdfsClosure) {
+
+            tripleStore.fullForwardClosure();
+            
+        }
         
         tripleStore.commit();
+        
+        if(true) tripleStore.dumpStore();
         
         transactionStarted = false;
         
@@ -533,7 +583,7 @@ public class SimpleRdfRepository implements RdfRepository {
     }
 
     /**
-     * @todo rewrite the join order based on selectivity.
+     * 
      */
     public Query optimizeQuery(Query query) {
         
@@ -542,7 +592,15 @@ public class SimpleRdfRepository implements RdfRepository {
          * variety of default optimizations.
          */
 
-        QueryOptimizer.optimizeQuery(query);
+//        QueryOptimizer.optimizeQuery(query);
+        
+        /*
+         * This variant is based on the Sesame optimizer but it uses range
+         * counts to order triple patterns based on their actual selectiveness
+         * in the data at the time that the query is run.  This can be a big
+         * win depending on the query.
+         */
+        optimizeQuery2(query);
 
         /*
          * Replace all Value objects stored in variables with the corresponding
@@ -556,7 +614,365 @@ public class SimpleRdfRepository implements RdfRepository {
         return query;
         
     }
+
+    /**
+     * An attempt to get the Sesame query optimizer to choose the join
+     * order based on the actual selectivity of the triple patterns.
+     * 
+     * @param qc
+     */
+    private void optimizeQuery2(Query qc) {
+        if (qc instanceof GraphPatternQuery) {
+            GraphPatternQuery gpQuery = (GraphPatternQuery)qc;
+            _optimizeGraphPattern(gpQuery.getGraphPattern(), new HashSet());
+        }
+        else if (qc instanceof SetOperator) {
+            SetOperator setOp = (SetOperator)qc;
+            optimizeQuery( setOp.getLeftArg() );
+            optimizeQuery( setOp.getRightArg() );
+        }
+    }
+
+    private void _optimizeGraphPattern(GraphPattern graphPattern, Set boundVars) {
+        // Optimize any optional child graph patterns:
+        Iterator iter = graphPattern.getOptionals().iterator();
+
+        if (iter.hasNext()) {
+            // Build set of variables that are bound in this scope
+            Set scopeVars = new HashSet(boundVars);
+            graphPattern.getLocalVariables(scopeVars);
+
+            // Optimize recursively
+            while (iter.hasNext()) {
+                GraphPattern optionalGP = (GraphPattern)iter.next();
+                _optimizeGraphPattern(optionalGP, new HashSet(scopeVars));
+            }
+        }
+
+        // Optimize the GraphPattern itself:
+        _inlineVarAssignments(graphPattern);
+        _orderExpressions(graphPattern, boundVars);
+    }
     
+    /**
+     * Inlines as much of the "variable assignments" (comparison between a
+     * variable and fixed value) that are found in the list of conjunctive
+     * constraints as possible, and removes them from the query. Only variable
+     * assignments for variables that are used in <tt>graphPattern</tt> itself
+     * are processed. Inlining variable assignments for variables that are
+     * (only) used in optional child graph patterns leads to incorrect query
+     * evaluation.
+     **/
+    private void _inlineVarAssignments(GraphPattern graphPattern) {
+        Set localVars = new HashSet();
+        graphPattern.getLocalVariables(localVars);
+
+        boolean constraintsModified = false;
+
+        List conjunctiveConstraints =
+                new ArrayList(graphPattern.getConjunctiveConstraints());
+
+        Iterator iter = conjunctiveConstraints.iterator();
+
+        while (iter.hasNext()) {
+            BooleanExpr boolExpr = (BooleanExpr)iter.next();
+
+            if (boolExpr instanceof ValueCompare) {
+                ValueCompare valueCompare = (ValueCompare)boolExpr;
+
+                if (valueCompare.getOperator() != ValueCompare.EQ) {
+                    continue;
+                }
+
+                ValueExpr arg1 = valueCompare.getLeftArg();
+                ValueExpr arg2 = valueCompare.getRightArg();
+
+                Var varArg = null;
+                Value value = null;
+
+                if (arg1 instanceof Var && arg1.getValue() == null && // arg1 is an unassigned var 
+                    arg2.getValue() != null) // arg2 has a value
+                {
+                    varArg = (Var)arg1;
+                    value = arg2.getValue();
+                }
+                else if (arg2 instanceof Var && arg2.getValue() == null && // arg2 is an unassigned var
+                    arg1.getValue() != null) // arg1 has a value
+                {
+                    varArg = (Var)arg2;
+                    value = arg1.getValue();
+                }
+
+                if (varArg != null && localVars.contains(varArg)) {
+                    // Inline this variable assignment
+                    varArg.setValue(value);
+
+                    // Remove the (now redundant) constraint
+                    iter.remove();
+
+                    constraintsModified = true;
+                }
+            }
+        }
+
+        if (constraintsModified) {
+            graphPattern.setConstraints(conjunctiveConstraints);
+        }
+    }
+    
+    /**
+     * Merges the boolean constraints and the path expressions in one single
+     * list. The order of the path expressions is not changed, but the boolean
+     * constraints are inserted between them. The separate boolean constraints
+     * are moved to the start of the list as much as possible, under the
+     * condition that all variables that are used in the constraint are
+     * instantiated by the path expressions that are earlier in the list. An
+     * example combined list might be:
+     * <tt>[(A,B,C), A != foo:bar, (B,E,F), C != F, (F,G,H)]</tt>.
+     **/
+    private void _orderExpressions(GraphPattern graphPattern, Set boundVars) {
+        List expressions = new ArrayList();
+        List conjunctiveConstraints = new LinkedList(graphPattern.getConjunctiveConstraints());
+
+        // First evaluate any constraints that don't depend on any variables:
+        _addVerifiableConstraints(conjunctiveConstraints, boundVars, expressions);
+
+        // Then evaluate all path expressions from graphPattern
+        List pathExpressions = new LinkedList(graphPattern.getPathExpressions());
+        Hashtable<PathExpression,Integer> rangeCounts = new Hashtable<PathExpression, Integer>();
+        while (!pathExpressions.isEmpty()) {
+            PathExpression pe = _getMostSpecificPathExpression(pathExpressions, boundVars, rangeCounts);
+
+            pathExpressions.remove(pe);
+            expressions.add(pe);
+
+            pe.getVariables(boundVars);
+
+            _addVerifiableConstraints(conjunctiveConstraints, boundVars, expressions);
+        }
+
+        // Finally, evaluate any optional child graph pattern lists
+        List optionals = new LinkedList(graphPattern.getOptionals());
+        while (!optionals.isEmpty()) {
+            PathExpression pe = _getMostSpecificPathExpression(optionals, boundVars, rangeCounts);
+
+            optionals.remove(pe);
+            expressions.add(pe);
+
+            pe.getVariables(boundVars);
+
+            _addVerifiableConstraints(conjunctiveConstraints, boundVars, expressions);
+        }
+
+        // All constraints should be verifiable when all path expressions are
+        // evaluated, but add any remaining constraints anyway
+        expressions.addAll(conjunctiveConstraints);
+
+        graphPattern.setExpressions(expressions);
+    }
+
+    /**
+     * Gets the most specific path expression from <tt>pathExpressions</tt>
+     * given that the variables in <tt>boundVars</tt> have already been assigned
+     * values. The most specific path expressions is the path expression with
+     * the least number of unbound variables.
+     **/
+    private PathExpression _getMostSpecificPathExpression(
+            List pathExpressions, Set boundVars, Hashtable<PathExpression,Integer> rangeCounts)
+    {
+        int minVars = Integer.MAX_VALUE;
+        int minRangeCount = Integer.MAX_VALUE;
+        PathExpression result = null;
+        ArrayList vars = new ArrayList();
+
+        for (int i = 0; i < pathExpressions.size(); i++) {
+            PathExpression pe = (PathExpression)pathExpressions.get(i);
+
+            /*
+             * The #of results for this PathException or -1 if not a
+             * TriplePattern.
+             * 
+             * @todo if zero (0), then at least order it first.
+             */
+            int rangeCount = getRangeCount(pe,rangeCounts);
+            
+            // Get the variables that are used in this path expression
+            vars.clear();
+            pe.getVariables(vars);
+
+            // Count unbound variables
+            int varCount = 0;
+            for (int j = 0; j < vars.size(); j++) {
+                Var var = (Var)vars.get(j);
+
+                if (!var.hasValue() && !boundVars.contains(var)) {
+                    varCount++;
+                }
+            }
+
+            // A bit of hack to make sure directType-, directSubClassOf- and
+            // directSubPropertyOf patterns get sorted to the back because these
+            // are potentially more expensive to evaluate.
+            if (pe instanceof DirectType ||
+                pe instanceof DirectSubClassOf ||
+                pe instanceof DirectSubPropertyOf)
+            {
+                varCount++;
+            }
+
+            if (rangeCount != -1) {
+                // rangeCount is known for this path expression.
+                if (rangeCount < minRangeCount) {
+                    // More specific path expression found
+                    minRangeCount = rangeCount;
+                    result = pe;
+                }
+            } else {
+                // rangeCount is NOT known.
+                if (varCount < minVars) {
+                    // More specific path expression found
+                    minVars = varCount;
+                    result = pe;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Estimate the #of results for a triple pattern.
+     * 
+     * @param pe
+     * @param rangeCounts
+     * 
+     * @return The estimated range count or <code>-1</code> if this is not a
+     *         {@link TriplePattern}.
+     */
+    private int getRangeCount(PathExpression pe,Hashtable<PathExpression,Integer> rangeCounts) {
+        
+        Integer rangeCount = rangeCounts.get(pe);
+        
+        if(rangeCount!=null) {
+            
+            return rangeCount;
+            
+        }
+        
+        if(pe instanceof TriplePattern) {
+            
+            TriplePattern tp = (TriplePattern)pe;
+            
+            rangeCount = rangeCount(tp);
+
+            System.err.println("rangeCount: " + rangeCount + " : " + pe);
+            
+            rangeCounts.put(pe,rangeCount);
+            
+            return rangeCount.intValue();
+            
+        } else {
+            
+            return -1;
+            
+        }
+        
+    }
+
+    private int rangeCount(TriplePattern tp) {
+        
+        /*
+         * Extract "variables". If hasValue() is true, then the variable is
+         * actually bound.
+         */
+        Var svar = tp.getSubjectVar();
+        Var pvar = tp.getPredicateVar();
+        Var ovar = tp.getObjectVar();
+        
+        /*
+         * Extract binding for variable or null iff not bound.
+         */
+        Resource s = svar.hasValue()?(Resource)svar.getValue():null;
+    
+        URI p = pvar.hasValue()?(URI)pvar.getValue():null;
+        
+        Value o = ovar.hasValue()?ovar.getValue():null;
+        
+        /*
+         * convert other Value object types to our object types.
+         */
+        if (s != null)
+            s = (Resource) valueFactory.toNativeValue(s);
+
+        if (p != null)
+            p = (URI) valueFactory.toNativeValue(p);
+
+        if (o != null)
+            o = (Value) valueFactory.toNativeValue(o);
+        
+        /*
+         * convert our object types to internal identifiers.
+         */
+        long _s, _p, _o;
+
+        _s = (s == null ? NULL : tripleStore.getTermId(s));
+        _p = (p == null ? NULL : tripleStore.getTermId(p));
+        _o = (o == null ? NULL : tripleStore.getTermId(o));
+
+        /*
+         * If a value was specified and it is not in the terms index then the
+         * statement can not exist in the KB.
+         */
+        if (_s == NULL && s != null) {
+
+            return 0;
+            
+        }
+        
+        if (_p == NULL && p != null) {
+        
+            return 0;
+            
+        }
+        
+        if (_o == NULL && o != null) {
+            
+            return 0;
+            
+        }
+        
+        return tripleStore.rangeCount(_s, _p, _o);
+
+    }
+    
+    /**
+     * Adds all verifiable constraints (constraint for which every variable has
+     * been bound to a specific value) from <tt>conjunctiveConstraints</tt> to
+     * <tt>expressions</tt>.
+     *
+     * @param conjunctiveConstraints A List of BooleanExpr objects.
+     * @param boundVars A Set of Var objects that have been bound.
+     * @param expressions The list to add the verifiable constraints to.
+     **/
+    private void _addVerifiableConstraints(
+        List conjunctiveConstraints, Set boundVars, List expressions)
+    {
+        Iterator iter = conjunctiveConstraints.iterator();
+
+        while (iter.hasNext()) {
+            BooleanExpr constraint = (BooleanExpr)iter.next();
+
+            Set constraintVars = new HashSet();
+            constraint.getVariables(constraintVars);
+
+            if (boundVars.containsAll(constraintVars)) {
+                // constraint can be verified
+                expressions.add(constraint);
+                iter.remove();
+            }
+        }
+    }
+
     /**
      * Replace all {@link Value} objects stored in variables with the
      * corresponding {@link _Value} objects.
@@ -653,13 +1069,28 @@ public class SimpleRdfRepository implements RdfRepository {
      *            transaction mechanism or the batch load mechanism. The
      *            selection of this option is NOT restart safe (it is not saved
      *            in the store).
-     * 
-     * @see #loadData(File, String, boolean)
      */
     public void initialize(Map configParams) throws SailInitializationException {
 
         properties = PropertyUtil.flatCopy(PropertyUtil.convert(configParams));
 
+        String val;
+        
+        val = properties.getProperty(Options.RDFS_CLOSURE);
+        
+        if (val != null) {
+            
+            rdfsClosure = Boolean.parseBoolean(val);
+            
+        } else {
+            
+            // No closure by default.
+            rdfsClosure = false;
+            
+        }
+
+        System.err.println(Options.RDFS_CLOSURE+"="+rdfsClosure);
+        
         valueFactory = new OptimizedValueFactory();
         
         try {
@@ -680,35 +1111,40 @@ public class SimpleRdfRepository implements RdfRepository {
         
     }
 
-    /**
-     * Uses a fast batch loader to load the data into the store.
-     * <p>
-     * This method lies outside of the SAIL and does not rely on the SAIL
-     * "transaction" mechanisms.
-     * 
-     * @param file
-     *            The file containing the data.
-     * @param baseURI
-     *            The base URI (optional).
-     * @param commit
-     *            When true, the store will be committed after the data load
-     *            (you can use false here if you will lots of small files in
-     *            sequence).
-     */
-    public void loadData(File file, String baseURI, boolean commit)
-            throws IOException {
-
-        tripleStore.loadData(file, baseURI, commit);
-        
-    }
+//    /**
+//     * Uses a fast batch loader to load the data into the store.
+//     * <p>
+//     * This method lies outside of the SAIL and does not rely on the SAIL
+//     * "transaction" mechanisms.
+//     * <p>
+//     * This method does NOT perform RDFS closure - you must explicitly request
+//     * that yourself, e.g., by specifying <code>commit:=false</code> here and
+//     * then invoking {@link #fullForwardClosure()}.
+//     * 
+//     * @param file
+//     *            The file containing the data.
+//     * @param baseURI
+//     *            The base URI (optional).
+//     * @param commit
+//     *            When true, the store will be committed after the data load
+//     *            (you can use false here if you will lots of small files in
+//     *            sequence).
+//     */
+//    public void loadData(File file, String baseURI, boolean commit)
+//            throws IOException {
+//
+//        tripleStore.loadData(file, baseURI, commit);
+//        
+//    }
     
     /**
-     * Computes the closure of the triple store for RDFS entailments. This
-     * implementation computes the full forward closure of the store and then
-     * commits the store. Since incremental closure and truth maintenance are
-     * NOT supported, you should load all your data into store using
-     * {@link #loadData(File, String, boolean)} and then invoke this method to
-     * compute the RDFS entailments.
+     * Computes the closure of the triple store for RDFS entailments.
+     * <p>
+     * This computes the full forward closure of the store and then commits the
+     * store. Since incremental closure and truth maintenance are NOT supported,
+     * you should load all your data into store using
+     * {@link TripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}
+     * and then invoke this method to compute the RDFS entailments.
      * <p>
      * This method lies outside of the SAIL and does not rely on the SAIL
      * "transaction" mechanisms.

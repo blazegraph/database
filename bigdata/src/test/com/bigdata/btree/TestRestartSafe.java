@@ -158,6 +158,8 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
     }
 
     /**
+     * Test basic btree is restart safe, including a test of
+     * {@link BTree#removeAll()}
      * 
      * @throws IOException
      */
@@ -204,6 +206,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         /*
          * restart, re-opening the same file.
          */
+        final long addr2;
         {
         
             journal = reopenStore(journal);
@@ -215,7 +218,34 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             // @todo verify in more detail.
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                     btree.entryIterator());
-    
+
+            // remove all entries by replacing the root node.
+            
+            btree.removeAll();
+            
+            assertTrue(btree.dump(Level.DEBUG,System.err));
+
+            assertSameIterator( new Object[]{}, btree.entryIterator() );
+
+            addr2 = btree.write();
+
+            journal.commit();
+            
+        }
+        
+        /*
+         * restart, re-opening the same file.
+         */
+        {
+
+            journal = reopenStore(journal);
+            
+            final BTree btree = BTree.load(journal, addr2);
+            
+            assertTrue(btree.dump(Level.DEBUG,System.err));
+
+            assertSameIterator( new Object[]{}, btree.entryIterator() );
+
             journal.closeAndDelete();
             
         }
@@ -246,7 +276,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
 
         {
 
-            final BTree btree = new MyBTree(journal, 3, UUID.randomUUID(),
+            final BTree btree = new MyBTree(journal, m, UUID.randomUUID(),
                     SimpleEntry.Serializer.INSTANCE);
 
             byte[][] keys = new byte[][] { new byte[] { 5 }, new byte[] { 6 },

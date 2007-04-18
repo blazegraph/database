@@ -60,6 +60,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 
 import org.CognitiveWeb.util.PropertyUtil;
+import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.TripleStore.LoadStats;
@@ -859,7 +860,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
             
             try {
                 
-                loadStats = store.loadData(new File(file), "", true);
+                loadStats = store
+                        .loadData(new File(file), "", RDFFormat.RDFXML,
+                                false/* verifyData */, true/* commit */);
                 
 //                InputStream rdfStream = new BufferedInputStream(
 //                        new FileInputStream(file));

@@ -77,6 +77,10 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDFS inference");
 
+        suite.addTestSuite( TestRuleRdfs07.class );
+        
+        suite.addTestSuite( TestRuleRdfs11.class );
+        
         suite.addTestSuite( TestFullForwardClosure.class );
         
         suite.addTestSuite( TestMagicSets.class);
