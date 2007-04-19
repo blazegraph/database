@@ -41,53 +41,46 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Apr 18, 2007
+ */
+
 package com.bigdata.rdf.inf;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
- * Aggregates test suites into increasing dependency order.
- *
+ * Test suite for {@link RuleRdf01}.
+ * 
+ * <pre>
+ *   triple(?v rdf:type rdf:Property) :-
+ *      triple( ?u ?v ?x ).
+ * </pre>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestRuleRdf01 extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestRuleRdf01() {
     }
 
     /**
-     * @param arg0
+     * @param name
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public TestRuleRdf01(String name) {
+        super(name);
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * FIXME write test of basic rule semantics and then write another test that
+     * can be used to verify that we are doing an efficient scan for the
+     * distinct predicates (key prefix scan).
      */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("RDFS inference");
-
-        suite.addTestSuite( TestRuleRdf01.class );
-
-        suite.addTestSuite( TestRuleRdfs07.class );
+    public void test_rdf01() {
         
-        suite.addTestSuite( TestRuleRdfs11.class );
-        
-        suite.addTestSuite( TestFullForwardClosure.class );
-        
-        suite.addTestSuite( TestMagicSets.class);
-
-        return suite;
+        fail("write test");
         
     }
     
