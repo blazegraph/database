@@ -47,6 +47,11 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import org.openrdf.model.URI;
+import org.openrdf.vocabulary.RDF;
+
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+
 /**
  * Test suite for {@link RuleRdf01}.
  * 
@@ -74,14 +79,74 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
     }
 
     /**
-     * FIXME write test of basic rule semantics and then write another test that
-     * can be used to verify that we are doing an efficient scan for the
-     * distinct predicates (key prefix scan).
+     * Basic of rule semantics.
      */
     public void test_rdf01() {
         
-        fail("write test");
+        URI A = new _URI("http://www.foo.org/A");
+        URI B = new _URI("http://www.foo.org/B");
+        URI C = new _URI("http://www.foo.org/C");
+
+        URI rdfType = new _URI(RDF.TYPE);
+        URI rdfProperty = new _URI(RDF.PROPERTY);
+
+        store.addStatement(A, B, C);
+
+        assertTrue(store.containsStatement(A, B, C));
+        assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
+
+        applyRule(store.rdf1, 1/* numComputed */, 1/* numCopied */);
         
+        /*
+         * validate the state of the primary store.
+         */
+        assertTrue(store.containsStatement(A, B, C));
+        assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
+        
+    }
+
+    /**
+     * Test that can be used to verify that we are doing an efficient scan for
+     * the distinct predicates (distinct key prefix scan).
+     */
+    public void test_rdf01_distinctPrefixScan() {
+        
+        URI A = new _URI("http://www.foo.org/A");
+        URI B = new _URI("http://www.foo.org/B");
+        URI C = new _URI("http://www.foo.org/C");
+        URI D = new _URI("http://www.foo.org/D");
+        URI E = new _URI("http://www.foo.org/E");
+
+        URI rdfType = new _URI(RDF.TYPE);
+        URI rdfProperty = new _URI(RDF.PROPERTY);
+
+        /*
+         * Three statements that will trigger the rule, but two statements share
+         * the same predicate. When it does the minimum amount of work, the rule
+         * will fire for each distinct predicate in the KB -- for this KB that
+         * is only twice.
+         */
+        store.addStatement(A, B, C);
+        store.addStatement(C, B, D);
+        store.addStatement(A, E, C);
+
+        assertTrue(store.containsStatement(A, B, C));
+        assertTrue(store.containsStatement(C, B, D));
+        assertTrue(store.containsStatement(A, E, C));
+        assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
+        assertFalse(store.containsStatement(E, rdfType, rdfProperty ));
+
+        applyRule(store.rdf1, 2/* numComputed */, 2/* numCopied */);
+        
+        /*
+         * validate the state of the primary store.
+         */
+        assertTrue(store.containsStatement(A, B, C));
+        assertTrue(store.containsStatement(C, B, D));
+        assertTrue(store.containsStatement(A, E, C));
+        assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
+        assertTrue(store.containsStatement(E, rdfType, rdfProperty ));
+     
     }
     
 }

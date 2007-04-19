@@ -43,8 +43,18 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-
-
+/**
+ * rdfs3:
+ * 
+ * <pre>
+ * triple(v rdf:type x) :-
+ *    triple(a rdfs:range x),
+ *    triple(u a v).
+ * </pre>
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class RuleRdfs03 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs03( InferenceEngine store, Var a, Var x, Var u, Var v ) {

@@ -43,10 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import org.openrdf.model.URI;
-
-import com.bigdata.btree.IIndex;
-
 public abstract class AbstractRuleRdf extends Rule {
     
     public AbstractRuleRdf(InferenceEngine store, Triple head, Pred[] body) {

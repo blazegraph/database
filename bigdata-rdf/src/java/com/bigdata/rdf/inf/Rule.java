@@ -177,6 +177,13 @@ abstract public class Rule {
          */
         long computeTime;
         
+        public String toString() {
+            
+            return ", #stmts1=" + stmts1 + ", #stmts2=" + stmts2
+                    + ", #subqueries=" + numSubqueries + ", numConsidered+"
+                    + numConsidered + ", computeTime=" + computeTime;
+        }
+
     }
 
 }

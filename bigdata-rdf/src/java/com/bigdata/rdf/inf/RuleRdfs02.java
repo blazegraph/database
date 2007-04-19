@@ -43,8 +43,16 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-
-
+/**
+ * rdfs2:
+ * <pre>
+ * triple( u rdf:type x) :-
+ *    triple( a rdfs:domain x),
+ *    triple( u a y ).
+ * </pre>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class RuleRdfs02 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs02( InferenceEngine store, Var a, Var x, Var u, Var y ) {

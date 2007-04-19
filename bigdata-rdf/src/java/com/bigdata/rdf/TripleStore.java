@@ -53,6 +53,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
@@ -281,9 +282,9 @@ public class TripleStore extends /*Master*/Journal {
     final String name_termId = "termId";
     final String name_idTerm = "idTerm";
 
-    final String name_spo = "spo";
-    final String name_pos = "pos";
-    final String name_osp = "osp";
+    final String name_spo = KeyOrder.SPO.name;
+    final String name_pos = KeyOrder.POS.name;
+    final String name_osp = KeyOrder.OSP.name;
 
     /*
      * Note: access to the indices through these methods is required to support
@@ -365,6 +366,28 @@ public class TripleStore extends /*Master*/Journal {
 
     }
 
+    /**
+     * Return the statement index identified by the {@link KeyOrder}.
+     * 
+     * @param keyOrder The key order.
+     * 
+     * @return The statement index for that access path.
+     */
+    public IIndex getStatementIndex(KeyOrder keyOrder) {
+
+        switch (keyOrder) {
+        case SPO:
+            return getSPOIndex();
+        case POS:
+            return getPOSIndex();
+        case OSP:
+            return getOSPIndex();
+        default:
+            throw new IllegalArgumentException("Unknown: " + keyOrder);
+        }
+
+    }
+    
     public IIndex getSPOIndex() {
 
         if(ndx_spo!=null) return ndx_spo;
@@ -620,17 +643,25 @@ public class TripleStore extends /*Master*/Journal {
      */
     public String toString( long s, long p, long o ) {
         
+        return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o) +" >");
+        
+    }
+
+    /**
+     * Externalizes a term using an abbreviated syntax.
+     * 
+     * @param termId
+     *            The term identifier.
+     * 
+     * @return A representation of the term.
+     */
+    public String toString( long termId ) {
+        
         IIndex ndx = getIdTermIndex();
         
-        Resource s1 = (Resource) ndx.lookup(keyBuilder.id2key(s));
-         
-        URI p1 = (URI) ndx.lookup(keyBuilder.id2key(p));
-         
-        Value o1 = (Value) ndx.lookup(keyBuilder.id2key(o));
-         
-        return ("< " + (s1 instanceof URI ? abbrev((URI) s1) : s1) + ", "
-                + abbrev(p1) + ", "
-                + (o1 instanceof URI ? abbrev((URI) o1) : o1) + " >");
+        Value v = (Value) ndx.lookup(keyBuilder.id2key(termId));
+        
+        return (v instanceof URI ? abbrev((URI) v) : v.toString());
         
     }
     
@@ -1857,6 +1888,81 @@ public class TripleStore extends /*Master*/Journal {
 //                        + " secs, rate= "
 //                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
 
+    }
+    
+    /**
+     * Performs an efficient scan of a statement index returning the distinct
+     * term identifiers found in the first key component for the named access
+     * path. Depending on which access path you are using, this will be the term
+     * identifiers for the distinct subjects, predicates, or values in the KB.
+     * 
+     * @param keyOrder
+     *            Names the access path. Use {@link KeyOrder#SPO} to get the
+     *            term identifiers for the distinct subjects,
+     *            {@link KeyOrder#POS} to get the term identifiers for the
+     *            distinct predicates, and {@link KeyOrder#OSP} to get the term
+     *            identifiers for the distinct objects
+     * 
+     * @return The distinct term identifiers in the first key slot for the
+     *         triples in that index.
+     */
+    public ArrayList<Long> distinctTermScan(KeyOrder keyOrder) {
+
+        /*
+         * The implementation uses a key scan to find the first term identifer
+         * for the given index. It then forms a fromKey that starts at the next
+         * possible term identifier and does another scan, thereby obtaining the
+         * 2nd distinct term identifier for that position on that index. This
+         * process is repeated iteratively until the key scan no longer
+         * identifies a match. This approach skips quickly over regions of the
+         * index which have many statements for the same term and makes N+1
+         * queries to identify N distinct terms.  Note that there is no way to
+         * pre-compute the #of distinct terms that will be identified short of
+         * running the queries.
+         */
+        ArrayList<Long> ids = new ArrayList<Long>(1000);
+        
+        byte[] fromKey = null;
+        
+        final byte[] toKey = null;
+        
+        IIndex ndx = getStatementIndex(keyOrder);
+        
+        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+        
+        long[] tmp = new long[3];
+        
+        while(itr.hasNext()) {
+            
+            itr.next();
+            
+            // extract the term ids from the key. 
+            keyBuilder.key2Statement(itr.getKey(), tmp); 
+
+            final long id = tmp[0];
+            
+            // append tmp[0] to the output list.
+            ids.add(id);
+
+//            System.err.println(ids.size() + " : " + id + " : "
+//                    + toString(id));
+            
+            // restart scan at the next possible term id.
+
+            final long nextId = id + 1;
+            
+            fromKey = keyBuilder.statement2Key(nextId, NULL, NULL);
+            
+            // new iterator.
+            itr = ndx.rangeIterator(fromKey, toKey);
+            
+        }
+        
+//        System.err.println("Distinct key scan: KeyOrder=" + keyOrder
+//                + ", #terms=" + ids.size());
+        
+        return ids;
+        
     }
     
 }
