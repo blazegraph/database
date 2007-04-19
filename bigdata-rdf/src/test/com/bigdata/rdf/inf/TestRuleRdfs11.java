@@ -50,8 +50,6 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 
 /**
@@ -75,6 +73,9 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         super(name);
     }
 
+    /**
+     * Simple test verifies inference of a subclassof entailment.
+     */
     public void test_rdfs11() {
 
         URI A = new _URI("http://www.foo.org/A");

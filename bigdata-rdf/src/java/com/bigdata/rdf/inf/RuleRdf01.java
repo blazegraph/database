@@ -43,7 +43,9 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.btree.IEntryIterator;
+import java.util.ArrayList;
+import java.util.Iterator;
+
 import com.bigdata.rdf.KeyOrder;
 
 /**
@@ -69,44 +71,66 @@ public class RuleRdf01 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
         
-        long lastP = -1;
-        
-        /*
-         * This is essentially doing a "select distinct predicate".
-         * 
-         * FIXME there should be a lighter weight way of achieving this result.
-         * One way would be to create a "predicates" index that had each
-         * distinct predicate (further denormalizing the schema and requiring
-         * maintenance). Another approach is to restart the iterator each time a
-         * predicate [p] is found by computing the fromKey as [p+1] thereby
-         * skipping over all intervening statements in the index (consider how
-         * to distribute that query in parallel).
-         * 
-         * @todo write a test for this rule and then write an optimized variant
-         * using the incremented toKey approach.
-         */
-        IEntryIterator it = store.getPOSIndex().rangeIterator(null,null); 
-        
-        while ( it.hasNext() ) {
+//        if (false) {
+//            
+//            /*
+//             * Original implementation does a full scan of all statements in the
+//             * KB.
+//             */
+//            
+//            long lastP = NULL;
+//
+//            IEntryIterator it = store.getPOSIndex().rangeIterator(null, null);
+//
+//            while (it.hasNext()) {
+//
+//                it.next();
+//
+//                stats.stmts1++;
+//
+//                SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
+//
+//                if (stmt.p != lastP) {
+//
+//                    lastP = stmt.p;
+//
+//                    stats.numComputed++;
+//
+//                    System.err.println("" + stats.numComputed + " : " + lastP
+//                            + " : " + store.toString(lastP));
+//
+//                    buffer.add(new SPO(stmt.p, store.rdfType.id,
+//                            store.rdfProperty.id));
+//
+//                }
+//
+//            }
+//            
+//        } else {
             
-            it.next();
+            /*
+             * Alternative implementation does an efficient scan for only the
+             * distinct predicates in the KB.
+             */
             
-            stats.stmts1++;
-            
-            SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
-            
-            if ( stmt.p != lastP ) {
-                
-                lastP = stmt.p;
+            // find the distinct predicates in the KB.
+            ArrayList<Long> ids = store.distinctTermScan(KeyOrder.POS);
 
-                buffer.add(new SPO(stmt.p, store.rdfType.id,
-                        store.rdfProperty.id));
-                
+            Iterator<Long> itr = ids.iterator();
+
+            while (itr.hasNext()) {
+
+                stats.stmts1++;
+
+                long p = itr.next();
+
+                buffer.add(new SPO(p, store.rdfType.id, store.rdfProperty.id));
+
                 stats.numComputed++;
-                
+
             }
-            
-        }
+
+//        }
         
         stats.computeTime += System.currentTimeMillis() - computeStart;
         

@@ -55,6 +55,12 @@ package com.bigdata.rdf;
  */
 public enum KeyOrder {
 
+    /**
+     * @todo make the case of the index name and the case of the enums the same
+     *       (either both upper or both lower). Enums naturally convert to
+     *       strings based on their case, so SPO.toString() is "SPO" but
+     *       SPO.name is "spo", which is confusing.
+     */
     SPO("spo",0),
     POS("pos",1),
     OSP("osp",2);
