@@ -104,8 +104,6 @@ import com.ibm.icu.text.RuleBasedCollator;
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @todo verify that re-loading the same data does not cause index writes.
- * 
  * @todo Refactor to support transactions and concurrent load/query and test
  *       same.
  *       <p>
@@ -152,20 +150,23 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       to ensure that bnode identifiers are distinct or the same when and
  *       where appropriate, so we need to assign identifiers to bnodes in a
  *       restart-safe manner even if we "forget" the term-id mapping.
- *       
+ * 
  * @todo modify the term identifier assignment mechanism to be compatible with
  *       the scale-out index partitions (32-bit unique within index partition
- *       identified plus a restart-safe counter for each index partition). 
+ *       identified plus a restart-safe counter for each index partition).
  * 
  * @todo Refactor to use a delegation mechanism so that we can run with or
  *       without partitioned indices? (All you have to do now is change the
  *       class that is being extended from Journal to MasterJournal and handle
- *       some different initialization properties.)
+ *       some different initialization properties.) In fact, the "triple store"
+ *       should be a client that uses partitioned indices to talk to metadata
+ *       and data services.
  * 
  * @todo the only added cost for a quad store is the additional statement
  *       indices. There are only three more statement indices in a quad store.
  *       Since statement indices are so cheap, it is probably worth implementing
- *       them now, even if only as a configuration option.
+ *       them now, even if only as a configuration option. (There may be reasons
+ *       to maintain both versions.)
  * 
  * @todo verify read after commit (restart safe) for large data sets and test
  *       re-load rate for a data set and verify that no new statements are
@@ -183,12 +184,10 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       order to reduce unicode conversions.
  * 
  * @todo support metadata about the statement, e.g., whether or not it is an
- *       inference.
- * 
- * @todo compute the MB/sec rate at which the store can load data and compare it
- *       with the maximum transfer rate for the journal without the btree and
- *       the maximum transfer rate to disk. this will tell us the overhead of
- *       the btree implementation.
+ *       inference.  consider that we may need to move the triple/quad ids into
+ *       the value in the statement indices since some key compression schemes
+ *       are not reversable (we depend on reversable keys to extract the term 
+ *       ids for a statement). 
  * 
  * @todo Try a variant in which we have metadata linking statements and terms
  *       together. In this case we would have to go back to the terms and update
@@ -215,6 +214,27 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       the #of index tests that you had to do. So, handling entailments and
  *       efficient joins for high-level query languages would be the two places
  *       for more thought.
+ * 
+ * @todo examine role for semi joins for a Sesame 2.x integration (quad store
+ *       with real query operators). semi-joins (join indices) can be declared
+ *       for various predicate combinations and then maintained. The
+ *       declarations can be part of the scale-out index metadata. The logic
+ *       that handles batch data load can also maintain the join indices. While
+ *       triggers could be used for this purpose, there would need to be a means
+ *       to aggregate and order the triggered events and then redistribute them
+ *       against the partitions of the join indices. If the logic is in the
+ *       client, then we need to make sure that newly declared join indices are
+ *       fully populated (e.g., clients are notified to start building the join
+ *       index and then we start the index build from existing data to remove
+ *       any chance that the join index would be incomplete - the index would be
+ *       ready as soon as the index build completes and client operations would
+ *       be in a maintenance role).
+ * 
+ * @todo provide option for closing aspects of the entire store vs just a single
+ *       context in a quad store. For example, in an open web and internet scale
+ *       kb it is unlikely that you would want to have all harvested ontologies
+ *       closed against all the data. however, that might make more sense in a
+ *       more controlled setting.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
