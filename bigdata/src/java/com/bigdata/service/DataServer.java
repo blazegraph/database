@@ -51,21 +51,15 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.Properties;
 
+import net.jini.config.Configuration;
+
 import com.bigdata.journal.IJournal;
 import com.sun.jini.start.LifeCycle;
 
 /**
  * The bigdata data server.
  * 
- * @todo reduce the permissions required to start the server with the server
- *       starter.
- * 
  * @see src/resources/config for sample configurations.
- * 
- * @todo write tests against an standalone installation and then see what it
- *       looks like when the data services are running on more than one host.
- *       note that unisolated operations can be tested without a transaction
- *       server.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,7 +67,10 @@ import com.sun.jini.start.LifeCycle;
 public class DataServer extends AbstractServer {
 
     /**
+     * Creates a new {@link DataServer}.
+     * 
      * @param args
+     *            The name of the {@link Configuration} file for the service.
      */
     public DataServer(String[] args) {
 
@@ -87,6 +84,12 @@ public class DataServer extends AbstractServer {
         
     }
 
+    /**
+     * Starts a new {@link DataServer}.
+     *  
+     * @param args
+     *            The name of the {@link Configuration} file for the service.
+     */
     public static void main(String[] args) {
         
         new DataServer(args).run();
@@ -103,7 +106,7 @@ public class DataServer extends AbstractServer {
      * Extends the behavior to close and delete the journal in use by the data
      * service.
      */
-    protected void destroy() {
+    public void destroy() {
 
         DataService service = (DataService)impl;
         

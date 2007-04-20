@@ -184,6 +184,15 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     protected Remote proxy;
 
     private boolean open = false;
+
+    /**
+     * Return the assigned {@link ServiceID}.
+     */
+    public ServiceID getServiceID() {
+        
+        return serviceID;
+        
+    }
     
     /**
      * The object used to inform the hosting environment that the server is
@@ -459,6 +468,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         log.info("serviceID=" + serviceID);
 
+        this.serviceID = serviceID;
+        
         if (serviceIdFile != null) {
             
             try {
@@ -648,7 +659,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      * Concrete subclasses SHOULD extend this method to destroy their persistent
      * state.
      */
-    protected void destroy() {
+    public void destroy() {
 
         shutdownNow();
         

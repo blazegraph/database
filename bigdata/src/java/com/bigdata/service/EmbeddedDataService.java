@@ -55,7 +55,7 @@ import java.util.concurrent.Executors;
 
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.service.DataService.RangeQueryResult;
+import com.bigdata.service.DataService.ResultSet;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -70,7 +70,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       {@link DataService} and {@link TransactionService} instance together
  *       using delegation patterns).
  */
-public class EmbeddedDataService implements IDataService, IServiceShutdown {
+abstract public class EmbeddedDataService implements IDataService, IServiceShutdown {
 
     private final DataService delegate;
     
@@ -117,9 +117,9 @@ public class EmbeddedDataService implements IDataService, IServiceShutdown {
 //        delegate.map(tx, name, fromKey, toKey, op);
 //    }
 
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException {
-        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
-    }
+//    public ResultSet rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException {
+//        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
+//    }
 
     public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException {
         delegate.submit(tx, proc);
