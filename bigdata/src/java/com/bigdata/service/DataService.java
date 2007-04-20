@@ -47,9 +47,7 @@ Modifications:
 
 package com.bigdata.service;
 
-import java.io.Externalizable;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
@@ -64,10 +62,8 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IBatchOp;
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IReadOnlyBatchOp;
@@ -1031,127 +1027,6 @@ public class DataService implements IDataService,
         
     }
 
-    /**
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo implement {@link Externalizable}, probably buffer the
-     * {@link ObjectOutputStream} and focus on byte[] transfers.
-     */
-    public static class ResultSet implements Serializable {
-        
-        /**
-         * Total #of key-value pairs within the key range (approximate).
-         */
-        public final int rangeCount;
-        
-        /**
-         * Actual #of key-value pairs in the {@link ResultSet}
-         */
-        public final int ntuples;
-
-        /**
-         * True iff the iterator exhausted the available keys such that no more
-         * results would be available if you formed the successor of the
-         * {@link #lastKey}.
-         */
-        final public boolean exhausted;
-            
-        /**
-         * The last key visited by the iterator <em>regardless</em> of the
-         * filter imposed -or- <code>null</code> iff no keys were visited by
-         * the iterator for the specified key range.
-         * 
-         * @see #nextKey()
-         */
-        public final byte[] lastKey;
-
-        /**
-         * The next key that should be used to retrieve keys and/or values
-         * starting from the first possible successor of the {@link #lastKey}
-         * visited by the iterator in this operation (the successor is formed by
-         * appending a <code>nul</code> byte to the {@link #lastKey}).
-         * 
-         * @return The successor of {@link #lastKey} -or- <code>null</code>
-         *         iff the iterator exhausted the available keys.
-         * 
-         * @exception UnsupportedOperationException
-         *                if the {@link #lastKey} is <code>null</code>.
-         */
-        public byte[] nextKey() {
-            
-            if (lastKey == null)
-                throw new UnsupportedOperationException();
-            
-            return BytesUtil.successor(lastKey);
-            
-        }
-        
-        /**
-         * The visited keys iff the {@link RangeQueryEnum#Keys} flag was set.
-         */
-        public final byte[][] keys;
-
-        /**
-         * The visited values iff the {@link RangeQueryEnum#Values} flag was
-         * set.
-         */
-        public final byte[][] vals;
-
-        public ResultSet(final IIndex ndx, final byte[] fromKey,
-                final byte[] toKey, final int capacity, final boolean sendKeys,
-                final boolean sendVals) {
-
-            // The upper bound on the #of key-value pairs in the range.
-            rangeCount = ndx.rangeCount(fromKey, toKey);
-
-            final int limit = (rangeCount > capacity ? capacity : rangeCount);
-
-            int ntuples = 0;
-
-            keys = (sendKeys ? new byte[limit][] : null);
-
-            vals = (sendVals ? new byte[limit][] : null);
-
-            // iterator that will visit the key range.
-            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
-
-            /*
-             * true if any keys were visited regardless of whether or not they
-             * satisified the optional filter. This is used to make sure that we
-             * always return the lastKey visited if any keys were visited and
-             * otherwise set lastKey := null.
-             */
-            boolean anything = false;
-
-            while (ntuples < limit && itr.hasNext()) {
-
-                anything = true;
-                
-                byte[] val = (byte[]) itr.next();
-                
-                if (sendVals)
-                    vals[ntuples] = val;
-
-                if (sendKeys)
-                    keys[ntuples] = itr.getKey();
-
-                // #of results that will be returned.
-                ntuples++;
-
-            }
-
-            this.ntuples = ntuples;
-
-            this.lastKey = (anything ? itr.getKey() : null);
-            
-            this.exhausted = ! itr.hasNext();
-            
-        }
-
-    }
-   
     /**
      * Abstract class for tasks that execute {@link IProcedure} operations.
      * There are various concrete subclasses, each of which MUST be submitted to

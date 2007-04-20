@@ -55,7 +55,6 @@ import java.util.concurrent.Executors;
 
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.service.DataService.ResultSet;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
