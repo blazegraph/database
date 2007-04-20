@@ -58,7 +58,6 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
-import com.bigdata.service.DataService.ResultSet;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -174,6 +173,8 @@ public class TestDataServer0 extends TestCase2 {
      * dropping the B+Tree.
      * 
      * @throws Exception
+     * 
+     * @todo test {@link IDataService#submit(long, IProcedure)}.
      */
     public void test_serverRunning() throws Exception {
 
@@ -225,14 +226,16 @@ public class TestDataServer0 extends TestCase2 {
         ResultSet rset = proxy.rangeQuery(IDataService.UNISOLATED, name, null,
                 null, 100, flags );
         
-        assertEquals("rangeCount",1,rset.rangeCount);
-        assertEquals("ntuples",1,rset.ntuples);
-        assertTrue("exhausted",rset.exhausted);
-        assertEquals("lastKey",new byte[]{1},rset.lastKey);
-        assertEquals("keys.length",1,rset.keys.length);
-        assertEquals(new byte[]{1},rset.keys[0]);
-        assertEquals("vals.length",1,rset.vals.length);
-        assertEquals(new byte[]{1},rset.vals[0]);
+        assertEquals("rangeCount",1,rset.getRangeCount());
+        assertEquals("ntuples",1,rset.getNumTuples());
+        assertTrue("exhausted",rset.isExhausted());
+        assertEquals("lastKey",new byte[]{1},rset.getLastKey());
+        assertNotNull("keys",rset.getKeys());
+        assertEquals("keys.length",1,rset.getKeys().length);
+        assertEquals(new byte[]{1},rset.getKeys()[0]);
+        assertNotNull("vals",rset.getValues());
+        assertEquals("vals.length",1,rset.getValues().length);
+        assertEquals(new byte[]{1},rset.getValues()[0]);
         
         // remove key that exists, verifying the returned values.
         values = proxy.batchRemove(IDataService.UNISOLATED, name, 2,

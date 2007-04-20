@@ -51,7 +51,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITxCommitProtocol;
-import com.bigdata.service.DataService.ResultSet;
 
 /**
  * Data service interface.

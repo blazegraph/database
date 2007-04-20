@@ -53,7 +53,6 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.service.DataService.ResultSet;
 
 /**
  * Client facing interface for communications with a data service.
