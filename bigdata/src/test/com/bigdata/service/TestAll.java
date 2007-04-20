@@ -56,7 +56,6 @@ import junit.framework.TestSuite;
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-
 public class TestAll extends TestCase {
 
     public TestAll() {}
@@ -70,7 +69,13 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestServiceDiscovery.class );
 
-//        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
+        /*
+         * Test of a single client talking to a single data service instance
+         * without the use of the metadata service or a transaction manager.
+         */
+        suite.addTestSuite( TestDataServer0.class );
+
+        //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
         return suite;
         

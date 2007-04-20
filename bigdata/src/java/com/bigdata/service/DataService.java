@@ -47,10 +47,14 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -60,6 +64,7 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.btree.IEntryIterator;
@@ -67,9 +72,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IReadOnlyBatchOp;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -344,17 +349,87 @@ public class DataService implements IDataService,
         return tx.isReadOnly();
         
     }
+
+    public void registerIndex(String name,UUID indexUUID) {
+        
+        journal.serialize(new RegisterIndexTask(name,indexUUID));
+        
+    }
+    
+    public void dropIndex(String name) {
+        
+        journal.serialize(new DropIndexTask(name));
+        
+    }
+    
+    public void batchInsert(long tx, String name, int ntuples, byte[][] keys,
+            byte[][] vals) throws InterruptedException, ExecutionException {
+        
+        batchOp( tx, name, new BatchInsert(ntuples, keys, vals));
+        
+    }
+
+    public boolean[] batchContains(long tx, String name, int ntuples, byte[][] keys
+            ) throws InterruptedException, ExecutionException {
+        
+        BatchContains op = new BatchContains(ntuples, keys, new boolean[ntuples]);
+        
+        batchOp( tx, name, op );
+
+        return op.contains;
+        
+    }
+    
+    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
+            throws InterruptedException, ExecutionException {
+        
+        BatchLookup op = new BatchLookup(ntuples,keys,new byte[ntuples][]);
+        
+        batchOp(tx, name, op);
+        
+        return (byte[][])op.values;
+        
+    }
+    
+    public byte[][] batchRemove(long tx, String name, int ntuples,
+            byte[][] keys, boolean returnOldValues)
+            throws InterruptedException, ExecutionException {
+        
+        BatchRemove op = new BatchRemove(ntuples,keys,new byte[ntuples][]);
+        
+        batchOp(tx, name, op);
+        
+        return returnOldValues ? (byte[][])op.values : null;
+        
+    }
     
     /**
+     * Executes a batch operation on a named btree.
      * 
-     * @todo the state of the op is changed as a side effect and needs to be
-     *       communicated back to a remote client. Also, the remote client does
-     *       not need to send uninitialized data across the network when the
-     *       batch operation will use the data purely for a response - we can
-     *       just initialize the data fields on this side of the interface and
-     *       then send them back across the network api.
+     * @param tx
+     *            The transaction identifier -or- zero (0L) IFF the operation is
+     *            NOT isolated by a transaction.
+     * @param name
+     *            The index name (required).
+     * @param op
+     *            The batch operation.
+     * 
+     * @exception InterruptedException
+     *                if the operation was interrupted (typically by
+     *                {@link #shutdownNow()}.
+     * @exception ExecutionException
+     *                If the operation caused an error. See
+     *                {@link ExecutionException#getCause()} for the underlying
+     *                error.
+     * 
+     * @todo it is possible to have concurrent execution of batch operations for
+     *       distinct indices. In order to support this, the write thread would
+     *       have to become a pool of N worker threads fed from a queue of
+     *       operations. Concurrent writers can execute as long as they are
+     *       writing on different indices. (Concurrent readers can execute as
+     *       long as they are reading from a historical commit time.)
      */
-    public void batchOp(long tx, String name, IBatchOp op)
+    protected void batchOp(long tx, String name, IBatchOp op)
             throws InterruptedException, ExecutionException {
         
         if( name == null ) throw new IllegalArgumentException();
@@ -414,23 +489,68 @@ public class DataService implements IDataService,
         }
 
     }
+
+    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+            throws InterruptedException, ExecutionException {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        final RangeCountTask task = new RangeCountTask(tx, name, fromKey, toKey);
+
+        final boolean isolated = tx != 0L;
+
+        if (isolated) {
+
+            return (Integer) readService.submit(task).get();
+
+        } else {
+
+            return (Integer) journal.serialize(task).get();
+
+        }
+
+    }
     
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int flags) throws InterruptedException, ExecutionException {
+    /**
+     * 
+     * FIXME the iterator needs to be aware of the defintion of a "row" for the
+     * sparse row store so that we can respect the atomic guarentee for reads as
+     * well as writes.
+     * 
+     * FIXME support filters. there are a variety of use cases from clients that
+     * are aware of version counters and delete markers to clients that encode a
+     * column name and datum or write time into the key to those that will
+     * filter based on inspection of the value associated with the key, e.g.,
+     * only values having some attribute.
+     * 
+     * @todo if we allow the filter to cause mutations (e.g., deleting matching
+     *       entries) then we have to examine the operation to determine whether
+     *       or not we need to use the {@link #txService} or the
+     *       {@link #readService}
+     */
+    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
+            byte[] toKey, int capacity, int flags) throws InterruptedException, ExecutionException {
 
         if( name == null ) throw new IllegalArgumentException();
         
-        if (tx == 0L)
-            throw new UnsupportedOperationException(
-                    "Unisolated context not allowed");
+        final RangeQueryTask task = new RangeQueryTask(tx, name, fromKey,
+                toKey, capacity, flags);
+
+        final boolean isolated = tx != 0L;
         
-        RangeQueryResult result = (RangeQueryResult) txService.submit(
-                new RangeQueryTask(tx, name, fromKey, toKey, flags)).get();
-        
-        return result;
+        if(isolated) {
+            
+            return (ResultSet) readService.submit(task).get();
+            
+        } else {
+            
+            return (ResultSet) journal.serialize(task).get();
+            
+        }
         
     }
-
+    
 //    /**
 //     * @todo if unisolated or isolated at the read-commit level, then the
 //     *       operation really needs to be broken down by partition or perhaps by
@@ -457,7 +577,7 @@ public class DataService implements IDataService,
 //            
 //            int flags = 0; // @todo set to deliver keys + values for map op.
 //            
-//            RangeQueryResult result = (RangeQueryResult) txService.submit(
+//            ResultSet result = (ResultSet) txService.submit(
 //                new RangeQueryTask(tx, name, fromKey, toKey, flags)).get();
 //
 //            // @todo resolve the reducer service.
@@ -466,6 +586,87 @@ public class DataService implements IDataService,
 //            op.apply(result.itr, reducer);
 //            
 //    }
+
+    /**
+     * 
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private abstract class AbstractIndexManagementTask implements Callable<Object> {
+
+        protected final String name;
+
+        protected AbstractIndexManagementTask(String name) {
+        
+            if(name==null) throw new IllegalArgumentException();
+
+            this.name = name;
+        
+        }
+
+    }
+
+    private class RegisterIndexTask extends AbstractIndexManagementTask {
+
+        protected final UUID indexUUID;
+        
+        public RegisterIndexTask(String name,UUID indexUUID) {
+
+            super(name);
+            
+            if(indexUUID==null) throw new IllegalArgumentException();
+            
+            this.indexUUID = indexUUID;
+            
+        }
+        
+        public Object call() throws Exception {
+
+            IIndex ndx = journal.getIndex(name);
+            
+            if(ndx != null) {
+                
+                if(!ndx.getIndexUUID().equals(indexUUID)) {
+                    
+                    throw new IllegalStateException(
+                            "Index already registered with that name and a different indexUUID");
+                    
+                }
+
+                return ndx;
+                
+            }
+            
+            ndx = journal.registerIndex(name, new UnisolatedBTree(journal, indexUUID));
+
+            journal.commit();
+            
+            return ndx;
+            
+        }
+        
+    }
+    
+    private class DropIndexTask extends AbstractIndexManagementTask {
+
+        public DropIndexTask(String name) {
+            
+            super(name);
+            
+        }
+        
+        public Object call() throws Exception {
+
+            journal.dropIndex(name);
+            
+            journal.commit();
+            
+            return null;
+            
+        }
+        
+    }
     
     /**
      * Abstract class for tasks that execute batch api operations. There are
@@ -649,50 +850,68 @@ public class DataService implements IDataService,
         
     }
 
-    private class RangeQueryTask implements Callable<Object> {
+    private class RangeCountTask implements Callable<Object> {
 
+        // startTime or 0L iff unisolated.
+        private final long startTime;
         private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
-        private final int flags;
         
         private final ITx tx;
 
-        public RangeQueryTask(long startTime, String name, byte[] fromKey,
-                byte[] toKey, int flags) {
+        public RangeCountTask(long startTime, String name, byte[] fromKey,
+                byte[] toKey) {
             
-            assert startTime != 0L;
+            this.startTime = startTime;
             
-            tx = journal.getTx(startTime);
-            
-            if (tx == null) {
+            if(startTime != 0L) {
+                
+                /*
+                 * Isolated read.
+                 */
+                
+                tx = journal.getTx(startTime);
+                
+                if (tx == null) {
 
-                throw new IllegalStateException("Unknown tx");
+                    throw new IllegalStateException("Unknown tx");
+                    
+                }
                 
-            }
-            
-            if (!tx.isActive()) {
+                if (!tx.isActive()) {
+                    
+                    throw new IllegalStateException("Tx not active");
+                    
+                }
                 
-                throw new IllegalStateException("Tx not active");
+            } else {
                 
-            }
-            
-            if( tx.getIsolationLevel() == IsolationEnum.ReadCommitted ) {
-                
-                throw new UnsupportedOperationException("Read-committed not supported");
+                /*
+                 * Unisolated read.
+                 */
+
+                tx = null;
                 
             }
             
             this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
-            this.flags = flags;
             
         }
         
         public IIndex getIndex(String name) {
             
-            return tx.getIndex(name);
+            if(tx==null) {
+             
+                return journal.getIndex(name);
+                
+            } else {
+
+                return tx.getIndex(name);
+                
+            }
 
         }
 
@@ -700,60 +919,243 @@ public class DataService implements IDataService,
             
             IIndex ndx = getIndex(name);
             
-            final int count = ndx.rangeCount(fromKey, toKey); 
+            if(ndx==null) {
+                
+                throw new IllegalStateException("No such index: "+name);
+                
+            }
 
-            boolean countOnly = false;
-            
-            final IEntryIterator itr = (countOnly ? null : ndx.rangeIterator(
-                    fromKey, toKey));
-            
-            return new RangeQueryResult(count, itr, tx.getStartTimestamp(),
-                    name, fromKey, toKey, flags);
+            return new Integer(ndx.rangeCount(fromKey, toKey));
             
         }
         
     }
-    
-    /**
-     * @todo must keep track of the open iterators on the transaction and
-     *       invalidate them once the transaction completes.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class RangeQueryResult {
-        
-        public final int count;
-        
-        public final IEntryIterator itr;
 
-        public final long startTime;
-        public final String name;
-        public final byte[] fromKey;
-        public final byte[] toKey;
-        public final int flags;
+    private class RangeQueryTask implements Callable<Object> {
 
-        public RangeQueryResult(int count, IEntryIterator itr, long startTime,  String name,
-                byte[] fromKey, byte[] toKey, int flags) {
-            
-            this.count = count;
-            
-            this.itr = itr;
+        // startTime or 0L iff unisolated.
+        private final long startTime;
+        private final String name;
+        private final byte[] fromKey;
+        private final byte[] toKey;
+        private final int capacity;
+        private final int flags;
+        
+        private final ITx tx;
+
+        public RangeQueryTask(long startTime, String name, byte[] fromKey,
+                byte[] toKey, int capacity, int flags) {
             
             this.startTime = startTime;
+            
+            if(startTime != 0L) {
+                
+                /*
+                 * Isolated read.
+                 */
+                
+                tx = journal.getTx(startTime);
+                
+                if (tx == null) {
+
+                    throw new IllegalStateException("Unknown tx");
+                    
+                }
+                
+                if (!tx.isActive()) {
+                    
+                    throw new IllegalStateException("Tx not active");
+                    
+                }
+                
+//                if( tx.getIsolationLevel() == IsolationEnum.ReadCommitted ) {
+//                    
+//                    throw new UnsupportedOperationException("Read-committed not supported");
+//                    
+//                }
+                
+            } else {
+                
+                /*
+                 * Unisolated read.
+                 */
+
+                tx = null;
+                
+            }
+            
             this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
+            this.capacity = capacity;
             this.flags = flags;
+            
+        }
+        
+        public IIndex getIndex(String name) {
+            
+            if(tx==null) {
+             
+                return journal.getIndex(name);
+                
+            } else {
 
+                return tx.getIndex(name);
+                
+            }
+
+        }
+
+        public Object call() throws Exception {
+            
+            IIndex ndx = getIndex(name);
+            
+            if(ndx==null) {
+                
+                throw new IllegalStateException("No such index: "+name);
+                
+            }
+
+            final boolean sendKeys = (flags & KEYS) != 0;
+            
+            final boolean sendVals = (flags & VALS) != 0;
+            
+            /*
+             * setup iterator since we will visit keys and/or values in the key
+             * range.
+             */
+            return new ResultSet(ndx, fromKey, toKey, capacity, sendKeys,
+                    sendVals);
+            
         }
         
     }
-    
+
     /**
-     * Abstract class for tasks that execute batch api operations. There are
-     * various concrete subclasses, each of which MUST be submitted to the
-     * appropriate service for execution.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo implement {@link Externalizable}, probably buffer the
+     * {@link ObjectOutputStream} and focus on byte[] transfers.
+     */
+    public static class ResultSet implements Serializable {
+        
+        /**
+         * Total #of key-value pairs within the key range (approximate).
+         */
+        public final int rangeCount;
+        
+        /**
+         * Actual #of key-value pairs in the {@link ResultSet}
+         */
+        public final int ntuples;
+
+        /**
+         * True iff the iterator exhausted the available keys such that no more
+         * results would be available if you formed the successor of the
+         * {@link #lastKey}.
+         */
+        final public boolean exhausted;
+            
+        /**
+         * The last key visited by the iterator <em>regardless</em> of the
+         * filter imposed -or- <code>null</code> iff no keys were visited by
+         * the iterator for the specified key range.
+         * 
+         * @see #nextKey()
+         */
+        public final byte[] lastKey;
+
+        /**
+         * The next key that should be used to retrieve keys and/or values
+         * starting from the first possible successor of the {@link #lastKey}
+         * visited by the iterator in this operation (the successor is formed by
+         * appending a <code>nul</code> byte to the {@link #lastKey}).
+         * 
+         * @return The successor of {@link #lastKey} -or- <code>null</code>
+         *         iff the iterator exhausted the available keys.
+         * 
+         * @exception UnsupportedOperationException
+         *                if the {@link #lastKey} is <code>null</code>.
+         */
+        public byte[] nextKey() {
+            
+            if (lastKey == null)
+                throw new UnsupportedOperationException();
+            
+            return BytesUtil.successor(lastKey);
+            
+        }
+        
+        /**
+         * The visited keys iff the {@link RangeQueryEnum#Keys} flag was set.
+         */
+        public final byte[][] keys;
+
+        /**
+         * The visited values iff the {@link RangeQueryEnum#Values} flag was
+         * set.
+         */
+        public final byte[][] vals;
+
+        public ResultSet(final IIndex ndx, final byte[] fromKey,
+                final byte[] toKey, final int capacity, final boolean sendKeys,
+                final boolean sendVals) {
+
+            // The upper bound on the #of key-value pairs in the range.
+            rangeCount = ndx.rangeCount(fromKey, toKey);
+
+            final int limit = (rangeCount > capacity ? capacity : rangeCount);
+
+            int ntuples = 0;
+
+            keys = (sendKeys ? new byte[limit][] : null);
+
+            vals = (sendVals ? new byte[limit][] : null);
+
+            // iterator that will visit the key range.
+            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+
+            /*
+             * true if any keys were visited regardless of whether or not they
+             * satisified the optional filter. This is used to make sure that we
+             * always return the lastKey visited if any keys were visited and
+             * otherwise set lastKey := null.
+             */
+            boolean anything = false;
+
+            while (ntuples < limit && itr.hasNext()) {
+
+                anything = true;
+                
+                byte[] val = (byte[]) itr.next();
+                
+                if (sendVals)
+                    vals[ntuples] = val;
+
+                if (sendKeys)
+                    keys[ntuples] = itr.getKey();
+
+                // #of results that will be returned.
+                ntuples++;
+
+            }
+
+            this.ntuples = ntuples;
+
+            this.lastKey = (anything ? itr.getKey() : null);
+            
+            this.exhausted = ! itr.hasNext();
+            
+        }
+
+    }
+   
+    /**
+     * Abstract class for tasks that execute {@link IProcedure} operations.
+     * There are various concrete subclasses, each of which MUST be submitted to
+     * the appropriate service for execution.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

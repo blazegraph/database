@@ -183,6 +183,16 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
     
     }
     
+    /**
+     * Builds the entailed triple from the matched triples.
+     * 
+     * @param stmt1
+     *            The match on the 1st triple pattern.
+     * @param stmt2
+     *            The match on the 2nd triple pattern.
+     *            
+     * @return The entailed triple.
+     */
     protected abstract SPO buildStmt3( SPO stmt1, SPO stmt2 );
 
 }

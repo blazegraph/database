@@ -53,7 +53,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.service.DataService.RangeQueryResult;
+import com.bigdata.service.DataService.ResultSet;
 
 /**
  * Client facing interface for communications with a data service.
@@ -65,7 +65,7 @@ import com.bigdata.service.DataService.RangeQueryResult;
  *       Only remote data service instances discovered via the metadata locator
  *       service will support a scale-out solution.
  */
-public class DataServiceClient implements IDataService {
+abstract public class DataServiceClient implements IDataService {
 
     final IDataService delegate;
     
@@ -104,13 +104,13 @@ public class DataServiceClient implements IDataService {
 
     }
 
-    public void batchOp(long tx, String name, IBatchOp op) throws InterruptedException, ExecutionException, IOException {
-        delegate.batchOp(tx, name, op);
-    }
-
-    public RangeQueryResult rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException, IOException {
-        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
-    }
+//    public void batchOp(long tx, String name, IBatchOp op) throws InterruptedException, ExecutionException, IOException {
+//        delegate.batchOp(tx, name, op);
+//    }
+//
+//    public ResultSet rangeQuery(long tx, String name, byte[] fromKey, byte[] toKey, int flags) throws InterruptedException, ExecutionException, IOException {
+//        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
+//    }
 
     public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException, IOException {
         delegate.submit(tx, proc);

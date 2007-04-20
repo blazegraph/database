@@ -187,7 +187,7 @@ public class MetadataServer extends AbstractServer {
      * Extends the behavior to close and delete the journal in use by the
      * metadata service.
      */
-    protected void destroy() {
+    public void destroy() {
 
         MetadataService service = (MetadataService)impl;
         

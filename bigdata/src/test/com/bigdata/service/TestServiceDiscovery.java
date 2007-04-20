@@ -113,13 +113,12 @@ public class TestServiceDiscovery extends TestCase {
     public static Logger log = Logger.getLogger(TestServiceDiscovery.class);
     
     /**
-     * Tests spans several services and verifies that we can discovery each of
-     * them.
+     * Tests launches a service and verifies that we can discovery it and invoke
+     * an operation exposed by that service.
      * 
      * @throws IOException
      * @throws ClassNotFoundException
      */
-    
     public void test_serviceDiscovery() throws IOException,
             ClassNotFoundException {
 

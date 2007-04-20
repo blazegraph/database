@@ -108,6 +108,10 @@ public interface IIndexManager extends IIndexStore {
      * @exception IllegalArgumentException
      *                if <i>name</i> does not identify a registered index.
      * 
+     * @todo reconsider the deletion of index resources. The should probably be
+     *       explicitly purged by a restart-safe delete from the metadata
+     *       service in due time.
+     * 
      * @todo add a rename index method, but note that names in the file system
      *       would not change.
      * 

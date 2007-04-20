@@ -550,7 +550,7 @@ public class InferenceEngine extends TripleStore {
      * 
      * @param itr
      *            The key scan iterator.
-     *            
+     * 
      * @return The objects visited by that iterator.
      */
     public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {

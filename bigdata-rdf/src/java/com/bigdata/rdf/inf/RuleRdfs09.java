@@ -66,9 +66,10 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
     }
     
     /**
-     * Overriden to be two bound (more selective), but otherwise also returning
-     * data in POS order. The query is formed from triple(?v,rdf:type,stmt1.s)
-     * and expressed in POS order as { rdf:type, stmt1.s, ?v }.
+     * Overriden to be two bound (more selective, but also joining stmt1.s to
+     * stmt2.o rather than to stmt2.p) and also returning data in POS order. The
+     * query is formed from triple(?v,rdf:type,stmt1.s) and expressed in POS
+     * order as { rdf:type, stmt1.s, ?v }.
      */
     protected SPO[] getStmts2( SPO stmt1 ) {
         

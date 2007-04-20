@@ -152,6 +152,13 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       where appropriate, so we need to assign identifiers to bnodes in a
  *       restart-safe manner even if we "forget" the term-id mapping.
  * 
+ * @todo Provide a wrapper class for {@link IEntryIterator} that visits
+ *       statements, terms, and ids (as appropriate). This will help to isolate
+ *       the rdf store from changes to the manner in which keys and values are
+ *       encoded in the indices, including whether the term ids can be decoded
+ *       from the statement keys, and also will help to create a
+ *       (de-)serialization divide for the values in the indices.
+ * 
  * @todo modify the term identifier assignment mechanism to be compatible with
  *       the scale-out index partitions (32-bit unique within index partition
  *       identified plus a restart-safe counter for each index partition).
@@ -185,10 +192,10 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       order to reduce unicode conversions.
  * 
  * @todo support metadata about the statement, e.g., whether or not it is an
- *       inference.  consider that we may need to move the triple/quad ids into
+ *       inference. consider that we may need to move the triple/quad ids into
  *       the value in the statement indices since some key compression schemes
- *       are not reversable (we depend on reversable keys to extract the term 
- *       ids for a statement). 
+ *       are not reversable (we depend on reversable keys to extract the term
+ *       ids for a statement).
  * 
  * @todo Try a variant in which we have metadata linking statements and terms
  *       together. In this case we would have to go back to the terms and update
@@ -232,10 +239,18 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       be in a maintenance role).
  * 
  * @todo provide option for closing aspects of the entire store vs just a single
- *       context in a quad store. For example, in an open web and internet scale
- *       kb it is unlikely that you would want to have all harvested ontologies
- *       closed against all the data. however, that might make more sense in a
- *       more controlled setting.
+ *       context in a quad store vs just a "document" before it is loaded into a
+ *       triple store (but with the term identifiers of the triple store). For
+ *       example, in an open web and internet scale kb it is unlikely that you
+ *       would want to have all harvested ontologies closed against all the
+ *       data. however, that might make more sense in a more controlled setting.
+ * 
+ * @todo provide a mechanism to make document loading robust to client failure.
+ *       When loads are unisolated, a client failure can result in the
+ *       statements being loaded into only a subset of the statement indices.
+ *       robust load would require a means for undo or redo of failed loads. a
+ *       loaded based on map/reduce would naturally provide a robust mechanism
+ *       using a redo model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
