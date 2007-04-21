@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -298,63 +299,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
             throws InterruptedException, ExecutionException, IOException,
             IOException;
-    
-//    /**
-//     * Typesafe enum for flags that control the behavior of
-//     * {@link IDataService#rangeQuery(long, String, byte[], byte[], int, int)}
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static enum RangeQueryEnum {
-//      
-//        /**
-//         * Flag specifies that keys in the key range will be returned. When not
-//         * given, the keys will NOT be included in the {@link ResultSetChunk}s
-//         * sent to the client.
-//         */
-//        Keys(1 << 1),
-//
-//        /**
-//         * Flag specifies that values in the key range will be returned. When
-//         * not given, the values will NOT be included in the
-//         * {@link ResultSetChunk}s sent to the client.
-//         */
-//        Values(1 << 2);
-//
-//        private final int flag;
-//        
-//        private RangeQueryEnum(int flag) {
-//
-//            this.flag = flag;
-//            
-//        }
-//        
-//        /**
-//         * True iff this flag is set.
-//         * 
-//         * @param flags
-//         *            An integer on which zero or more flags have been set.
-//         * 
-//         * @return True iff this flag is set.
-//         */
-//        public boolean isSet(int flags) {
-//         
-//            return (flags & flag) == 1;
-//            
-//        }        
-//        
-//        /**
-//         * The bit mask for this flag.
-//         */
-//        public final int valueOf() {
-//            
-//            return flag;
-//            
-//        }
-//        
-//    };
-    
+        
     /**
      * <p>
      * Submit a procedure.
@@ -384,18 +329,16 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @param proc
      *            The procedure to be executed.
      * 
+     * @return The result, which is entirely defined by the procedure
+     *         implementation and which MAY be null. In general, this MUST be
+     *         {@link Serializable} since it may have to pass across a network
+     *         interface.
+     * 
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void submit(long tx, IProcedure proc) throws InterruptedException,
+    public Object submit(long tx, IProcedure proc) throws InterruptedException,
             ExecutionException, IOException;
-
-//    /**
-//     * Execute a map worker task against all key/value pairs in a key range,
-//     * writing the results onto N partitions of an intermediate file.
-//     */
-//    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
-//            IMapOp op) throws InterruptedException, ExecutionException;
 
 }

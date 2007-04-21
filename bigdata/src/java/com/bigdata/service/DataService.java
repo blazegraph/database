@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.Properties;
@@ -70,13 +69,15 @@ import com.bigdata.btree.IReadOnlyBatchOp;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IAtomicStore;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * An implementation of a data service suitable for use with RPC, direct client
- * calls (if decoupled by an operation queue), or a NIO interface.
+ * An implementation of a network-capable {@link IDataService}. The service is
+ * started using the {@link DataServer} class.
  * <p>
  * This implementation is thread-safe. It will block for each operation. It MUST
  * be invoked within a pool of request handler threads servicing a network
@@ -100,15 +101,36 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
- * @todo add assertOpen() throughout
- * 
- * @todo declare interface for managing service shutdown()/shutdownNow()?
+ * @todo Note that "auto-commit" is provided for unisolated writes. This relies
+ *       on two things. First, only the {@link UnisolatedBTree} recoverable from
+ *       {@link AbstractJournal#getIndex(String)} is mutable - all other ways to
+ *       recover the named index will return a read-only view of a historical
+ *       committed state. Second, an explicit {@link IAtomicStore#commit()} must
+ *       be performed to make the changes restart-safe. The commit can only be
+ *       performed when no unisolated write is executing (even presuming that
+ *       different mutable btrees can receive writes concurrently) since it will
+ *       cause all dirty {@link ICommitter} to become restart-safe. Group commit
+ *       is essential to high throughput when unisolated writes are relatively
+ *       small.
  * 
  * @todo support group commit for unisolated writes. i may have to refactor some
  *       to get group commit to work for both transaction commits and unisolated
  *       writes. basically, the tasks on the
- *       {@link AbstractJournal#writeService write service} need to get
- *       aggregated.
+ *       {@link AbstractJournal#writeService} need to get aggregated (or each
+ *       commit examines the length of the write queue (basically, is there
+ *       another write in the queue or is this the last one), latency and data
+ *       volumn since the last commit and makes a decision whether or not to
+ *       commit at that time; if the commit is deferred, then it is placed onto
+ *       a queue of operations that have not finished and for which we can not
+ *       yet report "success" - even though additional unisolated writes must
+ *       continue to run; we also need to make sure that a commit will occur at
+ *       the first opportunity following the minimum latency -- even if no
+ *       unisolated writes are scheduled (or a single client would hang waiting
+ *       for a commit).
+ * 
+ * @todo add assertOpen() throughout
+ * 
+ * @todo declare interface for managing service shutdown()/shutdownNow()?
  * 
  * @todo implement NIODataService, RPCDataService(possible), EmbeddedDataService
  *       (uses queue to decouple operations), DataServiceClient (provides
@@ -154,7 +176,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       bidirectional. Can that rate be sustained with a fully connected
  *       bi-directional transfer?
  * 
- * @todo We will use non-blocking I/O for the page transfer protocol. Review
+ * @todo We will use non-blocking I/O for the data transfer protocol in order to
+ *       support an efficient pipelining of writes across data services. Review
  *       options to secure that protocol since we can not use JERI for that
  *       purpose. For example, using SSL or an SSH tunnel. For most purposes I
  *       expect bigdata to operate on a private network, but replicate across
@@ -457,7 +480,7 @@ public class DataService implements IDataService,
         
     }
     
-    public void submit(long tx, IProcedure proc) throws InterruptedException,
+    public Object submit(long tx, IProcedure proc) throws InterruptedException,
             ExecutionException {
 
         if( proc == null ) throw new IllegalArgumentException();
@@ -468,11 +491,30 @@ public class DataService implements IDataService,
         
         if(isolated) {
             
-            txService.submit(new TxProcedureTask(tx,proc)).get();
+            return txService.submit(new TxProcedureTask(tx,proc)).get();
             
         } else if( readOnly ) {
             
-            readService.submit(new UnisolatedReadProcedureTask(proc)).get();
+            /*
+             * FIXME The IReadOnlyInterface is a promise that the procedure will
+             * not write on an index (or anything on the store), but it is NOT a
+             * guarentee. Consider removing that interface and the option to run
+             * unisolated as anything but "read/write" since a "read-only" that
+             * in fact attempted to write could cause problems with the index
+             * data structure. Alternatively, examine other means for running a
+             * "read-only" unisolated store that enforces read-only semantics.
+             * 
+             * For example, since the IIndexStore defines only a single method,
+             * getIndex(String), we could provide an implementation of that
+             * method that always selected a historical committed state for the
+             * index. This would make writes impossible since they would be
+             * rejected by the index object itself.
+             * 
+             * Fix this and write tests that demonstrate that writes are
+             * rejected if the proc implements IReadOnlyProcedure.
+             */
+            
+            return readService.submit(new UnisolatedReadProcedureTask(proc)).get();
             
         } else {
             
@@ -480,7 +522,7 @@ public class DataService implements IDataService,
              * Special case since incomplete writes MUST be discarded and
              * complete writes MUST be committed.
              */
-            journal.serialize(new UnisolatedReadWriteProcedureTask(proc)).get();
+            return journal.serialize(new UnisolatedReadWriteProcedureTask(proc)).get();
             
         }
 
@@ -510,15 +552,15 @@ public class DataService implements IDataService,
     
     /**
      * 
-     * FIXME the iterator needs to be aware of the defintion of a "row" for the
-     * sparse row store so that we can respect the atomic guarentee for reads as
-     * well as writes.
+     * @todo the iterator needs to be aware of the defintion of a "row" for the
+     *       sparse row store so that we can respect the atomic guarentee for
+     *       reads as well as writes.
      * 
-     * FIXME support filters. there are a variety of use cases from clients that
-     * are aware of version counters and delete markers to clients that encode a
-     * column name and datum or write time into the key to those that will
-     * filter based on inspection of the value associated with the key, e.g.,
-     * only values having some attribute.
+     * @todo support filters. there are a variety of use cases from clients that
+     *       are aware of version counters and delete markers to clients that
+     *       encode a column name and datum or write time into the key to those
+     *       that will filter based on inspection of the value associated with
+     *       the key, e.g., only values having some attribute.
      * 
      * @todo if we allow the filter to cause mutations (e.g., deleting matching
      *       entries) then we have to examine the operation to determine whether
@@ -1098,9 +1140,7 @@ public class DataService implements IDataService,
 
         public Object call() throws Exception {
 
-            proc.apply(tx.getStartTimestamp(),tx);
-            
-            return null;
+            return proc.apply(tx.getStartTimestamp(),tx);
                         
         }
 
@@ -1122,9 +1162,7 @@ public class DataService implements IDataService,
 
         public Object call() throws Exception {
 
-            proc.apply(0L,journal);
-
-            return null;
+            return proc.apply(0L,journal);
 
         }
 
@@ -1154,14 +1192,16 @@ public class DataService implements IDataService,
             
         }
         
-        public Long call() throws Exception {
+        public Object call() throws Exception {
 
             try {
 
-                super.call();
+                Object result = super.call();
                 
                 // commit (synchronous, immediate).
-                return journal.commit();
+                journal.commit();
+                
+                return result;
 
             } catch(Throwable t) {
             
