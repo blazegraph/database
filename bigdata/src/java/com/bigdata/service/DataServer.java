@@ -58,6 +58,11 @@ import com.sun.jini.start.LifeCycle;
 
 /**
  * The bigdata data server.
+ * <p>
+ * The {@link DataServer} starts the {@link DataService}. The server and
+ * service are configured using a {@link Configuration} file whose name is
+ * passed to the {@link DataServer#DataServer(String[])} constructor or
+ * {@link #main(String[])}.
  * 
  * @see src/resources/config for sample configurations.
  * 
@@ -85,8 +90,13 @@ public class DataServer extends AbstractServer {
     }
 
     /**
-     * Starts a new {@link DataServer}.
-     *  
+     * Starts a new {@link DataServer}.  This can be done programmatically
+     * by executing
+     * <pre>
+     *    new DataServer(args).run();
+     * </pre>
+     * within a {@link Thread}.
+     * 
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */

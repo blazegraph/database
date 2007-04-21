@@ -58,6 +58,9 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.journal.IIndexStore;
+
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -180,7 +183,7 @@ public class TestDataServer0 extends TestCase2 {
 
         ServiceID serviceID = getServiceID();
         
-        IDataService proxy = lookupDataService(serviceID); 
+        final IDataService proxy = lookupDataService(serviceID); 
         
         assertNotNull("service not discovered",proxy);
         
@@ -255,8 +258,53 @@ public class TestDataServer0 extends TestCase2 {
         assertEquals(null,values[0]);
         assertEquals(null,values[1]);
 
-        proxy.dropIndex(name);
+        /*
+         * run a server local procedure.
+         */
+        {
+            
+            IProcedure proc = new RangeCountProcedure(name);
+            
+            /*
+             * Note: The result is ONE (1) since there is one deleted entry in
+             * the UnisolatedBTree and rangeCount does not correct for deletion
+             * markers!
+             */
+            assertEquals("result", 1, proxy.submit(IDataService.UNISOLATED,
+                    proc));
+            
+        }
         
+        proxy.dropIndex(name);
+
+    }
+    
+    /**
+     * This procedure just computes a range count on the index.
+     */
+    private static class RangeCountProcedure implements IProcedure {
+
+        private static final long serialVersionUID = 5856712176446915328L;
+
+        private final String name;
+
+        public RangeCountProcedure(String name) {
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            this.name = name;
+
+        }
+
+        public Object apply(long tx, IIndexStore store) {
+
+            IIndex ndx = store.getIndex(name);
+
+            return new Integer(ndx.rangeCount(null, null));
+
+        }
+
     }
     
     /**

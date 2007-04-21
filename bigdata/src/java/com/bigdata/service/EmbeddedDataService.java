@@ -120,9 +120,9 @@ abstract public class EmbeddedDataService implements IDataService, IServiceShutd
 //        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
 //    }
 
-    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException {
-        delegate.submit(tx, proc);
-    }
+//    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException {
+//        delegate.submit(tx, proc);
+//    }
 
     public void abort(long tx) throws IOException {
         delegate.abort(tx);

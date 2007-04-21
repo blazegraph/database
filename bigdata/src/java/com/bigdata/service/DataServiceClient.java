@@ -111,9 +111,9 @@ abstract public class DataServiceClient implements IDataService {
 //        return delegate.rangeQuery(tx, name, fromKey, toKey, flags);
 //    }
 
-    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException, IOException {
-        delegate.submit(tx, proc);
-    }
+//    public void submit(long tx, IProcedure proc) throws InterruptedException, ExecutionException, IOException {
+//        delegate.submit(tx, proc);
+//    }
 
     public void abort(long tx) throws IOException {
         delegate.abort(tx);

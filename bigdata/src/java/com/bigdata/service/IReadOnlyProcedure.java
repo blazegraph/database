@@ -47,6 +47,13 @@ Modifications:
 
 package com.bigdata.service;
 
-public interface IReadOnlyProcedure {
+/**
+ * Procedures that implement this marker interface will be executed within a
+ * read-only context and MUST NOT attempt to write on an index.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public interface IReadOnlyProcedure extends IProcedure {
     
 }
