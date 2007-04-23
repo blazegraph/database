@@ -254,7 +254,8 @@ public class MapReduceService implements IServiceShutdown {
             
             IMetadataService mds = getMetadataService();
             
-            final int nentries = mds.rangeCount(name,fromKey,toKey);  
+            final int nentries = mds.rangeCount(IDataService.UNISOLATED, name,
+                    fromKey, toKey);  
             
             return null;
             

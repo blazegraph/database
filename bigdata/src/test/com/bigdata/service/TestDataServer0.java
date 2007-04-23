@@ -47,20 +47,12 @@ Modifications:
 
 package com.bigdata.service;
 
-import java.io.IOException;
-import java.net.InetAddress;
 import java.util.UUID;
 
-import junit.framework.AssertionFailedError;
-import junit.framework.TestCase2;
-import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexStore;
-
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -73,15 +65,16 @@ import com.bigdata.journal.IIndexStore;
  * Note: The <code>bigdata</code> JAR must be current in order for the client
  * and the service to agree on interface definitions, etc. You can use
  * <code>build.xml</code> in the root of this module to update that JAR.
+ * <p>
+ * Note: You MUST grant sufficient permissions for the tests to execute, e.g.,
+ * <pre>
+ * -Djava.security.policy=policy.all
+ * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write another test class that accesses more than one
- *       {@link DataService} instance, e.g., by placing a different index on
- *       each {@link DataService}.
  */
-public class TestDataServer0 extends TestCase2 {
+public class TestDataServer0 extends AbstractServerTestCase {
 
     /**
      * 
@@ -96,16 +89,14 @@ public class TestDataServer0 extends TestCase2 {
         super(arg0);
     }
     
-    String[] args = new String[]{
-            "src/resources/config/standalone/DataServer0.config"
-    };
-    
     DataServer dataServer0;
 
     // start server in its own thread.
     public void setUp() throws Exception {
         
-        dataServer0 = new DataServer(args);
+        dataServer0 = new DataServer(new String[]{
+                "src/resources/config/standalone/DataServer0.config"
+        });
         
         new Thread() {
 
@@ -129,59 +120,16 @@ public class TestDataServer0 extends TestCase2 {
     }
    
     /**
-     * Return the {@link ServiceID} of the specific service that we launched in
-     * #setUp().
-     * 
-     * @exception AssertionFailedError
-     *                If the {@link ServiceID} can not be found after a timeout.
-     * 
-     * @exception InterruptedException
-     *                if the thread is interrupted while it is waiting to retry.
-     */
-    protected ServiceID getServiceID() throws AssertionFailedError, InterruptedException {
-
-        ServiceID serviceID = null;
-
-        for(int i=0; i<10 && serviceID == null; i++) {
-
-            /*
-             * Note: This can be null since the serviceID is not assigned
-             * synchonously by the registrar.
-             */
-
-            serviceID = dataServer0.getServiceID();
-            
-            if(serviceID == null) {
-                
-                /*
-                 * We wait a bit and retry until we have it or timeout.
-                 */
-                
-                Thread.sleep(200);
-                
-            }
-            
-        }
-        
-        assertNotNull("serviceID",serviceID);
-
-        return serviceID;
-        
-    }
-    
-    /**
      * Exercises the basic features of the {@link IDataService} interface using
      * unisolated operations, including creating a B+Tree, insert, contains,
      * lookup, and remove operations on key-value pairs in that B+Tree, and
      * dropping the B+Tree.
      * 
      * @throws Exception
-     * 
-     * @todo test {@link IDataService#submit(long, IProcedure)}.
      */
     public void test_serverRunning() throws Exception {
 
-        ServiceID serviceID = getServiceID();
+        ServiceID serviceID = getServiceID(dataServer0);
         
         final IDataService proxy = lookupDataService(serviceID); 
         
@@ -305,89 +253,6 @@ public class TestDataServer0 extends TestCase2 {
 
         }
 
-    }
-    
-    /**
-     * Lookup a {@link DataService} by its {@link ServiceID}.
-     * 
-     * @param serviceID
-     *            The {@link ServiceID}.
-     */
-    public IDataService lookupDataService(ServiceID serviceID)
-            throws IOException, ClassNotFoundException, InterruptedException {
-
-        /* 
-         * Lookup the discover service (unicast on localhost).
-         */
-
-        // get the hostname.
-        InetAddress addr = InetAddress.getLocalHost();
-        String hostname = addr.getHostName();
-
-        // Find the service registrar (unicast protocol).
-        final int timeout = 4*1000; // seconds.
-        System.err.println("hostname: "+hostname);
-        LookupLocator lookupLocator = new LookupLocator("jini://"+hostname);
-        ServiceRegistrar serviceRegistrar = lookupLocator.getRegistrar( timeout );
-
-        /*
-         * Prepare a template for lookup search.
-         * 
-         * Note: The client needs a local copy of the interface in order to be
-         * able to invoke methods on the service without using reflection. The
-         * implementation class will be downloaded from the codebase identified
-         * by the server.
-         */
-        ServiceTemplate template = new ServiceTemplate(//
-                /*
-                 * use this to request the service by its serviceID.
-                 */
-                serviceID,
-                /*
-                 * Use this to filter services by an interface that they expose.
-                 */
-//                new Class[] { IDataService.class },
-                null,
-                /*
-                 * use this to filter for services by Entry attributes.
-                 */
-                null);
-
-        /*
-         * Lookup a service. This can fail if the service registrar has not
-         * finished processing the service registration. If it does, you can
-         * generally just retry the test and it will succeed. However this
-         * points out that the client may need to wait and retry a few times if
-         * you are starting everthing up at once (or just register for
-         * notification events for the service if it is not found and enter a
-         * wait state).
-         */
-        
-        IDataService service = null;
-        
-        for (int i = 0; i < 10 && service == null; i++) {
-        
-            service = (IDataService) serviceRegistrar
-                    .lookup(template /* , maxMatches */);
-            
-            if (service == null) {
-            
-                System.err.println("Service not found: sleeping...");
-                
-                Thread.sleep(200);
-                
-            }
-            
-        }
-
-        if(service!=null) {
-
-            System.err.println("Service found.");
-            
-        }
-        
-        return service;
-        
     }
     
 }

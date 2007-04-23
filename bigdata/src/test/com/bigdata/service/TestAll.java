@@ -75,6 +75,12 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite( TestDataServer0.class );
 
+        /*
+         * Test of a single client talking to a single metadata service
+         * instance.
+         */
+        suite.addTestSuite( TestMetadataServer0.class );
+
         //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
         return suite;

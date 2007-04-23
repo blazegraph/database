@@ -116,11 +116,6 @@ public class AbstractClient implements DiscoveryListener {
     private Configuration config;
 
     /**
-     * The exported proxy for the service implementation object.
-     */
-    protected Remote proxy;
-
-    /**
      * Server startup reads {@link Configuration} data from the file(s) named by
      * <i>args</i>, starts the service, and advertises the service for
      * discovery. Aside from the server class to start, the behavior is more or

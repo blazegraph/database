@@ -62,27 +62,10 @@ import java.rmi.Remote;
  * Note: methods on this interface MUST throw {@link IOException} in order to be
  * compatible with RMI.
  * 
- * @todo extend IDataService
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMetadataService extends Remote {
-
-    /**
-     * The approximate number of entries in the index (non-transactional).
-     */
-    public int getEntryCount(String name) throws IOException;
-    
-    /**
-     * The approximate number of entries in the index for the specified key
-     * range (non-transactional).
-     * 
-     * @param fromKey
-     * @param toKey
-     * @return
-     */
-    public int rangeCount(String name,byte[] fromKey,byte[] toKey) throws IOException;
+public interface IMetadataService extends IDataService {
     
     /**
      * Return the address of the {@link IDataService} that has current primary

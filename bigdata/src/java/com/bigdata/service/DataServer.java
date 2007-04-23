@@ -54,7 +54,6 @@ import java.util.Properties;
 import net.jini.config.Configuration;
 
 import com.bigdata.journal.IJournal;
-import com.sun.jini.start.LifeCycle;
 
 /**
  * The bigdata data server.
@@ -63,8 +62,18 @@ import com.sun.jini.start.LifeCycle;
  * service are configured using a {@link Configuration} file whose name is
  * passed to the {@link DataServer#DataServer(String[])} constructor or
  * {@link #main(String[])}.
+ * <p>
  * 
  * @see src/resources/config for sample configurations.
+ * 
+ * @todo describe and implement the media replication mechanism and service
+ *       failover. only the primary service is mutable. service instances for
+ *       the same persistent data must determine whether or not another service
+ *       is running (basically, can they obtain a lock to operate as the primary
+ *       service). secondary service instances may provide redundent read-only
+ *       operations from replicated media (or media on a distributed file
+ *       system). the failover mechanisms are essentially the same for the data
+ *       service and for the derived metadata service.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -83,11 +92,11 @@ public class DataServer extends AbstractServer {
         
     }
     
-    public DataServer(String[] args, LifeCycle lifeCycle) {
-        
-        super( args, lifeCycle );
-        
-    }
+//    public DataServer(String[] args, LifeCycle lifeCycle) {
+//        
+//        super( args, lifeCycle );
+//        
+//    }
 
     /**
      * Starts a new {@link DataServer}.  This can be done programmatically
@@ -202,8 +211,6 @@ public class DataServer extends AbstractServer {
 // public void addLookupAttributes(Entry[] arg0) throws RemoteException {
 //            
 // log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
 //
@@ -211,15 +218,11 @@ public class DataServer extends AbstractServer {
 //
 //            log.info("");
 //
-//            // TODO Auto-generated method stub
-//
 //        }
 //
 //        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
 //
 //            log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
 //
@@ -227,7 +230,6 @@ public class DataServer extends AbstractServer {
 //
 //            log.info("");
 //
-//            // TODO Auto-generated method stub
 //            return null;
 //        }
 //
@@ -235,7 +237,6 @@ public class DataServer extends AbstractServer {
 //         
 //            log.info("");
 //
-//            // TODO Auto-generated method stub
 //            return null;
 //        }
 //
@@ -243,43 +244,32 @@ public class DataServer extends AbstractServer {
 //         
 //            log.info("");
 //
-//            // TODO Auto-generated method stub
 //            return null;
 //        }
 //
 //        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
 //         
 //            log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
 //
 //        public void removeLookupGroups(String[] arg0) throws RemoteException {
 //            log.info("");
 //
-//            // TODO Auto-generated method stub
-//            
 //        }
 //
 //        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
 //            log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
 //
 //        public void setLookupGroups(String[] arg0) throws RemoteException {
 //            log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
 //
 //        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
 //            log.info("");
-//
-//            // TODO Auto-generated method stub
 //            
 //        }
         

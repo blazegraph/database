@@ -78,7 +78,7 @@ import com.bigdata.scaleup.MetadataIndex;
  *       be able to access the historical state of the metadata index that
  *       corresponds to the commit time of interest for the database.)
  */
-public class MetadataService implements IMetadataService, IServiceShutdown {
+public class MetadataService extends DataService implements IMetadataService, IServiceShutdown {
 
     /**
      * The name of the journal on which the metadata index is stored.
@@ -90,12 +90,7 @@ public class MetadataService implements IMetadataService, IServiceShutdown {
     
     public MetadataService(Properties properties) {
         
-        /*
-         * @todo setup/resolve the journal and the metadata index on
-         * the journal.
-         */
-        
-        journal = new Journal(properties);
+        super(properties);
 
     }
     
@@ -104,24 +99,4 @@ public class MetadataService implements IMetadataService, IServiceShutdown {
         return null;
     }
 
-    public int getEntryCount(String name) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public int rangeCount(String name,byte[] fromKey,byte[] toKey) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    public void shutdown() {
-        // TODO Auto-generated method stub
-        
-    }
-
-    public void shutdownNow() {
-        // TODO Auto-generated method stub
-        
-    }
-    
 }
