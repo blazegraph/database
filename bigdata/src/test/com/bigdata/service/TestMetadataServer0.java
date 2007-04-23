@@ -354,7 +354,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          */
         {
 
-            ServiceID serviceID = MetadataServer.uuid2ServiceID(pmd.getDataServices()[0]);
+            ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
 
             // @todo use lookup cache in a real client.
             IDataService proxy = lookupDataService(serviceID);

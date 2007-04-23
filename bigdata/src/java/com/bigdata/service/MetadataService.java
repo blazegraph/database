@@ -193,7 +193,7 @@ abstract public class MetadataService extends DataService implements
             
             final UUID[] dataServices = new UUID[]{
                     
-                    MetadataServer.serviceID2UUID(dataServiceID)
+                    JiniUtil.serviceID2UUID(dataServiceID)
                     
             };
             

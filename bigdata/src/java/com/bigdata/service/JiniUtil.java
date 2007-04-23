@@ -42,54 +42,54 @@ Modifications:
 
 */
 /*
- * Created on Jun 26, 2006
+ * Created on Apr 23, 2007
  */
+
 package com.bigdata.service;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.util.UUID;
+
+import net.jini.core.lookup.ServiceID;
 
 /**
- * Aggregates tests in dependency order.
+ * Some utility methods that attempt to isolate the aspects of the Jini
+ * architecture that would otherwise bleed into the bigdata architecture.
  * 
- * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class TestAll extends TestCase {
+public class JiniUtil {
 
-    public TestAll() {}
+    /**
+     * Convert a Jini {@link ServiceID} to a {@link UUID} (this changes the kind
+     * of UUID implementation object but preserves the UUID data).
+     * 
+     * @param serviceID
+     *            The {@link ServiceID}.
+     * 
+     * @return The {@link UUID}.
+     */
+    public static UUID serviceID2UUID(ServiceID serviceID) {
+
+        return new UUID(serviceID.getMostSignificantBits(), serviceID
+                .getLeastSignificantBits());
+
+    }
     
-    public TestAll(String name) {super(name);}
-    
-    public static Test suite()
-    {
+    /**
+     * Convert a {@link UUID} to a Jini {@link ServiceID} (this changes the kind
+     * of UUID implementation object but preserves the UUID data).
+     * 
+     * @param uuid
+     *            The {@link UUID}.
+     * 
+     * @return The Jini {@link ServiceID}.
+     */
+    public static ServiceID uuid2ServiceID(UUID uuid) {
 
-        TestSuite suite = new TestSuite(TestAll.class.getName());
+        return new ServiceID(uuid.getMostSignificantBits(), uuid
+                .getLeastSignificantBits());
 
-        suite.addTestSuite( TestServiceDiscovery.class );
-
-        /*
-         * Test of a single client talking to a single data service instance
-         * without the use of the metadata service or a transaction manager.
-         */
-        suite.addTestSuite( TestDataServer0.class );
-
-        /*
-         * Test of a single client talking to a single metadata service
-         * instance.
-         */
-        suite.addTestSuite( TestMetadataServer0.class );
-
-        /*
-         * Test of a single client talking to a bigdata federation.
-         */
-        suite.addTestSuite( TestBigdataClient.class );
-        
-        //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
-
-        return suite;
-        
     }
     
 }

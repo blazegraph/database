@@ -918,8 +918,8 @@ public class DataService implements IDataService,
 
     protected class RangeCountTask implements Callable<Object> {
 
-        // startTime or 0L iff unisolated.
-        private final long startTime;
+//        // startTime or 0L iff unisolated.
+//        private final long startTime;
         private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -929,7 +929,7 @@ public class DataService implements IDataService,
         public RangeCountTask(long startTime, String name, byte[] fromKey,
                 byte[] toKey) {
             
-            this.startTime = startTime;
+//            this.startTime = startTime;
             
             if(startTime != 0L) {
                 
@@ -999,8 +999,8 @@ public class DataService implements IDataService,
 
     protected class RangeQueryTask implements Callable<Object> {
 
-        // startTime or 0L iff unisolated.
-        private final long startTime;
+//        // startTime or 0L iff unisolated.
+//        private final long startTime;
         private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -1012,7 +1012,7 @@ public class DataService implements IDataService,
         public RangeQueryTask(long startTime, String name, byte[] fromKey,
                 byte[] toKey, int capacity, int flags) {
             
-            this.startTime = startTime;
+//            this.startTime = startTime;
             
             if(startTime != 0L) {
                 
