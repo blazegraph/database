@@ -85,13 +85,13 @@ import com.bigdata.scaleup.PartitionedIndexView;
  */
 public class ClientIndexView implements IIndex {
 
-    protected final AbstractClient client;
+    protected final BigdataClient client;
     protected final String name;
     
     protected IMetadataService mdproxy;
     protected UUID indexUUID; // @todo final.
     
-    public ClientIndexView(AbstractClient client, String name) {
+    public ClientIndexView(BigdataClient client, String name) {
         
         if(client==null) throw new IllegalArgumentException();
         
