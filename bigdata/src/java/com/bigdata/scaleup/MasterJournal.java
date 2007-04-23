@@ -921,7 +921,7 @@ public class MasterJournal implements IJournal {
              * we will see IValue objects when processing an UnisolatedBTree.
              */
 
-            File outFile = getSegmentFile(name,pmd.partId);
+            File outFile = getSegmentFile(name,pmd.getPartitionId());
 
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     tmpDir, oldIndex.btree.getEntryCount(), oldIndex.btree
@@ -934,7 +934,7 @@ public class MasterJournal implements IJournal {
             /*
              * update the metadata index for this partition.
              */
-            mdi.put(separatorKey, new PartitionMetadata(0, pmd.dataServices,
+            mdi.put(separatorKey, new PartitionMetadata(0, pmd.getDataServices(),
                     new SegmentMetadata[] { new SegmentMetadata("" + outFile,
                             outFile.length(), ResourceState.Live,
                             builder.segmentUUID) }));
@@ -960,7 +960,7 @@ public class MasterJournal implements IJournal {
             final IndexSegment seg = (IndexSegment)view.getSources()[1];
 
             // output file for the merged segment.
-            File outFile = getSegmentFile(name, pmd.partId);
+            File outFile = getSegmentFile(name, pmd.getPartitionId());
 
             // merge the data from the btree on the slave and the index
             // segment.
@@ -1004,15 +1004,16 @@ public class MasterJournal implements IJournal {
             final SegmentMetadata[] newSegs = new SegmentMetadata[2];
 
             // assume only the last segment is live.
-            final SegmentMetadata oldSeg = (SegmentMetadata)pmd.resources[pmd.resources.length-1];
+            final SegmentMetadata oldSeg = (SegmentMetadata) pmd.getResources()[pmd
+                    .getResources().length - 1];
             
-            newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
-                    ResourceState.Dead, oldSeg.uuid);
+            newSegs[0] = new SegmentMetadata(oldSeg.getFile(), oldSeg.size(),
+                    ResourceState.Dead, oldSeg.getUUID());
 
             newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
                     .length(), ResourceState.Live, builder.segmentUUID);
 
-            mdi.put(separatorKey, new PartitionMetadata(0, pmd.dataServices, newSegs));
+            mdi.put(separatorKey, new PartitionMetadata(0, pmd.getDataServices(), newSegs));
 
 // /*
 // * open the merged index segment
@@ -1031,17 +1032,17 @@ public class MasterJournal implements IJournal {
 //            seg.close();
 
             // assuming at most one dead and one live segment.
-            if(pmd.resources.length>1) {
+            if(pmd.getResources().length>1) {
                 
-                final SegmentMetadata deadSeg = (SegmentMetadata)pmd.resources[0];
+                final SegmentMetadata deadSeg = (SegmentMetadata)pmd.getResources()[0];
                 
-                if(deadSeg.state!=ResourceState.Dead) {
+                if(deadSeg.state()!=ResourceState.Dead) {
                     
                     throw new AssertionError();
                     
                 }
                 
-                File deadSegFile = new File(deadSeg.filename);
+                File deadSegFile = new File(deadSeg.getFile());
                 
                 if(deadSegFile.exists() && !deadSegFile.delete() ) {
                     

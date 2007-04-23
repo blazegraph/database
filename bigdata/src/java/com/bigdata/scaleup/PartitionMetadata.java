@@ -43,20 +43,19 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import java.io.DataInput;
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.UUID;
 
-import com.bigdata.btree.DataOutputBuffer;
-import com.bigdata.btree.IValueSerializer;
+import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
+
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 
 /**
- * A description of the {@link IndexSegment}s containing the user data for a
- * partition.
  * 
  * @todo provide a persistent event log or just integrate the state changes over
  *       the historical states of the partition description in the metadata
@@ -65,12 +64,17 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionMetadata /*implements Externalizable*/ {
+public class PartitionMetadata implements IPartitionMetadata, Externalizable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 5234405541356126104L;
 
     /**
      * The unique partition identifier.
      */
-    final protected int partId;
+    private int partId;
 
     /**
      * The ordered list of data services on which data for this partition will
@@ -79,7 +83,7 @@ public class PartitionMetadata /*implements Externalizable*/ {
      * @todo refactor into a dataService UUID (required) and an array of zero or
      *       more media replication services for failover.
      */
-    final protected UUID[] dataServices;
+    private UUID[] dataServices;
     
     /**
      * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
@@ -93,7 +97,14 @@ public class PartitionMetadata /*implements Externalizable*/ {
      * 
      * @see ResourceState
      */
-    final protected IResourceMetadata[] resources;
+    private IResourceMetadata[] resources;
+    
+    /**
+     * De-serialization constructor.
+     */
+    public PartitionMetadata() {
+        
+    }
 
     public PartitionMetadata(int partId, UUID[] dataServices ) {
 
@@ -129,6 +140,15 @@ public class PartitionMetadata /*implements Externalizable*/ {
         
         this.resources = resources;
 
+    }
+
+
+    public int getPartitionId() {
+        return partId;
+    }
+
+    public IResourceMetadata[] getResources() {
+        return resources;
     }
 
     /**
@@ -246,123 +266,106 @@ public class PartitionMetadata /*implements Externalizable*/ {
 
     }
 
-    /**
-     * Serialization for an index segment metadata entry.
-     * 
-     * FIXME convert to use {@link UnisolatedBTree} (so byte[] values that we
-     * (de-)serialize one a one-by-one basis ourselves), implement
-     * {@link Externalizable} and use explicit versioning and packed integers.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class Serializer implements IValueSerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 4307076612127034103L;
-
-        public transient static final PartitionMetadata.Serializer INSTANCE = new Serializer();
-
-//        private static final transient int VERSION0 = 0x0;
+    private static final transient short VERSION0 = 0x0;
+    
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
-        public Serializer() {
-        }
-
-        public void putValues(DataOutputBuffer os, Object[] values, int nvals)
-                throws IOException {
+        final short version = ShortPacker.unpackShort(in);
+        
+        if(version!=VERSION0) {
             
-            for (int i = 0; i < nvals; i++) {
+            throw new IOException("Unknown version: "+version);
+            
+        }
+        
+        partId = (int) LongPacker.unpackLong(in);
 
-                PartitionMetadata val = (PartitionMetadata) values[i];
+        final int nservices = ShortPacker.unpackShort(in);
+        
+        final int nresources = ShortPacker.unpackShort(in);
+        
+        dataServices = new UUID[nservices];
+        
+        resources = new IResourceMetadata[nresources];
 
-                final int nservices = val.dataServices.length;
-                
-                final int nresources = val.resources.length;
-                
-                os.writeInt(val.partId);
-                
-                os.writeInt(nservices);
+        for (int j = 0; j < nservices; j++) {
 
-                os.writeInt(nresources);
+            dataServices[j] = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+            
+        }
+        
+        for (int j = 0; j < nresources; j++) {
 
-                for( int j=0; j<nservices; j++) {
-                    
-                    final UUID serviceUUID = val.dataServices[j];
-                    
-                    os.writeLong(serviceUUID.getMostSignificantBits());
-                    
-                    os.writeLong(serviceUUID.getLeastSignificantBits());
-                    
-                }
-                
-                for (int j = 0; j < nresources; j++) {
+            boolean isIndexSegment = in.readBoolean();
+            
+            String filename = in.readUTF();
 
-                    IResourceMetadata rmd = val.resources[j];
+            long nbytes = LongPacker.unpackLong(in);
 
-                    os.writeBoolean(rmd.isIndexSegment());
-                    
-                    os.writeUTF(rmd.getFile());
+            ResourceState state = ResourceState.valueOf(ShortPacker.unpackShort(in));
 
-                    os.writeLong(rmd.size());
+            UUID uuid = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
-                    os.writeInt(rmd.state().valueOf());
-
-                    final UUID resourceUUID = rmd.getUUID();
-                    
-                    os.writeLong(resourceUUID.getMostSignificantBits());
-                    
-                    os.writeLong(resourceUUID.getLeastSignificantBits());
-
-                }
-
-            }
+            resources[j] = (isIndexSegment ? new SegmentMetadata(
+                    filename, nbytes, state, uuid)
+                    : new JournalMetadata(filename, nbytes, state, uuid));
 
         }
+        
+    }
 
-        public void getValues(DataInput is, Object[] values, int nvals)
-                throws IOException {
+    public void writeExternal(ObjectOutput out) throws IOException {
 
-            for (int i = 0; i < nvals; i++) {
+        ShortPacker.packShort(out, VERSION0);
+        
+        final int nservices = dataServices.length;
+        
+        final int nresources = resources.length;
+        
+        assert nservices < Short.MAX_VALUE;
 
-                final int partId = is.readInt();
+        assert nresources < Short.MAX_VALUE;
+        
+        LongPacker.packLong(out,partId);
+        
+        ShortPacker.packShort(out,(short)nservices);
 
-                final int nservices = is.readInt();
-                
-                final int nresources = is.readInt();
-                
-                final UUID[] services = new UUID[nservices];
-                
-                final IResourceMetadata[] resources = new IResourceMetadata[nresources];
+        ShortPacker.packShort(out,(short)nresources);
 
-                for (int j = 0; j < nservices; j++) {
+        for( int j=0; j<nservices; j++) {
+            
+            final UUID serviceUUID = dataServices[j];
+            
+            out.writeLong(serviceUUID.getMostSignificantBits());
+            
+            out.writeLong(serviceUUID.getLeastSignificantBits());
+            
+        }
+        
+        /*
+         * Note: we serialize using the IResourceMetadata interface so that we
+         * can handle different subclasses and then special case the
+         * deserialization based on the boolean flag. This is significantly more
+         * compact than using an Externalizable for each ResourceMetadata object
+         * since we do not have to write the class names for those objects.
+         */
+        for (int j = 0; j < nresources; j++) {
 
-                    services[j] = new UUID(is.readLong()/*MSB*/,is.readLong()/*LSB*/);
-                    
-                }
-                
-                for (int j = 0; j < nresources; j++) {
+            IResourceMetadata rmd = resources[j];
 
-                    boolean isIndexSegment = is.readBoolean();
-                    
-                    String filename = is.readUTF();
+            out.writeBoolean(rmd.isIndexSegment());
+            
+            out.writeUTF(rmd.getFile());
 
-                    long nbytes = is.readLong();
+            LongPacker.packLong(out,rmd.size());
 
-                    ResourceState state = ResourceState.valueOf(is.readInt());
+            ShortPacker.packShort(out,rmd.state().valueOf());
 
-                    UUID uuid = new UUID(is.readLong()/*MSB*/,is.readLong()/*LSB*/);
-
-                    resources[j] = (isIndexSegment ? new SegmentMetadata(
-                            filename, nbytes, state, uuid)
-                            : new JournalMetadata(filename, nbytes, state, uuid));
-
-                }
-
-                values[i] = new PartitionMetadata(partId, services, resources);
-
-            }
+            final UUID resourceUUID = rmd.getUUID();
+            
+            out.writeLong(resourceUUID.getMostSignificantBits());
+            
+            out.writeLong(resourceUUID.getLeastSignificantBits());
 
         }
 

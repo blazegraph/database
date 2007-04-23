@@ -52,16 +52,13 @@ import com.bigdata.journal.Journal;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo make this persistence capable by modifying the value serializer to
- * use the {@link IResourceMetadata} interface.
  */
 public class JournalMetadata implements IResourceMetadata {
 
-    protected final String filename;
-    protected final long nbytes;
-    protected final ResourceState state;
-    protected final UUID uuid;
+    private final String filename;
+    private final long nbytes;
+    private final ResourceState state;
+    private final UUID uuid;
 
     public final boolean isIndexSegment() {
         

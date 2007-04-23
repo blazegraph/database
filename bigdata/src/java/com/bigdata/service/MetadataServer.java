@@ -52,6 +52,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.jini.core.lookup.ServiceID;
@@ -100,6 +101,38 @@ public class MetadataServer extends DataServer implements ServiceDiscoveryListen
         
         return dataServiceLookupCache;
         
+    }
+    
+    /**
+     * Convert a Jini {@link ServiceID} to a {@link UUID} (this changes the kind
+     * of UUID implementation object but preserves the UUID data).
+     * 
+     * @param serviceID
+     *            The {@link ServiceID}.
+     * 
+     * @return The {@link UUID}.
+     */
+    public static UUID serviceID2UUID(ServiceID serviceID) {
+
+        return new UUID(serviceID.getMostSignificantBits(), serviceID
+                .getLeastSignificantBits());
+
+    }
+    
+    /**
+     * Convert a {@link UUID} to a Jini {@link ServiceID} (this changes the kind
+     * of UUID implementation object but preserves the UUID data).
+     * 
+     * @param uuid
+     *            The {@link UUID}.
+     * 
+     * @return The Jini {@link ServiceID}.
+     */
+    public static ServiceID uuid2ServiceID(UUID uuid) {
+
+        return new ServiceID(uuid.getMostSignificantBits(), uuid
+                .getLeastSignificantBits());
+
     }
     
     /**

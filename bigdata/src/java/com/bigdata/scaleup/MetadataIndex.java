@@ -51,11 +51,12 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.IRawStore;
@@ -78,23 +79,19 @@ import com.bigdata.rawstore.IRawStore;
  *       transaction remains which can read those data. This metadata must be
  *       restart-safe so that resources are eventually deleted.
  */
-public class MetadataIndex extends BTree {
+public class MetadataIndex extends UnisolatedBTree {
 
     /**
-     * The name of the metadata index, which is the always the same as the name
-     * under which the corresponding {@link PartitionedIndexView} was registered.
-     * 
-     * @todo rename as managedIndexName (and the access method as well).
+     * The name of the managed index.
      */
-    private final String name;
+    private final String managedIndexName;
     
     /**
-     * The name of the metadata index, which is the always the same as the name
-     * under which the corresponding {@link PartitionedIndexView} was registered.
+     * The name of the managed index.
      */
-    final public String getName() {
+    final public String getManagedIndexName() {
         
-        return name;
+        return managedIndexName;
         
     }
     
@@ -137,22 +134,19 @@ public class MetadataIndex extends BTree {
      * 
      * @param store
      *            The backing store.
-     * @param branchingFactor
-     *            The branching factor.
      * @param indexUUID
      *            The unique identifier for the metadata index.
      * @param managedIndexUUID
      *            The unique identifier for the managed scale-out index.
      * @param managedIndexName
-     *            The name of the managed scale out index.
+     *            The managedIndexName of the managed scale out index.
      */
-    public MetadataIndex(IRawStore store, int branchingFactor, UUID indexUUID,
+    public MetadataIndex(IRawStore store, UUID indexUUID,
             UUID managedIndexUUID, String managedIndexName) {
 
-        super(store, branchingFactor, indexUUID,
-                PartitionMetadata.Serializer.INSTANCE);
+        super(store, indexUUID );
         
-        this.name = managedIndexName;
+        this.managedIndexName = managedIndexName;
 
         //
         this.managedIndexUUID = managedIndexUUID;
@@ -163,7 +157,7 @@ public class MetadataIndex extends BTree {
         
         super(store, metadata);
         
-        name = ((MetadataIndexMetadata)metadata).getName();
+        managedIndexName = ((MetadataIndexMetadata)metadata).getName();
 
         managedIndexUUID = ((MetadataIndexMetadata)metadata).getManagedIndexUUID();
         
@@ -176,13 +170,13 @@ public class MetadataIndex extends BTree {
     }
 
     /**
-     * Extends the {@link BTreeMetadata} record to also hold the name of the
+     * Extends the {@link BTreeMetadata} record to also hold the managedIndexName of the
      * partitioned index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class MetadataIndexMetadata extends BTreeMetadata implements Externalizable {
+    public static class MetadataIndexMetadata extends UnisolatedBTreeMetadata implements Externalizable {
 
         private static final long serialVersionUID = -7309267778881420043L;
         
@@ -190,7 +184,7 @@ public class MetadataIndex extends BTree {
         private UUID managedIndexUUID;
         
         /**
-         * The name of the metadata index, which is the always the same as the name
+         * The managedIndexName of the metadata index, which is the always the same as the managedIndexName
          * under which the corresponding {@link PartitionedIndexView} was registered.
          */
         public final String getName() {
@@ -230,7 +224,7 @@ public class MetadataIndex extends BTree {
 
             super(mdi);
             
-            this.name = mdi.getName();
+            this.name = mdi.getManagedIndexName();
             
             this.managedIndexUUID = mdi.getManagedIndexUUID();
             
@@ -339,7 +333,9 @@ public class MetadataIndex extends BTree {
         
         if(index == -1) return null;
         
-        return (PartitionMetadata) super.valueAt( index );
+        byte[] val = (byte[]) super.valueAt(index);
+        
+        return (PartitionMetadata) SerializerUtil.deserialize(val);
         
     }
     
@@ -355,7 +351,11 @@ public class MetadataIndex extends BTree {
      */
     public PartitionMetadata get(byte[] key) {
         
-        return (PartitionMetadata) super.lookup(key);
+        byte[] val = (byte[]) super.lookup(key);
+        
+        if(val==null) return null;
+        
+        return (PartitionMetadata) SerializerUtil.deserialize(val);
         
     }
     
@@ -384,13 +384,18 @@ public class MetadataIndex extends BTree {
 
         }
         
-        PartitionMetadata oldval = (PartitionMetadata) super.insert(key,
-                val);
+        byte[] newval = SerializerUtil.serialize(val);
+        
+        byte[] oldval2 = (byte[])super.insert(key, newval);
 
-        if (oldval != null && oldval.partId != val.partId) {
+        PartitionMetadata oldval = oldval2 == null ? null
+                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
+        
+        if (oldval != null && oldval.getPartitionId() != val.getPartitionId()) {
 
             throw new IllegalArgumentException("Expecting: partId="
-                    + oldval.partId + ", but have partId=" + val.partId);
+                    + oldval.getPartitionId() + ", but have partId="
+                    + val.getPartitionId());
 
         }
 
@@ -410,7 +415,12 @@ public class MetadataIndex extends BTree {
      */
     public PartitionMetadata remove(byte[] key) {
         
-        return (PartitionMetadata) super.remove(key);
+        byte[] oldval2 = (byte[])super.remove(key);
+
+        PartitionMetadata oldval = oldval2 == null ? null
+                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
+
+        return oldval;
         
     }
 

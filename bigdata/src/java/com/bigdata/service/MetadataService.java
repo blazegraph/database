@@ -54,8 +54,6 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.journal.Journal;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
@@ -65,6 +63,13 @@ import com.bigdata.scaleup.PartitionMetadata;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Support creation and management of scale-out indices, including mapping
+ *       their index partitions to data services. Build out this functionality
+ *       with a series of test cases that invoke the basic operations
+ *       (registerIndex (done), getPartition (done), putPartition,
+ *       getPartitions, movePartition, etc.) and handle the load-balancing
+ *       later.
  * 
  * @todo Provide a means to reconstruct the metadata index from the journal and
  *       index segment data files. We tag each journal and index segment with a
@@ -83,7 +88,7 @@ import com.bigdata.scaleup.PartitionMetadata;
  *       index would allow access to those historical states. (E.g., you have to
  *       be able to access the historical state of the metadata index that
  *       corresponds to the commit time of interest for the database.)
- *       
+ * 
  * @todo support two-tier metadata index and reconcile with
  *       {@link MetadataIndex} and {@link MasterJournal}.
  */
@@ -96,29 +101,15 @@ abstract public class MetadataService extends DataService implements
 
     }
     
-    /*
-     * @todo Support creation and management of scale-out indices, including
-     * mapping their index partitions to data services. Build out this
-     * functionality with a series of test cases that invoke the basic
-     * operations (registerIndex, getPartition, getPartitions, movePartition,
-     * etc.) and handle the load-balancing later.
-     */
-
     /**
-     * @todo if if exits already?
+     * @todo if if exits already? (and has consistent/inconsistent metadata)?
      * 
      * @todo index metadata options (unicode support, per-partition counters,
-     *       etc.)  i had been passing in the BTree instance, but that does
-     *       not work as well in a distributed environment.
-     * 
-     * @todo refactor so that the {@link MetadataIndex} can be used with a
-     *       normal {@link Journal}
-     * 
-     * @todo create the initial partition and assign to the "least used" data
-     *       service (the data service impl needs to aggregate events and log
-     *       them in a manner that gets noticed by the metadata service).
+     *       etc.) i had been passing in the BTree instance, but that does not
+     *       work as well in a distributed environment.
      */
-    public UUID registerIndex(String name) throws IOException, InterruptedException, ExecutionException {
+    public UUID registerIndex(String name) throws IOException,
+            InterruptedException, ExecutionException {
         
         MetadataIndex mdi = (MetadataIndex) journal.serialize(
                 new RegisterMetadataIndexTask(name)).get();
@@ -186,9 +177,13 @@ abstract public class MetadataService extends DataService implements
             
             final UUID managedIndexUUID = UUID.randomUUID();
             
-            MetadataIndex mdi = new MetadataIndex(journal,
-                    BTree.DEFAULT_BRANCHING_FACTOR, metadataIndexUUID,
+            MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
                     managedIndexUUID, name);
+            
+            /*
+             * Register the metadata index.
+             */
+            journal.registerIndex(metadataName, mdi);
             
             /*
              * Setup the initial partition which is able to accept any key.
@@ -196,12 +191,10 @@ abstract public class MetadataService extends DataService implements
             
             ServiceID dataServiceID = getUnderUtilizedDataService();
             
-            UUID dataServiceUUID = new UUID(dataServiceID
-                    .getMostSignificantBits(), dataServiceID
-                    .getLeastSignificantBits());
-            
             final UUID[] dataServices = new UUID[]{
-                    dataServiceUUID
+                    
+                    MetadataServer.serviceID2UUID(dataServiceID)
+                    
             };
             
             mdi.put(new byte[]{}, new PartitionMetadata(0, dataServices ));
@@ -218,7 +211,9 @@ abstract public class MetadataService extends DataService implements
              * service. Note that this is a high-latency remote operation and
              * MUST NOT be run inside of the serialized write on the metadata
              * index itself. It is a good question exactly when this operation
-             * should be run....
+             * should be run.... One option would be lazily by the data service
+             * when it receives a request for an index / index key range that
+             * was not known to be mapped to that data service.
              */
             
             IDataService dataService = getDataServiceByID(dataServiceID);
