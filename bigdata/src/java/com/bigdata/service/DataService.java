@@ -57,6 +57,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
@@ -74,6 +76,7 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -100,6 +103,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
+ * 
+ * @todo make sure that all service methods that create a {@link Future} do a
+ *       get() so that the will block until the serialized task actually runs.
  * 
  * @todo Note that "auto-commit" is provided for unisolated writes. This relies
  *       on two things. First, only the {@link UnisolatedBTree} recoverable from
@@ -187,6 +193,9 @@ public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
 
     protected Journal journal;
+
+    public static final transient Logger log = Logger
+            .getLogger(DataService.class);
     
     /**
      * Pool of threads for handling unisolated reads.
@@ -369,15 +378,24 @@ public class DataService implements IDataService,
         
     }
 
-    public void registerIndex(String name,UUID indexUUID) {
+    public void registerIndex(String name,UUID indexUUID) throws IOException, InterruptedException, ExecutionException{
         
-        journal.serialize(new RegisterIndexTask(name,indexUUID));
+        journal.serialize(new RegisterIndexTask(name,indexUUID)).get();
         
     }
     
-    public void dropIndex(String name) {
+    public void dropIndex(String name) throws IOException, InterruptedException, ExecutionException {
         
-        journal.serialize(new DropIndexTask(name));
+        journal.serialize(new DropIndexTask(name)).get();
+        
+    }
+    
+    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
+            InterruptedException, ExecutionException {
+
+        byte[][] vals = batchLookup(tx, name, 1, new byte[][]{key});
+
+        return vals[0];
         
     }
     
@@ -631,7 +649,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private abstract class AbstractIndexManagementTask implements Callable<Object> {
+    protected abstract class AbstractIndexManagementTask implements Callable<Object> {
 
         protected final String name;
 
@@ -645,7 +663,7 @@ public class DataService implements IDataService,
 
     }
 
-    private class RegisterIndexTask extends AbstractIndexManagementTask {
+    protected class RegisterIndexTask extends AbstractIndexManagementTask {
 
         protected final UUID indexUUID;
         
@@ -676,9 +694,12 @@ public class DataService implements IDataService,
                 
             }
             
-            ndx = journal.registerIndex(name, new UnisolatedBTree(journal, indexUUID));
+            ndx = journal.registerIndex(name, new UnisolatedBTree(journal,
+                    indexUUID));
 
             journal.commit();
+
+            log.info("registeredIndex: "+name+", indexUUID="+indexUUID);
             
             return ndx;
             
@@ -686,7 +707,7 @@ public class DataService implements IDataService,
         
     }
     
-    private class DropIndexTask extends AbstractIndexManagementTask {
+    protected class DropIndexTask extends AbstractIndexManagementTask {
 
         public DropIndexTask(String name) {
             
@@ -714,7 +735,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private abstract class AbstractBatchTask implements Callable<Object> {
+    protected abstract class AbstractBatchTask implements Callable<Object> {
         
         private final String name;
         private final IBatchOp op;
@@ -787,7 +808,7 @@ public class DataService implements IDataService,
      *       progress it should not be possible for the thread pool as a whole
      *       to block.
      */
-    private class TxBatchTask extends AbstractBatchTask {
+    protected class TxBatchTask extends AbstractBatchTask {
         
         private final ITx tx;
 
@@ -827,7 +848,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class UnisolatedReadBatchTask extends AbstractBatchTask {
+    protected class UnisolatedReadBatchTask extends AbstractBatchTask {
 
         public UnisolatedReadBatchTask(String name, IBatchOp op) {
             
@@ -853,7 +874,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class UnisolatedBatchReadWriteTask extends UnisolatedReadBatchTask {
+    protected class UnisolatedBatchReadWriteTask extends UnisolatedReadBatchTask {
 
         public UnisolatedBatchReadWriteTask(String name, IBatchOp op) {
             
@@ -888,7 +909,7 @@ public class DataService implements IDataService,
         
     }
 
-    private class RangeCountTask implements Callable<Object> {
+    protected class RangeCountTask implements Callable<Object> {
 
         // startTime or 0L iff unisolated.
         private final long startTime;
@@ -969,7 +990,7 @@ public class DataService implements IDataService,
         
     }
 
-    private class RangeQueryTask implements Callable<Object> {
+    protected class RangeQueryTask implements Callable<Object> {
 
         // startTime or 0L iff unisolated.
         private final long startTime;
@@ -1077,7 +1098,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private abstract class AbstractProcedureTask implements Callable<Object> {
+    protected abstract class AbstractProcedureTask implements Callable<Object> {
         
         protected final IProcedure proc;
         
@@ -1112,7 +1133,7 @@ public class DataService implements IDataService,
      *       progress it should not be possible for the thread pool as a whole
      *       to block.
      */
-    private class TxProcedureTask extends AbstractProcedureTask {
+    protected class TxProcedureTask extends AbstractProcedureTask {
         
         private final ITx tx;
 
@@ -1152,7 +1173,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class UnisolatedReadProcedureTask extends AbstractProcedureTask {
+    protected class UnisolatedReadProcedureTask extends AbstractProcedureTask {
 
         public UnisolatedReadProcedureTask(IProcedure proc) {
             
@@ -1178,7 +1199,7 @@ public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class UnisolatedReadWriteProcedureTask extends UnisolatedReadProcedureTask {
+    protected class UnisolatedReadWriteProcedureTask extends UnisolatedReadProcedureTask {
 
         public UnisolatedReadWriteProcedureTask(IProcedure proc) {
             

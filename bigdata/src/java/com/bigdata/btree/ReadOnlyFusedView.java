@@ -125,7 +125,7 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
                     throw new IllegalArgumentException(
                             "source used more than once");
 
-                if (srcs[i].getIndexUUID().equals(srcs[j].getIndexUUID())) {
+                if (! srcs[i].getIndexUUID().equals(srcs[j].getIndexUUID())) {
                     throw new IllegalArgumentException(
                             "Sources have different index UUIDs");
                 }
