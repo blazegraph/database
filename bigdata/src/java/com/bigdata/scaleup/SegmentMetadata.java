@@ -60,19 +60,19 @@ public class SegmentMetadata implements IResourceMetadata {
     /**
      * The name of the file containing the {@link IndexSegment}.
      */
-    final public String filename;
+    private String filename;
     
     /**
      * The size of that file in bytes.
      */
-    final public long nbytes;
+    private long nbytes;
     
     /**
      * The life-cycle state for that {@link IndexSegment}.
      */
-    final public ResourceState state;
+    private ResourceState state;
     
-    final public UUID uuid;
+    private UUID uuid;
     
     public final boolean isIndexSegment() {
         
@@ -113,20 +113,27 @@ public class SegmentMetadata implements IResourceMetadata {
         
     }
 
-    public String getFile() {
+    final public String getFile() {
+        
         return filename;
+        
     }
 
-    public long size() {
+    final public long size() {
+        
         return nbytes;
     }
 
-    public ResourceState state() {
+    final public ResourceState state() {
+        
         return state;
+        
     }
 
-    public UUID getUUID() {
+    final public UUID getUUID() {
+        
         return uuid;
+        
     }
     
 }

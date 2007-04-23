@@ -65,9 +65,9 @@ public enum ResourceState {
     
     public String toString() {return name;}
     
-    public int valueOf() {return id;}
+    public short valueOf() {return (short)id;}
     
-    static public ResourceState valueOf(int id) {
+    static public ResourceState valueOf(short id) {
         switch(id) {
         case 0: return New;
         case 1: return Live;

@@ -183,11 +183,13 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         
         int n = 0;
         
-        for(int i=0; i<pmd.resources.length; i++) {
+        IResourceMetadata[] resources = pmd.getResources();
+        
+        for(int i=0; i<resources.length; i++) {
             
-            if(pmd.resources[i].state() != ResourceState.Live) continue;
+            if(resources[i].state() != ResourceState.Live) continue;
             
-            segs[n++] = (IndexSegment) master.getIndex(getName(), pmd.resources[i]);
+            segs[n++] = (IndexSegment) master.getIndex(getName(), resources[i]);
             
         }
         
@@ -249,7 +251,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         
         PartitionMetadata pmd = mdi.find(key);
         
-        ReadOnlyFusedView view = views.get(pmd.partId);
+        ReadOnlyFusedView view = views.get(pmd.getPartitionId());
         
         if(view==null) {
             
@@ -278,7 +280,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
             view = new ReadOnlyFusedView(sources);
             
             // place the view in the cache.
-            views.put(pmd.partId, view);
+            views.put(pmd.getPartitionId(), view);
             
         }
         
@@ -308,32 +310,34 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
         final int liveCount = pmd.getLiveCount();
 
-        IResourceMetadata[] resources = new IResourceMetadata[liveCount + 1];
-
+        IResourceMetadata[] tmp = new IResourceMetadata[liveCount + 1];
+        
         int n = 0;
 
-        resources[n++] = journalResource;
+        tmp[n++] = journalResource;
 
-        for (int i = 0; i < resources.length; i++) {
+        // @todo this should probably be a loop out to pmd.getResources().length
+        for (int i = 0; i < tmp.length; i++) {
 
-            IResourceMetadata seg = pmd.resources[i];
+            // @todo refactor out of loop.
+            IResourceMetadata seg = pmd.getResources()[i];
 
             if (seg.state() != ResourceState.Live)
                 continue;
 
-            resources[n++] = seg;
+            tmp[n++] = seg;
 
         }
 
-        assert n == resources.length;
+        assert n == tmp.length;
         
-        return resources;
+        return tmp;
 
     }
     
     public String getName() {
         
-        return mdi.getName();
+        return mdi.getManagedIndexName();
         
     }
     

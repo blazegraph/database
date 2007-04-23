@@ -326,7 +326,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         assertEquals("#partitions",1,mdi.getEntryCount());
         
-        assertEquals("#segments",0,mdi.get(new byte[]{}).resources.length);
+        assertEquals("#segments",0,mdi.get(new byte[]{}).getResources().length);
         
         /*
          * verify that the data are there.
@@ -375,7 +375,7 @@ public class TestPartitionedJournal extends TestCase2 {
         
         assertEquals("#partitions",1,mdi.getEntryCount());
         
-        assertEquals("#segments",1,mdi.get(new byte[]{}).resources.length);
+        assertEquals("#segments",1,mdi.get(new byte[]{}).getResources().length);
         
         /*
          * Verify that the data there.
@@ -452,19 +452,21 @@ public class TestPartitionedJournal extends TestCase2 {
             
             PartitionMetadata pmd = mdi.get(separatorKey);
             
-            assertEquals("partId",0,pmd.partId);
+            assertEquals("partId",0,pmd.getPartitionId());
             
             assertEquals("#segments", 1, pmd.getLiveCount());
             
-            if(pmd.resources.length>1) {
+            IResourceMetadata[] resources = pmd.getResources();
+            
+            if(resources.length>1) {
                 
-                assertEquals("#segments",2,pmd.resources.length);
+                assertEquals("#segments",2,resources.length);
                 
                 assertEquals("state", ResourceState.Dead,
-                        pmd.resources[0].state());
+                        resources[0].state());
                 
                 assertEquals("state", ResourceState.Live,
-                        pmd.resources[1].state());
+                        resources[1].state());
                 
             }
 

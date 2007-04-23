@@ -136,7 +136,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
 
         /*
@@ -219,7 +219,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
 
         /*
@@ -289,7 +289,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // re-load the index.
         md = (MetadataIndex)BTree.load(store, addr);
-        assertEquals("name","abc",md.getName());
+        assertEquals("name","abc",md.getManagedIndexName());
         
         assertEquals("#entries",3,md.getEntryCount());
 
@@ -319,7 +319,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
 
         /*
@@ -439,7 +439,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
@@ -549,7 +549,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
@@ -733,7 +733,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.
@@ -967,7 +967,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  */
                 seg.close();
                 
-                new File(oldpart.resources[0].getFile()).delete();
+                new File(oldpart.getResources()[0].getFile()).delete();
 
                 // this is now the current index segment.
                 seg = seg02;
@@ -994,7 +994,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         seg.close();
 
-        new File(md.get(new byte[]{}).resources[0].getFile()).delete();
+        new File(md.get(new byte[]{}).getResources()[0].getFile()).delete();
 
         System.err.println("End of stress test: ntrial="+ntrials+", nops="+nops);
 
@@ -1034,7 +1034,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         final UUID managedIndexUUID = UUID.randomUUID();  
         
         // create the metadata index.
-        MetadataIndex md = new MetadataIndex(store, 3, indexUUID,
+        MetadataIndex md = new MetadataIndex(store, indexUUID,
                 managedIndexUUID, "abc");
         
         // define a single partition with no segments.

@@ -41,59 +41,51 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Apr 23, 2007
+ */
+
 package com.bigdata.scaleup;
 
 import java.util.UUID;
 
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentMetadata;
 import com.bigdata.journal.Journal;
 
 /**
- * Interface for metadata about a {@link Journal} or {@link IndexSegment}.
+ * A description of the metadata state for a partition of a scale-out index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IResourceMetadata {
+public interface IPartitionMetadata {
 
     /**
-     * True iff this resource is an {@link IndexSegment}. Each
-     * {@link IndexSegment} contains historical read-only data for exactly one
-     * partition of a scale-out index.
+     * The unique partition identifier.
      */
-    public boolean isIndexSegment();
-    
-    /**
-     * True iff this resource is a {@link Journal}. When the resource is a
-     * {@link Journal}, there will be a named mutable btree on the journal that
-     * is absorbing writes for one or more index partition of a scale-out index.
-     */
-    public boolean isJournal();
-    
-    /**
-     * The name of the file containing the resource.
-     */
-    public String getFile();
-    
-    /**
-     * The #of bytes in the store file.
-     */
-    public long size();
+    public int getPartitionId();
 
     /**
-     * The life cycle state of that store file.
+     * The ordered list of data services on which data for this partition will
+     * be written and from which data for this partition may be read.
+     * 
+     * @todo refactor into a dataService UUID (required) and an array of zero or
+     *       more media replication services for failover.
      */
-    public ResourceState state();
-
-    /**
-     * The unique identifier for the resource (the UUID found in either the
-     * journal root block or the {@link IndexSegmentMetadata}).
-     */
-    public UUID getUUID();
+    public UUID[] getDataServices();
     
-//    public int hashCode();
-//    
-//    public boolean equals(IResourceMetadata o);
+    /**
+     * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
+     * holding live data for this partition. The entries in the array reflect
+     * the creation time of the index segments. The earliest resource is listed
+     * first. The most recently created resource is listed last. Only the
+     * {@link ResourceState#Live} resources must be read in order to provide a
+     * consistent view of the data for the index partition.
+     * {@link ResourceState#Dead} resources will eventually be scheduled for
+     * restart-safe deletion.
+     * 
+     * @see ResourceState
+     */
+    public IResourceMetadata[] getResources();
 
 }

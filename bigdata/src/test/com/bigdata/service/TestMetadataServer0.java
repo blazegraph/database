@@ -47,13 +47,13 @@ Modifications:
 
 package com.bigdata.service;
 
-import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.scaleup.PartitionMetadata;
-
 import net.jini.core.lookup.ServiceID;
+
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}
@@ -296,10 +296,11 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
         // wait for the service to be ready.
         ServiceID dataService0ID = getServiceID(dataServer0);
 
-        // lookup proxy for dataService0
-        final IDataService dataService0Proxy = lookupDataService(dataService0ID); 
-
         try {
+
+            // lookup proxy for dataService0
+            final IDataService dataService0Proxy = lookupDataService(dataService0ID); 
+
             /*
              * This should fail since the index was never registered.
              */
@@ -329,18 +330,44 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
         log.info("Registered scale-out index: indexUUID="+indexUUID);
         
         /*
-         * @todo request the partition for the scale-out index, figure out the
-         * data service for that partition, and make sure that an index was
-         * created on that data service for the partition.
+         * Request the index partition metadata for the initial partition of the
+         * scale-out index.
          */
 
-        // @todo encapsulate in method to generate metadata index name.
-        byte[] val = metadataServiceProxy.lookup(IDataService.UNISOLATED,
-                MetadataService.getMetadataName(indexName), new byte[] {});
+        IPartitionMetadata pmd;
+        {
+         
+            byte[] val = metadataServiceProxy.lookup(IDataService.UNISOLATED,
+                    MetadataService.getMetadataName(indexName), new byte[] {});
+            
+            assertNotNull(val);
+            
+            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+            
+        }
         
-        dataService0Proxy.rangeCount(IDataService.UNISOLATED, indexName, null,
-                null);
-        
+        /*
+         * Resolve the data service to which the initial index partition was
+         * mapped and verify that we can invoke an operation on that index on
+         * that data service (i.e., that the data service recognizes that it
+         * has an index registered by that name).
+         */
+        {
+
+            ServiceID serviceID = MetadataServer.uuid2ServiceID(pmd.getDataServices()[0]);
+
+            // @todo use lookup cache in a real client.
+            IDataService proxy = lookupDataService(serviceID);
+
+            /*
+             * Note: this will throw an exception if the index is not registered
+             * with this data service.
+             */
+            assertEquals("rangeCount", 0, proxy.rangeCount(
+                    IDataService.UNISOLATED, indexName, null, null));
+
+        }
+
     }
-    
+
 }

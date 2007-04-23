@@ -104,6 +104,13 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
+ * @todo should the data service monitor key ranges so that it can readily
+ *       reject requests when the index is registered but the key lies outside
+ *       of the range of an index partition mapped onto the data service? This
+ *       probably needs to happen in order for the data service to be able to
+ *       redirect clients if it sheds an index partition while the client has a
+ *       lease.
+ * 
  * @todo make sure that all service methods that create a {@link Future} do a
  *       get() so that the will block until the serialized task actually runs.
  * 

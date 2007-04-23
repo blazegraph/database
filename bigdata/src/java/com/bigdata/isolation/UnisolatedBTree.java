@@ -248,7 +248,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
     }
 
-    public BTreeMetadata newMetadata() {
+    protected BTreeMetadata newMetadata() {
         
         return new UnisolatedBTreeMetadata(this);
         

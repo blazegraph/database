@@ -51,6 +51,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
@@ -245,15 +246,14 @@ public class SlaveJournal extends Journal {
         
         final UUID managedIndexUUID = btree.getIndexUUID();
         
-        MetadataIndex mdi = new MetadataIndex(this,
-                BTree.DEFAULT_BRANCHING_FACTOR, metadataIndexUUID,
+        MetadataIndex mdi = new MetadataIndex(this, metadataIndexUUID,
                 managedIndexUUID, name);
         
         /*
          * Create the initial partition which can accept any key.
          * 
          * @todo specify the DataSerivce(s) that will accept writes for this
-         * index partition.  This should be done as part of refactoring the
+         * index partition. This should be done as part of refactoring the
          * metadata index into a first level service.
          */
         
@@ -377,11 +377,14 @@ public class SlaveJournal extends Journal {
 
         while (itr.hasNext()) {
 
-            final PartitionMetadata pmd = (PartitionMetadata) itr.next();
+            final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil
+                    .deserialize((byte[]) itr.next());
 
-            for (int i = 0; i < pmd.resources.length; i++) {
+            final IResourceMetadata[] resources = pmd.getResources();
+            
+            for (int i = 0; i < resources.length; i++) {
 
-                IResourceMetadata rmd = pmd.resources[i];
+                IResourceMetadata rmd = resources[i];
 
                 if (rmd.isIndexSegment()) {
 
@@ -398,7 +401,7 @@ public class SlaveJournal extends Journal {
 
             }
 
-            File dir = master.getPartitionDirectory(name, pmd.partId);
+            File dir = master.getPartitionDirectory(name, pmd.getPartitionId());
 
             if (!dir.delete()) {
 

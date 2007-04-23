@@ -369,15 +369,16 @@ abstract public class AbstractPartitionTask implements
             final IResourceMetadata[] newSegs = new IResourceMetadata[2];
 
             // assume only the last segment is live.
-            final SegmentMetadata oldSeg = (SegmentMetadata)pmd.resources[pmd.resources.length-1];
+            final SegmentMetadata oldSeg = (SegmentMetadata) pmd.getResources()[pmd
+                    .getResources().length - 1];
             
-            newSegs[0] = new SegmentMetadata(oldSeg.filename, oldSeg.nbytes,
-                    ResourceState.Dead, oldSeg.uuid);
+            newSegs[0] = new SegmentMetadata(oldSeg.getFile(), oldSeg.size(),
+                    ResourceState.Dead, oldSeg.getUUID());
 
             newSegs[1] = new SegmentMetadata(outFile.toString(), outFile
                     .length(), ResourceState.Live, builder.segmentUUID);
             
-            mdi.put(fromKey, new PartitionMetadata(0, pmd.dataServices, newSegs));
+            mdi.put(fromKey, new PartitionMetadata(0, pmd.getDataServices(), newSegs));
             
             return null;
             
