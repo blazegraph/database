@@ -62,8 +62,6 @@ import com.bigdata.journal.Journal;
  *       the historical states of the partition description in the metadata
  *       index?
  * 
- * @todo aggregate resource load statistics.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -77,6 +75,9 @@ public class PartitionMetadata /*implements Externalizable*/ {
     /**
      * The ordered list of data services on which data for this partition will
      * be written and from which data for this partition may be read.
+     * 
+     * @todo refactor into a dataService UUID (required) and an array of zero or
+     *       more media replication services for failover.
      */
     final protected UUID[] dataServices;
     

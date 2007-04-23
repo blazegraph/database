@@ -1026,7 +1026,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         Journal store = new Journal(properties);
         
-        final UUID[] dataServices = new UUID[]{UUID.randomUUID(),UUID.randomUUID()};
+        final UUID[] dataServices = new UUID[] { UUID.randomUUID(),
+                UUID.randomUUID() };
 
         final UUID indexUUID = UUID.randomUUID();
         

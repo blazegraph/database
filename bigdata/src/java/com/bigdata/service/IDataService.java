@@ -142,7 +142,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *       to absorb writes when one or more partitions of a scale out index
      *       are mapped onto the {@link DataService}.
      */
-    public void registerIndex(String name,UUID uuid) throws IOException;
+    public void registerIndex(String name, UUID uuid) throws IOException,
+            InterruptedException, ExecutionException;
 
     /**
      * Drops the named index (unisolated).
@@ -153,8 +154,27 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @exception IllegalArgumentException
      *                if <i>name</i> does not identify a registered index.
      */
-    public void dropIndex(String name) throws IOException;
-        
+    public void dropIndex(String name) throws IOException,
+            InterruptedException, ExecutionException;
+
+    /**
+     * Point lookup.
+     * 
+     * @param tx
+     * @param name
+     * @param key
+     * @return The value for that key (may be null) and <code>null</code> if
+     *         there is no value for that key.
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * 
+     * @todo consider simply encapsulating in the client library since this just
+     *       wraps a batchLookup operation.
+     */
+    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
+            InterruptedException, ExecutionException;
+    
     /**
      * <p>
      * Used by the client to submit a batch operation on a named B+Tree

@@ -47,6 +47,12 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.rmi.RemoteException;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+
+import com.bigdata.scaleup.PartitionMetadata;
+
 import net.jini.core.lookup.ServiceID;
 
 /**
@@ -70,8 +76,18 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
         super(arg0);
     }
 
+    /**
+     * Starts in {@link #setUp()}.
+     */
     MetadataServer metadataServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
     DataServer dataServer1;
+    /**
+     * Must be started by the test.
+     */
+    DataServer dataServer0;
 
     /**
      * Starts a {@link DataServer} ({@link #dataServer1}) and then a
@@ -124,8 +140,51 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
         dataServer1.destroy();
         
+        if(dataServer0!=null) {
+            
+            destroyDataServer0();
+            
+        }
+        
     }
 
+    /**
+     * Start data service 0.
+     */
+    protected void startDataServer0() {
+
+        assert dataServer0 == null;
+        
+        dataServer0 = new DataServer(
+                new String[] { "src/resources/config/standalone/DataServer0.config" });
+
+        new Thread() {
+
+            public void run() {
+
+                dataServer0.run();
+
+            }
+
+        }.start();
+
+    }
+    
+    /**
+     * Destroy data server 0.
+     */
+    protected void destroyDataServer0() {
+
+        assert dataServer0 != null;
+        
+        System.err.println("Destroying DataServer0");
+
+        dataServer0.destroy();
+
+        dataServer0 = null;
+        
+    }
+    
     /**
      * Test the ability to discover the {@link MetadataService} and the ability
      * of the {@link MetadataServer} to track {@link DataService}s.
@@ -137,34 +196,27 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
      */
     public void test_serverRunning() throws Exception {
 
+        // wait for the service to be ready.
         ServiceID dataService1ID = getServiceID(dataServer1);
 
+        // wait for the service to be ready.
         ServiceID metadataServiceID = getServiceID(metadataServer0);
 
-        final IMetadataService proxy = (IMetadataService) lookupDataService(metadataServiceID);
+        // get proxy for this metadata service.
+        final IMetadataService metadataServiceProxy = (IMetadataService) lookupDataService(metadataServiceID);
 
-        assertNotNull("service not discovered", proxy);
+        assertNotNull("service not discovered", metadataServiceProxy);
 
         /*
          * Start a data service and verify that the metadata service will
          * discover it.
          */
-        final DataServer dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config" });
 
         ServiceID dataService0ID = null;
 
         try {
 
-            new Thread() {
-
-                public void run() {
-
-                    dataServer0.run();
-
-                }
-
-            }.start();
+            startDataServer0();
 
             /*
              * wait until we get the serviceID as an indication that the data
@@ -195,9 +247,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
              * Destroy one of the data services and verify that the metadata
              * server notices this event.
              */
-            System.err.println("Destroying DataServer0");
-
-            dataServer0.destroy();
+            destroyDataServer0();
 
             if (dataService0ID != null) {
 
@@ -219,4 +269,78 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
     }
 
+    /**
+     * Registers a scale-out index and pre-partitions it to have data on each
+     * of two {@link DataService} instances.
+     */
+    public void test_registerScaleOutIndex() throws Exception {
+
+        // wait for the service to be ready.
+        ServiceID dataService1ID = getServiceID(dataServer1);
+
+        // wait for the service to be ready.
+        ServiceID metadataServiceID = getServiceID(metadataServer0);
+
+        // get proxy for this metadata service.
+        final IMetadataService metadataServiceProxy = (IMetadataService) lookupDataService(metadataServiceID);
+
+        assertNotNull("service not discovered", metadataServiceProxy);
+
+        /*
+         * wait until we get the serviceID as an indication that the data
+         * service is running.
+         */
+
+        startDataServer0();
+
+        // wait for the service to be ready.
+        ServiceID dataService0ID = getServiceID(dataServer0);
+
+        // lookup proxy for dataService0
+        final IDataService dataService0Proxy = lookupDataService(dataService0ID); 
+
+        try {
+            /*
+             * This should fail since the index was never registered.
+             */
+            dataService0Proxy.rangeCount(IDataService.UNISOLATED, "xyz", null,
+                    null);
+            
+        } catch (ExecutionException ex) {
+            
+            System.err.println("cause="+ex.getCause());
+            
+            assertTrue(ex.getCause() instanceof IllegalStateException);
+            
+            log.info("Ignoring expected exception: " + ex);
+            
+        }
+
+        //
+        assertNotNull(metadataServiceProxy.getUnderUtilizedDataService());
+
+        /*
+         * register a scale-out index.
+         */
+        final String indexName = "testIndex";
+        
+        UUID indexUUID = metadataServiceProxy.registerIndex(indexName);
+        
+        log.info("Registered scale-out index: indexUUID="+indexUUID);
+        
+        /*
+         * @todo request the partition for the scale-out index, figure out the
+         * data service for that partition, and make sure that an index was
+         * created on that data service for the partition.
+         */
+
+        // @todo encapsulate in method to generate metadata index name.
+        byte[] val = metadataServiceProxy.lookup(IDataService.UNISOLATED,
+                MetadataService.getMetadataName(indexName), new byte[] {});
+        
+        dataService0Proxy.rangeCount(IDataService.UNISOLATED, indexName, null,
+                null);
+        
+    }
+    
 }

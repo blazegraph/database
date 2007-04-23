@@ -47,12 +47,18 @@ Modifications:
 
 package com.bigdata.service;
 
-import java.net.InetSocketAddress;
+import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
+import net.jini.core.lookup.ServiceID;
+
+import com.bigdata.btree.BTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -77,26 +83,161 @@ import com.bigdata.scaleup.MetadataIndex;
  *       index would allow access to those historical states. (E.g., you have to
  *       be able to access the historical state of the metadata index that
  *       corresponds to the commit time of interest for the database.)
+ *       
+ * @todo support two-tier metadata index and reconcile with
+ *       {@link MetadataIndex} and {@link MasterJournal}.
  */
-public class MetadataService extends DataService implements IMetadataService, IServiceShutdown {
+abstract public class MetadataService extends DataService implements
+        IMetadataService, IServiceShutdown {
 
-    /**
-     * The name of the journal on which the metadata index is stored.
-     * 
-     * @todo support two-tier metadata index and reconcile with
-     *       {@link MetadataIndex} and {@link MasterJournal}.
-     */
-    protected Journal journal;
-    
-    public MetadataService(Properties properties) {
-        
+    protected MetadataService(Properties properties) {
+
         super(properties);
 
     }
     
-    public InetSocketAddress getDataService(String name,byte[] key) {
-        // TODO Auto-generated method stub
-        return null;
+    /*
+     * @todo Support creation and management of scale-out indices, including
+     * mapping their index partitions to data services. Build out this
+     * functionality with a series of test cases that invoke the basic
+     * operations (registerIndex, getPartition, getPartitions, movePartition,
+     * etc.) and handle the load-balancing later.
+     */
+
+    /**
+     * @todo if if exits already?
+     * 
+     * @todo index metadata options (unicode support, per-partition counters,
+     *       etc.)  i had been passing in the BTree instance, but that does
+     *       not work as well in a distributed environment.
+     * 
+     * @todo refactor so that the {@link MetadataIndex} can be used with a
+     *       normal {@link Journal}
+     * 
+     * @todo create the initial partition and assign to the "least used" data
+     *       service (the data service impl needs to aggregate events and log
+     *       them in a manner that gets noticed by the metadata service).
+     */
+    public UUID registerIndex(String name) throws IOException, InterruptedException, ExecutionException {
+        
+        MetadataIndex mdi = (MetadataIndex) journal.serialize(
+                new RegisterMetadataIndexTask(name)).get();
+        
+        UUID managedIndexUUID = mdi.getManagedIndexUUID();
+        
+        return managedIndexUUID; 
+                
+    }
+    
+    /**
+     * Return the name of the metadata index.
+     * 
+     * @param indexName
+     *            The name of the scale-out index.
+     * 
+     * @return The name of the corresponding {@link MetadataIndex} that is used
+     *         to manage the partitions in the named scale-out index.
+     */
+    public static String getMetadataName(String indexName) {
+        
+        return "metadata-"+indexName;
+        
+    }
+    
+    /**
+     * Registers a metadata index for a named scale-out index and creates the
+     * initial partition for the scale-out index on a {@link DataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class RegisterMetadataIndexTask extends AbstractIndexManagementTask {
+        
+        public RegisterMetadataIndexTask(String name) {
+
+            super(name);
+            
+        }
+        
+        public Object call() throws Exception {
+
+            // the name of the metadata index itself.
+            final String metadataName = getMetadataName(name);
+            
+            // make sure there is no metadata index for that btree.
+            if( journal.getIndex(metadataName) != null ) {
+                
+                throw new IllegalStateException("Already registered: name="
+                        + name);
+                
+            }
+
+            /*
+             * Note: there are two UUIDs here - the UUID for the metadata index
+             * describing the partitions of the named scale-out index and the UUID
+             * of the named scale-out index. The metadata index UUID MUST be used by
+             * all B+Tree objects having data for the metadata index (its mutable
+             * btrees on journals and its index segments) while the managed named
+             * index UUID MUST be used by all B+Tree objects having data for the
+             * named index (its mutable btrees on journals and its index segments).
+             */
+            
+            final UUID metadataIndexUUID = UUID.randomUUID();
+            
+            final UUID managedIndexUUID = UUID.randomUUID();
+            
+            MetadataIndex mdi = new MetadataIndex(journal,
+                    BTree.DEFAULT_BRANCHING_FACTOR, metadataIndexUUID,
+                    managedIndexUUID, name);
+            
+            /*
+             * Setup the initial partition which is able to accept any key.
+             */
+            
+            ServiceID dataServiceID = getUnderUtilizedDataService();
+            
+            UUID dataServiceUUID = new UUID(dataServiceID
+                    .getMostSignificantBits(), dataServiceID
+                    .getLeastSignificantBits());
+            
+            final UUID[] dataServices = new UUID[]{
+                    dataServiceUUID
+            };
+            
+            mdi.put(new byte[]{}, new PartitionMetadata(0, dataServices ));
+
+            journal.commit();
+
+            /*
+             * Create the initial partition of the scale-out index on the
+             * selected data service.
+             * 
+             * FIXME This must be done using a restart-safe operation such that
+             * the partition is either eventually created or the operation is
+             * retracted and the partition is created on a different data
+             * service. Note that this is a high-latency remote operation and
+             * MUST NOT be run inside of the serialized write on the metadata
+             * index itself. It is a good question exactly when this operation
+             * should be run....
+             */
+            
+            IDataService dataService = getDataServiceByID(dataServiceID);
+            
+            if(dataService==null) {
+                
+                throw new RuntimeException("Condition is not supported");
+                
+            }
+            
+            /*
+             * Register the index on the target data service (remote operation).
+             */
+            dataService.registerIndex(name, managedIndexUUID);
+            
+            return mdi;
+            
+        }
+        
     }
 
 }

@@ -206,11 +206,15 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     protected DiscoveryManagement getDiscoveryManagement() {
+        
         return discoveryManager;
+        
     }
     
     protected JoinManager getJoinManager() {
+        
         return joinManager;
+        
     }
     
     /**
@@ -518,27 +522,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     public void notify(LeaseRenewalEvent event) {
 
-        log.error("Lease could not be renewed: " + event);
+        log.warn("Lease could not be renewed: " + event);
         
     }
-
-//    /*
-//     * DiscoveryListener
-//     */
-//
-//    /**
-//     * NOP.
-//     */
-//    public void discovered(DiscoveryEvent arg0) {
-//        log.info("DiscoveryListener.discovered: "+arg0);
-//    }
-//
-//    /**
-//     * NOP.
-//     */
-//    public void discarded(DiscoveryEvent arg0) {
-//        log.info("DiscoveryListener.discarded: "+arg0);
-//    }
 
     /**
      * Shutdown the server taking time only to unregister it from jini.
@@ -792,45 +778,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      *            command line arguments.
      */
     abstract protected Remote newService(Properties properties);
-
-//    /**
-//     * The remote service implementation object. This implements the
-//     * {@link Remote} interface and uses JERI to create a proxy for the remote
-//     * object and configure and manage the protocol for communications between
-//     * the client (service proxy) and the remote object (the service
-//     * implementation).
-//     * <p>
-//     * Note: You have to implement {@link JoinAdmin} in order to show up as an
-//     * administerable service (blue folder) in the jini Service Browser.
-//     * 
-//     * @version $Id$
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
-//     *         </a>
-//     */
-//    public static class TestServiceImpl implements ITestService
-//    {
-//
-//        /**
-//         * Service constructor.
-//         * 
-//         * @param properties
-//         */
-//        public TestServiceImpl(Properties properties) {
-//
-//            log.info("Created: " + this );
-//
-//            new Journal(properties);
-//            
-//        }
-//
-//        public void invoke() {
-//
-//            log.info("invoked: "+this);
-//            
-//        }
-//
-//    }
-
 
     /*
      * Note: You need to extend Remote in order for these APIs to be exported!
