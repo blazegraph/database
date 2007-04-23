@@ -94,7 +94,7 @@ import com.sun.jini.start.ServiceStarter;
  * The recommended way to start a server is using the {@link ServiceStarter}.
  * 
  * <pre>
- *      java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ *       java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
  * </pre>
  * 
  * Other command line options MAY be recommended depending on the server that
@@ -138,8 +138,11 @@ import com.sun.jini.start.ServiceStarter;
  * @todo put a lock on the serviceIdFile while the server is running.
  * 
  * @todo the {@link DestroyAdmin} implementation on the {@link DataServer} is
- *       not working correctly.  Untangle the various ways in which things can
- *       be stopped vs destroyed.
+ *       not working correctly. Untangle the various ways in which things can be
+ *       stopped vs destroyed.
+ * 
+ * @todo document exit status codes and unify their use in this and derived
+ *       classes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -164,7 +167,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
     private ServiceID serviceID;
     private DiscoveryManagement discoveryManager;
-    private JoinManager joinManager;
+    private  JoinManager joinManager;
     private Configuration config;
     /**
      * The file where the {@link ServiceID} will be written/read. 
@@ -186,6 +189,14 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     private boolean open = false;
 
     /**
+     * The object used to inform the hosting environment that the server is
+     * unregistering (terminating). A fake object is used when the server is run
+     * from the command line, otherwise the object is supplied by the
+     * {@link NonActivatableServiceDescriptor}.
+     */
+    private LifeCycle lifeCycle;
+    
+    /**
      * Return the assigned {@link ServiceID}.
      */
     public ServiceID getServiceID() {
@@ -193,14 +204,14 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         return serviceID;
         
     }
+
+    protected DiscoveryManagement getDiscoveryManagement() {
+        return discoveryManager;
+    }
     
-    /**
-     * The object used to inform the hosting environment that the server is
-     * unregistering (terminating). A fake object is used when the server is run
-     * from the command line, otherwise the object is supplied by the
-     * {@link NonActivatableServiceDescriptor}.
-     */
-    private LifeCycle lifeCycle;
+    protected JoinManager getJoinManager() {
+        return joinManager;
+    }
     
     /**
      * Server startup reads {@link Configuration} data from the file(s) named by
@@ -227,14 +238,14 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      * 
      * @see NonActivatableServiceDescriptor
      */
-    protected AbstractServer(String[] args, LifeCycle lifeCycle ) {
+    private AbstractServer(String[] args, LifeCycle lifeCycle ) {
         
         if (lifeCycle == null)
             throw new IllegalArgumentException();
         
         this.lifeCycle = lifeCycle;
         
-        // @todo verify that this belongs here.
+        // @todo verify that this belongs here vs in a main(String[]).
         System.setSecurityManager(new SecurityManager());
 
         Entry[] entries = null;
@@ -329,6 +340,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
             open = true;
             
+            log.info("Impl is "+impl);
             log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch(ConfigurationException ex) {
@@ -355,7 +367,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
              * multicast discovery.
              */
             discoveryManager = new LookupDiscoveryManager(
-                    groups, unicastLocators, null // DiscoveryListener
+                    groups, unicastLocators, null /*DiscoveryListener*/
             );
 
 //            DiscoveryManagement discoveryManager = new LookupDiscovery(
@@ -367,7 +379,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                  */
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
-                        serviceID, // ServiceIDListener
+                        serviceID, // ServiceID
                         discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
             } else {
@@ -509,6 +521,24 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         log.error("Lease could not be renewed: " + event);
         
     }
+
+//    /*
+//     * DiscoveryListener
+//     */
+//
+//    /**
+//     * NOP.
+//     */
+//    public void discovered(DiscoveryEvent arg0) {
+//        log.info("DiscoveryListener.discovered: "+arg0);
+//    }
+//
+//    /**
+//     * NOP.
+//     */
+//    public void discarded(DiscoveryEvent arg0) {
+//        log.info("DiscoveryListener.discarded: "+arg0);
+//    }
 
     /**
      * Shutdown the server taking time only to unregister it from jini.
