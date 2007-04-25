@@ -86,6 +86,12 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
     public boolean overflow();
     
     /**
+     * Shutdown the journal politely. Scheduled operations will run to
+     * completion, but no new operations will be scheduled.
+     */
+    public void shutdown();
+
+    /**
      * Return the named index which MAY may be invalidated by a
      * {@link IAtomicStore#commit()}.
      */

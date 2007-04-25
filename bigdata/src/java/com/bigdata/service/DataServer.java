@@ -50,6 +50,7 @@ package com.bigdata.service;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.Properties;
+import java.util.UUID;
 
 import net.jini.config.Configuration;
 
@@ -159,6 +160,7 @@ public class DataServer extends AbstractServer {
             RemoteAdministrable, RemoteDestroyAdmin {
         
         protected AbstractServer server;
+        private UUID serviceUUID;
         
         public AdministrableDataService(AbstractServer server,Properties properties) {
             
@@ -202,6 +204,18 @@ public class DataServer extends AbstractServer {
 
             }.start();
 
+        }
+
+        protected UUID getDataServiceUUID() {
+
+            if(serviceUUID==null) {
+
+                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+                
+            }
+            
+            return serviceUUID;
+            
         }
 
 // /*

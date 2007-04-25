@@ -47,6 +47,11 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.util.UUID;
+
+import com.bigdata.btree.IIndex;
+import com.bigdata.service.BigdataClient.IBigdataFederation;
+
 /**
  * Test suite for the {@link BigdataClient}.
  * 
@@ -183,7 +188,65 @@ public class TestBigdataClient extends AbstractServerTestCase {
     public void test_federationRunning() throws Exception {
         
         assertNotNull("metadataService", client.getMetadataService());
+
+        IBigdataFederation fed = client.connect();
         
+        final String name = "testIndex";
+        
+        UUID indexUUID = fed.registerIndex(name);
+        
+        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        
+        // fetches the index UUID from the metadata service.
+        assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+
+        // uses the cached copy of the index UUID.
+        assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+
+        // the index is empty.
+        assertFalse(ndx.contains(new byte[]{1}));
+     
+        // the key is not in the index.
+        assertEquals(null,(byte[])ndx.lookup(new byte[]{1}));
+        
+        // insert a key-value pair.
+        assertNull(ndx.insert(new byte[]{1}, new byte[]{1}));
+
+        // verify index reports value exists for the key.
+        assertTrue(ndx.contains(new byte[]{1}));
+
+        // verify correct value in the index.
+        assertEquals(new byte[]{1},(byte[])ndx.lookup(new byte[]{1}));
+
+        // verify some range counts.
+        // @todo test with rangeCount(null,null).
+        assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
+        assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
+        assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
+        
+        // remove the index entry.
+        assertEquals(new byte[]{1},(byte[])ndx.remove(new byte[]{1}));
+
+        // the index is empty.
+        assertFalse(ndx.contains(new byte[]{1}));
+
+        // the key is not in the index.
+        assertEquals(null,(byte[])ndx.lookup(new byte[]{1}));
+        
+        /*
+         * verify some range counts.
+         * 
+         * Note: the range counts do NOT immediately adjust when keys are
+         * removed since deletion markers are written into those entries. The
+         * relevant index partition(s) need to be compacted for those deletion
+         * markers to be removed and the range counts adjusted to match.
+         * 
+         * @todo test with rangeCount(null,null).
+         */
+        assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
+        assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
+        assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
+
     }
     
 }

@@ -1176,6 +1176,13 @@ public class MasterJournal implements IJournal {
     public File getFile() {
         return slave.getFile();
     }
+
+    /**
+     * Shutdown the journal politely.
+     */
+    public void shutdown() {
+        slave.shutdown();
+    }
     
     public void close() {
         slave.close();

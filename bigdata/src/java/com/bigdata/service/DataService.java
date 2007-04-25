@@ -196,7 +196,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       expect bigdata to operate on a private network, but replicate across
  *       gateways is also a common use case. Do we have to handle it specially?
  */
-public class DataService implements IDataService,
+abstract public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
 
     protected Journal journal;
@@ -347,6 +347,14 @@ public class DataService implements IDataService,
         
     }
 
+    /**
+     * The unique identifier for this data service - this is used mainly for log
+     * messages.
+     * 
+     * @return The unique data service identifier.
+     */
+    protected abstract UUID getDataServiceUUID();
+    
     /*
      * ITxCommitProtocol.
      */
@@ -385,12 +393,27 @@ public class DataService implements IDataService,
         
     }
 
-    public void registerIndex(String name,UUID indexUUID) throws IOException, InterruptedException, ExecutionException{
-        
-        journal.serialize(new RegisterIndexTask(name,indexUUID)).get();
-        
+    public void registerIndex(String name, UUID indexUUID) throws IOException,
+            InterruptedException, ExecutionException {
+
+        journal.serialize(new RegisterIndexTask(name, indexUUID)).get();
+
     }
     
+    public UUID getIndexUUID(String name) throws IOException {
+        
+        IIndex ndx = journal.getIndex(name);
+        
+        if(ndx == null) {
+            
+            return null;
+            
+        }
+        
+        return ndx.getIndexUUID();
+        
+    }
+
     public void dropIndex(String name) throws IOException, InterruptedException, ExecutionException {
         
         journal.serialize(new DropIndexTask(name)).get();
@@ -406,15 +429,20 @@ public class DataService implements IDataService,
         
     }
     
-    public void batchInsert(long tx, String name, int ntuples, byte[][] keys,
-            byte[][] vals) throws InterruptedException, ExecutionException {
-        
-        batchOp( tx, name, new BatchInsert(ntuples, keys, vals));
-        
+    public byte[][] batchInsert(long tx, String name, int ntuples,
+            byte[][] keys, byte[][] vals, boolean returnOldValues)
+            throws InterruptedException, ExecutionException {
+
+        BatchInsert op = new BatchInsert(ntuples, keys, vals);
+
+        batchOp(tx, name, op);
+
+        return returnOldValues ? (byte[][]) op.values : null;
+
     }
 
-    public boolean[] batchContains(long tx, String name, int ntuples, byte[][] keys
-            ) throws InterruptedException, ExecutionException {
+    public boolean[] batchContains(long tx, String name, int ntuples,
+            byte[][] keys) throws InterruptedException, ExecutionException {
         
         BatchContains op = new BatchContains(ntuples, keys, new boolean[ntuples]);
         
@@ -705,7 +733,7 @@ public class DataService implements IDataService,
                     indexUUID));
 
             journal.commit();
-
+            // @todo log the dataServiceID with each log message for this class.
             log.info("registeredIndex: "+name+", indexUUID="+indexUUID);
             
             return ndx;

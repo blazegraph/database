@@ -49,6 +49,8 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -63,11 +65,14 @@ import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
+import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
@@ -99,6 +104,10 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * When using unisolated operations, the client does not need to resolve or use
  * the transaction manager and it simply specifies <code>0L</code> as the
  * transaction identifier for its read and write operations.
+ * 
+ * @todo support transactions (there is no transaction manager service yet and
+ *       the 2-/3-phase commit protocol has not been implemented on the
+ *       journal).
  * 
  * @todo Write or refactor logic to map operations across multiple partitions.
  * 
@@ -150,6 +159,18 @@ public class BigdataClient {//implements DiscoveryListener {
     private DiscoveryManagement discoveryManager = null;
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
     private LookupCache metadataServiceLookupCache = null;
+    private LookupCache dataServiceLookupCache = null;
+    private DataServiceMap dataServiceMap = new DataServiceMap();
+
+    private final ServiceTemplate metadataServiceTemplate = new ServiceTemplate(
+            null, new Class[] { IMetadataService.class }, null);
+
+    private final ServiceTemplate dataServiceTemplate = new ServiceTemplate(
+            null, new Class[] { IDataService.class }, null);
+
+    private ServiceItemFilter metadataServiceFilter = null;
+
+    private ServiceItemFilter dataServiceFilter = new MetadataServer.DataServiceFilter();
 
     /**
      * Return the {@link MetadataService} from the cache. If there is a cache
@@ -169,37 +190,117 @@ public class BigdataClient {//implements DiscoveryListener {
      * 
      * @todo parameter for the bigdata federation? (filter)
      */
-    public IMetadataService getMetadataService() throws InterruptedException {
+    public IMetadataService getMetadataService() {
         
-        ServiceItem item = null;
-        
-        for(int i=0; i<10; i++) {
-        
-            item = metadataServiceLookupCache.lookup(null);
+        ServiceItem item = metadataServiceLookupCache.lookup(null);
             
-            if (item != null) {
+        if (item == null) {
 
-                // found one.
+            /*
+             * cache miss. do a remote query on the managed set of service
+             * registrars.
+             */
+
+            log.info("Cache miss.");
+            
+            final long timeout = 1000L; // millis.
+
+            try {
+
+                item = serviceDiscoveryManager.lookup(metadataServiceTemplate,
+                        metadataServiceFilter, timeout);
+
+            } catch (RemoteException ex) {
                 
-                break;
+                log.error(ex);
+                
+                return null;
+                
+            } catch(InterruptedException ex) {
+                
+                log.info("Interrupted - no match.");
+                
+                return null;
                 
             }
-        
-            Thread.sleep(200);
-            
-        }
-        
-        if(item==null) {
-            
-            log.warn("No metadata service in cache");
-            
-            return null;
+
+            if( item == null ) {
+                
+                // Could not discover a metadata service.
+                
+                log.warn("Could not discover metadata service");
+                
+                return null;
+                
+            }
             
         }
         
         log.info("Found: "+item);
         
         return (IMetadataService)item.service;
+        
+    }
+
+    /**
+     * Resolve the {@link ServiceID} to an {@link IDataService} using a local
+     * cache.
+     * 
+     * @param serviceID
+     *            The identifier for a {@link DataService}.
+     *            
+     * @return The proxy for that {@link DataService} or <code>null</code> iff
+     *         the {@link DataService} could not be discovered.
+     */
+    public IDataService getDataService(ServiceID serviceID) {
+        
+        ServiceItem item = dataServiceMap.getDataServiceByID(serviceID);
+        
+        if (item == null) {
+
+            /*
+             * cache miss. do a remote query on the managed set of service
+             * registrars.
+             */
+
+            log.info("Cache miss.");
+            
+            final long timeout = 1000L; // millis.
+
+            try {
+
+                item = serviceDiscoveryManager.lookup(dataServiceTemplate,
+                        dataServiceFilter, timeout);
+
+            } catch (RemoteException ex) {
+                
+                log.error(ex);
+                
+                return null;
+                
+            } catch(InterruptedException ex) {
+                
+                log.info("Interrupted - no match.");
+                
+                return null;
+                
+            }
+
+            if( item == null ) {
+                
+                // Could not discover a data service.
+                
+                log.warn("Could not discover data service");
+                
+                return null;
+                
+            }
+            
+        }
+        
+        log.info("Found: "+item);
+        
+        return (IDataService)item.service;
         
     }
     
@@ -272,7 +373,7 @@ public class BigdataClient {//implements DiscoveryListener {
 
         /*
          * Setup a helper class that will be notified as services join or leave
-         * the various registrars to which the metadata server is listening.
+         * the various registrars to which the client is listening.
          */
         try {
 
@@ -300,15 +401,38 @@ public class BigdataClient {//implements DiscoveryListener {
          */
         try {
             
-            ServiceTemplate template = new ServiceTemplate(null,
-                    new Class[] { IMetadataService.class }, null);
-
-            metadataServiceLookupCache = serviceDiscoveryManager
-                    .createLookupCache(template, null /* filter */, null);
+            metadataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
+                    metadataServiceTemplate,
+                    null /* filter */, null);
             
         } catch(RemoteException ex) {
             
-            log.error("Could not setup lookup metadataServiceLookupCache", ex);
+            log.error("Could not setup MetadataService LookupCache", ex);
+
+            terminate();
+            
+            System.exit(1);
+            
+        }
+
+        /*
+         * Setup a LookupCache that is used to keep track of all data services
+         * registered with any service registrar to which the client is
+         * listening.
+         * 
+         * @todo provide filtering by attributes to select the primary vs
+         * failover metadata servers? by attributes identiying the bigdata
+         * federation?
+         */
+        try {
+
+            dataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
+                    dataServiceTemplate,
+                    dataServiceFilter /* filter */, dataServiceMap);
+            
+        } catch(RemoteException ex) {
+            
+            log.error("Could not setup DataService LookupCache", ex);
 
             terminate();
             
@@ -331,6 +455,14 @@ public class BigdataClient {//implements DiscoveryListener {
 
         }
 
+        if (dataServiceLookupCache != null) {
+
+            dataServiceLookupCache.terminate();
+            
+            dataServiceLookupCache = null;
+
+        }
+
         if (serviceDiscoveryManager != null) {
 
             serviceDiscoveryManager.terminate();
@@ -349,4 +481,196 @@ public class BigdataClient {//implements DiscoveryListener {
 
     }
 
+    /**
+     * Connect to a bigdata federation.
+     * 
+     * @return
+     * 
+     * @todo determine how a federation will be identified, e.g., by a name that
+     *       is an {@link Entry} on the {@link MetadataServer} and
+     *       {@link DataServer} service descriptions and provide that name
+     *       attribute here. Note that a {@link MetadataService} can failover,
+     *       so the {@link ServiceID} for the {@link MetadataService} is not the
+     *       invariant, but rather the name attribute for the federation.
+     */
+    public IBigdataFederation connect() {
+
+        return new BigdataFederation(this);
+
+    }
+    
+    /**
+     * Interface to a bigdata federation.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo declare public methods intended for application use.
+     */
+    public static interface IBigdataFederation {
+
+        /**
+         * A constant that may be used as the transaction identifier when the
+         * operation is <em>unisolated</em> (non-transactional).  The value of
+         * this constant is ZERO (0L).
+         */
+        public static final long UNISOLATED = 0L;
+
+        /**
+         * Register a scale-out index with the federation.
+         * 
+         * @param name
+         *            The index name.
+         *            
+         * @return The UUID that identifies the scale-out index.
+         */
+        public UUID registerIndex(String name);
+        
+        /**
+         * Obtain a view on a partitioned index.
+         * 
+         * @param tx
+         *            The transaction identifier or zero(0L) iff the index will
+         *            be unisolated.
+         * 
+         * @param name
+         *            The index name.
+         * 
+         * @return The index or <code>null</code> if the index is not
+         *         registered with the {@link MetadataService}.
+         */
+        public IIndex getIndex(long tx, String name);
+
+    }
+
+    /**
+     * This class encapsulates access to the metadata and data services for a
+     * bigdata federation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class BigdataFederation implements IBigdataFederation {
+       
+        private final BigdataClient client;
+
+        public IMetadataService getMetadataService() {
+            
+            return client.getMetadataService();
+            
+        }
+        
+        public BigdataFederation(BigdataClient client) {
+            
+            if(client==null) throw new IllegalArgumentException();
+            
+            this.client = client;
+            
+        }
+        
+        public UUID registerIndex(String name) {
+            
+            try {
+
+                return getMetadataService().registerIndex(name);
+                
+            } catch(Exception ex) {
+                
+                log.error(ex);
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
+        }
+        
+        /**
+         * @todo support isolated views, share cached data service information
+         *       between isolated and unisolated views.
+         */
+        public IIndex getIndex(long tx, String name) {
+
+            // @todo if(tx!=0l) validate exists?
+            
+            return new ClientIndexView(this,tx,name); 
+            
+        }
+
+        /**
+         * @todo setup cache.  test cache and lookup on metadata service if a 
+         * cache miss.
+         * 
+         * @param name
+         * @param key
+         * @return
+         */
+        public IPartitionMetadata getPartition(String name, byte[] key) {
+        
+//            synchronized(indexCache) {
+//            
+//                Map<Integer,IDataService> partitionCache = indexCache.get(name);
+//             
+//                if(partitionCache==null) {
+//                    
+//                    partitionCache = new ConcurrentHashMap<Integer, IDataService>();
+//                    
+//                    indexCache.put(name, partitionCache);
+//                    
+//                }
+//                
+//                IDataService dataService = 
+//                
+//            }
+
+            /*
+             * Request the index partition metadata for the initial partition of the
+             * scale-out index.
+             */
+
+            IPartitionMetadata pmd;
+            
+            try {
+             
+                pmd = getMetadataService().getPartition(name, key);
+                
+            } catch(Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            return pmd;
+
+        }
+//        
+//        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
+
+        /**
+         * Resolve the data service to which the index partition was mapped.
+         * 
+         * @todo use lookup cache in a real client.
+         */
+        public IDataService getDataService(IPartitionMetadata pmd) {
+
+            ServiceID serviceID = JiniUtil
+                    .uuid2ServiceID(pmd.getDataServices()[0]);
+
+            final IDataService dataService;
+            
+            try {
+
+                dataService = client.getDataService(serviceID);
+                
+            } catch(Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            return dataService;
+
+        }
+        
+    }
+    
 }

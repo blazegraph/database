@@ -234,12 +234,12 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
             Thread.sleep(500);
 
-            assertNotNull(metadataServer0.getDataServiceByID(dataService0ID));
+            assertNotNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService0ID));
 
-            assertNotNull(metadataServer0.getDataServiceByID(dataService1ID));
+            assertNotNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService1ID));
 
-            assertEquals("#dataServices", 2, metadataServer0
-                    .getDataServiceCount());
+            assertEquals("#dataServices", 2, metadataServer0.
+                    dataServiceMap.getDataServiceCount());
 
         } finally {
 
@@ -256,12 +256,12 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
                 Thread.sleep(500);
 
                 assertEquals("#dataServices", 1, metadataServer0
-                        .getDataServiceCount());
+                        .dataServiceMap.getDataServiceCount());
 
-                assertNull(metadataServer0.getDataServiceByID(dataService0ID));
+                assertNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService0ID));
 
                 assertNotNull(metadataServer0
-                        .getDataServiceByID(dataService1ID));
+                        .dataServiceMap.getDataServiceByID(dataService1ID));
 
             }
 
@@ -334,17 +334,10 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          * scale-out index.
          */
 
-        IPartitionMetadata pmd;
-        {
-         
-            byte[] val = metadataServiceProxy.lookup(IDataService.UNISOLATED,
-                    MetadataService.getMetadataName(indexName), new byte[] {});
-            
-            assertNotNull(val);
-            
-            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
-            
-        }
+        IPartitionMetadata pmd = metadataServiceProxy.getPartition(indexName,
+                new byte[] {});
+
+        assertNotNull(pmd);
         
         /*
          * Resolve the data service to which the initial index partition was

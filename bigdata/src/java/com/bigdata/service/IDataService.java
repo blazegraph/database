@@ -146,6 +146,20 @@ public interface IDataService extends IRemoteTxCommitProtocol {
             InterruptedException, ExecutionException;
 
     /**
+     * Return the unique index identifier for the named index (synchronous,
+     * unisolated).
+     * 
+     * @param name
+     *            The index name.
+     *            
+     * @return The index UUID -or- <code>null</code> if the index is not
+     *         registered on this {@link IDataService}.
+     *         
+     * @throws IOException
+     */
+    public UUID getIndexUUID(String name) throws IOException;
+
+    /**
      * Drops the named index (unisolated).
      * 
      * @param name
@@ -228,9 +242,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @todo javadoc update.
      * @todo support extension operations (read or mutable).
      */
-    public void batchInsert(long tx, String name, int ntuples, byte[][] keys,
-            byte[][] values) throws InterruptedException, ExecutionException,
-            IOException;
+    public byte[][] batchInsert(long tx, String name, int ntuples,
+            byte[][] keys, byte[][] values, boolean returnOldValues)
+            throws InterruptedException, ExecutionException, IOException;
 
     public boolean[] batchContains(long tx, String name, int ntuples,
             byte[][] keys) throws InterruptedException, ExecutionException,

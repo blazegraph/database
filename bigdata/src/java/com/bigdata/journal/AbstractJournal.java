@@ -774,9 +774,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     }
 
     /**
-     * Shutdown the journal politely. Active transactions and transactions
-     * pending commit will run to completion, but no new transactions will be
-     * accepted.
+     * Shutdown the journal politely. Active writes, active transactions and
+     * transactions pending commit will run to completion, but no new
+     * transactions will be accepted.
      */
     public void shutdown() {
 

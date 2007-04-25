@@ -54,6 +54,7 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
+import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
@@ -95,6 +96,21 @@ import com.bigdata.scaleup.PartitionMetadata;
 abstract public class MetadataService extends DataService implements
         IMetadataService, IServiceShutdown {
 
+    /**
+     * Return the name of the metadata index.
+     * 
+     * @param indexName
+     *            The name of the scale-out index.
+     * 
+     * @return The name of the corresponding {@link MetadataIndex} that is used
+     *         to manage the partitions in the named scale-out index.
+     */
+    public static String getMetadataName(String indexName) {
+        
+        return "metadata-"+indexName;
+        
+    }
+    
     protected MetadataService(Properties properties) {
 
         super(properties);
@@ -119,21 +135,58 @@ abstract public class MetadataService extends DataService implements
         return managedIndexUUID; 
                 
     }
-    
-    /**
-     * Return the name of the metadata index.
-     * 
-     * @param indexName
-     *            The name of the scale-out index.
-     * 
-     * @return The name of the corresponding {@link MetadataIndex} that is used
-     *         to manage the partitions in the named scale-out index.
-     */
-    public static String getMetadataName(String indexName) {
+
+    public UUID getManagedIndexUUID(String name) throws IOException {
         
-        return "metadata-"+indexName;
+        // the name of the metadata index itself.
+        final String metadataName = getMetadataName(name);
+        
+        // make sure there is no metadata index for that btree.
+        MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
+        
+        if(mdi == null) {
+            
+            return null;
+            
+        }
+        
+        return mdi.getManagedIndexUUID();
         
     }
+
+    public IPartitionMetadata getPartition(String name,byte[] key) throws IOException {
+        
+        // the name of the metadata index itself.
+        final String metadataName = getMetadataName(name);
+        
+        // make sure there is no metadata index for that btree.
+        MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
+        
+        if(mdi == null) {
+            
+            throw new IllegalArgumentException("Index not registered: " + name);
+            
+        }
+
+        /*
+         * @todo this winds up deserializing the value into a PartitionMetadata
+         * object and then re-serializing it to return to the remote client.
+         */
+        IPartitionMetadata pmd = mdi.find(key);
+        
+        if( pmd == null ) {
+            
+            throw new IllegalStateException("No partitioned in index: "+name);
+            
+        }
+        
+        return pmd;
+        
+    }
+    
+    /*
+     * Tasks.
+     */
     
     /**
      * Registers a metadata index for a named scale-out index and creates the
