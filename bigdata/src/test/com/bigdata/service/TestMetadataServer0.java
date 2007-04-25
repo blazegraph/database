@@ -334,11 +334,19 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          * scale-out index.
          */
 
-        IPartitionMetadata pmd = metadataServiceProxy.getPartition(indexName,
-                new byte[] {});
-
-        assertNotNull(pmd);
+        IPartitionMetadata pmd;
         
+        {
+
+            byte[] val = metadataServiceProxy.getPartition(indexName,
+                    new byte[] {});
+
+            assertNotNull(val);
+
+            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+            
+        }
+
         /*
          * Resolve the data service to which the initial index partition was
          * mapped and verify that we can invoke an operation on that index on

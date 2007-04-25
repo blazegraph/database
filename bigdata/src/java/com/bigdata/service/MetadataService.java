@@ -72,6 +72,10 @@ import com.bigdata.scaleup.PartitionMetadata;
  *       getPartitions, movePartition, etc.) and handle the load-balancing
  *       later.
  * 
+ * @todo support transactionally isolated views onto the metadata index by
+ *       passing in the tx identifier and using the appropriate historical view
+ *       of the metadata index.
+ * 
  * @todo Provide a means to reconstruct the metadata index from the journal and
  *       index segment data files. We tag each journal and index segment with a
  *       UUID. Each index is also tagged with a UUID, and that UUID is written
@@ -154,7 +158,12 @@ abstract public class MetadataService extends DataService implements
         
     }
 
-    public IPartitionMetadata getPartition(String name,byte[] key) throws IOException {
+
+    /**
+     * Note: This is equivilent to {@link MetadataIndex#find(byte[])} except that
+     * it does not deserialize the {@link IPartitionMetadata}.
+     */
+    public byte[] getPartition(String name,byte[] key) throws IOException {
         
         // the name of the metadata index itself.
         final String metadataName = getMetadataName(name);
@@ -168,19 +177,58 @@ abstract public class MetadataService extends DataService implements
             
         }
 
-        /*
-         * @todo this winds up deserializing the value into a PartitionMetadata
-         * object and then re-serializing it to return to the remote client.
-         */
-        IPartitionMetadata pmd = mdi.find(key);
+        final int index = mdi.findIndexOf(key);
         
-        if( pmd == null ) {
+        if(index == -1) return null;
+        
+        byte[] val = (byte[]) mdi.valueAt(index);
+        
+        return val;
+        
+    }
+
+    /**
+     * This is equivilent to {@link MetadataIndex#findIndexOf(byte[])}.
+     */
+    public int findIndexOfPartition(String name,byte[] key) throws IOException {
+        
+        // the name of the metadata index itself.
+        final String metadataName = getMetadataName(name);
+        
+        // make sure there is no metadata index for that btree.
+        MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
+        
+        if(mdi == null) {
             
-            throw new IllegalStateException("No partitioned in index: "+name);
+            throw new IllegalArgumentException("Index not registered: " + name);
             
         }
+
+        final int index = mdi.findIndexOf(key);
+
+        return index;
         
-        return pmd;
+    }
+    
+    public byte[] getPartitionAtIndex(String name, int index ) throws IOException {
+        
+        // the name of the metadata index itself.
+        final String metadataName = getMetadataName(name);
+        
+        // make sure there is no metadata index for that btree.
+        MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
+        
+        if(mdi == null) {
+            
+            throw new IllegalArgumentException("Index not registered: " + name);
+            
+        }
+
+        if(index == -1) return null;
+        
+        byte[] val = (byte[]) mdi.valueAt(index);
+        
+        return val;
         
     }
     

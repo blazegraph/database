@@ -56,13 +56,19 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.BigdataClient.BigdataFederation;
 import com.bigdata.service.BigdataClient.IBigdataFederation;
 
 /**
  * A client-side view of an index.
+ * 
+ * @todo consider writing a client interface to the {@link MetadataIndex} so
+ *       that this code can look identifical to the code that we would write if
+ *       the metdata index was local.
  * 
  * @todo cache leased information about index partitions of interest to the
  *       client. The cache will be a little tricky since we need to know when
@@ -174,7 +180,7 @@ public class ClientIndexView implements IIndex {
 
     public boolean contains(byte[] key) {
         
-        IPartitionMetadata pmd = fed.getPartition(name, key);
+        IPartitionMetadata pmd = fed.getPartition(tx,name, key);
 
         IDataService dataService = fed.getDataService(pmd);
 
@@ -196,7 +202,7 @@ public class ClientIndexView implements IIndex {
 
     public Object insert(Object key, Object value) {
 
-        IPartitionMetadata pmd = fed.getPartition(name, (byte[])key);
+        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
         
         IDataService dataService = fed.getDataService(pmd);
 
@@ -222,7 +228,7 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = fed.getPartition(name, (byte[])key);
+        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
 
         IDataService dataService = fed.getDataService(pmd);
         
@@ -245,7 +251,7 @@ public class ClientIndexView implements IIndex {
 
     public Object remove(Object key) {
 
-        IPartitionMetadata pmd = fed.getPartition(name, (byte[])key);
+        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
 
         IDataService dataService = fed.getDataService(pmd);
         
@@ -285,36 +291,99 @@ public class ClientIndexView implements IIndex {
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
-        IPartitionMetadata pmd1 = fed.getPartition(name, (byte[])fromKey);
+        IMetadataService metadataService = getMetadataService();
         
-        IPartitionMetadata pmd2 = fed.getPartition(name, (byte[])toKey);
-        
-        if(pmd2.getPartitionId()!=pmd1.getPartitionId()) {
-            
-            throw new UnsupportedOperationException(
-                    "Can not span partitions at this time");
-            
-        }
-        
-        IDataService dataService = fed.getDataService(pmd1);
-
-        int rangeCount = 0;
-        
+        final int fromIndex;
+        final int toIndex;
         try {
 
-            rangeCount += dataService.rangeCount(IDataService.UNISOLATED, name,
-                    fromKey, toKey);
-        
-        } catch(Exception ex) {
-
+            // index of the first partition to check.
+            fromIndex = (fromKey == null ? 0 : metadataService
+                    .findIndexOfPartition(name, fromKey));
+            
+            // index of the last partition to check.
+            toIndex = (toKey == null ? 0 : metadataService
+                    .findIndexOfPartition(name, toKey));
+            
+        } catch (IOException ex) {
+            
             throw new RuntimeException(ex);
             
         }
-        
-        return rangeCount;
+
+        // per javadoc, keys out of order returns zero(0).
+        if (toIndex < fromIndex)
+            return 0;
+
+        // use to counters so that we can look for overflow.
+        int count = 0;
+        int lastCount = 0;
+
+        for (int index = fromIndex; index <= toIndex; index++) {
+
+            IPartitionMetadata pmd;
+
+            try {
+
+                byte[] tmp = metadataService.getPartitionAtIndex(name,
+                        fromIndex);
+
+                if (tmp == null)
+                    throw new AssertionError();
+
+                pmd = (IPartitionMetadata) SerializerUtil.deserialize(tmp);
+
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            // // The first key that would enter the nth partition.
+            // byte[] separatorKey = mdi.keyAt(index);
+
+            IDataService dataService = fed.getDataService(pmd);
+
+            try {
+
+                /*
+                 * Add in the count from that partition.
+                 * 
+                 * @todo modify to request only the range count that actually
+                 * lies within the partition so that the data service can check
+                 * the range and notify clients that appear to be requesting
+                 * data for index partitions that have been relocated.
+                 */
+
+                count += dataService.rangeCount(tx, name, fromKey, toKey);
+                
+            } catch(Exception ex) {
+
+                throw new RuntimeException(ex);
+                
+            }
+
+            if(count<lastCount) {
+            
+                // more than would fit in an Integer.
+                return Integer.MAX_VALUE;
+                
+            }
+            
+            lastCount = count;
+            
+        }
+
+        return count;
         
     }
 
+    /**
+     * FIXME provide an {@link IEntryIterator} that kinds the use of a series of
+     * {@link ResultSet}s to produce the range iterator. We need an outer loop
+     * over the partitions spanned by the key range and then an inner loop until
+     * we have exhausted the key range overlapping with each partition.
+     */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         // TODO Auto-generated method stub
         return null;
