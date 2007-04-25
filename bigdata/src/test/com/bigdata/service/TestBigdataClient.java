@@ -219,10 +219,13 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertEquals(new byte[]{1},(byte[])ndx.lookup(new byte[]{1}));
 
         // verify some range counts.
-        // @todo test with rangeCount(null,null).
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
         assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
         assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
+        assertEquals(0,ndx.rangeCount(null, new byte[]{1}));
+        assertEquals(1,ndx.rangeCount(new byte[]{1},null));
+        assertEquals(1,ndx.rangeCount(null,new byte[]{2}));
+        assertEquals(1,ndx.rangeCount(null,null));
         
         // remove the index entry.
         assertEquals(new byte[]{1},(byte[])ndx.remove(new byte[]{1}));
@@ -240,12 +243,14 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * removed since deletion markers are written into those entries. The
          * relevant index partition(s) need to be compacted for those deletion
          * markers to be removed and the range counts adjusted to match.
-         * 
-         * @todo test with rangeCount(null,null).
          */
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
         assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
         assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
+        assertEquals(0,ndx.rangeCount(null, new byte[]{1}));
+        assertEquals(1,ndx.rangeCount(new byte[]{1},null));
+        assertEquals(1,ndx.rangeCount(null,new byte[]{2}));
+        assertEquals(1,ndx.rangeCount(null,null));
 
     }
     

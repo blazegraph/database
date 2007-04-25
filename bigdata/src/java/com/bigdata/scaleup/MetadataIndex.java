@@ -326,11 +326,6 @@ public class MetadataIndex extends UnisolatedBTree {
      * 
      * @return The partition spanning the given key or <code>null</code> if
      *         there are no partitions defined.
-     * 
-     * FIXME offer a variant that reports the index partitions spanned by a key
-     * range and write tests for that. Note that the remote API for that method
-     * should use a result-set data model to efficiently communicate the data
-     * when there are a large #of spanned partitions.
      */
     public PartitionMetadata find(byte[] key) {
         
@@ -338,7 +333,7 @@ public class MetadataIndex extends UnisolatedBTree {
         
         if(index == -1) return null;
         
-        byte[] val = (byte[]) super.valueAt(index);
+        byte[] val = (byte[]) valueAt(index);
         
         return (PartitionMetadata) SerializerUtil.deserialize(val);
         
@@ -356,7 +351,7 @@ public class MetadataIndex extends UnisolatedBTree {
      */
     public PartitionMetadata get(byte[] key) {
         
-        byte[] val = (byte[]) super.lookup(key);
+        byte[] val = (byte[]) lookup(key);
         
         if(val==null) return null;
         
@@ -391,7 +386,7 @@ public class MetadataIndex extends UnisolatedBTree {
         
         byte[] newval = SerializerUtil.serialize(val);
         
-        byte[] oldval2 = (byte[])super.insert(key, newval);
+        byte[] oldval2 = (byte[])insert(key, newval);
 
         PartitionMetadata oldval = oldval2 == null ? null
                 : (PartitionMetadata) SerializerUtil.deserialize(oldval2);

@@ -50,7 +50,6 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -105,14 +104,19 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * the transaction manager and it simply specifies <code>0L</code> as the
  * transaction identifier for its read and write operations.
  * 
+ * @todo write tests where an index is static partitioned over multiple data
+ *       services and verify that the {@link ClientIndexView} is consistent.
+ *       <p>
+ *       Work towards the same guarentee when dynamic partitioning is enabled.
+ * 
  * @todo support transactions (there is no transaction manager service yet and
  *       the 2-/3-phase commit protocol has not been implemented on the
  *       journal).
  * 
  * @todo Write or refactor logic to map operations across multiple partitions.
  * 
- * FIXME Support factory for indices, reuse cached information across
- * transactional and non-transactional views of the same index.
+ * @todo reuse cached information across transactional and non-transactional
+ *       views of the same index.
  * 
  * @todo Use lambda expressions (and downloaded code) for server-side logic for
  *       batch operations.
@@ -597,30 +601,50 @@ public class BigdataClient {//implements DiscoveryListener {
         }
 
         /**
-         * @todo setup cache.  test cache and lookup on metadata service if a 
-         * cache miss.
+         * @todo setup cache. test cache and lookup on metadata service if a
+         *       cache miss. the cache should be based on a lease and the data
+         *       service should know whether an index partition has been moved
+         *       and notify the client that it needs to re-discover the data
+         *       service for an index partition. the cache is basically a
+         *       partial copy of the metadata index that is local to the client.
+         *       The cache needs to have "fake" entries that are the
+         *       left-sibling of each real partition entry so that it can
+         *       correctly determine when there is a cache miss.
+         *       <p>
+         *       Note that index partition definitions will evolve slowly over
+         *       time through splits and joins of index segments. again, the
+         *       client should presume consistency of its information but the
+         *       data service should know when it no longer has information for
+         *       a key range in a partition (perhaps passing the partitionId and
+         *       a timestamp for the last partition update to the data service
+         *       with each request).
+         *       <p>
+         *       Provide a historical view of the index partition definitions
+         *       when transactional isolation is in use by the client. This
+         *       should make it possible for a client to not be perturbed by
+         *       split/joins of index partitions when executing with
+         *       transactional isolation.
+         *       <p>
+         *       Note that service failover is at least partly orthogonal to the
+         *       partition metadata in as much as the index partition
+         *       definitions themselves do not evolve (the same separator keys
+         *       are in place and the same resources have the consistent data
+         *       for a view of the index partition), but it is possible that the
+         *       data services have changed. It is an open question how to
+         *       maintain isolation with failover while supporting failover
+         *       without aborting the transaction. The most obvious thing is to
+         *       have a transationally isolated client persue the failover
+         *       services already defined in the historical transaction without
+         *       causing the partition metadata to be updated on the metadata
+         *       service. (Unisolated clients would begin to see updated
+         *       partition metadata more or immediately.)
          * 
+         * @param tx
          * @param name
          * @param key
          * @return
          */
-        public IPartitionMetadata getPartition(String name, byte[] key) {
-        
-//            synchronized(indexCache) {
-//            
-//                Map<Integer,IDataService> partitionCache = indexCache.get(name);
-//             
-//                if(partitionCache==null) {
-//                    
-//                    partitionCache = new ConcurrentHashMap<Integer, IDataService>();
-//                    
-//                    indexCache.put(name, partitionCache);
-//                    
-//                }
-//                
-//                IDataService dataService = 
-//                
-//            }
+        public IPartitionMetadata getPartition(long tx, String name, byte[] key) {
 
             /*
              * Request the index partition metadata for the initial partition of the
@@ -631,7 +655,11 @@ public class BigdataClient {//implements DiscoveryListener {
             
             try {
              
-                pmd = getMetadataService().getPartition(name, key);
+                byte[] val = getMetadataService().getPartition(name, key);
+                
+                if(val ==null) return null;
+                
+                pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
                 
             } catch(Exception ex) {
                 
@@ -644,6 +672,22 @@ public class BigdataClient {//implements DiscoveryListener {
         }
 //        
 //        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
+//
+//        synchronized(indexCache) {
+//      
+//          Map<Integer,IDataService> partitionCache = indexCache.get(name);
+//       
+//          if(partitionCache==null) {
+//              
+//              partitionCache = new ConcurrentHashMap<Integer, IDataService>();
+//              
+//              indexCache.put(name, partitionCache);
+//              
+//          }
+//          
+//          IDataService dataService = 
+//          
+//      }
 
         /**
          * Resolve the data service to which the index partition was mapped.

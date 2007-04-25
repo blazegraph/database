@@ -72,48 +72,20 @@ import com.bigdata.scaleup.MetadataIndex;
  * @version $Id$
  */
 public interface IMetadataService extends IDataService {
-    
-//    /**
-//     * Return the partition metadata for the index partition that includes the
-//     * specified key.
-//     * 
-//     * @param key
-//     *            The key.
-//     * 
-//     * @return The metadata index partition in which that key is or would be
-//     *         located.
-//     * 
-//     * @todo return lease for the index partition that would contain the key.
-//     * 
-//     * @todo abstract away from Jini so that we can support other fabrics
-//     *       (OSGi/SCA).
-//     * 
-//     * @todo Either the client or the metadata service should support
-//     *       pre-caching of some number of index partitions surrounding that
-//     *       partition.
-//     * 
-//     * @todo do a variant that supports a key range - this should really just be
-//     *       the same as
-//     *       {@link IDataService#rangeQuery(long, String, byte[], byte[], int, int)}
-//     *       with the client addressing the metadata index rather than the data
-//     *       index (likewise for this method as well).
-//     * 
-//     * @todo update the {@link PartitionMetadata} data model to reflect a single
-//     *       point of responsibility with a media replication chain for
-//     *       failover. Either this method or a variant method needs to return
-//     *       the partition metadata itself so that {@link DataService}s can
-//     *       configure their downstream media replication pipelines.
-//     */
-//    public PartitionMetadata getPartition(String name, byte[] key) throws IOException;
-//
-    
+        
     /*
      * methods that require access to the metadata server for their
      * implementations.
+     * 
+     * @todo the tx identifier will have to be pass in for clients that want to
+     * use transactional isolation to achieve a consistent and stable view of
+     * the metadata index as of the start time of their transaction.
      */
     
     /**
-     * Return the UUID of an under utilized data service.
+     * Return the identifier of an under utilized data service.
+     * 
+     * @todo convert to return a UUID to kind Jini isolated from the core impl.
      */
     public ServiceID getUnderUtilizedDataService() throws IOException;
 
@@ -128,6 +100,8 @@ public interface IMetadataService extends IDataService {
      *         by the local cache.
      *         
      * @throws IOException
+     * 
+     * @todo convert serviceID to a UUID to keep Jini encapsulated.
      */
     public IDataService getDataServiceByID(ServiceID serviceID)
             throws IOException;
@@ -172,19 +146,51 @@ public interface IMetadataService extends IDataService {
      *            The name of the scale-out index.
      * @param key
      *            The key.
-     * @return The metadata for the index partition in which that key would be
-     *         found.
-     *         
-     * @throws IOException
      * 
-     * FIXME offer a variant that reports the index partitions spanned by a key
-     * range and write tests for that. Note that the remote API for that method
-     * should use a result-set data model to efficiently communicate the data
-     * when there are a large #of spanned partitions.
+     * @return The serialized {@link IPartitionMetadata} spanning the given key
+     *         or <code>null</code> if there are no partitions defined.
+     * 
+     * @throws IOException
      * 
      * @see MetadataIndex#find(byte[])
      */
-    public IPartitionMetadata getPartition(String name, byte[] key)
+    public byte[] getPartition(String name, byte[] key)
             throws IOException;
+    
+    /**
+     * Find the index of the partition spanning the given key.
+     * 
+     * @return The index of the partition spanning the given key or
+     *         <code>-1</code> iff there are no partitions defined.
+     * 
+     * @exception IllegalStateException
+     *                if there are partitions defined but no partition spans the
+     *                key. In this case the {@link MetadataIndex} lacks an entry
+     *                for the key <code>new byte[]{}</code>.
+     */
+    public int findIndexOfPartition(String name,byte[] key) throws IOException;
+    
+    /**
+     * The partition at that index.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param index
+     *            The entry index in the metadata index.
+     * 
+     * @return The serialized {@link IPartitionMetadata} for that the entry with
+     *         that index.
+     * 
+     * @throws IOException
+     * 
+     * @todo this is subject to concurrent modification of the metadata index
+     *       would can cause the index to identify a different partition. client
+     *       requests that use {@link #findIndexOfPartition(String, byte[])} and
+     *       {@link #getPartitionAtIndex(String, int)} really need to refer to
+     *       the same historical version of the metadata index (this effects
+     *       range count and range iterator requests and to some extent batch
+     *       operations that span multiple index partitions).
+     */
+    public byte[] getPartitionAtIndex(String name, int index ) throws IOException;
     
 }
