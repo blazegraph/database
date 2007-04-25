@@ -197,7 +197,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     private LifeCycle lifeCycle;
     
     /**
-     * Return the assigned {@link ServiceID}.
+     * Return the assigned {@link ServiceID}. If this is a new service, then
+     * the {@link ServiceID} will be <code>null</code> until it has been
+     * assigned by a service registrar.
      */
     public ServiceID getServiceID() {
         

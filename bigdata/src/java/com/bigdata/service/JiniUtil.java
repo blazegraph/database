@@ -71,6 +71,8 @@ public class JiniUtil {
      */
     public static UUID serviceID2UUID(ServiceID serviceID) {
 
+        if(serviceID==null) return null;
+        
         return new UUID(serviceID.getMostSignificantBits(), serviceID
                 .getLeastSignificantBits());
 
@@ -87,6 +89,8 @@ public class JiniUtil {
      */
     public static ServiceID uuid2ServiceID(UUID uuid) {
 
+        if(uuid==null) return null;
+        
         return new ServiceID(uuid.getMostSignificantBits(), uuid
                 .getLeastSignificantBits());
 

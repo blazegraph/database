@@ -54,6 +54,9 @@ import java.util.concurrent.ExecutionException;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 
+import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.scaleup.MetadataIndex;
+
 /**
  * A metadata service for a named index.
  * <p>
@@ -147,5 +150,41 @@ public interface IMetadataService extends IDataService {
      */
     public UUID registerIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
+    
+    /**
+     * Return the unique identifier for the managed index.
+     * 
+     * @param name
+     *            The name of the managed index.
+     * 
+     * @return The managed index UUID -or- <code>null</code> if there is no
+     *         managed scale-out index with that name.
+     *         
+     * @throws IOException
+     */
+    public UUID getManagedIndexUUID(String name) throws IOException;
 
+    /**
+     * Return the metadata for the index partition in which the key would be
+     * found.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param key
+     *            The key.
+     * @return The metadata for the index partition in which that key would be
+     *         found.
+     *         
+     * @throws IOException
+     * 
+     * FIXME offer a variant that reports the index partitions spanned by a key
+     * range and write tests for that. Note that the remote API for that method
+     * should use a result-set data model to efficiently communicate the data
+     * when there are a large #of spanned partitions.
+     * 
+     * @see MetadataIndex#find(byte[])
+     */
+    public IPartitionMetadata getPartition(String name, byte[] key)
+            throws IOException;
+    
 }

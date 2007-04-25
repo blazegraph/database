@@ -143,7 +143,8 @@ public class TestDataServer0 extends AbstractServerTestCase {
         // batch insert into that index.
         proxy.batchInsert(IDataService.UNISOLATED, name, 1,
                 new byte[][] { new byte[] { 1 } },
-                new byte[][] { new byte[] { 1 } });
+                new byte[][] { new byte[] { 1 } },
+                true /*returnOldValues*/ );
 
         // verify keys that exist/do not exist.
         boolean contains[] = proxy.batchContains(IDataService.UNISOLATED, name, 2,
