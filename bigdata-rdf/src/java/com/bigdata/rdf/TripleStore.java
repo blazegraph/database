@@ -118,7 +118,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       or that we let the application order the pass over the isolated indices
  *       and give the conflict resolver access to the {@link Tx} so that it can
  *       update the dependent indices if a conflict is discovered on the terms
- *       index.
+ *       index. 
  *       <p>
  *       The simplest approach appears to be NOT isolating the terms and ids
  *       indices. As long as the logic resides at the index, e.g., a lambda
