@@ -88,7 +88,7 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * communications from the application. The {@link IIndex} objects provided by
  * the factory are responsible for transparently discovering the
  * {@link IDataService}s on which the index partitions are located and
- * directing read and write operations appropriately.
+ * directing read and write operations appropriately. 
  * <p>
  * A client may discover and use an {@link ITransactionManager} if needs to use
  * transactions as opposed to unisolated reads and writes. When the client
