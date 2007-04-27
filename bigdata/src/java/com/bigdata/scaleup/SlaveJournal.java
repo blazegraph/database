@@ -255,6 +255,8 @@ public class SlaveJournal extends Journal {
          * @todo specify the DataSerivce(s) that will accept writes for this
          * index partition. This should be done as part of refactoring the
          * metadata index into a first level service.
+         * 
+         * @todo specify the journal as the initial resource.
          */
         
         final UUID[] dataServices = new UUID[]{};

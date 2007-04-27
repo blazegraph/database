@@ -53,12 +53,7 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JournalMetadata implements IResourceMetadata {
-
-    private final String filename;
-    private final long nbytes;
-    private final ResourceState state;
-    private final UUID uuid;
+public class JournalMetadata extends AbstractResourceMetadata {
 
     public final boolean isIndexSegment() {
         
@@ -71,76 +66,47 @@ public class JournalMetadata implements IResourceMetadata {
         return true;
         
     }
-    
-    public final String getFile() {
-        
-        return filename;
-        
-    }
 
     /**
-     * Note: this value is typically zero (0L) since we can not accurately
-     * estimate the #of bytes on the journal dedicated to a given partition of a
-     * named index. The value is originally set to zero (0L) by the
-     * {@link JournalMetadata#JournalMetadata(Journal, ResourceState)}
-     * constructor.
+     * Used to verify that the journal is backed by a file.
+     * 
+     * @param journal
+     *            The journal.
+     * 
+     * @return The journal.
+     * 
+     * @exception IllegalArgumentException
+     *                if the journal is not persistent.
      */
-    public final long size() {
-        
-        return nbytes;
-        
-    }
+    private static Journal assertPersistent(Journal journal) {
 
-    public final ResourceState state() {
-        
-        return state;
-        
-    }
-
-    public final UUID getUUID() {
-        
-        return uuid;
-        
-    }
-    
-    public JournalMetadata(Journal journal, ResourceState state) {
-        
         if(journal.getFile()==null) {
             
             throw new IllegalArgumentException("Journal is not persistent.");
             
         }
         
-        this.filename = journal.getFile().toString();
-
-        /*
-         * Note: 0L since we can not easily estimate the #of bytes on the
-         * journal that are dedicated to an index partition.
-         */
-        this.nbytes = 0L;
-        
-        this.state = state;
-        
-        this.uuid = journal.getRootBlockView().getUUID();
+        return journal;
         
     }
     
-    public JournalMetadata(String file, long nbytes, ResourceState state, UUID uuid) {
-        
-        if(file == null) throw new IllegalArgumentException();
+    /**
+     * Note: this assigns a size of zero (0L) since we can not accurately
+     * estimate the #of bytes on the journal dedicated to a given partition of a
+     * named index.
+     */
+    public JournalMetadata(Journal journal, ResourceState state) {
 
-        if(state == null) throw new IllegalArgumentException();
-        
-        if(uuid == null) throw new IllegalArgumentException();
-        
-        this.filename = file;
-        
-        this.nbytes = nbytes;
-        
-        this.state = state;
-        
-        this.uuid = uuid;
-        
+        super(assertPersistent(journal).getFile().toString(), 0L, state,
+                journal.getRootBlockView().getUUID());
+
     }
-    
+
+    public JournalMetadata(String file, long nbytes, ResourceState state,
+            UUID uuid) {
+
+        super(file, nbytes, state, uuid);
+
+    }
+
 }

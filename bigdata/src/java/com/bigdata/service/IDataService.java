@@ -171,23 +171,20 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-    /**
-     * Point lookup.
-     * 
-     * @param tx
-     * @param name
-     * @param key
-     * @return The value for that key (may be null) and <code>null</code> if
-     *         there is no value for that key.
-     * @throws IOException
-     * @throws InterruptedException
-     * @throws ExecutionException
-     * 
-     * @todo consider simply encapsulating in the client library since this just
-     *       wraps a batchLookup operation.
-     */
-    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
-            InterruptedException, ExecutionException;
+//    /**
+//     * Point lookup.
+//     * 
+//     * @param tx
+//     * @param name
+//     * @param key
+//     * @return The value for that key (may be null) and <code>null</code> if
+//     *         there is no value for that key.
+//     * @throws IOException
+//     * @throws InterruptedException
+//     * @throws ExecutionException
+//     */
+//    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
+//            InterruptedException, ExecutionException;
     
     /**
      * <p>

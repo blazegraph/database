@@ -52,27 +52,8 @@ import com.bigdata.btree.IndexSegment;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo make fields protected/private.
  */
-public class SegmentMetadata implements IResourceMetadata {
-
-    /**
-     * The name of the file containing the {@link IndexSegment}.
-     */
-    private String filename;
-    
-    /**
-     * The size of that file in bytes.
-     */
-    private long nbytes;
-    
-    /**
-     * The life-cycle state for that {@link IndexSegment}.
-     */
-    private ResourceState state;
-    
-    private UUID uuid;
+public class SegmentMetadata extends AbstractResourceMetadata {
     
     public final boolean isIndexSegment() {
         
@@ -88,52 +69,8 @@ public class SegmentMetadata implements IResourceMetadata {
     
     public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
-        this.filename = filename;
-        
-        this.nbytes = nbytes;
-        
-        this.state = state;
-        
-        this.uuid = uuid;
+        super(filename,nbytes,state,uuid);
         
     }
 
-    // Note: used by assertEquals in the test cases.
-    public boolean equals(Object o) {
-        
-        if(this == o)return true;
-        
-        SegmentMetadata o2 = (SegmentMetadata)o;
-        
-        if (filename.equals(o2.filename) && nbytes == o2.nbytes
-                && state == o2.state && uuid.equals(o2.uuid))
-            return true;
-        
-        return false;
-        
-    }
-
-    final public String getFile() {
-        
-        return filename;
-        
-    }
-
-    final public long size() {
-        
-        return nbytes;
-    }
-
-    final public ResourceState state() {
-        
-        return state;
-        
-    }
-
-    final public UUID getUUID() {
-        
-        return uuid;
-        
-    }
-    
 }

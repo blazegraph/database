@@ -68,6 +68,13 @@ import com.bigdata.scaleup.MetadataIndex;
  * Note: methods on this interface MUST throw {@link IOException} in order to be
  * compatible with RMI.
  * 
+ * @todo consider adding the timestamp of commit record for the data that was
+ *       read such that a client can effect consistent read-only view simply by
+ *       providing that timestamp to the next method call. This is especially
+ *       relevant for the {@link IMetadataService} interface since clients need
+ *       to make multiple requests for rangeCount and rangeIterator and the use
+ *       of the same read-timestamp will make those requests consistent.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -84,26 +91,21 @@ public interface IMetadataService extends IDataService {
     
     /**
      * Return the identifier of an under utilized data service.
-     * 
-     * @todo convert to return a UUID to kind Jini isolated from the core impl.
      */
-    public ServiceID getUnderUtilizedDataService() throws IOException;
+    public UUID getUnderUtilizedDataService() throws IOException;
 
     /**
      * Return the proxy for a {@link IDataService} from the local cache.
      * 
-     * @param serviceID
-     *            The {@link ServiceID} for the {@link DataService}.
-     *            
-     * @return The proxy or <code>null</code> if the {@link ServiceID} is not
-     *         mapped to a {@link ServiceItem} for a known {@link DataService}
-     *         by the local cache.
-     *         
-     * @throws IOException
+     * @param dataService
+     *            The {@link UUID} for the {@link DataService}.
      * 
-     * @todo convert serviceID to a UUID to keep Jini encapsulated.
+     * @return The proxy or <code>null</code> if the {@link UUID} does not
+     *         identify a known {@link DataService}.
+     * 
+     * @throws IOException
      */
-    public IDataService getDataServiceByID(ServiceID serviceID)
+    public IDataService getDataServiceByUUID(UUID dataService)
             throws IOException;
 
     /*
@@ -112,18 +114,23 @@ public interface IMetadataService extends IDataService {
      */
 
     /**
-     * Register a scale-out index. The index will automatically be assigned to a
-     * {@link DataService} for its initial partition. As the index grows, the
-     * initial partition will be split and the various partitions may be
-     * re-distributed among the available {@link DataService}s.
+     * Register a scale-out index with single initial partition. As the index
+     * grows, the initial partition will be split and the various partitions may
+     * be re-distributed among the available {@link DataService}s.
      * 
      * @param name
      *            The index name.
      * 
+     * @param dataService
+     *            The identifier of the {@link DataService} that will be
+     *            assigned to the initial index partition (optional). When
+     *            <code>null</code>, the {@link MetadataService} will choose
+     *            the initial {@link DataService} automatically.
+     * 
      * @return The UUID for that index.
      */
-    public UUID registerIndex(String name) throws IOException,
-            InterruptedException, ExecutionException;
+    public UUID registerManagedIndex(String name, UUID dataService)
+            throws IOException, InterruptedException, ExecutionException;
     
     /**
      * Return the unique identifier for the managed index.
@@ -139,25 +146,6 @@ public interface IMetadataService extends IDataService {
     public UUID getManagedIndexUUID(String name) throws IOException;
 
     /**
-     * Return the metadata for the index partition in which the key would be
-     * found.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * @param key
-     *            The key.
-     * 
-     * @return The serialized {@link IPartitionMetadata} spanning the given key
-     *         or <code>null</code> if there are no partitions defined.
-     * 
-     * @throws IOException
-     * 
-     * @see MetadataIndex#find(byte[])
-     */
-    public byte[] getPartition(String name, byte[] key)
-            throws IOException;
-    
-    /**
      * Find the index of the partition spanning the given key.
      * 
      * @return The index of the partition spanning the given key or
@@ -171,26 +159,75 @@ public interface IMetadataService extends IDataService {
     public int findIndexOfPartition(String name,byte[] key) throws IOException;
     
     /**
-     * The partition at that index.
+     * Return the metadata for the index partition (and the left- and
+     * right-separator keys for that index partition) in which the specified key
+     * would be found.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * 
+     * @param key
+     *            A key for that scale-out index (the key may or may not exist
+     *            in the index).
+     * 
+     * @return An byte[3][] array containing
+     *         <dl>
+     *         <dt>byte[0][]</dt>
+     *         <dd>The left separator key for the index partition. This is the
+     *         first key that would enter the index partition. The left most
+     *         separator key for a partitioned index is always an empty byte[]
+     *         since that is the smallest key that may be defined for any index.</dd>
+     *         <dt>byte[1][]</dt>
+     *         <dd>The byte[] containing the serialized
+     *         {@link IPartitionMetadata} for the index partition that spans the
+     *         given key.</dd>
+     *         <dt>byte[2][]</dt>
+     *         <dd>The right separator key for the index partition -or-
+     *         <code>null</code> if there is no right sibling for the index
+     *         partition (a null has the semantics of no upper bound for the
+     *         index partition).</dd>
+     *         </dl>
+     *         If the metadata index is empty (no partitions are defined) then
+     *         this method will return <code>null</code>. Note that this is
+     *         NOT a normal circumstance. The metadata index should always have
+     *         at least one partition once it has been registered.
+     */
+    public byte[][] getPartition(String name, byte[] key)
+            throws IOException;
+    
+    /**
+     * The partition at that index together with its left- and right-separator
+     * keys.
      * 
      * @param name
      *            The name of the scale-out index.
      * @param index
      *            The entry index in the metadata index.
      * 
-     * @return The serialized {@link IPartitionMetadata} for that the entry with
-     *         that index.
+     * @return An byte[3][] array containing
+     *         <dl>
+     *         <dt>byte[0][]</dt>
+     *         <dd>The left separator key for the index partition. This is the
+     *         first key that would enter the index partition. The left most
+     *         separator key for a partitioned index is always an empty byte[]
+     *         since that is the smallest key that may be defined for any index.</dd>
+     *         <dt>byte[1][]</dt>
+     *         <dd>The byte[] containing the serialized
+     *         {@link IPartitionMetadata} for the index partition that spans the
+     *         given key.</dd>
+     *         <dt>byte[2][]</dt>
+     *         <dd>The right separator key for the index partition -or-
+     *         <code>null</code> if there is no right sibling for the index
+     *         partition (a null has the semantics of no upper bound for the
+     *         index partition).</dd>
+     *         </dl>
+     *         If the metadata index is empty (no partitions are defined) then
+     *         this method will return <code>null</code>. Note that this is
+     *         NOT a normal circumstance. The metadata index should always have
+     *         at least one partition once it has been registered.
      * 
      * @throws IOException
-     * 
-     * @todo this is subject to concurrent modification of the metadata index
-     *       would can cause the index to identify a different partition. client
-     *       requests that use {@link #findIndexOfPartition(String, byte[])} and
-     *       {@link #getPartitionAtIndex(String, int)} really need to refer to
-     *       the same historical version of the metadata index (this effects
-     *       range count and range iterator requests and to some extent batch
-     *       operations that span multiple index partitions).
      */
-    public byte[] getPartitionAtIndex(String name, int index ) throws IOException;
+    public byte[][] getPartitionAtIndex(String name, int index ) throws IOException;
     
 }

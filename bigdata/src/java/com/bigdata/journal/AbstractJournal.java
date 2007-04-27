@@ -76,7 +76,6 @@ import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IMetadataIndexManager;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.scaleup.MasterJournal.Options;
@@ -88,13 +87,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * supporting atomic commit, named indices, and transactions. Writes are
  * logically appended to the journal to minimize disk head movement. This is an
  * abstract implementation of the {@link IJournal} interface that does not
- * implement services that are independent in a scale-out solution, including:
- * <ul>
- * <li>{@link ITransactionManager}, which is responsible for coordinating
- * transactions in a distributed database</li>
- * <li>{@link IMetadataIndexManager}, which is responsible for managing global
- * definitions of named indices and their partitions</li>
- * </ul>
+ * implement services that are independent in a scale-out solution (transaction
+ * management, scale-out index metadata management)
  * </p>
  * <p>
  * Commit processing. The journal maintains two root blocks. Commit updates the
