@@ -56,12 +56,12 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.BigdataClient.BigdataFederation;
 import com.bigdata.service.BigdataClient.IBigdataFederation;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * A client-side view of an index.
@@ -88,7 +88,9 @@ import com.bigdata.service.BigdataClient.IBigdataFederation;
  * @todo support partitioned indices by resolving client operations against each
  *       index partition as necessary and maintaining leases with the metadata
  *       service - the necessary logic is in the {@link PartitionedIndexView}
- *       and can be refactored for this purpose.
+ *       and can be refactored for this purpose. Some operations can be made
+ *       parallel (rangeCount), and we could offer parallelization with
+ *       post-sort for range query.
  * 
  * @todo offer alternatives for the batch insert and remove methods that do not
  *       return the old values to the client so that the client may opt to
@@ -165,6 +167,12 @@ public class ClientIndexView implements IIndex {
             try {
 
                 indexUUID = getMetadataService().getManagedIndexUUID(name);
+                
+                if(indexUUID == null) {
+                    
+                    throw new RuntimeException("No such index: "+name);
+                    
+                }
                 
             } catch(IOException ex) {
                 
@@ -274,13 +282,14 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /*
+     * All of these methods need to divide up the operation across index
+     * partitions.
+     */
+
     /**
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
-     * 
-     * FIXME support range count that spans more than one partition.
-     * 
-     * FIXME Handle fromKey == null, toKey == null.
      * 
      * @todo note that it is possible (though unlikely) for an index partition
      *       split or join to occur during this operation. Figure out how I want
@@ -292,7 +301,11 @@ public class ClientIndexView implements IIndex {
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
         IMetadataService metadataService = getMetadataService();
-        
+
+        /*
+         * @todo requesting the fromIndex/toIndex for a key range could be an
+         * atomic operation which would remove one RPC.
+         */
         final int fromIndex;
         final int toIndex;
         try {
@@ -321,23 +334,8 @@ public class ClientIndexView implements IIndex {
 
         for (int index = fromIndex; index <= toIndex; index++) {
 
-            IPartitionMetadata pmd;
-
-            try {
-
-                byte[] tmp = metadataService.getPartitionAtIndex(name,
-                        fromIndex);
-
-                if (tmp == null)
-                    throw new AssertionError();
-
-                pmd = (IPartitionMetadata) SerializerUtil.deserialize(tmp);
-
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
+            PartitionMetadataWithSeparatorKeys pmd = fed.getPartitionAtIndex(
+                    tx, name, index);
 
             // // The first key that would enter the nth partition.
             // byte[] separatorKey = mdi.keyAt(index);
@@ -349,13 +347,38 @@ public class ClientIndexView implements IIndex {
                 /*
                  * Add in the count from that partition.
                  * 
-                 * @todo modify to request only the range count that actually
-                 * lies within the partition so that the data service can check
-                 * the range and notify clients that appear to be requesting
-                 * data for index partitions that have been relocated.
+                 * Note: The range count request is formed such that it
+                 * addresses only those keys that actually lies within the
+                 * partition. This has two benefits:
+                 * 
+                 * (1) The data service can check the range and notify clients
+                 * that appear to be requesting data for index partitions that
+                 * have been relocated.
+                 * 
+                 * (2) In order to avoid double-counting when multiple
+                 * partitions for the same index are mapped onto the same data
+                 * service we MUST query at most the key range for a specific
+                 * partition (or we must provide the data service with the index
+                 * partition identifier and it must restrict the range on our
+                 * behalf).
                  */
 
-                count += dataService.rangeCount(tx, name, fromKey, toKey);
+                byte[] _fromKey = pmd.getLeftSeparatorKey();
+
+                byte[] _toKey = pmd.getRightSeparatorKey();
+                
+                if(_toKey==null) {
+                    
+                    /*
+                     * On the last partition, use the caller's toKey so that we
+                     * do not count everything up to the close of the partition
+                     * unless the caller specified toKey := null.
+                     */
+                    _toKey = toKey;
+                    
+                }
+                
+                count += dataService.rangeCount(tx, name, _fromKey, _toKey);
                 
             } catch(Exception ex) {
 

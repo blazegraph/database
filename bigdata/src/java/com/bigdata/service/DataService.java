@@ -195,6 +195,10 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       purpose. For example, using SSL or an SSH tunnel. For most purposes I
  *       expect bigdata to operate on a private network, but replicate across
  *       gateways is also a common use case. Do we have to handle it specially?
+ * 
+ * @todo Keep the "wire" format for the data and metadata services as clean as
+ *       possible so that it will be possible for non-Java clients to talk to
+ *       these services (assuming that they can talk to Jini...).
  */
 abstract public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
@@ -304,8 +308,6 @@ abstract public class DataService implements IDataService,
         /*
          * The journal's write service will be used to handle unisolated writes
          * and transaction commits.
-         * 
-         * @todo parameterize for use of scale-up vs scale-out journal impls.
          */
         journal = new Journal(properties);
 
@@ -414,20 +416,21 @@ abstract public class DataService implements IDataService,
         
     }
 
-    public void dropIndex(String name) throws IOException, InterruptedException, ExecutionException {
+    public void dropIndex(String name) throws IOException,
+            InterruptedException, ExecutionException {
         
         journal.serialize(new DropIndexTask(name)).get();
         
     }
     
-    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
-            InterruptedException, ExecutionException {
-
-        byte[][] vals = batchLookup(tx, name, 1, new byte[][]{key});
-
-        return vals[0];
-        
-    }
+//    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
+//            InterruptedException, ExecutionException {
+//
+//        byte[][] vals = batchLookup(tx, name, 1, new byte[][]{key});
+//
+//        return vals[0];
+//        
+//    }
     
     public byte[][] batchInsert(long tx, String name, int ntuples,
             byte[][] keys, byte[][] vals, boolean returnOldValues)
@@ -596,7 +599,7 @@ abstract public class DataService implements IDataService,
             return (Integer) readService.submit(task).get();
 
         } else {
-
+            // @todo do unisolated read operations need to get serialized?!?  check rangeQuery also.
             return (Integer) journal.serialize(task).get();
 
         }

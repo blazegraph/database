@@ -58,6 +58,9 @@ import com.bigdata.scaleup.IPartitionMetadata;
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}
  * 
+ * @todo add tests of all methods on the {@link IMetadataService} api, e.g.,
+ *       {@link IMetadataService#getPartition(String, byte[]) and friends.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -325,7 +328,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          */
         final String indexName = "testIndex";
         
-        UUID indexUUID = metadataServiceProxy.registerIndex(indexName);
+        UUID indexUUID = metadataServiceProxy.registerManagedIndex(indexName,
+                null);
         
         log.info("Registered scale-out index: indexUUID="+indexUUID);
         
@@ -338,12 +342,19 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
         
         {
 
-            byte[] val = metadataServiceProxy.getPartition(indexName,
+            byte[][] data = metadataServiceProxy.getPartition(indexName,
                     new byte[] {});
 
-            assertNotNull(val);
+            assertNotNull(data);
 
-            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+            // left separator key.
+            assertEquals(new byte[]{},data[0]);
+            
+            // partition metadata.
+            pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
+            
+            // right separator key.
+            assertEquals(null,data[2]);
             
         }
 

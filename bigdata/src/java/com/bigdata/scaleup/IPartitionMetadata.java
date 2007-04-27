@@ -68,9 +68,6 @@ public interface IPartitionMetadata {
     /**
      * The ordered list of data services on which data for this partition will
      * be written and from which data for this partition may be read.
-     * 
-     * @todo refactor into a dataService UUID (required) and an array of zero or
-     *       more media replication services for failover.
      */
     public UUID[] getDataServices();
     

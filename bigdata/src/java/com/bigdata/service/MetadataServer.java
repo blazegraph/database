@@ -275,19 +275,20 @@ public class MetadataServer extends DataServer {
          * @todo this is just an arbitrary instance and does not consider
          *       utilization.
          */
-        public ServiceID getUnderUtilizedDataService() throws IOException {
+        public UUID getUnderUtilizedDataService() throws IOException {
 
             ServiceItem item = server.dataServiceLookupCache.lookup(null);
 
             log.info(item.toString());
 
-            return item.serviceID;
+            return JiniUtil.serviceID2UUID(item.serviceID);
             
         }
 
-        public IDataService getDataServiceByID(ServiceID serviceID) throws IOException {
+        public IDataService getDataServiceByUUID(UUID dataService) throws IOException {
             
-            return (IDataService)server.dataServiceMap.getDataServiceByID(serviceID).service;
+            return (IDataService) server.dataServiceMap
+                    .getDataServiceByID(JiniUtil.uuid2ServiceID(dataService)).service;
             
         }
         

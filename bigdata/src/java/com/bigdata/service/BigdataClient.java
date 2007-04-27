@@ -73,6 +73,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.scaleup.IResourceMetadata;
 
 /**
  * Abstract base class for a bigdata client.
@@ -88,7 +89,7 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * communications from the application. The {@link IIndex} objects provided by
  * the factory are responsible for transparently discovering the
  * {@link IDataService}s on which the index partitions are located and
- * directing read and write operations appropriately. 
+ * directing read and write operations appropriately.
  * <p>
  * A client may discover and use an {@link ITransactionManager} if needs to use
  * transactions as opposed to unisolated reads and writes. When the client
@@ -103,6 +104,11 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * When using unisolated operations, the client does not need to resolve or use
  * the transaction manager and it simply specifies <code>0L</code> as the
  * transaction identifier for its read and write operations.
+ * 
+ * @todo if possible, reconcile index interfaces and a client interface such
+ *       that a bigdata client application can use the same code regardless
+ *       whether the client is embedded, uses jini, or uses another services
+ *       architectre such as OSGi, WSDL, etc.
  * 
  * @todo write tests where an index is static partitioned over multiple data
  *       services and verify that the {@link ClientIndexView} is consistent.
@@ -128,20 +134,10 @@ import com.bigdata.scaleup.IPartitionMetadata;
  *       to more than one bigdata federation.
  * 
  * @todo Use a weak-ref cache with an LRU (or hard reference cache) to retain
- *       cached {@link IPartitionMetadata}.
- * 
- * @todo add a cache for {@link DataService}s. The client needs access by {
+ *       cached {@link IPartitionMetadata}. The client needs access by {
  *       indexName, key } to obtain a {@link ServiceID} for a
  *       {@link DataService} and then needs to translate the {@link ServiceID}
- *       to a data service proxy using a cache. The use case is not quite the
- *       same as the {@link MetadataServer} since a client is not interested in
- *       a cache of all {@link DataService}s but only in those to which its
- *       attention has been directed based on the index partitions on which it
- *       is operating. Also, the cache needs to be a weak-ref/LRU combination or
- *       hard reference cache so that we can discard cached services that we are
- *       not interested in tracking. There are other differences to, the client
- *       interest is really based on the index partition so if the index
- *       partition is moved, then the data service may no longer be of interest.
+ *       to a data service using the {@link #dataServiceMap}.
  * 
  * @see ClientIndexView
  * 
@@ -164,6 +160,15 @@ public class BigdataClient {//implements DiscoveryListener {
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
     private LookupCache metadataServiceLookupCache = null;
     private LookupCache dataServiceLookupCache = null;
+    
+    /**
+     * Used to provide {@link DataService} lookup by {@link ServiceID} once the
+     * appropriate partition of an index has been identified. Note that this
+     * will wind up tracking all local data services. I am not filtering to only
+     * those that the client actually uses since the notification events will be
+     * generated anyway and we will be storing at most 1000s of
+     * {@link DataService}s in this map.
+     */
     private DataServiceMap dataServiceMap = new DataServiceMap();
 
     private final ServiceTemplate metadataServiceTemplate = new ServiceTemplate(
@@ -525,8 +530,8 @@ public class BigdataClient {//implements DiscoveryListener {
          * 
          * @param name
          *            The index name.
-         *            
-         * @return The UUID that identifies the scale-out index.
+         * 
+         * @return The UUID for the scale-out index.
          */
         public UUID registerIndex(String name);
         
@@ -571,12 +576,44 @@ public class BigdataClient {//implements DiscoveryListener {
             this.client = client;
             
         }
-        
+
+        /**
+         * Note: This does not return an {@link IIndex} since the client does
+         * not provide a transaction identifier when registering an index (
+         * index registration is always unisolated).
+         * 
+         * @todo add option to let the client specify the dataservice for the
+         *       initial index partition - when null, have the
+         *       {@link MetadataService} make that assignment.
+         */
         public UUID registerIndex(String name) {
+
+            return registerIndex(name,null);
             
+        }
+        
+        /**
+         * Registers a scale-out index and assigns the initial index partition
+         * to the specified data service.
+         * 
+         * @param name
+         *            The name of the scale-out index.
+         * 
+         * @param dataServiceUUID
+         *            The data service identifier (optional). When
+         *            <code>null</code>, a data service will be selected
+         *            automatically.
+         * 
+         * @return The UUID of the registered index.
+         */
+        public UUID registerIndex(String name, UUID dataServiceUUID) {
+
             try {
 
-                return getMetadataService().registerIndex(name);
+                UUID indexUUID = getMetadataService().registerManagedIndex(
+                        name, null);
+                
+                return indexUUID;
                 
             } catch(Exception ex) {
                 
@@ -585,16 +622,40 @@ public class BigdataClient {//implements DiscoveryListener {
                 throw new RuntimeException(ex);
                 
             }
-            
+
         }
         
         /**
+         * Return a view onto a scale-out index.
+         * 
+         * @param tx
+         *            The transaction identifier -or- <code>0L</code> if the
+         *            view is unisolated.
+         * 
+         * @param name
+         *            The name of the scale out index.
+         * 
+         * @return The view or <code>null</code> iff there is no scale-out
+         *         index registered with that name.
+         * 
          * @todo support isolated views, share cached data service information
          *       between isolated and unisolated views.
          */
         public IIndex getIndex(long tx, String name) {
 
-            // @todo if(tx!=0l) validate exists?
+            try {
+            
+                if( getMetadataService().getManagedIndexUUID(name) == null) {
+                    
+                    return null;
+                    
+                }
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
             
             return new ClientIndexView(this,tx,name); 
             
@@ -644,22 +705,20 @@ public class BigdataClient {//implements DiscoveryListener {
          * @param key
          * @return
          */
-        public IPartitionMetadata getPartition(long tx, String name, byte[] key) {
-
-            /*
-             * Request the index partition metadata for the initial partition of the
-             * scale-out index.
-             */
+        public PartitionMetadataWithSeparatorKeys getPartition(long tx, String name, byte[] key) {
 
             IPartitionMetadata pmd;
             
+            final byte[][] data;
+            
             try {
              
-                byte[] val = getMetadataService().getPartition(name, key);
+                data = getMetadataService().getPartition(name, key);
                 
-                if(val ==null) return null;
+                if (data == null)
+                    return null;
                 
-                pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
                 
             } catch(Exception ex) {
                 
@@ -667,10 +726,35 @@ public class BigdataClient {//implements DiscoveryListener {
                 
             }
 
-            return pmd;
+            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
 
         }
-//        
+
+        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(long tx, String name, int index) {
+
+            IPartitionMetadata pmd;
+
+            byte[][] data;
+
+            try {
+                
+                data = getMetadataService().getPartitionAtIndex(name, index);
+                
+                if (data == null)
+                    return null;
+                
+                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
+                
+            } catch(Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
+
+        }
+
 //        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
 //
 //        synchronized(indexCache) {
@@ -713,6 +797,72 @@ public class BigdataClient {//implements DiscoveryListener {
 
             return dataService;
 
+        }
+        
+    }
+
+    /**
+     * A class that carries the left and right separator keys surrounding the
+     * index partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class PartitionMetadataWithSeparatorKeys implements IPartitionMetadata {
+
+        private final byte[] leftSeparatorKey;
+        private final IPartitionMetadata src;
+        private final byte[] rightSeparatorKey;
+        
+        public PartitionMetadataWithSeparatorKeys(byte[] leftSeparatorKey,
+                IPartitionMetadata src, byte[] rightSeparatorKey) {
+
+            if (leftSeparatorKey == null)
+                throw new IllegalArgumentException("leftSeparatorKey");
+
+            if (src == null)
+                throw new IllegalArgumentException("src");
+            
+            // Note: rightSeparatorKey MAY be null.
+            
+            this.leftSeparatorKey = leftSeparatorKey;
+            
+            this.src = src;
+            
+            this.rightSeparatorKey = rightSeparatorKey;
+            
+        }
+        
+        public UUID[] getDataServices() {
+            return src.getDataServices();
+        }
+
+        public int getPartitionId() {
+            return src.getPartitionId();
+        }
+
+        public IResourceMetadata[] getResources() {
+            return src.getResources();
+        }
+        
+        /**
+         * The separator key that defines the left edge of that index partition
+         * (always defined) - this is the first key that can enter the index
+         * partition. The left-most separator key for a scale-out index is
+         * always an empty byte[] since that is the smallest key that may be
+         * defined.
+         */
+        public byte[] getLeftSeparatorKey() {
+           return leftSeparatorKey; 
+        }
+        
+        /**
+         * The separator key that defines the right edge of that index partition
+         * or [null] iff the index partition does not have a right sibling (a
+         * null has the semantics of no upper bound).
+         */
+        public byte[] getRightSeparatorKey() {
+            return rightSeparatorKey;
         }
         
     }

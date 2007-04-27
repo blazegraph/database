@@ -106,7 +106,10 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
         
     }
 
-    public PartitionMetadata(int partId, UUID[] dataServices ) {
+    /**
+     * @deprecated this is used by the test suite only.
+     */
+    /*public*/ PartitionMetadata(int partId, UUID[] dataServices ) {
 
         this(partId, dataServices, new IResourceMetadata[] {});
 
