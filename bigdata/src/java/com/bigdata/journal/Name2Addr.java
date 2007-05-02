@@ -57,8 +57,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
@@ -89,7 +90,7 @@ public class Name2Addr extends BTree {
      * synchonization interface for multi-threaded use or move an instance onto
      * the store since it already has a single-threaded contract for its api?
      */
-    private KeyBuilder keyBuilder = new KeyBuilder();
+    private UnicodeKeyBuilder keyBuilder = new UnicodeKeyBuilder();
 
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the

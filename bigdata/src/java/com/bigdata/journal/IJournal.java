@@ -94,6 +94,12 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
     /**
      * Return the named index which MAY may be invalidated by a
      * {@link IAtomicStore#commit()}.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @return The named index or <code>null</code> iff there is no index
+     *         registered with that name.
      */
     public IIndex getIndex(String name);
 

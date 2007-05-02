@@ -56,7 +56,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.OSPComparator;
@@ -150,7 +151,7 @@ public class TempTripleStore extends TemporaryStore {
     /**
      * Create or re-open a triple store.
      * 
-     * @todo initialize the locale for the {@link KeyBuilder} from properties or
+     * @todo initialize the locale for the {@link UnicodeKeyBuilder} from properties or
      *       use the default locale if none is specified. The locale should be a
      *       restart safe property since it effects the sort order of the
      *       term:id index.
@@ -160,7 +161,7 @@ public class TempTripleStore extends TemporaryStore {
         super();
 
         // setup key builder that handles unicode and primitive data types.
-        KeyBuilder _keyBuilder = new KeyBuilder(createCollator(), Bytes.kilobyte32 * 4);
+        IKeyBuilder _keyBuilder = new UnicodeKeyBuilder(createCollator(), Bytes.kilobyte32 * 4);
         
         // setup key builder for RDF Values and Statements.
         keyBuilder = new RdfKeyBuilder(_keyBuilder);

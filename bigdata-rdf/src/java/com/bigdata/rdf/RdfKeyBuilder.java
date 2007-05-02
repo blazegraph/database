@@ -54,6 +54,7 @@ import org.openrdf.model.Value;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.XmlSchema;
 
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 
 /**
@@ -67,9 +68,9 @@ import com.bigdata.btree.KeyBuilder;
  */
 public class RdfKeyBuilder {
 
-    public final KeyBuilder keyBuilder;
+    public final IKeyBuilder keyBuilder;
     
-    public RdfKeyBuilder(KeyBuilder keyBuilder) {
+    public RdfKeyBuilder(IKeyBuilder keyBuilder) {
         
         this.keyBuilder = keyBuilder;
         
@@ -122,8 +123,8 @@ public class RdfKeyBuilder {
 
     /**
      * When true all strings will be <em>assumed</em> to contain 7-bit clean
-     * US-ASCII characters and {@link KeyBuilder#appendASCII(String)} will be
-     * used in place of {@link KeyBuilder#append(String)}.
+     * US-ASCII characters and {@link IKeyBuilder#appendASCII(String)} will be
+     * used in place of {@link IKeyBuilder#append(String)}.
      * <p>
      * Note: These two processing modes produce incompatible keys and MUST NOT
      * be mixed for an index. The US-ASCII assumption is significantly faster
@@ -132,7 +133,7 @@ public class RdfKeyBuilder {
      */
     final public boolean assumeUSASCII = false;
     
-    protected final KeyBuilder appendString(String s) {
+    protected final IKeyBuilder appendString(String s) {
         
         if(assumeUSASCII) {
             

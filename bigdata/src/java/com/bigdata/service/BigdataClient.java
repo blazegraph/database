@@ -48,8 +48,12 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.rmi.RemoteException;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -66,14 +70,22 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
+import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IIndex;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.CommitRecordIndex.Entry;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * Abstract base class for a bigdata client.
@@ -274,7 +286,7 @@ public class BigdataClient {//implements DiscoveryListener {
 
             log.info("Cache miss.");
             
-            final long timeout = 1000L; // millis.
+            final long timeout = 2000L; // millis.
 
             try {
 
@@ -491,7 +503,8 @@ public class BigdataClient {//implements DiscoveryListener {
     }
 
     /**
-     * Connect to a bigdata federation.
+     * Connect to a bigdata federation. If the client is already connected, then
+     * the existing connection is returned.
      * 
      * @return
      * 
@@ -504,9 +517,16 @@ public class BigdataClient {//implements DiscoveryListener {
      */
     public IBigdataFederation connect() {
 
-        return new BigdataFederation(this);
+        if (fed == null) {
+
+            fed = new BigdataFederation(this);
+
+        }
+
+        return fed;
 
     }
+    private IBigdataFederation fed = null; 
     
     /**
      * Interface to a bigdata federation.
@@ -556,13 +576,76 @@ public class BigdataClient {//implements DiscoveryListener {
      * This class encapsulates access to the metadata and data services for a
      * bigdata federation.
      * 
+     * @todo in order to for a {@link IPartitionMetadata} cache to remain valid
+     *       we need to either not store the left and right separator keys or we
+     *       need to update the right separator key of an existing partition
+     *       when a new partition is created by either this client or any other
+     *       client. If the data service validates that the key(s) lie within
+     *       its mapped partitions, then it can issue an appropriate redirect
+     *       when the client has stale information. Failure to handle this issue
+     *       will result in reads or writes against the wrong data services,
+     *       which will result in lost data from the perspective of the clients.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static class BigdataFederation implements IBigdataFederation {
        
+        /**
+         * A temporary store used to cache various data in the client.
+         */
+        private IRawStore clientTempStore = new TemporaryRawStore();
+        
         private final BigdataClient client;
+        
+        /**
+         * Return a read-only view of the index partitions for the named
+         * scale-out index.
+         * 
+         * @param name
+         *            The name of the scale-out index.
+         * 
+         * @return The partitions for that index (keys are byte[] partition
+         *         separator keys, values are serialized
+         *         {@link PartitionMetadata} objects).
+         * 
+         * @throws NoSuchIndexException
+         * 
+         * @todo only statically partitioned indices are supported at this time.
+         * 
+         * @todo refactor to make use of this cache in the various operations of
+         *       this client.
+         * 
+         * @todo Rather than synchronizing all requests, this should queue
+         *       requests for a specific metadata index iff there is a cache
+         *       miss for that index.
+         */
+        public MetadataIndex getMetadataIndex(String name) {
 
+            MetadataIndex tmp = partitions.get(name);
+
+            if (tmp == null) {
+
+                try {
+
+                    tmp = cachePartitions(name);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(
+                            "Could not cache partition metadata", ex);
+
+                }
+
+                partitions.put(name, tmp);
+
+            }
+
+            return tmp;
+            
+        }
+        private Map<String, MetadataIndex> partitions = new ConcurrentHashMap<String, MetadataIndex>();
+        
         public IMetadataService getMetadataService() {
             
             return client.getMetadataService();
@@ -571,7 +654,8 @@ public class BigdataClient {//implements DiscoveryListener {
         
         public BigdataFederation(BigdataClient client) {
             
-            if(client==null) throw new IllegalArgumentException();
+            if (client == null)
+                throw new IllegalArgumentException();
             
             this.client = client;
             
@@ -582,9 +666,7 @@ public class BigdataClient {//implements DiscoveryListener {
          * not provide a transaction identifier when registering an index (
          * index registration is always unisolated).
          * 
-         * @todo add option to let the client specify the dataservice for the
-         *       initial index partition - when null, have the
-         *       {@link MetadataService} make that assignment.
+         * @see #registerIndex(String, UUID)
          */
         public UUID registerIndex(String name) {
 
@@ -611,7 +693,32 @@ public class BigdataClient {//implements DiscoveryListener {
             try {
 
                 UUID indexUUID = getMetadataService().registerManagedIndex(
-                        name, null);
+                        name, dataServiceUUID);
+                
+                return indexUUID;
+                
+            } catch(Exception ex) {
+                
+                log.error(ex);
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+        }
+        
+        /**
+         * Register and statically partition a scale-out index.
+         * @param name
+         * @param dataServiceUUID
+         * @return
+         */
+        public UUID registerIndex(String name, byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
+
+            try {
+
+                UUID indexUUID = getMetadataService().registerManagedIndex(
+                        name, separatorKeys, dataServiceUUIDs);
                 
                 return indexUUID;
                 
@@ -707,53 +814,151 @@ public class BigdataClient {//implements DiscoveryListener {
          */
         public PartitionMetadataWithSeparatorKeys getPartition(long tx, String name, byte[] key) {
 
+            MetadataIndex mdi = getMetadataIndex(name);
+            
             IPartitionMetadata pmd;
             
-            final byte[][] data;
+//            final byte[][] data;
             
             try {
              
-                data = getMetadataService().getPartition(name, key);
+                final int index = mdi.findIndexOf(key);
                 
-                if (data == null)
-                    return null;
+                /*
+                 * The code from this point on is shared with getPartitionAtIndex() and
+                 * also by some of the index partition tasks (CreatePartition for one).
+                 */
                 
-                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
+                if(index == -1) return null;
                 
+                /*
+                 * The serialized index partition metadata record for the partition that
+                 * spans the given key.
+                 */
+                byte[] val = (byte[]) mdi.valueAt(index);
+                
+                /*
+                 * The separator key that defines the left edge of that index partition
+                 * (always defined).
+                 */
+                byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+                
+                /*
+                 * The separator key that defines the right edge of that index partition
+                 * or [null] iff the index partition does not have a right sibling (a
+                 * null has the semantics of no upper bound).
+                 */
+                byte[] rightSeparatorKey;
+                
+                try {
+
+                    rightSeparatorKey = (byte[]) mdi.keyAt(index+1);
+                    
+                } catch(IndexOutOfBoundsException ex) {
+                    
+                    rightSeparatorKey = null;
+                    
+                }
+                
+//                return new byte[][] { leftSeparatorKey, val, rightSeparatorKey };
+//
+//                data = getMetadataService().getPartition(name, key);
+//                
+//                if (data == null)
+//                    return null;
+                
+                pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+
+                return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
+                        pmd, rightSeparatorKey);
+
             } catch(Exception ex) {
                 
                 throw new RuntimeException(ex);
                 
             }
 
-            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
-
         }
 
-        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(long tx, String name, int index) {
+        /**
+         * @todo this is subject to concurrent modification of the metadata index
+         *       would can cause the index to identify a different partition. client
+         *       requests that use {@link #findIndexOfPartition(String, byte[])} and
+         *       {@link #getPartitionAtIndex(String, int)} really need to refer to
+         *       the same historical version of the metadata index (this effects
+         *       range count and range iterator requests and to some extent batch
+         *       operations that span multiple index partitions).
+         */
+        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(
+                String name, int index) {
+            
+            MetadataIndex mdi = getMetadataIndex(name);
 
-            IPartitionMetadata pmd;
+            /*
+             * The code from this point on is shared with getPartition()
+             */
 
-            byte[][] data;
-
+            if(index == -1) return null;
+            
+            /*
+             * The serialized index partition metadata record for the partition that
+             * spans the given key.
+             */
+            byte[] val = (byte[]) mdi.valueAt(index);
+            
+            /*
+             * The separator key that defines the left edge of that index partition
+             * (always defined).
+             */
+            byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+            
+            /*
+             * The separator key that defines the right edge of that index partition
+             * or [null] iff the index partition does not have a right sibling (a
+             * null has the semantics of no upper bound).
+             */
+            byte[] rightSeparatorKey;
+            
             try {
+
+                rightSeparatorKey = (byte[]) mdi.keyAt(index+1);
                 
-                data = getMetadataService().getPartitionAtIndex(name, index);
+            } catch(IndexOutOfBoundsException ex) {
                 
-                if (data == null)
-                    return null;
-                
-                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
-                
-            } catch(Exception ex) {
-                
-                throw new RuntimeException(ex);
+                rightSeparatorKey = null;
                 
             }
-
-            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
-
+            
+            return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
+                    (PartitionMetadata) SerializerUtil.deserialize(val),
+                    rightSeparatorKey);
+            
         }
+
+//        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(long tx, String name, int index) {
+//
+//            IPartitionMetadata pmd;
+//
+//            byte[][] data;
+//
+//            try {
+//                
+//                data = getMetadataService().getPartitionAtIndex(name, index);
+//                
+//                if (data == null)
+//                    return null;
+//                
+//                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
+//                
+//            } catch(Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
+//
+//        }
 
 //        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
 //
@@ -775,8 +980,9 @@ public class BigdataClient {//implements DiscoveryListener {
 
         /**
          * Resolve the data service to which the index partition was mapped.
-         * 
-         * @todo use lookup cache in a real client.
+         * <p>
+         * This uses the lookup cache provided by
+         * {@link BigdataClient#getDataService(ServiceID)}
          */
         public IDataService getDataService(IPartitionMetadata pmd) {
 
@@ -799,6 +1005,97 @@ public class BigdataClient {//implements DiscoveryListener {
 
         }
         
+        /**
+         * Cache the index partition metadata in the client.
+         * 
+         * @param name
+         *            The name of the scale-out index.
+         * 
+         * @return The cached partition metadata.
+         * 
+         * @throws NoSuchIndexException
+         * 
+         * @todo write tests to validate this method. refactor the code code
+         *       into a utility class for batch index copy.
+         */
+        private MetadataIndex cachePartitions(String name) throws IOException {
+
+            // The name of the metadata index.
+            final String metadataName = MetadataService.getMetadataName(name);
+            
+            // The metadata service - we will use a range query on it.
+            final IMetadataService metadataService = getMetadataService();
+
+            // The UUID for the metadata index for that scale-out index.
+            final UUID metadataIndexUUID = metadataService.getIndexUUID(metadataName);
+            
+            if(metadataIndexUUID==null) {
+                
+                throw new NoSuchIndexException(name);
+                
+            }
+            
+            // The UUID for the managed scale-out index.
+            final UUID managedIndexUUID = metadataService.getManagedIndexUUID(metadataName);
+            
+            /*
+             * Allocate a cache for the defined index partitions.
+             */
+            MetadataIndex mdi = new MetadataIndex(clientTempStore,
+                    metadataIndexUUID, managedIndexUUID, name);
+            
+            /*
+             * Bulk copy the partition definitions for the scale-out index into the
+             * client. This uses range queries to bulk copy the keys and values from
+             * the metadata index on the metadata service into the client's cache.
+             */
+            ResultSet rset;
+
+            byte[] nextKey = null;
+
+            while (true) {
+
+                try {
+
+                    rset = metadataService.rangeQuery(IDataService.UNISOLATED,
+                            metadataName, nextKey, null, 1000, IDataService.KEYS
+                                    | IDataService.VALS);
+
+                    log.info("Fetched " + rset.getNumTuples()
+                            + " partition records for " + name);
+                    
+                } catch (Exception ex) {
+
+                    throw new RuntimeException(
+                            "Could not cache index partition metadata", ex);
+
+                }
+
+                int npartitions = rset.getNumTuples();
+
+                byte[][] separatorKeys = rset.getKeys();
+
+                byte[][] values = rset.getValues();
+
+                mdi.insert(new BatchInsert(npartitions, separatorKeys,
+                        values));
+
+                if (rset.isExhausted()) {
+
+                    // No more results are available.
+
+                    break;
+
+                }
+
+                nextKey = rset.getLastKey();
+
+            }
+
+            return mdi;
+            
+        }
+        
     }
 
     /**
@@ -808,41 +1105,46 @@ public class BigdataClient {//implements DiscoveryListener {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class PartitionMetadataWithSeparatorKeys implements IPartitionMetadata {
+    public static class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
 
-        private final byte[] leftSeparatorKey;
-        private final IPartitionMetadata src;
-        private final byte[] rightSeparatorKey;
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -1511361004851335936L;
         
-        public PartitionMetadataWithSeparatorKeys(byte[] leftSeparatorKey,
-                IPartitionMetadata src, byte[] rightSeparatorKey) {
+        private byte[] leftSeparatorKey;
+        private byte[] rightSeparatorKey;
+
+        /**
+         * De-serialization constructor.
+         */
+        public PartitionMetadataWithSeparatorKeys() {
+            
+        }
+        
+        public PartitionMetadataWithSeparatorKeys(int partitionId,
+                UUID[] dataServices, IResourceMetadata[] resources,
+                byte[] leftSeparatorKey, byte[] rightSeparatorKey) {
+
+            super(partitionId, dataServices, resources);
 
             if (leftSeparatorKey == null)
                 throw new IllegalArgumentException("leftSeparatorKey");
-
-            if (src == null)
-                throw new IllegalArgumentException("src");
             
             // Note: rightSeparatorKey MAY be null.
             
             this.leftSeparatorKey = leftSeparatorKey;
             
-            this.src = src;
-            
             this.rightSeparatorKey = rightSeparatorKey;
             
         }
-        
-        public UUID[] getDataServices() {
-            return src.getDataServices();
-        }
 
-        public int getPartitionId() {
-            return src.getPartitionId();
-        }
+        public PartitionMetadataWithSeparatorKeys(byte[] leftSeparatorKey,
+                IPartitionMetadata src, byte[] rightSeparatorKey) {
 
-        public IResourceMetadata[] getResources() {
-            return src.getResources();
+            this(src.getPartitionId(), src.getDataServices(), src
+                    .getResources(), leftSeparatorKey, rightSeparatorKey);
+            
         }
         
         /**
@@ -863,6 +1165,63 @@ public class BigdataClient {//implements DiscoveryListener {
          */
         public byte[] getRightSeparatorKey() {
             return rightSeparatorKey;
+        }
+        
+        private static final transient short VERSION0 = 0x0;
+        
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            super.readExternal(in);
+            
+            final short version = ShortPacker.unpackShort(in);
+            
+            if(version!=VERSION0) {
+                
+                throw new IOException("Unknown version: "+version);
+                
+            }
+
+            final int leftLen = (int) LongPacker.unpackLong(in);
+
+            final int rightLen = (int) LongPacker.unpackLong(in);
+
+            leftSeparatorKey = new byte[leftLen];
+            
+            in.read(leftSeparatorKey);
+            
+            if(rightLen!=0) {
+                
+                rightSeparatorKey = new byte[rightLen];
+
+                in.read(rightSeparatorKey);
+
+            } else {
+                
+                rightSeparatorKey = null;
+                
+            }
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            ShortPacker.packShort(out, VERSION0);
+            
+            LongPacker.packLong(out, leftSeparatorKey.length);
+
+            LongPacker.packLong(out, rightSeparatorKey == null ? 0
+                    : rightSeparatorKey.length);
+        
+            out.write(leftSeparatorKey);
+            
+            if(rightSeparatorKey!=null) {
+                
+                out.write(rightSeparatorKey);
+                
+            }
+            
         }
         
     }

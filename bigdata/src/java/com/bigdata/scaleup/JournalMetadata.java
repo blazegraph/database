@@ -55,6 +55,11 @@ import com.bigdata.journal.Journal;
  */
 public class JournalMetadata extends AbstractResourceMetadata {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 3783897093328558238L;
+
     public final boolean isIndexSegment() {
         
         return false;
@@ -89,7 +94,14 @@ public class JournalMetadata extends AbstractResourceMetadata {
         return journal;
         
     }
-    
+
+    /**
+     * De-serialization constructor.
+     */
+    public JournalMetadata() {
+        
+    }
+
     /**
      * Note: this assigns a size of zero (0L) since we can not accurately
      * estimate the #of bytes on the journal dedicated to a given partition of a

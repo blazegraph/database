@@ -55,6 +55,7 @@ import java.util.UUID;
 import net.jini.config.Configuration;
 
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.Journal;
 
 /**
  * The bigdata data server.
@@ -151,6 +152,15 @@ public class DataServer extends AbstractServer {
     }
     
     /**
+     * The backing {@link Journal}.
+     */
+    protected Journal getJournal() {
+        
+        return ((DataService)impl).journal;
+        
+    }
+    
+    /**
      * Adds jini administration interfaces to the basic {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -172,7 +182,7 @@ public class DataServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            log.info("");
+            log.info(""+getServiceUUID());
 
             return server.proxy;
             
@@ -190,7 +200,7 @@ public class DataServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info("");
+            log.info(""+getServiceUUID());
 
             new Thread() {
 
@@ -198,7 +208,7 @@ public class DataServer extends AbstractServer {
 
                     server.destroy();
                     
-                    log.info("Service stopped.");
+                    log.info(getServiceUUID()+" - Service stopped.");
 
                 }
 
@@ -206,7 +216,7 @@ public class DataServer extends AbstractServer {
 
         }
 
-        protected UUID getDataServiceUUID() {
+        public UUID getServiceUUID() {
 
             if(serviceUUID==null) {
 

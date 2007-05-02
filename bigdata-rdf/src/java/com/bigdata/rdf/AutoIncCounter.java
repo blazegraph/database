@@ -49,7 +49,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.UserDefinedFunction;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.rawstore.IRawStore;
@@ -67,7 +66,7 @@ import com.bigdata.rdf.rio.BulkRioLoader;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AutoIncCounter implements UserDefinedFunction, ICommitter {
+public class AutoIncCounter implements /*UserDefinedFunction,*/ ICommitter {
 
     /**
      * 
@@ -80,10 +79,10 @@ public class AutoIncCounter implements UserDefinedFunction, ICommitter {
      */
     private long nextId;
 
-    /**
-     * The last value assigned by the counter.
-     */
-    private Object retval;
+//    /**
+//     * The last value assigned by the counter.
+//     */
+//    private Object retval;
 
     private final IRawStore store;
     
@@ -128,34 +127,34 @@ public class AutoIncCounter implements UserDefinedFunction, ICommitter {
 
     }
     
-    /**
-     * If the key is found then we do not update the value.
-     */
-    public Object found(byte[] key, Object val) {
-
-        this.retval = val;
-        
-        return val;
-        
-    }
-
-    /**
-     * If the key is not found then we insert the current value of the
-     * counter and increment the counter.
-     */
-    public Object notFound(byte[] key) {
-        
-        retval = Long.valueOf(nextId());
-        
-        return retval;
-        
-    }
-    
-    public Object returnValue(byte[] key,Object oldval) {
-        
-        return retval;
-        
-    }
+//    /**
+//     * If the key is found then we do not update the value.
+//     */
+//    public Object found(byte[] key, Object val) {
+//
+//        this.retval = val;
+//        
+//        return val;
+//        
+//    }
+//
+//    /**
+//     * If the key is not found then we insert the current value of the
+//     * counter and increment the counter.
+//     */
+//    public Object notFound(byte[] key) {
+//        
+//        retval = Long.valueOf(nextId());
+//        
+//        return retval;
+//        
+//    }
+//    
+//    public Object returnValue(byte[] key,Object oldval) {
+//        
+//        return retval;
+//        
+//    }
 
     public byte[] serialize() {
 

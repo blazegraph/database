@@ -64,7 +64,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see KeyBuilder, which may be used to encode one or more values into a
+ * @see UnicodeKeyBuilder, which may be used to encode one or more values into a
  *      variable length unsigned byte[] key.
  * 
  * @todo add batch api for rangeCount and rangeQuery.

@@ -58,6 +58,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -70,7 +71,7 @@ import cutthecrap.utils.striterators.Striterator;
  * </p>
  * <p>
  * The B+-Tree implementation supports variable length unsigned byte[] keys and
- * provides a {@link KeyBuilder} utility class designed to make it possible to
+ * provides a {@link IKeyBuilder} utilities designed to make it possible to
  * generate keys from any combination of primitive data types and Unicode
  * strings. The total ordering imposed by the index is that of a bit-wise
  * comparison of the variable length unsigned byte[] keys. Encoding Unicode keys
@@ -80,7 +81,7 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link RuleBaseCollator}s are NOT compable and applications that use Unicode
  * data in their keys MUST make sure that they use a {@link RuleBasedCollator}
  * that imposes the same sort order each time they provision a
- * {@link KeyBuilder}. ICU4J provides a version number that is changed each
+ * {@link UnicodeKeyBuilder}. ICU4J provides a version number that is changed each
  * time a software revision would result in a change in the generated sort
  * order.
  * </p>
@@ -98,6 +99,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  * 
  * @see KeyBuilder
+ * @see UnicodeKeyBuilder
  * @see RuleBasedCollator
  * @see http://icu.sourceforge.net
  * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
@@ -726,7 +728,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *             for int keys passed into the non-batch api. It will disappear
      *             as soon as I update the test suites.
      */
-    private final KeyBuilder keyBuilder = new KeyBuilder();
+    private final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
 
     /**
      * Used to unbox an application key. This is NOT safe for concurrent

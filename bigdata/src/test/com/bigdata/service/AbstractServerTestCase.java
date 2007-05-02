@@ -50,6 +50,10 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.net.InetAddress;
 
+import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
+
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 import net.jini.core.discovery.LookupLocator;
@@ -63,6 +67,11 @@ import net.jini.core.lookup.ServiceTemplate;
  */
 public abstract class AbstractServerTestCase extends TestCase2 {
 
+    /**
+     * Equal to {@link IDataService#UNISOLATED}.
+     */
+    protected final long UNISOLATED = IDataService.UNISOLATED; 
+    
     /**
      * 
      */
@@ -113,6 +122,13 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         }
         
         assertNotNull("serviceID",serviceID);
+        
+        /*
+         * Verify that we have discovered the _correct_ service. This is a
+         * potential problem when starting a stopping services for the test
+         * suite.
+         */
+        assertEquals("serviceID", server.getServiceID(), serviceID);
 
         return serviceID;
         
@@ -211,4 +227,57 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         
     }
 
+    protected void assertEquals(IPartitionMetadata expected, IPartitionMetadata actual) {
+        
+        assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
+        
+        assertEquals("dataServices",expected.getDataServices(),actual.getDataServices());
+
+        final IResourceMetadata[] expectedResources = expected.getResources();
+
+        final IResourceMetadata[] actualResources = actual.getResources();
+        
+        assertEquals("#resources",expectedResources.length,actualResources.length);
+
+        for(int i=0;i<expected.getResources().length; i++) {
+            
+            // verify by components so that it is obvious what is wrong.
+            
+            assertEquals("filename[" + i + "]", expectedResources[i].getFile(),
+                    actualResources[i].getFile());
+
+            assertEquals("size[" + i + "]", expectedResources[i].size(),
+                    actualResources[i].size());
+
+            assertEquals("UUID[" + i + "]", expectedResources[i].getUUID(),
+                    actualResources[i].getUUID());
+
+            assertEquals("state[" + i + "]", expectedResources[i].state(),
+                    actualResources[i].state());
+            
+            // verify by equals.
+            assertTrue("resourceMetadata",expectedResources[i].equals(actualResources[i]));
+            
+        }
+        
+    }
+    
+    protected void assertEquals(PartitionMetadataWithSeparatorKeys expected,
+            IPartitionMetadata actual) {
+
+        assertEquals((IPartitionMetadata) expected, actual);
+
+        assertTrue("Class",
+                actual instanceof PartitionMetadataWithSeparatorKeys);
+
+        assertEquals("leftSeparatorKey", expected.getLeftSeparatorKey(),
+                ((PartitionMetadataWithSeparatorKeys) actual)
+                        .getLeftSeparatorKey());
+
+        assertEquals("rightSeparatorKey", expected.getRightSeparatorKey(),
+                ((PartitionMetadataWithSeparatorKeys) actual)
+                        .getRightSeparatorKey());
+
+    }
+    
 }

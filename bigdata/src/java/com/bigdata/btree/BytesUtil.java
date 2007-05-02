@@ -648,6 +648,8 @@ public class BytesUtil {
      */
     final public static String toString(byte[] key) {
 
+        if(key==null) return NULL;
+        
         StringBuilder sb = new StringBuilder(key.length*4+2);
         
         sb.append("[");
@@ -667,6 +669,8 @@ public class BytesUtil {
         return sb.toString();
         
     }
+    
+    private static transient String NULL = "null";
     
     /**
      * Compares two unsigned byte[]s.

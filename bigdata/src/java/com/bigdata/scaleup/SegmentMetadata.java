@@ -55,6 +55,11 @@ import com.bigdata.btree.IndexSegment;
  */
 public class SegmentMetadata extends AbstractResourceMetadata {
     
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -7296761796029541465L;
+
     public final boolean isIndexSegment() {
         
         return true;
@@ -67,6 +72,13 @@ public class SegmentMetadata extends AbstractResourceMetadata {
         
     }
     
+    /**
+     * De-serialization constructor.
+     */
+    public SegmentMetadata() {
+        
+    }
+
     public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
         super(filename,nbytes,state,uuid);

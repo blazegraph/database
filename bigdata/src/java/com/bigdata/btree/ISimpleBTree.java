@@ -58,7 +58,7 @@ package com.bigdata.btree;
  * 
  * @todo re-define this interface for byte[] keys
  * 
- * @see KeyBuilder, which may be used to encode one or more primitive data type
+ * @see UnicodeKeyBuilder, which may be used to encode one or more primitive data type
  *      values or Unicode strings into a variable length unsigned byte[] key.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

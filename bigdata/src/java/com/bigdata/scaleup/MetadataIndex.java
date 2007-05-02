@@ -57,6 +57,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.IRawStore;
@@ -70,6 +71,12 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo the partition identifier counter should be broken down into each
+ *       partition of the metadata index so that we can split L0 (the root
+ *       metadata index) into a set of L1 metadata index partitions. The int32
+ *       partition identifiers may be used to form int64 unique identifiers
+ *       within the various data partitions.
  * 
  * @todo mutation operations need to be synchronized.
  * 
@@ -128,6 +135,21 @@ public class MetadataIndex extends UnisolatedBTree {
         return managedIndexUUID;
         
     }
+
+    /**
+     * Returns the value to be assigned to the next partition created on this
+     * {@link MetadataIndex} and then increments the counter. The counter will
+     * be made restart-safe iff the index is dirty, the index is registered as
+     * an {@link ICommitter}, and the store on which the index is stored is
+     * committed.
+     */
+    public int nextPartitionId() {
+        
+        return nextPartitionId++;
+        
+    }
+    
+    private int nextPartitionId;
     
     /**
      * Create a new {@link MetadataIndex}.
@@ -151,6 +173,9 @@ public class MetadataIndex extends UnisolatedBTree {
         //
         this.managedIndexUUID = managedIndexUUID;
         
+        // The first partitionId is zero(0).
+        this.nextPartitionId = 0;
+        
     }
 
     public MetadataIndex(IRawStore store, BTreeMetadata metadata) {
@@ -160,6 +185,8 @@ public class MetadataIndex extends UnisolatedBTree {
         managedIndexName = ((MetadataIndexMetadata)metadata).getName();
 
         managedIndexUUID = ((MetadataIndexMetadata)metadata).getManagedIndexUUID();
+
+        nextPartitionId = ((MetadataIndexMetadata)metadata).getNextPartitionId();
         
     }
 
@@ -182,6 +209,7 @@ public class MetadataIndex extends UnisolatedBTree {
         
         private String name;
         private UUID managedIndexUUID;
+        private int nextPartitionId;
         
         /**
          * The managedIndexName of the metadata index, which is the always the same as the managedIndexName
@@ -209,6 +237,16 @@ public class MetadataIndex extends UnisolatedBTree {
             return managedIndexUUID;
             
         }
+
+        /**
+         * The immutable value of the <code>nextPartitionId</code> counter
+         * stored in the metadata record.
+         */
+        public int getNextPartitionId() {
+            
+            return nextPartitionId;
+            
+        }
         
         /**
          * De-serialization constructor.
@@ -227,6 +265,8 @@ public class MetadataIndex extends UnisolatedBTree {
             this.name = mdi.getManagedIndexName();
             
             this.managedIndexUUID = mdi.getManagedIndexUUID();
+            
+            this.nextPartitionId = mdi.nextPartitionId;
             
         }
 
@@ -247,6 +287,8 @@ public class MetadataIndex extends UnisolatedBTree {
             name = in.readUTF();
             
             managedIndexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+
+            nextPartitionId = (int)LongPacker.unpackLong(in);
             
         }
         
@@ -261,6 +303,8 @@ public class MetadataIndex extends UnisolatedBTree {
             out.writeLong(managedIndexUUID.getMostSignificantBits());
             
             out.writeLong(managedIndexUUID.getLeastSignificantBits());
+            
+            LongPacker.packLong(out, nextPartitionId);
             
         }
         

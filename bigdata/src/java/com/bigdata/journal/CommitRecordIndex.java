@@ -53,11 +53,13 @@ import org.CognitiveWeb.extser.ShortPacker;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -72,9 +74,9 @@ import com.bigdata.rawstore.IRawStore;
 public class CommitRecordIndex extends BTree {
 
     /**
-     * @todo refactor to share with the {@link Journal}?
+     * Instance used to encode the timestamp into the key.
      */
-    private KeyBuilder keyBuilder = new KeyBuilder();
+    private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
     
     /**
      * A weak value cache for {@link ICommitRecord}s. Note that lookup may be
@@ -124,7 +126,7 @@ public class CommitRecordIndex extends BTree {
     protected byte[] getKey(long commitTime) {
 
         /*
-         * Note: The {@link KeyBuilder} is NOT thread-safe
+         * Note: The {@link UnicodeKeyBuilder} is NOT thread-safe
          */
         return keyBuilder.reset().append(commitTime).getKey();
 

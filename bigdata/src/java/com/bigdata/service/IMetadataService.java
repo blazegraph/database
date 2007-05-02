@@ -56,6 +56,7 @@ import net.jini.core.lookup.ServiceItem;
 
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * A metadata service for a named index.
@@ -113,6 +114,27 @@ public interface IMetadataService extends IDataService {
      * their implementation.
      */
 
+    /**
+     * Register and statically partition a scale-out index.
+     * 
+     * @param name
+     * @param separatorKeys
+     * @param dataServices
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * 
+     * @todo Add a method to let a client cache the partitions of a scale-out
+     *       index - its use will be limited to a statically partitioned index
+     *       at this time and the #of expected partitions will be small enough
+     *       that it makes sense for clients to pre-fetch and cache the entire
+     *       set of partition definitions for a scale-out index.
+     */
+    public UUID registerManagedIndex(String name, byte[][] separatorKeys,
+            UUID[] dataServices) throws IOException, InterruptedException,
+            ExecutionException;
+    
     /**
      * Register a scale-out index with single initial partition. As the index
      * grows, the initial partition will be split and the various partitions may
@@ -229,5 +251,29 @@ public interface IMetadataService extends IDataService {
      * @throws IOException
      */
     public byte[][] getPartitionAtIndex(String name, int index ) throws IOException;
+    
+    /**
+     * Create a new partition for a scale-out index.
+     * 
+     * @param name
+     *            The index name.
+     * @param key
+     *            The separator key for the new partition.
+     * @param dataServiceUUID
+     *            The data service to which the new partition will be mapped.
+     * 
+     * @return The partition metadata for the new partition.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * 
+     * @todo change return signature to byte[][] or byte[] to consistent with
+     *       the other methods in this interface and send back a serialized
+     *       {@link PartitionMetadataWithSeparatorKeys}
+     */
+    public IPartitionMetadata createPartition(String name, byte[] key,
+            UUID dataServiceUUID) throws IOException, InterruptedException,
+            ExecutionException;
     
 }

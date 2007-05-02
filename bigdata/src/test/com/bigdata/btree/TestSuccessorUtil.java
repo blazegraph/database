@@ -122,13 +122,13 @@ public class TestSuccessorUtil extends TestCase2 {
 //     * The double precision number that is one less than zero in the double
 //     * precision value space.
 //     */
-//    final protected double dm1 = Double.longBitsToDouble(KeyBuilder.d2l(0d)-1);
+//    final protected double dm1 = Double.longBitsToDouble(UnicodeKeyBuilder.d2l(0d)-1);
 //
 //    /**
 //     * The double precision number that is one more than zero in the double
 //     * precision value space.
 //     */
-//    final protected double DPOS_ONE = Double.longBitsToDouble(KeyBuilder.d2l(0d)-1);
+//    final protected double DPOS_ONE = Double.longBitsToDouble(UnicodeKeyBuilder.d2l(0d)-1);
     
     /**
      * Derived from <a

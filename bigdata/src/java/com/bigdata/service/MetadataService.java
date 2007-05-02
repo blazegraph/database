@@ -48,16 +48,21 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.scaleup.AbstractPartitionTask;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -159,6 +164,36 @@ abstract public class MetadataService extends DataService implements
         super(properties);
 
     }
+
+    /**
+     * Register and statically partition a scale-out index.
+     * 
+     * @param name
+     * @param separatorKeys
+     * @param dataServices
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * 
+     * @todo Add a method to let a client cache the partitions of a scale-out
+     *       index - its use will be limited to a statically partitioned index
+     *       at this time and the #of expected partitions will be small enough
+     *       that it makes sense for clients to pre-fetch and cache the entire
+     *       set of partition definitions for a scale-out index.
+     */
+    public UUID registerManagedIndex(String name, byte[][] separatorKeys,
+            UUID[] dataServices) throws IOException, InterruptedException,
+            ExecutionException {
+        
+        final UUID managedIndexUUID = (UUID) journal.serialize(
+                new RegisterMetadataIndexWithPartitionsTask(name,
+                        separatorKeys, dataServices))
+                .get();
+
+        return managedIndexUUID; 
+        
+    }
     
     /**
      * @todo if if exits already? (and has consistent/inconsistent metadata)?
@@ -183,10 +218,8 @@ abstract public class MetadataService extends DataService implements
                 
         };
 
-        MetadataIndex mdi = (MetadataIndex) journal.serialize(
+        final UUID managedIndexUUID = (UUID) journal.serialize(
                 new RegisterMetadataIndexTask(name, dataServiceUUIDs)).get();
-        
-        UUID managedIndexUUID = mdi.getManagedIndexUUID();
         
         return managedIndexUUID; 
                 
@@ -220,43 +253,26 @@ abstract public class MetadataService extends DataService implements
      *       other implementations than {@link PartitionMetadata} into the
      *       index, but I have not done so since I want to ensure datatype
      *       consistency for now.
-     * 
-     * @todo this needs to be broken down into a createPartition and an
-     *       updatePartition since the former needs to assign the next available
-     *       partitionId while the latter needs to validate the partitionId. I
-     *       could hack this by requiring a partitionId := -1 on create (but it
-     *       is a packed integer...) and then overriding the partitionId before
-     *       it is stored in the mdi.
      */
-    public void createPartition(String name, byte[] key, UUID dataServiceUUID)
-            throws IOException, InterruptedException, ExecutionException {
-        
-        // the name of the metadata index itself.
-        final String metadataName = getMetadataName(name);
-        
-        // make sure there is no metadata index for that btree.
-        MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
-        
-        if(mdi == null) {
-            
-            throw new IllegalArgumentException("Index not registered: " + name);
-            
-        }
-        
-        if(dataServiceUUID==null) {
-            
+    public IPartitionMetadata createPartition(String name, byte[] separatorKey,
+            UUID dataServiceUUID) throws IOException, InterruptedException,
+            ExecutionException {
+
+        if (dataServiceUUID == null) {
+
             dataServiceUUID = getUnderUtilizedDataService();
-            
+
         }
 
         // @todo setup the failover data services.
-        UUID[] dataServices = new UUID[] { dataServiceUUID };
+        UUID[] dataServiceUUIDs = new UUID[] { dataServiceUUID };
 
-        // FIXME run task.
-//        mdi.put(key, new PartitionMetadata(getPartitionId(),
-//                dataServices, val.getResources()));
-        throw new UnsupportedOperationException();
-        
+        IPartitionMetadata pmd = (IPartitionMetadata) journal.serialize(
+                new CreateIndexPartitionTask(name, separatorKey,
+                        dataServiceUUIDs)).get();
+
+        return pmd;
+
     }
 
     /**
@@ -353,7 +369,8 @@ abstract public class MetadataService extends DataService implements
         final int index = mdi.findIndexOf(key);
         
         /*
-         * The code from this point on is shared with getPartitionAtIndex().
+         * The code from this point on is shared with getPartitionAtIndex() and
+         * also by some of the index partition tasks (CreatePartition for one).
          */
         
         if(index == -1) return null;
@@ -458,6 +475,294 @@ abstract public class MetadataService extends DataService implements
      */
     
     /**
+     * Registers a metadata index for a named scale-out index and statically
+     * partition the index using the given separator keys and data services.
+     * 
+     * @todo This task presumes a static system (no on-going writes on the
+     *       various data services since it does not attempt to handle overflow
+     *       events), runs remote operations inside the unisolated write thread,
+     *       and does not provide correcting across if remote operations
+     *       failure. This task was written in order to make it possible to
+     *       statically partition a scale-out index before the broader problems
+     *       of dynamic partitioning are solved.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class RegisterMetadataIndexWithPartitionsTask extends AbstractIndexManagementTask {
+        
+        final int npartitions;
+        final private byte[][] separatorKeys;
+        final private UUID[] dataServiceUUIDs;
+        final private IDataService[] dataServices;
+        
+        /**
+         * Create and statically partition a scale-out index.
+         * 
+         * @param name
+         *            The name of the scale-out index.
+         * @param separatorKeys
+         *            The array of separator keys. Each separator key is
+         *            interpreted as an <em>unsigned byte[]</em>. The first
+         *            entry MUST be an empty byte[]. The entries MUST be in
+         *            sorted order.
+         * @param dataServiceUUIDs
+         *            The array of data services onto which each partition
+         *            defined by a separator key will be mapped. The #of entries
+         *            in this array MUST agree with the #of entries in the
+         *            <i>separatorKeys</i> array.
+         */
+        public RegisterMetadataIndexWithPartitionsTask(String name,
+                byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
+
+            super(name);
+            
+            if(separatorKeys==null) 
+                throw new IllegalArgumentException();
+
+            if (separatorKeys.length == 0)
+                throw new IllegalArgumentException();
+
+            if (dataServiceUUIDs == null)
+                throw new IllegalArgumentException();
+            
+            if (dataServiceUUIDs.length == 0)
+                throw new IllegalArgumentException();
+            
+            if( separatorKeys.length != dataServiceUUIDs.length )
+                throw new IllegalArgumentException();
+
+            this.npartitions = separatorKeys.length;
+            
+            this.separatorKeys = separatorKeys;
+            
+            this.dataServiceUUIDs = dataServiceUUIDs;
+
+            this.dataServices = new IDataService[dataServiceUUIDs.length];
+
+            if( separatorKeys[0] == null )
+                throw new IllegalArgumentException();
+                
+            if (separatorKeys[0].length != 0)
+                throw new IllegalArgumentException(
+                        "The first separatorKey must be an empty byte[].");
+            
+            for (int i = 0; i < npartitions; i++) {
+
+                byte[] separatorKey = separatorKeys[i];
+                
+                if (separatorKey == null) {
+
+                    throw new IllegalArgumentException();
+
+                }
+                
+                if (i > 0) {
+                    
+                    if(BytesUtil.compareBytes(separatorKey, separatorKeys[i-1])<0) {
+                        
+                        throw new IllegalArgumentException(
+                                "Separator keys out of order at index=" + i);
+                        
+                    }
+                    
+                }
+
+                UUID uuid = dataServiceUUIDs[i];
+
+                if (uuid == null) {
+
+                    throw new IllegalArgumentException();
+
+                }
+
+                try {
+
+                    IDataService dataService = getDataServiceByUUID(uuid);
+
+                    if(dataService==null) {
+                        
+                        throw new IllegalArgumentException(
+                                "Unknown data service: uuid=" + uuid);
+                        
+                    }
+                    
+                    dataServices[i] = dataService;
+
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(
+                            "Could not resolve data service: UUID=" + uuid, ex);
+
+                }
+
+            }
+            
+        }
+
+        public Object call() throws Exception {
+
+            /*
+             * @todo refactor this into the base abstract class IFF the task
+             * writes on the journal. it provides safe commit iff the task
+             * succeeds and otherwise invokes abort() so that partial task
+             * executions are properly discarded. when possible, the original
+             * exception is rethrown so that we do not encapsulate the cause
+             * unless it would violate our throws clause.
+             */
+            try {
+
+                Object ret = doTask();
+                
+                journal.commit();
+                
+                return ret;
+                
+            } catch(Exception ex) {
+                
+                journal.abort();
+                
+                throw ex;
+                
+            } catch(Throwable t) {
+                
+                journal.abort();
+                
+                throw new RuntimeException(t);
+                
+            }
+            
+        }
+        
+        /**
+         * Create and statically partition the scale-out index.
+         * 
+         * @return The UUID assigned to the managed index.
+         */
+        protected UUID doTask() throws Exception {
+            
+            // the name of the metadata index itself.
+            final String metadataName = getMetadataName(name);
+            
+            // make sure there is no metadata index for that btree.
+            if( journal.getIndex(metadataName) != null ) {
+                
+                throw new IllegalStateException("Already registered: name="
+                        + name);
+                
+            }
+
+            /*
+             * Note: there are two UUIDs here - the UUID for the metadata index
+             * describing the partitions of the named scale-out index and the
+             * UUID of the named scale-out index. The metadata index UUID MUST
+             * be used by all B+Tree objects having data for the metadata index
+             * (its mutable btrees on journals and its index segments) while the
+             * managed named index UUID MUST be used by all B+Tree objects
+             * having data for the named index (its mutable btrees on journals
+             * and its index segments).
+             */
+            
+            final UUID metadataIndexUUID = UUID.randomUUID();
+            
+            final UUID managedIndexUUID = UUID.randomUUID();
+            
+            /*
+             * Create the metadata index.
+             */
+            
+            MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
+                    managedIndexUUID, name);
+
+            /*
+             * Register the metadata index with the metadata service.
+             */
+            journal.registerIndex(metadataName, mdi);
+
+            /*
+             * Register the scale-out index on each data service on which a
+             * partition of that index will be mapped.
+             */
+
+            Set<UUID> registered = new HashSet<UUID>();
+            
+            for(int i=0; i<npartitions; i++) {
+
+                /*
+                 * Register unless we have already registered the index on this
+                 * data service (multiple partitions may be mapped to the same
+                 * data service).
+                 */
+
+                UUID dataServiceUUID = dataServiceUUIDs[i];
+                
+                if(!registered.contains(dataServiceUUID)) {
+
+                    dataServices[i].registerIndex(name, managedIndexUUID);
+                 
+                    registered.add(dataServiceUUID);
+                    
+                }
+
+            }
+            
+            /*
+             * Map the partitions onto the data services.
+             */
+            
+            PartitionMetadata[] partitions = new PartitionMetadata[npartitions];
+            
+            for(int i=0; i<npartitions; i++) {
+                
+//                IDataService dataService = dataServices[i];
+                
+                PartitionMetadata pmd = new PartitionMetadata(//
+                        mdi.nextPartitionId(),//
+                        new UUID[] { //
+                            dataServiceUUIDs[i]
+                        },
+                        new IResourceMetadata[] { //
+                            dataServices[i].getJournalMetadata() }
+                        );
+                
+                log.info("name=" + name + ", partitionId="
+                        + pmd.getPartitionId());
+
+                /*
+                 * Map the initial partition onto that data service. This
+                 * requires us to compute the left and right separator keys. The
+                 * right separator key is just the separator key for the next
+                 * partition in order and null iff this is the last partition.
+                 */
+
+                dataServices[i].mapPartition(name,
+                        new PartitionMetadataWithSeparatorKeys(
+                                separatorKeys[i], pmd,
+                                i + 1 < npartitions ? separatorKeys[i + 1]
+                                        : null));
+
+                partitions[i] = pmd;
+                
+            }
+
+            /*
+             * Record each partition in the metadata index.
+             */
+
+            for(int i=0; i<npartitions; i++) {
+
+                mdi.put(separatorKeys[i], partitions[i]);
+            
+            }
+
+            // Done - caller will commit.
+            return mdi.getManagedIndexUUID();
+            
+        }
+        
+    }
+
+    /**
      * Registers a metadata index for a named scale-out index and creates the
      * initial partition for the scale-out index on a {@link DataService}.
      * 
@@ -516,7 +821,10 @@ abstract public class MetadataService extends DataService implements
             }
             
         }
-        
+
+        /**
+         * @return The UUID assigned to the managed index.
+         */
         public Object call() throws Exception {
 
             // the name of the metadata index itself.
@@ -544,6 +852,44 @@ abstract public class MetadataService extends DataService implements
             final UUID metadataIndexUUID = UUID.randomUUID();
             
             final UUID managedIndexUUID = UUID.randomUUID();
+            
+            /*
+             * @todo it must not be possible for the journal to overflow during
+             * this operation or we could wind up with stale metadata since a
+             * new journal would be in effect (actually, the trigger condition
+             * is that the journal is deemed to be inaccessible by any active
+             * transaction and the metadata service selects the journal for
+             * restart-safe deletion).
+             */ 
+            IResourceMetadata[] resourceMetadata = new IResourceMetadata[] {
+
+                    dataServices[0].getJournalMetadata()
+                    
+                    /*
+                     * Note: We the same resource exists on each failover data
+                     * service since the resource is a media-level replication
+                     * of the primary data service.
+                     * 
+                     * @todo in order to provide a global filename space we may
+                     * want to locate the resources in the file system
+                     * underneath a directory whose name is the UUID of the
+                     * primary data service on which that resource was created.
+                     * this could be handled by the data service itself, since
+                     * it is responsible for reporting the names of its
+                     * resources.
+                     */
+
+            };
+            
+            /*
+             * Create the metadata index.
+             */
+            
+            MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
+                    managedIndexUUID, name);
+            
+            PartitionMetadata pmd = new PartitionMetadata(
+                    mdi.nextPartitionId(), dataServiceUUIDs, resourceMetadata);
             
             /*
              * Register the initial index partition on the target data service
@@ -585,7 +931,188 @@ abstract public class MetadataService extends DataService implements
              * could be a confusion over which service advertisement was
              * authorative.
              */
+
             dataServices[0].registerIndex(name, managedIndexUUID);
+            
+            // map the initial partition onto that data service.
+            dataServices[0].mapPartition(name,
+                    new PartitionMetadataWithSeparatorKeys(new byte[] {}, pmd,
+                            null));
+            
+            /*
+             * Register the metadata index with the metadata service.
+             */
+            journal.registerIndex(metadataName, mdi);
+            
+            /*
+             * Record the partition in the metadata index.
+             */
+            mdi.put(new byte[] {}, pmd );
+
+            journal.commit();
+
+            return mdi.getManagedIndexUUID();
+            
+        }
+        
+    }
+
+    /**
+     * Create a new partition for a scale-out index - the caller specifies the
+     * separatorKey, the {@link DataService}, and the {@link JournalMetadata}
+     * and the task adds a new {@link IPartitionMetadata} with a unique
+     * partition identifier to the {@link MetadataIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class CreateIndexPartitionTask extends AbstractIndexManagementTask {
+        
+        /**
+         * The left separator key specified by the caller.
+         */
+        final private byte[] separatorKey;
+
+        final private UUID[] dataServiceUUIDs;
+        
+        final private IDataService[] dataServices;
+        
+        public CreateIndexPartitionTask(String name, byte[] separatorKey,
+                UUID[] dataServiceUUIDs) {
+
+            super(name);
+
+            if(separatorKey==null) 
+                throw new IllegalArgumentException();
+
+            this.separatorKey = separatorKey;
+            
+            /*
+             * @todo refactor logic to validate the dataServiceUUIDs and to
+             * convert them to ServiceIDs into an abstract base class.
+             */
+            if (dataServiceUUIDs == null)
+                throw new IllegalArgumentException();
+            
+            if (dataServiceUUIDs.length == 0)
+                throw new IllegalArgumentException();
+            
+            this.dataServiceUUIDs = dataServiceUUIDs;
+
+            this.dataServices = new IDataService[dataServiceUUIDs.length];
+            
+            for (int i = 0; i < dataServiceUUIDs.length; i++) {
+
+                UUID uuid = dataServiceUUIDs[i];
+
+                if (uuid == null) {
+
+                    throw new IllegalArgumentException();
+
+                }
+
+                try {
+
+                    IDataService dataService = getDataServiceByUUID(uuid);
+
+                    if(dataService==null) {
+                        
+                        throw new IllegalArgumentException(
+                                "Unknown data service: uuid=" + uuid);
+                        
+                    }
+                    
+                    dataServices[i] = dataService;
+
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(
+                            "Could not resolve data service: UUID=" + uuid, ex);
+
+                }
+
+            }
+            
+        }
+        
+        /**
+         * Figure out the separator key for the rightSibling based on the
+         * pre-existing partition that spans the new separator key.
+         */
+        protected byte[] getRightSeparatorKey(MetadataIndex mdi,
+                byte[] separatorKey) {
+
+            /*
+             * The code from this point on is shared with getPartition() and
+             * getPartitionAtIndex() on MetadataService.
+             */
+
+            final int index = mdi.findIndexOf(separatorKey);
+
+            if (index == -1)
+                return null;
+
+//            /*
+//             * The serialized index partition metadata record for the partition
+//             * that spans the given key.
+//             */
+//            byte[] val = (byte[]) mdi.valueAt(index);
+
+//            /*
+//             * The separator key that defines the left edge of that index
+//             * partition (always defined).
+//             */
+//            byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+
+            /*
+             * The separator key that defines the right edge of that index
+             * partition or [null] iff the index partition does not have a right
+             * sibling (a null has the semantics of no upper bound).
+             */
+            byte[] rightSeparatorKey;
+
+            try {
+
+                rightSeparatorKey = (byte[]) mdi.keyAt(index + 1);
+
+            } catch (IndexOutOfBoundsException ex) {
+
+                rightSeparatorKey = null;
+
+            }
+
+            return rightSeparatorKey;
+            
+        }
+
+        /**
+         * @return The new {@link IPartitionMetadata} that was added to the
+         *         {@link MetadataIndex}.
+         */
+        public Object call() throws Exception {
+
+            // the name of the metadata index itself.
+            final String metadataName = getMetadataName(name);
+            
+            // make sure there is no metadata index for that btree.
+            
+            final MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
+            
+            if( mdi == null ) {
+                
+                throw new IllegalStateException("No such index: " + name);
+                
+            }
+
+            /*
+             * Using the definition of the index partitions _before_ we create
+             * the new partition, locate the right separator key of the existing
+             * partition that spans the given key. This will become the right
+             * separator key of the newly created partition and we will need it
+             * to notify the data service to map that partition.
+             */
+            final byte[] rightSeparatorKey = getRightSeparatorKey(mdi,
+                    separatorKey);
             
             /*
              * @todo get the metadata for the journal resource on which the
@@ -594,52 +1121,62 @@ abstract public class MetadataService extends DataService implements
              * @todo it must not be possible for the journal to overflow during
              * this operation or we could wind up with stale metadata since a
              * new journal would be in effect.
-             */ 
-            IResourceMetadata journalResource = null; // dataServices[0].getResourceMetadata();
-            
+             */
             IResourceMetadata[] resourceMetadata = new IResourceMetadata[] {
 
-//                    journalResource // @todo
+                    dataServices[0].getJournalMetadata()
                     
-                    /*
-                     * Note: We the same resource exists on each failover data
-                     * service since the resource is a media-level replication
-                     * of the primary data service.
-                     * 
-                     * @todo in order to provide a global filename space we may
-                     * want to locate the resources in the file system
-                     * underneath a directory whose name is the UUID of the
-                     * primary data service on which that resource was created.
-                     * this could be handled by the data service itself, since
-                     * it is responsible for reporting the names of its
-                     * resources.
-                     */
-
             };
             
+            PartitionMetadata pmd = new PartitionMetadata(
+                    mdi.nextPartitionId(), dataServiceUUIDs, resourceMetadata);
+
             /*
-             * Create the metadata index now that we have the index registered
-             * successfully on its data services.
+             * Make sure that the target data service has a mutable index
+             * registered for the named index (remote operation).
+             * 
+             * @todo this should be atomic. If the event originates with the
+             * data services then we can accept this as a precondition.
+             * 
+             * @todo verify that the index exists either by trapping the
+             * appropriate exception, by testing first, or by using a
+             * conditional registration.
              */
-            
-            MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
-                    managedIndexUUID, name);
-            
+            dataServices[0].registerIndex(name, mdi.getManagedIndexUUID());
+
             /*
-             * Register the metadata index with the metadata service.
+             * map the partition onto that data service.
+             * 
+             * FIXME this needs to update the target data service mapping for
+             * both the new partition and the partition whose key range was
+             * split by this operation.
+             * 
+             * @todo Rather than define this as "creating" a partition, it
+             * should be defined as "split"ing a partition. A separate operation
+             * should be defined to move a partition to a different data service -
+             * that "MOVE" operation may need to be queued until the journal
+             * overflows or otherwise account for the data already on the data
+             * service for the pre-split partition.
+             * 
+             * FIXME define a simple API to create a static partitioning of an
+             * index onto N data services as part of the scale-out index
+             * registration.  That will let me decouple the logic of working
+             * through index partition split/joins and index partition moves
+             * while supporting full operations on a statically partitioned
+             * index.
              */
-            journal.registerIndex(metadataName, mdi);
-            
+            dataServices[0].mapPartition(name,
+                    new PartitionMetadataWithSeparatorKeys(separatorKey, pmd,
+                            rightSeparatorKey));
+
             /*
-             * Setup the initial partition which is able to accept any key.
+             * Insert the new partition into the metadata index.
              */
-            
-            mdi.put(new byte[] {}, new PartitionMetadata(0, dataServiceUUIDs,
-                    resourceMetadata));
+            mdi.put(separatorKey, pmd);
 
             journal.commit();
 
-            return mdi;
+            return pmd;
             
         }
         
