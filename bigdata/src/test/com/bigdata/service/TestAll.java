@@ -67,6 +67,12 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite(TestAll.class.getName());
 
+        //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
+
+        /*
+         * Test case used to develop code for Jini-based service advertisment
+         * and discovery.
+         */
         suite.addTestSuite( TestServiceDiscovery.class );
 
         /*
@@ -85,9 +91,32 @@ public class TestAll extends TestCase {
          * Test of a single client talking to a bigdata federation.
          */
         suite.addTestSuite( TestBigdataClient.class );
-        
-        //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
+        /*
+         * @todo test correctness when services fail at various points in
+         * distributed operations, e.g., during the FSA for registering a
+         * scale-out index the data service onto which the first index partition
+         * will be mapped may fail during registration - or may overflow during
+         * registration, all of which lead to interesting places that need to
+         * be handled correctly.
+         */
+        
+        /*
+         * @todo test service failover and restart-safety.
+         */
+        
+        /*
+         * @todo test telemetry (define a telemetry service that will collect
+         * data from other services on their operation load and on server load
+         * that will be used to inform load-balancing decisions, including which
+         * data service to map a new partition onto and when to have a partition
+         * moved to a new data service - either choosing a secondary service to
+         * become primary and thereby changing hosts (and either making the
+         * primary into a secondary or choosing a new secondary to maintain
+         * replication) or by selecting a new host and bringing the state onto
+         * that host).
+         */
+        
         return suite;
         
     }

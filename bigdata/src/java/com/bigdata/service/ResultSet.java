@@ -16,6 +16,8 @@ import com.bigdata.btree.IIndex;
 /**
  * An object used to stream key scan results back to the client.
  * 
+ * FIXME Modify to use a compressed key buffer for the keys.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -62,6 +62,7 @@ import junit.framework.TestSuite;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -443,7 +444,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      */
     public long doIndexWriteRateTest(String name, long tx, int valueSize) {
 
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
         
         IIndex ndx = (tx == 0 ? journal.getIndex(name)
                 : journal.getTx(tx).getIndex(name));

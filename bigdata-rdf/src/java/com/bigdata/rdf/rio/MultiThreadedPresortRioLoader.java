@@ -57,7 +57,7 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.TripleStore;
@@ -168,7 +168,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         
         this.buffer = new Buffer(store, capacity, distinct );
        
-        this.keyBuilder = new RdfKeyBuilder(new KeyBuilder(store
+        this.keyBuilder = new RdfKeyBuilder(new UnicodeKeyBuilder(store
                 .createCollator(), Bytes.kilobyte32 * 4));
     }
     

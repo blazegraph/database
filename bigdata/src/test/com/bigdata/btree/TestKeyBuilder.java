@@ -52,7 +52,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -60,46 +59,12 @@ import java.util.TreeMap;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.NoSuccessorException;
-import com.bigdata.btree.SuccessorUtil;
-import com.bigdata.rawstore.Bytes;
-import com.ibm.icu.text.Collator;
-import com.ibm.icu.text.RuleBasedCollator;
-
 /**
  * Test suite for high level operations that build variable length _unsigned_
  * byte[] keys from various data types and unicode strings.
  * 
  * @see http://docs.hp.com/en/B3906-90004/ch02s02.html#d0e1095 for ranges on
  * negative float and double values.
- * 
- * @todo write performance test for encoding strings, possibly in the context of
- *       parsed rdf data, and see if there are any easy wins in how the encoding
- *       to a sort key is handled or in alignment of the apis.
- * 
- * @todo use ICU4J as provider for compression for unicode fields, perhaps
- *       factoring a minimal module into extSer for that purpose.
- * 
- * @todo document use of ICU for forming keys but note that this feature really
- *       belongs in the client not the server. when dividing bigdata into client -
- *       server APIs, ICU will go into the client API. Also, a minimum ICU
- *       module could be built to support sort key generation. Integrate support
- *       for ICU versioning into the client and perhaps into the index metadata
- *       so clients can discover which version to use when generating keys for
- *       an index, and also the locale and other parameters for the collation
- *       (PRIMARY, SECONDARY, etc). Support the JNI integration of ICU (native
- *       code for faster generation of sort keys).
- * 
- * @todo write tests in that construct keys for a triple store, quad store,
- *       column store, and the metadata index for a paritioned index.
- * 
- * @todo refactor the bulk insert tests into another test suite since they
- *       introduce a dependency on the btree implementation rather than just a
- *       focus on the correctness and performance of the key encoder.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -130,7 +95,6 @@ public class TestKeyBuilder extends TestCase2 {
             assertNotNull(keyBuilder.buf);
             assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.buf.length);
             assertEquals(0,keyBuilder.len);
-            assertNotNull(keyBuilder.collator);
 
         }
         
@@ -139,7 +103,6 @@ public class TestKeyBuilder extends TestCase2 {
             assertNotNull(keyBuilder.buf);
             assertEquals(0,keyBuilder.buf.length);
             assertEquals(0,keyBuilder.len);
-            assertNotNull(keyBuilder.collator);
         }
         
         {
@@ -147,25 +110,15 @@ public class TestKeyBuilder extends TestCase2 {
             assertNotNull(keyBuilder.buf);
             assertEquals(20,keyBuilder.buf.length);
             assertEquals(0,keyBuilder.len);
-            assertNotNull(keyBuilder.collator);
-        }
-        
-        {
-            KeyBuilder keyBuilder = new KeyBuilder((RuleBasedCollator)Collator.getInstance(Locale.UK),30);
-            assertNotNull(keyBuilder.buf);
-            assertEquals(30,keyBuilder.buf.length);
-            assertEquals(0,keyBuilder.len);
-            assertNotNull(keyBuilder.collator);
         }
         
         {
             final byte[] expected = new byte[]{1,2,3,4,5,6,7,8,9,10};
-            KeyBuilder keyBuilder = new KeyBuilder((RuleBasedCollator)Collator.getInstance(Locale.UK),4,expected);
+            KeyBuilder keyBuilder = new KeyBuilder(4,expected);
             assertNotNull(keyBuilder.buf);
             assertEquals(4,keyBuilder.len);
             assertEquals(10,keyBuilder.buf.length);
             assertTrue(expected==keyBuilder.buf);
-            assertNotNull(keyBuilder.collator);
         }
 
         /*
@@ -182,16 +135,16 @@ public class TestKeyBuilder extends TestCase2 {
 
         {
             try {
-                new KeyBuilder(null,20);
+                new KeyBuilder(20,null);
                 fail("Expecting: "+IllegalArgumentException.class);
             } catch(IllegalArgumentException ex) {
                 System.err.println("Ignoring expected exception: "+ex);
             }
         }
-
+        
         {
             try {
-                new KeyBuilder((RuleBasedCollator)Collator.getInstance(Locale.UK),-20);
+                new KeyBuilder(20,new byte[3]);
                 fail("Expecting: "+IllegalArgumentException.class);
             } catch(IllegalArgumentException ex) {
                 System.err.println("Ignoring expected exception: "+ex);
@@ -264,10 +217,13 @@ public class TestKeyBuilder extends TestCase2 {
         assertEquals(20,keyBuilder.len);
         assertEquals(30,keyBuilder.buf.length);
 
-        assertEquals(0,BytesUtil.compareBytesWithLenAndOffset(0, expected.length, expected, 0, expected.length, keyBuilder.buf));
+        assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
+                expected.length, expected, 0, expected.length, keyBuilder.buf));
         
-        for(int i=21;i<30; i++) {
-            assertEquals(0,keyBuilder.buf[i]);
+        for (int i = 21; i < 30; i++) {
+
+            assertEquals(0, keyBuilder.buf[i]);
+
         }
         
     }
@@ -331,7 +287,7 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_keyBuilder_getKey() {
         
-        KeyBuilder keyBuilder = new KeyBuilder(5,new byte[]{1,2,3,4,5,6,7,8,9,10});
+        IKeyBuilder keyBuilder = new KeyBuilder(5,new byte[]{1,2,3,4,5,6,7,8,9,10});
         
         byte[] key = keyBuilder.getKey();
         
@@ -345,7 +301,7 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_keyBuilder_getKey_len0() {
 
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         
         byte[] key = keyBuilder.getKey();
 
@@ -380,7 +336,7 @@ public class TestKeyBuilder extends TestCase2 {
 
     public void test_keyBuilder_byte_key() {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
 
         final byte bmin = Byte.MIN_VALUE;
         final byte bm1  = (byte)-1;
@@ -424,7 +380,7 @@ public class TestKeyBuilder extends TestCase2 {
     
     public void test_keyBuilder_short_key() {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
 
         final short smin = Short.MIN_VALUE;
         final short sm1  = (short)-1;
@@ -459,7 +415,7 @@ public class TestKeyBuilder extends TestCase2 {
     
     public void test_keyBuilder_int_key() {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
 
         final int imin = Integer.MIN_VALUE;
         final int im1 = -1;
@@ -494,7 +450,7 @@ public class TestKeyBuilder extends TestCase2 {
 
     public void test_keyBuilder_long_key() {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         
         final long lmin = Long.MIN_VALUE;
         final long lm1 = -1L;
@@ -542,7 +498,7 @@ public class TestKeyBuilder extends TestCase2 {
 
     public void test_keyBuilder_float_key() throws NoSuccessorException {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         
         byte[] kmin = keyBuilder.reset().append(SuccessorUtil.FNEG_MAX).getKey(); // largest negative float.
         byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.FNEG_ONE).getKey(); // -1f
@@ -583,7 +539,7 @@ public class TestKeyBuilder extends TestCase2 {
 
     public void test_keyBuilder_double_key() throws NoSuccessorException {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         
         byte[] kmin = keyBuilder.reset().append(SuccessorUtil.DNEG_MAX).getKey(); // largest negative double.
         byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.DNEG_ONE).getKey(); // -1f
@@ -622,75 +578,43 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
+    public void test_keyBuilder_unicode_String_key() {
+        
+        IKeyBuilder keyBuilder = new KeyBuilder();
+        
+        try {
+            keyBuilder.reset().append("a");
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }        
+
+    }
+    
     public void test_keyBuilder_unicode_char_key() {
         
-        fail("write test");
+        IKeyBuilder keyBuilder = new KeyBuilder();
+        
+        try {
+            keyBuilder.reset().append('a');
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }        
+
     }
     
     public void test_keyBuilder_unicode_chars_key() {
         
-        fail("write test");
-    }
-
-    /**
-     * Test ability to encode unicode data into a variable length byte[] that
-     * allows direct byte-by-byte comparisons which maintain the local-specific
-     * sort order of the original strings.
-     */
-    public void test_keyBuilder_unicode_string_key_us_primary() {
-
-        /*
-         * Get the Collator for US English and set its strength to PRIMARY.
-         */
-        RuleBasedCollator usCollator = (RuleBasedCollator) Collator
-        .getInstance(Locale.US);
-            
-        usCollator.setStrength(Collator.PRIMARY);
+        IKeyBuilder keyBuilder = new KeyBuilder();
         
-        assertEquals(0,usCollator.compare("abc", "ABC"));
+        try {
+            keyBuilder.reset().append(new char[]{'a'});
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }        
 
-        KeyBuilder keyBuilder = new KeyBuilder(usCollator,1000);
-            
-        byte[] key1 = keyBuilder.reset().append("abc").getKey();
-        byte[] key2 = keyBuilder.reset().append("ABC").getKey();
-        byte[] key3 = keyBuilder.reset().append("Abc").getKey();
-
-        System.err.println("abc: "+BytesUtil.toString(key1));
-        System.err.println("ABC: "+BytesUtil.toString(key2));
-        System.err.println("Abc: "+BytesUtil.toString(key3));
-
-        // all are equal using PRIMARY strength.
-        assertEquals(0,BytesUtil.compareBytes(key1, key2));
-        assertEquals(0,BytesUtil.compareBytes(key2, key3));
-        
-    }
-
-    public void test_keyBuilder_unicode_string_key_us_identical() {
-
-        /*
-         * Get the Collator for US English and set its strength to IDENTICAL.
-         */
-        RuleBasedCollator usCollator = (RuleBasedCollator) Collator
-        .getInstance(Locale.US);
-            
-        usCollator.setStrength(Collator.IDENTICAL);
-        
-        assertNotSame(0,usCollator.compare("abc", "ABC"));
-
-        KeyBuilder keyBuilder = new KeyBuilder(usCollator,1000);
-            
-        byte[] key1 = keyBuilder.reset().append("abc").getKey();
-        byte[] key2 = keyBuilder.reset().append("ABC").getKey();
-        byte[] key3 = keyBuilder.reset().append("Abc").getKey();
-
-        System.err.println("abc: "+BytesUtil.toString(key1));
-        System.err.println("ABC: "+BytesUtil.toString(key2));
-        System.err.println("Abc: "+BytesUtil.toString(key3));
-
-        // verify ordering for IDENTICAL comparison.
-        assertTrue(BytesUtil.compareBytes(key1, key2)<0);
-        assertTrue(BytesUtil.compareBytes(key2, key3)>0);
-        
     }
 
     /**
@@ -700,7 +624,7 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_encodeASCII() throws UnsupportedEncodingException {
         
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
             
         byte[] key1 = keyBuilder.reset().appendASCII("abc").getKey();
         byte[] key2 = keyBuilder.reset().appendASCII("ABC").getKey();
@@ -733,35 +657,6 @@ public class TestKeyBuilder extends TestCase2 {
 //        assertEquals("ABC",new String(key1,"UTF-8"));
 //        assertEquals("Abc",new String(key1,"UTF-8"));
         
-    }
-
-    /**
-     * Tests for keys formed from the application key, a column name, and a long
-     * timestamp. A zero(0) byte is used as a delimiter between components of
-     * the key.
-     * 
-     * @todo this is not testing much yet.
-     */
-    public void test_cstore_keys() {
-        
-        KeyBuilder keyBuilder = new KeyBuilder();
-        
-        final byte[] colname1 = keyBuilder.reset().append("column1").getKey();
-        
-        final byte[] colname2 = keyBuilder.reset().append("another column").getKey();
-        
-        final long timestamp = System.currentTimeMillis();
-        
-        byte[] k1 = keyBuilder.reset().append(12L).appendNul().append(colname1)
-        .appendNul().append(timestamp).getKey();
-
-        byte[] k2 = keyBuilder.reset().append(12L).appendNul().append(colname2)
-        .appendNul().append(timestamp).getKey();
-
-        System.err.println("k1="+BytesUtil.toString(k1));
-        System.err.println("k2="+BytesUtil.toString(k2));
-
-        fail("this does not test anything yet");
     }
     
     /*
@@ -808,7 +703,7 @@ public class TestKeyBuilder extends TestCase2 {
 //        final byte[][] keys = new byte[limit][];
         Set<Float> set = new HashSet<Float>(limit);
         final X[] data = new X[limit];
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         {
 
             int nkeys = 0;
@@ -948,7 +843,7 @@ public class TestKeyBuilder extends TestCase2 {
         };
         Set<Double> set = new HashSet<Double>(limit);
         final X[] data = new X[limit];
-        KeyBuilder keyBuilder = new KeyBuilder();
+        IKeyBuilder keyBuilder = new KeyBuilder();
         {
 
             int nkeys = 0;
@@ -1049,129 +944,6 @@ public class TestKeyBuilder extends TestCase2 {
             
         }
         
-    }
-
-    /**
-     * Encodes a collection of strings, returning sort keys for those
-     * strings. Each sort key has the property that a bit-wise (or
-     * byte-wise) comparison of sort keys produced by the same collator will
-     * have the same ordering as the strings (according to the rules of the
-     * collator). Keys produced by different collators must not be mixed.
-     * The returned keys can be sorted using {@link Arrays#sort(byte[])}.
-     * 
-     * @todo the problem with the approach is that we want to sort the keys
-     * before presenting them to the btree.  However, the application needs
-     * to know which key is associated with which input string.  If we use
-     * {@link CollatorKey} then that relationship is preserved.  If we use
-     * {@link RawCollatorKey} then the code is more efficient, but we loose
-     * the relationship and it is hard to sort the data ....
-     * 
-     * create internally a tuple {string, key, id}, where id is a one up
-     * integer for the batch.  sort those tuples by key and id will provide
-     * the permutation of the original strings that will present them in 
-     * sorted order to the btree.  the btree responses will come out in the
-     * same tuple ordering.
-     * 
-     * @param collator
-     *            The collator.
-     * @param strings
-     *            The strings (in).
-     *            
-     * @return The sort keys.
-     */
-    public static Tuple[] encodeString(RuleBasedCollator collator,String[] strings) {
-        
-        Tuple[] tuples = new Tuple[strings.length];
-
-        KeyBuilder keyBuilder = new KeyBuilder(collator,Bytes.kilobyte32);
-        
-        for(int i=0; i<strings.length; i++) {
-            
-            String s = strings[i];
-            
-            keyBuilder.reset();
-            
-            keyBuilder.append(s);
-            
-            // copy out the sort key from the buffer.
-            byte[] sortKey = keyBuilder.getKey();
-
-            // form tuple.
-            tuples[i] = new Tuple(i,s,sortKey);
-            
-        }
-        
-        return tuples;
-        
-    }
-
-    public static void batchInsert(BTree btree,Tuple[] tuples,boolean sorted) {
-
-        final int ntuples = tuples.length;
-
-        /*
-         * Someone must sort the tuples before presenting to the btree. In
-         * general, the client has more information, especially whether or
-         * not the data are already sorted. As an alternative, we could set
-         * a flag in the batch api or the network api by which the caller
-         * declares sorted data and sort the data when it is not already
-         * sorted.
-         */
-        if (!sorted) {
-            { // shallow copy
-                Tuple[] tuples2 = new Tuple[ntuples];
-                for (int i = 0; i < ntuples; i++) {
-                    tuples2[i] = tuples[i];
-                }
-                tuples = tuples2;
-            }
-            // sort the copy.
-            Arrays.sort(tuples, TupleComparator.INSTANCE);
-        }
-
-        byte[][] keys = new byte[ntuples][];
-        { // shallow copy of sort keys.
-            for(int i=0; i<ntuples; i++) {
-                keys[i] = tuples[i].sortKey;
-            }
-        }
-        
-        Object[] values = new Object[ntuples];
-        { // shallow copy of values paired to sort keys.
-            for(int i=0; i<ntuples; i++) {
-                values[i] = tuples[i].value;
-            }
-        }
-        
-        /*
-         * batch insert operation - no outputs.
-         */
-        btree.insert(new BatchInsert(ntuples, keys, values));
-        
-    }
-    
-    public static class Tuple implements Comparable<Tuple> {
-        public final int id;
-        public final String string;
-        public final byte[] sortKey;
-        public Object value;
-        public Tuple(int id,String string, byte[] sortKey) {
-            this.id = id;
-            this.string = string;
-            this.sortKey = sortKey;
-        }
-        public int compareTo(Tuple o) {
-            return BytesUtil.compareBytes(sortKey,o.sortKey);
-        }
-    }
-
-    public static class TupleComparator implements Comparator<Tuple> {
-        
-        public static transient final Comparator<Tuple> INSTANCE = new TupleComparator();
-        
-        public int compare(Tuple o1, Tuple o2) {
-            return BytesUtil.compareBytes(o1.sortKey,o2.sortKey);
-        }
     }
 
 }

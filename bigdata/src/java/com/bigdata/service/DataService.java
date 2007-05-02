@@ -59,22 +59,30 @@ import java.util.concurrent.Executors;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IBatchOp;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IReadOnlyBatchOp;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.scaleup.ResourceState;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.sun.corba.se.impl.orbutil.closure.Future;
 
@@ -203,7 +211,9 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
 abstract public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer {
 
-    protected Journal journal;
+    IKeyBuilder keyBuilder;
+    
+    protected DataServiceJournal journal;
 
     public static final transient Logger log = Logger
             .getLogger(DataService.class);
@@ -309,7 +319,7 @@ abstract public class DataService implements IDataService,
          * The journal's write service will be used to handle unisolated writes
          * and transaction commits.
          */
-        journal = new Journal(properties);
+        journal = new DataServiceJournal(properties);
 
         // setup thread pool for unisolated read operations.
         readService = Executors.newFixedThreadPool(readServicePoolSize,
@@ -355,7 +365,7 @@ abstract public class DataService implements IDataService,
      * 
      * @return The unique data service identifier.
      */
-    protected abstract UUID getDataServiceUUID();
+    public abstract UUID getServiceUUID() throws IOException;
     
     /*
      * ITxCommitProtocol.
@@ -395,6 +405,21 @@ abstract public class DataService implements IDataService,
         
     }
 
+    /**
+     * @todo if the journal overflows then the returned metadata can become
+     *       stale (the journal in question will no longer be absorbing writes
+     *       but it will continue to be used to absorb reads until the asyn
+     *       overflow operation is complete, at which point the journal can be
+     *       closed. the journal does not become "Dead" until it is no longer
+     *       possible that a live transaction will want to read from a
+     *       historical state found on that journal).
+     */
+    public JournalMetadata getJournalMetadata() throws IOException {
+        
+        return new JournalMetadata(journal,ResourceState.Live);
+        
+    }
+
     public void registerIndex(String name, UUID indexUUID) throws IOException,
             InterruptedException, ExecutionException {
 
@@ -423,56 +448,70 @@ abstract public class DataService implements IDataService,
         
     }
     
-//    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
-//            InterruptedException, ExecutionException {
-//
-//        byte[][] vals = batchLookup(tx, name, 1, new byte[][]{key});
-//
-//        return vals[0];
-//        
-//    }
+    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
+            throws IOException, InterruptedException, ExecutionException {
+
+        log.info(getServiceUUID() + ", name=" + name + ", partitionId="
+                + pmd.getPartitionId() + ", leftSeparatorKey="
+                + BytesUtil.toString(pmd.getLeftSeparatorKey())
+                + ", rightSeparatorKey="
+                + BytesUtil.toString(pmd.getRightSeparatorKey()));
+        
+        journal.serialize(new MapIndexPartitionTask(name,pmd)).get();
     
-    public byte[][] batchInsert(long tx, String name, int ntuples,
+    }
+
+    /**
+     * @todo implement {@link #unmapPartition(String, int)}
+     */
+    public void unmapPartition(String name, int partitionId)
+            throws IOException, InterruptedException, ExecutionException {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    public byte[][] batchInsert(long tx, String name, int partitionId, int ntuples,
             byte[][] keys, byte[][] vals, boolean returnOldValues)
-            throws InterruptedException, ExecutionException {
+            throws IOException, InterruptedException, ExecutionException {
 
         BatchInsert op = new BatchInsert(ntuples, keys, vals);
 
-        batchOp(tx, name, op);
+        batchOp(tx, name, partitionId, op);
 
         return returnOldValues ? (byte[][]) op.values : null;
 
     }
 
-    public boolean[] batchContains(long tx, String name, int ntuples,
-            byte[][] keys) throws InterruptedException, ExecutionException {
-        
+    public boolean[] batchContains(long tx, String name, int partitionId, int ntuples,
+            byte[][] keys) throws IOException, InterruptedException, ExecutionException {
+
         BatchContains op = new BatchContains(ntuples, keys, new boolean[ntuples]);
         
-        batchOp( tx, name, op );
+        batchOp( tx, name, partitionId, op );
 
         return op.contains;
         
     }
     
-    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
-            throws InterruptedException, ExecutionException {
-        
+    public byte[][] batchLookup(long tx, String name, int partitionId, int ntuples, byte[][] keys)
+            throws IOException, InterruptedException, ExecutionException {
+
         BatchLookup op = new BatchLookup(ntuples,keys,new byte[ntuples][]);
         
-        batchOp(tx, name, op);
+        batchOp(tx, name, partitionId, op);
         
         return (byte[][])op.values;
         
     }
     
-    public byte[][] batchRemove(long tx, String name, int ntuples,
+    public byte[][] batchRemove(long tx, String name, int partitionId, int ntuples,
             byte[][] keys, boolean returnOldValues)
-            throws InterruptedException, ExecutionException {
+            throws IOException, InterruptedException, ExecutionException {
         
         BatchRemove op = new BatchRemove(ntuples,keys,new byte[ntuples][]);
         
-        batchOp(tx, name, op);
+        batchOp(tx, name, partitionId, op);
         
         return returnOldValues ? (byte[][])op.values : null;
         
@@ -503,8 +542,13 @@ abstract public class DataService implements IDataService,
      *       operations. Concurrent writers can execute as long as they are
      *       writing on different indices. (Concurrent readers can execute as
      *       long as they are reading from a historical commit time.)
+     * 
+     * @todo probably we should pass in the partitionId as well and we should
+     *       define the exceptions thrown for a partition that is not mapped
+     *       onto the data service and for one that has been "recently" unmapped
+     *       (moved or joined).
      */
-    protected void batchOp(long tx, String name, IBatchOp op)
+    protected void batchOp(long tx, String name, int partitionId, IBatchOp op)
             throws InterruptedException, ExecutionException {
         
         if( name == null ) throw new IllegalArgumentException();
@@ -518,11 +562,11 @@ abstract public class DataService implements IDataService,
         
         if(isolated) {
             
-            txService.submit(new TxBatchTask(tx,name,op)).get();
+            txService.submit(new TxBatchTask(tx,name,partitionId,op)).get();
             
         } else if( readOnly ) {
             
-            readService.submit(new UnisolatedReadBatchTask(name,op)).get();
+            readService.submit(new UnisolatedReadBatchTask(name,partitionId,op)).get();
             
         } else {
             
@@ -530,7 +574,7 @@ abstract public class DataService implements IDataService,
              * Special case since incomplete writes MUST be discarded and
              * complete writes MUST be committed.
              */
-            journal.serialize(new UnisolatedBatchReadWriteTask(name,op)).get();
+            journal.serialize(new UnisolatedBatchReadWriteTask(name,partitionId,op)).get();
             
         }
         
@@ -736,8 +780,9 @@ abstract public class DataService implements IDataService,
                     indexUUID));
 
             journal.commit();
-            // @todo log the dataServiceID with each log message for this class.
-            log.info("registeredIndex: "+name+", indexUUID="+indexUUID);
+            
+            log.info(getServiceUUID() + " - registeredIndex: " + name
+                    + ", indexUUID=" + indexUUID);
             
             return ndx;
             
@@ -765,54 +810,247 @@ abstract public class DataService implements IDataService,
         
     }
     
+    protected class MapIndexPartitionTask extends AbstractIndexManagementTask {
+        
+        private final PartitionMetadataWithSeparatorKeys pmd;
+        
+        public MapIndexPartitionTask(String name, PartitionMetadataWithSeparatorKeys pmd) {
+            
+            super(name);
+           
+            if (pmd == null)
+                throw new IllegalArgumentException();
+            
+            this.pmd = pmd;
+            
+        }
+        
+        public Object call() throws Exception {
+
+            IIndex ndx = journal.getIndex(name);
+            
+            if (ndx == null) {
+
+                throw new NoSuchIndexException(name);
+                
+            }
+            
+            UUID indexUUID = ndx.getIndexUUID();
+
+            /*
+             * Used to construct the key for the partitions index.
+             */
+            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_UUID
+                    + Bytes.SIZEOF_INT);
+
+            byte[] key = keyBuilder.reset().append(indexUUID).append(
+                    pmd.getPartitionId()).getKey();
+            
+            byte[] value = SerializerUtil.serialize(pmd);
+            
+            BTree btree = journal.getPartitionsBTree(); 
+
+            /*
+             * Insert the new partition mapping into the btree.
+             * 
+             * @todo This aborts the unisolated write and throws an exception if
+             * there is already a mapping for that partition. Instead, we could
+             * verify that the mapping is consistent or update an existing
+             * mapping (e.g., if the left-or-right separator key for the
+             * partition was modified).
+             */
+            if (btree.insert(key, value) != null) {
+
+                // throw away the unisolated write on the btree.
+                journal.abort();
+                
+                throw new RuntimeException("Partition already mapped: index="
+                        + name);
+                
+            }
+            
+            journal.commit();
+            
+            return null;
+            
+        }
+        
+    }
+    
     /**
      * Abstract class for tasks that execute batch api operations. There are
      * various concrete subclasses, each of which MUST be submitted to the
      * appropriate service for execution.
+     * <p>
+     * Note: While this does verify that the first/last key are inside of the
+     * specified index partition, it does not verify that the keys are sorted -
+     * this is the responsibility of the client. Therefore it is possible that
+     * an incorrect client providing unsorted keys could execute an operation
+     * that read or wrote data on the data service that lay outside of the
+     * indicated partitionId.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     protected abstract class AbstractBatchTask implements Callable<Object> {
         
-        private final String name;
+        protected final String name;
+        protected final int partitionId;
         private final IBatchOp op;
         
-        public AbstractBatchTask(String name, IBatchOp op) {
+        public AbstractBatchTask(String name, int partitionId, IBatchOp op) {
 
             this.name = name;
+
+            this.partitionId = partitionId;
+            
             this.op = op;
             
         }
+        
+        /**
+         * A helper method that may be invoked within execution context for the
+         * operation and which returns the partition metadata for the indicated
+         * index and partitionId.
+         * 
+         * @param ndx
+         *            The index.
+         * @param partitionId
+         *            The partition identifier.
+         *            
+         * @return The de-serialized partition metadata -or- <code>null</code>
+         *         if there is no metadata record for that index partition.
+         * 
+         * @throws IOException
+         * 
+         * @todo this is always accessing the unisolated version of the
+         *       partitions btree. if we need to also access a historical
+         *       version, then it will need to be resolved using the commit
+         *       record for the appropriate historical timestamp.
+         */
+        protected PartitionMetadataWithSeparatorKeys getPartition(IIndex ndx,
+                int partitionId) throws IOException {
 
-        abstract IIndex getIndex(String name);
+            UUID indexUUID = ndx.getIndexUUID();
+
+            /*
+             * Used to construct the key for the partitions index.
+             */
+            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_UUID
+                    + Bytes.SIZEOF_INT);
+            
+            byte[] key = keyBuilder.reset().append(indexUUID).append(
+                    partitionId).getKey();
+
+            /*
+             * The unisolated version of the partitions index.
+             */ 
+            byte[] data = (byte[]) journal.getPartitionsBTree().lookup(key);
+
+            if(data==null) {
+                
+                return null;
+                
+            }
+            
+            PartitionMetadataWithSeparatorKeys pmd = (PartitionMetadataWithSeparatorKeys) SerializerUtil
+                    .deserialize(data);
+
+            return pmd;
+            
+        }
+        
+        /**
+         * Verify that the key lies within the partition.
+         */
+        protected void checkPartition(PartitionMetadataWithSeparatorKeys pmd,
+                byte[] key) throws IOException {
+
+            assert pmd != null;
+            assert key != null;
+            
+            final byte[] leftSeparatorKey = pmd.getLeftSeparatorKey();
+            
+            final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
+            
+            if (BytesUtil.compareBytes(key, leftSeparatorKey ) < 0) {
+
+                throw new RuntimeException("KeyBeforePartition");
+                
+            }
+            
+            if (rightSeparatorKey != null && BytesUtil.compareBytes(key, rightSeparatorKey) >= 0) {
+                
+                throw new RuntimeException("KeyAfterPartition");
+                
+            }
+            
+        }
+        
+        abstract IIndex getIndex();
         
         public Object call() throws Exception {
 
-            IIndex ndx = getIndex(name);
+            IIndex ndx = getIndex();
             
             if (ndx == null)
-                throw new IllegalStateException("Index not registered: " + name);
+                throw new NoSuchIndexException(name);
 
-            if( op instanceof BatchContains ) {
+            PartitionMetadataWithSeparatorKeys pmd = getPartition(ndx, partitionId);
+            
+            if(pmd == null) {
                 
+                throw new NoSuchIndexPartitionException(name, partitionId);
+                
+            }
+            
+            if( op instanceof BatchContains ) {
+
+                final int ntuples = ((BatchContains)op).ntuples;
+                final byte[][] keys = ((BatchContains)op).keys;
+                
+                checkPartition(pmd, keys[0]);
+                checkPartition(pmd, keys[ntuples-1]);
+
                 ndx.contains((BatchContains) op);
                 
             } else if( op instanceof BatchLookup ) {
+
+                final int ntuples = ((BatchLookup)op).ntuples;
+                final byte[][] keys = ((BatchLookup)op).keys;
+                
+                checkPartition(pmd, keys[0]);
+                checkPartition(pmd, keys[ntuples-1]);
 
                 ndx.lookup((BatchLookup) op);
 
             } else if( op instanceof BatchInsert ) {
 
+                final int ntuples = ((BatchInsert)op).ntuples;
+                final byte[][] keys = ((BatchInsert)op).keys;
+                
+                checkPartition(pmd, keys[0]);
+                checkPartition(pmd, keys[ntuples-1]);
+
                 ndx.insert((BatchInsert) op);
 
             } else if( op instanceof BatchRemove ) {
+
+                final int ntuples = ((BatchRemove)op).ntuples;
+                final byte[][] keys = ((BatchRemove)op).keys;
+                
+                checkPartition(pmd, keys[0]);
+                checkPartition(pmd, keys[ntuples-1]);
 
                 ndx.remove((BatchRemove) op);
 
             } else {
 
-                // Extension batch mutation operation. 
+                /*
+                 * Extension batch mutation operation.
+                 * 
+                 * @todo range check against the partitionId.
+                 */ 
                 op.apply(ndx);
                 
             }
@@ -850,9 +1088,9 @@ abstract public class DataService implements IDataService,
         
         private final ITx tx;
 
-        public TxBatchTask(long startTime, String name, IBatchOp op) {
+        public TxBatchTask(long startTime, String name, int partitionId, IBatchOp op) {
             
-            super(name,op);
+            super(name,partitionId,op);
             
             assert startTime != 0L;
             
@@ -872,10 +1110,18 @@ abstract public class DataService implements IDataService,
             
         }
 
-        public IIndex getIndex(String name) {
+        public IIndex getIndex() {
 
-            return tx.getIndex(name);
-
+            IIndex ndx = tx.getIndex(name);
+            
+            if(ndx==null) {
+                
+                throw new NoSuchIndexException(name);
+                
+            }
+            
+            return ndx;
+            
         }
         
     }
@@ -888,13 +1134,13 @@ abstract public class DataService implements IDataService,
      */
     protected class UnisolatedReadBatchTask extends AbstractBatchTask {
 
-        public UnisolatedReadBatchTask(String name, IBatchOp op) {
+        public UnisolatedReadBatchTask(String name, int partitionId, IBatchOp op) {
             
-            super(name,op);
+            super(name,partitionId, op);
             
         }
         
-        public IIndex getIndex(String name) {
+        public IIndex getIndex() {
             
             return journal.getIndex(name);
 
@@ -914,9 +1160,9 @@ abstract public class DataService implements IDataService,
      */
     protected class UnisolatedBatchReadWriteTask extends UnisolatedReadBatchTask {
 
-        public UnisolatedBatchReadWriteTask(String name, IBatchOp op) {
+        public UnisolatedBatchReadWriteTask(String name, int partitionId, IBatchOp op) {
             
-            super(name,op);
+            super(name,partitionId, op);
             
         }
 
@@ -935,6 +1181,15 @@ abstract public class DataService implements IDataService,
                 // commit (synchronous, immediate).
                 return journal.commit();
 
+            } catch(RuntimeException ex) {
+                
+                /*
+                 * Do not masquerade a RuntimeException.
+                 */
+                abort();
+                
+                throw ex;
+                
             } catch(Throwable t) {
             
                 abort();
@@ -1279,6 +1534,44 @@ abstract public class DataService implements IDataService,
      */
     public void sendResource(String filename, InetSocketAddress sink) {
         throw new UnsupportedOperationException();
+    }
+
+    public static class NoSuchIndexException extends RuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6124193775040326194L;
+
+        /**
+         * @param message The index name.
+         */
+        public NoSuchIndexException(String message) {
+            super(message);
+        }
+
+
+    }
+    
+    public static class NoSuchIndexPartitionException extends NoSuchIndexException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4626663314737025524L;
+
+        /**
+         * @param name
+         *            The index name.
+         * @param partitionId
+         *            The partition identifier.
+         */
+        public NoSuchIndexPartitionException(String name, int partitionId) {
+
+            super(name+", partitionId="+partitionId);
+            
+        }
+
     }
 
 }

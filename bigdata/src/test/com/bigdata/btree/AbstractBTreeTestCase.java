@@ -59,20 +59,8 @@ import junit.framework.TestCase2;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IAbstractNodeData;
-import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IIdentityAccess;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.INodeData;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-import com.bigdata.btree.PO;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -86,7 +74,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     protected Random r = new Random();
 
-    protected KeyBuilder keyBuilder = new KeyBuilder();
+    protected IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
     
     /**
      * Encodes an integer as a unsigned byte[] key.

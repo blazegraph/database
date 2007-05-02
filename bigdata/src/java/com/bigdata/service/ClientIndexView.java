@@ -50,6 +50,8 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
@@ -62,6 +64,7 @@ import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.BigdataClient.BigdataFederation;
 import com.bigdata.service.BigdataClient.IBigdataFederation;
 import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * A client-side view of an index.
@@ -70,6 +73,13 @@ import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
  *       that this code can look identifical to the code that we would write if
  *       the metdata index was local.
  * 
+ * @todo note that it is possible (though unlikely) for an index partition split
+ *       or join to occur during operations. Figure out how I want to handle
+ *       that, and how I want to handle that with transactional isolation
+ *       (presumably a read-only historical view of the metadata index would be
+ *       used - in which case we need to pass the tx into the getPartition()
+ *       method).
+ *       
  * @todo cache leased information about index partitions of interest to the
  *       client. The cache will be a little tricky since we need to know when
  *       the client does not possess a partition definition. Index partitions
@@ -105,22 +115,36 @@ import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
  */
 public class ClientIndexView implements IIndex {
 
+    public static final transient Logger log = Logger
+            .getLogger(ClientIndexView.class);
+    
     private final BigdataFederation fed;
     private final long tx;
     private final String name;
 
     /**
-     * The unique index identifier (initally null and cached once fetched).
+     * The unique index identifier.
      */
     private UUID indexUUID;
-    
+
     /**
      * Obtain the proxy for a metadata service. if this instance fails, then we
      * can always ask for a new instance for the same federation (failover).
      */
-    protected IMetadataService getMetadataService() {
+    final protected IMetadataService getMetadataService() {
         
         return fed.getMetadataService();
+        
+    }
+    
+    /**
+     * @todo define an interface an use a read-only view of the metadata index.
+     *       this approach is forward looking to when the metadata index is only
+     *       partly materialized on the client.
+     */
+    final protected MetadataIndex getMetadataIndex() {
+        
+        return fed.getMetadataIndex(name);
         
     }
     
@@ -136,10 +160,12 @@ public class ClientIndexView implements IIndex {
      *            The index name.
      */
     public ClientIndexView(BigdataFederation fed, long tx, String name) {
-        
-        if(fed ==null) throw new IllegalArgumentException();
-        
-        if(name==null) throw new IllegalArgumentException();
+
+        if (fed == null)
+            throw new IllegalArgumentException();
+
+        if (name == null)
+            throw new IllegalArgumentException();
     
         if(tx != IBigdataFederation.UNISOLATED) {
             
@@ -153,24 +179,24 @@ public class ClientIndexView implements IIndex {
         this.tx = tx;
         
         this.name = name;
-       
-    }
-    
-    public UUID getIndexUUID() {
         
-        if(indexUUID==null) {
+    }
 
+    public UUID getIndexUUID() {
+
+        if(indexUUID == null) {
+        
             /*
              * obtain the UUID for the managed scale-out index.
              */
             
             try {
 
-                indexUUID = getMetadataService().getManagedIndexUUID(name);
+                this.indexUUID = getMetadataService().getManagedIndexUUID(name);
                 
                 if(indexUUID == null) {
                     
-                    throw new RuntimeException("No such index: "+name);
+                    throw new NoSuchIndexException(name);
                     
                 }
                 
@@ -179,6 +205,7 @@ public class ClientIndexView implements IIndex {
                 throw new RuntimeException(ex);
                 
             }
+
 
         }
         
@@ -196,7 +223,8 @@ public class ClientIndexView implements IIndex {
         
         try {
 
-            ret = dataService.batchContains(tx, name, 1, new byte[][]{key});
+            ret = dataService.batchContains(tx, name, pmd.getPartitionId(), 1,
+                    new byte[][] { key });
             
         } catch(Exception ex) {
             
@@ -220,7 +248,7 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchInsert(tx, name, 1,
+            ret = dataService.batchInsert(tx, name, pmd.getPartitionId(), 1,
                     new byte[][] { (byte[]) key },
                     new byte[][] { (byte[]) value }, returnOldValues);
 
@@ -236,7 +264,7 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
+        IPartitionMetadata pmd = fed.getPartition(tx, name, (byte[]) key);
 
         IDataService dataService = fed.getDataService(pmd);
         
@@ -244,7 +272,7 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchLookup(tx, name, 1,
+            ret = dataService.batchLookup(tx, name, pmd.getPartitionId(), 1,
                     new byte[][] { (byte[]) key });
 
         } catch (Exception ex) {
@@ -269,7 +297,7 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchRemove(tx, name, 1,
+            ret = dataService.batchRemove(tx, name, pmd.getPartitionId(), 1,
                     new byte[][] { (byte[]) key }, returnOldValues );
 
         } catch (Exception ex) {
@@ -290,17 +318,11 @@ public class ClientIndexView implements IIndex {
     /**
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
-     * 
-     * @todo note that it is possible (though unlikely) for an index partition
-     *       split or join to occur during this operation. Figure out how I want
-     *       to handle that, and how I want to handle that with transactional
-     *       isolation (presumably a read-only historical view of the metadata
-     *       index would be used - in which case we need to pass the tx into
-     *       the getPartition() method).
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
-        IMetadataService metadataService = getMetadataService();
+//        IMetadataService metadataService = getMetadataService();
+        MetadataIndex mdi = getMetadataIndex();
 
         /*
          * @todo requesting the fromIndex/toIndex for a key range could be an
@@ -308,21 +330,19 @@ public class ClientIndexView implements IIndex {
          */
         final int fromIndex;
         final int toIndex;
-        try {
+//        try {
 
             // index of the first partition to check.
-            fromIndex = (fromKey == null ? 0 : metadataService
-                    .findIndexOfPartition(name, fromKey));
-            
+            fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
+
             // index of the last partition to check.
-            toIndex = (toKey == null ? 0 : metadataService
-                    .findIndexOfPartition(name, toKey));
+            toIndex = (toKey == null ? 0 : mdi.findIndexOf(toKey));
             
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+//        } catch (IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
 
         // per javadoc, keys out of order returns zero(0).
         if (toIndex < fromIndex)
@@ -335,7 +355,7 @@ public class ClientIndexView implements IIndex {
         for (int index = fromIndex; index <= toIndex; index++) {
 
             PartitionMetadataWithSeparatorKeys pmd = fed.getPartitionAtIndex(
-                    tx, name, index);
+                    name, index);
 
             // // The first key that would enter the nth partition.
             // byte[] separatorKey = mdi.keyAt(index);
@@ -367,7 +387,8 @@ public class ClientIndexView implements IIndex {
 
                 byte[] _toKey = pmd.getRightSeparatorKey();
                 
-                if(_toKey==null) {
+//                if(_toKey==null) {
+                if(index==toIndex) {
                     
                     /*
                      * On the last partition, use the caller's toKey so that we
@@ -409,26 +430,30 @@ public class ClientIndexView implements IIndex {
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     public void contains(BatchContains op) {
         // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
         
     }
 
     public void insert(BatchInsert op) {
         // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
         
     }
 
     public void lookup(BatchLookup op) {
         // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
         
     }
 
     public void remove(BatchRemove op) {
         // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
         
     }
     

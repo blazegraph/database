@@ -54,14 +54,17 @@ import com.bigdata.btree.IndexSegment;
  */
 public enum ResourceState {
 
-    New("New",0),
-    Live("Live",1),
-    Dead("Dead",2);
+    New("New",(short)0),
+    Live("Live",(short)1),
+    Dead("Dead",(short)2);
     
     final private String name;
-    final private int id;
+    final private short id;
     
-    ResourceState(String name,int id) {this.name = name;this.id = id;}
+    ResourceState(String name, short id) {
+        this.name = name;
+        this.id = id;
+    }
     
     public String toString() {return name;}
     

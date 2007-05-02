@@ -48,11 +48,15 @@ Modifications:
 package com.bigdata.service;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -125,6 +129,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
      * lookup, and remove operations on key-value pairs in that B+Tree, and
      * dropping the B+Tree.
      * 
+     * @todo this test needs to be (re-)developed - it is some code from before
+     *       I decided on static partitioning for now and could lead the way for
+     *       some tests of dynamic partitioning. Dynamic partitioning can
+     *       probably be its own tests suite.
+     *       
      * @throws Exception
      */
     public void test_serverRunning() throws Exception {
@@ -137,17 +146,69 @@ public class TestDataServer0 extends AbstractServerTestCase {
         
         final String name = "testIndex";
         
-        // add an index.
-        proxy.registerIndex(name, UUID.randomUUID());
+        final int partitionId = 0;
         
-        // batch insert into that index.
-        proxy.batchInsert(IDataService.UNISOLATED, name, 1,
+        /*
+         * Register the index on the data service.
+         */
+        proxy.registerIndex(name, UUID.randomUUID());
+
+        /* 
+         * Verify rejection of operations on unmapped partition.
+         */
+        {
+
+            try {
+                proxy.batchContains(IDataService.UNISOLATED, name, partitionId,
+                        1, new byte[][] { new byte[] { 1 } });
+                fail("Expecting exception.");
+            } catch (ExecutionException ex) {
+                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+            }
+
+            try {
+                proxy.batchLookup(IDataService.UNISOLATED, name, partitionId,
+                        1, new byte[][] { new byte[] { 1 } });
+                fail("Expecting exception.");
+            } catch (ExecutionException ex) {
+                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+            }
+
+            try {
+                proxy.batchInsert(IDataService.UNISOLATED, name, partitionId,
+                        1, new byte[][] { new byte[] { 1 } },
+                        new byte[][] { new byte[] { 1 } }, false /* returnOldValues */
+                );
+                fail("Expecting exception.");
+            } catch (ExecutionException ex) {
+                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+            }
+
+            try {
+                proxy.batchRemove(IDataService.UNISOLATED, name, partitionId,
+                        1, new byte[][] { new byte[] { 1 } }, false /* returnOldValues */
+                );
+                fail("Expecting exception.");
+            } catch (ExecutionException ex) {
+                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+            }
+
+        }
+        
+        // map an index partition onto that data service.
+        proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
+                partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
+                new IResourceMetadata[] {/* @todo resource metadata */},
+                new byte[] {}, null/* no right sibling */));
+        
+        // batch insert into that index partition.
+        proxy.batchInsert(IDataService.UNISOLATED, name, partitionId, 1,
                 new byte[][] { new byte[] { 1 } },
                 new byte[][] { new byte[] { 1 } },
                 true /*returnOldValues*/ );
 
         // verify keys that exist/do not exist.
-        boolean contains[] = proxy.batchContains(IDataService.UNISOLATED, name, 2,
+        boolean contains[] = proxy.batchContains(IDataService.UNISOLATED, name, partitionId, 2,
                 new byte[][] { new byte[] { 1 }, new byte[] { 2 } });
 
         assertNotNull(contains);
@@ -156,7 +217,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertFalse(contains[1]);
 
         // lookup keys that do and do not exist. 
-        byte[][] values = proxy.batchLookup(IDataService.UNISOLATED, name, 2,
+        byte[][] values = proxy.batchLookup(IDataService.UNISOLATED, name, partitionId, 2,
                 new byte[][] { new byte[] { 1 }, new byte[] { 2 } });
 
         assertNotNull(values);
@@ -190,7 +251,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(new byte[]{1},rset.getValues()[0]);
         
         // remove key that exists, verifying the returned values.
-        values = proxy.batchRemove(IDataService.UNISOLATED, name, 2,
+        values = proxy.batchRemove(IDataService.UNISOLATED, name, partitionId, 2,
                 new byte[][] { new byte[] { 1 }, new byte[] { 2 } }, true);
 
         assertNotNull(values);
@@ -199,7 +260,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(null,values[1]);
 
         // remove again, verifying that the returned values are now null.
-        values = proxy.batchRemove(IDataService.UNISOLATED, name, 2,
+        values = proxy.batchRemove(IDataService.UNISOLATED, name, partitionId, 2,
                 new byte[][] { new byte[] { 1 }, new byte[] { 2 } }, true);
 
         assertNotNull(values);

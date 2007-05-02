@@ -57,6 +57,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
+import java.util.Arrays;
 import java.util.Properties;
 
 import net.jini.admin.Administrable;
@@ -167,7 +168,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
     private ServiceID serviceID;
     private DiscoveryManagement discoveryManager;
-    private  JoinManager joinManager;
+    private JoinManager joinManager;
     private Configuration config;
     /**
      * The file where the {@link ServiceID} will be written/read. 
@@ -273,6 +274,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             groups = (String[]) config.getEntry(ADVERT_LABEL, "groups",
                     String[].class, LookupDiscovery.ALL_GROUPS/* default */);
 
+            log.info("groups="+Arrays.toString(groups));
+            
             unicastLocators = (LookupLocator[]) config.getEntry(
                     ADVERT_LABEL, "unicastLocators",
                     LookupLocator[].class, null/* default */);

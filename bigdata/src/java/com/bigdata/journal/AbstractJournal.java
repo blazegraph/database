@@ -1616,10 +1616,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
     /**
      * Return the named index (unisolated). Writes on the returned index will be
-     * made restart-safe with the next {@link #commit()} regardless of the
-     * success or failure of a transaction. Transactional writes must use the
-     * same named method on the {@link Tx} in order to obtain an isolated
-     * version of the named btree.
+     * made restart-safe with the next {@link #commit()} unless discarded by
+     * {@link #abort()}. Transactional writes must use the same named method on
+     * the {@link Tx} in order to obtain an isolated version of the named btree.
      * 
      * @todo add hard reference queue for {@link AbstractBTree} to the journal
      *       and track the #of instances of each {@link AbstractBTree} on the
@@ -1640,7 +1639,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      *       {@link #writeService} so that they are executed in the same thread
      *       as other operations on the unisolated index.<br>
      *       Make sure that we close out old {@link Journal}s that are no
-     *       longer required by any open index.  This will require a distinct
+     *       longer required by any open index. This will require a distinct
      *       referenceCount on the {@link Journal}.
      */
     public IIndex getIndex(String name) {

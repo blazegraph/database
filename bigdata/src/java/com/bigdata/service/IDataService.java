@@ -52,6 +52,8 @@ import com.bigdata.btree.BTree;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITxCommitProtocol;
+import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * Data service interface.
@@ -114,6 +116,13 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public static final int VALS = 1 << 1;
     
     /**
+     * A description of the journal currently backing the data service.
+     * 
+     * @throws IOException
+     */
+    public JournalMetadata getJournalMetadata() throws IOException;
+    
+    /**
      * Register a named mutable B+Tree on the {@link DataService} (unisolated).
      * The keys will be variable length unsigned byte[]s. The values will be
      * variable length byte[]s. The B+Tree will support version counters and
@@ -131,7 +140,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
      * 
-     * @todo exception if index exists?
+     * @todo exception if index exists? or modify to validate consistent decl
+     *       and exception iff not consistent.
      * 
      * @todo provide configuration options {whether the index supports isolation
      *       or not ({@link BTree} vs {@link UnisolatedBTree}), the branching
@@ -171,20 +181,33 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-//    /**
-//     * Point lookup.
-//     * 
-//     * @param tx
-//     * @param name
-//     * @param key
-//     * @return The value for that key (may be null) and <code>null</code> if
-//     *         there is no value for that key.
-//     * @throws IOException
-//     * @throws InterruptedException
-//     * @throws ExecutionException
-//     */
-//    public byte[] lookup(long tx, String name, byte[] key) throws IOException,
-//            InterruptedException, ExecutionException;
+    /**
+     * Maps an index partition onto the data service. This method must be
+     * invoked before a client will be permitted to access the key range for the
+     * index partition on the data service.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param pmd
+     *            The partition metadata.
+     * 
+     * @see #unmapPartition(String, int)
+     * 
+     * @todo When a new partition is created or destroyed that is a sibling of
+     *       this partition then the data service needs to be notified so that
+     *       it will update the partition definition.
+     */
+    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
+            throws IOException, InterruptedException, ExecutionException;
+    
+    /**
+     * Unmaps an index partition from the data service.
+     * 
+     * @param name
+     * @param partitionId
+     */
+    public void unmapPartition(String name, int partitionId)
+            throws IOException, InterruptedException, ExecutionException;
     
     /**
      * <p>
@@ -239,20 +262,20 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @todo javadoc update.
      * @todo support extension operations (read or mutable).
      */
-    public byte[][] batchInsert(long tx, String name, int ntuples,
-            byte[][] keys, byte[][] values, boolean returnOldValues)
+    public byte[][] batchInsert(long tx, String name, int partitionId,
+            int ntuples, byte[][] keys, byte[][] values, boolean returnOldValues)
             throws InterruptedException, ExecutionException, IOException;
 
-    public boolean[] batchContains(long tx, String name, int ntuples,
-            byte[][] keys) throws InterruptedException, ExecutionException,
-            IOException;
+    public boolean[] batchContains(long tx, String name, int partitionId,
+            int ntuples, byte[][] keys) throws InterruptedException,
+            ExecutionException, IOException;
 
-    public byte[][] batchLookup(long tx, String name, int ntuples,
-            byte[][] keys) throws InterruptedException, ExecutionException,
-            IOException;
+    public byte[][] batchLookup(long tx, String name, int partitionId,
+            int ntuples, byte[][] keys) throws InterruptedException,
+            ExecutionException, IOException;
 
-    public byte[][] batchRemove(long tx, String name, int ntuples,
-            byte[][] keys, boolean returnOldValues)
+    public byte[][] batchRemove(long tx, String name, int partitionId,
+            int ntuples, byte[][] keys, boolean returnOldValues)
             throws InterruptedException, ExecutionException, IOException;
 
     /**
@@ -278,12 +301,10 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @param toKey
      *            The first key that will not be visited.
      * @param capacity
-     *            The maximum #of key-values to return. (This must be rounded up
-     *            if necessary in order to all values selected for a single row
-     *            of a sparse row store.)
+     *            The maximum #of key-values to return.
      * @param flags
-     *            One or more flags formed by bitwise OR of the constants
-     *            defined by {@link RangeQueryEnum}.
+     *            One or more flags formed by bitwise OR of zero or more of the
+     *            constants {@link #KEYS} and {@link #VALS}.
      * 
      * @exception InterruptedException
      *                if the operation was interrupted (typically by
@@ -293,11 +314,14 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
+     * @todo The capacity must be rounded up if necessary in order to all values
+     *       selected for a single row of a sparse row store.
+     *       
      * @todo provide for optional filter.
      */
     public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags) throws InterruptedException,
-            ExecutionException, IOException, IOException;
+            ExecutionException, IOException;
     
     /**
      * <p>
@@ -328,8 +352,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                error.
      */
     public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-            throws InterruptedException, ExecutionException, IOException,
-            IOException;
+            throws InterruptedException, ExecutionException, IOException;
         
     /**
      * <p>

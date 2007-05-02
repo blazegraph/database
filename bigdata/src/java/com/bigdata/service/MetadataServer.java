@@ -251,13 +251,13 @@ public class MetadataServer extends DataServer {
 
         public Object getAdmin() throws RemoteException {
 
-            log.info("");
+            log.info(""+getServiceUUID());
 
             return server.proxy;
 
         }
 
-        protected UUID getDataServiceUUID() {
+        public UUID getServiceUUID() {
 
             if (serviceUUID == null) {
 
@@ -304,7 +304,7 @@ public class MetadataServer extends DataServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info("");
+            log.info(""+getServiceUUID());
 
             new Thread() {
 
@@ -312,7 +312,7 @@ public class MetadataServer extends DataServer {
 
                     server.destroy();
                     
-                    log.info("Service stopped.");
+                    log.info(getServiceUUID()+" - Service stopped.");
 
                 }
 

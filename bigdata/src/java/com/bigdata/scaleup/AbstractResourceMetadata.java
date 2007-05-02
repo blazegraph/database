@@ -47,13 +47,20 @@ Modifications:
 
 package com.bigdata.scaleup;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.UUID;
+
+import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractResourceMetadata implements IResourceMetadata {
+abstract public class AbstractResourceMetadata implements IResourceMetadata, Externalizable {
 
     /**
      * The name of the resource file.
@@ -75,6 +82,13 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata {
      */
     private UUID uuid;
     
+    /**
+     * De-serialization constructor.
+     */
+    public AbstractResourceMetadata() {
+        
+    }
+
     public AbstractResourceMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
         if (filename == null || state == null || uuid == null)
@@ -143,4 +157,39 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata {
         
     }
     
+    private static transient short VERSION0 = 0x0;
+    
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+        final short version = ShortPacker.unpackShort(in);
+        
+        if (version != 0x0)
+            throw new IOException("Unknown version: " + version);
+
+        nbytes = LongPacker.unpackLong(in);
+        
+        state = ResourceState.valueOf(ShortPacker.unpackShort(in));
+        
+        uuid = new UUID(in.readLong(),in.readLong());
+        
+        filename = in.readUTF();
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        ShortPacker.packShort(out, VERSION0);
+        
+        LongPacker.packLong(out, nbytes);
+        
+        ShortPacker.packShort(out, state.valueOf());
+        
+        out.writeLong(uuid.getMostSignificantBits());
+
+        out.writeLong(uuid.getLeastSignificantBits());
+
+        out.writeUTF(filename);
+        
+    }
+
 }

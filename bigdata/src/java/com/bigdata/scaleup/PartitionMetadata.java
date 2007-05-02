@@ -145,7 +145,6 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
 
     }
 
-
     public int getPartitionId() {
         return partId;
     }
