@@ -62,8 +62,6 @@ public interface IIndexStore {
      * 
      * @return The named index or <code>null</code> if no index was registered
      *         under that name.
-     * 
-     * @see IJournal#registerIndex(String, IIndex)
      */
     public IIndex getIndex(String name);
     

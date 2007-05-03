@@ -53,7 +53,6 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITxCommitProtocol;
 import com.bigdata.scaleup.JournalMetadata;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * Data service interface.

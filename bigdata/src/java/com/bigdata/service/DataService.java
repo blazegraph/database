@@ -82,7 +82,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.ResourceState;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.sun.corba.se.impl.orbutil.closure.Future;
 

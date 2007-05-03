@@ -55,7 +55,6 @@ import net.jini.core.lookup.ServiceID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.scaleup.IResourceMetadata;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
