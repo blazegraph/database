@@ -425,7 +425,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
 
         // index of the last partition to check.
-        final int toIndex = (toKey == null ? 0 : mdi.findIndexOf(toKey));
+        final int toIndex = (toKey == null ? mdi.getEntryCount()-1 : mdi.findIndexOf(toKey));
 
         // per javadoc, keys out of order returns zero(0).
         if(toIndex<fromIndex) return 0;
@@ -466,7 +466,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
 
         // index of the last partition to check.
-        final int toIndex = (toKey == null ? 0 : mdi.findIndexOf(toKey));
+        final int toIndex = (toKey == null ? mdi.getEntryCount()-1 : mdi.findIndexOf(toKey));
 
         // keys are out of order.
         if(toIndex<fromIndex) return EmptyEntryIterator.INSTANCE;

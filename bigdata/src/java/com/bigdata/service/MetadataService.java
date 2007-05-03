@@ -62,7 +62,6 @@ import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * Implementation of a metadata service for a named scale-out index.

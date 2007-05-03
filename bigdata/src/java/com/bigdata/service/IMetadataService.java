@@ -51,12 +51,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceItem;
-
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 /**
  * A metadata service for a named index.
@@ -117,10 +113,20 @@ public interface IMetadataService extends IDataService {
     /**
      * Register and statically partition a scale-out index.
      * 
+     * Create and statically partition a scale-out index.
+     * 
      * @param name
+     *            The name of the scale-out index.
      * @param separatorKeys
-     * @param dataServices
-     * @return
+     *            The array of separator keys. Each separator key is interpreted
+     *            as an <em>unsigned byte[]</em>. The first entry MUST be an
+     *            empty byte[]. The entries MUST be in sorted order.
+     * @param dataServiceUUIDs
+     *            The array of data services onto which each partition defined
+     *            by a separator key will be mapped. The #of entries in this
+     *            array MUST agree with the #of entries in the <i>separatorKeys</i>
+     *            array.
+     * @return The UUID of the scale-out index.
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException

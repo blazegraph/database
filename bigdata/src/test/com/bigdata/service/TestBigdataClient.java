@@ -51,8 +51,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.service.BigdataClient.BigdataFederation;
-import com.bigdata.service.BigdataClient.IBigdataFederation;
+import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
 
 /**
  * Test suite for the {@link BigdataClient}.
@@ -322,9 +321,10 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
     /**
      * @todo write a test the verifies the client code which caches the metadata
-     *       index for a scale-out index.
+     *       index for a scale-out index and check the fence post for multiple
+     *       result set queries.
      */
-    public void test_indexPartitionCache() throws Exception {
+    public void test_cacheMetadataIndex() throws Exception {
         fail("write test");
     }
     
@@ -343,9 +343,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        // register the initial partition on dataService0.
-//        UUID indexUUID = fed.registerIndex(name, JiniUtil
-//                .serviceID2UUID(dataServer0.getServiceID()));
         UUID indexUUID = fed.registerIndex(name, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -406,14 +403,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertIndexRegistered(dataService0, name, indexUUID);
         assertIndexRegistered(dataService1, name, indexUUID);
 
-        /*
-         * @todo verify writes and reads, including operations that cross over
-         * the separatorKey.
-         * 
-         * @todo verify that methods read and write in the correct partition by
-         * going to the data service for that partition to verify the operation.
-         */
-
         // the index is empty.
         assertFalse(ndx.contains(new byte[]{1}));
         assertFalse(ndx.contains(new byte[]{5}));
@@ -446,14 +435,37 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
         assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
         assertEquals(0,ndx.rangeCount(null, new byte[]{1}));
-        assertEquals(1,ndx.rangeCount(new byte[]{1},null));
+        assertEquals(2,ndx.rangeCount(new byte[]{1},null));
         assertEquals(1,ndx.rangeCount(null,new byte[]{2}));
-        assertEquals(1,ndx.rangeCount(null,null));
+        assertEquals(2,ndx.rangeCount(null,null));
+        
+        // verify range iterator for the same cases as range count.
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {}, new byte[] { 1 }));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 1 } //
+                }, ndx.rangeIterator(new byte[] {}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 1 }//
+                }, ndx.rangeIterator(new byte[] {1}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, new byte[] { 1 }));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 1 },//
+                new byte[] { 5 } //
+                }, ndx.rangeIterator(new byte[] {1}, null));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 1 }//
+                }, ndx.rangeIterator(null, new byte[] {2}));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 1 },//
+                new byte[] { 5 } //
+                }, ndx.rangeIterator(null, null));
         
         // remove the index entry.
         assertEquals(new byte[]{1},(byte[])ndx.remove(new byte[]{1}));
 
-        // the index is empty.
+        // verify that this entry is gone (actually it is marked as deleted).
         assertFalse(ndx.contains(new byte[]{1}));
 
         // the key is not in the index.
@@ -471,10 +483,387 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
         assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
         assertEquals(0,ndx.rangeCount(null, new byte[]{1}));
-        assertEquals(1,ndx.rangeCount(new byte[]{1},null));
+        assertEquals(2,ndx.rangeCount(new byte[]{1},null));
         assertEquals(1,ndx.rangeCount(null,new byte[]{2}));
-        assertEquals(1,ndx.rangeCount(null,null));
+        assertEquals(2,ndx.rangeCount(null,null));
 
+        /*
+         * Verify the range iterator for the same cases as the range count.
+         * 
+         * Note: Unlike rangeCount, the range iterator filters out deleted
+         * entries so the deleted entry {1} MUST NOT be visited by any of these
+         * iterators.
+         */
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {}, new byte[] { 1 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {1}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, new byte[] { 1 }));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 5 } //
+                }, ndx.rangeIterator(new byte[] {1}, null));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, new byte[] {2}));
+        assertSameIterator(new byte[][] {//
+                new byte[] { 5 } //
+                }, ndx.rangeIterator(null, null));
+
+        // remove the other index entry.
+        assertEquals(new byte[]{5},(byte[])ndx.remove(new byte[]{5}));
+
+        // verify that this entry is gone (actually it is marked as deleted).
+        assertFalse(ndx.contains(new byte[]{5}));
+
+        // the key is not in the index.
+        assertEquals(null,(byte[])ndx.lookup(new byte[]{5}));
+
+        /*
+         * verify some range counts -- they are unchanged since the deleted keys
+         * are still counted until the index parition(s) are compacted.
+         */
+        assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
+        assertEquals(1,ndx.rangeCount(new byte[]{}, new byte[]{2}));
+        assertEquals(1,ndx.rangeCount(new byte[]{1}, new byte[]{2}));
+        assertEquals(0,ndx.rangeCount(null, new byte[]{1}));
+        assertEquals(2,ndx.rangeCount(new byte[]{1},null));
+        assertEquals(1,ndx.rangeCount(null,new byte[]{2}));
+        assertEquals(2,ndx.rangeCount(null,null));
+
+        /*
+         * verify range iterator for the same cases as range count.
+         * 
+         * Note: Unlike rangeCount, the range iterator filters out deleted
+         * entries so all of these cases will be an empty iterator.
+         */
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {}, new byte[] { 1 }));
+        assertSameIterator(new byte[][]{},//
+                ndx.rangeIterator(new byte[] {}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {1}, new byte[] { 2 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, new byte[] { 1 }));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(new byte[] {1}, null));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, new byte[] {2}));
+        assertSameIterator(new byte[][] {},//
+                ndx.rangeIterator(null, null));
+
+    }
+    
+    /*
+     * Range count tests with static partitions.
+     * 
+     * @todo write tests where the successor of a key is found in the next
+     * partition.
+     */
+    
+    /**
+     * @todo write test. 
+     */
+    public void test_rangeCount_staticPartitions() {
+
+        fail("write test");
+
+    }
+
+    /*
+     * Range query tests with static partitions.
+     * 
+     * @todo write stress test with random data, including delete operations.
+     * 
+     * @todo write performance test with random data.
+     * 
+     * @todo test unisolated and different isolation levels.
+     * 
+     * @todo test when some index partitions have been joined such that there
+     * are some deleted entries in the metadata index and verify that the
+     * toIndex is correct when the toKey is null (no upper bound).
+     */
+    
+    /**
+     * Test unbounded range query with an empty index and two partitions.
+     */
+    public void test_rangeQuery_staticPartitions_unbounded_emptyIndex_2partitions() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{},
+                new byte[]{5}
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+
+        PartitionedRangeQuery itr = null;
+        
+        /*
+         * Query entire key range.
+         */
+        {
+            
+            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+
+            assertEquals("nvisited",0,itr.getVisitedCount());
+            assertEquals("npartitions",1,itr.getPartitionCount());
+            assertEquals("nqueries",1,itr.getQueryCount());
+            
+            assertFalse("hasNext",itr.hasNext());
+            
+            assertEquals("nvisited",0,itr.getVisitedCount());
+            assertEquals("npartitions",2,itr.getPartitionCount());
+            assertEquals("nqueries",2,itr.getQueryCount());
+            
+        }
+        
+    }
+
+    /**
+     * Test unbounded range query with one entry in the index and two index
+     * partitions. The entry is in the first partition.
+     */
+    public void test_rangeQuery_staticPartitions_unbounded_1entry_2partitions_01() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{},
+                new byte[]{5}
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+
+        PartitionedRangeQuery itr = null;
+
+        /*
+         * Insert an entry into the first partition.
+         */
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+
+        /*
+         * Query the entire key range.
+         */
+        {
+
+            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",1,itr.getPartitionCount());
+            assertEquals("next()",new byte[]{1},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{1},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{1},(byte[])itr.getValue());
+
+            assertFalse("hasNext",
+                    itr.hasNext()
+                    );
+
+        }
+       
+    }
+    
+    /**
+     * Test unbounded range query with one entry in the index and two index
+     * partitions. The entry is in the 2nd partition.
+     */
+    public void test_rangeQuery_staticPartitions_unbounded_1entry_2partitions_02() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{},
+                new byte[]{5}
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+
+        PartitionedRangeQuery itr = null;
+
+        /*
+         * Insert an entry into the 2nd partition.
+         */
+        ndx.insert(new byte[] { 5 }, new byte[] { 5 });
+
+        /*
+         * Query the entire key range.
+         */
+        {
+
+            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",2,itr.getPartitionCount());
+            assertEquals("next()",new byte[]{5},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{5},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{5},(byte[])itr.getValue());
+
+            assertFalse("hasNext",
+                    itr.hasNext()
+                    );
+
+        }
+       
+    }
+    
+    /**
+     * Test unbounded range query with two entries in the index and two index
+     * partitions. There is one entry in each partition.
+     */
+    public void test_rangeQuery_staticPartitions_unbounded_2entries_2partitions_01() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{},
+                new byte[]{5}
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+
+        PartitionedRangeQuery itr = null;
+
+        /*
+         * Insert an entry into the first partition.
+         */
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+
+        /*
+         * Insert an entry into the 2nd partition.
+         */
+        ndx.insert(new byte[] { 5 }, new byte[] { 5 });
+
+        /*
+         * Query the entire key range.
+         */
+        {
+
+            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",1,itr.getPartitionCount());
+            assertEquals("next()",new byte[]{1},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{1},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{1},(byte[])itr.getValue());
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",2,itr.getPartitionCount());
+            assertEquals("next()",new byte[]{5},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{5},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{5},(byte[])itr.getValue());
+
+            assertFalse("hasNext",
+                    itr.hasNext()
+                    );
+
+        }
+       
+    }
+    
+    /**
+     * Test unbounded range query with two entries in the index and two index
+     * partitions. Both entries are in the 1st index partition and we limit the
+     * data service query to one result per query.
+     */
+    public void test_rangeQuery_staticPartitions_unbounded_2entries_2partitions_02() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{},
+                new byte[]{5}
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
+                IBigdataFederation.UNISOLATED, name);
+
+        PartitionedRangeQuery itr = null;
+
+        /*
+         * Insert the entries into the first partition.
+         */
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+        ndx.insert(new byte[] { 2 }, new byte[] { 2 });
+
+        /*
+         * Query the entire key range.
+         */
+        {
+
+            // Limit to one entry per data service query.
+            final int capacity = 1;
+            
+            final int flags = IDataService.KEYS | IDataService.VALS;
+            
+            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null,
+                    capacity, flags);
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",1,itr.getPartitionCount());
+            assertEquals("nqueries",1,itr.getQueryCount());
+            assertEquals("next()",new byte[]{1},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{1},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{1},(byte[])itr.getValue());
+
+            assertTrue("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",1,itr.getPartitionCount());
+            assertEquals("nqueries",2,itr.getQueryCount());
+            assertEquals("next()",new byte[]{2},(byte[])itr.next());
+            assertEquals("getKey()",new byte[]{2},(byte[])itr.getKey());
+            assertEquals("getValue()",new byte[]{2},(byte[])itr.getValue());
+
+            assertFalse("hasNext",
+                    itr.hasNext()
+                    );
+            assertEquals("nparts",2,itr.getPartitionCount());
+            assertEquals("nqueries",3,itr.getQueryCount());
+
+        }
+       
     }
     
     /**
@@ -486,11 +875,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
      */
     public void test_batchOps_staticPartitions() {
        
-        // Store reference to each data service.
-        final IDataService dataService0 = client.getDataService(dataServer0.getServiceID());
-        
-        final IDataService dataService1 = client.getDataService(dataServer1.getServiceID());
-        
         // Connect to the federation.
         BigdataFederation fed = (BigdataFederation)client.connect();
         
@@ -522,22 +906,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         fail("write test");
         
-    }
-    
-    /**
-     * Test of range count with a statically partitioned index.
-     * 
-     * @todo test with partitions on different data services.
-     * 
-     * @todo write tests to verify that we do not double count (multiple
-     *       partitions on the same data service).
-     * 
-     * @todo write tests for key scans as well.
-     */
-    public void test_rangeCount_staticPartitions() {
-
-        fail("write test");
-
     }
     
     /**

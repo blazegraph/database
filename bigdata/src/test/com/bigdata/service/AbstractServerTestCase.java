@@ -52,7 +52,6 @@ import java.net.InetAddress;
 
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
-import com.bigdata.service.BigdataClient.PartitionMetadataWithSeparatorKeys;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
