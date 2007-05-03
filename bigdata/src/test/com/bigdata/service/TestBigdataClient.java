@@ -50,6 +50,8 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
 import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
 
@@ -901,8 +903,66 @@ public class TestBigdataClient extends AbstractServerTestCase {
          */
         assertEquals("rangeCount",0,ndx.rangeCount(null, null));
        
+        /*
+         * Batch insert operation that spans two partitions (2 keys in
+         * the 1st partition and 3 keys in the 2nd).
+         */
+        BatchInsert op1 = new BatchInsert(5,new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        },new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        });
         
+        ndx.insert(op1);
         
+        assertEquals("vals",new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        },op1.values);
+
+        // verify with range count.
+        assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+        
+        // verify with range query.
+        assertSameIterator(new byte[][]{//
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}},
+                ndx.rangeIterator(null,null)
+                );
+        
+        /*
+         * Batch lookup operation that spans two partitions (verify the insert
+         * operation).
+         */
+        BatchLookup op2 = new BatchLookup(5,new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        },new byte[5][]
+        );
+        assertEquals("vals",new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        },op2.values);
         
         fail("write test");
         

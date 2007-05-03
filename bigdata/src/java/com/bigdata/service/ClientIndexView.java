@@ -48,6 +48,10 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -58,7 +62,6 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.EmptyEntryIterator;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.scaleup.IPartitionMetadata;
@@ -68,6 +71,14 @@ import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * A client-side view of an index.
+ * 
+ * @todo the client does not attempt to obtain a new data service proxy for a
+ *       partition if the current proxy fails (no failover).
+ * 
+ * @todo the client does not notice deleted index partitions (which can arise
+ *       from index partition joins). this case needs to be handled in any code
+ *       that visits partitions using the entryIndex in the metadata index since
+ *       some entries may be "deleted".
  * 
  * @todo consider writing a client interface to the {@link MetadataIndex} so
  *       that this code can look identifical to the code that we would write if
@@ -79,7 +90,7 @@ import com.bigdata.service.DataService.NoSuchIndexException;
  *       (presumably a read-only historical view of the metadata index would be
  *       used - in which case we need to pass the tx into the getPartition()
  *       method).
- *       
+ * 
  * @todo cache leased information about index partitions of interest to the
  *       client. The cache will be a little tricky since we need to know when
  *       the client does not possess a partition definition. Index partitions
@@ -110,6 +121,15 @@ import com.bigdata.service.DataService.NoSuchIndexException;
  *       unavailable at the time of the request (continued operation during
  *       partial failure).
  * 
+ * @todo rangeCount and the batch CRUD API (contains, insert, lookup, remove)
+ *       could all execute operations in parallel against the index partitions
+ *       that are relevant to their data. Explore parallelism solutions in which
+ *       the client uses a worker thread pool that throttles the #of concurrent
+ *       operations that it is allowed to execute, but make sure that it is not
+ *       possible for the client to deadlock owing to dependencies required by
+ *       the execution of those operations by the worker threads (I don't think
+ *       that a deadlock is possible).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -121,6 +141,15 @@ public class ClientIndexView implements IIndex {
     private final BigdataFederation fed;
     private final long tx;
     private final String name;
+    
+    /**
+     * The name of the scale-out index.
+     */
+    public String getName() {
+        
+        return name;
+        
+    }
 
     /**
      * The unique index identifier.
@@ -318,9 +347,6 @@ public class ClientIndexView implements IIndex {
     /**
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
-     * 
-     * @todo This could issue its queries in parallel against each index
-     *       partition.
      */
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
@@ -428,17 +454,20 @@ public class ClientIndexView implements IIndex {
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
-        // @todo make this a configuration parameter for the client and/or index.
+        // @todo make this a configuration parameter for the client and/or
+        // index.
         final int capacity = 1000;
-        
-        return new PartitionedRangeQuery(tx, fromKey, toKey, capacity,
+
+        return new PartitionedRangeQuery(this, tx, fromKey, toKey, capacity,
                 IDataService.KEYS | IDataService.VALS);
-        
+
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags) {
-        
-        return new PartitionedRangeQuery(tx,fromKey,toKey,capacity,flags);
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags) {
+
+        return new PartitionedRangeQuery(this, tx, fromKey, toKey, capacity,
+                flags);
         
     }
 
@@ -454,7 +483,7 @@ public class ClientIndexView implements IIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class PartitionedRangeQuery implements IEntryIterator {
+    static class PartitionedRangeQuery implements IEntryIterator {
 
         /**
          * Error message used by {@link #getKey()} when the iterator was not
@@ -468,6 +497,11 @@ public class ClientIndexView implements IIndex {
          */
         static public transient final String ERR_NO_VALS = "Values not requested";
 
+        /**
+         * The index on which the range query is being performed.
+         */
+        private final ClientIndexView ndx;
+        
         /**
          * The transaction identifier -or- zero iff the request is unisolated.
          */
@@ -611,15 +645,22 @@ public class ClientIndexView implements IIndex {
             
         }
         
-        public PartitionedRangeQuery(long tx, byte[] fromKey, byte[] toKey,
-                int capacity, int flags) {
+        public PartitionedRangeQuery(ClientIndexView ndx, long tx,
+                byte[] fromKey, byte[] toKey, int capacity, int flags) {
 
+            if (ndx == null) {
+
+                throw new IllegalArgumentException();
+                
+            }
+            
             if (capacity <= 0) {
 
                 throw new IllegalArgumentException("capacity must be positive.");
                 
             }
-            
+
+            this.ndx = ndx;
             this.tx = tx;
             this.fromKey = fromKey;
             this.toKey = toKey;
@@ -627,7 +668,7 @@ public class ClientIndexView implements IIndex {
             this.flags = flags;
 
 //          IMetadataService metadataService = getMetadataService();
-            MetadataIndex mdi = getMetadataIndex();
+            MetadataIndex mdi = ndx.getMetadataIndex();
 
             final int fromIndex;
             final int toIndex;
@@ -673,9 +714,9 @@ public class ClientIndexView implements IIndex {
 
             assert ! exhausted;
 
-            pmd = fed.getPartitionAtIndex(name, index);
+            pmd = ndx.fed.getPartitionAtIndex(ndx.name, index);
 
-            dataService = fed.getDataService(pmd);
+            dataService = ndx.fed.getDataService(pmd);
             
             try {
 
@@ -709,11 +750,11 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
 
-                log.info("name=" + name + ", partition=" + pmd.getPartitionId()
+                log.info("name=" + ndx.name + ", partition=" + pmd.getPartitionId()
                         + ", fromKey=" + BytesUtil.toString(_fromKey)
                         + ", toKey=" + BytesUtil.toString(_toKey));
                 
-                rset = dataService.rangeQuery(tx, name, _fromKey, _toKey,
+                rset = dataService.rangeQuery(tx, ndx.name, _fromKey, _toKey,
                         capacity, flags);
                 
                 // reset index into the ResultSet.
@@ -776,11 +817,11 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
 
-                log.info("name=" + name + ", partition=" + pmd.getPartitionId()
+                log.info("name=" + ndx.name + ", partition=" + pmd.getPartitionId()
                         + ", fromKey=" + BytesUtil.toString(_fromKey)
                         + ", toKey=" + BytesUtil.toString(_toKey));
                 
-                rset = dataService.rangeQuery(tx, name, _fromKey, _toKey,
+                rset = dataService.rangeQuery(tx, ndx.name, _fromKey, _toKey,
                         capacity, flags);
                 
                 // reset index into the ResultSet.
@@ -969,15 +1010,81 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /*
+     * All of these methods need to divide up the operation across index
+     * partitions. Like rangeCount, but unlike rangeQuery, these operations can
+     * be parallelized. Unlike either rangeCount or rangeQuery, these operations
+     * are likely to access only a "few" partitions in the most common cases.
+     * The reason is that the client needs to buffer all data for the operation
+     * in memory, so there is an inherent scale limit on the #of partitions that
+     * will be touched. A worst case scenario would be a client using an index
+     * whose keys were randomly choosen (e.g., UUIDs). In such a case the
+     * operations may be expected to be distributed uniformly across the index
+     * partitions.
+     * 
+     * @todo decide if the batch API will _require_ the keys to be presented in
+     * sorted order - I think that this requirement makes good sense.
+     */
+
     public void contains(BatchContains op) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
         
     }
 
+    /**
+     * @todo expose option to not return the old values.
+     * 
+     * @todo provide retry / ignore options for failures on individual index
+     * partitions.
+     */
     public void insert(BatchInsert op) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
+        
+        final boolean returnOldValues = true;
+        
+        List<Split> splits = splitKeys(op.ntuples, op.keys);
+        
+//        final boolean singleSplit = splits.size() == 1;
+        
+        Iterator<Split> itr = splits.iterator();
+        
+        while(itr.hasNext()) {
+            
+            Split split = itr.next();
+            
+            IDataService dataService = fed.getDataService(split.pmd);
+            
+            byte[][] _keys = new byte[split.ntuples][];
+            byte[][] _vals = new byte[split.ntuples][];
+            
+            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+            System.arraycopy(op.values, split.fromIndex, _vals, 0, split.ntuples);
+            
+            byte[][] oldVals;
+            
+            try {
+
+                oldVals = dataService.batchInsert(tx, name, split.pmd
+                        .getPartitionId(), split.ntuples, _keys, _vals,
+                        returnOldValues);
+                
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            if(returnOldValues) {
+                
+                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
+                        split.ntuples);
+                
+            }
+            
+        }
         
     }
 
@@ -990,6 +1097,112 @@ public class ClientIndexView implements IIndex {
     public void remove(BatchRemove op) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * Utility method to split a set of ordered keys into partitions based the
+     * index partitions defined for a scale-out index.
+     * <p>
+     * Find the partition for the first key. Check the last key, if it is in the
+     * same partition then then this is the simplest case and we can just send
+     * the data along, perhaps breaking it down into smaller batches (note that
+     * batch break points MUST respect the "row" identity for a sparse row
+     * store).
+     * <p>
+     * Otherwise, perform a binary search on the remaining keys looking for the
+     * index of the first key GTE the right separator key for that partition.
+     * The batch for this partition is formed from all keys from the first key
+     * for that partition up to but excluding the index position identified by
+     * the binary search (if there is a match; if there is a miss, then the
+     * binary search result needs to be converted into a key index and that will
+     * be the last key for the current partition).
+     * <p>
+     * Examine the next key and repeat the process until all keys have been
+     * allocated to index partitions.
+     * <p>
+     * Form requests based on the identified first/last key and partition
+     * identified by this process.
+     * 
+     * @param ntuples
+     *            The #of keys.
+     * @param keys
+     *            An array of keys. Each key is an interpreted as an unsigned
+     *            byte[]. All keys must be non-null. The keys must be in sorted
+     *            order.
+     * 
+     * @see Arrays#sort(Object[], int, int, java.util.Comparator)
+     * 
+     * @see BytesUtil#compareBytes(byte[], byte[])
+     */
+    public List<Split> splitKeys(int ntuples, byte[][] keys ) {
+        
+        if (ntuples <= 0)
+            throw new IllegalArgumentException();
+        
+        MetadataIndex mdi = getMetadataIndex();
+        
+        List<Split> splits = new LinkedList<Split>();
+        
+        // start w/ the first key.
+        int fromIndex = 0;
+
+        // partition spanning that key.
+        PartitionMetadataWithSeparatorKeys pmd = fed.getPartition(tx, name,
+                keys[fromIndex]);
+
+        // FIXME binary search, etc. to finish this method.
+        if(true) throw new UnsupportedOperationException();
+//        BytesUtil.search...
+        
+        return splits;
+        
+    }
+    
+    /**
+     * Describes a "split" of keys for a batch operation that are spanned by the
+     * same index partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Split {
+        
+        /**
+         * The index partition that spans the keys in this split.
+         */
+        public final IPartitionMetadata pmd;
+
+        /**
+         * Index of the first key in this split.
+         */
+        public final int fromIndex;
+        
+        /**
+         * Index of the last key in this split.
+         */
+        public final int toIndex;
+
+        /**
+         * The #of keys in this split (toIndex - fromIndex).
+         */
+        public final int ntuples;
+        
+        public Split(IPartitionMetadata pmd,int fromIndex,int toIndex) {
+            
+            assert pmd != null;
+            assert fromIndex >= 0;
+            assert toIndex >= fromIndex;
+            
+            this.pmd = pmd;
+            
+            this.fromIndex = fromIndex;
+            
+            this.toIndex = toIndex;
+            
+            this.ntuples = toIndex - fromIndex;
+            
+        }
         
     }
     

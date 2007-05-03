@@ -77,7 +77,7 @@ public class BatchInsert implements IBatchOp {
     
     /**
      * Create a batch insert operation.
-     * 
+     * <p>
      * Batch insert operation of N tuples presented in sorted order. This
      * operation can be very efficient if the tuples are presented sorted by key
      * order.
