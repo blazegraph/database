@@ -48,12 +48,16 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
+import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
+import com.bigdata.service.ClientIndexView.Split;
 
 /**
  * Test suite for the {@link BigdataClient}.
@@ -867,6 +871,129 @@ public class TestBigdataClient extends AbstractServerTestCase {
         }
        
     }
+
+    /**
+     * Test of the routine responsible for identifying the split points in an
+     * ordered set of keys for a batch index operation. Note that the routine
+     * requires access to the partition definitions in the form of a
+     * {@link MetadataIndex} in order to identify the split points in the
+     * keys[].
+     */
+    public void test_splitKeys_staticPartitions01() {
+        
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
+
+        /*
+         * Register and statically partition an index.
+         */
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{}, // keys less than 5...
+                new byte[]{5} // keys GTE 5....
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        /*
+         * Request a view of that index.
+         */
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
+                IBigdataFederation.UNISOLATED, name);
+
+        /*
+         * Range count the index to verify that it is empty.
+         */
+        assertEquals("rangeCount",0,ndx.rangeCount(null, null));
+
+        /*
+         * Get metadata for the index partitions that we will need to verify
+         * the splits.
+         */
+        final PartitionMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        assertNotNull("partition#0",pmd0);
+        assertNotNull("partition#1",pmd1);
+        
+        /*
+         * Setup data and test splitKeys().
+         * 
+         * Note: In this test there is a key that is an exact match on the 
+         * separator key between the index partitions.
+         */
+        {
+            
+            final int ntuples = 5;
+            
+            final byte[][] keys = new byte[][] {//
+            new byte[]{1}, // [0]
+            new byte[]{2}, // [1]
+            new byte[]{5}, // [2]
+            new byte[]{6}, // [3]
+            new byte[]{9}  // [4]
+            };
+            
+            List<Split> splits = ndx.splitKeys(ntuples, keys);
+        
+            assertNotNull(splits);
+            
+            assertEquals("#splits",2,splits.size());
+            
+            assertEquals(new Split(pmd0,0,2),splits.get(0));
+            assertEquals(new Split(pmd1,2,5),splits.get(1));
+            
+        }
+        
+        /*
+         * Setup data and test splitKeys().
+         * 
+         * Note: In this test there is NOT an exact match on the separator key
+         * between the index partitions. This will result in a negative encoding
+         * of the insertion point by the binary search routine. This test
+         * verifies that the correct index is selected for the last key to enter
+         * the first partition.
+         */
+        {
+            
+            final int ntuples = 5;
+            
+            final byte[][] keys = new byte[][] {//
+            new byte[]{1}, // [0]
+            new byte[]{2}, // [1]
+            new byte[]{4}, // [2]
+            new byte[]{6}, // [3]
+            new byte[]{9}  // [4]
+            };
+            
+            List<Split> splits = ndx.splitKeys(ntuples, keys);
+        
+            assertNotNull(splits);
+            
+            assertEquals("#splits",2,splits.size());
+            
+            assertEquals(new Split(pmd0,0,3),splits.get(0));
+            assertEquals(new Split(pmd1,3,5),splits.get(1));
+            
+        }
+        
+    }
+    
+    /**
+     * Verifies that two splits have the same data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public static void assertEquals(Split expected, Split actual) {
+       
+        assertEquals("partition",expected.pmd,actual.pmd);
+        assertEquals("fromIndex",expected.fromIndex,actual.fromIndex);
+        assertEquals("toIndex",expected.toIndex,actual.toIndex);
+        assertEquals("ntuples",expected.ntuples,actual.ntuples);
+        
+    }
     
     /**
      * Test of batch operations (contains, lookup, insert, remove) that span
@@ -923,6 +1050,55 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         ndx.insert(op1);
         
+        // verify that the old values were reported as nulls.
+        assertEquals("vals",new byte[][]{
+                null,
+                null,
+                null,
+                null,
+                null
+        },op1.values);
+
+        // verify with range count.
+        assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+        
+        // verify with range query.
+        assertSameIterator(new byte[][]{//
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}},
+                ndx.rangeIterator(null,null)
+                );
+        
+        /*
+         * Re-run the batch insert operation using a fresh copy of the same
+         * data. This is used to verify that the overwrite reports the newly
+         * written values.
+         */
+        op1 = new BatchInsert(5,new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        },new byte[][]{
+                new byte[]{1},
+                new byte[]{2},
+                new byte[]{5},
+                new byte[]{6},
+                new byte[]{9}
+        });
+        
+        ndx.insert(op1);
+        
+        /* verify that the old values are reported as non-nulls.
+         * 
+         * FIXME The code is working, but assertEquals is failing to
+         * compare the data correctly as byte[][]s.  Write a test
+         * helper for this purpose and apply it here.
+         */
         assertEquals("vals",new byte[][]{
                 new byte[]{1},
                 new byte[]{2},

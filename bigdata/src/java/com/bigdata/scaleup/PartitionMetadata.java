@@ -227,6 +227,13 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
 
     }
 
+    // The hash code of an int is the int.
+    public int hashCode() {
+        
+        return partId;
+        
+    }
+    
     // Note: used by assertEquals in the test cases.
     public boolean equals(Object o) {
 

@@ -226,6 +226,14 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         
     }
 
+    /**
+     * Compares two representations of the metadata for an index partition
+     * without the left- and right-separator keys that bound the index
+     * partition.
+     * 
+     * @param expected
+     * @param actual
+     */
     protected void assertEquals(IPartitionMetadata expected, IPartitionMetadata actual) {
         
         assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
@@ -260,7 +268,15 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         }
         
     }
-    
+
+    /**
+     * Compares two representations of the metadata for an index partition
+     * including the left- and right-separator keys that bound the index
+     * partition.
+     * 
+     * @param expected
+     * @param actual
+     */
     protected void assertEquals(PartitionMetadataWithSeparatorKeys expected,
             IPartitionMetadata actual) {
 

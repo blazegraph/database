@@ -673,6 +673,69 @@ public class BytesUtil {
     private static transient String NULL = "null";
     
     /**
+     * Binary search on an array whose members are variable length unsigned
+     * byte[]s.
+     * 
+     * @param keys
+     *            The buffer.
+     * @param base
+     *            The offset of the base of the array within the buffer.
+     * @param nmem
+     *            The #of members in the array. When [nmem == 0], the array is
+     *            empty.
+     * @param key
+     *            The key for the search.
+     * 
+     * @return index of the search key, if it is contained in <i>keys</i>;
+     *         otherwise, <code>(-(insertion point) - 1)</code>. The
+     *         insertion point is defined as the point at which the key would be
+     *         inserted into the array of keys. Note that this guarantees that
+     *         the return value will be >= 0 if and only if the key is found.
+     */
+    static final public int binarySearch(final byte[][] keys, final int base,
+            final int nmem, final byte[] key) {
+
+        int low = 0;
+
+        int high = nmem - 1;
+
+        while (low <= high) {
+
+            final int mid = (low + high) >> 1;
+
+            final int offset = base + mid;
+
+            final byte[] midVal = keys[offset];
+
+            int tmp = BytesUtil.compareBytes(midVal, key);
+
+            if (tmp < 0) {
+
+                low = mid + 1;
+
+            } else if (tmp > 0) {
+
+                high = mid - 1;
+
+            } else {
+
+                // Found: return offset.
+
+                return offset;
+
+            }
+
+        }
+
+        // Not found: return insertion point.
+
+        final int offset = (base + low);
+
+        return -(offset + 1);
+
+    }
+
+    /**
      * Compares two unsigned byte[]s.
      *  
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

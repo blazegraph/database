@@ -47,10 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IKeyBuffer;
-import com.bigdata.btree.ImmutableKeyBuffer;
-
 import junit.framework.TestCase2;
 
 /**
@@ -496,4 +492,233 @@ public class TestBytesUtil extends TestCase2 {
         
     }
     
+    /**
+     * A series of test cases for binary search for a "key" in an array of keys
+     * with an adjustable base (starting offset) and length (#of members). This
+     * tests for "key not found" resulting in a variety of insertion points
+     * (including before and after all records in the array) as well as for key
+     * found at a variety of locations. The first and last members of the array
+     * are then "hidden" by shifting the base and reducing the #of declared
+     * array elements and the tests are repeated in the new context to verify
+     * that the base and nmem parameters are correctly respected.
+     */
+    public void test_binarySearch01()
+    {
+
+    final int capacity = 5;
+
+    final byte[][] keys = new byte[ capacity ][];
+
+    int base = 0;
+
+    int nmem = 5;
+
+    // The general formula for the record offset is:
+    //
+    //    offset := sizeof(record) * ( index - 1 )
+    //
+    // The general formula for the insertion point is:
+    //
+    //    insert := - ( offset + 1 )
+    //
+    // where [offset] is the offset of the record before which the
+    // new record should be inserted.
+
+    int i = 0;
+    keys[ i ++ ] =  new byte[]{  5 };    // offset := 0, insert before := -1
+    keys[ i ++ ] =  new byte[]{  7 };    // offset := 1, insert before := -2
+    keys[ i ++ ] =  new byte[]{  9 };    // offset := 2, insert before := -3
+    keys[ i ++ ] =  new byte[]{ 11 };    // offset := 3, insert before := -4
+    keys[ i ++ ] =  new byte[]{ 13 };    // offset := 4, insert before := -5
+                                        //               insert after := -6
+
+    //
+    // verify offset of record found.
+    //
+
+    // Verify finds the first record in the array.
+    assertEquals
+        ( 0,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 5 }
+        )
+          );
+
+    // Verify finds the 2nd record in the array.
+    assertEquals
+        ( 1,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 7 }
+        )
+          );
+
+    // Verify finds the penultimate record in the array.
+    assertEquals
+        ( 3,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 11 }
+        )
+          );
+
+    // Verify finds the last record in the array.
+    assertEquals
+        ( 4,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 13 }
+        )
+          );
+
+    //
+    // verify insertion points (key not found).
+    //
+
+    // Verify insertion point for key less than any value in the
+    // array.
+    assertEquals
+        ( -1,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 4 }
+        )
+          );
+    
+    // Verify insertion point for key between first and 2nd
+    // records.
+    assertEquals
+        ( -2,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 6 }
+        )
+          );
+
+    // Verify insertion point for key between penultimate and last
+    // records.
+    assertEquals
+        ( -5,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 12 }
+        )
+          );
+
+    // Verify insertion point for key greater than the last record.
+    assertEquals
+        ( -6,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 14 }
+        )
+          );
+
+    //
+    // Shift the array base and the #of members so that only the
+    // three records in the middle of the array are "exposed" to
+    // the search and then do a series of tests to verify that the
+    // [base] and [nmem] parameters are being correctly respected.
+    //
+    
+    base++;     // hides the first record.
+
+    nmem -= 2;  // hides the last record (we have to
+                // subtract two since we are actually
+                // hiding two members).
+
+    //
+    // Verify offset of "hidden" records, which now qualify as
+    // "not found".
+    //
+
+    // Verify does not find the first record in the array (which
+    // is now "hidden").
+    assertEquals
+        ( -2,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 5 }
+        )
+          );
+
+    // Verify does not find the last record in the array (which is
+    // now hidden).
+    assertEquals
+        ( -5,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 13 }
+        )
+          );
+
+    //
+    // verify offset of record found.
+    //
+
+    // Verify finds the 2nd record in the array (the first that is
+    // now visible).
+    assertEquals
+        ( 1,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 7 }
+        )
+          );
+
+    // Verify finds the 3rd record in the array (the 2nd that is
+    // now visible).
+    assertEquals
+        ( 2,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 9 }
+        )
+          );
+
+    // Verify finds the penultimate record in the array (the 3rd
+    // and last that is now visibile).
+    assertEquals
+        ( 3,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 11 }
+        )
+          );
+
+    //
+    // verify insertion points (keys not found in either the
+    // hidden or the full array).
+    //
+//  buf[ i ++ ] =   7L ;    // offset := 1, insert before := -2
+//  buf[ i ++ ] =   9L ;    // offset := 2, insert before := -3
+//  buf[ i ++ ] =  11L ;    // offset := 3, insert before := -4
+//                                              insert after  := -5
+
+    // Verify insertion point for key less than any value in the
+    // array.
+    assertEquals
+        ( -2,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 6 }
+        )
+          );
+    
+    // Verify insertion point for key between first and 2nd
+    // visible records.
+    assertEquals
+        ( -3,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 8 }
+        )
+          );
+
+    // Verify insertion point for key between 2nd and 3rd visible
+    // records.
+    assertEquals
+        ( -4,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 10 }
+        )
+          );
+
+    // Verify insertion point for key afer the last visible
+    // record.
+    assertEquals
+        ( -5,
+          BytesUtil.binarySearch
+          ( keys, base, nmem, new byte[]{ 12 }
+        )
+          );
+
+    }
+
 }
