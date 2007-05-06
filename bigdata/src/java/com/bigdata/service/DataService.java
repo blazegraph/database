@@ -469,7 +469,8 @@ abstract public class DataService implements IDataService,
         throw new UnsupportedOperationException();
         
     }
-    
+
+    // FIXME modify to allow vals[] as null when index does not use values.
     public byte[][] batchInsert(long tx, String name, int partitionId, int ntuples,
             byte[][] keys, byte[][] vals, boolean returnOldValues)
             throws IOException, InterruptedException, ExecutionException {

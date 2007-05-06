@@ -64,6 +64,7 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionedIndexView;
@@ -1045,11 +1046,9 @@ public class ClientIndexView implements IIndex {
         
         final boolean returnOldValues = true;
         
-        List<Split> splits = splitKeys(op.ntuples, op.keys);
+        final List<Split> splits = splitKeys(op.ntuples, op.keys);
         
-//        final boolean singleSplit = splits.size() == 1;
-        
-        Iterator<Split> itr = splits.iterator();
+        final Iterator<Split> itr = splits.iterator();
         
         while(itr.hasNext()) {
             
@@ -1134,31 +1133,74 @@ public class ClientIndexView implements IIndex {
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 
      * @see BytesUtil#compareBytes(byte[], byte[])
+     * 
+     * @todo refactor to accept {@link IKeyBuffer}, which should be the basis
+     *       for the data interchange as well - along with an IValueBuffer. This
+     *       will promote reuse of key compression and value compression
+     *       techniques for the on the wire format.
      */
     public List<Split> splitKeys(int ntuples, byte[][] keys ) {
         
         if (ntuples <= 0)
             throw new IllegalArgumentException();
         
-        MetadataIndex mdi = getMetadataIndex();
+//        MetadataIndex mdi = getMetadataIndex();
         
         List<Split> splits = new LinkedList<Split>();
         
         // start w/ the first key.
         int fromIndex = 0;
 
+        while(fromIndex<ntuples) {
+        
         // partition spanning that key.
-        PartitionMetadataWithSeparatorKeys pmd = fed.getPartition(tx, name,
-                keys[fromIndex]);
+            PartitionMetadataWithSeparatorKeys pmd = fed.getPartition(tx, name,
+                    keys[fromIndex]);
 
-        // FIXME binary search, etc. to finish this method.
-        if(true) throw new UnsupportedOperationException();
-//        BytesUtil.search...
-        
+            final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
+
+            if (rightSeparatorKey == null) {
+
+                /*
+                 * The last index partition does not have an upper bound and
+                 * will absorb any keys that order GTE to its left separator
+                 * key.
+                 */
+                final int toIndex = ntuples;
+
+                splits.add(new Split(pmd, fromIndex, toIndex));
+
+                fromIndex = toIndex;
+
+            } else {
+
+                /*
+                 * Otherwise this partition has an upper bound, so figure out
+                 * the index of the last key that would go into this partition.
+                 */
+                int toIndex = BytesUtil.binarySearch(keys, fromIndex, ntuples
+                        - fromIndex, rightSeparatorKey);
+
+                if (toIndex < 0) {
+
+                    toIndex = -toIndex - 1;
+
+                }
+
+                assert toIndex > fromIndex;
+
+                splits.add(new Split(pmd, fromIndex, toIndex));
+
+                fromIndex = toIndex;
+
+            }
+
+        }
+
         return splits;
-        
+
     }
-    
+
     /**
      * Describes a "split" of keys for a batch operation that are spanned by the
      * same index partition.
@@ -1179,7 +1221,7 @@ public class ClientIndexView implements IIndex {
         public final int fromIndex;
         
         /**
-         * Index of the last key in this split.
+         * Index of the first key NOT included in this split.
          */
         public final int toIndex;
 
@@ -1188,6 +1230,19 @@ public class ClientIndexView implements IIndex {
          */
         public final int ntuples;
         
+        /**
+         * Create a representation of a split point.
+         * 
+         * @param pmd
+         *            The metadata for the index partition within which the keys
+         *            in this split lie.
+         * @param fromIndex
+         *            The index of the first key that will enter that index
+         *            partition (inclusive lower bound).
+         * @param toIndex
+         *            The index of the first key that will NOT enter that index
+         *            partition (exclusive upper bound).
+         */
         public Split(IPartitionMetadata pmd,int fromIndex,int toIndex) {
             
             assert pmd != null;
@@ -1201,6 +1256,29 @@ public class ClientIndexView implements IIndex {
             this.toIndex = toIndex;
             
             this.ntuples = toIndex - fromIndex;
+            
+        }
+        
+        /**
+         * Hash code is based on the {@link IPartitionMetadata} hash code.
+         */
+        public int hashCode() {
+            
+            return pmd.hashCode();
+            
+        }
+
+        public boolean equals(Split o) {
+            
+            if( fromIndex != o.fromIndex ) return false;
+
+            if( toIndex != o.toIndex ) return false;
+            
+            if( ntuples != o.ntuples ) return false;
+            
+            if( ! pmd.equals(o.pmd)) return false;
+            
+            return true;
             
         }
         
