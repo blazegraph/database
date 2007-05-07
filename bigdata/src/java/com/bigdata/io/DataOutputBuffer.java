@@ -45,7 +45,7 @@ Modifications:
  * Created on Apr 7, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.io;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutput;
@@ -53,25 +53,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.io.ByteBufferOutputStream;
-
 /**
  * Fast special purpose serialization onto a managed byte[] buffer.
- * 
- * @todo IO costs might be reduced by special purpose routines using a counter
- *       and a pre-/re-sized byte[] with direct byte[] access. This code would
- *       be similar to the {@link KeyBuilder} in its handling of the byte[], but
- *       would use standard Java data types rather than their unsigned variants
- *       and would support packing of unsigned short, int, and long values. I
- *       estimate 29% of the costs of the index load performance benchmark is
- *       serialization with 13% of the total cost being the
- *       {@link DataOutputStream} over a {@link ByteArrayOutputStream} or
- *       {@link ByteBufferOutputStream}. The class could be a
- *       {@link DataOutput} implementation that had intimate knowledge of a
- *       backing byte[]. If we go this route, then
- *       {@link DataOutput#writeChars(String)} and
- *       {@link DataOutput#writeUTF(String)} might throw exceptions since they
- *       are not used when (de-)serializing nodes and leaves.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -87,13 +70,13 @@ public class DataOutputBuffer implements DataOutput {
      * A non-negative integer specifying the #of bytes of data in the buffer
      * that contain valid data starting from position zero(0).
      */
-    protected int len;
+    public int len;
     
     /**
      * The buffer. This is re-allocated whenever the capacity of the buffer
      * is too small and reused otherwise.
      */
-    protected byte[] buf;
+    public byte[] buf;
     
     /**
      * Throws exception unless the value is non-negative.

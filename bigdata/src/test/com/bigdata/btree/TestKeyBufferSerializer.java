@@ -53,10 +53,10 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.ImmutableKeyBuffer;
 import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.MutableKeyBuffer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

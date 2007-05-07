@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.io;
 
+import com.bigdata.btree.TestDataOutputBuffer;
 import com.bigdata.io.TestByteBufferStreams;
 
 import junit.framework.Test;
@@ -86,6 +87,13 @@ public class TestAll extends TestCase {
         // test classes that let us treat a ByteBuffer as an input/output stream.
         suite.addTestSuite( TestByteBufferStreams.class );
 
+        /*
+         * test fast DataOutput and DataInput implementations.
+         */
+        suite.addTestSuite(TestDataOutputBuffer.class);
+        suite.addTestSuite(TestShortPacker.class);
+        suite.addTestSuite(TestLongPacker.class);
+        
         return suite;
         
     }

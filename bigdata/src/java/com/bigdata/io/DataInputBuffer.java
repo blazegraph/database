@@ -45,7 +45,7 @@ Modifications:
  * Created on Apr 9, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.io;
 
 import java.io.DataInput;
 import java.io.DataInputStream;

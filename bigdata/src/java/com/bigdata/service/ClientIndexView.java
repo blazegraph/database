@@ -168,7 +168,7 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
-     * @todo define an interface an use a read-only view of the metadata index.
+     * @todo define an interface and use a read-only view of the metadata index.
      *       this approach is forward looking to when the metadata index is only
      *       partly materialized on the client.
      */

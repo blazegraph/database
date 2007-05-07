@@ -55,11 +55,11 @@ import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 

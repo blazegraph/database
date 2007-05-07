@@ -51,6 +51,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import com.bigdata.io.DataOutputBuffer;
+
 /**
  * Interface for (de-)serialization of addresses of child nodes and leaves as
  * recorded on a node.

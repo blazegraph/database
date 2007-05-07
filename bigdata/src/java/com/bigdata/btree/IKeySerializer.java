@@ -52,6 +52,8 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
 
+import com.bigdata.io.DataOutputBuffer;
+
 /**
  * (De-)serialize the keys in a {@link Leaf} or {@link Node}.
  * 

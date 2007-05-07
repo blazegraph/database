@@ -41,39 +41,33 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.serializers;
+/*
+ * Created on May 7, 2007
+ */
 
-import java.io.DataInput;
-import java.io.IOException;
+package com.bigdata.rdf.scaleout;
 
-import com.bigdata.btree.IValueSerializer;
-import com.bigdata.io.DataOutputBuffer;
+import junit.framework.TestCase2;
 
 /**
- * Note: There is no additional data serialized with a statement at this time so
- * the value serializer is essentially a nop. All the information is in the
- * keys.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementSerializer implements IValueSerializer {
+public class TestStatementIndex extends TestCase2 {
 
-    private static final long serialVersionUID = -2174985132435709536L;
-
-    public static transient final IValueSerializer INSTANCE = new StatementSerializer();
-
-    public StatementSerializer() {
+    /**
+     * 
+     */
+    public TestStatementIndex() {
+        // TODO Auto-generated constructor stub
     }
 
-    public void getValues(DataInput is, Object[] values, int n)
-            throws IOException {
-        return;
-    }
-
-    public void putValues(DataOutputBuffer os, Object[] values, int n)
-            throws IOException {
-        return;
+    /**
+     * @param arg0
+     */
+    public TestStatementIndex(String arg0) {
+        super(arg0);
+        // TODO Auto-generated constructor stub
     }
 
 }

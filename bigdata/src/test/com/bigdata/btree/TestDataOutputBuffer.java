@@ -51,7 +51,7 @@ import java.io.IOException;
 import java.util.Random;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.io.DataOutputBuffer;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;

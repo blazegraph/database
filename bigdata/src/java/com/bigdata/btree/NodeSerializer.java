@@ -61,6 +61,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;

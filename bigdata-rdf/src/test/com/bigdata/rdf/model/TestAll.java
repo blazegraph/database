@@ -41,39 +41,46 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.serializers;
+package com.bigdata.rdf.model;
 
-import java.io.DataInput;
-import java.io.IOException;
-
-import com.bigdata.btree.IValueSerializer;
-import com.bigdata.io.DataOutputBuffer;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Note: There is no additional data serialized with a statement at this time so
- * the value serializer is essentially a nop. All the information is in the
- * keys.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementSerializer implements IValueSerializer {
+public class TestAll extends TestCase {
 
-    private static final long serialVersionUID = -2174985132435709536L;
-
-    public static transient final IValueSerializer INSTANCE = new StatementSerializer();
-
-    public StatementSerializer() {
+    /**
+     * 
+     */
+    public TestAll() {
     }
 
-    public void getValues(DataInput is, Object[] values, int n)
-            throws IOException {
-        return;
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+        super(arg0);
     }
 
-    public void putValues(DataOutputBuffer os, Object[] values, int n)
-            throws IOException {
-        return;
-    }
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
 
+        TestSuite suite = new TestSuite("RDF data model");
+
+        suite.addTestSuite(TestSerialization.class);
+        
+        return suite;
+        
+    }
+    
 }

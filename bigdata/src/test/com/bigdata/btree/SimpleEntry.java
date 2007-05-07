@@ -52,9 +52,9 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.Leaf;
+import com.bigdata.io.DataOutputBuffer;
 
 
 /**

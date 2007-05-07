@@ -50,8 +50,8 @@ import java.util.Arrays;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IValueSerializer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * A persistence capable implementation of {@link IValue}.

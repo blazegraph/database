@@ -49,6 +49,8 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.io.DataOutputBuffer;
+
 /**
  * Compact serialization for the key buffer.
  * 
