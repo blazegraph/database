@@ -1023,22 +1023,95 @@ public class ClientIndexView implements IIndex {
      * operations may be expected to be distributed uniformly across the index
      * partitions.
      * 
+     * @todo expose option to not return the old values for insert and remove()
+     * in order to allow the client to minimize the network traffic.
+     * 
+     * @todo provide retry / ignore options for failures on individual index
+     * partitions.
+     * 
+     * @todo all of the batch api operations can be parallelized.
+     * 
      * @todo decide if the batch API will _require_ the keys to be presented in
      * sorted order - I think that this requirement makes good sense.
      */
 
     public void contains(BatchContains op) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
+        
+        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        
+        final Iterator<Split> itr = splits.iterator();
+        
+        while(itr.hasNext()) {
+            
+            Split split = itr.next();
+            
+            IDataService dataService = fed.getDataService(split.pmd);
+            
+            byte[][] _keys = new byte[split.ntuples][];
+            boolean[] _vals;
+            
+            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+            
+            try {
+
+                _vals = dataService.batchContains(tx, name, split.pmd
+                        .getPartitionId(), split.ntuples, _keys);
+                
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            System.arraycopy(_vals, 0, op.contains, split.fromIndex,
+                    split.ntuples);
+            
+        }
         
     }
 
-    /**
-     * @todo expose option to not return the old values.
-     * 
-     * @todo provide retry / ignore options for failures on individual index
-     * partitions.
-     */
+
+    public void lookup(BatchLookup op) {
+
+        if (op == null)
+            throw new IllegalArgumentException();
+        
+        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        
+        final Iterator<Split> itr = splits.iterator();
+        
+        while(itr.hasNext()) {
+            
+            Split split = itr.next();
+            
+            IDataService dataService = fed.getDataService(split.pmd);
+            
+            byte[][] _keys = new byte[split.ntuples][];
+            byte[][] _vals;
+            
+            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+            
+            try {
+
+                _vals = dataService.batchLookup(tx, name, split.pmd
+                        .getPartitionId(), split.ntuples, _keys);
+                
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            System.arraycopy(_vals, 0, op.values, split.fromIndex,
+                    split.ntuples);
+            
+        }
+        
+    }
+
     public void insert(BatchInsert op) {
 
         if (op == null)
@@ -1087,16 +1160,50 @@ public class ClientIndexView implements IIndex {
         
     }
 
-    public void lookup(BatchLookup op) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
-        
-    }
-
     public void remove(BatchRemove op) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
         
+        final boolean returnOldValues = true;
+        
+        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        
+        final Iterator<Split> itr = splits.iterator();
+        
+        while(itr.hasNext()) {
+            
+            Split split = itr.next();
+            
+            IDataService dataService = fed.getDataService(split.pmd);
+            
+            byte[][] _keys = new byte[split.ntuples][];
+            
+            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+            
+            byte[][] oldVals;
+            
+            try {
+
+                oldVals = dataService.batchRemove(tx, name, split.pmd
+                        .getPartitionId(), split.ntuples, _keys, 
+                        returnOldValues);
+                
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+            if(returnOldValues) {
+                
+                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
+                        split.ntuples);
+                
+            }
+            
+        }
+
     }
 
     /**
