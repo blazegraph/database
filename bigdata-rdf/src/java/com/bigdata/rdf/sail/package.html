@@ -1,17 +1,17 @@
 <html>
 <head>
-<title>Sesame 1.x SAIL integration</title>
+<title>Scale-out integration</title>
 </head>
 <body>
 <p>
-This package provides a Sesame 1.x integration using the SAIL.  This is very
-much a trial balloon.  Sesame 1.x coupled the control logic and data structures
-in such a way that you could not write your own JOIN operators, which makes it
-very difficult to optimize performance.  An option is provided to turn on a
-simple (and not very well tested) eager closure solution without truth maintenance.
-A custom integration is provided for directly loading data into the triple store
-with throughput of 20,000+ triples per second - see the com.bigdata.rdf.rio
-package and {@link com.bigdata.rdf.TripleStore}.
+This package is developing an alternative bigdata integration suitable for
+scale-out on commodity hardware.  The original integration was tightly coupled
+to an embedded bigdata instance and used unisolatable indices that were responsible
+for (de-)serializing and storing terms and statements.  This integration uses
+scale-out indices, which accept variable length unsigned byte[] keys and byte[]
+values.  The client is responsible for (de-)serialization of values, which is
+mainly of interest for the terms and ids indices.  This integration also respects
+the client-data services divide.
 </p>
 </body>
 </html>

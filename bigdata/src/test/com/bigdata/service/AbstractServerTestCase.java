@@ -95,7 +95,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      * @exception InterruptedException
      *                if the thread is interrupted while it is waiting to retry.
      */
-    protected ServiceID getServiceID(AbstractServer server) throws AssertionFailedError, InterruptedException {
+    static public ServiceID getServiceID(AbstractServer server) throws AssertionFailedError, InterruptedException {
 
         ServiceID serviceID = null;
 

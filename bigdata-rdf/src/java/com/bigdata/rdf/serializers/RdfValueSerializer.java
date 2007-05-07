@@ -50,9 +50,9 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IValueSerializer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;

@@ -44,13 +44,13 @@ Modifications:
 /*
  * Created on Oct 28, 2005
  */
-package com.bigdata.btree;
+package com.bigdata.io;
 
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.btree.DataInputBuffer;
-import com.bigdata.btree.DataOutputBuffer;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.DataOutputBuffer;
 
 import junit.framework.TestCase;
 

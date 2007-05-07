@@ -58,8 +58,8 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.ByteArrayValueSerializer;
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IValueSerializer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * Test suite for {@link ByteArrayValueSerializer}.

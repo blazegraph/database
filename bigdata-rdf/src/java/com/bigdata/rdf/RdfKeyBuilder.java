@@ -56,6 +56,8 @@ import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -182,13 +184,25 @@ public class RdfKeyBuilder {
         
     }
     
+    /**
+     * Note: The language code is serialized as US-ASCII UPPER CASE for the
+     * purposes of defining the total key ordering. The character set for the
+     * language code is restricted to [A-Za-z0-9] and "-" for separating subtype
+     * codes. The RDF store interprets an empty language code as NO language
+     * code, so we require that the languageCode is non-empty here. The language
+     * code specifications require that the language code comparison is
+     * case-insensitive, so we force the code to upper case for the purposes of
+     * comparisons.
+     * 
+     * @see _Literal#language
+     */
     public byte[] languageCodeLiteral2key(String languageCode, String text) {
         
-        assert languageCode.length() == 2;
+        assert languageCode.length() > 0;
         
         keyBuilder.reset().append(CODE_LCL);
         
-        appendString(languageCode).appendNul();
+        keyBuilder.appendASCII(languageCode.toUpperCase()).appendNul();
         
         return appendString(text).getKey();
         
@@ -273,6 +287,18 @@ public class RdfKeyBuilder {
         
     }
 
+    /**
+     * Return an unsigned byte[] that locates the value within a total ordering
+     * over the RDF value space.
+     * 
+     * @param value
+     *            An RDF value.
+     * 
+     * @return The sort key for that RDF value.
+     * 
+     * @todo can this be optimized for (and possibly restricted to) the case
+     *       where the {@link Value} is a {@link _Value}?
+     */
     public byte[] value2Key(Value value) {
 
         if (value instanceof URI) {
@@ -319,10 +345,10 @@ public class RdfKeyBuilder {
         } else if (value instanceof BNode) {
 
             /*
-             * @todo if we know that the bnode id is a segmentUUID that we generated
+             * @todo if we know that the bnode id is a UUID that we generated
              * then we should encode that using faster logic that this unicode
-             * conversion and stick the sort key on the bnode so that we do
-             * not have to convert UUID to id:String to key:byte[]. 
+             * conversion and stick the sort key on the bnode so that we do not
+             * have to convert UUID to id:String to key:byte[].
              */
             final String bnodeId = ((BNode)value).getID();
             

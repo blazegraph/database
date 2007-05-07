@@ -106,6 +106,16 @@ import com.ibm.icu.text.RuleBasedCollator;
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
+ * @todo refactor the rdf application to use the client-data service divide and
+ *       compare performance with the embedded database (ideally both will
+ *       continue to run so that they may be directly compared), support journal
+ *       overflow (sync and then async) and view in the data service (assembled
+ *       from journal(s) and index segment(s)) so that we can do very large data
+ *       loads (refactor out of the scale-up package), tune the forward chainer
+ *       to remove more redundency, add flag for entailments vs assertions vs
+ *       told triples so that they can be identified in the KB, move to a quad
+ *       store model, support scalable joins, test on large lubm data set.
+ * 
  * @todo Refactor to support transactions and concurrent load/query and test
  *       same.
  *       <p>
@@ -119,7 +129,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       or that we let the application order the pass over the isolated indices
  *       and give the conflict resolver access to the {@link Tx} so that it can
  *       update the dependent indices if a conflict is discovered on the terms
- *       index. 
+ *       index.
  *       <p>
  *       The simplest approach appears to be NOT isolating the terms and ids
  *       indices. As long as the logic resides at the index, e.g., a lambda

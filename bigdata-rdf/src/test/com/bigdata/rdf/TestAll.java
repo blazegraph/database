@@ -83,10 +83,20 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite( TestInsertRateStore.class);
 
+        suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
+
         suite.addTest( com.bigdata.rdf.rio.TestAll.suite() );
 
         suite.addTest( com.bigdata.rdf.inf.TestAll.suite() );
-        
+
+        /*
+         * Note: This test suite requires access to the Sesame 1.x test suite --
+         * not just the Sesame JARs.
+         */
+        suite.addTest( com.bigdata.rdf.sail.TestAll.suite() );
+
+        suite.addTest( com.bigdata.rdf.scaleout.TestAll.suite() );
+
         return suite;
         
     }

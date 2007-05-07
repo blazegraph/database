@@ -579,7 +579,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * Run the server (this should be invoked from <code>main</code>.
      */
-    protected void run() {
+    public void run() {
 
         log.info("Started server.");
 

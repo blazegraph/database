@@ -54,6 +54,7 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.IConflictResolver;
 
 /**

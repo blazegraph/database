@@ -564,20 +564,76 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
     }
     
-    /*
-     * Range count tests with static partitions.
-     * 
-     * @todo write tests where the successor of a key is found in the next
-     * partition.
-     */
-    
     /**
-     * @todo write test. 
+     * Range count tests with two (2) static partitions where the successor of a
+     * key is found in the next partition (tests the fence post for the mapping
+     * of the rangeCount operation over the different partitions).
      */
-    public void test_rangeCount_staticPartitions() {
+    public void test_rangeCount_staticPartitions_01() {
 
-        fail("write test");
+        // Connect to the federation.
+        BigdataFederation fed = (BigdataFederation)client.connect();
+        
+        final String name = "testIndex";
 
+        /*
+         * Register and statically partition an index.
+         */
+        fed.registerIndex(name, new byte[][]{//
+                new byte[]{}, // keys less than 5...
+                new byte[]{5} // keys GTE 5....
+        }, new UUID[]{//
+                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+        });
+        
+        /*
+         * Request a view of that index.
+         */
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
+                IBigdataFederation.UNISOLATED, name);
+
+        /*
+         * Range count the index to verify that it is empty.
+         */
+        assertEquals("rangeCount",0,ndx.rangeCount(null, null));
+
+        /*
+         * Get metadata for the index partitions that we will need to verify
+         * the splits.
+         */
+        final PartitionMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        assertNotNull("partition#0",pmd0);
+        assertNotNull("partition#1",pmd1);
+
+        /*
+         * Insert keys into each partition, but not on the partition
+         * separator.
+         */
+        ndx.insert(new byte[]{3}, new byte[]{3});
+        ndx.insert(new byte[]{4}, new byte[]{4});
+        ndx.insert(new byte[]{6}, new byte[]{6});
+
+        /*
+         * Verify range counts.
+         */
+        assertEquals("rangeCount",2,ndx.rangeCount(null, new byte[]{5}));
+        assertEquals("rangeCount",1,ndx.rangeCount(new byte[]{5},null));
+        assertEquals("rangeCount",3,ndx.rangeCount(null, null));
+        
+        /*
+         * Insert another key right on the partition separator.
+         */
+        ndx.insert(new byte[]{5}, new byte[]{5});
+
+        /*
+         * Verify range counts.
+         */
+        assertEquals("rangeCount",2,ndx.rangeCount(null, new byte[]{5}));
+        assertEquals("rangeCount",2,ndx.rangeCount(new byte[]{5},null));
+        assertEquals("rangeCount",4,ndx.rangeCount(null, null));
+        
     }
 
     /*

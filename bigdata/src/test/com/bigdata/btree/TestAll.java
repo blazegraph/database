@@ -43,6 +43,9 @@ Modifications:
 */
 package com.bigdata.btree;
 
+import com.bigdata.io.TestLongPacker;
+import com.bigdata.io.TestShortPacker;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -76,13 +79,6 @@ public class TestAll extends TestCase {
     {
 
         TestSuite suite = new TestSuite("BTree");
-        
-        /*
-         * test fast DataOutput and DataInput implementations.
-         */
-        suite.addTestSuite(TestDataOutputBuffer.class);
-        suite.addTestSuite(TestShortPacker.class);
-        suite.addTestSuite(TestLongPacker.class);
         
         /*
          * test key encoding and comparison support.

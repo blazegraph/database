@@ -49,6 +49,7 @@ package com.bigdata.rdf;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
@@ -115,7 +116,7 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         _Literal lit2 = new _Literal("abc",A);
         _Literal lit3 = new _Literal("abc","en");
 
-        _BNode bn1 = new _BNode();
+        _BNode bn1 = new _BNode(UUID.randomUUID().toString());
         _BNode bn2 = new _BNode("a12");
         
         store.addStatement(x, rdfType, C);

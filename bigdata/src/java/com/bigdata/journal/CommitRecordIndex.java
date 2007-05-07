@@ -52,12 +52,12 @@ import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.DataOutputBuffer;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;

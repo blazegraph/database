@@ -49,6 +49,7 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
