@@ -51,8 +51,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
@@ -1031,116 +1034,241 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertEquals("rangeCount",0,ndx.rangeCount(null, null));
        
         /*
+         * Batch contains operation that spans two partitions (verifies no keys).
+         */
+        {
+            BatchContains op2 = new BatchContains(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new boolean[5]
+            );
+            
+            ndx.contains(op2);
+            
+            assertEquals("vals",new boolean[]{
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+            },op2.contains);
+        }
+
+        /*
+         * Batch lookup operation that spans two partitions (verifies no keys).
+         */
+        {
+            BatchLookup op2 = new BatchLookup(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new byte[5][]
+            );
+            
+            ndx.lookup(op2);
+            
+            assertEquals("vals",new byte[][]{
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            },(byte[][])op2.values);
+        }
+
+        /*
          * Batch insert operation that spans two partitions (2 keys in
          * the 1st partition and 3 keys in the 2nd).
          */
-        BatchInsert op1 = new BatchInsert(5,new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        },new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        });
+        {
+            BatchInsert op1 = new BatchInsert(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            });
+            
+            ndx.insert(op1);
+            
+            // verify that the old values were reported as nulls.
+            assertEquals("vals",new byte[][]{
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            },(byte[][])op1.values);
+        }
         
-        ndx.insert(op1);
+        {
+            // verify with range count.
+            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+            
+            // verify with range query.
+            assertSameIterator(new byte[][]{//
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}},
+                    ndx.rangeIterator(null,null)
+                    );
         
-        // verify that the old values were reported as nulls.
-        assertEquals("vals",new byte[][]{
-                null,
-                null,
-                null,
-                null,
-                null
-        },op1.values);
+        }
+        
+        /*
+         * Batch contains operation that spans two partitions (verifies keys
+         * found).
+         */
+        {
+            BatchContains op2 = new BatchContains(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new boolean[5]
+            );
+            
+            ndx.contains(op2);
+            
+            assertEquals("vals",new boolean[]{
+                    true,
+                    true,
+                    true,
+                    true,
+                    true
+            },op2.contains);
+        }
 
-        // verify with range count.
-        assertEquals("rangeCount",5,ndx.rangeCount(null,null));
-        
-        // verify with range query.
-        assertSameIterator(new byte[][]{//
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}},
-                ndx.rangeIterator(null,null)
-                );
-        
         /*
          * Re-run the batch insert operation using a fresh copy of the same
          * data. This is used to verify that the overwrite reports the newly
          * written values.
          */
-        op1 = new BatchInsert(5,new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        },new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        });
-        
-        ndx.insert(op1);
-        
-        /* verify that the old values are reported as non-nulls.
-         * 
-         * FIXME The code is working, but assertEquals is failing to
-         * compare the data correctly as byte[][]s.  Write a test
-         * helper for this purpose and apply it here.
-         */
-        assertEquals("vals",new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        },op1.values);
+        {
+            BatchInsert op1 = new BatchInsert(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            });
+            
+            ndx.insert(op1);
+            
+            /* verify that the old values are reported as non-nulls.
+             */
+            assertEquals("vals",new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },(byte[][])op1.values);
 
-        // verify with range count.
-        assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+        }
         
-        // verify with range query.
-        assertSameIterator(new byte[][]{//
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}},
-                ndx.rangeIterator(null,null)
-                );
+        {
+            // verify with range count.
+            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+            
+            // verify with range query.
+            assertSameIterator(new byte[][]{//
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}},
+                    ndx.rangeIterator(null,null)
+                    );
+        }
         
         /*
          * Batch lookup operation that spans two partitions (verify the insert
          * operation).
          */
-        BatchLookup op2 = new BatchLookup(5,new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        },new byte[5][]
-        );
-        assertEquals("vals",new byte[][]{
-                new byte[]{1},
-                new byte[]{2},
-                new byte[]{5},
-                new byte[]{6},
-                new byte[]{9}
-        },op2.values);
+        {
+            BatchLookup op2 = new BatchLookup(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new byte[5][]
+            );
+            
+            ndx.lookup(op2);
+            
+            assertEquals("vals",new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },(byte[][])op2.values);
+        }
         
-        fail("write test");
+        /*
+         * Batch remove operation that spans two partitions and removes all of
+         * the keys that we inserted above.
+         */
+        {
+            BatchRemove op1 = new BatchRemove(5,new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },new byte[5][]
+            );
+            
+            ndx.remove(op1);
+            
+            // verify that the old values were reported.
+            assertEquals("vals",new byte[][]{
+                    new byte[]{1},
+                    new byte[]{2},
+                    new byte[]{5},
+                    new byte[]{6},
+                    new byte[]{9}
+            },(byte[][])op1.values);
+        }
+        
+        {
+            /*
+             * verify range count is _unchanged_ since the entries are marked as
+             * "deleted" until the index is compacted.
+             */
+            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+            
+            /*
+             * verify that the entries are _gone_ with range query since it will
+             * automatically filter out the deleted entries.
+             */
+            assertSameIterator(new byte[][]{},
+                    ndx.rangeIterator(null,null)
+                    );
+        
+        }
         
     }
     
@@ -1162,4 +1290,51 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
     }
     
+    /**
+     * Compares two byte[][]s for equality.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals(byte[][] expected, byte[][] actual ) {
+        assertEquals(null,expected,actual);
+    }
+    
+    /**
+     * Compares two byte[][]s for equality.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public void assertEquals(String msg,byte[][] expected, byte[][] actual ) {
+        
+        if(msg==null) msg=""; else msg = msg+":";
+        
+        assertEquals(msg+"length", expected.length, actual.length);
+        
+        for( int i=0; i<expected.length; i++ ) {
+
+            if (expected[i] == null) {
+
+                if (actual[i] != null) {
+                    
+                    fail("expected " + i + "th entry to be null.");
+                    
+                }
+                
+            } else {
+
+                if (BytesUtil.compareBytes(expected[i], actual[i]) != 0) {
+
+                    fail("expected=" + BytesUtil.toString(expected[i])
+                            + ", actual=" + BytesUtil.toString(actual[i]));
+
+                }
+
+            }
+            
+        }
+        
+    }
+
 }
