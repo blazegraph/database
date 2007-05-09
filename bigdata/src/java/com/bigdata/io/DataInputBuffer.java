@@ -80,6 +80,12 @@ public class DataInputBuffer implements DataInput {
      */
     final protected int len;
     
+    /**
+     * Prepare for reading from the byte[].
+     * 
+     * @param buf
+     *            The source data.
+     */
     public DataInputBuffer(byte[] buf) {
         
         if(buf==null) throw new IllegalArgumentException();
@@ -89,6 +95,35 @@ public class DataInputBuffer implements DataInput {
         this.off = 0;
         
         this.len = buf.length;
+        
+    }
+    
+    /**
+     * Prepare for reading from the byte[].
+     * 
+     * @param buf
+     *            The source data.
+     * @param off
+     *            The offset of the first byte to be read.
+     * @param len
+     *            The #of bytes available.
+     */
+    public DataInputBuffer(byte[] buf,int off, int len) {
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+        
+        assert off >= 0;
+
+        assert len >= 0;
+        
+        assert off + len < buf.length;
+        
+        this.buf = buf;
+        
+        this.off = off;
+        
+        this.len = len;
         
     }
     

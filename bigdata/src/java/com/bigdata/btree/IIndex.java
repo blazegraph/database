@@ -65,5 +65,5 @@ public interface IIndex extends ISimpleBTree, IBatchBTree {
      * they belong.
      */
     public UUID getIndexUUID();
-    
+
 }

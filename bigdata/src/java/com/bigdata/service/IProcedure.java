@@ -49,6 +49,7 @@ package com.bigdata.service;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
@@ -92,5 +93,5 @@ public interface IProcedure extends Serializable {
      *         interface.
      */
     public Object apply(long tx, IIndexStore store);
-
+    
 }

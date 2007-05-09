@@ -1205,6 +1205,38 @@ public class ClientIndexView implements IIndex {
         }
 
     }
+    
+    public static abstract class AbstractProcedure implements IProcedure {
+     
+        
+    }
+    
+    public Object submit(IProcedure op) {
+        
+//        if (op == null)
+//            throw new IllegalArgumentException();
+//        
+//        final boolean returnOldValues = true;
+//        
+//        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+//        
+//        final Iterator<Split> itr = splits.iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            Split split = itr.next();
+//            
+//            IDataService dataService = fed.getDataService(split.pmd);
+//            
+//            byte[][] _keys = new byte[split.ntuples][];
+//
+////         execute, gather results.
+//        
+//    }
+
+        throw new UnsupportedOperationException();
+        
+    }
 
     /**
      * Utility method to split a set of ordered keys into partitions based the
@@ -1245,6 +1277,10 @@ public class ClientIndexView implements IIndex {
      *       for the data interchange as well - along with an IValueBuffer. This
      *       will promote reuse of key compression and value compression
      *       techniques for the on the wire format.
+     *       <p>
+     *       I would need to modify the {@link IKeyBuffer#search(byte[])} method
+     *       to accept a fromIndex (and perhaps a toIndex) so that we can search
+     *       within only the remaining keys.
      */
     public List<Split> splitKeys(int ntuples, byte[][] keys ) {
         

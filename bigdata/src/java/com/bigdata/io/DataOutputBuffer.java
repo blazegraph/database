@@ -51,6 +51,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInput;
 import java.nio.ByteBuffer;
 
 /**
@@ -144,6 +146,50 @@ public class DataOutputBuffer implements DataOutput {
     }
 
     /**
+     * Reads the entire input stream into the buffer. The data are then
+     * available in {@link #buf} from position 0 (inclusive) through position
+     * {@link #len} (exclusive).
+     */
+    public DataOutputBuffer(InputStream in) throws IOException {
+
+        // temporary buffer for read from the input stream.
+        final byte[] b = new byte[remaining()];
+        
+        while(true) {
+            
+            int nread = in.read(b);
+            
+            if( nread == -1 ) break;
+            
+            write(b,0,nread);
+            
+        }
+        
+    }
+    
+    /**
+     * Reads the entire input stream into the buffer. The data are then
+     * available in {@link #buf} from position 0 (inclusive) through position
+     * {@link #len} (exclusive).
+     */
+    public DataOutputBuffer(ObjectInput in) throws IOException {
+
+        // temporary buffer for read from the input stream.
+        byte[] b = new byte[remaining()];
+        
+        while(true) {
+            
+            int nread = in.read(b);
+            
+            if( nread == -1 ) break;
+            
+            write(b,0,nread);
+            
+        }
+        
+    }
+    
+    /**
      * The current position in the buffer.
      */
     final public int position() {
@@ -223,6 +269,15 @@ public class DataOutputBuffer implements DataOutput {
             
         }
 
+    }
+    
+    /**
+     * The #of bytes remaining in the buffer before it would overflow.
+     */
+    final public int remaining() {
+       
+        return len - buf.length;
+        
     }
 
     /**

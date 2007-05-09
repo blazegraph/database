@@ -58,6 +58,7 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.scaleout.TestTermAndIdsIndex.AddIds;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -365,8 +366,13 @@ public class RdfKeyBuilder {
     /**
      * Converts a long integer that identifies an RDF {@link Value} into a key
      * suitable for use with the id:term index.
-     *  
-     * @param id The term identifier.
+     * <p>
+     * Note: The code that handles efficient batch insertion of terms into the
+     * database replicates the logic for encoding the term identifer as an
+     * unsigned long integer.
+     * 
+     * @param id
+     *            The term identifier.
      * 
      * @return The id expressed as an unsigned byte[] key of length 8.
      */

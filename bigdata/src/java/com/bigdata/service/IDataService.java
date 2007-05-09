@@ -380,7 +380,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            The transaction identifier -or- zero (0L) IFF the operation is
      *            NOT isolated by a transaction.
      * @param proc
-     *            The procedure to be executed.
+     *            The procedure to be executed.  This MUST be downloadable code
+     *            since it will be executed on the {@link DataService}.
      * 
      * @return The result, which is entirely defined by the procedure
      *         implementation and which MAY be null. In general, this MUST be
