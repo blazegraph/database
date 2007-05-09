@@ -1619,20 +1619,21 @@ public class TripleStore extends /*Master*/Journal {
      * @param value
      *            The value.
      * 
-     * @return The pre-assigned termId -or- 0L iff the term is not known to the
-     *         database.
+     * @return The pre-assigned termId -or- {@link #NULL} iff the term is not
+     *         known to the database.
      * 
-     * @todo cache some well-known values?  E.g., this defined by the InferenceEngine.
+     * @todo cache some well-known values? E.g., this defined by the
+     *       InferenceEngine.
      */
     public long getTermId(Value value) {
 
         _Value val = (_Value) value;
         
-        if( val.termId != 0l ) return val.termId; 
+        if( val.termId != NULL ) return val.termId; 
 
         Long id = (Long)getTermIdIndex().lookup(keyBuilder.value2Key(value));
         
-        if( id == null ) return 0L;
+        if( id == null ) return NULL;
 
         val.termId = id.longValue();
 

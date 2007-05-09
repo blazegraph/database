@@ -64,5 +64,5 @@ public interface IIndexStore {
      *         under that name.
      */
     public IIndex getIndex(String name);
-    
+
 }

@@ -380,11 +380,30 @@ public class OptimizedValueFactory implements ValueFactory {
          */
         public byte[] serialize() {
 
+            DataOutputBuffer out = new DataOutputBuffer(128);
+
+            return serialize(out);
+            
+        }
+        
+        /**
+         * Variant which permits reuse of the same buffer. This has the
+         * advantage that the buffer is reused on each invocation and swiftly
+         * grows to its maximum extent.
+         * 
+         * @param out
+         *            The buffer - the caller is responsible for resetting the
+         *            buffer before each invocation.
+         * 
+         * @return The byte[] containing the serialized data record. This array
+         *         is newly allocated so that a series of invocations of this
+         *         method return distinct byte[]s.
+         */
+        public byte[] serialize(DataOutputBuffer out) {
+            
             try {
 
                 final short version = VERSION0;
-
-                DataOutputBuffer out = new DataOutputBuffer(128);
 
                 ShortPacker.packShort(out, version);
 
@@ -397,6 +416,13 @@ public class OptimizedValueFactory implements ValueFactory {
                  */
                 out.writeByte(termCode);
 
+                /*
+                 * FIXME There are inefficiencies in the DataOutputBuffer when
+                 * writing UTF8. See if we can work around those using the ICU
+                 * package. The issue is documented in the DataOutputBuffer
+                 * class.
+                 */
+                
                 serialize(version, termCode, out);
 
                 return out.toByteArray();
@@ -406,7 +432,7 @@ public class OptimizedValueFactory implements ValueFactory {
                 throw new RuntimeException(ex);
 
             }
-            
+                        
         }
         
         /**

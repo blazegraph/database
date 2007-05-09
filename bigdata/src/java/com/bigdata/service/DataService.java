@@ -98,10 +98,17 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * <p>
  * The {@link #txService} provides concurrency for transaction processing.
  * <p>
- * The {@link #opService} provides concurrency for unisolated reads.
+ * The {@link #readService} provides concurrency for unisolated reads from the
+ * last committed state of the store (concurrent writes do not show up in this
+ * view).
  * <p>
- * Unisolated writes serialized using
- * {@link AbstractJournal#serialize(Callable)}.
+ * Unisolated writes are serialized using
+ * {@link AbstractJournal#serialize(Callable)}. This ensures that each
+ * unisolated write operation occurs within a single-theaded context and thereby
+ * guarentees atomicity, consistency, and isolatation without requiring locking.
+ * Unisolated writes either committing or aborting after each unisolated
+ * operation using a restart-safe protocol. Successful unisolated write
+ * operations are therefore ACID.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -110,6 +117,34 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * 
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
+ * 
+ * @todo break out a map/reduce service - at least at an interface level. There
+ *       is a distinction between map/reduce where the inputs (outputs) are
+ *       index partitions and map/reduce when the inputs (outputs) are files.
+ *       The basic issue is that index reads (and to a much greater extent index
+ *       writes) contend with other data service processes. Map file or index
+ *       read operations may run with full concurrency, as may map file write
+ *       and reduce file write operations. Reduce operations that complete with
+ *       non-indexed outputs may also have full concurrency. Reduce operations
+ *       that seek to build a scale-out index from the individual reduce inputs
+ *       will conduct unisolated writes on index partitions, which would of
+ *       necessity be distributed since the hash function does not produce a
+ *       total ordering. (There may well be optimizations available for
+ *       partitioned bulk index builds from the reduce operation that would then
+ *       be migrated to the appropriate data service and merged into the current
+ *       index view for the appropriate index partition).
+ *       <p>
+ *       So, the take away for map processes is that they always have full
+ *       concurrency since they never write directly on indices.  Index reads
+ *       will be advantaged if they can occur in the data service on which the
+ *       input index partition exists.
+ *       <p>
+ *       Likewise, the take away for reduce processes is that they are
+ *       essentially clients rather than data service processes. As such, the
+ *       reduce process should run fully concurrently with a data service for
+ *       the machine on which the reduce inputs reside (its own execution
+ *       thread, and perhaps its own top-level service), but index writes will
+ *       be distributed across the network to various data services.
  * 
  * @todo should the data service monitor key ranges so that it can readily
  *       reject requests when the index is registered but the key lies outside

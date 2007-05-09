@@ -42,52 +42,32 @@ Modifications:
 
 */
 /*
- * Created on Nov 20, 2006
+ * Created on May 8, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.service;
 
-import java.io.DataInput;
-import java.io.IOException;
-import java.io.Serializable;
-
-import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.btree.BTree;
 
 /**
- * (De-)serialize the values in a {@link Leaf}.
+ * An interface for a counter. Mutable btrees expose mutable counters while
+ * read-only btrees do not. Like the mutable {@link BTree}, the mutable counter
+ * is NOT thread-safe. A partitioned index exposes a counter per index partition
+ * and the partition identified forms the high int32 for the counter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IValueSerializer extends Serializable {
+public interface ICounter {
 
     /**
-     * De-serialize the values.
-     * 
-     * @param is
-     *            The input stream.
-     * @param values
-     *            The array into which the values must be written.
-     * @param nvals
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be read from the buffer and
-     *            written on the array.
+     * The current value of the counter.
      */
-    public void getValues(DataInput is, Object[] values, int nvals)
-            throws IOException;
-
+    public long get();
+    
     /**
-     * Serialize the values.
-     * 
-     * @param os
-     *            The output stream.
-     * @param values
-     *            The array of values from the {@link Leaf}.
-     * @param nvals
-     *            The #of valid values in the array. The values in indices
-     *            [0:n-1] are defined and must be written.
+     * Return and increment the current value of the counter. 
      */
-    public void putValues(DataOutputBuffer os, Object[] values, int nvals)
-            throws IOException;
-
+    public long inc();
+    
 }
