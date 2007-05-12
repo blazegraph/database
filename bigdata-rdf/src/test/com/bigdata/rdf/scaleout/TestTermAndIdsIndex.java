@@ -93,6 +93,7 @@ import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataServer;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ICounter;
+import com.bigdata.service.IProcedure;
 import com.bigdata.service.MetadataServer;
 import com.bigdata.service.ClientIndexView.Split;
 
@@ -104,8 +105,11 @@ import com.bigdata.service.ClientIndexView.Split;
  * <code>src/resources/config</code>.
  * 
  * <pre>
- *    -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/ *
+ *     -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/ *
  * </pre>
+ * 
+ * @todo consider an integration point for a full text index when loading new
+ *       terms into the lexicon.
  * 
  * FIXME write a stress test with concurrent threads inserting terms and having
  * occasional failures between the insertion into terms and the insertion into
@@ -571,16 +575,6 @@ public class TestTermAndIdsIndex extends TestCase2 {
 
     }
 
-    public static interface IIndexOperation {
-        
-        /*
-         * @todo constrain to an index partition?
-         * @todo provide access to the Counter?
-         */
-        public Object apply(IIndex ndx) throws Exception;
-        
-    }
-    
     /**
      * Batch insert of terms into the database.
      * 
@@ -655,22 +649,35 @@ public class TestTermAndIdsIndex extends TestCase2 {
              * execute a remote unisolated batch operation that assigns the term
              * identifier.
              * 
-             * @todo who is responsible for filtering out the terms with
-             * pre-assigned term identifiers? Make sure that if we do this that
-             * the identifier assignments are used iff the reverse mapping was
-             * also validated.
-             * 
              * @todo parallelize operations across index partitions?
              */
             {
-
+                
                 long _begin = System.currentTimeMillis();
 
                 ClientIndexView termId = this.terms;
 
-                // @todo abstract so that we can apply the same logic.
-                List<Split> splits = termId.splitKeys(numTerms, terms);
+                /*
+                 * Create a key buffer holding the sort keys. This does not
+                 * allocate new storage for the sort keys, but rather aligns the
+                 * data structures for the call to splitKeys().
+                 */
+                byte[][] termKeys = new byte[numTerms][];
                 
+                {
+                    
+                    for(int i=0; i<numTerms; i++) {
+                        
+                        termKeys[i] = terms[i].key;
+                        
+                    }
+                    
+                }
+
+                // split up the keys by the index partitions.
+                List<Split> splits = termId.splitKeys(numTerms, termKeys);
+
+                // for each split.
                 Iterator<Split> itr = splits.iterator();
                 
                 while(itr.hasNext()) {
@@ -690,7 +697,8 @@ public class TestTermAndIdsIndex extends TestCase2 {
                             split.ntuples, keys));
 
                     // submit batch operation.
-                    AddTerms.Result result = termId.submit(op);
+                    AddTerms.Result result = (AddTerms.Result) termId.submit(
+                            split.pmd, op);
                     
                     // copy the assigned/discovered term identifiers.
                     for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
@@ -712,16 +720,15 @@ public class TestTermAndIdsIndex extends TestCase2 {
             /*
              * Sort terms based on their assigned termId.
              * 
-             * FIXME The termId should be converted to a byte[8] for this sort
-             * order since that is how the termId is actually encoded when we
-             * insert into the termId:term (reverse) index.  We could also 
-             * fake this with a comparator that compared the termIds as if they
-             * were _unsigned_ long integers (which will be a faster sort). The
-             * unsigned byte[] keys will still need to be generated before the
-             * records can be inserted into the [ids] index.
-             * 
-             * @todo the term identifers could be serialized as an IKeyBuffer
-             * by AddTerms
+             * FIXME The termId MUST be in a total ordering based on the
+             * unsigned long integer. This could be accomplished by converting
+             * to a byte[8] for this sort order since that is how the termId is
+             * actually encoded when we insert into the termId:term (reverse)
+             * index. However, it will be faster to fake this with a comparator
+             * that compared the termIds as if they were _unsigned_ long
+             * integers (which will be a faster sort). The unsigned byte[] keys
+             * will still need to be generated before the records can be
+             * inserted into the [ids] index.
              */
 
             long _begin = System.currentTimeMillis();
@@ -751,14 +758,32 @@ public class TestTermAndIdsIndex extends TestCase2 {
             
             ClientIndexView idTerm = this.ids;
 
-            // @todo abstract so that we can apply the same logic.
-            List<Split> splits = idTerm.splitKeys(numTerms, terms);
+            /*
+             * Create a key buffer to hold the keys generated from the term
+             * identifers and then generate those keys. The terms are already in
+             * sorted order by their term identifiers from the previous step.
+             */
+            byte[][] idKeys = new byte[numTerms][];
             
+            {
+
+                // Private key builder removes single-threaded constraint.
+                KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG); 
+                
+                for(int i=0; i<numTerms; i++) {
+                    
+                    idKeys[i] = keyBuilder.reset().append(terms[i].termId).getKey();
+                    
+                }
+                
+            }
+
+            // split up the keys by the index partitions.
+            List<Split> splits = idTerm.splitKeys(numTerms, idKeys);
+
+            // for each split.
             Iterator<Split> itr = splits.iterator();
 
-            // Private key builder removes single-threaded constraint.
-            KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG); 
-            
             // Buffer is reused for each serialized term.
             DataOutputBuffer out = new DataOutputBuffer();
             
@@ -773,7 +798,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
                 for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
                     
                     // Encode the term identifier as an unsigned long integer.
-                    keys[j] = keyBuilder.reset().append(terms[i].termId).getKey();
+                    keys[j] = idKeys[i];
                     
                     // Serialize the term.
                     vals[j] = terms[i].serialize(out.reset());
@@ -786,7 +811,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
                         new MutableValueBuffer(split.ntuples, vals));
 
                 // submit batch operation (result is "null").
-                idTerm.submit(op);
+                idTerm.submit(split.pmd, op);
                 
                 /*
                  * Iff the unisolated write succeeds then this client knows that
@@ -902,7 +927,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AddTerms implements IIndexOperation, Externalizable {
+    public static class AddTerms implements IProcedure, Externalizable {
 
         /**
          * 
@@ -911,6 +936,13 @@ public class TestTermAndIdsIndex extends TestCase2 {
         
         private IKeyBuffer keys;
 
+        /**
+         * De-serialization constructor.
+         */
+        public AddTerms() {
+            
+        }
+        
         public AddTerms(IKeyBuffer keys) {
 
             assert keys != null;
@@ -919,7 +951,10 @@ public class TestTermAndIdsIndex extends TestCase2 {
             
         }
         
-        // @todo on IIndex?  IIndexStore?
+        /**
+         * FIXME Locate a per index partition getCounter() on IIndex?
+         * IIndexStore?
+         */
         private ICounter getCounter(/*String name, int partitionId*/) {
             
             throw new UnsupportedOperationException();
@@ -1114,7 +1149,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AddIds implements IIndexOperation, Externalizable {
+    public static class AddIds implements IProcedure, Externalizable {
 
         /**
          * 
@@ -1123,6 +1158,13 @@ public class TestTermAndIdsIndex extends TestCase2 {
         
         private IKeyBuffer keys;
         private IValueBuffer vals;
+        
+        /**
+         * De-serialization constructor.
+         */
+        public AddIds() {
+            
+        }
         
         public AddIds(IKeyBuffer keys,IValueBuffer vals) {
 

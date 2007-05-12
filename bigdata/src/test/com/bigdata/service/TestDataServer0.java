@@ -53,7 +53,6 @@ import java.util.concurrent.ExecutionException;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.scaleup.IResourceMetadata;
 import com.bigdata.service.DataService.NoSuchIndexException;
 
@@ -272,7 +271,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
          */
         {
             
-            IProcedure proc = new RangeCountProcedure(name);
+            IProcedure proc = new RangeCountProcedure();
             
             /*
              * Note: The result is ONE (1) since there is one deleted entry in
@@ -280,7 +279,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
              * markers!
              */
             assertEquals("result", 1, proxy.submit(IDataService.UNISOLATED,
-                    proc));
+                    name, partitionId, proc));
             
         }
         
@@ -295,20 +294,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
 
         private static final long serialVersionUID = 5856712176446915328L;
 
-        private final String name;
-
-        public RangeCountProcedure(String name) {
-
-            if (name == null)
-                throw new IllegalArgumentException();
-
-            this.name = name;
+        public RangeCountProcedure() {
 
         }
 
-        public Object apply(long tx, IIndexStore store) {
-
-            IIndex ndx = store.getIndex(name);
+        public Object apply(IIndex ndx) {
 
             return new Integer(ndx.rangeCount(null, null));
 

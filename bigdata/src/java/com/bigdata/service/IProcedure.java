@@ -50,9 +50,6 @@ package com.bigdata.service;
 import java.io.Serializable;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.IJournal;
-import com.bigdata.journal.ITx;
 
 /**
  * A procedure to be executed on an {@link IDataService}.
@@ -78,20 +75,13 @@ public interface IProcedure extends Serializable {
      * ACID properties. In order for a distributed procedure to be ACID, the
      * procedure MUST be fully isolated.
      * 
-     * @param tx
-     *            The transaction identifier (aka start time) -or- zero (0L) IFF
-     *            this is an unisolationed operation.
-     * @param store
-     *            The store against which writes will be made. If the procedure
-     *            is running inside of a transaction, then this will be an
-     *            {@link ITx}. If the procedure is running unisolated, then
-     *            this will be an {@link IJournal}.
+     * @param ndx The index.
      * 
      * @return The result, which is entirely defined by the procedure
      *         implementation and which MAY be null. In general, this MUST be
      *         {@link Serializable} since it may have to pass across a network
      *         interface.
      */
-    public Object apply(long tx, IIndexStore store);
+    public Object apply(IIndex ndx) throws Exception;
     
 }
