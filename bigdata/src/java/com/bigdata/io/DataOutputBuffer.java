@@ -152,6 +152,8 @@ public class DataOutputBuffer implements DataOutput {
      */
     public DataOutputBuffer(InputStream in) throws IOException {
 
+        this();
+        
         // temporary buffer for read from the input stream.
         final byte[] b = new byte[remaining()];
         
@@ -173,6 +175,8 @@ public class DataOutputBuffer implements DataOutput {
      * {@link #len} (exclusive).
      */
     public DataOutputBuffer(ObjectInput in) throws IOException {
+
+        this();
 
         // temporary buffer for read from the input stream.
         byte[] b = new byte[remaining()];
@@ -276,7 +280,7 @@ public class DataOutputBuffer implements DataOutput {
      */
     final public int remaining() {
        
-        return len - buf.length;
+        return buf.length - len;
         
     }
 

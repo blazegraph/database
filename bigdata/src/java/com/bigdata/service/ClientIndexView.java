@@ -67,6 +67,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.DataService.NoSuchIndexException;
 
@@ -1206,12 +1207,17 @@ public class ClientIndexView implements IIndex {
 
     }
     
-    public static abstract class AbstractProcedure implements IProcedure {
-     
-        
-    }
-    
-    public Object submit(IProcedure op) {
+    /**
+     * FIXME Develop this as a helper method that accepts {@link Split}s paired
+     * to {@link IProcedure}s. The helper should execute the operations in
+     * parallel and should provide a means of combining the results of each
+     * split operation into an overall operation. Perhaps the splitting of the
+     * main operation into component operations can also be abstracted?
+     * 
+     * @param op
+     * @return
+     */
+    public Object submit(IPartitionMetadata pmd,IProcedure op) {
         
 //        if (op == null)
 //            throw new IllegalArgumentException();
@@ -1234,7 +1240,19 @@ public class ClientIndexView implements IIndex {
 //        
 //    }
 
-        throw new UnsupportedOperationException();
+        IDataService dataService = fed.getDataService(pmd);
+        
+        try {
+
+            Object ret = dataService.submit(tx, name, pmd.getPartitionId(), op);
+        
+            return ret;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
 

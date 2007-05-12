@@ -29,16 +29,13 @@
         <javac destdir="${build.dir}" 
                classpathref="build.classpath"
                debug="on">
-            <src path="${cweb.dir}/commons/src/java"/>
-            <src path="${cweb.dir}/concurrent/src/java"/>
-            <src path="${cweb.dir}/dbcache/src/java"/>
-            <src path="${cweb.dir}/extser/src/java"/>
-            <src path="${cweb.dir}/junit-ext/src/java"/>
-            <src path="${cweb.dir}/lgpl-utils/src/java"/>
             <src path="${bigdata.dir}/src/java"/>
             <src path="${bigdata.dir}/src/test"/>
             <src path="${bigdata.rdf.dir}/src/java"/>
             <src path="${bigdata.rdf.dir}/src/test"/>
+        	<!-- Do not compile the Sesame 1.x SAIL tests by default since they
+        	     have a dependency on the Sesame 1.x _test_ suite. -->
+	        <exclude name="com/bigdata/rdf/sail/*"/>
         </javac>
 <!--
         <copy toDir="${build.dir}/classes">

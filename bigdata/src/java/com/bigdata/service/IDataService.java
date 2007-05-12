@@ -313,6 +313,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
+     * @todo add partitionId to the method signature.
+     * 
      * @todo The capacity must be rounded up if necessary in order to all values
      *       selected for a single row of a sparse row store.
      *       
@@ -349,6 +351,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
+     * 
+     * @todo add partitionId to the method signature.
      */
     public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
             throws InterruptedException, ExecutionException, IOException;
@@ -379,8 +383,12 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @param tx
      *            The transaction identifier -or- zero (0L) IFF the operation is
      *            NOT isolated by a transaction.
+     * @param name
+     *            The name of the scale-out index.
+     * @param partitionId
+     *            The index partition against which the procedure will be run.
      * @param proc
-     *            The procedure to be executed.  This MUST be downloadable code
+     *            The procedure to be executed. This MUST be downloadable code
      *            since it will be executed on the {@link DataService}.
      * 
      * @return The result, which is entirely defined by the procedure
@@ -392,7 +400,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public Object submit(long tx, IProcedure proc) throws InterruptedException,
+    public Object submit(long tx, String name, int partitionId, IProcedure proc) throws InterruptedException,
             ExecutionException, IOException;
 
 }

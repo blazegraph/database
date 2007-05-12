@@ -118,6 +118,26 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
+ * @todo With the change to the submit method, it is now trivial to process
+ *       writes on distinct indices mapped on the same data service
+ *       concurrently. The can be done as follows: Modify the journal's
+ *       IRawStore implementation to support concurrent writers (it is MROW now
+ *       and will become MRMW). The change is limited to a very small section of
+ *       code where the next address is computed. Commits are still
+ *       single-threaded of course and will continue to run in the
+ *       "writeService" which could be renamed "commitService". Create an
+ *       executor thread (write service) per named index mapped onto a journal.
+ *       There are a variety of strategies here. The easiest is one thread per
+ *       named index, but that does not provide governance over the #of threads
+ *       that can run directly. An alternative is a thread pool with a lock per
+ *       named index such that new writes on an index block until the lock is
+ *       released by the current writer. The size of the pool could be
+ *       configured. In any case, index writes run concurrently on different
+ *       indices with concurrent writes against the backing IRawStore and then
+ *       index commits are serialized. This preserves consistency and might make
+ *       group commit trivial by accepting all commit requests in the commit
+ *       queue periodically, e.g., at intervals of no more than 100ms latency.
+ * 
  * @todo break out a map/reduce service - at least at an interface level. There
  *       is a distinction between map/reduce where the inputs (outputs) are
  *       index partitions and map/reduce when the inputs (outputs) are files.
@@ -135,7 +155,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       index view for the appropriate index partition).
  *       <p>
  *       So, the take away for map processes is that they always have full
- *       concurrency since they never write directly on indices.  Index reads
+ *       concurrency since they never write directly on indices. Index reads
  *       will be advantaged if they can occur in the data service on which the
  *       input index partition exists.
  *       <p>
@@ -615,7 +635,7 @@ abstract public class DataService implements IDataService,
         
     }
     
-    public Object submit(long tx, IProcedure proc) throws InterruptedException,
+    public Object submit(long tx, String name, int partitionId, IProcedure proc) throws InterruptedException,
             ExecutionException {
 
         if( proc == null ) throw new IllegalArgumentException();
@@ -626,7 +646,7 @@ abstract public class DataService implements IDataService,
         
         if(isolated) {
             
-            return txService.submit(new TxProcedureTask(tx,proc)).get();
+            return txService.submit(new TxProcedureTask(tx,name,partitionId,proc)).get();
             
         } else if( readOnly ) {
             
@@ -649,7 +669,7 @@ abstract public class DataService implements IDataService,
              * rejected if the proc implements IReadOnlyProcedure.
              */
             
-            return readService.submit(new UnisolatedReadProcedureTask(proc)).get();
+            return readService.submit(new UnisolatedReadProcedureTask(name,partitionId,proc)).get();
             
         } else {
             
@@ -657,7 +677,7 @@ abstract public class DataService implements IDataService,
              * Special case since incomplete writes MUST be discarded and
              * complete writes MUST be committed.
              */
-            return journal.serialize(new UnisolatedReadWriteProcedureTask(proc)).get();
+            return journal.serialize(new UnisolatedReadWriteProcedureTask(name,partitionId,proc)).get();
             
         }
 
@@ -1428,13 +1448,31 @@ abstract public class DataService implements IDataService,
      */
     protected abstract class AbstractProcedureTask implements Callable<Object> {
         
+        protected final long startTime;
+        protected final String name;
+        protected final int partitionId;
         protected final IProcedure proc;
         
-        public AbstractProcedureTask(IProcedure proc) {
+        public AbstractProcedureTask(long startTime, String name, int partitionId, IProcedure proc) {
 
+            assert name != null;
+            assert proc != null;
+            assert partitionId >= 0;
+            
+            this.startTime = startTime;
+            this.name = name;
+            this.partitionId = partitionId;
             this.proc = proc;
             
         }
+        
+        /**
+         * Return the index for the operation
+         * 
+         * @return The index or <code>null</code> if the named index does not
+         *         exist.
+         */
+        abstract IIndex getIndex();
         
     }
 
@@ -1465,9 +1503,9 @@ abstract public class DataService implements IDataService,
         
         private final ITx tx;
 
-        public TxProcedureTask(long startTime, IProcedure proc) {
+        public TxProcedureTask(long startTime, String name, int partitionId, IProcedure proc) {
             
-            super(proc);
+            super(startTime, name, partitionId, proc);
             
             assert startTime != 0L;
             
@@ -1487,9 +1525,26 @@ abstract public class DataService implements IDataService,
             
         }
 
+        /**
+         * Returns the isolated index.
+         */
+        final public IIndex getIndex() {
+            
+            return tx.getIndex(name);
+            
+        }
+
         public Object call() throws Exception {
 
-            return proc.apply(tx.getStartTimestamp(),tx);
+            IIndex ndx = getIndex();
+            
+            if(ndx==null) {
+                
+                throw new IllegalStateException("No such index: "+name);
+                
+            }
+
+            return proc.apply(ndx);
                         
         }
 
@@ -1503,15 +1558,24 @@ abstract public class DataService implements IDataService,
      */
     protected class UnisolatedReadProcedureTask extends AbstractProcedureTask {
 
-        public UnisolatedReadProcedureTask(IProcedure proc) {
+        public UnisolatedReadProcedureTask(String name, int partitionId, IProcedure proc) {
             
-            super(proc);
+            super(0L, name, partitionId, proc);
+            
+        }
+
+        /**
+         * Returns the unisolated index.
+         */
+        public IIndex getIndex() {
+
+            return journal.getIndex(name);
             
         }
 
         public Object call() throws Exception {
 
-            return proc.apply(0L,journal);
+            return proc.apply(getIndex());
 
         }
 
@@ -1529,9 +1593,9 @@ abstract public class DataService implements IDataService,
      */
     protected class UnisolatedReadWriteProcedureTask extends UnisolatedReadProcedureTask {
 
-        public UnisolatedReadWriteProcedureTask(IProcedure proc) {
+        public UnisolatedReadWriteProcedureTask(String name, int partitionId, IProcedure proc) {
             
-            super(proc);
+            super(name,partitionId, proc);
             
         }
 
@@ -1552,8 +1616,16 @@ abstract public class DataService implements IDataService,
                 
                 return result;
 
+            } catch(Exception ex) {
+                
+                // abort and do not masquerade the exception.
+                abort();
+                
+                throw ex;
+                
             } catch(Throwable t) {
             
+                // abort and masquerade the Throwable.
                 abort();
                 
                 throw new RuntimeException(t);
