@@ -42,28 +42,33 @@ Modifications:
 
 */
 /*
- * Created on Feb 27, 2007
+ * Created on May 17, 2007
  */
 
-package com.bigdata.isolation;
+package com.bigdata.btree;
 
-import com.bigdata.btree.ReadOnlyIndex;
-
-/**
- * This class presents a read-only view of an {@link IIsolatableIndex} as an
- * {@link IIsolatedIndex} that is used to masquerade the {@link UnisolatedBTree}
- * within a read-only transaction.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public class ReadOnlyIsolatedIndex extends ReadOnlyIndex implements IIsolatedIndex {
+public interface IValueBuffer {
+    
+    /**
+     * The capacity of the buffer.
+     */
+    public int capacity();
+    
+    /**
+     * The #of "defined" values in the buffer (defined values MAY be null
+     * but are always paired to a key).
+     */
+    public int getValueCount();
 
     /**
-     * @param src
+     * The value in the buffer at the specified index.
+     * 
+     * @param index
+     *            The index into the buffer. The indices into the buffer are
+     *            dense and are origin ZERO(0).
+     * 
+     * @return The value (MAY be null).
      */
-    public ReadOnlyIsolatedIndex(IIsolatableIndex src) {
-        super(src);
-    }
-
+    public byte[] getValue(int index);
+    
 }

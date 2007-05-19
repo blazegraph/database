@@ -49,6 +49,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITxCommitProtocol;
@@ -101,6 +103,12 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public static final long UNISOLATED = 0L;
     
     /**
+     * A constant that may be used as the partition identifier when the target
+     * index is not partitioned (-1).
+     */
+    public static final int UNPARTITIONED = -1;
+    
+    /**
      * Flag specifies that keys in the key range will be returned. When not
      * given, the keys will NOT be included in the {@link ResultSet} sent to the
      * client.
@@ -137,6 +145,17 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            for that scale-out index. Otherwise this MUST be a random
      *            UUID, e.g., using {@link UUID#randomUUID()}.
      * 
+     * @param className
+     *            The name of the implementation class for the index (must
+     *            extend {@link BTree}). Normally this is
+     *            {@link UnisolatedBTree} for an unpartitioned index and
+     *            {@link UnisolatedBTreePartition} for a partitioned index.
+     * 
+     * @param config
+     *            A serializable object containing configuration state that will
+     *            be used to initialize the index. For a partitioned index, this
+     *            will include the partition metadata for that index partition.
+     * 
      * @return The object that would be returned by {@link #getIndex(String)}.
      * 
      * @todo exception if index exists? or modify to validate consistent decl
@@ -151,8 +170,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *       to absorb writes when one or more partitions of a scale out index
      *       are mapped onto the {@link DataService}.
      */
-    public void registerIndex(String name, UUID uuid) throws IOException,
-            InterruptedException, ExecutionException;
+    public void registerIndex(String name, UUID uuid, String className,
+            Object config) throws IOException, InterruptedException,
+            ExecutionException;
 
     /**
      * Return the unique index identifier for the named index (synchronous,
@@ -172,7 +192,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * Drops the named index (unisolated).
      * 
      * @param name
-     *            The name of the index to be dropped.
+     *            The index name.
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> does not identify a registered index.
@@ -180,33 +200,43 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-    /**
-     * Maps an index partition onto the data service. This method must be
-     * invoked before a client will be permitted to access the key range for the
-     * index partition on the data service.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * @param pmd
-     *            The partition metadata.
-     * 
-     * @see #unmapPartition(String, int)
-     * 
-     * @todo When a new partition is created or destroyed that is a sibling of
-     *       this partition then the data service needs to be notified so that
-     *       it will update the partition definition.
-     */
-    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
-            throws IOException, InterruptedException, ExecutionException;
-    
-    /**
-     * Unmaps an index partition from the data service.
-     * 
-     * @param name
-     * @param partitionId
-     */
-    public void unmapPartition(String name, int partitionId)
-            throws IOException, InterruptedException, ExecutionException;
+//    /**
+//     * Maps a <em>new</em> index partition onto the data service. This method
+//     * must be invoked before a client will be permitted to access the key range
+//     * for the index partition on the data service.
+//     * 
+//     * @param name
+//     *            The name of the scale-out index.
+//     * @param pmd
+//     *            The partition metadata.
+//     * 
+//     * @see #unmapPartition(String, int)
+//     * 
+//     * @todo When a new partition is created or destroyed that is a sibling of
+//     *       this partition then the data service needs to be notified so that
+//     *       it will update the partition definition.
+//     */
+//    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
+//            throws IOException, InterruptedException, ExecutionException;
+//    
+//    /**
+//     * Unmaps an index partition from the data service. This method is invoked
+//     * under two circumstances: (1) the index partition is being deleted
+//     * following a join of two index partitions; and (2) the index partition is
+//     * being shed by the data service.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * @param partitionId
+//     *            The partition identifier (must be zero for an unpartitioned
+//     *            index).
+//     * 
+//     * @todo Review state machine for unmapping an index partition for (a) an
+//     *       index partition join; and (b) shedding an index partition (it must
+//     *       be picked up by a different data service).
+//     */
+//    public void unmapPartition(String name, int partitionId)
+//            throws IOException, InterruptedException, ExecutionException;
     
     /**
      * <p>
@@ -245,8 +275,15 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
-     * @param op
-     *            The batch operation.
+     * @param partitionId
+     *            The partition identifier (must be -1 for an unpartitioned
+     *            index).
+     * @param ntuples
+     *            The #of items in the batch operation.
+     * @param keys
+     *            The keys for the batch operation (must be in ascending order
+     *            when the keys are interpreted as unsigned byte[]s, e.g., using
+     *            an {@link UnsignedByteArrayComparator}).
      * 
      * @exception IOException
      *                if there was a problem with the RPC.
@@ -258,6 +295,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
+     * @todo modify to use {@link IKeyBuffer} and IValueBuffer.
      * @todo javadoc update.
      * @todo support extension operations (read or mutable).
      */
@@ -295,6 +333,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
+     * @param partitionId
+     *            The partition identifier (must be -1 for an unpartitioned
+     *            index).
      * @param fromKey
      *            The starting key for the scan.
      * @param toKey
@@ -313,16 +354,14 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
-     * @todo add partitionId to the method signature.
-     * 
      * @todo The capacity must be rounded up if necessary in order to all values
      *       selected for a single row of a sparse row store.
-     *       
+     * 
      * @todo provide for optional filter.
      */
-    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags) throws InterruptedException,
-            ExecutionException, IOException;
+    public ResultSet rangeQuery(long tx, String name, int partitionId,
+            byte[] fromKey, byte[] toKey, int capacity, int flags)
+            throws InterruptedException, ExecutionException, IOException;
     
     /**
      * <p>
@@ -335,6 +374,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
+     * @param partitionId
+     *            The partition identifier (must be -1 for an unpartitioned
+     *            index).
      * @param fromKey
      *            The starting key for the scan.
      * @param toKey
@@ -351,11 +393,10 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
-     * 
-     * @todo add partitionId to the method signature.
      */
-    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-            throws InterruptedException, ExecutionException, IOException;
+    public int rangeCount(long tx, String name, int partitionId,
+            byte[] fromKey, byte[] toKey) throws InterruptedException,
+            ExecutionException, IOException;
         
     /**
      * <p>
@@ -386,7 +427,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @param name
      *            The name of the scale-out index.
      * @param partitionId
-     *            The index partition against which the procedure will be run.
+     *            The partition identifier (must be -1 for an unpartitioned
+     *            index).
      * @param proc
      *            The procedure to be executed. This MUST be downloadable code
      *            since it will be executed on the {@link DataService}.

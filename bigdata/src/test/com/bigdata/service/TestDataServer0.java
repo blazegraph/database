@@ -52,9 +52,9 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.scaleup.IResourceMetadata;
-import com.bigdata.service.DataService.NoSuchIndexException;
+import com.bigdata.service.DataService.NoSuchIndexPartitionException;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -146,11 +146,6 @@ public class TestDataServer0 extends AbstractServerTestCase {
         
         final int partitionId = 0;
         
-        /*
-         * Register the index on the data service.
-         */
-        proxy.registerIndex(name, UUID.randomUUID());
-
         /* 
          * Verify rejection of operations on unmapped partition.
          */
@@ -161,7 +156,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
                         1, new byte[][] { new byte[] { 1 } });
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
             }
 
             try {
@@ -169,7 +164,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
                         1, new byte[][] { new byte[] { 1 } });
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
             }
 
             try {
@@ -179,7 +174,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
                 );
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
             }
 
             try {
@@ -188,16 +183,25 @@ public class TestDataServer0 extends AbstractServerTestCase {
                 );
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexException);
+                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
             }
 
         }
         
-        // map an index partition onto that data service.
-        proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
+        /*
+         * Register an index partition on the data service.
+         */
+        proxy.registerIndex(DataService.getIndexPartitionName(name, partitionId),//
+                UUID.randomUUID(), UnisolatedBTreePartition.class
+                .toString(),new UnisolatedBTreePartition.Config(new PartitionMetadataWithSeparatorKeys(
                 partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
                 new IResourceMetadata[] {/* @todo resource metadata */},
-                new byte[] {}, null/* no right sibling */));
+                new byte[] {}, null/* no right sibling */)));
+        
+//        proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
+//                partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
+//                new IResourceMetadata[] {/* @todo resource metadata */},
+//                new byte[] {}, null/* no right sibling */));
         
         // batch insert into that index partition.
         proxy.batchInsert(IDataService.UNISOLATED, name, partitionId, 1,
@@ -223,19 +227,19 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(new byte[]{1},values[0]);
         assertEquals(null,values[1]);
         
-        // rangeCount the all partitions of the index on the data service.
-        assertEquals(1, proxy.rangeCount(IDataService.UNISOLATED, name, null,
-                null));
+        // rangeCount the partition of the index on the data service.
+        assertEquals(1, proxy.rangeCount(IDataService.UNISOLATED, name,
+                partitionId, null, null));
         
         /*
-         * visit all keys and values for the partitions of the index on the data
+         * visit all keys and values for the partition of the index on the data
          * service.
          */
         
         final int flags = IDataService.KEYS | IDataService.VALS;
         
-        ResultSet rset = proxy.rangeQuery(IDataService.UNISOLATED, name, null,
-                null, 100, flags );
+        ResultSet rset = proxy.rangeQuery(IDataService.UNISOLATED, name,
+                partitionId, null, null, 100, flags);
         
         assertEquals("rangeCount",1,rset.getRangeCount());
         assertEquals("ntuples",1,rset.getNumTuples());
@@ -298,7 +302,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
 
         }
 
-        public Object apply(IIndex ndx) {
+        public Object apply(IIndexWithCounter ndx) {
 
             return new Integer(ndx.rangeCount(null, null));
 

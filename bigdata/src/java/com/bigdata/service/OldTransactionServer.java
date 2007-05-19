@@ -49,9 +49,7 @@ package com.bigdata.service;
 
 import java.util.BitSet;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;

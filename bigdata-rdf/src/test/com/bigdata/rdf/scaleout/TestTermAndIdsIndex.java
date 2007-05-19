@@ -66,13 +66,18 @@ import org.openrdf.vocabulary.RDFS;
 import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.IValueBuffer;
 import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.MutableKeyBuffer;
+import com.bigdata.btree.MutableValueBuffer;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.btree.ValueBufferSerializer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -92,7 +97,6 @@ import com.bigdata.service.BigdataClient;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataServer;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ICounter;
 import com.bigdata.service.IProcedure;
 import com.bigdata.service.MetadataServer;
 import com.bigdata.service.ClientIndexView.Split;
@@ -952,16 +956,6 @@ public class TestTermAndIdsIndex extends TestCase2 {
         }
         
         /**
-         * FIXME Locate a per index partition getCounter() on IIndex?
-         * IIndexStore?
-         */
-        private ICounter getCounter(/*String name, int partitionId*/) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        /**
          * For each term whose serialized key is mapped to the current index
          * partition, lookup the term in the <em>terms</em> index. If it is
          * there then note its assigned termId. Otherwise, use the partition
@@ -975,7 +969,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
          * @return The {@link Result}, which contains the discovered / assigned
          *         term identifiers.
          */
-        public Object apply(IIndex ndx) throws Exception {
+        public Object apply(IIndexWithCounter ndx) throws Exception {
 
             final int numTerms = keys.getKeyCount();
             
@@ -983,7 +977,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
             final long[] ids = new long[numTerms];
             
             // used to assign term identifiers.
-            final ICounter counter = getCounter();
+            final ICounter counter = ndx.getCounter();
             
             // used to serialize term identifers.
             final DataOutputBuffer idbuf = new DataOutputBuffer(
@@ -1190,7 +1184,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
          * 
          * @return <code>null</code>.
          */
-        public Object apply(IIndex ndx) throws Exception {
+        public Object apply(IIndexWithCounter ndx) throws Exception {
 
             final int n = keys.getKeyCount();
 
@@ -1236,7 +1230,7 @@ public class TestTermAndIdsIndex extends TestCase2 {
                          * be deployed.
                          */
 
-                        if (BytesUtil.bytesEqual(val, oldval)) {
+                        if (! BytesUtil.bytesEqual(val, oldval)) {
 
                             throw new RuntimeException(
                                     "Consistency problem: id="
@@ -1323,264 +1317,6 @@ public class TestTermAndIdsIndex extends TestCase2 {
 
     }
 
-    public static interface IValueBuffer {
-        
-        /**
-         * The capacity of the buffer.
-         */
-        public int capacity();
-        
-        /**
-         * The #of "defined" values in the buffer (defined values MAY be null
-         * but are always paired to a key).
-         */
-        public int getValueCount();
-
-        /**
-         * The value in the buffer at the specified index.
-         * 
-         * @param index
-         *            The index into the buffer. The indices into the buffer are
-         *            dense and are origin ZERO(0).
-         * 
-         * @return The value (MAY be null).
-         */
-        public byte[] getValue(int index);
-        
-    }
-    
-    public static class MutableValueBuffer implements IValueBuffer {
-
-        private int nvals; 
-        private final byte[][] vals;
-        
-        public MutableValueBuffer(int nvals, byte[][] vals) {
-            
-            assert nvals >= 0;
-            assert vals != null;
-            assert vals.length > 0;
-            assert nvals <= vals.length;
-            
-            this.nvals = nvals;
-            
-            this.vals = vals;
-            
-        }
-        
-        final public int capacity() {
-            
-            return vals.length;
-            
-        }
-        
-        final public byte[] getValue(int index) {
-            
-            if (index >= nvals) {
-
-                throw new IndexOutOfBoundsException();
-                
-            }
-            
-            return vals[index];
-
-        }
-
-        final public int getValueCount() {
-            
-            return nvals;
-            
-        }
-        
-    }
-
-    /**
-     * The serialized record has a version# and indicates what kind of
-     * compression technique was applied.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo write test case, move to com.bigdata.btree package.
-     * 
-     * @todo support dictinary compression.
-     * 
-     * @todo support hamming code compression.
-     */
-    public static class ValueBufferSerializer {
-
-        public static final transient ValueBufferSerializer INSTANCE = new ValueBufferSerializer();
-        
-        private static final short VERSION0 = 0x0;
-        
-        private static final short COMPRESSION_NONE = 0x0;
-        private static final short COMPRESSION_DICT = 0x1;
-        private static final short COMPRESSION_HAMM = 0x2;
-        private static final short COMPRESSION_RUNL = 0x3;
-        
-        /**
-         * Serialize the {@link IValueBuffer}.
-         * 
-         * @param out
-         *            Used to write the record (NOT reset by this method).
-         * @param buf
-         *            The data.
-         *            
-         * @return The serialized data.
-         */
-        public byte[] serialize(DataOutputBuffer out, IValueBuffer buf) {
-
-            assert out != null;
-            assert buf != null;
-            
-            try {
-                
-                final short version = VERSION0;
-
-                out.packShort(version);
-
-                // @todo support other compression strategies.
-                final short compression = COMPRESSION_NONE;
-
-                out.packShort(compression);
-
-                switch (compression) {
-
-                case COMPRESSION_NONE:
-                    serializeNoCompression(version, out, buf);
-                    break;
-                    
-                default:
-                    throw new UnsupportedOperationException();
-                
-                }
-                
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-            return out.toByteArray();
-            
-        }
-
-        private void serializeNoCompression(short version,
-                DataOutputBuffer out, IValueBuffer buf) throws IOException {
-            
-            final int n = buf.getValueCount();
-            
-            // #of values.
-            out.packLong( n );
-            
-            // vector of value lengths.
-            for(int i=0; i<n; i++) {
-                
-                byte[] val = buf.getValue(i);
-
-                /*
-                 * Note: adds one so that we can differentiate between NULL
-                 * and byte[0].
-                 */
-                out.packLong(val == null ? 0L : val.length + 1);
-                
-            }
-
-            for(int i=0; i<n; i++) {
-                
-                byte[] val = buf.getValue(i);
-            
-                if(val==null) continue;
-                
-                out.write(val);
-                
-            }
-            
-        }
-
-        /**
-         * 
-         * @param version
-         * @param in
-         * @return
-         * @throws IOException
-         * 
-         * @todo Deserialization could choose a format in which the values were
-         *       a byte[] and the data were only extracted as necessary rather
-         *       unpacked into a byte[][] at once. This could improve
-         *       performance for some cases. Since the performance depends on
-         *       the use, this might be a choice that the caller could indicate.
-         */
-        private IValueBuffer deserializeNoCompression(short version,DataInputBuffer in) throws IOException {
-            
-            final int n = (int)in.unpackLong();
-            
-            final byte[][] vals = new byte[n][];
-
-            for (int i = 0; i < n; i++) {
-
-                /*
-                 * Note: length is encoded as len + 1 so that we can identify
-                 * nulls.
-                 */
-                int len = (int) in.unpackLong();
-
-                // allocate the byte[] for this value.
-                vals[i] = len == 0 ? null : new byte[len - 1];
-                
-            }
-            
-            for( int i=0; i<n; i++) {
-                
-                if(vals[i] == null) continue;
-                
-                in.readFully(vals[i]);
-                
-            }
-            
-            return new MutableValueBuffer(n,vals);
-            
-        }
-        
-        /**
-         * 
-         * @param in
-         * @return
-         */
-        public IValueBuffer deserialize(DataInputBuffer in) {
-
-            try {
-            
-                final short version = in.unpackShort();
-                
-                if (version != VERSION0) {
-
-                    throw new RuntimeException("Unknown version: " + version);
-                    
-                }
-                
-                final short compression = in.unpackShort();
-            
-                switch (compression) {
-
-                case COMPRESSION_NONE:
-                    
-                    return deserializeNoCompression(version, in);
-                    
-                default:
-                    throw new UnsupportedOperationException();
-                
-                }
-
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-        }
-        
-    }
-    
     /**
      * Test helper verifies that the term is not in the lexicon, adds the term
      * to the lexicon, verifies that the term can be looked up by its assigned

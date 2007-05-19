@@ -45,15 +45,14 @@ Modifications:
  * Created on May 8, 2007
  */
 
-package com.bigdata.service;
-
-import com.bigdata.btree.BTree;
+package com.bigdata.btree;
 
 /**
  * An interface for a counter. Mutable btrees expose mutable counters while
  * read-only btrees do not. Like the mutable {@link BTree}, the mutable counter
- * is NOT thread-safe. A partitioned index exposes a counter per index partition
- * and the partition identified forms the high int32 for the counter.
+ * is NOT thread-safe. An unpartitioned index exposes a single counter for the
+ * entire index. A partitioned index exposes a counter per index partition and
+ * the partition identified forms the high int32 for the counter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

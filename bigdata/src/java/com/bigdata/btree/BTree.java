@@ -235,7 +235,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommitter {
+public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexWithCounter, ICommitter {
     
     /**
      * The default branching factor.
@@ -310,6 +310,16 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
     }
 
     /**
+     * Returns a mutable counter. All {@link ICounter}s returned by this method
+     * report and increment the same underlying counter.
+     */
+    public ICounter getCounter() {
+        
+        return new Counter(this);
+        
+    }
+    
+    /**
      * The metadata record used to load the last state of the index that was
      * written by {@link #write()}. When an index is loaded this is set to the
      * metadata specified to the constructor. When a new index is created, this
@@ -350,6 +360,11 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      */
     protected int nentries;
 
+    /**
+     * The mutable counter exposed by #getCounter()}.
+     */
+    protected long counter;
+    
     /**
      * Constructor for a new B+Tree with a default hard reference queue policy
      * and no record compression.
@@ -458,7 +473,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         
         this.root = new Leaf(this);
         
-        this.nleaves = 1; 
+        this.nleaves = 1;
+        
+        this.counter = 0L;
 
     }
     
@@ -500,6 +517,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
         this.nnodes = metadata.getNodeCount();
         this.nleaves = metadata.getLeafCount();
         this.nentries = metadata.getEntryCount();
+        this.counter  = metadata.getCounter();
         
         /*
          * Read the root node of the btree.
@@ -607,7 +625,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
          */
         final BTreeMetadata metadata = newMetadata();
         
-        metadata.addrMetadata = metadata.write(store);
+        metadata.addrMetadata = metadata.write(this,store);
         
         this.metadata = metadata;
         
@@ -658,7 +676,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
      * first created) -AND- </li>
      * <li> the root of the btree is NOT dirty and the persistent address of the
      * root of the btree is the same as the address record in the metadata
-     * record -OR- </li>
+     * record (and the {@link #counter} value agrees with the counter on the
+     * metadata record) -OR- </li>
      * <li> the root is <code>null</code>, indicating that the index is
      * closed (flushing the index to disk and updating the metadata record is
      * part of the close protocol so we know that the metadata address is
@@ -672,7 +691,10 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
 
         if (metadata != null
                 && (root == null || !root.dirty
-                        && metadata.getRootAddr() == root.getIdentity())) {
+                        && metadata.getRootAddr() == root.getIdentity()
+                        && metadata.getCounter() == counter
+                    )
+             ) {
 
             /*
              * There have not been any writes on this btree.
@@ -798,4 +820,36 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, ICommit
 
     }
 
+    /**
+     * Mutable counter.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Counter implements ICounter {
+
+        private final BTree btree;
+        
+        public Counter(BTree btree) {
+            
+            assert btree != null;
+            
+            this.btree = btree;
+            
+        }
+        
+        public long get() {
+            
+            return btree.counter;
+            
+        }
+
+        public long inc() {
+            
+            return btree.counter++;
+            
+        }
+        
+    }
+    
 }

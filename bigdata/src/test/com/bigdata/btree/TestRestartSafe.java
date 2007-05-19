@@ -251,6 +251,48 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         }
 
     }
+    
+    /**
+     * Test verifies that the {@link IIndexWithCounter} is restart-safe.
+     */
+    public void test_restartSafeCounter() {
+       
+        Journal journal = new Journal(getProperties());
+
+        final int m = 3;
+
+        final long addr1;
+        {
+            
+            final BTree btree = getBTree(m,journal);
+            
+            assertEquals(0,btree.getCounter().get());
+            assertEquals(0,btree.getCounter().inc());
+            assertEquals(1,btree.getCounter().get());
+            
+            addr1 = btree.write();
+            
+            journal.commit();
+            
+        }
+        
+        /*
+         * restart, re-opening the same file.
+         */
+        {
+
+            journal = reopenStore(journal);
+            
+            final BTree btree = BTree.load(journal, addr1);
+
+            // verify the counter.
+            assertEquals(1,btree.getCounter().get());
+
+            journal.closeAndDelete();
+            
+        }
+        
+    }
 
     /**
      * Test verifies that classes which extend {@link BTree} are correctly

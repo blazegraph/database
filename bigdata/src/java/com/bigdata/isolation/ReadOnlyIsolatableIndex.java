@@ -42,18 +42,27 @@ Modifications:
 
 */
 /*
- * Created on Mar 15, 2007
+ * Created on May 14, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.isolation;
+
+import com.bigdata.btree.ReadOnlyIndex;
 
 /**
- * Procedures that implement this marker interface will be executed within a
- * read-only context and MUST NOT attempt to write on an index.
+ * This class presents a read-only view of an unisolated index that is used to
+ * prevent writes on an unisolated index by an operation that has been declared
+ * to be read-only.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IReadOnlyProcedure extends IProcedure {
+public class ReadOnlyIsolatableIndex extends ReadOnlyIndex {
+
+    public ReadOnlyIsolatableIndex(IIsolatableIndex src){
+        
+        super(src);
+        
+    }
     
 }

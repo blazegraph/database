@@ -49,10 +49,11 @@ package com.bigdata.service;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IReadOnlyOperation;
 
 /**
- * A procedure to be executed on an {@link IDataService}.
+ * An arbitrary index procedure to be executed on an {@link IDataService}.
  * <p>
  * Note: while this interface is {@link Serializable}, that provides only for
  * communicating state to the {@link IDataService}. If an instance of this
@@ -64,6 +65,8 @@ import com.bigdata.btree.IIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see IReadOnlyOperation
  */
 public interface IProcedure extends Serializable {
 
@@ -75,13 +78,14 @@ public interface IProcedure extends Serializable {
      * ACID properties. In order for a distributed procedure to be ACID, the
      * procedure MUST be fully isolated.
      * 
-     * @param ndx The index.
+     * @param ndx
+     *            The index.
      * 
      * @return The result, which is entirely defined by the procedure
      *         implementation and which MAY be null. In general, this MUST be
      *         {@link Serializable} since it may have to pass across a network
      *         interface.
      */
-    public Object apply(IIndex ndx) throws Exception;
+    public Object apply(IIndexWithCounter ndx) throws Exception;
     
 }

@@ -54,7 +54,7 @@ import java.io.ObjectOutput;
 import java.util.Iterator;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
+import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
@@ -63,7 +63,7 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.IndexSegment;
@@ -121,7 +121,7 @@ import com.bigdata.rawstore.IRawStore;
  *  
  *  entryIterator() - only non-deleted entries.
  *  
- *  IBatchBTree - all methods are overriden to use {@link IBatchOp#apply(ISimpleBTree)}
+ *  IBatchBTree - all methods are overriden to use {@link IBatchOperation#apply(ISimpleBTree)}
  *  so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
  *  
  * </pre>
@@ -255,7 +255,14 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     }
     
     /**
-     * Extends {@link BTreeMetadata} to also store the {@link IConflictResolver}.
+     * Extends {@link BTreeMetadata} to also store the {@link IConflictResolver}
+     * and per index partition metadata (per partition counters, separator keys,
+     * etc).
+     * <p>
+     * Note that the mutable index is single-threaded so there are never
+     * concurrent updates to distinct index partitions for the same mutable
+     * btree data structure. This means that the per index partition metadata
+     * updates are also restricted to a single index partition at a time.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -290,13 +297,13 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
             
         }
 
-        private static final transient int VERSION0 = 0x0;
+        private static final transient short VERSION0 = 0x0;
         
         public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
             super.readExternal(in);
             
-            final int version = (int)LongPacker.unpackLong(in);
+            final short version = (short)ShortPacker.unpackShort(in);
             
             if (version != VERSION0) {
 
@@ -312,12 +319,12 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
             super.writeExternal(out);
             
-            LongPacker.packLong(out,VERSION0);
+            ShortPacker.packShort(out,VERSION0);
 
             out.writeObject(conflictResolver);
             
         }
-
+        
     }
     
     /**

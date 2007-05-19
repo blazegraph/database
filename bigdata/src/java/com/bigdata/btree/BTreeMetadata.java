@@ -99,6 +99,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
 
     private UUID indexUUID;
     
+    private long counter;
+    
     /**
      * The address of the root node or leaf.
      */
@@ -153,6 +155,15 @@ public class BTreeMetadata implements Serializable, Externalizable {
         
     }
    
+    /**
+     * Return the value of the counter stored in the metadata record.
+     */
+    public final long getCounter() {
+        
+        return counter;
+        
+    }
+    
     /**
      * Address that can be used to read this metadata record from the store.
      * <p>
@@ -210,6 +221,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
         
         this.indexUUID = btree.indexUUID;
         
+        this.counter = btree.counter;
+        
         /*
          * Note: This can not be invoked here since a derived class will not 
          * have initialized its fields yet.  Therefore the write() is done by
@@ -223,9 +236,15 @@ public class BTreeMetadata implements Serializable, Externalizable {
      * Write out the metadata record for the btree on the store and return the
      * {@link Addr address}.
      * 
+     * @param btree
+     *            The btree whose metadata record is being written.
+     * 
+     * @param store
+     *            The store on which the metadata record is being written.
+     * 
      * @return The address of the metadata record.
      */
-    protected long write(IRawStore store) {
+    protected long write(BTree btree, IRawStore store) {
 
         return store.write(ByteBuffer.wrap(SerializerUtil.serialize(this)));
 
@@ -313,6 +332,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
         useChecksum = in.readBoolean();
         
         indexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+        
+        counter = LongPacker.unpackLong(in);
 
     }
 
@@ -343,6 +364,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
         out.writeLong(indexUUID.getMostSignificantBits());
         
         out.writeLong(indexUUID.getLeastSignificantBits());
+        
+        LongPacker.packLong(out, counter);
         
     }
     

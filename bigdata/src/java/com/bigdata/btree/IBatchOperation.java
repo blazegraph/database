@@ -42,28 +42,43 @@ Modifications:
 
 */
 /*
- * Created on Feb 27, 2007
+ * Created on Feb 12, 2007
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.btree.ReadOnlyIndex;
+package com.bigdata.btree;
 
 /**
- * This class presents a read-only view of an {@link IIsolatableIndex} as an
- * {@link IIsolatedIndex} that is used to masquerade the {@link UnisolatedBTree}
- * within a read-only transaction.
+ * A common interface for batch operations. Batch operations can be very
+ * efficient if the keys are presented in sorted order and should be used
+ * to minimize network traffic.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see IReadOnlyOperation
  */
-public class ReadOnlyIsolatedIndex extends ReadOnlyIndex implements IIsolatedIndex {
-
+public interface IBatchOperation {
+    
     /**
-     * @param src
+     * Return the #of tuples in the operation.
      */
-    public ReadOnlyIsolatedIndex(IIsolatableIndex src) {
-        super(src);
-    }
+    public int getTupleCount();
+    
+    /**
+     * Return the keys.
+     * 
+     * @todo change to use IKeyBuffer?
+     */
+    public byte[][] getKeys();
+    
+    /**
+     * Apply the operation - this method may be used both to define extensible
+     * batch operations and to provide default (un-optimized) implementations of
+     * the batch api that are useful for derived btree implementations with
+     * modified semantics.
+     * 
+     * @param btree
+     */
+    public void apply(ISimpleBTree btree);
 
 }

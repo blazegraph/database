@@ -42,17 +42,51 @@ Modifications:
 
 */
 /*
- * Created on Mar 14, 2007
+ * Created on May 17, 2007
  */
 
 package com.bigdata.btree;
 
-/**
- * A batch operation that does not allow mutation operations.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public interface IReadOnlyBatchOp extends IBatchOp {
+public class MutableValueBuffer implements IValueBuffer {
 
+    private int nvals; 
+    private final byte[][] vals;
+    
+    public MutableValueBuffer(int nvals, byte[][] vals) {
+        
+        assert nvals >= 0;
+        assert vals != null;
+        assert vals.length > 0;
+        assert nvals <= vals.length;
+        
+        this.nvals = nvals;
+        
+        this.vals = vals;
+        
+    }
+    
+    final public int capacity() {
+        
+        return vals.length;
+        
+    }
+    
+    final public byte[] getValue(int index) {
+        
+        if (index >= nvals) {
+
+            throw new IndexOutOfBoundsException();
+            
+        }
+        
+        return vals[index];
+
+    }
+
+    final public int getValueCount() {
+        
+        return nvals;
+        
+    }
+    
 }

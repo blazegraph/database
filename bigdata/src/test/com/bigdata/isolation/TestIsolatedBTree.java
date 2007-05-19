@@ -51,7 +51,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IBatchOperation;
 import com.bigdata.journal.TestTx;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -74,7 +74,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * 
  * @todo test the batch apis. all methods must work with {@link Value}s (the
  *       test for this could be a test of the
- *       {@link IBatchOp#apply(com.bigdata.btree.ISimpleBTree)} implementations
+ *       {@link IBatchOperation#apply(com.bigdata.btree.ISimpleBTree)} implementations
  *       in the btree package since we apply that method in a trivial manner to
  *       support the batch api.
  * 
