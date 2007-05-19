@@ -47,13 +47,6 @@ Modifications:
 
 package com.bigdata.service;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The network facing {@link DataService} interface.

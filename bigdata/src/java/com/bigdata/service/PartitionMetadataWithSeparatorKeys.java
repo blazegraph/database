@@ -13,8 +13,8 @@ import com.bigdata.scaleup.IResourceMetadata;
 import com.bigdata.scaleup.PartitionMetadata;
 
 /**
- * A class that carries the left and right separator keys surrounding the
- * index partition.
+ * An immutable object whose state describes an index partition together with
+ * the left and right separator keys surrounding the index partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

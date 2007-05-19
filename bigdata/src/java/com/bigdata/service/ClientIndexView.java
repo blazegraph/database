@@ -67,7 +67,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.DataService.NoSuchIndexException;
 
@@ -423,7 +422,10 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
                 
-                count += dataService.rangeCount(tx, name, _fromKey, _toKey);
+                final int partitionId = pmd.getPartitionId();
+                
+                count += dataService.rangeCount(tx, name, partitionId,
+                        _fromKey, _toKey);
                 
             } catch(Exception ex) {
 
@@ -752,12 +754,14 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
 
-                log.info("name=" + ndx.name + ", partition=" + pmd.getPartitionId()
+                final int partitionId = pmd.getPartitionId();
+                
+                log.info("name=" + ndx.name + ", partition=" + partitionId
                         + ", fromKey=" + BytesUtil.toString(_fromKey)
                         + ", toKey=" + BytesUtil.toString(_toKey));
                 
-                rset = dataService.rangeQuery(tx, ndx.name, _fromKey, _toKey,
-                        capacity, flags);
+                rset = dataService.rangeQuery(tx, ndx.name, partitionId,
+                        _fromKey, _toKey, capacity, flags);
                 
                 // reset index into the ResultSet.
                 lastVisited = -1;
@@ -819,12 +823,14 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
 
-                log.info("name=" + ndx.name + ", partition=" + pmd.getPartitionId()
+                final int partitionId = pmd.getPartitionId();
+                
+                log.info("name=" + ndx.name + ", partition=" + partitionId
                         + ", fromKey=" + BytesUtil.toString(_fromKey)
                         + ", toKey=" + BytesUtil.toString(_toKey));
                 
-                rset = dataService.rangeQuery(tx, ndx.name, _fromKey, _toKey,
-                        capacity, flags);
+                rset = dataService.rangeQuery(tx, ndx.name, partitionId,
+                        _fromKey, _toKey, capacity, flags);
                 
                 // reset index into the ResultSet.
                 lastVisited = -1;
@@ -1212,7 +1218,9 @@ public class ClientIndexView implements IIndex {
      * to {@link IProcedure}s. The helper should execute the operations in
      * parallel and should provide a means of combining the results of each
      * split operation into an overall operation. Perhaps the splitting of the
-     * main operation into component operations can also be abstracted?
+     * main operation into component operations can also be abstracted?  Failure
+     * on individual partitions could be retried or not depending on the client
+     * configuration or index view options.
      * 
      * @param op
      * @return

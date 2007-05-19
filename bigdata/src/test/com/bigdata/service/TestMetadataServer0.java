@@ -54,6 +54,7 @@ import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}
@@ -279,7 +280,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
     public void test_registerScaleOutIndex() throws Exception {
 
         // wait for the service to be ready.
-        ServiceID dataService1ID = getServiceID(dataServer1);
+        getServiceID(dataServer1);
 
         // wait for the service to be ready.
         ServiceID metadataServiceID = getServiceID(metadataServer0);
@@ -304,17 +305,22 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             // lookup proxy for dataService0
             final IDataService dataService0Proxy = lookupDataService(dataService0ID); 
 
+            // should be null since the index was not registered.
+            assertNull("indexUUID", dataService0Proxy.getIndexUUID("xyz"));
+            
             /*
              * This should fail since the index was never registered.
              */
-            dataService0Proxy.rangeCount(IDataService.UNISOLATED, "xyz", null,
-                    null);
+            dataService0Proxy.rangeCount(IDataService.UNISOLATED, "xyz",
+                    0/* partitionId */, null, null);
             
         } catch (ExecutionException ex) {
             
-            System.err.println("cause="+ex.getCause());
+            assertNotNull("cause",ex.getCause());
             
-            assertTrue(ex.getCause() instanceof IllegalStateException);
+            ex.getCause().printStackTrace();
+            
+            assertTrue(ex.getCause() instanceof NoSuchIndexException);
             
             log.info("Ignoring expected exception: " + ex);
             
@@ -368,15 +374,16 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
             ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
 
-            // @todo use lookup cache in a real client.
+            // lookup the data service (does not use a cache).
             IDataService proxy = lookupDataService(serviceID);
 
             /*
-             * Note: this will throw an exception if the index is not registered
-             * with this data service.
+             * Note: this will be null iff the index is not registered with this
+             * data service.
              */
-            assertEquals("rangeCount", 0, proxy.rangeCount(
-                    IDataService.UNISOLATED, indexName, null, null));
+            
+            assertNotNull("indexUUID", proxy.getIndexUUID(DataService
+                    .getIndexPartitionName(indexName, pmd.getPartitionId())));
 
         }
 

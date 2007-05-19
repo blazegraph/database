@@ -42,28 +42,26 @@ Modifications:
 
 */
 /*
- * Created on Feb 27, 2007
+ * Created on May 17, 2007
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.btree.ReadOnlyIndex;
+package com.bigdata.btree;
 
 /**
- * This class presents a read-only view of an {@link IIsolatableIndex} as an
- * {@link IIsolatedIndex} that is used to masquerade the {@link UnisolatedBTree}
- * within a read-only transaction.
+ * Interface that exposes a counter associated with an index or index partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIsolatedIndex extends ReadOnlyIndex implements IIsolatedIndex {
-
+public interface IIndexWithCounter extends IIndex {
+    
     /**
-     * @param src
+     * A restart-safe counter. For an unpartitioned index, this a single counter
+     * for the entire index and it is stored in the index metadata record. For a
+     * partitioned index, there is a distinct counter for each index partition
+     * and the partition identifier is used as the high int32 bits of the
+     * counter.
      */
-    public ReadOnlyIsolatedIndex(IIsolatableIndex src) {
-        super(src);
-    }
+    public ICounter getCounter();
 
 }

@@ -50,14 +50,14 @@ package com.bigdata.service;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
-
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
+
+import org.apache.log4j.Logger;
 
 /**
  * A mapping from {@link ServiceID} to {@link ServiceItem} that is maintained by

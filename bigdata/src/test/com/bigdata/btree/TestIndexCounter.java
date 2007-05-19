@@ -42,29 +42,49 @@ Modifications:
 
 */
 /*
- * Created on Feb 12, 2007
+ * Created on May 17, 2007
  */
 
 package com.bigdata.btree;
 
 /**
- * A common interface for batch operations. Batch operations can be very
- * efficient if the keys are presented in sorted order and should be used
- * to minimize network traffic.
+ * Test suite for the {@link IIndexWithCounter} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBatchOp {
-    
-    /**
-     * Apply the operation - this method may be used both to define extensible
-     * batch operations and to provide default (un-optimized) implementations of
-     * the batch api that are useful for derived btree implementations with
-     * modified semantics.
-     * 
-     * @param btree
-     */
-    public void apply(ISimpleBTree btree);
+public class TestIndexCounter extends AbstractBTreeTestCase {
 
+    /**
+     * 
+     */
+    public TestIndexCounter() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestIndexCounter(String name) {
+        super(name);
+    }
+
+    public void test_counter() {
+        
+        BTree btree = getBTree(3);
+        
+        ICounter counter = btree.getCounter();
+        
+        // initial value is zero for an unpartitioned index
+        assertEquals(0,counter.get());
+        
+        // get() does not have a side-effect on the counter.
+        assertEquals(0,counter.get());
+        
+        // inc() returns the value and _then_ increments the counter.
+        assertEquals(0,counter.inc());
+        assertEquals(1,counter.get());
+        assertEquals(1,counter.inc());
+
+    }
+    
 }

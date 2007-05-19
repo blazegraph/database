@@ -123,6 +123,19 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * The index that is being isolated by the {@link IsolatedBTree}.
      */
     private final UnisolatedBTree src;
+    
+    /**
+     * The index that is being isolated by the {@link IsolatedBTree}. The use
+     * of this method is <em>strongly</em> discouraged as it requires the
+     * caller to maintain isolation. It is exposed so that methods on classes
+     * derived from {@link UnisolatedBTree} may be accessed within a
+     * transaction.
+     */
+    public UnisolatedBTree getUnisolatedBTree() {
+        
+        return src;
+        
+    }
 
     /**
      * Returns a fully isolated btree suitable for use within a transaction.

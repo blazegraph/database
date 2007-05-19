@@ -49,6 +49,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+
 /**
  * A fly-weight wrapper that does not permit write operations and reads
  * through onto an underlying {@link IIndex}.
@@ -56,13 +57,14 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIndex implements IIndex, IRangeQuery {
+public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
 
     private final IIndex src;
     
     public ReadOnlyIndex(IIndex src) {
         
-        if(src==null) throw new IllegalArgumentException();
+        if (src == null)
+            throw new IllegalArgumentException();
         
         this.src = src;
         
@@ -70,6 +72,22 @@ public class ReadOnlyIndex implements IIndex, IRangeQuery {
 
     public UUID getIndexUUID() {
         return src.getIndexUUID();
+    }
+
+    public ICounter getCounter() {
+        
+        if(src instanceof IIndexWithCounter) {
+        
+            IIndexWithCounter ndx = (IIndexWithCounter) src;
+            
+            return new ReadOnlyCounter(ndx.getCounter());
+            
+        } else {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
     }
     
     public boolean contains(byte[] key) {

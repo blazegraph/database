@@ -56,7 +56,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
 
 /**
- * 
+ * An immutable object whose state describes an index partition.
+ *  
  * @todo provide a persistent event log or just integrate the state changes over
  *       the historical states of the partition description in the metadata
  *       index?

@@ -254,8 +254,14 @@ public class MapReduceService implements IServiceShutdown {
             
             IMetadataService mds = getMetadataService();
             
+            /*
+             * @todo support partitioned metadata indices by reusing the
+             * BigdataClient class here.
+             */
+            final int partitionId = 0;
+            
             final int nentries = mds.rangeCount(IDataService.UNISOLATED, name,
-                    fromKey, toKey);  
+                    partitionId, fromKey, toKey);  
             
             return null;
             

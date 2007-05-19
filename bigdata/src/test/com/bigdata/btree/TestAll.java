@@ -43,9 +43,6 @@ Modifications:
 */
 package com.bigdata.btree;
 
-import com.bigdata.io.TestLongPacker;
-import com.bigdata.io.TestShortPacker;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -132,6 +129,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestSplitJoinThreeLevels.class );
         // test indexOf, keyAt, valueAt.
         suite.addTestSuite( TestLinearListMethods.class );
+        // test getCounter()
+        suite.addTestSuite( TestIndexCounter.class );
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
         // test delete semantics (also see the isolation package).

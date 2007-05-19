@@ -54,7 +54,7 @@ import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.EntryIterator;
-import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rawstore.IRawStore;
@@ -373,7 +373,7 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
     /**
      * @todo test the batch apis. all methods must work with {@link Value}s
      *       (the test for this could be a test of the
-     *       {@link IBatchOp#apply(com.bigdata.btree.ISimpleBTree)}
+     *       {@link IBatchOperation#apply(com.bigdata.btree.ISimpleBTree)}
      *       implementations in the btree package since we apply that method in
      *       a trivial manner to support the batch api.
      */

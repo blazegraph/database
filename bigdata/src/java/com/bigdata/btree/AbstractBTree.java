@@ -1414,4 +1414,85 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
+//    /**
+//     * Configuration options.
+//     * <p>
+//     * Note: This class is {@link Serializable} so that an instance of the class
+//     * may be passed to a remote data service in the scale-out architecture in
+//     * order to provision a btree with the desired options.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class Config implements Serializable {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 1728456753818367361L;
+//
+//        public int branchingFactor;
+//        public int initialBufferCapacity;
+//        public HardReferenceQueue<PO> hardReferenceQueue;
+//        public IAddressSerializer addrSer;
+//        public IValueSerializer valueSer;
+//        public INodeFactory nodeFactory;
+//        public RecordCompressor recordCompressor;
+//        public boolean useChecksum;
+//        public UUID indexUUID;
+//        
+//        /**
+//         * @param branchingFactor
+//         *            The branching factor is the #of children in a node or
+//         *            values in a leaf and must be an integer greater than or
+//         *            equal to three (3). Larger branching factors result in
+//         *            trees with fewer levels. However there is a point of
+//         *            diminishing returns at which the amount of copying
+//         *            performed to move the data around in the nodes and leaves
+//         *            exceeds the performance gain from having fewer levels.
+//         * @param initialBufferCapacity
+//         *            When non-zero, this is the initial buffer capacity used by
+//         *            the {@link NodeSerializer}. When zero the initial buffer
+//         *            capacity will be estimated based on the branching factor,
+//         *            the key serializer, and the value serializer. The initial
+//         *            estimate is not critical and the buffer will be resized by
+//         *            the {@link NodeSerializer} if necessary.
+//         * @param headReferenceQueue
+//         *            The hard reference queue.
+//         * @param addrSer
+//         *            Object that knows how to (de-)serialize the child
+//         *            addresses in an {@link INodeData}.
+//         * @param valueSer
+//         *            Object that knows how to (de-)serialize the values in an
+//         *            {@link ILeafData}.
+//         * @param nodeFactory
+//         *            Object that provides a factory for node and leaf objects.
+//         * @param recordCompressor
+//         *            Object that knows how to (de-)compress serialized nodes
+//         *            and leaves (optional).
+//         * @param useChecksum
+//         *            When true, computes and verifies checksum of serialized
+//         *            nodes and leaves. This option is not recommended for use
+//         *            with a fully buffered store, such as a {@link Journal},
+//         *            since all reads are against memory which is presumably
+//         *            already parity checked.
+//         * @param indexUUID
+//         *            The unique identifier for the index whose data is stored
+//         *            in this B+Tree data structure. When using a scale-out
+//         *            index the same <i>indexUUID</i> MUST be assigned to each
+//         *            mutable and immutable B+Tree having data for any partition
+//         *            of that scale-out index. This makes it possible to work
+//         *            backwards from the B+Tree data structures and identify the
+//         *            index to which they belong.
+//         */
+//        public Config(int branchingFactor,
+//                int initialBufferCapacity,
+//                HardReferenceQueue<PO> hardReferenceQueue,
+//                IAddressSerializer addrSer, IValueSerializer valueSer,
+//                INodeFactory nodeFactory, RecordCompressor recordCompressor,
+//                boolean useChecksum, UUID indexUUID) {
+//        }
+//
+//    }
+
 }

@@ -50,7 +50,7 @@ package com.bigdata.rdf;
 import java.util.Arrays;
 
 import com.bigdata.btree.Errors;
-import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -96,8 +96,10 @@ import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This has been replaced by some code in the test suites.
  */
-abstract public class BatchTermInsertOp implements IBatchOp {
+abstract public class BatchTermInsertOp implements IBatchOperation {
 
 //    /**
 //     * The #of tuples to be processed.

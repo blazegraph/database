@@ -66,20 +66,22 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBatchBTree;
-import com.bigdata.btree.IBatchOp;
+import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ILinearList;
-import com.bigdata.btree.IReadOnlyBatchOp;
+import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ISimpleBTree;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.isolation.IIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.journal.Journal;
 import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.ResourceState;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -118,6 +120,9 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
+ * @todo Validation of partition indices during the PREPARE phase of a
+ *       transaction should proceed in parallel.
+ * 
  * @todo With the change to the submit method, it is now trivial to process
  *       writes on distinct indices mapped on the same data service
  *       concurrently. The can be done as follows: Modify the journal's
@@ -137,6 +142,22 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       index commits are serialized. This preserves consistency and might make
  *       group commit trivial by accepting all commit requests in the commit
  *       queue periodically, e.g., at intervals of no more than 100ms latency.
+ *       <p>
+ *       Note: The commit protocol for indices needs to be modified slightly. As
+ *       it stands, all dirty indices are flushed when the journal commits. In
+ *       order to permit concurrent writes on distinct indices on the same
+ *       journal the protocol must be modified so that an index does not commit
+ *       unless and until the unisolated operation has completed. Failure to
+ *       respect this would result in partial unisolated writes being made
+ *       restart safe. One way to approach this is to default indices to an
+ *       "auto-commit" such that they commit whenever the journal commits.
+ *       Auto-commit would then be turned off for unisolated writes and an
+ *       explicit commit on the index would be required as a pre-condition for
+ *       the index to participate in the journal commit. In practice, it may be
+ *       that "auto-commit" is just a bad idea for named indices and that writes
+ *       should be discarded unless an explicit commit is requested (the
+ *       exception might be certain shared indices, which tend not to be named,
+ *       such as the commit record index itself).
  * 
  * @todo break out a map/reduce service - at least at an interface level. There
  *       is a distinction between map/reduce where the inputs (outputs) are
@@ -166,12 +187,16 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       thread, and perhaps its own top-level service), but index writes will
  *       be distributed across the network to various data services.
  * 
- * @todo should the data service monitor key ranges so that it can readily
- *       reject requests when the index is registered but the key lies outside
- *       of the range of an index partition mapped onto the data service? This
- *       probably needs to happen in order for the data service to be able to
- *       redirect clients if it sheds an index partition while the client has a
- *       lease.
+ * @todo consider that all getIndex() methods on the various tasks should be
+ *       getIndexPartition() methods. The getIndexPartition() method could be
+ *       implemented by a single static helper method. The IIndexPartition could
+ *       cache the partition metadata and optional range check the keys for
+ *       operations on that partition. Consider throwing
+ *       {@link NoSuchIndexException} and {@link NoSuchIndexPartitionException}
+ *       from getIndexPartition().
+ * 
+ * @todo The data service should redirect clients if an index partition has been
+ *       moved (shed) while a client has a lease.
  * 
  * @todo make sure that all service methods that create a {@link Future} do a
  *       get() so that the will block until the serialized task actually runs.
@@ -267,7 +292,7 @@ abstract public class DataService implements IDataService,
 
     IKeyBuilder keyBuilder;
     
-    protected DataServiceJournal journal;
+    protected Journal journal;
 
     public static final transient Logger log = Logger
             .getLogger(DataService.class);
@@ -373,7 +398,7 @@ abstract public class DataService implements IDataService,
          * The journal's write service will be used to handle unisolated writes
          * and transaction commits.
          */
-        journal = new DataServiceJournal(properties);
+        journal = new Journal(properties);
 
         // setup thread pool for unisolated read operations.
         readService = Executors.newFixedThreadPool(readServicePoolSize,
@@ -443,6 +468,21 @@ abstract public class DataService implements IDataService,
      * IDataService.
      */
     
+    /**
+     * Forms the name of the index corresponding to a partition of a named
+     * scale-out index as <i>name</i>#<i>partitionId</i>.
+     * 
+     * @return The name of the index partition.
+     */
+    public static final String getIndexPartitionName(String name,
+            int partitionId) {
+
+        assert name != null;
+
+        return name + "#" + partitionId;
+
+    }
+    
     private boolean isReadOnly(long startTime) {
         
         assert startTime != 0l;
@@ -474,10 +514,13 @@ abstract public class DataService implements IDataService,
         
     }
 
-    public void registerIndex(String name, UUID indexUUID) throws IOException,
-            InterruptedException, ExecutionException {
+    public void registerIndex(String name, UUID indexUUID, String className,
+            Object config) throws IOException, InterruptedException,
+            ExecutionException {
 
-        journal.serialize(new RegisterIndexTask(name, indexUUID)).get();
+        journal.serialize(
+                new RegisterIndexTask(name, indexUUID, className, config))
+                .get();
 
     }
     
@@ -502,28 +545,28 @@ abstract public class DataService implements IDataService,
         
     }
     
-    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
-            throws IOException, InterruptedException, ExecutionException {
-
-        log.info(getServiceUUID() + ", name=" + name + ", partitionId="
-                + pmd.getPartitionId() + ", leftSeparatorKey="
-                + BytesUtil.toString(pmd.getLeftSeparatorKey())
-                + ", rightSeparatorKey="
-                + BytesUtil.toString(pmd.getRightSeparatorKey()));
-        
-        journal.serialize(new MapIndexPartitionTask(name,pmd)).get();
-    
-    }
-
-    /**
-     * @todo implement {@link #unmapPartition(String, int)}
-     */
-    public void unmapPartition(String name, int partitionId)
-            throws IOException, InterruptedException, ExecutionException {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
+//            throws IOException, InterruptedException, ExecutionException {
+//
+//        log.info(getServiceUUID() + ", name=" + name + ", partitionId="
+//                + pmd.getPartitionId() + ", leftSeparatorKey="
+//                + BytesUtil.toString(pmd.getLeftSeparatorKey())
+//                + ", rightSeparatorKey="
+//                + BytesUtil.toString(pmd.getRightSeparatorKey()));
+//        
+//        journal.serialize(new MapIndexPartitionTask(name,pmd)).get();
+//    
+//    }
+//
+//    /**
+//     * @todo implement {@link #unmapPartition(String, int)}
+//     */
+//    public void unmapPartition(String name, int partitionId)
+//            throws IOException, InterruptedException, ExecutionException {
+//
+//        journal.serialize(new UnmapIndexPartitionTask(name,partitionId)).get();
+//        
+//    }
 
     // FIXME modify to allow vals[] as null when index does not use values.
     public byte[][] batchInsert(long tx, String name, int partitionId, int ntuples,
@@ -590,20 +633,8 @@ abstract public class DataService implements IDataService,
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
-     * 
-     * @todo it is possible to have concurrent execution of batch operations for
-     *       distinct indices. In order to support this, the write thread would
-     *       have to become a pool of N worker threads fed from a queue of
-     *       operations. Concurrent writers can execute as long as they are
-     *       writing on different indices. (Concurrent readers can execute as
-     *       long as they are reading from a historical commit time.)
-     * 
-     * @todo probably we should pass in the partitionId as well and we should
-     *       define the exceptions thrown for a partition that is not mapped
-     *       onto the data service and for one that has been "recently" unmapped
-     *       (moved or joined).
      */
-    protected void batchOp(long tx, String name, int partitionId, IBatchOp op)
+    protected void batchOp(long tx, String name, int partitionId, IBatchOperation op)
             throws InterruptedException, ExecutionException {
         
         if( name == null ) throw new IllegalArgumentException();
@@ -612,14 +643,25 @@ abstract public class DataService implements IDataService,
         
         final boolean isolated = tx != 0L;
         
-        final boolean readOnly = (op instanceof IReadOnlyBatchOp)
+        final boolean readOnly = (op instanceof IReadOnlyOperation)
                 || (isolated && isReadOnly(tx));
         
         if(isolated) {
             
-            txService.submit(new TxBatchTask(tx,name,partitionId,op)).get();
+            txService.submit(new TxBatchTask(tx,readOnly,name,partitionId,op)).get();
             
         } else if( readOnly ) {
+            
+            /*
+             * Note: The IReadOnlyOperation is a promise that the procedure will
+             * not write on an index (or anything on the store), but it is NOT a
+             * guarentee.  The guarentee is provided by wrapping the index in a
+             * read-only view.
+             * 
+             * @todo Write tests that demonstrate that writes are rejected if
+             * the proc implements IReadOnlyOperation (same for read-only index
+             * operations).
+             */
             
             readService.submit(new UnisolatedReadBatchTask(name,partitionId,op)).get();
             
@@ -642,34 +684,30 @@ abstract public class DataService implements IDataService,
         
         final boolean isolated = tx != 0L;
         
-        final boolean readOnly = proc instanceof IReadOnlyProcedure;
+        final boolean readOnly = proc instanceof IReadOnlyOperation;
         
         if(isolated) {
             
-            return txService.submit(new TxProcedureTask(tx,name,partitionId,proc)).get();
+            return txService.submit(
+                    new TxProcedureTask(tx, readOnly, name, partitionId, proc))
+                    .get();
             
         } else if( readOnly ) {
             
             /*
-             * FIXME The IReadOnlyInterface is a promise that the procedure will
+             * Note: The IReadOnlyOperation is a promise that the procedure will
              * not write on an index (or anything on the store), but it is NOT a
-             * guarentee. Consider removing that interface and the option to run
-             * unisolated as anything but "read/write" since a "read-only" that
-             * in fact attempted to write could cause problems with the index
-             * data structure. Alternatively, examine other means for running a
-             * "read-only" unisolated store that enforces read-only semantics.
+             * guarentee.  The guarentee is provided by wrapping the index in a
+             * read-only view.
              * 
-             * For example, since the IIndexStore defines only a single method,
-             * getIndex(String), we could provide an implementation of that
-             * method that always selected a historical committed state for the
-             * index. This would make writes impossible since they would be
-             * rejected by the index object itself.
-             * 
-             * Fix this and write tests that demonstrate that writes are
-             * rejected if the proc implements IReadOnlyProcedure.
+             * @todo Write tests that demonstrate that writes are rejected if
+             * the proc implements IReadOnlyOperation (same for read-only index
+             * operations).
              */
             
-            return readService.submit(new UnisolatedReadProcedureTask(name,partitionId,proc)).get();
+            return readService.submit(
+                    new UnisolatedReadProcedureTask(name, partitionId, proc))
+                    .get();
             
         } else {
             
@@ -677,19 +715,23 @@ abstract public class DataService implements IDataService,
              * Special case since incomplete writes MUST be discarded and
              * complete writes MUST be committed.
              */
-            return journal.serialize(new UnisolatedReadWriteProcedureTask(name,partitionId,proc)).get();
+            return journal.serialize(
+                    new UnisolatedReadWriteProcedureTask(name, partitionId,
+                            proc)).get();
             
         }
 
     }
 
-    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-            throws InterruptedException, ExecutionException {
+    public int rangeCount(long tx, String name, int partitionId,
+            byte[] fromKey, byte[] toKey) throws InterruptedException,
+            ExecutionException {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        final RangeCountTask task = new RangeCountTask(tx, name, fromKey, toKey);
+        final RangeCountTask task = new RangeCountTask(tx, name, partitionId,
+                fromKey, toKey);
 
         final boolean isolated = tx != 0L;
 
@@ -698,7 +740,11 @@ abstract public class DataService implements IDataService,
             return (Integer) readService.submit(task).get();
 
         } else {
-            // @todo do unisolated read operations need to get serialized?!?  check rangeQuery also.
+            
+            /*
+             * @todo do unisolated read operations need to get serialized?!?
+             * check rangeQuery also.
+             */
             return (Integer) journal.serialize(task).get();
 
         }
@@ -722,13 +768,14 @@ abstract public class DataService implements IDataService,
      *       or not we need to use the {@link #txService} or the
      *       {@link #readService}
      */
-    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags) throws InterruptedException, ExecutionException {
+    public ResultSet rangeQuery(long tx, String name, int partitionId,
+            byte[] fromKey, byte[] toKey, int capacity, int flags)
+            throws InterruptedException, ExecutionException {
 
         if( name == null ) throw new IllegalArgumentException();
         
-        final RangeQueryTask task = new RangeQueryTask(tx, name, fromKey,
-                toKey, capacity, flags);
+        final RangeQueryTask task = new RangeQueryTask(tx, name, partitionId,
+                fromKey, toKey, capacity, flags);
 
         final boolean isolated = tx != 0L;
         
@@ -780,246 +827,277 @@ abstract public class DataService implements IDataService,
 //            
 //    }
 
-    /**
-     * 
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected abstract class AbstractIndexManagementTask implements Callable<Object> {
-
+    protected abstract class AbstractIndexTask implements Callable<Object> {
+    
+        /**
+         * The transaction identifier -or- 0L iff the operation is not isolated
+         * by a transaction.
+         */
+        protected final long startTime;
+        /**
+         * True iff the operation is isolated by a transaction.
+         */
+        protected final boolean isolated;
+        /**
+         * True iff the operation is not permitted to write.
+         */
+        protected final boolean readOnly;
+        /**
+         * The name of the index.
+         */
         protected final String name;
-
-        protected AbstractIndexManagementTask(String name) {
+        /**
+         * The transaction object iff the operation is isolated by a transaction
+         * and otherwise <code>null</code>. 
+         */
+        protected final ITx tx;
         
+        protected AbstractIndexTask(long startTime,boolean readOnly,String name) {
+
             if(name==null) throw new IllegalArgumentException();
-
+            
+            this.startTime = startTime;
+            
+            this.isolated = startTime != 0L;
+            
+            this.readOnly = readOnly;
+            
             this.name = name;
-        
-        }
 
-    }
-
-    protected class RegisterIndexTask extends AbstractIndexManagementTask {
-
-        protected final UUID indexUUID;
-        
-        public RegisterIndexTask(String name,UUID indexUUID) {
-
-            super(name);
-            
-            if(indexUUID==null) throw new IllegalArgumentException();
-            
-            this.indexUUID = indexUUID;
-            
-        }
-        
-        public Object call() throws Exception {
-
-            IIndex ndx = journal.getIndex(name);
-            
-            if(ndx != null) {
+            if(startTime != 0L) {
                 
-                if(!ndx.getIndexUUID().equals(indexUUID)) {
+                /*
+                 * Isolated read.
+                 */
+                
+                tx = journal.getTx(startTime);
+                
+                if (tx == null) {
+
+                    throw new IllegalStateException("Unknown tx");
                     
-                    throw new IllegalStateException(
-                            "Index already registered with that name and a different indexUUID");
+                }
+                
+                if (!tx.isActive()) {
+                    
+                    throw new IllegalStateException("Tx not active");
+                    
+                }
+                
+            } else {
+                
+                /*
+                 * Unisolated read.
+                 */
+
+                tx = null;
+                
+            }
+
+        }
+
+        /**
+         * Implement the task behavior here.
+         * 
+         * @return The object that will be returned by {@link #call()} iff the
+         *         operation succeeds.
+         * 
+         * @throws Exception
+         *             The exception that will be thrown by {@link #call()} iff
+         *             the operation fails.
+         */
+        abstract protected Object doTask() throws Exception;
+
+        /**
+         * Delegates the task behavior to {@link #doTask()}.
+         * <p>
+         * For an unisolated operation, this method provides safe commit iff the
+         * task succeeds and otherwise invokes abort() so that partial task
+         * executions are properly discarded. When possible, the original
+         * exception is re-thrown so that we do not encapsulate the cause unless
+         * it would violate our throws clause.
+         * <p>
+         * Commit and abort are NOT invoked for an isolated operation regardless
+         * of whether the operation succeeds or fails.  It is the responsibility
+         * of the "client" to commit or abort a transaction as it sees fit.
+         */
+        final public Object call() throws Exception {
+
+            if(isolated) {
+                
+                return doTask();
+                
+            }
+            
+            try {
+
+                Object result = doTask();
+
+                if(!readOnly) {
+                    
+                    // commit (synchronous, immediate).
+                    journal.commit();
                     
                 }
 
-                return ndx;
-                
-            }
-            
-            ndx = journal.registerIndex(name, new UnisolatedBTree(journal,
-                    indexUUID));
+                return result;
 
-            journal.commit();
-            
-            log.info(getServiceUUID() + " - registeredIndex: " + name
-                    + ", indexUUID=" + indexUUID);
-            
-            return ndx;
-            
-        }
-        
-    }
-    
-    protected class DropIndexTask extends AbstractIndexManagementTask {
+            } catch (RuntimeException ex) {
 
-        public DropIndexTask(String name) {
-            
-            super(name);
-            
-        }
-        
-        public Object call() throws Exception {
-
-            journal.dropIndex(name);
-            
-            journal.commit();
-            
-            return null;
-            
-        }
-        
-    }
-    
-    protected class MapIndexPartitionTask extends AbstractIndexManagementTask {
-        
-        private final PartitionMetadataWithSeparatorKeys pmd;
-        
-        public MapIndexPartitionTask(String name, PartitionMetadataWithSeparatorKeys pmd) {
-            
-            super(name);
-           
-            if (pmd == null)
-                throw new IllegalArgumentException();
-            
-            this.pmd = pmd;
-            
-        }
-        
-        public Object call() throws Exception {
-
-            IIndex ndx = journal.getIndex(name);
-            
-            if (ndx == null) {
-
-                throw new NoSuchIndexException(name);
-                
-            }
-            
-            UUID indexUUID = ndx.getIndexUUID();
-
-            /*
-             * Used to construct the key for the partitions index.
-             */
-            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_UUID
-                    + Bytes.SIZEOF_INT);
-
-            byte[] key = keyBuilder.reset().append(indexUUID).append(
-                    pmd.getPartitionId()).getKey();
-            
-            byte[] value = SerializerUtil.serialize(pmd);
-            
-            BTree btree = journal.getPartitionsBTree(); 
-
-            /*
-             * Insert the new partition mapping into the btree.
-             * 
-             * @todo This aborts the unisolated write and throws an exception if
-             * there is already a mapping for that partition. Instead, we could
-             * verify that the mapping is consistent or update an existing
-             * mapping (e.g., if the left-or-right separator key for the
-             * partition was modified).
-             */
-            if (btree.insert(key, value) != null) {
-
-                // throw away the unisolated write on the btree.
+                // abort and do not masquerade the exception.
                 journal.abort();
+
+                throw ex;
                 
-                throw new RuntimeException("Partition already mapped: index="
-                        + name);
-                
+            } catch (Exception ex) {
+
+                // abort and do not masquerade the exception.
+                journal.abort();
+
+                throw ex;
+
+            } catch (Throwable t) {
+
+                // abort and masquerade the Throwable.
+                journal.abort();
+
+                throw new RuntimeException(t);
+
             }
-            
-            journal.commit();
-            
-            return null;
-            
+
         }
-        
+
     }
     
     /**
-     * Abstract class for tasks that execute batch api operations. There are
-     * various concrete subclasses, each of which MUST be submitted to the
-     * appropriate service for execution.
-     * <p>
-     * Note: While this does verify that the first/last key are inside of the
-     * specified index partition, it does not verify that the keys are sorted -
-     * this is the responsibility of the client. Therefore it is possible that
-     * an incorrect client providing unsorted keys could execute an operation
-     * that read or wrote data on the data service that lay outside of the
-     * indicated partitionId.
+     * Abstract class for tasks on an index partition.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected abstract class AbstractBatchTask implements Callable<Object> {
+    public abstract class AbstractIndexPartitionTask extends AbstractIndexTask {
         
-        protected final String name;
         protected final int partitionId;
-        private final IBatchOp op;
-        
-        public AbstractBatchTask(String name, int partitionId, IBatchOp op) {
-
-            this.name = name;
-
-            this.partitionId = partitionId;
+        protected final String indexName;
+        private IIndexWithCounter index = null; // lazily set.
+                
+        public AbstractIndexPartitionTask(long startTime, boolean readOnly,
+                String name, int partitionId) {
             
-            this.op = op;
+            super(startTime,readOnly,name);
+            
+            this.partitionId = partitionId;
+
+            /*
+             * Note: -1 indicates an unpartitioned index.
+             */
+            this.indexName = (partitionId == -1 ? name : getIndexPartitionName(
+                    name, partitionId));
             
         }
         
         /**
-         * A helper method that may be invoked within execution context for the
-         * operation and which returns the partition metadata for the indicated
-         * index and partitionId.
+         * Return an appropriate view of the index for the operation. When the
+         * operation is isolated by a transaction, then the index will be
+         * isolated by the transaction. When the operation is read-only, the
+         * index will be read-only.
          * 
-         * @param ndx
-         *            The index.
-         * @param partitionId
-         *            The partition identifier.
-         *            
-         * @return The de-serialized partition metadata -or- <code>null</code>
-         *         if there is no metadata record for that index partition.
+         * @return The index partition or <code>null</code> if the named index
+         *         does not exist or the identifed index partition is not mapped
+         *         onto the {@link DataService}.
          * 
-         * @throws IOException
+         * @exception NoSuchIndexException
+         *                if the named index does not exist at the time that the
+         *                operation is executed.
          * 
-         * @todo this is always accessing the unisolated version of the
-         *       partitions btree. if we need to also access a historical
-         *       version, then it will need to be resolved using the commit
-         *       record for the appropriate historical timestamp.
+         * @exception NoSuchIndexPartitionException
+         *                if the named index is a partitioned index but the
+         *                partition identifier specified in the operation does
+         *                not correspond to a partition that is mapped onto this
+         *                {@link DataService}.
+         * 
+         * @exception IllegalArgumentException
+         *                if the partition identifier is non-zero for an
+         *                unpartitioned index.
          */
-        protected PartitionMetadataWithSeparatorKeys getPartition(IIndex ndx,
-                int partitionId) throws IOException {
-
-            UUID indexUUID = ndx.getIndexUUID();
-
-            /*
-             * Used to construct the key for the partitions index.
-             */
-            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_UUID
-                    + Bytes.SIZEOF_INT);
+        final public IIndexWithCounter getIndex() {
             
-            byte[] key = keyBuilder.reset().append(indexUUID).append(
-                    partitionId).getKey();
-
-            /*
-             * The unisolated version of the partitions index.
-             */ 
-            byte[] data = (byte[]) journal.getPartitionsBTree().lookup(key);
-
-            if(data==null) {
+            if(index != null) {
                 
-                return null;
+                // Cached value.
+                return index;
                 
             }
-            
-            PartitionMetadataWithSeparatorKeys pmd = (PartitionMetadataWithSeparatorKeys) SerializerUtil
-                    .deserialize(data);
 
-            return pmd;
+            // the name of the index partition.
+            final String name = this.indexName;
+            
+            final IIndexWithCounter tmp;
+            
+            if (isolated) {
+
+                /*
+                 * isolated operation.
+                 */
+                
+                final IIsolatedIndex isolatedIndex = (IIsolatedIndex) tx
+                        .getIndex(name);
+                
+                if (isolatedIndex == null) {
+
+                    throw new NoSuchIndexPartitionException(name, partitionId);
+                    
+                }
+                
+                 tmp = (IIndexWithCounter) isolatedIndex;
+
+            } else {
+
+                /*
+                 * unisolated operation.
+                 */
+                
+                final BTree unisolatedIndex = (BTree) journal.getIndex(name);
+
+                if(unisolatedIndex == null) {
+                    
+                    throw new NoSuchIndexPartitionException(name, partitionId);
+                    
+                }
+                
+                if(readOnly) {
+                    
+                    tmp = new ReadOnlyIndex( unisolatedIndex );
+                    
+                } else {
+                    
+                    tmp = unisolatedIndex;
+                    
+                }
+                
+            }
+
+            index = tmp;
+            
+            return index;
             
         }
-        
+
         /**
          * Verify that the key lies within the partition.
+         * 
+         * @param pmd
+         *            The partition.
+         * @param key
+         *            The key.
+         * 
+         * @exception RuntimeException
+         *                if the key does not lie within the partition.
+         * 
+         * @todo could be moved into {@link UnisolatedBTreePartition}
          */
         protected void checkPartition(PartitionMetadataWithSeparatorKeys pmd,
-                byte[] key) throws IOException {
+                byte[] key) {
 
             assert pmd != null;
             assert key != null;
@@ -1042,60 +1120,311 @@ abstract public class DataService implements IDataService,
             
         }
         
-        abstract IIndex getIndex();
+    }
+    
+    /**
+     * Abstract base class for index management tasks (these tasks are all
+     * unisolated).
+     * <p>
+     * Note: Tasks that register and unregister indices MUST commit before
+     * the change is visible via {@link IJournal#getIndex(String)}
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected abstract class AbstractUnisolatedIndexManagementTask extends AbstractIndexTask {
+
+        protected AbstractUnisolatedIndexManagementTask(boolean readOnly, String name) {
         
-        public Object call() throws Exception {
-
-            IIndex ndx = getIndex();
+            super(0L/*unisolated*/,readOnly, name );
             
-            if (ndx == null)
-                throw new NoSuchIndexException(name);
+        }
 
-            PartitionMetadataWithSeparatorKeys pmd = getPartition(ndx, partitionId);
+    }
+
+    /**
+     * Register a {@link UnisolatedBTree} under the given name and having the
+     * given index UUID.
+     */
+    protected class RegisterIndexTask extends AbstractUnisolatedIndexManagementTask {
+
+        protected final UUID indexUUID;
+        protected final Class cls;
+        protected final Object config;
+        
+        public RegisterIndexTask(String name, UUID indexUUID, String className,
+                Object config) {
+
+            super(false/*readOnly*/,name);
             
-            if(pmd == null) {
+            if (indexUUID == null)
+                throw new IllegalArgumentException();
+
+            if( className == null)
+                throw new IllegalArgumentException();
+            
+            final Class cls;
+            
+            try {
+                // @todo review choice of class loader.
+                cls = Class.forName(className);
                 
-                throw new NoSuchIndexPartitionException(name, partitionId);
+            } catch(Exception ex) {
+                
+                throw new RuntimeException(ex);
                 
             }
             
-            if( op instanceof BatchContains ) {
+            if (!BTree.class.isAssignableFrom(cls)) {
 
-                final int ntuples = ((BatchContains)op).ntuples;
-                final byte[][] keys = ((BatchContains)op).keys;
+                throw new IllegalArgumentException("Class does not extend: "
+                        + BTree.class);
                 
+            }
+            
+            this.indexUUID = indexUUID;
+            
+            this.cls = cls;
+
+            this.config = config;
+            
+        }
+        
+        /**
+         * Registers the named index.
+         * 
+         * @return The newly created index.
+         * 
+         * @exception IndexExistsException
+         *                if there is already an index registered with the same
+         *                name and a different index UUID.
+         */
+        public Object doTask() throws Exception {
+
+            IIndex ndx = journal.getIndex(name);
+            
+            if(ndx != null) {
+                
+                if(!ndx.getIndexUUID().equals(indexUUID)) {
+                    
+                    throw new IndexExistsException(name);
+                    
+                }
+
+                return ndx;
+                
+            }
+
+            if(cls.equals(UnisolatedBTree.class)) {
+
+                ndx = journal.registerIndex(name, new UnisolatedBTree(journal,
+                        indexUUID));
+
+                log.info(getServiceUUID() + " - registered unpartitioned index: name=" + name
+                        + ", indexUUID=" + indexUUID);
+                
+            } else if(cls.equals(UnisolatedBTreePartition.class)) {
+
+                UnisolatedBTreePartition.Config tmp = (UnisolatedBTreePartition.Config) config;
+
+                final int partitionId = tmp.pmd.getPartitionId();
+
+                ndx = journal.registerIndex(name, new UnisolatedBTreePartition(
+                        journal, indexUUID, tmp));
+
+                log.info(getServiceUUID() + " - registered partitioned index: name=" + name
+                        + ", partitionId=" + partitionId + ", indexUUID="
+                        + indexUUID);
+                
+            } else {
+                
+                /*
+                 * @todo Don't know how to configure this kind of btree.  The
+                 * registration should be based on the configuration object.
+                 */
+                throw new UnsupportedOperationException();
+                
+            }
+
+            assert ndx != null;
+            
+            assert journal.getIndex(name) != null;
+            
+            return ndx;
+            
+        }
+        
+    }
+
+    protected class DropIndexTask extends AbstractUnisolatedIndexManagementTask {
+
+        public DropIndexTask(String name) {
+
+            super(false/*readOnly*/,name);
+
+        }
+
+        public Object doTask() throws Exception {
+
+            journal.dropIndex(name);
+            
+            return null;
+     
+        }
+        
+    }
+    
+//    /**
+//     * Maps a new index partition onto this data service.
+//     * <p>
+//     * Note: This method will initialize the partition-local counter to zero(0).
+//     * When a partition fails over from one {@link DataService} to another it is
+//     * already "mapped" in the persistent data on the journal and this method is
+//     * NOT invoked. This method is only invoked when an index partition is being
+//     * created for the first time and mapped onto a specific {@link DataService}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    protected class MapIndexPartitionTask extends AbstractUnisolatedIndexManagementTask {
+//        
+//        private final PartitionMetadataWithSeparatorKeys pmd;
+//        
+//        public MapIndexPartitionTask(String name, PartitionMetadataWithSeparatorKeys pmd) {
+//            
+//            super(false,name);
+//           
+//            if (pmd == null)
+//                throw new IllegalArgumentException();
+//            
+//            this.pmd = pmd;
+//            
+//        }
+//        
+//        public Object doTask() throws Exception {
+//
+//            PartitionedUnisolatedBTree ndx = (PartitionedUnisolatedBTree) journal
+//                    .getIndex(name);
+//            
+//            if (ndx == null) {
+//
+//                throw new NoSuchIndexException(name);
+//                
+//            }
+//
+//            ndx.map(pmd);
+//            
+//            return null;
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    protected class UnmapIndexPartitionTask extends AbstractUnisolatedIndexManagementTask {
+//        
+//        private final int partitionId;
+//        
+//        public UnmapIndexPartitionTask(String name, int partitionId) {
+//            
+//            super(false,name);
+//           
+//            this.partitionId = partitionId;
+//            
+//        }
+//        
+//        public Object doTask() throws Exception {
+//
+//            PartitionedUnisolatedBTree ndx = (PartitionedUnisolatedBTree) journal
+//                    .getIndex(name);
+//            
+//            if (ndx == null) {
+//
+//                throw new NoSuchIndexException(name);
+//                
+//            }
+//
+//            ndx.unmap(partitionId);
+//            
+//            return null;
+//            
+//        }
+//        
+//    }
+    
+    /**
+     * Abstract class for tasks that execute batch api operations. There are
+     * various concrete subclasses, each of which MUST be submitted to the
+     * appropriate service for execution.
+     * <p>
+     * Note: While this does verify that the first/last key are inside of the
+     * specified index partition, it does not verify that the keys are sorted -
+     * this is the responsibility of the client. Therefore it is possible that
+     * an incorrect client providing unsorted keys could execute an operation
+     * that read or wrote data on the data service that lay outside of the
+     * indicated partitionId.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected abstract class AbstractBatchTask extends AbstractIndexPartitionTask {
+        
+        private final IBatchOperation op;
+        
+        public AbstractBatchTask(long startTime, boolean readOnly, String name,
+                int partitionId, IBatchOperation op) {
+
+            super(startTime, readOnly, name, partitionId);
+            
+            if (op == null)
+                throw new IllegalArgumentException();
+            
+            this.op = op;
+            
+        }
+        
+        final protected Object doTask() throws Exception {
+        
+            IIndexWithCounter ndx = getIndex();
+            
+            final int ntuples = op.getTupleCount();
+            
+            final byte[][] keys = op.getKeys();
+
+            if(ndx instanceof UnisolatedBTreePartition) {
+
+                /*
+                 * If this is an index partition, then test the keys against the
+                 * separator keys for the partition. All client keys must lie
+                 * within the partition ( left <= key < right ).
+                 */
+                
+                PartitionMetadataWithSeparatorKeys pmd = ((UnisolatedBTreePartition) ndx)
+                        .getPartitionMetadata();
+             
                 checkPartition(pmd, keys[0]);
+                
                 checkPartition(pmd, keys[ntuples-1]);
+
+            }
+            
+            if( op instanceof BatchContains ) {
 
                 ndx.contains((BatchContains) op);
                 
             } else if( op instanceof BatchLookup ) {
 
-                final int ntuples = ((BatchLookup)op).ntuples;
-                final byte[][] keys = ((BatchLookup)op).keys;
-                
-                checkPartition(pmd, keys[0]);
-                checkPartition(pmd, keys[ntuples-1]);
-
                 ndx.lookup((BatchLookup) op);
 
             } else if( op instanceof BatchInsert ) {
 
-                final int ntuples = ((BatchInsert)op).ntuples;
-                final byte[][] keys = ((BatchInsert)op).keys;
-                
-                checkPartition(pmd, keys[0]);
-                checkPartition(pmd, keys[ntuples-1]);
-
                 ndx.insert((BatchInsert) op);
 
             } else if( op instanceof BatchRemove ) {
-
-                final int ntuples = ((BatchRemove)op).ntuples;
-                final byte[][] keys = ((BatchRemove)op).keys;
-                
-                checkPartition(pmd, keys[0]);
-                checkPartition(pmd, keys[ntuples-1]);
 
                 ndx.remove((BatchRemove) op);
 
@@ -1109,7 +1438,7 @@ abstract public class DataService implements IDataService,
                 op.apply(ndx);
                 
             }
-
+            
             return null;
             
         }
@@ -1143,9 +1472,10 @@ abstract public class DataService implements IDataService,
         
         private final ITx tx;
 
-        public TxBatchTask(long startTime, String name, int partitionId, IBatchOp op) {
+        public TxBatchTask(long startTime, boolean readOnly, String name,
+                int partitionId, IBatchOperation op) {
             
-            super(name,partitionId,op);
+            super(startTime, readOnly, name, partitionId, op);
             
             assert startTime != 0L;
             
@@ -1165,42 +1495,39 @@ abstract public class DataService implements IDataService,
             
         }
 
-        public IIndex getIndex() {
-
-            IIndex ndx = tx.getIndex(name);
-            
-            if(ndx==null) {
-                
-                throw new NoSuchIndexException(name);
-                
-            }
-            
-            return ndx;
-            
-        }
-        
     }
  
+    /**
+     * Class used for unisolated operations.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    abstract protected class AbstractUnisolatedBatchTask extends AbstractBatchTask {
+
+        public AbstractUnisolatedBatchTask(boolean readOnly, String name,
+                int partitionId, IBatchOperation op) {
+            
+            super(0L/*unisolated*/,readOnly,name,partitionId, op);
+            
+        }
+                
+    }
+
     /**
      * Class used for unisolated <em>read</em> operations.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class UnisolatedReadBatchTask extends AbstractBatchTask {
+    protected class UnisolatedReadBatchTask extends AbstractUnisolatedBatchTask {
 
-        public UnisolatedReadBatchTask(String name, int partitionId, IBatchOp op) {
+        public UnisolatedReadBatchTask(String name, int partitionId, IBatchOperation op) {
             
-            super(name,partitionId, op);
+            super(true/*readOnly*/,name,partitionId, op);
             
         }
         
-        public IIndex getIndex() {
-            
-            return journal.getIndex(name);
-
-        }
-
     }
 
     /**
@@ -1213,185 +1540,63 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class UnisolatedBatchReadWriteTask extends UnisolatedReadBatchTask {
+    protected class UnisolatedBatchReadWriteTask extends AbstractUnisolatedBatchTask {
 
-        public UnisolatedBatchReadWriteTask(String name, int partitionId, IBatchOp op) {
+        public UnisolatedBatchReadWriteTask(String name, int partitionId, IBatchOperation op) {
             
-            super(name,partitionId, op);
+            super(false/*readOnly*/,name,partitionId, op);
             
         }
 
-        protected void abort() {
-            
-            journal.abort();
-            
-        }
-        
-        public Long call() throws Exception {
-
-            try {
-
-                super.call();
-                
-                // commit (synchronous, immediate).
-                return journal.commit();
-
-            } catch(RuntimeException ex) {
-                
-                /*
-                 * Do not masquerade a RuntimeException.
-                 */
-                abort();
-                
-                throw ex;
-                
-            } catch(Throwable t) {
-            
-                abort();
-                
-                throw new RuntimeException(t);
-                
-            }
-            
-        }
-        
     }
 
-    protected class RangeCountTask implements Callable<Object> {
+    /**
+     * Task for running a rangeCount operation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class RangeCountTask extends AbstractIndexPartitionTask {
 
-//        // startTime or 0L iff unisolated.
-//        private final long startTime;
-        private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
         
-        private final ITx tx;
-
-        public RangeCountTask(long startTime, String name, byte[] fromKey,
-                byte[] toKey) {
+        public RangeCountTask(long startTime, String name, int partitionId,
+                byte[] fromKey, byte[] toKey) {
             
-//            this.startTime = startTime;
+            super(startTime,true/*readOnly*/,name,partitionId);
             
-            if(startTime != 0L) {
-                
-                /*
-                 * Isolated read.
-                 */
-                
-                tx = journal.getTx(startTime);
-                
-                if (tx == null) {
-
-                    throw new IllegalStateException("Unknown tx");
-                    
-                }
-                
-                if (!tx.isActive()) {
-                    
-                    throw new IllegalStateException("Tx not active");
-                    
-                }
-                
-            } else {
-                
-                /*
-                 * Unisolated read.
-                 */
-
-                tx = null;
-                
-            }
-            
-            this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
             
         }
-        
-        public IIndex getIndex(String name) {
+
+        public Object doTask() throws Exception {
             
-            if(tx==null) {
-             
-                return journal.getIndex(name);
-                
-            } else {
-
-                return tx.getIndex(name);
-                
-            }
-
-        }
-
-        public Object call() throws Exception {
-            
-            IIndex ndx = getIndex(name);
-            
-            if(ndx==null) {
-                
-                throw new IllegalStateException("No such index: "+name);
-                
-            }
-
-            return new Integer(ndx.rangeCount(fromKey, toKey));
+            return new Integer(getIndex().rangeCount(fromKey, toKey));
             
         }
         
     }
 
-    protected class RangeQueryTask implements Callable<Object> {
+    /**
+     * Task for running a rangeQuery operation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class RangeQueryTask extends AbstractIndexPartitionTask {
 
-//        // startTime or 0L iff unisolated.
-//        private final long startTime;
-        private final String name;
         private final byte[] fromKey;
         private final byte[] toKey;
         private final int capacity;
         private final int flags;
         
-        private final ITx tx;
+        public RangeQueryTask(long startTime, String name, int partitionId,
+                byte[] fromKey, byte[] toKey, int capacity, int flags) {
 
-        public RangeQueryTask(long startTime, String name, byte[] fromKey,
-                byte[] toKey, int capacity, int flags) {
+            super(startTime,true/*readOnly*/,name,partitionId);
             
-//            this.startTime = startTime;
-            
-            if(startTime != 0L) {
-                
-                /*
-                 * Isolated read.
-                 */
-                
-                tx = journal.getTx(startTime);
-                
-                if (tx == null) {
-
-                    throw new IllegalStateException("Unknown tx");
-                    
-                }
-                
-                if (!tx.isActive()) {
-                    
-                    throw new IllegalStateException("Tx not active");
-                    
-                }
-                
-//                if( tx.getIsolationLevel() == IsolationEnum.ReadCommitted ) {
-//                    
-//                    throw new UnsupportedOperationException("Read-committed not supported");
-//                    
-//                }
-                
-            } else {
-                
-                /*
-                 * Unisolated read.
-                 */
-
-                tx = null;
-                
-            }
-            
-            this.name = name;
             this.fromKey = fromKey;
             this.toKey = toKey;
             this.capacity = capacity;
@@ -1399,30 +1604,8 @@ abstract public class DataService implements IDataService,
             
         }
         
-        public IIndex getIndex(String name) {
+        public Object doTask() throws Exception {
             
-            if(tx==null) {
-             
-                return journal.getIndex(name);
-                
-            } else {
-
-                return tx.getIndex(name);
-                
-            }
-
-        }
-
-        public Object call() throws Exception {
-            
-            IIndex ndx = getIndex(name);
-            
-            if(ndx==null) {
-                
-                throw new IllegalStateException("No such index: "+name);
-                
-            }
-
             final boolean sendKeys = (flags & KEYS) != 0;
             
             final boolean sendVals = (flags & VALS) != 0;
@@ -1431,8 +1614,8 @@ abstract public class DataService implements IDataService,
              * setup iterator since we will visit keys and/or values in the key
              * range.
              */
-            return new ResultSet(ndx, fromKey, toKey, capacity, sendKeys,
-                    sendVals);
+            return new ResultSet(getIndex(), fromKey, toKey, capacity,
+                    sendKeys, sendVals);
             
         }
         
@@ -1446,34 +1629,27 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected abstract class AbstractProcedureTask implements Callable<Object> {
+    protected abstract class AbstractProcedureTask extends AbstractIndexPartitionTask {
         
-        protected final long startTime;
-        protected final String name;
-        protected final int partitionId;
         protected final IProcedure proc;
         
-        public AbstractProcedureTask(long startTime, String name, int partitionId, IProcedure proc) {
+        public AbstractProcedureTask(long startTime, boolean readOnly,
+                String name, int partitionId, IProcedure proc) {
 
-            assert name != null;
-            assert proc != null;
-            assert partitionId >= 0;
+            super(startTime, readOnly, name, partitionId);
             
-            this.startTime = startTime;
-            this.name = name;
-            this.partitionId = partitionId;
+            assert proc != null;
+            
             this.proc = proc;
             
         }
         
-        /**
-         * Return the index for the operation
-         * 
-         * @return The index or <code>null</code> if the named index does not
-         *         exist.
-         */
-        abstract IIndex getIndex();
-        
+        final public Object doTask() throws Exception {
+
+            return proc.apply(getIndex());
+                        
+        }
+
     }
 
     /**
@@ -1501,82 +1677,62 @@ abstract public class DataService implements IDataService,
      */
     protected class TxProcedureTask extends AbstractProcedureTask {
         
-        private final ITx tx;
+//        private final ITx tx;
 
-        public TxProcedureTask(long startTime, String name, int partitionId, IProcedure proc) {
+        public TxProcedureTask(long startTime, boolean readOnly, String name,
+                int partitionId, IProcedure proc) {
             
-            super(startTime, name, partitionId, proc);
+            super(startTime, readOnly, name, partitionId, proc);
             
-            assert startTime != 0L;
+//            assert startTime != 0L;
+//            
+//            tx = journal.getTx(startTime);
+//            
+//            if (tx == null) {
+//
+//                throw new IllegalStateException("Unknown tx");
+//                
+//            }
+//            
+//            if (!tx.isActive()) {
+//                
+//                throw new IllegalStateException("Tx not active");
+//                
+//            }
             
-            tx = journal.getTx(startTime);
-            
-            if (tx == null) {
-
-                throw new IllegalStateException("Unknown tx");
-                
-            }
-            
-            if (!tx.isActive()) {
-                
-                throw new IllegalStateException("Tx not active");
-                
-            }
-            
-        }
-
-        /**
-         * Returns the isolated index.
-         */
-        final public IIndex getIndex() {
-            
-            return tx.getIndex(name);
-            
-        }
-
-        public Object call() throws Exception {
-
-            IIndex ndx = getIndex();
-            
-            if(ndx==null) {
-                
-                throw new IllegalStateException("No such index: "+name);
-                
-            }
-
-            return proc.apply(ndx);
-                        
         }
 
     }
- 
+    
+    /**
+     * Abstract class for unisolated procedures.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class AbstractUnisolatedProcedureTask extends AbstractProcedureTask {
+
+        public AbstractUnisolatedProcedureTask(boolean readOnly, String name,
+                int partitionId, IProcedure proc) {
+            
+            super(0L/* unisolated */, readOnly, name, partitionId, proc);
+            
+        }
+
+    }
+
     /**
      * Class used for unisolated <em>read</em> operations.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class UnisolatedReadProcedureTask extends AbstractProcedureTask {
+    protected class UnisolatedReadProcedureTask extends AbstractUnisolatedProcedureTask {
 
         public UnisolatedReadProcedureTask(String name, int partitionId, IProcedure proc) {
             
-            super(0L, name, partitionId, proc);
+            super(true/* readOnly */, name, partitionId, proc);
             
-        }
-
-        /**
-         * Returns the unisolated index.
-         */
-        public IIndex getIndex() {
-
-            return journal.getIndex(name);
-            
-        }
-
-        public Object call() throws Exception {
-
-            return proc.apply(getIndex());
-
         }
 
     }
@@ -1591,46 +1747,11 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class UnisolatedReadWriteProcedureTask extends UnisolatedReadProcedureTask {
+    protected class UnisolatedReadWriteProcedureTask extends AbstractUnisolatedProcedureTask {
 
         public UnisolatedReadWriteProcedureTask(String name, int partitionId, IProcedure proc) {
             
-            super(name,partitionId, proc);
-            
-        }
-
-        protected void abort() {
-            
-            journal.abort();
-            
-        }
-        
-        public Object call() throws Exception {
-
-            try {
-
-                Object result = super.call();
-                
-                // commit (synchronous, immediate).
-                journal.commit();
-                
-                return result;
-
-            } catch(Exception ex) {
-                
-                // abort and do not masquerade the exception.
-                abort();
-                
-                throw ex;
-                
-            } catch(Throwable t) {
-            
-                // abort and masquerade the Throwable.
-                abort();
-                
-                throw new RuntimeException(t);
-                
-            }
+            super(false/*readOnly*/,name,partitionId, proc);
             
         }
         
@@ -1643,6 +1764,10 @@ abstract public class DataService implements IDataService,
         throw new UnsupportedOperationException();
     }
 
+    /*
+     * Exceptions.
+     */
+    
     public static class NoSuchIndexException extends RuntimeException {
 
         /**
@@ -1656,7 +1781,6 @@ abstract public class DataService implements IDataService,
         public NoSuchIndexException(String message) {
             super(message);
         }
-
 
     }
     
@@ -1674,6 +1798,44 @@ abstract public class DataService implements IDataService,
          *            The partition identifier.
          */
         public NoSuchIndexPartitionException(String name, int partitionId) {
+
+            super(name+", partitionId="+partitionId);
+            
+        }
+
+    }
+
+    public static class IndexExistsException extends IllegalStateException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2151894480947760726L;
+
+        /**
+         * @param message The index name.
+         */
+        public IndexExistsException(String message) {
+            super(message);
+        }
+
+
+    }
+    
+    public static class IndexPartitionExistsException extends IndexExistsException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -7272309604448771916L;
+
+        /**
+         * @param name
+         *            The index name.
+         * @param partitionId
+         *            The partition identifier.
+         */
+        public IndexPartitionExistsException(String name, int partitionId) {
 
             super(name+", partitionId="+partitionId);
             

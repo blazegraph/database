@@ -42,28 +42,19 @@ Modifications:
 
 */
 /*
- * Created on Feb 27, 2007
+ * Created on Mar 14, 2007
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.btree.ReadOnlyIndex;
+package com.bigdata.btree;
 
 /**
- * This class presents a read-only view of an {@link IIsolatableIndex} as an
- * {@link IIsolatedIndex} that is used to masquerade the {@link UnisolatedBTree}
- * within a read-only transaction.
+ * An index operation that asserts that it will not attempt mutation operations.
+ * The presence of this marker interface is used to impose runtime restrictions
+ * on mutation, e.g., by wrapping the index within a read-only view.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIsolatedIndex extends ReadOnlyIndex implements IIsolatedIndex {
-
-    /**
-     * @param src
-     */
-    public ReadOnlyIsolatedIndex(IIsolatableIndex src) {
-        super(src);
-    }
+public interface IReadOnlyOperation {
 
 }

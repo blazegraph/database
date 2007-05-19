@@ -471,6 +471,9 @@ import com.bigdata.service.DataService.NoSuchIndexException;
          * 
          * @todo write tests to validate this method. refactor the code code
          *       into a utility class for batch index copy.
+         * 
+         * @todo This implementation does not handle a partitioned metadata
+         *       index.
          */
         private MetadataIndex cacheMetadataIndex(String name) throws IOException {
 
@@ -506,14 +509,21 @@ import com.bigdata.service.DataService.NoSuchIndexException;
             ResultSet rset;
 
             byte[] nextKey = null;
+            
+            /*
+             * Note: metadata index is NOT partitioned.
+             * 
+             * @todo Does not support partitioned metadata index.
+             */
+            final int partitionId = IDataService.UNPARTITIONED;
 
             while (true) {
 
                 try {
 
                     rset = metadataService.rangeQuery(IDataService.UNISOLATED,
-                            metadataName, nextKey, null, 1000, IDataService.KEYS
-                                    | IDataService.VALS);
+                        metadataName, partitionId, nextKey, null, 1000,
+                        IDataService.KEYS | IDataService.VALS);
 
                     BigdataClient.log.info("Fetched " + rset.getNumTuples()
                             + " partition records for " + name);

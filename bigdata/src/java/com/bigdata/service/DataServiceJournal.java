@@ -57,10 +57,13 @@ import com.bigdata.scaleup.PartitionMetadata;
 
 /**
  * A specialization of {@link Journal} that maintains some additional state for
- * a {@link DataService} (the partitionsBTree mapped onto that {@link DataService}).
+ * a {@link DataService} (the partitions mapped onto that {@link DataService}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated The additional state is maintained by each
+ *             {@link UnisolatedBTreePartition}
  */
 public class DataServiceJournal extends Journal {
 

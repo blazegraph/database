@@ -343,9 +343,11 @@ public class TestBigdataClient extends AbstractServerTestCase {
     public void test_staticPartitioning() throws Exception {
         
         // Store reference to each data service.
-        final IDataService dataService0 = client.getDataService(dataServer0.getServiceID());
-        
-        final IDataService dataService1 = client.getDataService(dataServer1.getServiceID());
+        final IDataService dataService0 = client.getDataService(dataServer0
+                .getServiceID());
+
+        final IDataService dataService1 = client.getDataService(dataServer1
+                .getServiceID());
         
         // Connect to the federation.
         BigdataFederation fed = (BigdataFederation)client.connect();
@@ -409,8 +411,10 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * data service must have the same indexUUID since they are just
          * components of the same scale-out index.
          */
-        assertIndexRegistered(dataService0, name, indexUUID);
-        assertIndexRegistered(dataService1, name, indexUUID);
+        assertIndexRegistered(dataService0, DataService.getIndexPartitionName(
+                name, partition0), indexUUID);
+        assertIndexRegistered(dataService1, DataService.getIndexPartitionName(
+                name, partition1), indexUUID);
 
         // the index is empty.
         assertFalse(ndx.contains(new byte[]{1}));

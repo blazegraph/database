@@ -53,7 +53,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchInsert implements IBatchOp {
+public class BatchInsert implements IBatchOperation {
 
     /**
      * The #of tuples to be processed.
@@ -75,6 +75,14 @@ public class BatchInsert implements IBatchOp {
      */
     public int tupleIndex = 0;
     
+    public int getTupleCount() {
+        return ntuples;
+    }
+    
+    public byte[][] getKeys() {
+        return keys;
+    }
+
     /**
      * Create a batch insert operation.
      * <p>

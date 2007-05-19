@@ -54,7 +54,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchRemove implements IBatchOp {
+public class BatchRemove implements IBatchOperation {
 
     /**
      * The #of tuples to be processed.
@@ -75,7 +75,15 @@ public class BatchRemove implements IBatchOp {
      * The index of the tuple that is currently being processed.
      */
     public int tupleIndex = 0;
+
+    public int getTupleCount() {
+        return ntuples;
+    }
     
+    public byte[][] getKeys() {
+        return keys;
+    }
+
     /**
      * Create batch remove operation.
      * 
