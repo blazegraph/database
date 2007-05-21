@@ -54,8 +54,9 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
+import com.bigdata.journal.IJournal;
+import com.bigdata.journal.Journal;
 import com.bigdata.scaleup.MasterJournal.Options;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Base class for test suites for inference engine and the magic sets
@@ -66,6 +67,8 @@ import com.bigdata.rawstore.Bytes;
  */
 public class AbstractTripleStoreTestCase extends TestCase2 {
 
+    protected final long NULL = ITripleStore.NULL;
+    
     /**
      * 
      */
@@ -142,7 +145,7 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
         
     }
     
-    public void setUp() throws Exception {
+    protected void setUp() throws Exception {
         
         Properties properties = getProperties();
 
@@ -160,23 +163,35 @@ public class AbstractTripleStoreTestCase extends TestCase2 {
             
         }
 
-        store = new TripleStore(properties);
+        store = new LocalTripleStore(properties);
         
     }
     
     /**
-     * If the store is open, then closes and deletes the store.
+     * If the store is open, then closes the store. If the store is recognized
+     * as using local persistent database ({@link LocalTripleStore}) then the
+     * database is also deleted.
      */
-    public void tearDown() {
+    protected void tearDown() {
 
-        if(store.isOpen()) {
+        if (store instanceof LocalTripleStore) {
+
+            IJournal journal = ((LocalTripleStore) store).getJournal();
+
+            if (journal.isOpen()) {
+
+                journal.closeAndDelete();
+
+            }
+
+        } else {
             
-            store.closeAndDelete();
+            store.close();
             
         }
         
     }
     
-    protected TripleStore store;
+    protected ITripleStore store;
     
 }

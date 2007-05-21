@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
-import java.io.InputStream;
 import java.io.Reader;
 
 import org.apache.log4j.Logger;

@@ -63,7 +63,7 @@ import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.TripleStore.LoadStats;
+import com.bigdata.rdf.rio.LoadStats;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -983,7 +983,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
 //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
 //     * @version $Id$
 //     * 
-//     * @todo we can now this stuff directly for our {@link TripleStore} and that
+//     * @todo we can now this stuff directly for our {@link LocalTripleStore} and that
 //     *       will pose fewer problems than this integration point with Sesame,
 //     *       which works only for a specific patched version of the Sesame code.
 //     */

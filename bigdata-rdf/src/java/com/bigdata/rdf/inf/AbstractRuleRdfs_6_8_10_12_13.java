@@ -44,7 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
 
@@ -62,12 +63,14 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
         
-        byte[] startKey = store.keyBuilder.statement2Key
-            ( body[0].p.id, body[0].o.id, 0
+        final RdfKeyBuilder keyBuilder = store.getKeyBuilder();
+        
+        byte[] startKey = keyBuilder.statement2Key
+            ( body[0].p.id, body[0].o.id, NULL
               );
             
-        byte[] endKey = store.keyBuilder.statement2Key
-            ( body[0].p.id, body[0].o.id+1, 0
+        byte[] endKey = keyBuilder.statement2Key
+            ( body[0].p.id, body[0].o.id+1, NULL
               );
         
         IEntryIterator it = store.getPOSIndex().rangeIterator(startKey, endKey); 
@@ -78,7 +81,7 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
             
             stats.stmts1++;
 
-            SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
+            SPO stmt = new SPO(KeyOrder.POS, keyBuilder, it.getKey());
             
             // @todo review -- should this be substituting stmt.s in each case?
             long _s = head.s.isVar() ? stmt.s : head.s.id;

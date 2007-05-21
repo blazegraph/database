@@ -44,8 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.TripleStore;
 
 
 /**
@@ -92,7 +92,7 @@ abstract public class Rule {
      * @todo use this throughout rather than "0" since the value should really
      *       be an <em>unsigned long</em>.
      */
-    final public long NULL = TripleStore.NULL;
+    final public long NULL = ITripleStore.NULL;
     
     public Rule(InferenceEngine store, Pred head, Pred[] body) {
 

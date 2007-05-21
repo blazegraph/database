@@ -67,6 +67,10 @@ import com.bigdata.btree.IReadOnlyOperation;
  * @version $Id$
  * 
  * @see IReadOnlyOperation
+ * 
+ * @todo refactor into the btree package, abstract away from the data services,
+ *       and remove the exception declaration for
+ *       {@link #apply(IIndexWithCounter)}.
  */
 public interface IProcedure extends Serializable {
 

@@ -43,13 +43,18 @@ Modifications:
 */
 package com.bigdata.rdf;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
  * Aggregates test suites into increasing dependency order.
- *
+ * 
+ * FIXME Each of the tests needs to be run for each of the different
+ * {@link ITripleStore} implementations using a delegated test harness
+ * approach.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -77,13 +82,15 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF");
 
-        suite.addTestSuite( TestRdfKeyBuilder.class );
+        suite.addTest( com.bigdata.rdf.util.TestAll.suite() );
      
+        suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
+
+        suite.addTestSuite( TestTripleStore.class );
+        
         suite.addTestSuite( TestRestartSafe.class );
         
-        suite.addTestSuite( TestInsertRateStore.class);
-
-        suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
+        suite.addTestSuite( TestInsertRate.class);
 
         suite.addTest( com.bigdata.rdf.rio.TestAll.suite() );
 
@@ -95,6 +102,11 @@ public class TestAll extends TestCase {
          */
         suite.addTest( com.bigdata.rdf.sail.TestAll.suite() );
 
+        /*
+         * Note: This test suite sets up a local bigdata federation for
+         * each test.  See the test suite for more information about 
+         * required Java properties.
+         */
         suite.addTest( com.bigdata.rdf.scaleout.TestAll.suite() );
 
         return suite;

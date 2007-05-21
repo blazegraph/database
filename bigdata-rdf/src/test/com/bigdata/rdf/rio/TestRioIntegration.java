@@ -53,8 +53,8 @@ import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.AbstractTripleStore;
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.TripleStore;
 
 /**
  * A test of the RIO integration.
@@ -118,7 +118,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             
         }
         
-        TestRioIntegration test = new TestRioIntegration("TestInsertRateStore");
+        TestRioIntegration test = new TestRioIntegration("TestInsertRate");
         test.setUp();
         test.doTest( new PresortRioLoader(test.store), args );
 //        test.doTest( new BulkRioLoader(test.store), args );
@@ -147,9 +147,10 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      *            list of test resources to be parsed and inserted into the
      *            triple store
      * 
-     * @todo modify {@link TripleStore#loadData(java.io.File)} to chain input
-     *       sources together for better bulk builds rather than using a
-     *       separate loader for each input source.
+     * @todo modify
+     *       {@link AbstractTripleStore#loadData(java.io.File, String, RDFFormat, boolean, boolean)}
+     *       to chain input sources together for better bulk builds rather than
+     *       using a separate loader for each input source.
      */
     public void doTest( IRioLoader loader, final String[] resources ) throws IOException {
 
@@ -220,8 +221,6 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
             }
             
         } // next source to load.
-
-        store.closeAndDelete();
         
 //        long elapsed = System.currentTimeMillis() - begin;
 //        

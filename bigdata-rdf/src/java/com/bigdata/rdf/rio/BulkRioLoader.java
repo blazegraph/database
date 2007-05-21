@@ -64,11 +64,8 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.serializers.RdfValueSerializer;
-import com.bigdata.rdf.serializers.StatementSerializer;
-import com.bigdata.rdf.serializers.TermIdSerializer;
 import com.bigdata.scaleup.MasterJournal;
 
 /**
@@ -117,7 +114,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final TripleStore store;
+    protected final ITripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
@@ -152,13 +149,13 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      */
     BulkLoaderBuffer buffer;
     
-    public BulkRioLoader( TripleStore store ) {
+    public BulkRioLoader( ITripleStore store ) {
     
         this(store, DEFAULT_BUFFER_SIZE );
         
     }
     
-    public BulkRioLoader(TripleStore store, int capacity) {
+    public BulkRioLoader(ITripleStore store, int capacity) {
 
         assert store != null;
         
@@ -236,14 +233,14 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      * statement array.  These should be buffers of a settable size.
      * <p>
      * Once the term buffers are full (or the data is exhausted), the term 
-     * arrays should be sorted and batch inserted into the TripleStore.
+     * arrays should be sorted and batch inserted into the LocalTripleStore.
      * <p>
      * As each term is inserted, its id should be noted in the Value object,
      * so that the statement array is sortable based on term id.
      * <p>
      * Once the statement buffer is full (or the data is exhausted), the 
      * statement array should be sorted and batch inserted into the
-     * TripleStore.  Also the term buffers should be flushed first.
+     * LocalTripleStore.  Also the term buffers should be flushed first.
      * 
      * @param reader
      *                  the RDF/XML source

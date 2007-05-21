@@ -58,9 +58,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.NoSuccessorException;
-import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.RdfKeyBuilder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -70,6 +68,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Filter;
@@ -103,7 +103,7 @@ public class Buffer {
      */
     final Map<_Statement,_Statement> distinctStmtMap;
     
-    protected final TripleStore store;
+    protected final ITripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
@@ -135,7 +135,7 @@ public class Buffer {
      *            When true only distinct terms and statements are stored in the
      *            buffer.
      */
-    public Buffer(TripleStore store, int capacity, boolean distinct) {
+    public Buffer(ITripleStore store, int capacity, boolean distinct) {
     
         this.store = store;
         
@@ -652,7 +652,8 @@ public class Buffer {
     }
 
     /**
-     * Visits the term identifier for all URIs, Literals, and BNodes in their current order.
+     * Visits the term identifier for all URIs, Literals, and BNodes in their
+     * current order.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -660,14 +661,11 @@ public class Buffer {
     public static class TermIdIterator implements IEntryIterator {
 
         private final IStriterator src;
-        private final TripleStore store;
         
         private int nvisited = 0;
         private _Value current = null;
 
         public TermIdIterator(Buffer buffer) {
-            
-            this.store = buffer.store;
             
             src = new Striterator(EmptyIterator.DEFAULT)
                 .append(new TermClassIterator(buffer.uris, buffer.numURIs))
@@ -701,10 +699,6 @@ public class Buffer {
             
         }
 
-        /**
-         * FIXME this assigns a term identifier if one is not found which breaks
-         * down the iterator abstraction.
-         */
         public Object next() {
             
             try {
@@ -721,11 +715,7 @@ public class Buffer {
                 
             }
             
-            if(current.termId == 0L) {
-                
-                current.termId = store.getCounter().nextId();
-                
-            }
+            assert current.termId != ITripleStore.NULL;
             
             return current.termId;
             
@@ -831,7 +821,8 @@ public class Buffer {
 
         public StatementIterator(KeyOrder keyOrder,Buffer buffer) {
             
-            this(keyOrder,buffer.store.keyBuilder,buffer.stmts,buffer.numStmts);
+            this(keyOrder, buffer.store.getKeyBuilder(), buffer.stmts,
+                    buffer.numStmts);
             
         }
         
@@ -927,7 +918,7 @@ public class Buffer {
         
             this.keyOrder = keyOrder;
             
-            this.keyBuilder = buffer.store.keyBuilder;
+            this.keyBuilder = buffer.store.getKeyBuilder();
             
             src = new Striterator(new StatementIterator(keyOrder,buffer))
                     .addFilter(new Filter() {

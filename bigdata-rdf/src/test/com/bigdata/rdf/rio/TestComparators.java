@@ -52,6 +52,9 @@ import java.util.Comparator;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -83,30 +86,55 @@ public class TestComparators extends TestCase2 {
         final long lp1 = 1L;
         final long lmax = Long.MAX_VALUE;
 
-        _Value vmin = new _Literal("a"); vmin.termId = lmin;
-        _Value vm1  = new _Literal("b"); vm1.termId = lm1;
-        _Value v0   = new _Literal("c"); v0.termId = l0;
-        _Value vp1  = new _Literal("d"); vp1.termId = lp1;
-        _Value vmax = new _Literal("e"); vmax.termId = lmax;
+        final _Value vmin = new _Literal("a"); vmin.termId = lmin;
+        final _Value vm1  = new _Literal("b"); vm1.termId = lm1;
+        final _Value v0   = new _Literal("c"); v0.termId = l0;
+        final _Value vp1  = new _Literal("d"); vp1.termId = lp1;
+        final _Value vmax = new _Literal("e"); vmax.termId = lmax;
 
-        long[] ids = new long[] {lm1,lmax,l0,lp1,lmin};
+        // ids out of order.
+        long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };
+        // ids in order.
+        long[] expectedIds = new long[] { lmin, lm1, l0, lp1, lmax };
         
         // values out of order.
-        _Value[] terms = new _Value[] {
+        _Value[] terms = new _Value[] { vmax, vm1, vmin, v0, vp1 };
 
-                vmax,
-                vm1,
-                vmin,
-                v0,
-                vp1
-                
-        };
+        /*
+         * Test conversion of longs to unsigned byte[]s using the KeyBuilder and
+         * verify the order on those unsigned byte[]s.
+         */
+        {
+            byte[][] keys = new byte[actualIds.length][];
+            KeyBuilder keyBuilder = new KeyBuilder(8);
+            for(int i=0; i<actualIds.length; i++) {
+                keys[i] = keyBuilder.reset().append(actualIds[i]).getKey();
+            }
+            Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
+            for(int i=0;i<actualIds.length;i++) {
+                System.err.println(BytesUtil.toString(keys[i]));
+                /*
+                 * Decode and verify sorted into the expected order.
+                 */
+                assertEquals(expectedIds[i], KeyBuilder.decodeLong(keys[i],0));
+            }
+        }
+        
+        /*
+         * Test unsigned long integer comparator.
+         */
+
+        System.err.println("unsorted ids  : "+Arrays.toString(actualIds));
+        Arrays.sort(actualIds);
+        System.err.println("sorted ids    : "+Arrays.toString(actualIds));
+        System.err.println("expected ids  : "+Arrays.toString(expectedIds));
+        assertEquals("ids order",expectedIds,actualIds);
+
+        /*
+         * Test the term identifier comparator.
+         */
         
         Comparator<_Value> c = TermIdComparator.INSTANCE;
-
-        System.err.println("unsorted ids  : "+Arrays.toString(ids));
-        Arrays.sort(ids);
-        System.err.println("sorted ids    : "+Arrays.toString(ids));
 
         System.err.println("unsorted terms: "+Arrays.toString(terms));
         Arrays.sort(terms,c);
@@ -119,5 +147,5 @@ public class TestComparators extends TestCase2 {
         assertTrue("kmin<kmax", c.compare(vmin, vmax) < 0);
 
     }
-
+    
 }

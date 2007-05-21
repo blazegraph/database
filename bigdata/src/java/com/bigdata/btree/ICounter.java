@@ -54,6 +54,8 @@ package com.bigdata.btree;
  * entire index. A partitioned index exposes a counter per index partition and
  * the partition identified forms the high int32 for the counter.
  * 
+ * @see IIndexWithCounter
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

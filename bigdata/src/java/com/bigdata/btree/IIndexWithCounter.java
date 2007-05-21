@@ -57,10 +57,13 @@ public interface IIndexWithCounter extends IIndex {
     
     /**
      * A restart-safe counter. For an unpartitioned index, this a single counter
-     * for the entire index and it is stored in the index metadata record. For a
-     * partitioned index, there is a distinct counter for each index partition
-     * and the partition identifier is used as the high int32 bits of the
-     * counter.
+     * for the entire index with an initial value of zero (0) and it is stored
+     * in the index metadata record. For a partitioned index, there is a
+     * distinct counter for each index partition, the partition identifier is
+     * used as the high int32 bits of the counter, and the low int32 of the
+     * counter has an initial value of zero (0) in each index partition.
+     * 
+     * @todo consider supporting named counters.
      */
     public ICounter getCounter();
 

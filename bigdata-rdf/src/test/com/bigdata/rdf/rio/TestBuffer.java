@@ -53,15 +53,15 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.KeyOrder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.Buffer.UnknownTermIterator;
-import com.bigdata.rdf.rio.Buffer.UnknownStatementIterator;
 import com.bigdata.rdf.rio.Buffer.StatementIterator;
 import com.bigdata.rdf.rio.Buffer.TermClassIterator;
 import com.bigdata.rdf.rio.Buffer.TermIterator;
+import com.bigdata.rdf.rio.Buffer.UnknownStatementIterator;
+import com.bigdata.rdf.rio.Buffer.UnknownTermIterator;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test suite for {@link Buffer}.
@@ -201,7 +201,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         /*
          * assign sort keys for terms.
          */
-        buffer.generateTermSortKeys(store.keyBuilder);
+        buffer.generateTermSortKeys(store.getKeyBuilder());
 
         /*
          * verify sort keys assigned for terms.
@@ -394,7 +394,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         /*
          * generate the term sort keys.
          */
-        buffer.generateTermSortKeys(store.keyBuilder);
+        buffer.generateTermSortKeys(store.getKeyBuilder());
         
         /*
          * sort terms by the assigned sort keys.

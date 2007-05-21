@@ -43,23 +43,31 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Properties;
 
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
+import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Adds support for RDFS inference.
@@ -76,7 +84,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * A rule always has the form:
  * 
  * <pre>
- *    pred :- pred*.
+ *      pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -111,21 +119,26 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * rdfs9 is represented as:
  * 
  * <pre>
- *     triple(?v,rdf:type,?x) :-
- *        triple(?u,rdfs:subClassOf,?x),
- *        triple(?v,rdf:type,?u). 
+ *       triple(?v,rdf:type,?x) :-
+ *          triple(?u,rdfs:subClassOf,?x),
+ *          triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *     triple(?u,rdfs:subClassOf,?x) :-
- *        triple(?u,rdfs:subClassOf,?v),
- *        triple(?v,rdf:subClassOf,?x). 
+ *       triple(?u,rdfs:subClassOf,?x) :-
+ *          triple(?u,rdfs:subClassOf,?v),
+ *          triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo provide option for "owl:sameAs" semantics using destructive merging
+ *       (the terms are assigned the same term identifier, one of them is
+ *       treated as a canonical, and there is no way to retract the sameAs
+ *       assertion).
  * 
  * @todo experiment with use of a bloom filter
  * 
@@ -136,8 +149,22 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  *       entailments (avoid re-computing all entailments already proven in each
  *       pass).
  */
-public class InferenceEngine extends TripleStore {
+public class InferenceEngine implements ITripleStore {
 
+    /**
+     * The delegate.
+     */
+    final protected ITripleStore tripleStore;
+    
+    /**
+     * The delegate {@link ITripleStore}.
+     */
+    public ITripleStore getTripleStore() {
+    
+        return tripleStore;
+        
+    }
+    
     /**
      * Used to assign unique variable identifiers.
      */
@@ -193,9 +220,11 @@ public class InferenceEngine extends TripleStore {
      * @param properties
      * @throws IOException
      */
-    public InferenceEngine(Properties properties) throws IOException {
+    public InferenceEngine(ITripleStore tripleStore) {
 
-        super(properties);
+        if(tripleStore==null) throw new IllegalArgumentException();
+        
+        this.tripleStore = tripleStore;
 
         setup();
 
@@ -279,6 +308,134 @@ public class InferenceEngine extends TripleStore {
 
     }
 
+    public void addStatement(Resource s, URI p, Value o) {
+        tripleStore.addStatement(s, p, o);
+    }
+
+    public void addStatements(_Statement[] stmts, int numStmts) {
+        tripleStore.addStatements(stmts, numStmts);
+    }
+
+    public long addTerm(Value value) {
+        return tripleStore.addTerm(value);
+    }
+
+    public boolean containsStatement(Resource s, URI p, Value o) {
+        return tripleStore.containsStatement(s, p, o);
+    }
+
+    public ArrayList<Long> distinctTermScan(KeyOrder keyOrder) {
+        return tripleStore.distinctTermScan(keyOrder);
+    }
+
+    public void generateSortKeys(RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
+        tripleStore.generateSortKeys(keyBuilder, terms, numTerms);
+    }
+
+    public int getBNodeCount() {
+        return tripleStore.getBNodeCount();
+    }
+
+    public IIndex getIdTermIndex() {
+        return tripleStore.getIdTermIndex();
+    }
+
+    public RdfKeyBuilder getKeyBuilder() {
+        return tripleStore.getKeyBuilder();
+    }
+
+    public int getLiteralCount() {
+        return tripleStore.getLiteralCount();
+    }
+
+    public IIndex getOSPIndex() {
+        return tripleStore.getOSPIndex();
+    }
+
+    public IIndex getPOSIndex() {
+        return tripleStore.getPOSIndex();
+    }
+
+    public Properties getProperties() {
+        return tripleStore.getProperties();
+    }
+
+    public IIndex getSPOIndex() {
+        return tripleStore.getSPOIndex();
+    }
+
+    public int getStatementCount() {
+        return tripleStore.getStatementCount();
+    }
+
+    public IIndex getStatementIndex(KeyOrder keyOrder) {
+        return tripleStore.getStatementIndex(keyOrder);
+    }
+
+    public _Value getTerm(long id) {
+        return tripleStore.getTerm(id);
+    }
+
+    public int getTermCount() {
+        return tripleStore.getTermCount();
+    }
+
+    public long getTermId(Value value) {
+        return tripleStore.getTermId(value);
+    }
+
+    public IIndex getTermIdIndex() {
+        return tripleStore.getTermIdIndex();
+    }
+
+    public int getURICount() {
+        return tripleStore.getURICount();
+    }
+
+    public void insertTerms(_Value[] terms, int numTerms, boolean haveKeys, boolean sorted) {
+        tripleStore.insertTerms(terms, numTerms, haveKeys, sorted);
+    }
+
+    public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat, boolean verifyData, boolean commit) throws IOException {
+        return tripleStore.loadData(file, baseURI, rdfFormat, verifyData, commit);
+    }
+
+    public int rangeCount(long s, long p, long o) {
+        return tripleStore.rangeCount(s, p, o);
+    }
+
+    public IEntryIterator rangeQuery(long s, long p, long o) {
+        return tripleStore.rangeQuery(s, p, o);
+    }
+
+    public int removeStatements(long _s, long _p, long _o) {
+        return tripleStore.removeStatements(_s, _p, _o);
+    }
+
+    public int removeStatements(Resource s, URI p, Value o) {
+        return tripleStore.removeStatements(s, p, o);
+    }
+
+    public String toString(long s, long p, long o) {
+        return tripleStore.toString(s, p, o);
+    }
+
+    public String toString(long termId) {
+        return tripleStore.toString(termId);
+    }
+    
+    public void dumpStore() {
+        tripleStore.dumpStore();
+    }
+
+    public void commit() {
+        tripleStore.commit();
+    }
+    
+    public void close() {
+        tripleStore.close();
+    }
+    
     /**
      * Compute the complete forward closure of the store using a set-at-a-time
      * inference strategy.
@@ -359,7 +516,7 @@ public class InferenceEngine extends TripleStore {
         /*
          * The temporary store used to accumulate the entailments.
          */
-        TempTripleStore tmpStore = new TempTripleStore(); 
+        TempTripleStore tmpStore = new TempTripleStore(getProperties()); 
 
         /*
          * This is a buffer that is used to hold entailments so that we can
@@ -555,6 +712,8 @@ public class InferenceEngine extends TripleStore {
      */
     public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
 
+        final RdfKeyBuilder keyBuilder = getKeyBuilder();
+        
         final int n = ndx.rangeCount(fromKey, toKey);
 
         // buffer for storing the extracted s:p:o data.
@@ -597,7 +756,7 @@ public class InferenceEngine extends TripleStore {
      * FIXME Magic sets has NOT been implemented -- this method does NOT
      * function.
      */
-    public TripleStore query(Triple query, Rule[] rules) throws IOException {
+    public ITripleStore query(Triple query, Rule[] rules) throws IOException {
 
         if (query == null)
             throw new IllegalArgumentException("query is null");
@@ -633,18 +792,14 @@ public class InferenceEngine extends TripleStore {
         /*
          * Run the magic transform.
          */
-
-        Properties answerSetProperties = new Properties();
         
         /*
          * @todo support bufferQueue extension for the transient mode or set the
          * default capacity to something larger.  if things get too large
          * then we need to spill over to disk.
          */
-        answerSetProperties.setProperty(Options.BUFFER_MODE,
-                BufferMode.Transient.toString());
         
-        TripleStore answerSet = new TripleStore(answerSetProperties);
+        ITripleStore answerSet = new TempTripleStore(getProperties());
         
         int lastStatementCount = getStatementCount();
 

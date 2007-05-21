@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.sail;
 
-import com.bigdata.rdf.TripleStore;
 
 /**
  * Additional parameters understood by the Sesame 1.x SAIL implementation.

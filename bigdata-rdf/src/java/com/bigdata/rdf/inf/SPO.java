@@ -43,9 +43,9 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.RdfKeyBuilder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Represents a triple.
@@ -221,7 +221,7 @@ public class SPO {
      * Return a representation of the statement using the term identifiers (the
      * identifers are NOT resolved to terms).
      * 
-     * @see TripleStore#toString(long, long, long)
+     * @see ITripleStore#toString(long, long, long)
      */
     public String toString() {
         

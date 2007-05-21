@@ -45,26 +45,30 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 
 /**
  * A class that models either the identifier for an RDF {@link Value} or a
- * variable. Both value identifier and variables are modeled as a long
- * integer. The {@link TripleStore} assigns positive long integers to
- * values. The inference engine uses negative long integers to denote
- * variables.
+ * variable. Both value identifier and variables are modeled as a long integer.
+ * {@link ITripleStore#addTerm(Value)} assigns positive long integers to values.
+ * The inference engine uses negative long integers to denote variables.
  */
 public class VarOrId {
 
     public long id;
 
     public boolean isVar() {
+        
         return id < 0;
+        
     }
 
     public VarOrId(long id) {
+ 
         assert id != 0L;
+        
         this.id = id;
+        
     }
 
 }
