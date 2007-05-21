@@ -47,15 +47,9 @@ Modifications:
 
 package com.bigdata.rdf.metrics;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.Reader;
 import java.util.Properties;
-import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
 /**

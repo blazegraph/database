@@ -49,7 +49,6 @@ package com.bigdata.rdf.rio;
 
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -57,12 +56,9 @@ import java.util.Arrays;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.RecordCompressor;
-import com.bigdata.io.ByteBufferOutputStream;
-import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -70,9 +66,14 @@ import com.bigdata.rdf.rio.BulkRioLoader.Indices;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Implementation specialized to support bulk index load operations.
+ * 
+ * @todo this needs to be rewritten to support scale-out indices. Also, the bulk
+ *       loader should probably attempt to directly generate index segments
+ *       rather than proceeding through journal overflow operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -129,7 +130,7 @@ public class BulkLoaderBuffer extends Buffer {
      * @param store
      * @param capacity
      */
-    public BulkLoaderBuffer(TripleStore store, int capacity) {
+    public BulkLoaderBuffer(ITripleStore store, int capacity) {
         
         super(store, capacity, true);
         
@@ -238,7 +239,7 @@ public class BulkLoaderBuffer extends Buffer {
     /**
      * Bulk load the buffered data into {@link IndexSegment}s.
      * <p>
-     * The {@link TripleStore} maintain one index to map term:id, one index to
+     * The {@link ITripleStore} maintain one index to map term:id, one index to
      * map id:term, and one index per access path for the statements. For each
      * of these indices we now generate an {@link IndexSegment}.
      * <p>
@@ -268,7 +269,7 @@ public class BulkLoaderBuffer extends Buffer {
     {
         
         // generate sort keys.
-        generateTermSortKeys(store.keyBuilder);
+        generateTermSortKeys(store.getKeyBuilder());
         
         // sort each type of term (URI, Literal, BNode).
         sortTermsBySortKeys();

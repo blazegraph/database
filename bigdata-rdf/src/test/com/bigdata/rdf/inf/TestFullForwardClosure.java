@@ -130,10 +130,6 @@ RuleRdfs13  0   0   0
         
         store.fullForwardClosure();
         
-        store.commit();
-        
-        store.closeAndDelete();
-        
     }
         
 }

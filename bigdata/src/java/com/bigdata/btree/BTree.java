@@ -733,8 +733,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * writing explicit delete markers for each entry in the B+Tree.
      * <p>
      * Note: The {@link IIndexManager} defines methods for registering (adding)
-     * and dropping indices. The {@link IIndexManager#dropIndex(String)} method
-     * should be used to remove a scale-out partitioned index.
+     * and dropping indices vs removing the entries in an individual
+     * {@link BTree}.
      */
     public void removeAll() {
 

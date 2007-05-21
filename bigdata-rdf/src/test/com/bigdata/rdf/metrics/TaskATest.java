@@ -51,13 +51,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.BufferOverflowException;
 
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 
-import com.bigdata.rdf.TripleStore.LoadStats;
+import com.bigdata.rdf.rio.LoadStats;
 
 /**
  * @todo update javadoc.

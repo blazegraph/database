@@ -57,11 +57,9 @@ import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
-import com.bigdata.btree.UnicodeKeyBuilder;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.RdfKeyBuilder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Statement handler for the RIO RDF Parser that a producer-consumer queue to
@@ -75,6 +73,11 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * the statement for each index in turn, and bulk inserts the statements into
  * each index in turn.
  * <p>
+ * 
+ * FIXME This needs to be refactored to create one {@link ITripleStore} client
+ * per worker thread since the individual {@link ITripleStore} clients are NOT
+ * thread-safe (the main issue is that {@link RdfKeyBuilder} is not
+ * thread-safe).
  * 
  * @todo The consumer lags behind the producer. Explore optimizations for the
  *       btree batch api to improve the insert rate.
@@ -96,7 +99,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final TripleStore store;
+    protected final ITripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
@@ -148,13 +151,13 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      */
     Buffer buffer;
     
-    public MultiThreadedPresortRioLoader( TripleStore store ) {
+    public MultiThreadedPresortRioLoader( ITripleStore store ) {
     
         this( store, DEFAULT_BUFFER_SIZE, false );
         
     }
     
-    public MultiThreadedPresortRioLoader( TripleStore store, int capacity, boolean distinct ) {
+    public MultiThreadedPresortRioLoader( ITripleStore store, int capacity, boolean distinct ) {
 
         assert store != null;
         
@@ -168,8 +171,8 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         
         this.buffer = new Buffer(store, capacity, distinct );
        
-        this.keyBuilder = new RdfKeyBuilder(new UnicodeKeyBuilder(store
-                .createCollator(), Bytes.kilobyte32 * 4));
+        this.keyBuilder = store.getKeyBuilder();
+        
     }
     
     public long getStatementsAdded() {
@@ -236,14 +239,14 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      * statement array.  These should be buffers of a settable size.
      * <p>
      * Once the term buffers are full (or the data is exhausted), the term 
-     * arrays should be sorted and batch inserted into the TripleStore.
+     * arrays should be sorted and batch inserted into the LocalTripleStore.
      * <p>
      * As each term is inserted, its id should be noted in the Value object,
      * so that the statement array is sortable based on term id.
      * <p>
      * Once the statement bufferQueue is full (or the data is exhausted), the 
      * statement array should be sorted and batch inserted into the
-     * TripleStore.  Also the term buffers should be flushed first.
+     * LocalTripleStore.  Also the term buffers should be flushed first.
      * 
      * @param reader
      *                  the RDF/XML source

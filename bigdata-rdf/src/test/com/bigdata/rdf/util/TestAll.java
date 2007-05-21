@@ -41,7 +41,7 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.scaleout;
+package com.bigdata.rdf.util;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -49,16 +49,7 @@ import junit.framework.TestSuite;
 
 /**
  * Aggregates test suites into increasing dependency order.
- * <p>
- * Note: The tests in this suite setup a bigdata federation for each test. In
- * order for these tests to succeed you MUST specify at least the following
- * properties to the JVM and have access to the resources in
- * <code>src/resources/config</code>.
- * 
- * <pre>
- * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
- * </pre>
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -78,18 +69,15 @@ public class TestAll extends TestCase {
     }
 
     /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
+     * Returns a test that will run test suites in turn.
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("scale-out");
+        TestSuite suite = new TestSuite("util");
 
-        suite.addTestSuite(TestTermAndIdsIndex.class);
-
-        suite.addTestSuite(TestStatementIndex.class);
-        
+        suite.addTestSuite( TestRdfKeyBuilder.class );
+     
         return suite;
         
     }

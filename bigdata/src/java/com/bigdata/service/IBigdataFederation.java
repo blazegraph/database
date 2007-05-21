@@ -3,12 +3,16 @@ package com.bigdata.service;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IIndexStore;
 
 /**
  * Interface to a bigdata federation.
  *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo reconcile with {@link IIndexManager} and {@link IIndexStore}.
  */
 public interface IBigdataFederation {
 
@@ -72,5 +76,15 @@ public interface IBigdataFederation {
      *         registered with the {@link MetadataService}.
      */
     public IIndex getIndex(long tx, String name);
+    
+    /**
+     * Return the client object that was used to connect to the federation.
+     */
+    public BigdataClient getClient();
 
+    /**
+     * Disconnect from the federation.
+     */
+    public void disconnect();
+    
 }

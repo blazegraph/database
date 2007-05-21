@@ -44,7 +44,6 @@ Modifications:
 package com.bigdata.rdf.serializers;
 
 import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -53,11 +52,11 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rdf.RdfKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.ibm.icu.text.UnicodeCompressor;
 import com.ibm.icu.text.UnicodeDecompressor;
 

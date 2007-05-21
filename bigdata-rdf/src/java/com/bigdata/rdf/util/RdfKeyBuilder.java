@@ -45,7 +45,7 @@ Modifications:
  * Created on Jan 18, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.util;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -56,9 +56,9 @@ import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.scaleout.TestTermAndIdsIndex.AddIds;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -73,6 +73,15 @@ public class RdfKeyBuilder {
 
     public final IKeyBuilder keyBuilder;
     
+    /**
+     * Note: You can pass a {@link KeyBuilder} if you need a light-weight
+     * instance of this class for generating keys for the ids index or the
+     * statement indices. However, if you need to generate keys for the terms
+     * index then you MUST provide an appropriately configured instance of the
+     * {@link UnicodeKeyBuilder}.
+     * 
+     * @param keyBuilder
+     */
     public RdfKeyBuilder(IKeyBuilder keyBuilder) {
         
         this.keyBuilder = keyBuilder;

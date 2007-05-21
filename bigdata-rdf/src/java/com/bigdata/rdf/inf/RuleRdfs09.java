@@ -43,7 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * rdfs9:
@@ -73,11 +73,11 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
      */
     protected SPO[] getStmts2( SPO stmt1 ) {
         
-        byte[] fromKey = store.keyBuilder.statement2Key(store.rdfType.id,
-                stmt1.s, 0);
+        byte[] fromKey = store.getKeyBuilder().statement2Key(store.rdfType.id,
+                stmt1.s, NULL);
 
-        byte[] toKey = store.keyBuilder.statement2Key(store.rdfType.id,
-                stmt1.s + 1, 0);
+        byte[] toKey = store.getKeyBuilder().statement2Key(store.rdfType.id,
+                stmt1.s + 1, NULL);
 
         return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey,
                 toKey);

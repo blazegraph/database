@@ -56,7 +56,7 @@ import com.bigdata.rdf.inf.Rule.Stats;
  */
 abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCase {
 
-    final protected TempTripleStore tmpStore = new TempTripleStore();
+    protected TempTripleStore tmpStore;
     
     final protected Stats stats = new Stats();
     
@@ -64,8 +64,18 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
     
     final protected boolean distinct = false;
     
-    final protected SPOBuffer buffer = new SPOBuffer(tmpStore,capacity,distinct);
+    protected SPOBuffer buffer;
 
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        tmpStore = new TempTripleStore(store.getProperties());
+    
+        buffer = new SPOBuffer(tmpStore,capacity,distinct);
+        
+    }
+    
     /**
      * 
      */

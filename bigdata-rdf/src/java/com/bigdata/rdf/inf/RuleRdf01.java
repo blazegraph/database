@@ -46,7 +46,7 @@ package com.bigdata.rdf.inf;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Rdf1:

@@ -52,11 +52,9 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
@@ -96,18 +94,18 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestInsertRateStore extends AbstractTripleStoreTestCase {
+public class TestInsertRate extends AbstractTripleStoreTestCase {
 
     /**
      * 
      */
-    public TestInsertRateStore() {
+    public TestInsertRate() {
     }
 
     /**
      * @param name
      */
-    public TestInsertRateStore(String name) {
+    public TestInsertRate(String name) {
         super(name);
     }
 
@@ -155,7 +153,7 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
 //      int nliteral = 0;
       int litsize = 300;
     
-        TestInsertRateStore test = new TestInsertRateStore("TestInsertRateStore");
+        TestInsertRate test = new TestInsertRate("TestInsertRate");
         test.setUp();
         test.doTest( nclass, nproperty, nliteral, litsize );
         test.tearDown();
@@ -544,10 +542,6 @@ public class TestInsertRateStore extends AbstractTripleStoreTestCase {
             }
             
         }
-
-        store.commit();
-
-        store.closeAndDelete();
         
         long elapsed = System.currentTimeMillis() - begin;
 

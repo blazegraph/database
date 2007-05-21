@@ -45,7 +45,9 @@ Modifications:
  * Created on Jan 26, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.util;
+
+import com.bigdata.rdf.ITripleStore;
 
 /**
  * Represents the key order used by an index.
@@ -74,17 +76,17 @@ public enum KeyOrder {
         this.order = order;
     }
     
-    private static final long NULL = TripleStore.NULL;
+    private static final long NULL = ITripleStore.NULL;
     
     /**
      * Return the access path that should be used for the triple pattern.
      * 
      * @param s
-     *            The optional subject identifier or {@link TripleStore#NULL}.
+     *            The optional subject identifier or {@link ITripleStore#NULL}.
      * @param p
-     *            The optional subject identifier or {@link TripleStore#NULL}.
+     *            The optional subject identifier or {@link ITripleStore#NULL}.
      * @param o
-     *            The optional subject identifier or {@link TripleStore#NULL}.
+     *            The optional subject identifier or {@link ITripleStore#NULL}.
      * 
      * @return The KeyOrder that identifies the index to use for that triple
      *         pattern.

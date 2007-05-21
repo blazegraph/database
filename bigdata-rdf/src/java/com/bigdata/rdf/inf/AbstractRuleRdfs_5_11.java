@@ -45,8 +45,8 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Abstract rule for chain triple patterns where the object position in the
@@ -86,10 +86,11 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
         final long p = head.p.id;
         
         // the key for that predicate.
-        final byte[] pkey = store.keyBuilder.statement2Key(p, 0, 0);
-        
+        final byte[] pkey = store.getKeyBuilder().statement2Key(p, NULL, NULL);
+
         // the successor of that key.
-        final byte[] pkey1 = store.keyBuilder.statement2Key(p+1, 0, 0);
+        final byte[] pkey1 = store.getKeyBuilder().statement2Key(p + 1, NULL,
+                NULL);
 
         /*
          * Query for the 1st part of the rule.
@@ -135,7 +136,7 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
              * out of the inner loop and continue with the outer loop.
              */ 
             int j = Arrays.binarySearch(stmts1, new SPO(left.o, p,
-                    TripleStore.NULL), SPOComparator.INSTANCE);
+                    ITripleStore.NULL), SPOComparator.INSTANCE);
 
             if (j < 0) {
 

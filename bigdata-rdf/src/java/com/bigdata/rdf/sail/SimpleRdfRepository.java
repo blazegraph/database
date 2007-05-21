@@ -85,7 +85,6 @@ import org.openrdf.sesame.sail.query.GraphPattern;
 import org.openrdf.sesame.sail.query.GraphPatternQuery;
 import org.openrdf.sesame.sail.query.PathExpression;
 import org.openrdf.sesame.sail.query.Query;
-import org.openrdf.sesame.sail.query.QueryOptimizer;
 import org.openrdf.sesame.sail.query.SetOperator;
 import org.openrdf.sesame.sail.query.TriplePattern;
 import org.openrdf.sesame.sail.query.ValueCompare;
@@ -98,8 +97,8 @@ import org.openrdf.sesame.sail.util.SingleStatementIterator;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.KeyOrder;
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.LocalTripleStore;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory;
@@ -107,6 +106,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * A simple Sesame 1.x SAIL integration.
@@ -119,14 +120,14 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * maintenance and you must re-compute the entire closure if you add more data
  * to the store) - use of this method will let you run high level queries using
  * the SAIL with entailments. Only a simple transaction model is supported (no
- * transactional isolation). The {@link TripleStore} uses an embedded write-only
+ * transactional isolation). The {@link LocalTripleStore} uses an embedded write-only
  * {@link Journal} as its store (it does not support distributed scale-out). The
  * namespace management methods and the methods to clear the repository have not
  * been implemented.
  * <p>
  * A custom integration is provided for directly loading data into the triple
  * store with throughput of 20,000+ triples per second - see
- * {@link TripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}.
+ * {@link LocalTripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}.
  * This method lies outside of the SAIL and does NOT rely on the SAIL
  * "transaction" mechanisms. This method does NOT perform RDFS closure - you
  * must explicitly request that yourself, e.g., by specifying
@@ -151,7 +152,7 @@ public class SimpleRdfRepository implements RdfRepository {
     /**
      * The equivilent of a null identifier for an internal RDF Value.
      */
-    protected static final long NULL = TripleStore.NULL;
+    protected static final long NULL = ITripleStore.NULL;
     
     protected OptimizedValueFactory valueFactory;
     protected InferenceEngine tripleStore;
@@ -421,7 +422,7 @@ public class SimpleRdfRepository implements RdfRepository {
         
         tripleStore.commit();
         
-        if(true) tripleStore.dumpStore();
+        if(true) tripleStore.getTripleStore().dumpStore();
         
         transactionStarted = false;
         
@@ -489,7 +490,8 @@ public class SimpleRdfRepository implements RdfRepository {
          */
         if (_s != NULL && _p != NULL && _o != NULL) {
 
-            if( tripleStore.getSPOIndex().contains(tripleStore.keyBuilder.statement2Key(_s, _p, _o))) {
+            if (tripleStore.getSPOIndex().contains(
+                    tripleStore.getKeyBuilder().statement2Key(_s, _p, _o))) {
                 
                 return new SingleStatementIterator(s,p,o);
                 
@@ -521,6 +523,7 @@ public class SimpleRdfRepository implements RdfRepository {
 
         private final KeyOrder keyOrder;
         private final IEntryIterator src;
+        private final RdfKeyBuilder keyBuilder;
         
         public MyStatementIterator(KeyOrder keyOrder,IEntryIterator src) {
             
@@ -531,6 +534,8 @@ public class SimpleRdfRepository implements RdfRepository {
             this.keyOrder = keyOrder;
             
             this.src = src;
+
+            this.keyBuilder = tripleStore.getKeyBuilder();
             
         }
         
@@ -546,7 +551,7 @@ public class SimpleRdfRepository implements RdfRepository {
             src.next();
 
             // unpacks the term identifiers from the key.
-            SPO spo = new SPO(keyOrder, tripleStore.keyBuilder, src.getKey());
+            SPO spo = new SPO(keyOrder, keyBuilder, src.getKey());
             
             // resolves the term identifiers to the terms.
             return new _Statement((_Resource) tripleStore.getTerm(spo.s),
@@ -1093,21 +1098,13 @@ public class SimpleRdfRepository implements RdfRepository {
         
         valueFactory = new OptimizedValueFactory();
         
-        try {
-
-             tripleStore = new InferenceEngine(properties);
-            
-        } catch(IOException ex) {
-            
-            throw new SailInitializationException(ex);
-            
-        }
+        tripleStore = new InferenceEngine(new LocalTripleStore(properties));
         
     }
 
     public void shutDown() {
 
-        tripleStore.shutdown();
+        tripleStore.close();
         
     }
 
@@ -1143,7 +1140,7 @@ public class SimpleRdfRepository implements RdfRepository {
      * This computes the full forward closure of the store and then commits the
      * store. Since incremental closure and truth maintenance are NOT supported,
      * you should load all your data into store using
-     * {@link TripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}
+     * {@link LocalTripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}
      * and then invoke this method to compute the RDFS entailments.
      * <p>
      * This method lies outside of the SAIL and does not rely on the SAIL

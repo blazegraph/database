@@ -45,7 +45,7 @@ Modifications:
  * Created on Jan 18, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.util;
 
 import junit.framework.TestCase2;
 
@@ -55,6 +55,7 @@ import org.openrdf.vocabulary.XmlSchema;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Test suite for construction of variable length unsigned byte[] keys from RDF

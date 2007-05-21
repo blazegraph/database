@@ -45,7 +45,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.KeyOrder;
+import com.bigdata.rdf.util.KeyOrder;
 
 public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
 
@@ -139,10 +139,10 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
         // use the POS index to look up the matches for body[0], the more
         // constrained triple
         
-        byte[] fromKey = store.keyBuilder.statement2Key(body[0].p.id, NULL,
+        byte[] fromKey = store.getKeyBuilder().statement2Key(body[0].p.id, NULL,
                 NULL);
 
-        byte[] toKey = store.keyBuilder.statement2Key(body[0].p.id + 1, NULL,
+        byte[] toKey = store.getKeyBuilder().statement2Key(body[0].p.id + 1, NULL,
                 NULL);
 
         SPO[] stmts = store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey,
@@ -174,9 +174,9 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
          * The subject from stmt1 is in the predicate position for this query.
          */
 
-        byte[] fromKey = store.keyBuilder.statement2Key(stmt1.s, NULL, NULL);
+        byte[] fromKey = store.getKeyBuilder().statement2Key(stmt1.s, NULL, NULL);
 
-        byte[] toKey = store.keyBuilder.statement2Key(stmt1.s + 1, NULL, NULL);
+        byte[] toKey = store.getKeyBuilder().statement2Key(stmt1.s + 1, NULL, NULL);
 
         return store.getStatements(store.getPOSIndex(), KeyOrder.POS, fromKey,
                 toKey);

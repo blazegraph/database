@@ -450,6 +450,10 @@ public class BigdataClient {//implements DiscoveryListener {
 
     /**
      * Terminates various background processes.
+     * 
+     * @todo add IBigdataFederation#disconnect() which disconnects from a
+     *       specific federation. When the client is terminated, first
+     *       disconnect from each federation and then terminate the client.
      */
     public void terminate() {
 

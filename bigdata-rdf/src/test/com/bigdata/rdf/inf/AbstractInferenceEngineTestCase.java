@@ -47,13 +47,11 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import java.io.File;
 import java.util.Properties;
-
-import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
@@ -63,7 +61,7 @@ import com.bigdata.scaleup.MasterJournal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractInferenceEngineTestCase extends TestCase2 {
+public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase {
 
     /**
      * 
@@ -120,34 +118,11 @@ public class AbstractInferenceEngineTestCase extends TestCase2 {
         
     }
     
-    public void setUp() throws Exception {
+    protected void setUp() throws Exception {
         
-        Properties properties = getProperties();
-
-        String filename = properties.getProperty(Options.FILE);
+        super.setUp();
         
-        if( filename != null ) {
-            
-            File file = new File(filename);
-            
-            System.err.println( "store file: " + file.getAbsolutePath() );
-        
-            if(file.exists() && ! file.delete() ) {
-                
-                throw new RuntimeException("Could not delete file: "+file.getAbsoluteFile());
-                
-            }
-            
-        }
-
-        store = new InferenceEngine(properties);
-        
-    }
-    
-    public void tearDown() {
-
-        if (store.isOpen())
-            store.closeAndDelete();
+        this.store = new InferenceEngine(super.store);
         
     }
     

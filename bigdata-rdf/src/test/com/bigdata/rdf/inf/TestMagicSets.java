@@ -50,13 +50,11 @@ package com.bigdata.rdf.inf;
 import java.io.IOException;
 
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.TripleStore;
 
 /**
  * Test suite for inference engine and the magic sets implementation.
@@ -206,8 +204,6 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         store.addStatement(B, rdfsSubClassOf, A);
         store.addStatement(C, rdfsSubClassOf, B);
 
-        store.commit();
-
         assertEquals("statementCount", 5, store.getStatementCount());
         assertTrue(store.containsStatement(x, rdfType, C));
         assertTrue(store.containsStatement(y, rdfType, B));
@@ -224,7 +220,7 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
                 .addTerm(new _URI("http://www.foo.org/A"))));
 
         // Run the queryy.
-        TripleStore answerSet = store.query(query, new Rule[] { store.rdfs9,
+        ITripleStore answerSet = store.query(query, new Rule[] { store.rdfs9,
                 store.rdfs11 });
 
         /*
@@ -234,8 +230,6 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         assertTrue(answerSet.containsStatement(x, rdfType, A));
         assertTrue(answerSet.containsStatement(y, rdfType, A));
         assertTrue(answerSet.containsStatement(z, rdfType, A));
-
-        store.closeAndDelete();
         
     }
     

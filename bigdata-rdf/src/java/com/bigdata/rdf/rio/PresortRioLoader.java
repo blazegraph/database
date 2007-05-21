@@ -43,11 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.rio;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.Reader;
-import java.net.URL;
 import java.util.Iterator;
 import java.util.Vector;
 
@@ -63,12 +59,12 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.rdf.TripleStore;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
  * Statement handler for the RIO RDF Parser that collects values and statements
- * in batches and inserts ordered batches into the {@link TripleStore}.  The
+ * in batches and inserts ordered batches into the {@link ITripleStore}.  The
  * default batch size is large enough to absorb many ontologies in a single
  * batch.
  * 
@@ -89,7 +85,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final TripleStore store;
+    protected final ITripleStore store;
     
     /**
      * The RDF syntax to be parsed.
@@ -139,7 +135,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param store
      *            The store into which to insert the loaded statements.
      */
-    public PresortRioLoader(TripleStore store) {
+    public PresortRioLoader(ITripleStore store) {
         
         this(store, RDFFormat.RDFXML, false /*verifyData*/);
         
@@ -155,7 +151,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param verifyData
      *            Controls the {@link Parser#setVerifyData(boolean)} option.
      */
-    public PresortRioLoader( TripleStore store, RDFFormat rdfFormat, boolean verifyData ) {
+    public PresortRioLoader( ITripleStore store, RDFFormat rdfFormat, boolean verifyData ) {
     
         this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true);
         
@@ -176,7 +172,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      *            Whether or not terms and statements are made distinct in the
      *            buffer.
      */
-    public PresortRioLoader(TripleStore store, RDFFormat rdfFormat,
+    public PresortRioLoader(ITripleStore store, RDFFormat rdfFormat,
             boolean verifyData, int capacity, boolean distinct) {
 
         assert store != null;
@@ -334,13 +330,13 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * statement array. These should be buffers of a settable size.
      * <p>
      * Once the term buffers are full (or the data is exhausted), the term
-     * arrays should be sorted and batch inserted into the TripleStore.
+     * arrays should be sorted and batch inserted into the LocalTripleStore.
      * <p>
      * As each term is inserted, its id should be noted in the Value object, so
      * that the statement array is sortable based on term id.
      * <p>
      * Once the statement buffer is full (or the data is exhausted), the
-     * statement array should be sorted and batch inserted into the TripleStore.
+     * statement array should be sorted and batch inserted into the LocalTripleStore.
      * Also the term buffers should be flushed first.
      * 
      * @param reader

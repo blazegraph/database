@@ -50,12 +50,15 @@ package com.bigdata.rdf.model;
 import java.io.Externalizable;
 import java.util.UUID;
 
-import org.openrdf.vocabulary.XmlSchema;
-
 import junit.framework.TestCase2;
 
+import org.openrdf.vocabulary.XmlSchema;
+
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rdf.model.OptimizedValueFactory.*;
+import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
+import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

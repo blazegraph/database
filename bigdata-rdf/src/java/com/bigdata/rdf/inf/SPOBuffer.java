@@ -51,7 +51,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.bigdata.rdf.TempTripleStore;
-import com.bigdata.rdf.TripleStore;
 import com.bigdata.rdf.rio.Buffer;
 
 /**
@@ -110,6 +109,8 @@ public class SPOBuffer {
      */
     public SPOBuffer(TempTripleStore store, int capacity, boolean distinct) {
     
+        assert store != null;
+        
         this.store = store;
         
         this.capacity = capacity;
