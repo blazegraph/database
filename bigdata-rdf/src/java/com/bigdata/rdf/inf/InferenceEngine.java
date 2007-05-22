@@ -424,6 +424,10 @@ public class InferenceEngine implements ITripleStore {
         return tripleStore.toString(termId);
     }
     
+    public void usage() {
+        tripleStore.usage();
+    }
+    
     public void dumpStore() {
         tripleStore.dumpStore();
     }

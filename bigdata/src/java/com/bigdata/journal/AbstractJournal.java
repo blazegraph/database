@@ -352,13 +352,13 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         val = properties.getProperty(Options.BUFFER_MODE);
 
-        if (val == null) {
+        final BufferMode bufferMode;
+        
+        if (val != null) {
 
-            val = BufferMode.Direct.toString();
+            bufferMode = BufferMode.parse(val);
             
-        }
-
-        BufferMode bufferMode = BufferMode.parse(val);
+        } else bufferMode = Options.DEFAULT_BUFFER_MODE;
 
         System.err.println(Options.BUFFER_MODE+"="+bufferMode);
         

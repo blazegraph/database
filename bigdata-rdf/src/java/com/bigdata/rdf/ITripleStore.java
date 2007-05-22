@@ -410,6 +410,11 @@ public interface ITripleStore {
     public void dumpStore();
 
     /**
+     * Writes out some usage details on System.err.
+     */
+    public void usage();
+    
+    /**
      * A read-only copy of the properties used to configure the
      * {@link ITripleStore}.
      */

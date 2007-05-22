@@ -151,6 +151,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      *       {@link AbstractTripleStore#loadData(java.io.File, String, RDFFormat, boolean, boolean)}
      *       to chain input sources together for better bulk builds rather than
      *       using a separate loader for each input source.
+     * 
+     * @todo modify to use the {@link LoadStats} helper class.
      */
     public void doTest( IRioLoader loader, final String[] resources ) throws IOException {
 
