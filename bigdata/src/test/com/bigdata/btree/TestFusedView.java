@@ -47,10 +47,15 @@ Modifications:
 
 package com.bigdata.btree;
 
+import java.util.UUID;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegmentMerger;
 import com.bigdata.btree.ReadOnlyFusedView;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link ReadOnlyFusedView}.
@@ -75,8 +80,22 @@ public class TestFusedView extends AbstractBTreeTestCase {
 
     public void test_ctor() {
         
-        BTree btree1 = getBTree(3);
-        BTree btree2 = getBTree(3);
+        IRawStore store = new SimpleMemoryRawStore();
+        
+        final int branchingFactor = 3;
+        
+        final UUID indexUUID = UUID.randomUUID();
+        
+        // two btrees with the same indexUUID.
+        BTree btree1 = new BTree(store, branchingFactor, indexUUID,
+                SimpleEntry.Serializer.INSTANCE);
+        
+        BTree btree2 = new BTree(store, branchingFactor, indexUUID,
+                SimpleEntry.Serializer.INSTANCE);
+        
+        // Another btree with a different index UUID.
+        BTree btree3 = new BTree(store, branchingFactor, UUID.randomUUID(),
+                SimpleEntry.Serializer.INSTANCE);
         
         try {
             new ReadOnlyFusedView(null);
@@ -113,6 +132,13 @@ public class TestFusedView extends AbstractBTreeTestCase {
             System.err.println("Ignoring expected exception: "+ex);
         }
                 
+        try {
+            new ReadOnlyFusedView(new AbstractBTree[]{btree1,btree3});
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }
+        
         new ReadOnlyFusedView(new AbstractBTree[]{btree1,btree2});
                 
     }
@@ -144,8 +170,18 @@ public class TestFusedView extends AbstractBTreeTestCase {
         Object v5b = "5b";
         Object v7b = "7b";
         
-        BTree btree1 = getBTree(3);
-        BTree btree2 = getBTree(3);
+        IRawStore store = new SimpleMemoryRawStore();
+        
+        final int branchingFactor = 3;
+        
+        final UUID indexUUID = UUID.randomUUID();
+        
+        // two btrees with the same indexUUID.
+        BTree btree1 = new BTree(store, branchingFactor, indexUUID,
+                SimpleEntry.Serializer.INSTANCE);
+        
+        BTree btree2 = new BTree(store, branchingFactor, indexUUID,
+                SimpleEntry.Serializer.INSTANCE);
 
         ReadOnlyFusedView view = new ReadOnlyFusedView(new AbstractBTree[] { btree1, btree2 });
         
