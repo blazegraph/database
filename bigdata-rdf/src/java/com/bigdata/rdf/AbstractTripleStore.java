@@ -75,6 +75,7 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
@@ -957,7 +958,12 @@ abstract public class AbstractTripleStore implements ITripleStore {
      * @todo the {@link #keyBuilder} is being used, which means that this is NOT
      *       thread safe.
      * 
-     * @todo this is not using the batch btree api.
+     * @todo In order to return the exact #of statements that are being removed
+     *       we have to execute and aggregate a server-side procedure since a
+     *       simple rangeCount will only tell us the upper bound on the #of
+     *       matching statements when using an {@link UnisolatedBTree}.
+     * 
+     * FIXME Use the batch btree api.
      * 
      * @todo write tests.
      */
@@ -994,12 +1000,13 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
         KeyOrder keyOrder = KeyOrder.getKeyOrder(_s, _p, _o);
         
-        // #of matching statements.
-        int rangeCount = rangeCount(_s, _p, _o);
+        // The upper bound on the #of matching statements.
+        final int rangeCount = rangeCount(_s, _p, _o);
         
         SPO[] stmts = new SPO[rangeCount];
 
         // materialize the matching statements.
+        final int nremoved;
         {
             IEntryIterator itr1 = rangeQuery(_s, _p, _o);
 
@@ -1013,7 +1020,8 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
             }
 
-            assert i == rangeCount;
+//            assert i == rangeCount; // Note: Not true with UnisolatedBTree
+            nremoved = i; // The actual #of statements being removed.
         }
 
         /*
@@ -1025,10 +1033,10 @@ abstract public class AbstractTripleStore implements ITripleStore {
                 IIndex ndx = getSPOIndex();
 
                 // Place statements in SPO order.
-                Arrays.sort(stmts, com.bigdata.rdf.inf.SPOComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.SPOComparator.INSTANCE);
 
                 // remove statements from SPO index.
-                for (int i = 0; i < stmts.length; i++) {
+                for (int i = 0; i < nremoved; i++) {
 
                     SPO spo = stmts[i];
 
@@ -1040,11 +1048,12 @@ abstract public class AbstractTripleStore implements ITripleStore {
             {
 
                 IIndex ndx = getPOSIndex();
+                
                 // Place statements in POS order.
-                Arrays.sort(stmts, com.bigdata.rdf.inf.POSComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.POSComparator.INSTANCE);
 
                 // Remove statements from POS index.
-                for (int i = 0; i < stmts.length; i++) {
+                for (int i = 0; i < nremoved; i++) {
 
                     SPO spo = stmts[i];
 
@@ -1059,10 +1068,10 @@ abstract public class AbstractTripleStore implements ITripleStore {
                 IIndex ndx = getOSPIndex();
 
                 // Place statements in OSP order.
-                Arrays.sort(stmts, com.bigdata.rdf.inf.OSPComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.OSPComparator.INSTANCE);
 
                 // Remove statements from OSP index.
-                for (int i = 0; i < stmts.length; i++) {
+                for (int i = 0; i < nremoved; i++) {
 
                     SPO spo = stmts[i];
 
@@ -1074,7 +1083,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
             
         }
 
-        return rangeCount;
+        return nremoved;
 
     }
 
