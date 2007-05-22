@@ -74,6 +74,7 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
@@ -484,11 +485,19 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
         if( val.termId != ITripleStore.NULL ) return val.termId; 
 
-        Long id = (Long) getIdTermIndex().lookup(keyBuilder.value2Key(value));
+        byte[] tmp = (byte[]) getTermIdIndex().lookup(keyBuilder.value2Key(value));
         
-        if( id == null ) return ITripleStore.NULL;
-
-        val.termId = id.longValue();
+        if( tmp == null ) return ITripleStore.NULL;
+        
+        try {
+            
+            val.termId = new DataInputBuffer(tmp).unpackLong();
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
 
         return val.termId;
 
@@ -638,9 +647,12 @@ abstract public class AbstractTripleStore implements ITripleStore {
      * (non-batch api). The terms are inserted into the database iff they are
      * not already defined. The statement is inserted into the database iff it
      * is not already defined.
+     * 
+     * @todo rewrite to use batch lookup on the N>1 terms, where N is the #of
+     *       terms that do not have their termId fields already set.
      */
     final public void addStatement(Resource s, URI p, Value o) {
-
+        
         // assume until disproven.
         boolean termsExist = true;
         
@@ -722,22 +734,21 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
     final public boolean containsStatement(Resource s, URI p, Value o) {
 
-        long _s, _p, _o;
-
-        _s = (s == null ? NULL : getTermId(s));
-        _p = (p == null ? NULL : getTermId(p));
-        _o = (o == null ? NULL : getTermId(o));
-
         /*
-         * If a value was specified and it is not in the terms index then the
-         * statement can not exist in the KB.
+         * Resolve each term to its term identifier.
+         * 
+         * Note: If a value was specified and it is not in the terms index then
+         * the statement can not exist in the KB and the code will return
+         * [false] immediately.
          */
-        if (_s == NULL && s != null)
-            return false;
-        if (_p == NULL && p != null)
-            return false;
-        if (_o == NULL && o != null)
-            return false;
+        final long _s = (s == null ? NULL : getTermId(s));
+        if (_s == NULL && s != null) return false;
+
+        final long _p = (p == null ? NULL : getTermId(p));
+        if (_p == NULL && p != null) return false;
+        
+        final long _o = (o == null ? NULL : getTermId(o));
+        if (_o == NULL && o != null) return false;
         
         /*
          * if all bound, then a slight optimization.
@@ -751,6 +762,10 @@ abstract public class AbstractTripleStore implements ITripleStore {
         /*
          * Choose the access path and test to see if any statements would be
          * visited for that triple pattern.
+         * 
+         * @todo We really need to send a "limit" parameter along with this
+         * request or we could pull back a full buffer of data just to perform
+         * an existence test.
          */
         return rangeQuery(_s,_p,_o).hasNext();
         

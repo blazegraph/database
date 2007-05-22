@@ -61,6 +61,7 @@ import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.ScaleOutTripleStore;
 import com.bigdata.service.IProcedure;
 
@@ -171,7 +172,7 @@ public class AddTerms implements IProcedure, Externalizable {
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
         
-        if (counter.get() == ScaleOutTripleStore.NULL) {
+        if (counter.get() == ITripleStore.NULL) {
             /*
              * Note: we never assign this value as a term identifier.
              */
