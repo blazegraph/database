@@ -249,6 +249,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      * {@link ITripleStore#containsStatement(org.openrdf.model.Resource, org.openrdf.model.URI, org.openrdf.model.Value)}.
      */
     public void test_statements() {
+        
         _URI x = new _URI("http://www.foo.org/x");
         _URI y = new _URI("http://www.foo.org/y");
         _URI z = new _URI("http://www.foo.org/z");
@@ -275,7 +276,21 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         store.addStatement(B, rdfsSubClassOf, A);
         store.addStatement(C, rdfsSubClassOf, B);
 
-        final long x_id = store.getTermId(x); assertTrue(x_id!=NULL);
+        final long x_termId;
+        {
+            
+            /*
+             * Make sure that lookup with a different instance succeeds (this
+             * defeats the caching of the termId on the _Value).
+             */
+
+            x_termId = store.getTermId(new _URI("http://www.foo.org/x"));
+            
+            assertTrue(x_termId != NULL);
+            
+        }
+
+        final long x_id = store.getTermId(x); assertTrue(x_id!=NULL); assertEquals(x_termId,x_id);
         final long y_id = store.getTermId(y); assertTrue(y_id!=NULL);
         final long z_id = store.getTermId(z); assertTrue(z_id!=NULL);
         final long A_id = store.getTermId(A); assertTrue(A_id!=NULL);
