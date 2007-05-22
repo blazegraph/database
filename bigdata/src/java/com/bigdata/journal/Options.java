@@ -75,6 +75,8 @@ public class Options {
      * @see BufferMode#Direct
      * @see BufferMode#Mapped
      * @see BufferMode#Disk
+     * 
+     * @see #DEFAULT_BUFFER_MODE
      */
     public static final String BUFFER_MODE = "bufferMode";
 
@@ -234,6 +236,11 @@ public class Options {
      */
     public static final String TMP_DIR = "tmp.dir";
 
+    /**
+     * The default for the {@link #BUFFER_MODE}.
+     */
+    public final static BufferMode DEFAULT_BUFFER_MODE = BufferMode.Direct;
+    
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.
      */

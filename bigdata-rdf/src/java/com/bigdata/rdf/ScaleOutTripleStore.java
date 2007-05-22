@@ -55,6 +55,7 @@ import java.util.Properties;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.MutableKeyBuffer;
 import com.bigdata.btree.MutableValueBuffer;
@@ -131,23 +132,12 @@ import com.bigdata.service.ClientIndexView.Split;
  *       and closure exists). this will prevent partial reads of data during
  *       data load.
  * 
- * @todo Very large bulk inserts outside of a transactional context while
- *       handling concurrent transactions (re-implement the
- *       {@link BulkRioLoader}). Reconcile as of the commit time of the bulk
- *       insert and you get to do that using efficient compacting sort-merges of
- *       "perfect" bulk index segments. The architecture would perform well on
- *       concurrent apstars style document loading as well as what we might
- *       normally consider a bulk load (a few hundred megabytes of data) within
- *       the normal transaction mechanisms, but if you needed to ingest uniprot
- *       you would want to use a different technique :-) outside of the normal
- *       transactional isolation mechanisms.
- *       <P>
- *       I'm not sure what the right solution is for entailments, e.g., truth
- *       maintenance vs eager closure. Either way, you would definitely want to
- *       avoid tuple at a time processing and batch things up so as to minimize
- *       the #of index tests that you had to do. So, handling entailments and
- *       efficient joins for high-level query languages would be the two places
- *       for more thought.
+ * @todo Very large bulk data load (using the {@link BulkRioLoader} to load
+ *       {@link IndexSegment} directly). Reconcile as of the commit time of the
+ *       bulk insert and you get to do that using efficient compacting
+ *       sort-merges of "perfect" bulk index segments.
+ * 
+ * @todo write utility class to create and pre-partition a federated store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -155,7 +145,7 @@ import com.bigdata.service.ClientIndexView.Split;
 public class ScaleOutTripleStore extends AbstractTripleStore {
 
     private final IBigdataFederation fed;
-    
+
     /**
      * 
      */
@@ -163,72 +153,73 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         // @todo pass in the Unicode configuration.
         super(new Properties());
-        
-        if(fed == null) throw new IllegalArgumentException();
-        
+
+        if (fed == null)
+            throw new IllegalArgumentException();
+
         this.fed = fed;
-        
-//        // Register indices.
-//        fed.registerIndex(name_terms);
-//        fed.registerIndex(name_ids);
-//        fed.registerIndex(name_spo);
-//        fed.registerIndex(name_pos);
-//        fed.registerIndex(name_osp);
-        
+
+        // // Register indices.
+        // fed.registerIndex(name_terms);
+        // fed.registerIndex(name_ids);
+        // fed.registerIndex(name_spo);
+        // fed.registerIndex(name_pos);
+        // fed.registerIndex(name_osp);
+
         // Obtain unisolated views on those indices.
         terms = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                  name_termId);
-          ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                  name_idTerm);
-          spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                  name_spo);
-          pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                  name_pos);
-          osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                  name_osp);
-        
+                name_termId);
+        ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                name_idTerm);
+        spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                name_spo);
+        pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                name_pos);
+        osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                name_osp);
+
     }
     
     /**
      * The terms index.
      */
-    ClientIndexView terms;
+    private ClientIndexView terms;
     
     /**
      * The ids index.
      */
-    ClientIndexView ids;
+    private ClientIndexView ids;
     
     /**
      * The statement indices for a triple store.
      */
-    ClientIndexView spo, pos, osp;
+    private ClientIndexView spo, pos, osp;
     
-    public IIndex getTermIdIndex() {
+    final public IIndex getTermIdIndex() {
         
         return terms;
         
     }
 
-    public IIndex getIdTermIndex() {
+    final public IIndex getIdTermIndex() {
         
         return ids;
         
     }
     
-    public IIndex getSPOIndex() {
+    final public IIndex getSPOIndex() {
         
         return spo;
         
     }
     
-    public IIndex getPOSIndex() {
+    final public IIndex getPOSIndex() {
         
         return pos;
         
     }
     
-    public IIndex getOSPIndex() {
+    final public IIndex getOSPIndex() {
         
         return osp;
         
@@ -501,14 +492,16 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      */
     final public void commit() {
         
+        if(INFO) usage();
+        
     }
     
     /**
-     * Terminates the {@link BigdataClient}.
+     * Disconnects from the {@link IBigdataFederation}.
      */
     final public void close() {
         
-        fed.getClient().terminate();
+        fed.disconnect();
         
     }
     

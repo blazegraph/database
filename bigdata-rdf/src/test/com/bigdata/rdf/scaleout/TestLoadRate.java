@@ -41,63 +41,70 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on May 21, 2007
+ */
+
 package com.bigdata.rdf.scaleout;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.io.File;
+import java.io.IOException;
+
+import org.openrdf.sesame.constants.RDFFormat;
+
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.ScaleOutTripleStore;
+import com.bigdata.rdf.rio.PresortRioLoader;
 
 /**
- * Aggregates test suites into increasing dependency order.
- * <p>
- * Note: The tests in this suite setup a bigdata federation for each test. In
- * order for these tests to succeed you MUST specify at least the following
- * properties to the JVM and have access to the resources in
- * <code>src/resources/config</code>.
+ * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
  * 
- * <pre>
- * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
- * </pre>
+ * @todo try with {@link BufferMode#Disk} when testing on a resource starved
+ *       system (e.g., a laptop).
  * 
- * @todo run the Sesame 1.x SAIL tests for correctness testing
+ * @todo there is no reason for the {@link PresortRioLoader} to do one operation
+ *       per type of term (uri, bnode or literal).  That should just fall out of
+ *       how we partition the indices.
  * 
- * @todo run the LUBM query tests for performance and correctness testing.
+ * @todo partition the terms index at least for literals (by type), URIs, and
+ *       bnodes.
+ * 
+ * @todo partition the ids index every 1M ids.
+ * 
+ * @todo write a test of concurrent load rates using LUBM. This data set is good
+ *       since it reuses the same ontology and will let us scale the #of
+ *       concurrent clients and the #of files to be loaded to an arbitrary
+ *       degree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestLoadRate extends AbstractBigdataFederationTestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestLoadRate() {
     }
 
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestLoadRate(String arg0) {
         super(arg0);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
+    public void test_loadNCIOncology() throws IOException {
 
-        TestSuite suite = new TestSuite("scale-out");
+        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+                false, false /*commit*/);
 
-        suite.addTestSuite(TestTermAndIdsIndex.class);
-
-        suite.addTestSuite(TestStatementIndex.class);
-        
-        suite.addTestSuite(TestLoadRate.class);
-        
-        return suite;
-        
     }
-    
+
+//    protected String[] testData = new String[] {
+//            "data/nciOncology.owl" // nterms := 289844
+////            "data/wordnet_nouns-20010201.rdf"
+////            "data/taxonomy.rdf"
+//            };
+
 }

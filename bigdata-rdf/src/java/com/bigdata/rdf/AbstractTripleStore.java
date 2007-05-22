@@ -70,6 +70,7 @@ import org.openrdf.vocabulary.RDFS;
 import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnicodeKeyBuilder;
@@ -185,8 +186,10 @@ abstract public class AbstractTripleStore implements ITripleStore {
      * @param stmts
      *            An array of statements
      * 
-     * FIXME This must use the batch btree operations to have good performance
-     * with a client-server divide.
+     * @todo the statements could be inserted into each index in parallel. This
+     *       depends on support for concurrent writes on each index within a
+     *       journal that has not been completed.  Doing this in parallel could
+     *       also swamp a resource starved system.
      */
     final public void addStatements(_Statement[] stmts, int numStmts) {
 
@@ -201,12 +204,14 @@ abstract public class AbstractTripleStore implements ITripleStore {
         final long elapsed_POS;
         final long elapsed_OSP;
 
+        final byte[][] keys = new byte[numStmts][];
+        
         System.err.print("Writing " + numStmts + " statements...");
 
         { // SPO
 
             final long beginIndex = System.currentTimeMillis();
-            
+
             IIndex ndx_spo = getSPOIndex();
 
             { // sort
@@ -227,11 +232,21 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
                     final _Statement stmt = stmts[i];
 
-                    ndx_spo.insert(keyBuilder.statement2Key(stmt.s.termId, stmt.p.termId,
-                            stmt.o.termId), null);
-                    
+                    keys[i] = keyBuilder.statement2Key(stmt.s.termId,
+                            stmt.p.termId, stmt.o.termId);
+
                 }
 
+                /*
+                 * @todo allow client to send null for the values when (a) they
+                 * are inserting [null] values under the keys; and (b) they do
+                 * not need the old values back.
+                 */
+                BatchInsert op = new BatchInsert(numStmts, keys,
+                        new byte[numStmts][]);
+                
+                ndx_spo.insert( op );
+                
                 insertTime += System.currentTimeMillis() - _begin;
 
             }
@@ -264,11 +279,19 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
                     final _Statement stmt = stmts[i];
                     
-                    ndx_pos.insert(keyBuilder.statement2Key(stmt.p.termId,
-                            stmt.o.termId, stmt.s.termId), null);
+                    keys[i] = keyBuilder.statement2Key(stmt.p.termId,
+                            stmt.o.termId, stmt.s.termId);
+
+//                    ndx_pos.insert(keyBuilder.statement2Key(stmt.p.termId,
+//                            stmt.o.termId, stmt.s.termId), null);
 
                 }
 
+                BatchInsert op = new BatchInsert(numStmts, keys,
+                        new byte[numStmts][]);
+
+                ndx_pos.insert(op);
+                
                 insertTime += System.currentTimeMillis() - _begin;
                 
             }
@@ -301,10 +324,18 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
                     final _Statement stmt = stmts[i];
 
-                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
-                            stmt.p.termId), null);
+                    keys[i] = keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+                            stmt.p.termId);
+                    
+//                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+//                            stmt.p.termId), null);
 
                 }
+                
+                BatchInsert op = new BatchInsert(numStmts, keys,
+                        new byte[numStmts][]);
+                
+                ndx_osp.insert( op );
                 
                 insertTime += System.currentTimeMillis() - _begin;
 

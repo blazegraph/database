@@ -49,6 +49,7 @@ package com.bigdata.rdf.scaleout;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.ScaleOutTripleStore;
 import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.service.AbstractServerTestCase;
@@ -78,7 +79,7 @@ public class AbstractBigdataFederationTestCase extends TestCase2 {
         super(arg0);
     }
 
-    protected final long NULL = ScaleOutTripleStore.NULL;
+    protected final long NULL = ITripleStore.NULL;
     
     /**
      * Starts in {@link #setUp()}.
