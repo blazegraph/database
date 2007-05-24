@@ -57,6 +57,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -298,6 +299,20 @@ abstract public class DataService implements IDataService,
             .getLogger(DataService.class);
     
     /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    protected int nunisolated = 0;
+    
+    /**
      * Pool of threads for handling unisolated reads.
      */
     final protected ExecutorService readService;
@@ -306,6 +321,11 @@ abstract public class DataService implements IDataService,
      * Pool of threads for handling concurrent transactions.
      */
     final protected ExecutorService txService;
+    
+    /**
+     * Thread printing out periodic service status information (counters).
+     */
+    final protected Thread statusService;
 
     /**
      * Options understood by the {@link DataService}.
@@ -407,6 +427,11 @@ abstract public class DataService implements IDataService,
         // setup thread pool for concurrent transactions.
         txService = Executors.newFixedThreadPool(txServicePoolSize,
                 DaemonThreadFactory.defaultThreadFactory());
+
+        // thread for periodic status messages.
+        statusService = new StatusThread();
+        
+        statusService.start();
         
     }
 
@@ -419,6 +444,8 @@ abstract public class DataService implements IDataService,
         readService.shutdown();
         
         txService.shutdown();
+        
+        statusService.interrupt();
         
         journal.shutdown();
         
@@ -433,11 +460,76 @@ abstract public class DataService implements IDataService,
         readService.shutdownNow();
         
         txService.shutdownNow();
+
+        statusService.interrupt();
         
         journal.close();
         
     }
 
+    /**
+     * Writes out periodic status information about the {@link DataService}.
+     * 
+     * @todo I am not convinced that the shutdown logic is correctly bringing
+     *       down the status thread - what is a more robust way to write the
+     *       status service, e.g., using a scheduled executor service?
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class StatusThread extends Thread {
+        
+        final public long millis = 500;
+        
+        public StatusThread() {
+            
+            setDaemon(true);
+            
+        }
+        
+        public void run() {
+
+            while (true) {
+
+                if(isInterrupted()) {
+                    
+                    System.err.println("Status thread was interrupted(1)");
+                    
+                    return;
+                    
+                }
+                
+                try {
+
+                    Thread.sleep(millis);
+                    
+                    status();
+
+                } catch (InterruptedException ex) {
+
+                    System.err.println("Status thread was interrupted(2)");
+
+                    status();
+
+                    return;
+
+                }
+
+            }
+            
+        }
+        
+        /*
+         * @todo Write out the queue depths, #of operations to date, etc.
+         */
+        public void status() {
+            
+            System.err.println("status: nunisolated="+nunisolated);
+            
+        }
+        
+    }
+    
     /**
      * The unique identifier for this data service - this is used mainly for log
      * messages.
@@ -671,7 +763,11 @@ abstract public class DataService implements IDataService,
              * Special case since incomplete writes MUST be discarded and
              * complete writes MUST be committed.
              */
+            nunisolated++;
+            if(DEBUG)log.debug("nunisolated(inc)="+nunisolated);
             journal.serialize(new UnisolatedBatchReadWriteTask(name,partitionId,op)).get();
+            nunisolated--;
+            if(DEBUG)log.debug("nunisolated(dec)="+nunisolated);
             
         }
         

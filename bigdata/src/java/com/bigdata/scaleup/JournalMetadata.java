@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
+import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.journal.Journal;
@@ -73,28 +74,33 @@ public class JournalMetadata extends AbstractResourceMetadata {
     }
 
     /**
-     * Used to verify that the journal is backed by a file.
+     * Return the file whose contents are the persistent state for the 
+     * journal.
      * 
      * @param journal
      *            The journal.
-     * 
-     * @return The journal.
-     * 
-     * @exception IllegalArgumentException
-     *                if the journal is not persistent.
+     *
+     * @return The file.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if the journal is not persistent.
      */
-    private static Journal assertPersistent(Journal journal) {
-
-        if(journal.getFile()==null) {
-            
-            throw new IllegalArgumentException("Journal is not persistent.");
-            
-        }
+    private static String getFileString(Journal journal) {
+    
+//        if(journal.getFile()==null) {
+//            
+//            throw new IllegalArgumentException("Journal is not persistent.");
+//            
+//        }
         
-        return journal;
+        File file = journal.getFile();
         
+        if(file==null) return "";
+        
+        return file.toString();
+                
     }
-
+    
     /**
      * De-serialization constructor.
      */
@@ -109,7 +115,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
      */
     public JournalMetadata(Journal journal, ResourceState state) {
 
-        super(assertPersistent(journal).getFile().toString(), 0L, state,
+        super(getFileString(journal), 0L, state,
                 journal.getRootBlockView().getUUID());
 
     }
