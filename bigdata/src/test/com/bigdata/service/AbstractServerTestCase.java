@@ -61,6 +61,16 @@ import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
 /**
+ * Abstract base class for tests of remote services.
+ * <p>
+ * Note: jini MUST be running. You can get the jini starter kit and install it
+ * to get jini running.
+ * </p>
+ * 
+ * <pre>
+ * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+ * </pre>
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

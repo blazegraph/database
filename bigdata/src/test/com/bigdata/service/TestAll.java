@@ -93,6 +93,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBigdataClient.class );
 
         /*
+         * Stress test of concurrent clients writing on a single data service.
+         */
+        suite.addTestSuite( StressTestConcurrent.class );
+        
+        /*
          * @todo test correctness when services fail at various points in
          * distributed operations, e.g., during the FSA for registering a
          * scale-out index the data service onto which the first index partition

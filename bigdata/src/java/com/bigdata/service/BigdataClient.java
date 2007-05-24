@@ -304,7 +304,7 @@ public class BigdataClient {//implements DiscoveryListener {
             
         }
         
-        log.info("Found: "+item);
+//        log.info("Found: "+item);
         
         return (IDataService)item.service;
         
