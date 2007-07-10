@@ -660,8 +660,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     public void doStressTest(int ntrials,int nnodes) {
 
         // Some branching factors to choose from.
-        int[] branchingFactors = new int[] { 8, 16, 32, 48, 64, 96, 112, 128,
-                256, 512, 1024 };
+        int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48, 64, 96, 99, 112, 128, 256, 512, 1024, 4096 };
+//        int[] branchingFactors = new int[] {4096};
         
         for (int trial = 0; trial < ntrials; trial++) {
 
@@ -681,6 +681,11 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
                 doRoundTripTest( false, ndx, expected);
                 
             }
+
+            // Show the counters.
+            System.err
+                    .println(((KeyBufferSerializer) ndx.getNodeSerializer().keySerializer).counters
+                            .toString());
             
         }
         

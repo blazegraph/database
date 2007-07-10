@@ -73,6 +73,12 @@ import com.bigdata.service.DataService.NoSuchIndexException;
 /**
  * A client-side view of an index.
  * 
+ * @todo change the {@link IDataService} API so that we can provide custome
+ *       serialization for the various methods. For example, we are relying on
+ *       default marshalling of the arguments for the batch operations. This is
+ *       especially bad since the arguments are things like byte[][] and not
+ *       IKeyBuffer.
+ * 
  * @todo the client does not attempt to obtain a new data service proxy for a
  *       partition if the current proxy fails (no failover).
  * 

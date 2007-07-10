@@ -80,7 +80,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
      * value.
      */
-    static final int DEFAULT_BUFFER_SIZE = 100000;
+    static final int DEFAULT_BUFFER_SIZE = 1000000;
     
     /**
      * Terms and statements are inserted into this store.

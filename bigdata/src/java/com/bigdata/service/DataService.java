@@ -56,6 +56,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -310,7 +311,7 @@ abstract public class DataService implements IDataService,
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    protected int nunisolated = 0;
+    protected volatile int nunisolated = 0;
     
     /**
      * Pool of threads for handling unisolated reads.
