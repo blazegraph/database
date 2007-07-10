@@ -112,7 +112,7 @@ public class RecordCompressor implements Serializable {
      */
     public RecordCompressor(int level) {
 
-        _deflater = new Deflater(Deflater.BEST_SPEED);
+        _deflater = new Deflater(level);
 
     }
 

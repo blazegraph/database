@@ -48,14 +48,11 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.bigdata.btree.ImmutableKeyBuffer;
-import com.bigdata.btree.KeyBufferSerializer;
-import com.bigdata.btree.MutableKeyBuffer;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 
 /**
@@ -138,9 +135,11 @@ public class TestKeyBufferSerializer extends TestAbstractKeyBuffer {
 
         // de-serialize.
         
-        ByteArrayInputStream bais = new ByteArrayInputStream(dos.buf);
+//        ByteArrayInputStream bais = new ByteArrayInputStream(dos.buf);
+//
+//        DataInputStream dis = new DataInputStream(bais);
 
-        DataInputStream dis = new DataInputStream(bais);
+        DataInput dis = new DataInputBuffer(dos.buf,0,dos.len);
 
         ImmutableKeyBuffer actual = (ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
                 .getKeys(dis);
@@ -167,9 +166,9 @@ public class TestKeyBufferSerializer extends TestAbstractKeyBuffer {
 
         // de-serialize again.
         
-        bais = new ByteArrayInputStream(dos.buf);
+//        bais = new ByteArrayInputStream(dos.buf);
 
-        dis = new DataInputStream(bais);
+        dis = new DataInputBuffer(dos.buf,0,dos.len);
 
         actual = (ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
                 .getKeys(dis);

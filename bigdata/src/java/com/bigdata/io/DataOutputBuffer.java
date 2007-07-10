@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.io;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -93,7 +94,7 @@ public class DataOutputBuffer implements DataOutput {
      * @exception IllegalArgumentException
      *                unless the value is non-negative.
      */
-    protected static int assertNonNegative(String msg,int v) {
+    protected static int assertNonNegative(String msg, final int v) {
        
         if(v<0) throw new IllegalArgumentException(msg);
         
@@ -114,7 +115,7 @@ public class DataOutputBuffer implements DataOutput {
      * @param initialCapacity
      *            The initial capacity of the internal byte[].
      */
-    public DataOutputBuffer(int initialCapacity) {
+    public DataOutputBuffer(final int initialCapacity) {
         
         this(0, new byte[assertNonNegative("initialCapacity", initialCapacity)]);
         
@@ -128,7 +129,7 @@ public class DataOutputBuffer implements DataOutput {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    public DataOutputBuffer(int len, byte[] buf) {
+    public DataOutputBuffer(final int len, byte[] buf) {
 
         if (len < 0)
             throw new IllegalArgumentException("len");
@@ -210,7 +211,7 @@ public class DataOutputBuffer implements DataOutput {
      * 
      * @return The old position.
      */
-    final public int position(int pos) {
+    final public int position(final int pos) {
 
         if(pos<0 || pos>=buf.length) throw new IllegalArgumentException();
         
@@ -238,7 +239,7 @@ public class DataOutputBuffer implements DataOutput {
      * @param len
      *            The minimum #of free bytes.
      */
-    final public void ensureFree(int len) {
+    final public void ensureFree(final int len) {
         
         ensureCapacity(this.len + len );
         
@@ -252,7 +253,7 @@ public class DataOutputBuffer implements DataOutput {
      * @param capacity
      *            The minimum #of bytes in the buffer.
      */
-    final public void ensureCapacity(int capacity) {
+    final public void ensureCapacity(final int capacity) {
         
         if(capacity<0) throw new IllegalArgumentException();
 //        assert capacity >= 0;
@@ -285,6 +286,15 @@ public class DataOutputBuffer implements DataOutput {
     }
 
     /**
+     * The capacity of the buffer.
+     */
+    final public int capacity() {
+        
+        return buf.length;
+        
+    }
+    
+    /**
      * Return the new capacity for the buffer (default is always large enough
      * and will normally double the buffer capacity each time it overflows).
      * 
@@ -293,7 +303,7 @@ public class DataOutputBuffer implements DataOutput {
      * 
      * @return The new capacity.
      */
-    protected int extend(int required) {
+    protected int extend(final int required) {
 
         int capacity = Math.max(required, buf.length * 2);
 
@@ -362,7 +372,44 @@ public class DataOutputBuffer implements DataOutput {
         
     }
 
-    final public void write(int b) throws IOException {
+    /**
+     * Read <i>len</i> bytes into the buffer.
+     * 
+     * @param in
+     *            The input source.
+     * @param len
+     *            The #of bytes to read.
+     *            
+     * @throws EOFException
+     *             if the EOF is reached before <i>len</i> bytes have been
+     *             read.
+     * @throws IOException
+     *             if an I/O error occurs.
+     * 
+     * @todo read many bytes at a time.
+     * @todo write test.
+     */
+    final public void write(DataInput in, final int len) throws IOException {
+
+        ensureCapacity(len);
+        
+        int c = 0;
+        
+        byte b;
+        
+        while (c < len) {
+
+            b = in.readByte();
+
+            buf[this.len++] = (byte) (b & 0xff);
+            
+            c++;
+
+        }
+
+    }
+    
+    final public void write(final int b) throws IOException {
 
         if (len + 1 > buf.length)
             ensureCapacity(len + 1);
@@ -371,13 +418,13 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void write(byte[] b) throws IOException {
+    final public void write(final byte[] b) throws IOException {
 
         write(b,0,b.length);
 
     }
 
-    final public void write(byte[] b, int off, int len) throws IOException {
+    final public void write(final byte[] b, final int off, final int len) throws IOException {
 
       ensureFree(len);
       
@@ -387,7 +434,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void writeBoolean(boolean v) throws IOException {
+    final public void writeBoolean(final boolean v) throws IOException {
 
         if (len + 1 > buf.length)
             ensureCapacity(len + 1);
@@ -396,7 +443,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void writeByte(int v) throws IOException {
+    final public void writeByte(final int v) throws IOException {
 
         if (len + 1 > buf.length)
             ensureCapacity(len + 1);
@@ -405,7 +452,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void writeDouble(double d) throws IOException {
+    final public void writeDouble(final double d) throws IOException {
 
         if (len + 8 > buf.length)
             ensureCapacity(len + 8);
@@ -424,7 +471,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void writeFloat(float f) throws IOException {
+    final public void writeFloat(final float f) throws IOException {
 
         if (len + 4 > buf.length)
             ensureCapacity(len + 4);
@@ -438,7 +485,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    final public void writeInt(int v) throws IOException {
+    final public void writeInt(final int v) throws IOException {
 
         if (len + 4 > buf.length)
             ensureCapacity(len + 4);
@@ -488,7 +535,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    public void writeBytes(String s) throws IOException {
+    public void writeBytes(final String s) throws IOException {
 
         int len = s.length();
         
@@ -500,7 +547,7 @@ public class DataOutputBuffer implements DataOutput {
 
     }
 
-    public void writeChars(String s) throws IOException {
+    public void writeChars(final String s) throws IOException {
 
         int len = s.length();
         
@@ -527,7 +574,7 @@ public class DataOutputBuffer implements DataOutput {
      *       side code as soon we as refactor to isolate the client and the
      *       server.
      */
-    public void writeUTF(String str) throws IOException {
+    public void writeUTF(final String str) throws IOException {
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
@@ -577,7 +624,7 @@ public class DataOutputBuffer implements DataOutput {
      * 
      * @return The #of bytes onto which the unsigned long value was packed.
      */
-    final public int packLong( long v ) throws IOException {
+    final public int packLong( final long v ) throws IOException {
         
         /*
          * You can only pack non-negative long values with this method.
@@ -689,7 +736,7 @@ public class DataOutputBuffer implements DataOutput {
      * 
      * @return The #of nibbles in [1:16].
      */
-    static protected final int getNibbleLength( long v )
+    static protected final int getNibbleLength( final long v )
     {
 
         for( int i=56, j=16; i>=0; i-=8, j-=2 ) {
@@ -727,7 +774,7 @@ public class DataOutputBuffer implements DataOutput {
      * 
      * @return The #of bytes into which the value was packed.
      */ 
-    final public int packShort( short v ) throws IOException
+    final public int packShort( final short v ) throws IOException
     {
     
         /*
