@@ -83,6 +83,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.Buffer;
 import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
@@ -552,6 +553,19 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
     }
     
+    /**
+     * The capacity (in triples or terms, which ever comes first) of the
+     * {@link Buffer} used when reading RDF data. The default (1M) is good for
+     * the {@link LocalTripleStore}.
+     * 
+     * @return The buffer capacity.
+     */
+    protected int getDataLoadBufferCapacity() {
+        
+        return 1000000;
+        
+    }
+    
     final public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat,
             boolean verifyData, boolean commit) throws IOException {
 
@@ -561,7 +575,8 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
         log.debug( "loading: " + file.getAbsolutePath() );
         
-        IRioLoader loader = new PresortRioLoader( this, rdfFormat, verifyData );
+        IRioLoader loader = new PresortRioLoader(this, rdfFormat, verifyData,
+                getDataLoadBufferCapacity(), false /* distinct */);
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             
