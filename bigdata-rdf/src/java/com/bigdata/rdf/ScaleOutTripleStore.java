@@ -504,5 +504,18 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         fed.disconnect();
         
     }
+
+    /**
+     * @todo this is temporarily overriden in order to experiment with buffer
+     *       capacity vs data transfer size for batch operations vs data
+     *       compaction techniques for client-service RPC vs breaking down
+     *       within index partition operations to no more than n megabytes per
+     *       operation.
+     */
+    protected int getDataLoadBufferCapacity() {
+        
+        return 100000;
+        
+    }
     
 }
