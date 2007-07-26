@@ -49,6 +49,7 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
+import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -65,15 +66,14 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
- * Abstract base class for a bigdata client.
+ * A client capable of connecting to a distributed bigdata federation using
+ * JNDI.
  * <p>
  * Clients are configured to perform service lookup with a jini group that
  * identifies the bigdata federation. Clients begin by discovering the
@@ -141,10 +141,7 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataClient {//implements DiscoveryListener {
-
-    public static final transient Logger log = Logger
-            .getLogger(BigdataClient.class);
+public class BigdataClient implements IBigdataClient {//implements DiscoveryListener {
 
     /**
      * The label in the {@link Configuration} file for the client configuration
@@ -179,11 +176,11 @@ public class BigdataClient {//implements DiscoveryListener {
     private ServiceItemFilter dataServiceFilter = new MetadataServer.DataServiceFilter();
 
     /**
-     * Return the {@link MetadataService} from the cache. If there is a cache
-     * miss, then this will wait a bit for a {@link MetadataService} to show up
+     * Return the {@link IMetadataService} from the cache. If there is a cache
+     * miss, then this will wait a bit for a {@link IMetadataService} to show up
      * in the cache before reporting failure.
      * 
-     * @return The {@link MetadataService} or <code>null</code> if none was
+     * @return The {@link IMetadataService} or <code>null</code> if none was
      *         found.
      * 
      * @throws InterruptedException
@@ -254,11 +251,15 @@ public class BigdataClient {//implements DiscoveryListener {
      * 
      * @param serviceID
      *            The identifier for a {@link DataService}.
-     *            
+     * 
      * @return The proxy for that {@link DataService} or <code>null</code> iff
      *         the {@link DataService} could not be discovered.
+     * 
+     * @todo change to accept the UUID so that JINI may be encapsulated.
      */
-    public IDataService getDataService(ServiceID serviceID) {
+    public IDataService getDataService(UUID serviceUUID) {
+        
+        ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
         
         ServiceItem item = dataServiceMap.getDataServiceByID(serviceID);
         
@@ -457,6 +458,12 @@ public class BigdataClient {//implements DiscoveryListener {
      */
     public void terminate() {
 
+        if( fed != null ) {
+            
+            fed.disconnect();
+            
+        }
+        
         if (metadataServiceLookupCache != null) {
 
             metadataServiceLookupCache.terminate();
@@ -495,7 +502,7 @@ public class BigdataClient {//implements DiscoveryListener {
      * Connect to a bigdata federation. If the client is already connected, then
      * the existing connection is returned.
      * 
-     * @return
+     * @return The federation.
      * 
      * @todo determine how a federation will be identified, e.g., by a name that
      *       is an {@link Entry} on the {@link MetadataServer} and

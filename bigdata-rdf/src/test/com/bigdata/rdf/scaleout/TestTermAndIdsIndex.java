@@ -94,7 +94,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTermAndIdsIndex extends AbstractBigdataFederationTestCase {
+public class TestTermAndIdsIndex extends AbstractDistributedTripleStoreTestCase {
 
     /**
      * 

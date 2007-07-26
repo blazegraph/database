@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import com.bigdata.rawstore.Addr;
+
 
 /**
  * A read-only view of an {@link ICommitRecord}.
@@ -128,7 +130,7 @@ public class CommitRecord implements ICommitRecord {
             
             if(i>0) sb.append(", ");
             
-            sb.append(roots[i]);
+            sb.append(Addr.toString(roots[i]));
             
         }
         

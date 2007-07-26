@@ -61,6 +61,7 @@ import com.bigdata.btree.IndexSegmentMerger.MergedEntryIterator;
 import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.io.NameAndExtensionFilter;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;

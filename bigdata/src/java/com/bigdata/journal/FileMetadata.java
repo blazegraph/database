@@ -105,6 +105,18 @@ public class FileMetadata {
     final RandomAccessFile raf;
     
     /**
+     * The 32-bit magic value at offset 0L in the file.
+     * 
+     * @see #MAGIC
+     */
+    final int magic;
+    
+    /**
+     * The 32-bit version number at offset 4 in the file.
+     */
+    final int version;
+    
+    /**
      * The extent of the file in bytes.
      */
     final long extent;
@@ -154,6 +166,16 @@ public class FileMetadata {
      */
     final boolean exists;
 
+    /**
+     * The 1st root block.
+     */
+    IRootBlockView rootBlock0;
+
+    /**
+     * The 2nd root block.
+     */
+    IRootBlockView rootBlock1;
+    
     /**
      * The current root block. For a new file, this is "rootBlock0". For an
      * existing file it is based on an examination of both root blocks.
@@ -282,7 +304,7 @@ public class FileMetadata {
              */
             this.raf = new RandomAccessFile(file, fileMode);
     
-            if (bufferMode != BufferMode.Mapped) {
+            if (!readOnly && bufferMode != BufferMode.Mapped) {
     
                 /*
                  * Obtain exclusive lock on the file. This is a non-blocking
@@ -290,13 +312,24 @@ public class FileMetadata {
                  * is closed.
                  * 
                  * Note: Do not attempt to gain a lock on the file if you are
-                 * going to use a memory-mapped buffer.  The JDK cautions that
+                 * going to use a memory-mapped buffer. The JDK cautions that
                  * these things do not play well together on some platforms.
+                 * 
+                 * Note: tryLock() will fail if the file channel was opened in a
+                 * read-only mode, so we do not attempt to lock files that are
+                 * not being written.
+                 * 
+                 * @todo we should write a semaphore lock file to avoid
+                 * concurrent processes operating on the same journal, including
+                 * the case of a read-only process and a read-write process. The
+                 * JDK tryLock() mechanism is only suited to control access to a
+                 * file from within the same JVM, not across processes. Further,
+                 * tryLock() can not be used when the file channel is read-only.
                  */
     
-                FileLock fileLock = this.raf.getChannel().tryLock();
+                final FileLock fileLock = this.raf.getChannel().tryLock();
     
-                if (fileLock == null) {
+                 if (fileLock == null) {
     
                     /*
                      * We were not able to get a lock on the file.
@@ -349,14 +382,19 @@ public class FileMetadata {
                 }
     
                 /*
+                 * Note: The code to read the MAGIC, VERSION, and root blocks is
+                 * shared by DumpJournal (code is copy by value).
+                 */
+                
+                /*
                  * Read the MAGIC and VERSION.
                  */
                 raf.seek(0L);
-                final int magic = raf.readInt();
+                magic = raf.readInt();
                 if (magic != MAGIC)
                     throw new RuntimeException("Bad journal magic: expected="
                             + MAGIC + ", actual=" + magic);
-                final int version = raf.readInt();
+                version = raf.readInt();
                 if (version != VERSION1)
                     throw new RuntimeException("Bad journal version: expected="
                             + VERSION1 + ", actual=" + version);
@@ -382,8 +420,6 @@ public class FileMetadata {
                 }
                 tmp0.position(0); // resets the position.
                 tmp1.position(0);
-                IRootBlockView rootBlock0 = null;
-                IRootBlockView rootBlock1 = null;
                 try {
                     rootBlock0 = new RootBlockView(true,tmp0);
                 } catch(RootBlockException ex ) {
@@ -502,8 +538,8 @@ public class FileMetadata {
                  * Write the MAGIC and version on the file.
                  */
                 raf.seek(0);
-                raf.writeInt(MAGIC);
-                raf.writeInt(VERSION1);
+                raf.writeInt(magic = MAGIC);
+                raf.writeInt(version = VERSION1);
     
                 /*
                  * Generate the root blocks. They are for all practical purposes

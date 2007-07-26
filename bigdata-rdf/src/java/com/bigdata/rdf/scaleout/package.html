@@ -1,17 +1,11 @@
 <html>
 <head>
-<title>Sesame 1.x SAIL integration</title>
+<title>Scale-out RDF database</title>
 </head>
 <body>
 <p>
-This package provides a Sesame 1.x integration using the SAIL.  This is very
-much a trial balloon.  Sesame 1.x coupled the control logic and data structures
-in such a way that you could not write your own JOIN operators, which makes it
-very difficult to optimize performance.  An option is provided to turn on a
-simple (and not very well tested) eager closure solution without truth maintenance.
-A custom integration is provided for directly loading data into the triple store
-with throughput of 20,000+ triples per second - see the com.bigdata.rdf.rio
-package and {@link com.bigdata.rdf.TripleStore}.
+This package provides an RDF database realization designed for scale-out on commodity
+hardware.
 </p>
 </body>
 </html>

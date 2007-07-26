@@ -41,63 +41,53 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Jul 25, 2007
+ */
+
 package com.bigdata.rdf.scaleout;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.io.File;
+import java.io.IOException;
+
+import org.openrdf.sesame.constants.RDFFormat;
 
 /**
- * Aggregates test suites into increasing dependency order.
- * <p>
- * Note: The tests in this suite setup a bigdata federation for each test. In
- * order for these tests to succeed you MUST specify at least the following
- * properties to the JVM and have access to the resources in
- * <code>src/resources/config</code>.
- * 
- * <pre>
- * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
- * </pre>
- * 
- * @todo run the Sesame 1.x SAIL tests for correctness testing
- * 
- * @todo run the LUBM query tests for performance and correctness testing.
+ * Variant of {@link TestDistributedTripleStoreLoadRate} that tests with an
+ * embedded bigdata federation and therefore does not incur costs for network
+ * IO.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestEmbeddedTripleStoreLoadRate extends
+        AbstractEmbeddedTripleStoreTestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestEmbeddedTripleStoreLoadRate() {
+        super();
     }
 
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestEmbeddedTripleStoreLoadRate(String arg0) {
         super(arg0);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
+        public void test_loadNCIOncology() throws IOException {
 
-        TestSuite suite = new TestSuite("scale-out");
+            store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+                    false, false /*commit*/);
 
-        suite.addTestSuite(TestTermAndIdsIndex.class);
+        }
 
-        suite.addTestSuite(TestStatementIndex.class);
-        
-        suite.addTestSuite(TestDistributedTripleStoreLoadRate.class);
-        
-        return suite;
-        
-    }
-    
+//        protected String[] testData = new String[] {
+//                "data/nciOncology.owl" // nterms := 289844
+////                "data/wordnet_nouns-20010201.rdf"
+////                "data/taxonomy.rdf"
+//                };
+
 }

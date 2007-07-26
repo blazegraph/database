@@ -79,18 +79,18 @@ import com.bigdata.rdf.rio.PresortRioLoader;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLoadRate extends AbstractBigdataFederationTestCase {
+public class TestDistributedTripleStoreLoadRate extends AbstractDistributedTripleStoreTestCase {
 
     /**
      * 
      */
-    public TestLoadRate() {
+    public TestDistributedTripleStoreLoadRate() {
     }
 
     /**
      * @param arg0
      */
-    public TestLoadRate(String arg0) {
+    public TestDistributedTripleStoreLoadRate(String arg0) {
         super(arg0);
     }
 

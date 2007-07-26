@@ -41,7 +41,7 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.scaleup;
+package com.bigdata.io;
 
 import java.io.File;
 import java.io.FileFilter;

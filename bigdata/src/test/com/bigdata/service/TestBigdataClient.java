@@ -343,11 +343,11 @@ public class TestBigdataClient extends AbstractServerTestCase {
     public void test_staticPartitioning() throws Exception {
         
         // Store reference to each data service.
-        final IDataService dataService0 = client.getDataService(dataServer0
-                .getServiceID());
+        final IDataService dataService0 = client.getDataService(JiniUtil
+                .serviceID2UUID(dataServer0.getServiceID()));
 
-        final IDataService dataService1 = client.getDataService(dataServer1
-                .getServiceID());
+        final IDataService dataService1 = client.getDataService(JiniUtil
+                .serviceID2UUID(dataServer1.getServiceID()));
         
         // Connect to the federation.
         BigdataFederation fed = (BigdataFederation)client.connect();

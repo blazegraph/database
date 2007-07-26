@@ -59,7 +59,7 @@ import com.bigdata.journal.LocalTimestampService;
 import com.bigdata.journal.Options;
 
 /**
- * The transaction server is responsible for starting, preparing, and committing
+ * @deprecated The transaction server is responsible for starting, preparing, and committing
  * transactions, for assignig unique start and commit timestamps to
  * transactions, for determining when a transaction is "dead" (through
  * inactivity), and for coordinating a restart-safe process for releasing

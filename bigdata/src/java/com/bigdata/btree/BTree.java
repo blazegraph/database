@@ -416,6 +416,13 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      *            leaf (optional).
      * 
      * @todo change record compressor to an interface.
+     * 
+     * @todo expose the choice of checksum behavior to the application as a
+     *       configuration option. checksums are relatively expensive to compute
+     *       and make the most sense for long-term read-only data (the index
+     *       segments) and the least sense for fully buffered journals (since
+     *       the data are fully buffered, reads occur against memory and disk
+     *       checksum errors would not be detected in any case).
      */
     public BTree(
             IRawStore store,
@@ -435,7 +442,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
                 recordCompressor, //
                 /*
                  * Note: there is less need to use checksum for stores that are
-                 * not fully buffered since the data are always read from memory
+                 * fully buffered since the data are always read from memory
                  * which we presume is already parity checked. While a checksum
                  * on a fully buffered store could detect an overwrite, the
                  * journal architecture makes that extremely unlikely and one

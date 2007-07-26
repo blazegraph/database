@@ -5,10 +5,13 @@ import java.util.UUID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
- * Interface to a bigdata federation.
- *  
+ * The client-facing interface to a bigdata federation.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -23,6 +26,26 @@ public interface IBigdataFederation {
      */
     public static final long UNISOLATED = 0L;
 
+    /**
+     * Return the metadata service (or a proxy for the metadata service).
+     */
+    public IMetadataService getMetadataService();
+    
+    /**
+     * Return a read-only view of the index partitions for the named
+     * scale-out index.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * 
+     * @return The partitions for that index (keys are byte[] partition
+     *         separator keys, values are serialized
+     *         {@link PartitionMetadata} objects).
+     * 
+     * @throws NoSuchIndexException
+     */
+    public MetadataIndex getMetadataIndex(String name);
+    
     /**
      * Register a scale-out index with the federation.
      * 
@@ -80,7 +103,7 @@ public interface IBigdataFederation {
     /**
      * Return the client object that was used to connect to the federation.
      */
-    public BigdataClient getClient();
+    public IBigdataClient getClient();
 
     /**
      * Disconnect from the federation.

@@ -94,7 +94,7 @@ public interface IMetadataService extends IDataService {
     /**
      * Return the proxy for a {@link IDataService} from the local cache.
      * 
-     * @param dataService
+     * @param serviceUUID
      *            The {@link UUID} for the {@link DataService}.
      * 
      * @return The proxy or <code>null</code> if the {@link UUID} does not
@@ -102,7 +102,7 @@ public interface IMetadataService extends IDataService {
      * 
      * @throws IOException
      */
-    public IDataService getDataServiceByUUID(UUID dataService)
+    public IDataService getDataServiceByUUID(UUID serviceUUID)
             throws IOException;
 
     /*

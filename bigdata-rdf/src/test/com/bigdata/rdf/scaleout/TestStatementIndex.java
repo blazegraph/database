@@ -73,7 +73,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStatementIndex extends AbstractBigdataFederationTestCase {
+public class TestStatementIndex extends AbstractDistributedTripleStoreTestCase {
     
     /**
      * 

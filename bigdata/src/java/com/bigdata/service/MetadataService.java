@@ -155,7 +155,22 @@ abstract public class MetadataService extends DataService implements
         return "metadata-"+indexName;
         
     }
+
+    /**
+     * Options for the {@link MetadataService}.
+     *  
+     * @todo define options for the {@link MetadataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Options extends DataService.Options {
+        
+    }
     
+    /**
+     * @param properties
+     */
     protected MetadataService(Properties properties) {
 
         super(properties);
