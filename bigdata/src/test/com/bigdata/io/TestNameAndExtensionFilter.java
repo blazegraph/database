@@ -44,13 +44,15 @@ Modifications:
 /*
  * Created on Feb 1, 2006
  */
-package com.bigdata.scaleup;
+package com.bigdata.io;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
+
+import com.bigdata.io.NameAndExtensionFilter;
 
 import junit.framework.TestCase;
 

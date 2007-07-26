@@ -51,7 +51,6 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import com.bigdata.rawstore.Addr;
-import com.bigdata.scaleup.MasterJournal;
 
 /**
  * Interface for a root block on the journal. The root block provides metadata
@@ -161,15 +160,15 @@ public interface IRootBlockView {
     /**
      * Return the {@link Addr} at which the {@link ICommitRecord} for this root
      * block is stored. The {@link ICommitRecord}s are stored separately from
-     * the root block so that the may be indexed by the
+     * the root block so that they may be indexed by the
      * {@link #getCommitTimestamp()}. This is necessary in order to be able to
      * quickly recover the root addresses for a given commit timestamp, which is
      * a featured used to support transactional isolation.
      * <p>
-     * Note: When using a {@link MasterJournal} the {@link Addr address} of
-     * the {@link ICommitRecord} MAY refer to a historical {@link SlaveJournal}
-     * and care MUST be exercised to resolve the address against the appropriate
-     * {@link SlaveJournal}.
+     * Note: When a logical journal may overflow onto more than one physical
+     * journal then the {@link Addr address} of the {@link ICommitRecord} MAY
+     * refer to a historical physical journal and care MUST be exercised to
+     * resolve the address against the appropriate journal file.
      * 
      * @return The {@link Addr address} at which the {@link ICommitRecord} for
      *         this root block is stored.

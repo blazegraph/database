@@ -42,44 +42,37 @@ Modifications:
 
 */
 /*
- * Created on May 19, 2007
+ * Created on Jul 25, 2007
  */
 
 package com.bigdata.rdf.scaleout;
 
-import junit.framework.TestCase2;
+import junit.framework.TestCase;
 
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.ScaleOutTripleStore;
+import com.bigdata.btree.BTree;
 import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.service.AbstractServerTestCase;
 import com.bigdata.service.BigdataClient;
 import com.bigdata.service.DataServer;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.MetadataServer;
 
 /**
- * Abstract test case that sets up and connects to a bigdata federation.
+ * An abstract test harness that sets up (and tears down) the metadata and data
+ * services required for a bigdata federation using JINI to handle service
+ * discovery.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractBigdataFederationTestCase extends TestCase2 {
+abstract public class AbstractDistributedBigdataFederationTestCase extends TestCase {
 
-    /**
-     * 
-     */
-    public AbstractBigdataFederationTestCase() {
+    public AbstractDistributedBigdataFederationTestCase() {
+        super();
     }
-
-    /**
-     * @param arg0
-     */
-    public AbstractBigdataFederationTestCase(String arg0) {
-        super(arg0);
+    
+    public AbstractDistributedBigdataFederationTestCase(String name) {
+        super(name);
     }
-
-    protected final long NULL = ITripleStore.NULL;
     
     /**
      * Starts in {@link #setUp()}.
@@ -97,23 +90,21 @@ public class AbstractBigdataFederationTestCase extends TestCase2 {
      * Starts in {@link #setUp()}.
      */
     BigdataClient client;
-
-    /**
-     * The triple store under test.
-     */
-    ScaleOutTripleStore store;
     
     /**
      * FIXME Work the setup, teardown, and APIs until I can use either an
-     * embedded database or a client-service divide with equal ease. This will
-     * be especially important for the {@link TempTripleStore}, which normally
-     * uses only local resources. The best way is to defined an interface
-     * IBigdataClient and then provide both embedded and data-server
+     * embedded database or a client-service divide with equal ease -- and note
+     * that there is also a distinction at this time between an intrinsically
+     * local rdf database and one that is network capable but running locally
+     * (e.g., whether or not it was written using the {@link BigdataClient}
+     * class or direct use of a {@link BTree}).
+     * <p>
+     * This will be especially important for the {@link TempTripleStore}, which
+     * normally uses only local resources. The best way is to defined an
+     * interface IBigdataClient and then provide both embedded and data-server
      * implementations.
      */
     public void setUp() throws Exception {
-        
-        log.info(getName());
 
         // @todo verify that this belongs here vs in a main(String[]).
         System.setSecurityManager(new SecurityManager());
@@ -189,26 +180,21 @@ public class AbstractBigdataFederationTestCase extends TestCase2 {
       // verify that the client has/can get the metadata service.
       assertNotNull("metadataService", client.getMetadataService());
 
-      // Connect to the federation.
-      IBigdataFederation fed = client.connect();
-      
-      // Register indices.
-      fed.registerIndex(ScaleOutTripleStore.name_termId);
-      fed.registerIndex(ScaleOutTripleStore.name_idTerm);
-      fed.registerIndex(ScaleOutTripleStore.name_spo);
-      fed.registerIndex(ScaleOutTripleStore.name_pos);
-      fed.registerIndex(ScaleOutTripleStore.name_osp);
-
-      // start the client.
-      store = new ScaleOutTripleStore(client.connect());
-      
     }
 
     public void tearDown() throws Exception {
 
         /*
-         * @todo add fed.disconnect() and possibly fed.destroy().
+         * @todo consider fed.destroy().
          */
+        
+        if(client!=null) {
+
+            client.terminate();
+
+            client = null;
+            
+        }
         
         if(metadataServer0!=null) {
 
@@ -233,17 +219,7 @@ public class AbstractBigdataFederationTestCase extends TestCase2 {
             dataServer1 = null;
             
         }
-        
-        if(client!=null) {
-
-            client.terminate();
-
-            client = null;
-            
-        }
-        
-        log.info(getName());
 
     }
-
+    
 }

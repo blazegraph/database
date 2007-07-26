@@ -426,7 +426,9 @@ public class CommitRecordIndex extends BTree {
 
 //                LongPacker.packLong(os, entry.commitTime);
 //                LongPacker.packLong(os, entry.addr);
+                
                 os.packLong(entry.commitTime);
+                
                 os.packLong(entry.addr);
                 
             }
@@ -443,9 +445,9 @@ public class CommitRecordIndex extends BTree {
             
             for (int i = 0; i < n; i++) {
 
-                final long commitTime = Long.valueOf(LongPacker.unpackLong(is));
+                final long commitTime = LongPacker.unpackLong(is);
 
-                final long addr = Long.valueOf(LongPacker.unpackLong(is));
+                final long addr = LongPacker.unpackLong(is);
                 
                 values[i] = new Entry(commitTime,addr);
 

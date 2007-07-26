@@ -381,7 +381,8 @@ public class RootBlockView implements IRootBlockView {
         
         sb.append("rootBlock");
         
-        sb.append("{ rootBlockTimestamp="+getRootBlockTimestamp());
+        sb.append("{ rootBlock="+(isRootBlock0()?0:1));
+        sb.append(", rootBlockTimestamp="+getRootBlockTimestamp());
         sb.append(", version="+getVersion());
 //        sb.append(", segmentId="+getSegmentId());
         sb.append(", nextOffset="+getNextOffset());

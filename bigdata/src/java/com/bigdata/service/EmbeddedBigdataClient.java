@@ -41,63 +41,74 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.scaleout;
+/*
+ * Created on Jul 25, 2007
+ */
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.service;
+
+import java.util.Properties;
+import java.util.UUID;
 
 /**
- * Aggregates test suites into increasing dependency order.
- * <p>
- * Note: The tests in this suite setup a bigdata federation for each test. In
- * order for these tests to succeed you MUST specify at least the following
- * properties to the JVM and have access to the resources in
- * <code>src/resources/config</code>.
- * 
- * <pre>
- * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
- * </pre>
- * 
- * @todo run the Sesame 1.x SAIL tests for correctness testing
- * 
- * @todo run the LUBM query tests for performance and correctness testing.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class EmbeddedBigdataClient implements IBigdataClient {
 
-    /**
-     * 
-     */
-    public TestAll() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("scale-out");
-
-        suite.addTestSuite(TestTermAndIdsIndex.class);
-
-        suite.addTestSuite(TestStatementIndex.class);
+    protected final Properties properties;
+    
+    public EmbeddedBigdataClient(Properties properties) {
         
-        suite.addTestSuite(TestDistributedTripleStoreLoadRate.class);
+        if(properties==null) throw new IllegalArgumentException(); 
         
-        return suite;
+        this.properties = properties;
         
     }
     
+    public IBigdataFederation connect() {
+
+            if (fed == null) {
+
+            fed = new EmbeddedBigdataFederation(this, properties);
+
+        }
+
+        return fed;
+
+    }
+
+    private IBigdataFederation fed = null;
+
+    public void terminate() {
+
+        if(fed != null) {
+            
+            fed.disconnect();
+            
+        }
+        
+    }
+
+    /**
+     * Return the (in process) data service.
+     * 
+     * @param serviceUUID
+     *            The data service identifier.
+     */
+    public IDataService getDataService(UUID serviceUUID) {
+
+        return ((EmbeddedBigdataFederation)fed).getDataService(serviceUUID);
+        
+    }
+
+    /**
+     * The (in process) metadata service.
+     */
+    public IMetadataService getMetadataService() {
+
+        return ((EmbeddedBigdataFederation)fed).getMetadataService();
+        
+    }
+
 }

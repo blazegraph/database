@@ -55,6 +55,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import net.jini.core.lookup.ServiceID;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BatchContains;
@@ -65,19 +67,28 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * A client-side view of an index.
- * 
+ * <p>
+ *
  * @todo change the {@link IDataService} API so that we can provide custome
  *       serialization for the various methods. For example, we are relying on
  *       default marshalling of the arguments for the batch operations. This is
  *       especially bad since the arguments are things like byte[][] and not
  *       IKeyBuffer.
+ *
+ * @todo We should be able to transparently use either a hash mod N approach to
+ *       distributed index partitions or a dynamic approach based on overflow.
+ *       This could even be decided on a per-index basis. The different
+ *       approaches would be hidden by appropriate implementations of this
+ *       class.
  * 
  * @todo the client does not attempt to obtain a new data service proxy for a
  *       partition if the current proxy fails (no failover).
@@ -87,9 +98,12 @@ import com.bigdata.service.DataService.NoSuchIndexException;
  *       that visits partitions using the entryIndex in the metadata index since
  *       some entries may be "deleted".
  * 
- * @todo consider writing a client interface to the {@link MetadataIndex} so
- *       that this code can look identifical to the code that we would write if
- *       the metdata index was local.
+ * @todo It is a design goal (not yet obtained) that the client should interact
+ *       with an interface rather than directly with {@link MetadataIndex} so
+ *       that this code can look identical regardless of whether the metadata
+ *       index is local (embedded) or remote. (We do in fact use the same code
+ *       for both scenarios, but only because, at this time, the metadata index
+ *       is fully cached in the remote case).
  * 
  * @todo note that it is possible (though unlikely) for an index partition split
  *       or join to occur during operations. Figure out how I want to handle
@@ -145,7 +159,7 @@ public class ClientIndexView implements IIndex {
     public static final transient Logger log = Logger
             .getLogger(ClientIndexView.class);
     
-    private final BigdataFederation fed;
+    private final IBigdataFederation fed;
     private final long tx;
     private final String name;
     
@@ -195,7 +209,7 @@ public class ClientIndexView implements IIndex {
      * @param name
      *            The index name.
      */
-    public ClientIndexView(BigdataFederation fed, long tx, String name) {
+    public ClientIndexView(IBigdataFederation fed, long tx, String name) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -251,9 +265,9 @@ public class ClientIndexView implements IIndex {
 
     public boolean contains(byte[] key) {
         
-        IPartitionMetadata pmd = fed.getPartition(tx,name, key);
+        IPartitionMetadata pmd = getPartition(tx,name, key);
 
-        IDataService dataService = fed.getDataService(pmd);
+        IDataService dataService = getDataService(pmd);
 
         final boolean[] ret;
         
@@ -274,9 +288,9 @@ public class ClientIndexView implements IIndex {
 
     public Object insert(Object key, Object value) {
 
-        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
+        IPartitionMetadata pmd = getPartition(tx,name, (byte[])key);
         
-        IDataService dataService = fed.getDataService(pmd);
+        IDataService dataService = getDataService(pmd);
 
         final boolean returnOldValues = true;
         
@@ -300,9 +314,9 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = fed.getPartition(tx, name, (byte[]) key);
+        IPartitionMetadata pmd = getPartition(tx, name, (byte[]) key);
 
-        IDataService dataService = fed.getDataService(pmd);
+        IDataService dataService = getDataService(pmd);
         
         final byte[][] ret;
         
@@ -323,9 +337,9 @@ public class ClientIndexView implements IIndex {
 
     public Object remove(Object key) {
 
-        IPartitionMetadata pmd = fed.getPartition(tx,name, (byte[])key);
+        IPartitionMetadata pmd = getPartition(tx,name, (byte[])key);
 
-        IDataService dataService = fed.getDataService(pmd);
+        IDataService dataService = getDataService(pmd);
         
         final byte[][] ret;
         
@@ -386,13 +400,13 @@ public class ClientIndexView implements IIndex {
 
         for (int index = fromIndex; index <= toIndex; index++) {
 
-            PartitionMetadataWithSeparatorKeys pmd = fed.getPartitionAtIndex(
+            PartitionMetadataWithSeparatorKeys pmd = getPartitionAtIndex(
                     name, index);
 
             // // The first key that would enter the nth partition.
             // byte[] separatorKey = mdi.keyAt(index);
 
-            IDataService dataService = fed.getDataService(pmd);
+            IDataService dataService = getDataService(pmd);
 
             try {
 
@@ -724,9 +738,9 @@ public class ClientIndexView implements IIndex {
 
             assert ! exhausted;
 
-            pmd = ndx.fed.getPartitionAtIndex(ndx.name, index);
+            pmd = ndx.getPartitionAtIndex(ndx.name, index);
 
-            dataService = ndx.fed.getDataService(pmd);
+            dataService = ndx.getDataService(pmd);
             
             try {
 
@@ -1061,7 +1075,7 @@ public class ClientIndexView implements IIndex {
             
             Split split = itr.next();
             
-            IDataService dataService = fed.getDataService(split.pmd);
+            IDataService dataService = getDataService(split.pmd);
             
             byte[][] _keys = new byte[split.ntuples][];
             boolean[] _vals;
@@ -1100,7 +1114,7 @@ public class ClientIndexView implements IIndex {
             
             Split split = itr.next();
             
-            IDataService dataService = fed.getDataService(split.pmd);
+            IDataService dataService = getDataService(split.pmd);
             
             byte[][] _keys = new byte[split.ntuples][];
             byte[][] _vals;
@@ -1140,7 +1154,7 @@ public class ClientIndexView implements IIndex {
             
             Split split = itr.next();
             
-            IDataService dataService = fed.getDataService(split.pmd);
+            IDataService dataService = getDataService(split.pmd);
             
             byte[][] _keys = new byte[split.ntuples][];
             byte[][] _vals = new byte[split.ntuples][];
@@ -1188,7 +1202,7 @@ public class ClientIndexView implements IIndex {
             
             Split split = itr.next();
             
-            IDataService dataService = fed.getDataService(split.pmd);
+            IDataService dataService = getDataService(split.pmd);
             
             byte[][] _keys = new byte[split.ntuples][];
             
@@ -1254,7 +1268,7 @@ public class ClientIndexView implements IIndex {
 //        
 //    }
 
-        IDataService dataService = fed.getDataService(pmd);
+        IDataService dataService = getDataService(pmd);
         
         try {
 
@@ -1329,7 +1343,7 @@ public class ClientIndexView implements IIndex {
         while(fromIndex<ntuples) {
         
         // partition spanning that key.
-            PartitionMetadataWithSeparatorKeys pmd = fed.getPartition(tx, name,
+            PartitionMetadataWithSeparatorKeys pmd = getPartition(tx, name,
                     keys[fromIndex]);
 
             final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
@@ -1459,4 +1473,207 @@ public class ClientIndexView implements IIndex {
         
     }
     
+    /**
+     * 
+     * @param tx
+     * @param name
+     * @param key
+     * @return
+     */
+    public PartitionMetadataWithSeparatorKeys getPartition(long tx,
+            String name, byte[] key) {
+
+        MetadataIndex mdi = fed.getMetadataIndex(name);
+
+        IPartitionMetadata pmd;
+
+        //            final byte[][] data;
+
+        try {
+
+            final int index = mdi.findIndexOf(key);
+
+            /*
+             * The code from this point on is shared with getPartitionAtIndex() and
+             * also by some of the index partition tasks (CreatePartition for one).
+             */
+
+            if (index == -1)
+                return null;
+
+            /*
+             * The serialized index partition metadata record for the partition that
+             * spans the given key.
+             */
+            byte[] val = (byte[]) mdi.valueAt(index);
+
+            /*
+             * The separator key that defines the left edge of that index partition
+             * (always defined).
+             */
+            byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+
+            /*
+             * The separator key that defines the right edge of that index partition
+             * or [null] iff the index partition does not have a right sibling (a
+             * null has the semantics of no upper bound).
+             */
+            byte[] rightSeparatorKey;
+
+            try {
+
+                rightSeparatorKey = (byte[]) mdi.keyAt(index + 1);
+
+            } catch (IndexOutOfBoundsException ex) {
+
+                rightSeparatorKey = null;
+
+            }
+
+            //                return new byte[][] { leftSeparatorKey, val, rightSeparatorKey };
+            //
+            //                data = getMetadataService().getPartition(name, key);
+            //                
+            //                if (data == null)
+            //                    return null;
+
+            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+
+            return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
+                    pmd, rightSeparatorKey);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * @todo this is subject to concurrent modification of the metadata index
+     *       would can cause the index to identify a different partition. client
+     *       requests that use {@link #findIndexOfPartition(String, byte[])} and
+     *       {@link #getPartitionAtIndex(String, int)} really need to refer to
+     *       the same historical version of the metadata index (this effects
+     *       range count and range iterator requests and to some extent batch
+     *       operations that span multiple index partitions).
+     */
+    public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(String name,
+            int index) {
+
+        MetadataIndex mdi = fed.getMetadataIndex(name);
+
+        /*
+         * The code from this point on is shared with getPartition()
+         */
+
+        if (index == -1)
+            return null;
+
+        /*
+         * The serialized index partition metadata record for the partition that
+         * spans the given key.
+         */
+        byte[] val = (byte[]) mdi.valueAt(index);
+
+        /*
+         * The separator key that defines the left edge of that index partition
+         * (always defined).
+         */
+        byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+
+        /*
+         * The separator key that defines the right edge of that index partition
+         * or [null] iff the index partition does not have a right sibling (a
+         * null has the semantics of no upper bound).
+         */
+        byte[] rightSeparatorKey;
+
+        try {
+
+            rightSeparatorKey = (byte[]) mdi.keyAt(index + 1);
+
+        } catch (IndexOutOfBoundsException ex) {
+
+            rightSeparatorKey = null;
+
+        }
+
+        return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
+                (PartitionMetadata) SerializerUtil.deserialize(val),
+                rightSeparatorKey);
+
+    }
+
+    //        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(long tx, String name, int index) {
+    //
+    //            IPartitionMetadata pmd;
+    //
+    //            byte[][] data;
+    //
+    //            try {
+    //                
+    //                data = getMetadataService().getPartitionAtIndex(name, index);
+    //                
+    //                if (data == null)
+    //                    return null;
+    //                
+    //                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
+    //                
+    //            } catch(Exception ex) {
+    //                
+    //                throw new RuntimeException(ex);
+    //                
+    //            }
+    //
+    //            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
+    //
+    //        }
+
+    //        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
+    //
+    //        synchronized(indexCache) {
+    //      
+    //          Map<Integer,IDataService> partitionCache = indexCache.get(name);
+    //       
+    //          if(partitionCache==null) {
+    //              
+    //              partitionCache = new ConcurrentHashMap<Integer, IDataService>();
+    //              
+    //              indexCache.put(name, partitionCache);
+    //              
+    //          }
+    //          
+    //          IDataService dataService = 
+    //          
+    //      }
+
+    /**
+     * Resolve the data service to which the index partition was mapped.
+     * <p>
+     * This uses the lookup cache provided by
+     * {@link IBigdataClient#getDataService(UUID))}
+     */
+    public IDataService getDataService(IPartitionMetadata pmd) {
+
+        ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
+
+        final IDataService dataService;
+
+        try {
+
+            dataService = fed.getClient().getDataService(
+                    JiniUtil.serviceID2UUID(serviceID));
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return dataService;
+
+    }
+
 }

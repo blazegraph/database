@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
+import com.bigdata.io.TestNameAndExtensionFilter;
 import com.bigdata.scaleup.TestMetadataIndex;
 
 import junit.framework.Test;

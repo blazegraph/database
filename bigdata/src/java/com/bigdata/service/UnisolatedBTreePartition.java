@@ -275,7 +275,7 @@ public class UnisolatedBTreePartition extends UnisolatedBTree {
              * read additional metadata.
              */
             
-            this.pmd = (LocalPartitionMetadata)in.readObject();
+            this.pmd = (PartitionMetadataWithSeparatorKeys)in.readObject();
             
             assert this.pmd != null;
 

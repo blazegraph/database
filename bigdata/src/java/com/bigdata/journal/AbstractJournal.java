@@ -78,7 +78,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
-import com.bigdata.scaleup.MasterJournal.Options;
+//import com.bigdata.scaleup.MasterJournal.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -242,6 +242,12 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     final public File tmpDir;
     
     /**
+     * The metadata for a pre-existing journal -or- <code>null</code> if the journal was
+     * created for the first time.
+     */
+    final FileMetadata fileMetadata;
+    
+    /**
      * The implementation logic for the current {@link BufferMode}.
      */
     final protected IBufferStrategy _bufferStrategy;
@@ -266,17 +272,23 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     /**
      * BTree mapping index names to the last metadata record committed for the
      * named index. The keys are index names (unicode strings). The values are
-     * the last known {@link Addr address} of the named btree.
+     * the names and the last known {@link Addr address} of the named btree.
+     * 
+     * @todo this should be private, but {@link DumpJournal} is using it to
+     *       report on the state of named btrees.
      */
-    private Name2Addr name2Addr;
+    /*private*/ Name2Addr name2Addr;
 
     /**
      * BTree mapping commit timestamps to the address of the corresponding
      * {@link ICommitRecord}. The keys are timestamps (long integers). The
      * values are the {@link Addr address} of the {@link ICommitRecord} with
      * that commit timestamp.
+     * 
+     * @todo this should be private, but {@link DumpJournal} is using it to
+     *       report on the historical states of named btrees.
      */
-    private CommitRecordIndex _commitRecordIndex;
+    /*private*/ CommitRecordIndex _commitRecordIndex;
 
     /**
      * Option controls whether the journal forces application data to disk
@@ -358,6 +370,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             bufferMode = BufferMode.parse(val);
             
+            log.info(Options.BUFFER_MODE+"="+bufferMode);
+            
         } else bufferMode = Options.DEFAULT_BUFFER_MODE;
 
         System.err.println(Options.BUFFER_MODE+"="+bufferMode);
@@ -371,6 +385,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         if (val != null) {
 
             useDirectBuffers = Boolean.parseBoolean(val);
+            
+            log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
 
         }
 
@@ -415,6 +431,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             }
 
+            log.info(Options.INITIAL_EXTENT+"="+initialExtent);           
+
         }
 
         /*
@@ -435,6 +453,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             }
 
+            log.info(Options.MAXIMUM_EXTENT+"="+maximumExtent); 
+            
         }
 
         this.maximumExtent = maximumExtent;
@@ -449,6 +469,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             createTempFile = Boolean.parseBoolean(val);
 
+            log.info(Options.CREATE_TEMP_FILE+"="+createTempFile);
+            
             if(createTempFile) {
                 
                 create = false;
@@ -460,26 +482,36 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         }
 
         // "tmp.dir"
-        val = properties.getProperty(Options.TMP_DIR);
-        
-        tmpDir = val == null ? new File(System.getProperty("java.io.tmpdir"))
-                : new File(val); 
+        {
 
-        if (!tmpDir.exists()) {
-            
-            if (!tmpDir.mkdirs()) {
+            val = properties.getProperty(Options.TMP_DIR);
 
-                throw new RuntimeException("Could not create directory: "
+            tmpDir = val == null ? new File(System
+                    .getProperty("java.io.tmpdir")) : new File(val);
+
+            if (!tmpDir.exists()) {
+
+                if (!tmpDir.mkdirs()) {
+
+                    throw new RuntimeException("Could not create directory: "
+                            + tmpDir.getAbsolutePath());
+
+                }
+
+            }
+
+            if (!tmpDir.isDirectory()) {
+
+                throw new RuntimeException("Not a directory: "
                         + tmpDir.getAbsolutePath());
+
+            }
+
+            if(val!=null) {
+                
+                log.info(Options.TMP_DIR+"="+tmpDir); 
                 
             }
-            
-        }
-
-        if(!tmpDir.isDirectory()) {
-            
-            throw new RuntimeException("Not a directory: "
-                    + tmpDir.getAbsolutePath());
             
         }
             
@@ -493,6 +525,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             readOnly = Boolean.parseBoolean(val);
 
+            create = false;
+            
+            log.info(Options.READ_ONLY+"="+readOnly);
+
         }
 
         /*
@@ -504,6 +540,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         if (val != null) {
 
             forceWrites = ForceEnum.parse(val);
+
+            log.info(Options.FORCE_WRITES+"="+forceWrites);
 
         }
 
@@ -517,8 +555,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             forceOnCommit = ForceEnum.parse(val);
 
+            log.info(Options.FORCE_ON_COMMIT+"="+forceOnCommit);
+            
         }
-
+        
         this.forceOnCommit = forceOnCommit;
 
         /*
@@ -531,10 +571,12 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             doubleSync = Boolean.parseBoolean(val);
 
+            log.info(Options.DOUBLE_SYNC+"="+doubleSync);
+            
         }
 
         this.doubleSync = doubleSync;
-
+        
         /*
          * "deleteOnClose"
          */
@@ -544,6 +586,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         if (val != null) {
 
             deleteOnClose = Boolean.parseBoolean(val);
+
+            log.info(Options.DELETE_ON_CLOSE+"="+deleteOnClose);
 
         }
 
@@ -558,6 +602,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         if (val != null) {
 
             deleteOnExit = Boolean.parseBoolean(val);
+
+            log.info(Options.DELETE_ON_EXIT+"="+deleteOnExit);
 
         }
         
@@ -604,8 +650,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
                         + Options.FILE + "'");
 
             }
-            
+
             file = new File(val);
+
+            log.info(Options.FILE+"="+val);
 
         }
 
@@ -628,6 +676,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             }
 
+            fileMetadata = null;
+            
             _bufferStrategy = new TransientBufferStrategy(initialExtent,
                     0L/* soft limit for maximumExtent */, useDirectBuffers);
 
@@ -665,7 +715,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(file,
+            fileMetadata = new FileMetadata(file,
                     BufferMode.Direct, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -685,7 +735,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(file,
+            fileMetadata = new FileMetadata(file,
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -710,7 +760,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * Setup the buffer strategy.
              */
 
-            FileMetadata fileMetadata = new FileMetadata(file,
+            fileMetadata = new FileMetadata(file,
                     BufferMode.Disk, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites);
@@ -1151,7 +1201,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             final long lastCommitTime = commitTime;
 
-
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), /*old.getSegmentId(),*/ _bufferStrategy
@@ -1368,6 +1417,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     /**
      * Create or re-load the index that resolves timestamps to
      * {@link ICommitRecord}s.
+     * <p>
+     * The current commit record index is {@link #_commitRecordIndex}.
      * 
      * @param addr
      *            The root address of the index -or- 0L if the index has not
@@ -1376,7 +1427,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      * @return The {@link CommitRecordIndex} for that address or a new index if
      *         0L was specified as the address.
      * 
-     * @see #_commitRecordIndex, which hold the current commit record index.
+     * @see #_commitRecordIndex
      */
     private CommitRecordIndex getCommitRecordIndex(long addr) {
 

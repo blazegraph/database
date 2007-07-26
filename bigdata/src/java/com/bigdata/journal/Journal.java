@@ -52,6 +52,10 @@ import com.bigdata.scaleup.MasterJournal.Options;
  */
 public class Journal extends AbstractJournal implements ITransactionManager, IIndexManager {
 
+    /**
+     * 
+     * @param properties See {@link com.bigdata.journal.Options}.
+     */
     public Journal(Properties properties) {
         
         super(properties);

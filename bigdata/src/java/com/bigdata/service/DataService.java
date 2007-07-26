@@ -80,6 +80,7 @@ import com.bigdata.isolation.IIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IAtomicStore;
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
@@ -215,7 +216,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       is essential to high throughput when unisolated writes are relatively
  *       small.
  * 
- * @todo support group commit for unisolated writes. i may have to refactor some
+ * FIXME support group commit for unisolated writes. i may have to refactor some
  *       to get group commit to work for both transaction commits and unisolated
  *       writes. basically, the tasks on the
  *       {@link AbstractJournal#writeService} need to get aggregated (or each
@@ -311,8 +312,14 @@ abstract public class DataService implements IDataService,
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
+    /**
+     * The #of concurrent unisolated batch write operations that are currently
+     * in the queue.
+     * 
+     * @todo this is not counting queued reads or non-batch operations.
+     */
     protected volatile int nunisolated = 0;
-    
+
     /**
      * Pool of threads for handling unisolated reads.
      */
@@ -419,7 +426,7 @@ abstract public class DataService implements IDataService,
          * The journal's write service will be used to handle unisolated writes
          * and transaction commits.
          */
-        journal = new Journal(properties);
+        journal = new DataServiceJournal(properties);
 
         // setup thread pool for unisolated read operations.
         readService = Executors.newFixedThreadPool(readServicePoolSize,
@@ -480,7 +487,7 @@ abstract public class DataService implements IDataService,
      */
     public class StatusThread extends Thread {
         
-        final public long millis = 500;
+        final public long millis = 2500;
         
         public StatusThread() {
             
@@ -525,15 +532,32 @@ abstract public class DataService implements IDataService,
          */
         public void status() {
             
-            System.err.println("status: nunisolated="+nunisolated);
+            final long commitCounter = journal.getCommitRecord().getCommitCounter();
+
+            final UUID serviceUUID;
+            
+            try {
+            
+                // Note: MAY be null until assigned by the service registrar.
+                serviceUUID = getServiceUUID();
+                
+            } catch(IOException ex) {
+                
+                // IOException declared for RMI compatibility.
+                throw new RuntimeException(ex);
+                
+            }
+            
+
+            System.err.println("status: uuid=" + serviceUUID + ", nunisolated="
+                    + nunisolated + ", commitCounter=" + commitCounter);
             
         }
         
     }
     
     /**
-     * The unique identifier for this data service - this is used mainly for log
-     * messages.
+     * The unique identifier for this data service.
      * 
      * @return The unique data service identifier.
      */
@@ -1940,4 +1964,33 @@ abstract public class DataService implements IDataService,
 
     }
 
+    /**
+     * Inner class permits adding of <code>synchronized</code> keyword to
+     * select methods where there is a possibility for thread contention.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class DataServiceJournal extends Journal {
+
+        /**
+         * @param properties
+         */
+        public DataServiceJournal(Properties properties) {
+            super(properties);
+        }
+        
+        /**
+         * Note: Synchronization was added to this method since the
+         * {@link StatusThread} invokes this concurrently with
+         * {@link DataService} operations.
+         */
+        public synchronized ICommitRecord getCommitRecord() {
+            
+            return super.getCommitRecord();
+            
+        }
+        
+    }
+    
 }
