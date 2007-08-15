@@ -47,9 +47,9 @@ Modifications:
 
 package com.bigdata.util;
 
-import com.bigdata.util.TimestampFactory;
-
 import junit.framework.TestCase;
+
+import com.bigdata.journal.RootBlockView;
 
 /**
  * Test suite for {@link TimestampFactory}.

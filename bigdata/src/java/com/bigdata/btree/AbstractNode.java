@@ -53,7 +53,6 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.EntryIterator.EntryFilter;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;

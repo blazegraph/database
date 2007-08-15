@@ -179,18 +179,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentFastLeafScan.class );
         // test compacting merge of two index segments.
         suite.addTestSuite( TestIndexSegmentMerger.class );
-
-        /*
-         * @todo use of btree to support column store (in another package)
-         * 
-         * @todo handle column names and timestamp as part of the key.
-         * 
-         * @todo test version expiration based on age
-         * 
-         * @todo test version expiration based on #of versions.
-         * 
-         * @todo test on partitioned index. 
-         */
         
         return suite;
         

@@ -49,6 +49,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.ibm.icu.text.Collator;
+
 /**
  * <p>
  * Interface for building up variable <code>unsigned byte[]</code> keys from
@@ -116,12 +118,40 @@ public interface IKeyBuilder {
      * Encodes a unicode string using the rules of the {@link #collator} and
      * appends the resulting sort key to the buffer (without a trailing nul
      * byte) (optional operation).
+     * <p>
+     * Note: The {@link SuccessorUtil#successor(String)} of a string is formed
+     * by appending a trailing <code>nul</code> character. However, since
+     * {@link Collator#IDENTICAL} appears to be required to differentiate
+     * between a string and its successor (with the trailing <code>nul</code>
+     * character), you MUST form the sort key first and then its successor (by
+     * appending a trailing <code>nul</code>). Failure to follow this pattern
+     * will lead to the successor of the key comparing as EQUAL to the key. For
+     * example,
+     * 
+     * <pre>
+     *         
+     *         IKeyBuilder keyBuilder = ...;
+     *         
+     *         String s = &quot;foo&quot;;
+     *         
+     *         byte[] fromKey = keyBuilder.reset().append( s );
+     *         
+     *         // right.
+     *         byte[] toKey = keyBuilder.reset().append( s ).appendNul();
+     *         
+     *         // wrong!
+     *         byte[] toKey = keyBuilder.reset().append( s+&quot;\0&quot; );
+     *         
+     * </pre>
      * 
      * @param s
      *            A string.
      * 
      * @exception UnsupportedOperationException
      *                if Unicode is not supported.
+     * 
+     * @see SuccessorUtil#successor(String)
+     * @see TestUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
      */
     public IKeyBuilder append(String s);
 

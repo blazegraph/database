@@ -42,18 +42,16 @@ Modifications:
 
 */
 /*
- * Created on Feb 4, 2007
+ * Created on Aug 10, 2007
  */
 
-package com.bigdata;
+package com.bigdata.sparse;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites in increase dependency order.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -63,6 +61,7 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
+        super();
     }
 
     /**
@@ -73,25 +72,34 @@ public class TestAll extends TestCase {
     }
 
     /**
-     * Aggregates the tests in increasing dependency order.
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("bigdata");
+        TestSuite suite = new TestSuite("Sparse Row Store");
 
-        suite.addTest( com.bigdata.cache.TestAll.suite() );
-        suite.addTest( com.bigdata.io.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
-        suite.addTest( com.bigdata.rawstore.TestAll.suite() );
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
-        suite.addTest( com.bigdata.sparse.TestAll.suite() );
-        suite.addTest( com.bigdata.journal.TestAll.suite() );
-        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
-
+        suite.addTestSuite(TestValueType.class);
+        
+        suite.addTestSuite(TestSparseRowStore.class);
+        
+        /*
+         * @todo use of btree to support column store (in another package)
+         * 
+         * @todo handle column names and timestamp as part of the key.
+         * 
+         * @todo test data load utility for CSV and the like.
+         * 
+         * @todo test version expiration based on age
+         * 
+         * @todo test version expiration based on #of versions.
+         * 
+         * @todo test on partitioned index. 
+         */
+        
         return suite;
         
     }
-
+    
 }

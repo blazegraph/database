@@ -77,17 +77,24 @@ public class TestEmbeddedTripleStoreLoadRate extends
         super(arg0);
     }
 
-        public void test_loadNCIOncology() throws IOException {
+    public void test_loadNCIOncology() throws IOException {
 
-            store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
-                    false, false /*commit*/);
+        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+                false, false /*commit*/);
 
-        }
+    }
 
-//        protected String[] testData = new String[] {
-//                "data/nciOncology.owl" // nterms := 289844
-////                "data/wordnet_nouns-20010201.rdf"
-////                "data/taxonomy.rdf"
-//                };
+    /**
+     * Runs the test RDF/XML load.
+     */
+    public static void main(String[] args) throws Exception {
+
+        TestEmbeddedTripleStoreLoadRate test = new TestEmbeddedTripleStoreLoadRate(
+                "TestInsertRate");
+        test.setUp();
+        test.test_loadNCIOncology();
+        test.tearDown();
+
+    }
 
 }

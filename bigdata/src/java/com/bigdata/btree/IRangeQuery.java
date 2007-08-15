@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.btree;
 
+
 /**
  * Interface for range count and range query operations (non-batch api).
  * 
@@ -73,15 +74,10 @@ public interface IRangeQuery {
      * @see BytesUtil#successor(byte[]), which may be used to compute the
      *      successor of an encoded key.
      * 
-     * @todo define behavior when the toKey is less than the fromKey.
+     * @see EntryFilter, which may be used to filter the entries visited by the
+     *      iterator.
      * 
-     * @todo While the IEntryIterator offers tightly coupled code an opportunity
-     *       to choose on an entry by entry basis whether or not it also wants
-     *       the key for a value, this will not work for the network-based api
-     *       (it would require an RPC to get the key, which would have long
-     *       since disappeared from the stream window). Instead, applications
-     *       will have to declare whether they want keys, values, or both up
-     *       front.
+     * @todo define behavior when the toKey is less than the fromKey.
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
 

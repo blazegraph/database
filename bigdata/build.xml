@@ -35,12 +35,15 @@
 		 Note: clients share much of the bigadata java code since they require
 		 access to local temporary stores and btrees for some operations. Also,
 		 servers require client code (including the bulky ICU package) when they
-		 run remote jobs on the behalf of clients.  Therefore, there is point in
-		 creating both a "client" and a "server" JAR.
+		 run remote jobs on the behalf of clients.  Therefore, there is no point
+		 to creating both a "client" and a "server" JAR.
 		 -->
 	<target name="jar" depends="compile">
 		<jar destfile="${jar.name}">
 			<fileset dir="${build.dir}" />
+			<fileset dir="${bigdata.dir}/src">
+				<include name="resources/config/**"/>
+				</fileset>
 			<manifest>
 				<!-- @todo could be main routine for services startup, or perhaps
 				     a standalone instance startup. -->

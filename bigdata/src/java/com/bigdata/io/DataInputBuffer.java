@@ -117,7 +117,7 @@ public class DataInputBuffer implements DataInput {
 
         assert len >= 0;
         
-        assert off + len < buf.length;
+        assert off + len <= buf.length;
         
         this.buf = buf;
         
