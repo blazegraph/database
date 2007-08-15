@@ -35,7 +35,7 @@
             <src path="${bigdata.rdf.dir}/src/test"/>
         	<!-- Do not compile the Sesame 1.x SAIL tests by default since they
         	     have a dependency on the Sesame 1.x _test_ suite. -->
-	        <exclude name="com/bigdata/rdf/sail/*"/>
+	        <exclude name="com/bigdata/rdf/sail/**"/>
         </javac>
 <!--
         <copy toDir="${build.dir}/classes">

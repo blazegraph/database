@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.btree;
 
+
 /**
  * Utility methods for computing the successor of a value for various data
  * types.
@@ -481,7 +482,8 @@ public class SuccessorUtil {
      * string. The successor of a string value is defined unless the string is
      * too long.
      * 
-     * @param s The string reference or <code>null</code>.
+     * @param s
+     *            The string reference or <code>null</code>.
      * 
      * @return The successor and never <code>null</code>
      */

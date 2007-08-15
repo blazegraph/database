@@ -100,7 +100,7 @@ public class TestAll extends TestCase {
          * Note: This test suite requires access to the Sesame 1.x test suite --
          * not just the Sesame JARs.
          */
-        suite.addTest( com.bigdata.rdf.sail.TestAll.suite() );
+//        suite.addTest( com.bigdata.rdf.sail.TestAll.suite() );
 
         /*
          * Note: This test suite sets up a local bigdata federation for

@@ -55,6 +55,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.ScaleOutTripleStore;
 import com.bigdata.rdf.rio.PresortRioLoader;
+import com.bigdata.rdf.rio.TestRioIntegration;
 
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
@@ -106,5 +107,17 @@ public class TestDistributedTripleStoreLoadRate extends AbstractDistributedTripl
 ////            "data/wordnet_nouns-20010201.rdf"
 ////            "data/taxonomy.rdf"
 //            };
+
+    /**
+     * Runs the test RDF/XML load.
+     */
+    public static void main(String[] args) throws Exception {
+        
+        TestDistributedTripleStoreLoadRate test = new TestDistributedTripleStoreLoadRate("TestInsertRate");
+        test.setUp();
+        test.test_loadNCIOncology();
+        test.tearDown();
+            
+    }
 
 }

@@ -590,7 +590,7 @@ public class TestKeyBuilder extends TestCase2 {
         }        
 
     }
-    
+
     public void test_keyBuilder_unicode_char_key() {
         
         IKeyBuilder keyBuilder = new KeyBuilder();

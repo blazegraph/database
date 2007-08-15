@@ -63,11 +63,11 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.EntryFilter;
 import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.EntryIterator.EntryFilter;
 import com.bigdata.rawstore.IRawStore;
 
 /**

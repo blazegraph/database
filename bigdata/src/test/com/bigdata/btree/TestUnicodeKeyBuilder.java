@@ -47,10 +47,12 @@ Modifications:
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
 import java.util.Locale;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.rawstore.Bytes;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -252,34 +254,111 @@ public class TestUnicodeKeyBuilder extends TestCase2 {
     }
 
     /**
-     * Tests for keys formed from the application key, a column name, and a long
-     * timestamp. A zero(0) byte is used as a delimiter between components of
-     * the key.
-     * 
-     * @todo this is not testing much yet and should be in its own test suite.
+     * Test examines the behavior when the
+     * {@link SuccessorUtil#successor(String)} of an Unicode string is formed by
+     * appending a <code>nul</code> character and reports an error if the
+     * resulting byte[] when the key are formed compares as equal to the
+     * original string from which the successor was formed.
+     * <p>
+     * Note: Since {@link Collator#IDENTICAL} appears to be required to
+     * differentiate a trailing nul character (i.e., the successor of some
+     * Unicode string), then I would strongly recommend that you form the sort
+     * key first and then its successor (by appending a trailing nul).
      */
-    public void test_cstore_keys() {
-        
-        IKeyBuilder keyBuilder = new UnicodeKeyBuilder();
-        
-        final byte[] colname1 = keyBuilder.reset().append("column1").getKey();
-        
-        final byte[] colname2 = keyBuilder.reset().append("another column").getKey();
-        
-        final long timestamp = System.currentTimeMillis();
-        
-        byte[] k1 = keyBuilder.reset().append(12L).appendNul().append(colname1)
-        .appendNul().append(timestamp).getKey();
+    public void test_keyBuilder_unicode_trailingNuls() {
 
-        byte[] k2 = keyBuilder.reset().append(12L).appendNul().append(colname2)
-        .appendNul().append(timestamp).getKey();
+        int[] strengths = new int[] { 
+                Collator.PRIMARY,
+                Collator.SECONDARY,
+                Collator.TERTIARY,
+                Collator.QUATERNARY,
+                Collator.IDENTICAL,
+                };
+        
+        int minStrength = -1;
+        
+        for(int i=0; i<strengths.length; i++) {
+           
+            final int strength = strengths[i];
+            
+            RuleBasedCollator collator = (RuleBasedCollator) Collator
+                    .getInstance(Locale.getDefault());
+            
+            collator.setStrength(strength);
+            
+            if(!doSuccessorTest( "Hello World!", collator )) {
+                
+                log.warn("Collator does not differentiate trailing nul characters at strength="+strength);
+                
+            } else {
+                
+                minStrength = strength;
+                
+            }
 
-        System.err.println("k1="+BytesUtil.toString(k1));
-        System.err.println("k2="+BytesUtil.toString(k2));
+        }
+        
+        assertFalse(
+                "Collator will not differentiate trailing nul characters at any strength.",
+                minStrength == -1); 
 
-        fail("this does not test anything yet");
+        System.err
+                .println("Minimum strength ("+minStrength+") to differentiate trailing nul character is: "
+                        + (minStrength == Collator.PRIMARY ? "PRIMARY"
+                                : (minStrength == Collator.SECONDARY ? "SECONDARY"
+                                        : (minStrength == Collator.TERTIARY ? "TERTIARY"
+                                                : (minStrength == Collator.QUATERNARY ? "QUARERNARY"
+                                                        : (minStrength == Collator.IDENTICAL ? "IDENTICAL"
+                                                                : ""
+                                                                        + minStrength))))));
+        
     }
 
+    /**
+     * Test whether or not the {@link Collator} will differentiate Unicode
+     * strings that differ only in a trailing <code>nul</code> character.
+     * 
+     * @param s
+     *            The Unicode string.
+     * @param collator
+     *            The collator.
+     *            
+     * @return True iff the collector differenties between the string and its
+     *         successor (formed by appending a nul character) in its generated
+     *         sort keys.
+     */
+    protected boolean doSuccessorTest(String s, RuleBasedCollator collator) {
+
+        final IKeyBuilder keyBuilder = new UnicodeKeyBuilder(collator,
+                Bytes.kilobyte32);
+
+        final String successor = SuccessorUtil.successor(s);
+
+        // the successor is one character longer.
+        assertEquals(s.length() + 1, successor.length());
+
+        final byte[] key1 = keyBuilder.reset().append(s).getKey();
+
+        final byte[] key2 = keyBuilder.reset().append(successor).getKey();
+
+        // key1 MUST order less than key2.
+        final int ret = BytesUtil.compareBytes(key1, key2);
+
+        if (ret >= 0) {
+            log
+                    .warn("Key1 does NOT order less than successor(key1) : comparator returns "
+                            + ret);
+            System.err.println("text=" + s);
+            System.err.println("strength=" + collator.getStrength());
+            System.err.println("key1: " + Arrays.toString(key1));
+            System.err.println("key2: " + Arrays.toString(key2));
+            return false;
+        }
+
+        return true;
+        
+    }
+    
 //    /**
 //     * Encodes a collection of strings, returning sort keys for those
 //     * strings. Each sort key has the property that a bit-wise (or

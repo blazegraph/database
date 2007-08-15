@@ -56,7 +56,6 @@ import com.bigdata.btree.IAbstractNode;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.EntryIterator.EntryFilter;
 
 /**
  * Test suite for iterators. The tests are presented from the least dependencies

@@ -47,7 +47,12 @@ Modifications:
 
 package com.bigdata.btree;
 
+import java.util.Locale;
 import java.util.UUID;
+
+import com.ibm.icu.text.Collator;
+import com.ibm.icu.text.RawCollationKey;
+import com.ibm.icu.text.RuleBasedCollator;
 
 /**
  * A class that may be used to form multi-component keys but which does not
@@ -88,6 +93,24 @@ public class KeyBuilder implements IKeyBuilder {
      */
     protected byte[] buf;
     
+    /**
+     * Used to encode unicode strings into compact unsigned byte[]s that have
+     * the same sort order (aka sort keys).
+     * <p>
+     * Note: When <code>null</code> the IKeyBuilder does NOT support Unicode
+     * and the optional Unicode methods will all throw an
+     * {@link UnsupportedOperationException}.
+     */
+    protected final RuleBasedCollator collator;
+
+//  /**
+//  * This class integrates with {@link RuleBasedCollator} for efficient
+//  * generation of compact sort keys.  Since {@link RawCollationKey} is
+//  * final, but its fields are public, we just set the fields directly
+//  * each time before we use this object.
+//  */
+// private RawCollationKey b2;
+
     /**
      * Throws exception unless the value is non-negative.
      * 
@@ -144,6 +167,30 @@ public class KeyBuilder implements IKeyBuilder {
      */
     public KeyBuilder(int len, byte[] buf) {
 
+        this( null /* no unicode support*/, len, buf );
+        
+    }    
+    
+    /**
+     * Creates a key builder using an existing buffer with some data (designated
+     * constructor).
+     * 
+     * @param collator
+     *            The collator used to encode Unicode strings (when
+     *            <code>null</code> Unicode collation support is disabled).
+     * @param len
+     *            The #of bytes of data in the provided buffer.
+     * @param buf
+     *            The buffer, with <i>len</i> pre-existing bytes of valid data.
+     *            The buffer reference is used directly rather than making a
+     *            copy of the data.
+     * 
+     * @see RuleBasedCollator
+     * @see Collator#getInstance(Locale)
+     * @see Locale
+     */
+    protected KeyBuilder(RuleBasedCollator collator, int len, byte[] buf) {
+        
         if (len < 0)
             throw new IllegalArgumentException("len");
 
@@ -156,8 +203,16 @@ public class KeyBuilder implements IKeyBuilder {
         this.len = len;
 
         this.buf = buf;
+
+        this.collator = collator; // MAY be null.
         
-    }    
+//        /*
+//         * Note: The bytes and size fields MUST be reset before each use of
+//         * this object!
+//         */
+//        this.b2 = new RawCollationKey(buf,len);
+        
+    }
     
     final public int getLength() {
         
@@ -271,33 +326,76 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /*
-     * Optional Unicode operations are not supported by this implementation.
+     * Optional Unicode operations.
      */
-    
-    /**
-     * Not supported.
-     */
-    public IKeyBuilder append(String s) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
-     * Not supported.
-     */
-    public IKeyBuilder append(char[] v) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
-     * Not supported.
-     */
-    public IKeyBuilder append(char v) {
 
-        throw new UnsupportedOperationException();
+    private final void assertUnicodeEnabled() {
+        
+        if (collator == null)
+            throw new UnsupportedOperationException();
+        
+    }
+
+    final public RuleBasedCollator getCollator() {
+        
+        return collator;
+        
+    }
+
+    final public IKeyBuilder append(String s) {
+        
+        assertUnicodeEnabled();
+        
+//        set public fields on the RawCollationKey
+//        b2.bytes = this.buf;
+//        b2.size = this.len;
+//        collator.getRawCollationKey(s, b2);
+//        
+//        /*
+//         * take the buffer, which may have changed.
+//         * 
+//         * note: we do not take the last byte since it is always zero per
+//         * the ICU4J documentation. if you want null bytes between
+//         * components of a key you have to put them there yourself.
+//         */
+//        this.buf = b2.bytes;
+//        this.len = b2.size - 1;
+
+//        RawCollationKey raw = new RawCollationKey(this.buf, this.len);
+//        
+//        collator.getRawCollationKey(s, raw );
+//
+//        this.buf = raw.bytes;
+//        this.len = raw.size;
+
+        /*
+         * Note: This is the only invocation that appears to work reliably. The
+         * downside is that it grows a new byte[] each time we encode a unicode
+         * string rather than being able to leverage the existing array on our
+         * class.
+         * 
+         * @todo look into the source code for RawCollationKey and its base
+         * class, ByteArrayWrapper, and see if I can resolve this issue for
+         * better performance and less heap churn. Unfortunately the
+         * RawCollationKey class is final so we can not subclass it.
+         */
+        RawCollationKey raw = collator.getRawCollationKey(s, null);
+
+        append(0,raw.size,raw.bytes);
+        
+        return this;
+        
+    }
+
+    final public IKeyBuilder append(char[] v) {
+
+        return append(new String(v));
+        
+    }
+    
+    final public IKeyBuilder append(char v) {
+
+        return append("" + v);
                     
     }
 
