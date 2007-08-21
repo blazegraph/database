@@ -102,6 +102,13 @@ public class TestCSVReader extends TestCase2 {
 
     }
     
+    /**
+     * Test reads from a tab-delimited file <code>test.csv</code> with headers
+     * in the first row and two rows of data.
+     * 
+     * @throws IOException
+     * @throws ParseException
+     */
     public void test_read_test_csv() throws IOException, ParseException {
         
         Header[] headers = new Header[] {
@@ -155,6 +162,63 @@ public class TestCSVReader extends TestCase2 {
         }), r.next() );
 
         assertEquals(3,r.lineNo());
+
+        /* 
+         * Verify EOF.
+         */
+        assertFalse(r.hasNext());
+        
+    }
+
+    /**
+     * Test reads from a tab-delimited file <code>test-no-headers.csv</code>
+     * with NO headers and two rows of data.
+     * 
+     * @throws IOException
+     * @throws ParseException
+     */
+    public void test_read_test_no_headers_csv() throws IOException, ParseException {
+        
+        Header[] headers = new Header[] {
+          
+                new Header("1"),
+                new Header("2"),
+                new Header("3"),
+                new Header("4"),
+                new Header("5"),
+                
+        };
+        
+        CSVReader r = new CSVReader(
+                getTestInputStream("com/bigdata/util/test-no-headers.csv"), "UTF-8");
+
+        /*
+         * 1st row of data.
+         */
+        assertTrue(r.hasNext());
+
+        assertSameValues(newMap(headers, new Object[] { "Bryan Thompson",
+                new Long(12), "SAIC",
+                new SimpleDateFormat("MM/dd/yy").parse("4/30/2002"),
+                new Double(12.02)
+        }), r.next() );
+
+        assertEquals(1,r.lineNo());
+
+        
+        /*
+         * 2nd row of data.
+         */
+        assertTrue(r.hasNext());
+
+        assertSameValues( newMap(headers, new Object[]{
+                "Bryan Thompson",
+                new Long(12), "SYSTAP",
+                new SimpleDateFormat("MM/dd/yy").parse("4/30/2005"),
+                new Double(13.03)
+        }), r.next() );
+
+        assertEquals(2,r.lineNo());
 
         /* 
          * Verify EOF.

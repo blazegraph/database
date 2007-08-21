@@ -51,6 +51,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.text.DateFormat;
 import java.text.Format;
 import java.text.NumberFormat;
@@ -60,6 +61,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
 
@@ -74,12 +77,23 @@ import com.bigdata.rawstore.Bytes;
  * {@link Integer} or {@link Float}. If you want to change this you need to
  * customize the {@link Header} class since that is responsible for interpreting
  * column values.
+ * <p>
+ * Note: If no headers are defined (by the caller) or read from the file (by the
+ * caller), then default headers named by the origin ONE column indices will be
+ * used.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class CSVReader implements Iterator<Map<String, Object>> {
 
+    public static Logger log = Logger.getLogger(CSVReader.class);
+
+    /**
+     * The #of characters to buffer in the reader.
+     */
+    protected static final int BUF_SIZE = Bytes.kilobyte32 * 20;
+    
     /**
      * A header for a column that examines its values and interprets them as
      * floating point numbers, integers, dates, or times when possible and
@@ -277,7 +291,16 @@ public class CSVReader implements Iterator<Map<String, Object>> {
             throw new IllegalArgumentException();
 
         r = new BufferedReader(new InputStreamReader(is, charSet),
-                Bytes.kilobyte32 * 20);
+                BUF_SIZE);
+
+    }
+
+    public CSVReader(Reader r) throws IOException {
+
+        if (r == null)
+            throw new IllegalArgumentException();
+
+        this.r = new BufferedReader(r, BUF_SIZE);
 
     }
 
@@ -448,19 +471,25 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     }
 
     /**
-     * Parse the line into column values.
+     * Parse the line into column values. If no headers have been defined then
+     * default headers are automatically using {@link #setDefaultHeaders(int)}.
      * 
      * @param line
      *            The line.
-     *            
+     * 
      * @return A map containing the parsed data.
      */
     protected Map<String, Object> parse(String[] values) {
 
         Map<String, Object> map = new TreeMap<String, Object>();
 
-        if (headers == null)
-            throw new RuntimeException("Headers not defined");
+        if (headers == null) {
+       
+            log.warn("No headers - using defaults.");
+            
+            setDefaultHeaders(values.length);
+            
+        }
 
         if (headers.length < values.length) {
 
@@ -482,6 +511,27 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
+    /**
+     * Creates default headers named by the origin ONE column indices
+     * {1,2,3,4,...}.
+     * 
+     * @param ncols
+     *            The #of columns.
+     */
+    protected void setDefaultHeaders(int ncols) {
+
+        Header[] headers = new Header[ncols];
+        
+        for( int i=0; i<ncols; i++) {
+            
+            headers[i] = new Header(""+(i+1));
+            
+        }
+        
+        this.headers = headers;
+        
+    }
+    
     /**
      * Parse a line containing headers.
      * 
