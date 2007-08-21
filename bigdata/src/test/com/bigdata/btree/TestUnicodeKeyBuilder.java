@@ -254,6 +254,28 @@ public class TestUnicodeKeyBuilder extends TestCase2 {
     }
 
     /**
+     * Test verifies that the trailing <code>nul</code> byte is not part of
+     * the key when a unicode string is appended to an {@link IKeyBuilder}.
+     * <p>
+     * Note: The trailing <code>nul</code> byte is appended by the ICU library
+     * in order to have compatibility with their C library, but it is not of
+     * interest for Java processing. However, note that a <code>nul</code>
+     * byte MAY be used to separate components of a complex key.
+     */
+    public void test_keyBuilder_unicode_String_noTrailingNul() {
+
+        UnicodeKeyBuilder keyBuilder = new UnicodeKeyBuilder();
+        
+        keyBuilder.append("Hello World!");
+        
+        byte[] key = keyBuilder.getKey();
+        
+        assertNotSame("Not expecting a trailing nul byte.", (byte) 0,
+                key[key.length - 1]);
+        
+    }
+    
+    /**
      * Test examines the behavior when the
      * {@link SuccessorUtil#successor(String)} of an Unicode string is formed by
      * appending a <code>nul</code> character and reports an error if the

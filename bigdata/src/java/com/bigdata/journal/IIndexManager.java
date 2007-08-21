@@ -69,6 +69,9 @@ public interface IIndexManager extends IIndexStore {
      *            The name that can be used to recover the index.
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
+     * 
+     * @exception IllegalStateException
+     *                if there is an index already registered under that name.
      */
     public IIndex registerIndex(String name);
 
@@ -90,6 +93,11 @@ public interface IIndexManager extends IIndexStore {
      *            The btree.
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
+     * 
+     * @exception IllegalStateException
+     *                if there is an index already registered under that name.
+     *                Use {@link IIndexStore#getIndex(String)} to test whether
+     *                there is an index registered under a given name.
      * 
      * @todo The provided {@link BTree} must serve as a prototype so that it is
      *       possible to retain additional metadata.

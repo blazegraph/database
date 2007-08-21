@@ -177,7 +177,9 @@ public class KeyBuilder implements IKeyBuilder {
      * 
      * @param collator
      *            The collator used to encode Unicode strings (when
-     *            <code>null</code> Unicode collation support is disabled).
+     *            <code>null</code> Unicode collation support is disabled). If
+     *            you wish to use a non-default collation strength, then you
+     *            MUST set it explicitly on this collator object.
      * @param len
      *            The #of bytes of data in the provided buffer.
      * @param buf
@@ -381,7 +383,7 @@ public class KeyBuilder implements IKeyBuilder {
          */
         RawCollationKey raw = collator.getRawCollationKey(s, null);
 
-        append(0,raw.size,raw.bytes);
+        append(0, raw.size - 1/* do not include the nul byte */, raw.bytes);
         
         return this;
         

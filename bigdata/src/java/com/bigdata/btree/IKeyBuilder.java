@@ -152,6 +152,10 @@ public interface IKeyBuilder {
      * 
      * @see SuccessorUtil#successor(String)
      * @see TestUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
+     * 
+     * @todo provide a more flexible interface for handling Unicode, including
+     * the means to encode using a specified language family (such as could be
+     * identified with an <code>xml:lang</code> attribute).
      */
     public IKeyBuilder append(String s);
 
