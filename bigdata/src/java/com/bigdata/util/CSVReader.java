@@ -387,12 +387,12 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
                 lineNo++;
 
-                if (skipCommentLines && line.charAt(0) == '#')
-                    continue;
-
                 if (skipBlankLines && line.trim().length() == 0)
                     continue;
                 
+                if (skipCommentLines && line.length()>0 && line.charAt(0) == '#')
+                    continue;
+
                 return true;
 
             }
