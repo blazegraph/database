@@ -159,47 +159,120 @@ public class RootBlockView implements IRootBlockView {
             long commitCounter, long commitRecordAddr,
             long commitRecordIndexAddr, UUID uuid) {
 
-        if (nextOffset < 0)
-            throw new IllegalArgumentException("nextOffset is negative.");
-        if( firstCommitTime == 0L && lastCommitTime != 0L)
-            throw new IllegalArgumentException("first transaction identifier is zero, but last transaction identifier is not.");
-        if (firstCommitTime != 0 && lastCommitTime < firstCommitTime)
-            throw new IllegalArgumentException("last transaction identifier is less than first transaction identifier.");
-        if( lastCommitTime != 0 && commitTimestamp < lastCommitTime) {
-            throw new IllegalArgumentException("commit counter must be greater than the start time of the last committed transactions");
+        if (nextOffset < 0) {
+         
+            throw new IllegalArgumentException(
+                    "nextOffset is negative: nextOffset=" + nextOffset);
+            
         }
-        if (commitCounter < 0)
-            throw new IllegalArgumentException("commit counter is zero.");
-        if (commitCounter == Long.MAX_VALUE )
+        
+        if( firstCommitTime == 0L && lastCommitTime != 0L) {
+         
+            throw new IllegalArgumentException(
+                    "first transaction identifier is zero, but last transaction identifier is not: lastCommitTime="
+                            + lastCommitTime);
+            
+        }
+        
+        if (firstCommitTime != 0 && lastCommitTime < firstCommitTime) {
+        
+            throw new IllegalArgumentException(
+                    "last transaction identifier is less than first transaction identifier: lastCommitTime="
+                            + lastCommitTime
+                            + ", firstCommitTime="
+                            + firstCommitTime);
+        }
+        
+        if (lastCommitTime != 0 && commitTimestamp < lastCommitTime) {
+        
+            throw new IllegalArgumentException(
+                    "commit time must be greater than the start time of the last committed transactions: commitTime="
+                            + commitTimestamp
+                            + ", lastCommitTime="
+                            + lastCommitTime);
+            
+        }
+
+        if (commitCounter < 0) {
+         
+            throw new IllegalArgumentException(
+                    "commit counter is negative: commitCounter="
+                            + commitCounter);
+            
+        }
+        
+        if (commitCounter == Long.MAX_VALUE ) {
+        
             throw new IllegalArgumentException("commit counter would overflow.");
-        if( commitRecordAddr < 0 ) 
-            throw new IllegalArgumentException("Invalid address for the commit record.");
-        if( commitRecordIndexAddr < 0 ) 
-            throw new IllegalArgumentException("Invalid address for the commit record index.");
+            
+        }
+        
+        if( commitRecordAddr < 0 ) { 
+         
+            throw new IllegalArgumentException(
+                    "Invalid address for the commit record: "
+                            + commitRecordAddr);
+            
+        }
+        if( commitRecordIndexAddr < 0 ) {
+        
+            throw new IllegalArgumentException(
+                    "Invalid address for the commit record index: "
+                            + commitRecordIndexAddr);
+            
+        }
+        
         if (commitCounter > 0) {
-            if (commitRecordAddr == 0)
+            
+            if (commitRecordAddr == 0) {
+                
                 throw new IllegalArgumentException(
-                        "The commit record must exist if the commit counter is non-zero");
-            if (commitRecordIndexAddr == 0)
+                        "The commit record must exist if the commit counter is non-zero: commitCounter="
+                                + commitCounter);
+                
+            }
+            
+            if (commitRecordIndexAddr == 0) {
+        
                 throw new IllegalArgumentException(
-                        "The commit record index must exist if the commit counter is non-zero");
+                        "The commit record index must exist if the commit counter is non-zero: commitCounter="
+                                + commitCounter);
+                
+            }
+
         }
+        
         if (commitRecordAddr > 0 && commitRecordIndexAddr == 0) {
+
             throw new IllegalArgumentException(
-                    "The commit record index must exist if there is a commit record.");
+                    "The commit record index must exist if there is a commit record: commitRecordAddr="
+                            + commitRecordAddr
+                            + ", but commitRecordIndexAddr="
+                            + commitRecordIndexAddr);
+            
         }
+        
         if (commitRecordIndexAddr > 0 && commitRecordAddr == 0) {
+
             throw new IllegalArgumentException(
-                    "The commit record address must exist if there is a commit record index.");
+                    "The commit record address must exist if there is a commit record index: commitRecordIndexAddr="
+                            + commitRecordIndexAddr
+                            + ", but commitRecordAddr="
+                            + commitRecordAddr);
+        
         }
+        
         if(uuid == null) {
+            
             throw new IllegalArgumentException("UUID is null");
+            
         }
         
         buf = ByteBuffer.allocate(SIZEOF_ROOT_BLOCK);
         
         this.rootBlock0 = rootBlock0;
         
+        // @todo why not the commitTimestamp that was provided by the caller?
         final long rootBlockTimestamp = TimestampFactory.nextNanoTime();
 
         buf.putLong(rootBlockTimestamp);

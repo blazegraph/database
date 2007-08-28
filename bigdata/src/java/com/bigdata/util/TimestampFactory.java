@@ -81,6 +81,13 @@ public class TimestampFactory {
             
         } while( nanoTime == lastNanoTime );
         
+        if(nanoTime<lastNanoTime) {
+
+            throw new AssertionError("Nano time goes backward: lastNanoTime="
+                    + lastNanoTime + ", nanoTime=" + nanoTime);
+            
+        }
+        
         lastNanoTime = nanoTime;
         
         return nanoTime;
