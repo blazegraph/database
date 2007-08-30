@@ -405,9 +405,20 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                 log.info("this="+this+", trigger="+triggeredByChild);
                 if( DEBUG ) {
                     System.err.println("this"); dump(Level.DEBUG,System.err);
-                    if( triggeredByChild != null ) {
-                        System.err.println("trigger"); triggeredByChild.dump(Level.DEBUG,System.err);
-                    }
+                    /*
+                     * Note: I believe that this dump() invocation can cause
+                     * false reporting of "ERROR child[x] has wrong parent". I
+                     * think that the code path for this involves the parent
+                     * reference being changed during the copy-on-write
+                     * operation. However, I have not verified this is gruesome
+                     * detail, e.g., using a specially crafted test case with
+                     * DEBUG level logging forced on.  Instead, I have simply
+                     * commented out this additional logging.  If I am correct,
+                     * then the logging statement itself was the problem!
+                     */
+//                    if( triggeredByChild != null ) {
+//                        System.err.println("trigger"); triggeredByChild.dump(Level.DEBUG,System.err);
+//                    }
                 }
             }
 
