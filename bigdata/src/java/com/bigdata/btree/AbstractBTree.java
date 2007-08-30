@@ -131,9 +131,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             .toInt();
 
     /**
-     * flag turns on some more expensive assertions.
+     * Flag turns on the use of {@link AbstractNode#assertInvariants()} and is
+     * automatically enabled when the {@link #log logger} is set to
+     * {@link Level#DEBUG}.
      */
-    final protected boolean debug = DEBUG || true;
+    final protected boolean debug = DEBUG;
 
     /**
      * Counters tracking various aspects of the btree.
