@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.journal;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Properties;
 
@@ -70,6 +71,13 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @todo add an option to restrict the names of the indices to be dumped (-name=<regex>).
  * 
+ * @todo allow dump even on a journal that is open (e.g., only request a read
+ *       lock or do not request a lock). An error is reported when you actually
+ *       begin to read from the file once it is opened in a read-only mode if
+ *       there is another process with an exclusive lock.  In fact, since the
+ *       root blocks must be consistent when they are read, a reader would have
+ *       to have a lock at the moment that it read the root blocks...
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -89,6 +97,8 @@ public class DumpJournal {
      *            <dd>Dump metadata for indices in all commit records (default
      *            only dumps the metadata for the indices as of the most current
      *            committed state).</dd>
+     *            <dt>-indices</dt>
+     *            <dd>Dump the records in the indices.</dd>
      *            </dl>
      */
     public static void main(String[] args) {
@@ -104,6 +114,8 @@ public class DumpJournal {
         int i = 0;
         
         boolean dumpHistory = false;
+        
+        boolean dumpIndices = false;
         
         for(; i<args.length; i++) {
             
@@ -122,6 +134,12 @@ public class DumpJournal {
                 
             }
             
+            if(arg.equals("-indices")) {
+                
+                dumpIndices = true;
+                
+            }
+            
         }
         
         for(; i<args.length; i++) {
@@ -130,7 +148,7 @@ public class DumpJournal {
 
             try {
 
-                dumpJournal(file,dumpHistory);
+                dumpJournal(file,dumpHistory,dumpIndices);
                 
             } catch( RuntimeException ex) {
                 
@@ -146,7 +164,7 @@ public class DumpJournal {
         
     }
     
-    public static void dumpJournal(File file,boolean dumpHistory) {
+    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpIndices) {
         
         /*
          * Stat the file and report on its size, etc.
@@ -247,7 +265,7 @@ public class DumpJournal {
                     
                     System.err.println(commitRecord.toString());
 
-                    dumpNamedIndicesMetadata(journal,commitRecord);
+                    dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices);
                     
                 }
                 
@@ -261,7 +279,7 @@ public class DumpJournal {
                 
                 System.err.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(journal,commitRecord);
+                dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices);
                 
             }
 
@@ -280,7 +298,7 @@ public class DumpJournal {
      * @param commitRecord
      */
     private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-            ICommitRecord commitRecord) {
+            ICommitRecord commitRecord,boolean dumpIndices) {
 
         Name2Addr name2Addr = journal.name2Addr;
 
@@ -303,7 +321,61 @@ public class DumpJournal {
             
                 System.err.println(ndx.getMetadata().toString());
                 
+                if(dumpIndices) dumpIndex(ndx);
+                
             }
+            
+        }
+        
+    }
+
+    private static void dumpIndex(BTree btree) {
+
+        IEntryIterator itr = btree.rangeIterator(null, null);
+        
+        int i = 0;
+        
+        while(itr.hasNext()) {
+            
+            Object val = itr.next();
+            
+            Object key = itr.getKey();
+            
+            System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
+            
+            i++;
+            
+        }
+        
+    }
+
+    private static String dumpKey(Object key) {
+        
+        try {
+
+            byte[] tmp = (byte[]) key;
+
+            return Arrays.toString(tmp);
+            
+        } catch (ClassCastException ex) {
+            
+            return ""+key;
+            
+        }
+        
+    }
+    
+    private static String dumpVal(Object key) {
+        
+        try {
+
+            byte[] tmp = (byte[]) key;
+
+            return Arrays.toString(tmp);
+            
+        } catch (ClassCastException ex) {
+            
+            return ""+key;
             
         }
         
