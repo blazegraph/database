@@ -51,36 +51,32 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.bigdata.journal.TemporaryRawStore;
 
 
 /**
- * A simple persistent unbuffered implementation backed by a file. The maximum
- * size of the file is restricted to {@link Integer#MAX_VALUE} bytes since we
- * must code the offset into the file using {@link Addr#toLong(int, int)}.
+ * A simple persistent unbuffered implementation backed by a file.
  * 
- * @see {@link TemporaryRawStore}, which provides a more solution for temporary
- *      data that begins with the benefits of a memory-resident buffer and then
+ * @see {@link TemporaryRawStore}, which provides a solution for temporary data
+ *      that begins with the benefits of a memory-resident buffer and then
  *      converts to a disk-based store on overflow.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleFileRawStore implements IRawStore {
+public class SimpleFileRawStore extends AbstractRawWormStore {
 
     private boolean open = true;
     
     public final File file;
     protected final RandomAccessFile raf;
     
-    /**
-     * This provides a purely transient means to identify deleted records.  This
-     * data does NOT survive restart of the store. 
-     */
-    private final Set<Long> deleted = new HashSet<Long>();
+//    /**
+//     * This provides a purely transient means to identify deleted records.  This
+//     * data does NOT survive restart of the store. 
+//     */
+//    private final Set<Long> deleted = new HashSet<Long>();
 
     /**
      * Open a store. The file will be created if it does not exist and it is
@@ -94,6 +90,8 @@ public class SimpleFileRawStore implements IRawStore {
      *            {@link RandomAccessFile#RandomAccessFile(File, String)()}.
      */
     public SimpleFileRawStore(File file, String mode) throws IOException {
+        
+        super(WormAddressManager.DEFAULT_OFFSET_BITS);
         
         if (file == null)
             throw new IllegalArgumentException("file is null");
@@ -177,9 +175,9 @@ public class SimpleFileRawStore implements IRawStore {
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
 
-        final int offset = Addr.getOffset(addr);
+        final long offset = getOffset(addr);
 
-        final int nbytes = Addr.getByteCount(addr);
+        final int nbytes = getByteCount(addr);
 
         if (nbytes == 0) {
 
@@ -188,12 +186,12 @@ public class SimpleFileRawStore implements IRawStore {
 
         }
 
-        if (deleted.contains(addr)) {
-
-            throw new IllegalArgumentException(
-                    "Address was deleted in this session");
-
-        }
+//        if (deleted.contains(addr)) {
+//
+//            throw new IllegalArgumentException(
+//                    "Address was deleted in this session");
+//
+//        }
 
         try {
 
@@ -209,7 +207,7 @@ public class SimpleFileRawStore implements IRawStore {
 
             // copy the data into the buffer.
 
-            raf.getChannel().read(dst, (long) offset);
+            raf.getChannel().read(dst, offset);
 
             // flip for reading.
 
@@ -250,7 +248,7 @@ public class SimpleFileRawStore implements IRawStore {
             }
 
             // the offset into the file at which the record will be written.
-            final int offset = (int) pos;
+            final long offset = pos;
 
             // // extend the file to have sufficient space for this record.
             // raf.setLength(pos + nbytes);
@@ -259,7 +257,7 @@ public class SimpleFileRawStore implements IRawStore {
             raf.getChannel().write(data, pos);
 
             // formulate the address that can be used to recover that record.
-            return Addr.toLong(nbytes, offset);
+            return toAddr(nbytes, offset);
 
         } catch (IOException ex) {
 

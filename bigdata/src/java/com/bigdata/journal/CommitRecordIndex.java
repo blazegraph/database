@@ -58,17 +58,18 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * BTree mapping commit times to {@link ICommitRecord}s. The keys are the long
  * integers. The values are {@link Entry} objects recording the commit time of
- * the index and the {@link Addr address} of the {@link ICommitRecord} for that
- * commit time. A canonicalizing cache is maintained such that the caller will
- * never observe distinct concurrent instances of the same {@link ICommitRecord}.
- * This in turn facilitates canonicalizing caches for objects loaded from that
+ * the index and the address of the {@link ICommitRecord} for that commit time.
+ * A canonicalizing cache is maintained such that the caller will never observe
+ * distinct concurrent instances of the same {@link ICommitRecord}. This in
+ * turn facilitates canonicalizing caches for objects loaded from that
  * {@link ICommitRecord}.
  */
 public class CommitRecordIndex extends BTree {
@@ -97,7 +98,7 @@ public class CommitRecordIndex extends BTree {
     public CommitRecordIndex(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                ValueSerializer.INSTANCE);
+                new ValueSerializer());
 
     }
 
@@ -380,8 +381,8 @@ public class CommitRecordIndex extends BTree {
         public final long commitTime;
         
         /**
-         * The {@link Addr address} of the {@link ICommitRecord} whose commit
-         * timestamp is {@link #commitTime}.
+         * The address of the {@link ICommitRecord} whose commit timestamp is
+         * {@link #commitTime}.
          */
         public final long addr;
         
@@ -408,13 +409,30 @@ public class CommitRecordIndex extends BTree {
          */
         private static final long serialVersionUID = 8085229450005958541L;
 
-        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
+//        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
 
         final public static transient short VERSION0 = 0x0;
 
-        public ValueSerializer() {
-        }
+        // FIXME this is not parameterized by the actual offsetBits.
+        final private static transient IAddressManager addressManager = WormAddressManager.INSTANCE;
+        
+        /**
+         * Required to (de-)serialize the addresses.
+         */
+//        protected final transient IRawStore store;
+//        
+//        public ValueSerializer(IRawStore store) {
+//            
+//            if(store==null) throw new IllegalArgumentException();
+//            
+//            this.store = store;
+//            
+//        }
 
+        public ValueSerializer() {
+            
+        }
+        
         public void putValues(DataOutputBuffer os, Object[] values, int n)
                 throws IOException {
 
@@ -429,7 +447,8 @@ public class CommitRecordIndex extends BTree {
                 
                 os.packLong(entry.commitTime);
                 
-                os.packLong(entry.addr);
+                addressManager.packAddr(os, entry.addr);
+//                os.packLong(entry.addr);
                 
             }
 
@@ -447,7 +466,9 @@ public class CommitRecordIndex extends BTree {
 
                 final long commitTime = LongPacker.unpackLong(is);
 
-                final long addr = LongPacker.unpackLong(is);
+//                final long addr = LongPacker.unpackLong(is);
+                
+                final long addr = addressManager.unpackAddr(is);
                 
                 values[i] = new Entry(commitTime,addr);
 

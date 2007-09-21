@@ -55,6 +55,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Helper object used when opening or creating journal file in any of the
@@ -127,11 +129,18 @@ public class FileMetadata {
     final long userExtent;
 
     /**
+     * The #of bits out of a 64-bit long integer that are used to encode the
+     * byte offset as an unsigned integer.  The remaining bits are used to
+     * encode the byte count (aka record length) as an unsigned integer.
+     */
+    final int offsetBits;
+    
+    /**
      * The next offset at which a record would be written on the store.  The
      * offset is relative to the start of the user data space.  Offset zero(0)
      * addresses the first byte after the root blocks.
      */
-    final int nextOffset;
+    final long nextOffset;
     
     /**
      * True iff the file was opened in a read-only mode.
@@ -150,8 +159,8 @@ public class FileMetadata {
     
     /**
      * The size of the journal header, including MAGIC, version, and both root
-     * blocks. This is as an offset when computing the index of a slot on the
-     * journal.
+     * blocks. This is used as an offset when computing the index of a record in
+     * the journal.
      */
     static final int headerSize0 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
     
@@ -219,15 +228,25 @@ public class FileMetadata {
      *            When true, the file is opened in "rwd" mode and individual IOs
      *            are forced to disk. This option SHOULD be false since we only
      *            need to write through to disk on commit, not on each IO.
-     * 
+     * @param offsetBits
+     *            The #of bits out of a 64-bit long integer that are used to
+     *            encode the byte offset as an unsigned integer. The remaining
+     *            bits are used to encode the byte count (aka record length) as
+     *            an unsigned integer.
+     * @param validateChecksum
+     *            When true, the checksum stored in the root blocks of an
+     *            existing file will be validated when the file is opened.  See {@link Options}
+     * @param checker
+     *            The object used to compute the checksum of the root blocks.
      * @throws RuntimeException
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
-    FileMetadata(File file, BufferMode bufferMode,
-            boolean useDirectBuffers, long initialExtent, long maximumExtent,
-            boolean create, boolean isEmptyFile, boolean deleteOnExit,
-            boolean readOnly, ForceEnum forceWrites) throws RuntimeException {
+    FileMetadata(File file, BufferMode bufferMode, boolean useDirectBuffers,
+            long initialExtent, long maximumExtent, boolean create,
+            boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
+            ForceEnum forceWrites, int offsetBits, boolean validateChecksum,
+            ChecksumUtility checker) throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -258,10 +277,14 @@ public class FileMetadata {
 
         }
 
+        WormAddressManager.assertOffsetBits(offsetBits);
+        
 //        this.segment = segmentId;
         
         this.bufferMode = bufferMode;
 
+        this.offsetBits = offsetBits;
+        
         final String fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
         this.readOnly = readOnly;
@@ -421,12 +444,12 @@ public class FileMetadata {
                 tmp0.position(0); // resets the position.
                 tmp1.position(0);
                 try {
-                    rootBlock0 = new RootBlockView(true,tmp0);
+                    rootBlock0 = new RootBlockView(true,tmp0,validateChecksum?checker:null);
                 } catch(RootBlockException ex ) {
                     log.warn("Bad root block zero: "+ex);
                 }
                 try {
-                    rootBlock1 = new RootBlockView(false,tmp1);
+                    rootBlock1 = new RootBlockView(false,tmp1,validateChecksum?checker:null);
                 } catch(RootBlockException ex ) {
                     log.warn("Bad root block one: "+ex);
                 }
@@ -453,7 +476,12 @@ public class FileMetadata {
                             .allocateDirect((int) userExtent) : ByteBuffer
                             .allocate((int) userExtent));
                     // Setup to read data from file into the buffer.
-                    buffer.limit(nextOffset);
+                    if (nextOffset > Integer.MAX_VALUE) {
+                        throw new RuntimeException(
+                                "This file is too large for a buffered mode: use "
+                                        + BufferMode.Disk);
+                    }
+                    buffer.limit((int)nextOffset);
                     buffer.position(0);
                     // Read the file image into the direct buffer.
                     final int nbytes = raf.getChannel().read(buffer,
@@ -554,20 +582,19 @@ public class FileMetadata {
                  */
                 nextOffset = 0;
                 final long commitCounter = 0L;
-                final long commitTimestamp = 0L;
-                final long firstTxId = 0L;
-                final long lastTxId = 0L;
+                final long firstCommitTime = 0L;
+                final long lastCommitTime = 0L;
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
                 final UUID uuid = UUID.randomUUID();
-                IRootBlockView rootBlock0 = new RootBlockView(true, 
-                        nextOffset, firstTxId, lastTxId, commitTimestamp,
+                IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
+                        nextOffset, firstCommitTime, lastCommitTime,
                         commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                        uuid);
+                        uuid, checker);
                 IRootBlockView rootBlock1 = new RootBlockView(false,
-                        nextOffset, firstTxId, lastTxId, commitTimestamp,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                        uuid);
+                        offsetBits, nextOffset, firstCommitTime,
+                        lastCommitTime, commitCounter, commitRecordAddr,
+                        commitRecordIndexAddr, uuid, checker);
                 FileChannel channel = raf.getChannel();
                 channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
                 channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);

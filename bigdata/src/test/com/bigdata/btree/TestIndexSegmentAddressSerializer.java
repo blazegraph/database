@@ -47,10 +47,9 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegment.CustomAddressSerializer;
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Tests logic to encode and decode the addresses of nodes and leaves in an {@link
@@ -108,24 +107,30 @@ public class TestIndexSegmentAddressSerializer extends AbstractBTreeTestCase {
     
     public void test_encodeLeaf01() {
         
-        final int nbytes = 12;
-        final int offset = 44;
+        int offsetBits = 48;
         
-        final long addrLeaf = CustomAddressSerializer.encode(nbytes, offset, true);
+        IAddressManager am = new WormAddressManager(offsetBits);
+        
+        CustomAddressSerializer ser = new CustomAddressSerializer(am);
+        
+        final int nbytes = 12;
+        final long offset = 44L;
+        
+        final long addrLeaf = ser.encode(nbytes, offset, true);
         
         assertTrue((addrLeaf&1)==0);
         
-        final long addrNode = CustomAddressSerializer.encode(nbytes, offset, false);
+        final long addrNode = ser.encode(nbytes, offset, false);
 
         assertTrue((addrNode&1)==1);
 
-        assertEquals(nbytes,Addr.getByteCount(addrLeaf>>1));
+        assertEquals(nbytes,am.getByteCount(addrLeaf>>1));
         
-        assertEquals(offset,Addr.getOffset(addrLeaf>>1));
+        assertEquals(offset,am.getOffset(addrLeaf>>1));
         
-        assertEquals(nbytes,Addr.getByteCount(addrNode>>1));
+        assertEquals(nbytes,am.getByteCount(addrNode>>1));
         
-        assertEquals(offset,Addr.getOffset(addrNode>>1));
+        assertEquals(offset,am.getOffset(addrNode>>1));
         
     }
     

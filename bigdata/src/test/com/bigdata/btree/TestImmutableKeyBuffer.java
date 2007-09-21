@@ -49,9 +49,6 @@ package com.bigdata.btree;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ImmutableKeyBuffer;
-
 /**
  * Test of an immutable representation of keys that is both compact and
  * efficient for search.

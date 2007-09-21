@@ -55,9 +55,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
-import com.bigdata.io.ByteBufferInputStream;
-import com.bigdata.io.ByteBufferOutputStream;
-
 import junit.framework.TestCase2;
 
 /**

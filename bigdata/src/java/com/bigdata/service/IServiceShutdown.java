@@ -48,12 +48,13 @@ Modifications:
 package com.bigdata.service;
 
 /**
- * API for service shutdown.
+ * Local API for service shutdown.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo reconcile with jini startup/shutdown.
+ * @todo reconcile with Jini - does Jini provide for both polite and immediate
+ *       shutdown or only a single kind (destroyService).
  */
 public interface IServiceShutdown {
 

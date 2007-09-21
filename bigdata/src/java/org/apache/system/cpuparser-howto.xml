@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+
+<!--
+     Licensed to the Apache Software Foundation (ASF) under one or more
+     contributor license agreements.  See the NOTICE file distributed with
+     this work for additional information regarding copyright ownership.
+     The ASF licenses this file to You under the Apache License, Version 2.0
+     (the "License"); you may not use this file except in compliance with
+     the License.  You may obtain a copy of the License at
+     
+     http://www.apache.org/licenses/LICENSE-2.0
+     
+     Unless required by applicable law or agreed to in writing, software
+     distributed  under the  License is distributed on an "AS IS" BASIS,
+     WITHOUT  WARRANTIES OR CONDITIONS  OF ANY KIND, either  express  or
+     implied.
+     
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<document>
+    <properties>
+        <title>Event - How To Extend System Util</title>
+    </properties>
+    <body>
+        <section name="System Util Design">
+            <p>
+        SystemUtil determines which CPUParser it needs by examining
+        the results from
+                <code>System.getProperty( "os.name" )</code>.
+        It strips all the whitespace from the name, and appends it
+        to the
+                <code>org.apache.excalibur.util.system</code> package.
+        For example, if the "os.name" property returns "Windows XP",
+        then the full class name needs to be
+                <code>org.apache.excalibur.util.system.WindowsXP</code>.
+            </p>
+        </section>
+        <section name="Writing a CPUParser">
+            <p>
+        Writing a CPUParser is not hard.  You only need to know
+        how to name your implementation, and then write the relevant
+        logic.  All CPUParser implementations must be in the
+                <code>org.apache.excalibur.util.system</code> package and
+        implement the CPUParser interface.  The example below is
+        taken from the WindowsXP CPUParser included in this project.
+            </p>
+            <source>
+                <![CDATA[
+package org.apache.excalibur.util.system;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import org.apache.excalibur.util.CPUParser;
+
+/**
+ * Parses the Windows XP environment
+ *
+ * @author <a href="mailto:bloritsch@apache.org">Berin Loritsch</a>
+ * @version CVS $Revision$ $Date$
+ */
+public final class WindowsXP implements CPUParser
+{
+    private final int m_processors;
+    private final String m_cpuInfo;
+
+    /**
+     * Create this instance of CPUParser and gather information from
+     * the Windows XP system.
+     */
+    public WindowsXP()
+    {
+        int procs = 1;
+        String info = "";
+
+        try
+        {
+            Runtime rt = Runtime.getRuntime();
+            Process proc = rt.exec( "cmd.exe /C echo %NUMBER_OF_PROCESSORS%" );
+            BufferedReader reader = new BufferedReader( new InputStreamReader(
+                proc.getInputStream() ) );
+            String numProcs = reader.readLine();
+
+            proc = rt.exec( "cmd.exe /C echo %PROCESSOR_IDENTIFIER%" );
+            reader = new BufferedReader( new InputStreamReader( proc.getInputStream() ) );
+            info = reader.readLine();
+
+            procs = Integer.parseInt( numProcs );
+        }
+        catch( Exception e )
+        {
+        }
+
+        m_processors = procs;
+        m_cpuInfo = info;
+    }
+
+    /**
+     * Return the number of processors available on the machine
+     */
+    public int numProcessors()
+    {
+        return m_processors;
+    }
+
+    /**
+     * Return the cpu info for the processors (assuming symetric multiprocessing
+     * which means that all CPUs are identical).  The format is:
+     *
+     * ${arch} family ${family} Model ${model} Stepping ${stepping}, ${identifier}
+     */
+    public String cpuInfo()
+    {
+        return m_cpuInfo;
+    }
+}
+
+      ]]>
+            </source>
+        </section>
+    </body>
+</document>

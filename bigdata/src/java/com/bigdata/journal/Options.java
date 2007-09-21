@@ -49,6 +49,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to
@@ -115,6 +116,28 @@ public class Options {
      * @see #DEFAULT_MAXIMUM_EXTENT
      */
     public static final String MAXIMUM_EXTENT = "maximumExtent";
+
+    /**
+     * <code>offsetBits</code> - The #of bits in a 64-bit long integer
+     * identifier that are used to encode the byte offset of a record in the
+     * store as an unsigned integer. The default is
+     * {@link WormAddressManager#DEFAULT_OFFSET_BITS}, which allows store files
+     * up to ~4T in length and records up to (but not including) 4M in length.
+     * 
+     * @see WormAddressManager
+     * @see WormAddressManager#DEFAULT_OFFSET_BITS
+     */
+    public static final String OFFSET_BITS = "offsetBits";
+    
+    /**
+     * <code>validateChecksum</code> - An optional boolean property (default
+     * is <code>true</code>). When true, the checksum stored in the root
+     * blocks of an existing store will be validated when the store file is
+     * opened. This property may be set to false if you are engaged in a
+     * desparate attempt to use a bad root block or to patch a bad root block
+     * using a hex editor.
+     */
+    public static final String VALIDATE_CHECKSUM = "validateChecksum";
     
     /**
      * <code>create</code> - An optional boolean property (default is
@@ -256,6 +279,14 @@ public class Options {
      * overflow event.
      */
     public final static long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
+    
+    /**
+     * The default #of bits used to encode the byte offset of a record in the
+     * store as an unsigned integer.
+     * 
+     * @see WormAddressManager#DEFAULT_OFFSET_BITS
+     */
+    public final static int DEFAULT_OFFSET_BITS = WormAddressManager.DEFAULT_OFFSET_BITS;
     
     /**
      * The default for the {@link #CREATE} option.

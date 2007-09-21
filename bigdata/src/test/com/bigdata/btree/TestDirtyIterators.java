@@ -49,12 +49,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IAbstractNode;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-
 /**
  * Test suite for iterators that visit only dirty nodes or leaves. This test
  * suite was factored apart from {@link TestIterators} since this suite relies

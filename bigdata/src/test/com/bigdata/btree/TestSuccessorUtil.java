@@ -47,9 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.NoSuccessorException;
-import com.bigdata.btree.SuccessorUtil;
-
 import junit.framework.TestCase2;
 
 /**

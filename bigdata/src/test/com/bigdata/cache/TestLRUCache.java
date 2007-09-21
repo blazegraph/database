@@ -49,9 +49,6 @@ package com.bigdata.cache;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.bigdata.cache.ICacheEntry;
-import com.bigdata.cache.ICachePolicy;
-import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.LRUCache.LRUIterator;
 
 /**

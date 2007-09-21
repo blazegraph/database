@@ -58,6 +58,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.io.NameAndExtensionFilter;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.scaleup.MetadataIndex;
 
 /**
@@ -75,9 +76,6 @@ import com.bigdata.scaleup.MetadataIndex;
  * 
  * @todo refactor the tests suites to run the embedded as well as the
  *       distributed versions.
- * 
- * @todo define EmbeddedBigdataClient, share code w/ {@link BigdataFederation},
- *       and refactor the RDF test suites.
  * 
  * @todo clean up the restart logic and validate with test suites. The service
  *       UUIDs need to be persistent and must define a consistent mapping from
@@ -155,6 +153,21 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         return dataServiceByUUID.get(serviceUUID);
         
     }
+
+    /**
+     * There are {@link #ndataServices} data services defined in the federation.
+     * This returns the data service with that index.
+     * 
+     * @param index
+     *            The index.
+     *            
+     * @return The data service at that index.
+     */
+    public DataService getDataService(int index) {
+        
+        return dataService[index];
+        
+    }
     
     /**
      * Options for the embedded (in process) federation. Service instances will
@@ -209,7 +222,13 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         }
 
     }
+    
+    // The basename of the journal file for the metadata service.
+    private final String metadataBasename = "metadataService";
 
+    // The basename of the journal file for the data service.
+    private final String dataBasename = "dataService";
+    
     /**
      * Start or restart an embedded bigdata federation.
      * 
@@ -225,12 +244,10 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             throw new IllegalArgumentException();
         
         this.client = client;
-        
-        // The basename of the journal file for the metadata service.
-        final String metadataBasename = "metadataService";
 
-        // The basename of the journal file for the data service.
-        final String dataBasename = "dataService";
+        // true iff the federation is diskless.
+        final boolean isTransient = BufferMode.Transient.toString().equals(
+                properties.getProperty(Options.BUFFER_MODE));
         
         /*
          * The directory in which the data files will reside.
@@ -265,139 +282,163 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         }
 
-        /*
-         * Look for pre-existing data files.
-         */
-        {
+        if(isTransient) {
             
             /*
+             * First time startup.
+             */
+            ndataServices = createFederation(properties);
+
+            return;
+            
+        } else {
+
+            /*
+             * Look for pre-existing data files.
+             * 
              * @todo if we are supporting overflow then there will be multiple
              * versions of the files per the master journal. In that case it is
              * better to place each (meta)data service into its own
              * subdirectory.
              */
-            
+
             /*
              * Scan the data directory for metadata service data files.
              */
-            
+
             File[] metadataFiles = new NameAndExtensionFilter(new File(dataDir,
                     metadataBasename).toString(), Options.JNL).getFiles();
 
             /*
              * Scan the data directory for data service data files.
              */
-            
+
             File[] dataFiles = new NameAndExtensionFilter(new File(dataDir,
                     dataBasename).toString(), Options.JNL).getFiles();
 
-            if(metadataFiles.length==0) {
-                
-                if(dataFiles.length != 0) {
-                    
-                    throw new RuntimeException("Data files found, but no metadata files.");
-                    
+            if (metadataFiles.length == 0) {
+
+                if (dataFiles.length != 0) {
+
+                    throw new RuntimeException(
+                            "Data files found, but no metadata files.");
+
                 }
 
                 /*
                  * First time startup.
                  */
-                
-                /*
-                 * The #of data services (used iff this is a 1st time start).
-                 */
-                {
+                ndataServices = createFederation(properties);
 
-                    String val = properties.getProperty(Options.NDATA_SERVICES,
-                            Options.DEFAULT_NDATA_SERVICES);
-
-                    ndataServices = Integer.parseInt(val);
-
-                    if (ndataServices <= 0) {
-
-                        throw new IllegalArgumentException(Options.NDATA_SERVICES + "="
-                                + val);
-
-                    }
-                
-                }
-                
-                /*
-                 * Start the metadata service.
-                 */
-                {
-
-                    Properties p = new Properties(properties);
-                    
-                    // name of the metadata journal.
-                    p.setProperty(Options.FILE, new File(dataDir,
-                            metadataBasename + Options.JNL).toString());
-                    
-                    metadataService = new EmbeddedMetadataService(this, UUID
-                            .randomUUID(), p);
-                    
-                }
-                
-                /*
-                 * Start the data services.
-                 */
-                {
-
-                    dataService = new DataService[ndataServices];
-
-                    for (int i = 0; i < ndataServices; i++) {
-
-                        Properties p = new Properties(properties);
-
-                        // name of the data journal.
-                        p.setProperty(Options.FILE, new File(dataDir,
-                                dataBasename + "_" + i + Options.JNL)
-                                .toString());
-
-                        dataService[i] = new EmbeddedDataService(UUID
-                                .randomUUID(), p);
-                        
-                        final UUID serviceUUID;
-                        
-                        try {
-                            
-                            serviceUUID = dataService[i].getServiceUUID();
-                        
-                        } catch(IOException ex) {
-                            
-                            /*
-                             * Note: IOException is declared for RMI
-                             * compatability, but the embedded federation does
-                             * not use RMI.
-                             */
-
-                            throw new RuntimeException(ex);
-                            
-                        }
-                        
-                        dataServiceByUUID.put(serviceUUID, dataService[i]);
-
-                    }
-                    
-                }
-                
-                
             } else {
 
                 /*
                  * Re-start.
                  */
-                
+
                 ndataServices = dataFiles.length;
 
                 // @todo support restart.
                 throw new UnsupportedOperationException(
                         "Restart not supported yet");
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Create a new federation.
+     * 
+     * @param properties
+     * 
+     * @return The #of created data services.
+     */
+    private int createFederation(Properties properties) {
+        
+        final int ndataServices;
+        
+        /*
+         * The #of data services (used iff this is a 1st time start).
+         */
+        {
+
+            String val = properties.getProperty(Options.NDATA_SERVICES,
+                    Options.DEFAULT_NDATA_SERVICES);
+
+            ndataServices = Integer.parseInt(val);
+
+            if (ndataServices <= 0) {
+
+                throw new IllegalArgumentException(Options.NDATA_SERVICES + "="
+                        + val);
+
+            }
+        
+        }
+        
+        /*
+         * Start the metadata service.
+         */
+        {
+
+            Properties p = new Properties(properties);
+            
+            // name of the metadata journal.
+            p.setProperty(Options.FILE, new File(dataDir,
+                    metadataBasename + Options.JNL).toString());
+            
+            metadataService = new EmbeddedMetadataService(this, UUID
+                    .randomUUID(), p);
+            
+        }
+        
+        /*
+         * Start the data services.
+         */
+        {
+
+            dataService = new DataService[ndataServices];
+
+            for (int i = 0; i < ndataServices; i++) {
+
+                Properties p = new Properties(properties);
+
+                // name of the data journal.
+                p.setProperty(Options.FILE, new File(dataDir,
+                        dataBasename + "_" + i + Options.JNL)
+                        .toString());
+
+                dataService[i] = new EmbeddedDataService(UUID
+                        .randomUUID(), p);
                 
+                final UUID serviceUUID;
+                
+                try {
+                    
+                    serviceUUID = dataService[i].getServiceUUID();
+                
+                } catch(IOException ex) {
+                    
+                    /*
+                     * Note: IOException is declared for RMI
+                     * compatability, but the embedded federation does
+                     * not use RMI.
+                     */
+
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+                dataServiceByUUID.put(serviceUUID, dataService[i]);
+
             }
             
         }
         
+        return ndataServices;
+
     }
     
     /**
@@ -645,6 +686,8 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 throw new IllegalArgumentException();
             
             this.serviceUUID = serviceUUID;
+            
+            log.info("uuid="+serviceUUID);
             
         }
 

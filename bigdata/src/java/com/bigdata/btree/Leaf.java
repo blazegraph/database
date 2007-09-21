@@ -92,7 +92,7 @@ public class Leaf extends AbstractNode implements ILeafData {
      * @param btree
      *            The tree to which the leaf belongs.
      * @param addr
-     *            The {@link Addr address} of this leaf.
+     *            The address of this leaf.
      * @param branchingFactor
      *            The branching factor for the leaf.
      * @param keys

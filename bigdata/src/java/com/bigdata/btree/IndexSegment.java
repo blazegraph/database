@@ -51,16 +51,17 @@ import org.CognitiveWeb.extser.LongPacker;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ResourceManager;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
- * segmented and potentially distributed index. The file format of the index
- * segment includes a metadata record, the leaves of the segment in key order,
- * and the nodes of the segment in an arbitrary order. It is possible to map or
- * buffer the part of the file containing the index nodes or the entire file
- * depending on application requirements.
+ * potentially distributed index. The file format of the index segment includes
+ * a metadata record, the leaves of the segment in key order, and the nodes of
+ * the segment in an arbitrary order. It is possible to map or buffer the part
+ * of the file containing the index nodes or the entire file depending on
+ * application requirements.
  * <p>
  * Note: iterators returned by this class do not support removal (the nodes and
  * leaves will all refuse mutation operations).
@@ -168,8 +169,7 @@ public class IndexSegment extends AbstractBTree {
 
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
-                new CustomAddressSerializer(Addr
-                        .getOffset(fileStore.metadata.addrNodes)),
+                new CustomAddressSerializer(fileStore.metadata),
                 fileStore.extensionMetadata.getValueSerializer(),
                 ImmutableNodeFactory.INSTANCE,
                 fileStore.extensionMetadata.getRecordCompressor(),
@@ -580,10 +580,17 @@ public class IndexSegment extends AbstractBTree {
      * address is of a child leaf. During de-serialization, the low bit is
      * examined so that the address may be appropriately decoded and the addr is
      * then right shifted one bit. A leaf address does not require further
-     * decodiing. Decoding for a node address requires that we add in the offset
+     * decoding. Decoding for a node address requires that we add in the offset
      * of the start of the nodes in the file, which is recorded in
      * {@link IndexSegmentMetadata#offsetNodes} and is specified as a parameter
      * to the {@link CustomAddressSerializer} constructor.
+     * </p>
+     * <p>
+     * Note: This practice essentially discards the high bit of the long integer
+     * encoding the address.  This means that only N-1 offsetBits are actually
+     * available to the {@link IndexSegmentFileStore}.  The #of offsetBits MUST
+     * therefore be choosen to be one larger than would otherwise be necessary 
+     * for the #of distinct index records to be addressed.
      * </p>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -592,44 +599,79 @@ public class IndexSegment extends AbstractBTree {
     public static class CustomAddressSerializer implements IAddressSerializer {
 
         /**
+         * The object that knows how to encoding a byte offset and byte count
+         * into a long integer for the {@link IndexSegmentFileStore}.
+         */
+        protected final IAddressManager am;
+        
+        /**
          * The offset within the file of the first node. All nodes are written
          * densely on the file beginning at this offset. The child addresses for
          * a node are relative to this offset and must be corrected during
          * decoding (this is handled automatically by this class).
          */
-        protected final int offsetNodes;
+        protected final long offsetNodes;
 
         /**
          * Constructor variant used when the offset of the nodes is not known.
          * This is used by the {@link IndexSegmentBuilder}. When using this
          * constructor de-serialization of addresses is disabled.
+         * 
+         * @param am
+         *            The object that knows how to encoding a byte offset and
+         *            byte count into a long integer for the
+         *            {@link IndexSegmentFileStore}.
          */
-        public CustomAddressSerializer() {
+        public CustomAddressSerializer(IAddressManager am) {
 
+            if(am==null) throw new IllegalArgumentException();
+            
+            this.am = am;
+            
             this.offsetNodes = 0;
 
         }
 
+//        /**
+//         * 
+//         * @param am
+//         *            The object that knows how to encoding a byte offset and
+//         *            byte count into a long integer for the
+//         *            {@link IndexSegmentFileStore}. This object may be
+//         *            constructed using {@link IndexSegmentMetadata#offsetBits}
+//         *            and {@link WormAddressManager#WormAddressManager(int)}.
+//         * @param nodesOffset
+//         *            The offset within the file of the first node. All nodes
+//         *            are written densely on the file beginning at this offset.
+//         *            The child addresses for a node are relative to this offset
+//         *            and must be corrected during decoding (this is handled
+//         *            automatically by this class). When zero(0) node
+//         *            deserialization is not permitted (the nodesOffset will be
+//         *            zero in the metadata record iff no nodes were generated by
+//         *            the index segment builder).
+//         * 
+//         * @see IndexSegmentMetadata#offsetNodes
+//         */
+//        public CustomAddressSerializer(IAddressManager am, long offsetNodes) {
+        
         /**
-         * 
-         * @param nodesOffset
-         *            The offset within the file of the first node. All nodes
-         *            are written densely on the file beginning at this offset.
-         *            The child addresses for a node are relative to this offset
-         *            and must be corrected during decoding (this is handled
-         *            automatically by this class). When zero(0) node
-         *            deserialization is not permitted (the nodesOffset will be
-         *            zero in the metadata record iff no nodes were generated by
-         *            the index segment builder).
-         * 
-         * @see IndexSegmentMetadata#offsetNodes
+         * Constructor variant used when opening an
+         * {@link IndexSegmentFileStore}.
          */
-        public CustomAddressSerializer(long offsetNodes) {
+        public CustomAddressSerializer(IndexSegmentMetadata metadata) {
+            
+//            if(am==null) throw new IllegalArgumentException();
+//            
+//            this.am = am;
 
-            /*
-             * Note: trim to int (we restrict the maximum size of the segment).
-             */
-            this.offsetNodes = (int) offsetNodes;
+            this.am = new WormAddressManager(metadata.offsetBits);
+            
+            this.offsetNodes = am.getOffset(metadata.addrNodes);
+            
+//            /*
+//             * Note: trim to int (we restrict the maximum size of the segment).
+//             */
+//            this.offsetNodes = (int) offsetNodes;
 
             // System.err.println("offsetNodes="+offsetNodes);
 
@@ -671,11 +713,11 @@ public class IndexSegment extends AbstractBTree {
                 // strip off the low bit.
                 addr >>= 1;
 
-                final int offset = Addr.getOffset(addr);
+                final long offset = am.getOffset(addr);
 
-                final int nbytes = Addr.getByteCount(addr);
+                final int nbytes = am.getByteCount(addr);
 
-                final int adjustedOffset = (isLeaf ? (offset << 1)
+                final long adjustedOffset = (isLeaf ? (offset << 1)
                         : ((offset << 1) | 1));
 
                 // write the adjusted offset (requires decoding).
@@ -713,8 +755,6 @@ public class IndexSegment extends AbstractBTree {
                  */
                 long v = LongPacker.unpackLong(is);
 
-                assert v <= Integer.MAX_VALUE;
-
                 // test the low bit. when set this is a node; otherwise a leaf.
                 final boolean isLeaf = (v & 1) == 0;
 
@@ -722,7 +762,7 @@ public class IndexSegment extends AbstractBTree {
                 v >>= 1;
 
                 // compute the real offset into the file.
-                final int offset = isLeaf ? (int) v : (int) v + offsetNodes;
+                final long offset = isLeaf ? v : v + offsetNodes;
 
                 /*
                  * nbytes (this field does not need any further interpretation).
@@ -737,7 +777,7 @@ public class IndexSegment extends AbstractBTree {
                 /*
                  * combine into the correct address.
                  */
-                final long addr = Addr.toLong(nbytes, offset);
+                final long addr = am.toAddr(nbytes, offset);
 
                 if (addr == 0L) {
 
@@ -768,9 +808,9 @@ public class IndexSegment extends AbstractBTree {
          * 
          * @return The encoded address.
          */
-        static public long encode(int nbytes, int offset, boolean isLeaf) {
+        public long encode(int nbytes, long offset, boolean isLeaf) {
 
-            long addr = Addr.toLong(nbytes, (int) offset);
+            long addr = am.toAddr(nbytes, offset);
 
             addr <<= 1; // (addr << 1)
 

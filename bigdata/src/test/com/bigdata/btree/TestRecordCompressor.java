@@ -51,8 +51,6 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
-import com.bigdata.btree.RecordCompressor;
-
 import junit.framework.TestCase2;
 
 

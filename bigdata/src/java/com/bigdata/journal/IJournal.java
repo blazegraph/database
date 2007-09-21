@@ -46,6 +46,7 @@ package com.bigdata.journal;
 import java.util.Properties;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.rawstore.IMROW;
 
 /**
  * <p>

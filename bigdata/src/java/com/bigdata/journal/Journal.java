@@ -45,10 +45,12 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.scaleup.MasterJournal.Options;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
- * Concrete implementation that does not handle {@link #overflow()} events.
+ * Concrete implementation suitable for a local and unpartitioned database
+ * introduces a trivial {@link ITransactionManager} and does NOT handle
+ * {@link #overflow()} events.
  */
 public class Journal extends AbstractJournal implements ITransactionManager, IIndexManager {
 
@@ -85,12 +87,20 @@ public class Journal extends AbstractJournal implements ITransactionManager, IIn
      *       low-latency service for use with a distributed database commit
      *       protocol.
      */
-    protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
 
+    /**
+     * A private instance is used so that different code paths will not touch
+     * the same underlying factory.
+     */
+    private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+    
+    /**
+     * Waits for the next millsecond.
+     */
     public long nextTimestamp() {
-        
-        return timestampFactory.nextTimestamp();
-        
+
+        return timestampFactory.nextMillis();
+
     }
 
     public long newTx(IsolationEnum level) {

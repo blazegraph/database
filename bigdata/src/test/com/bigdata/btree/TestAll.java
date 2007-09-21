@@ -50,6 +50,9 @@ import junit.framework.TestSuite;
 /**
  * Aggregates test suites into increasing dependency order.
  *
+ * FIXME write a test that verifies that spurious errors are not reported
+ * when the log level for the com.bigdata.btree package is DEBUG.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -143,6 +146,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestFusedView.class );
         // test of user-defined functions.
         suite.addTestSuite( TestUserDefinedFunction.class );
+        // test child address serialization.
+        suite.addTestSuite( TestAddressSerializer.class );
+        suite.addTestSuite( TestPackedAddressSerializer.class );
         // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
         // test iterator semantics for visiting only "dirty" nodes or leaves.
@@ -169,6 +175,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentPlan.class );
         // test encoding and decoding of child node/leaf addresses.
         suite.addTestSuite( TestIndexSegmentAddressSerializer.class );
+        // test write and read back of the index segment metadata record.
+        suite.addTestSuite( TestIndexSegmentMetadata.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // stress test with larger random input trees and a variety of branching factors.

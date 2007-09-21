@@ -48,9 +48,6 @@ Modifications:
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
-import java.util.Random;
-
-import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link CommitRecordSerializer}.

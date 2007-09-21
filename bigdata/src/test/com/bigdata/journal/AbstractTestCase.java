@@ -52,8 +52,6 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.rawstore.IRawStore;
-
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 

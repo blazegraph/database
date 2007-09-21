@@ -81,7 +81,15 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("util");
 
-        suite.addTestSuite( TestTimestampFactory.class );
+        // test of the millisecond resolution timestamp factory.
+        suite.addTestSuite( TestMillisecondTimestampFactory.class );
+        
+        // test of the nanosecond resolution timestamp factory.
+        suite.addTestSuite( TestNanosecondTimestampFactory.class );
+        
+        // test of the hybrid timestamp factory.
+        suite.addTestSuite( TestHybridTimestampFactory.class );
+        
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
 

@@ -190,6 +190,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         this.commitRecord = journal.getCommitRecord(startTime);
         
         this.tmpStore = readOnly ? null : new TemporaryRawStore(
+                journal.getOffsetBits(),
                 Bytes.megabyte * 1, // initial in-memory size.
                 Bytes.megabyte * 10, // maximum in-memory size.
                 false // do NOT use direct buffers.

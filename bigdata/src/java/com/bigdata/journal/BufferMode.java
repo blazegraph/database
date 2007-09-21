@@ -50,11 +50,10 @@ import java.nio.ByteBuffer;
  * The buffer mode in which the journal is opened.
  * </p>
  * <p>
- * This {@link #Direct} and {@link #Mapped} options may not be used for
- * files exceeding {@link Integer#MAX_VALUE} bytes in length since a
- * {@link ByteBuffer} is indexed with an <code>int</code>. However the
- * common use case for a journal is a small file on the order of 10s of
- * megabytes that absorbs writes for a read-optimized database file.
+ * This {@link #Direct} and {@link #Mapped} options may not be used for files
+ * exceeding {@link Integer#MAX_VALUE} bytes in length since a
+ * {@link ByteBuffer} is indexed with an <code>int</code> (the pragmatic limit
+ * is much lower since a JVM does not have access to more than 2G of RAM).
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

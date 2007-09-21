@@ -18,7 +18,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.SuccessorUtil;
 import com.bigdata.service.IDataService;
-import com.bigdata.util.TimestampFactory;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -396,10 +395,12 @@ public class SparseRowStore {
         if (timestamp == -1L) {
 
             /*
-             * @todo this needs to be done server-side during the unisolated
-             * operation.
+             * FIXME this needs to be done server-side during the unisolated
+             * operation. It should not be a distinct timestamp if we allow
+             * concurrent unisolated operations in the same commit group to
+             * overwrite one another.
              */
-            timestamp = TimestampFactory.nextNanoTime();
+            timestamp = System.currentTimeMillis();
 
         }
 

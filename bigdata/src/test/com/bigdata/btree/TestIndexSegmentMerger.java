@@ -49,9 +49,6 @@ package com.bigdata.btree;
 
 import java.io.IOException;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.IndexSegmentMerger;
 import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 
 /**

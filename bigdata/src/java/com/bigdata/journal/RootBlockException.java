@@ -49,7 +49,8 @@ package com.bigdata.journal;
 
 /**
  * An instance of this class is thrown if there is a problem with a root block
- * (bad magic, timestamps do not agree, etc).
+ * (bad magic, unknown version, Challis fields do not agree, checksum error,
+ * etc).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

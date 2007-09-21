@@ -46,9 +46,6 @@ Modifications:
  */
 package com.bigdata.btree;
 
-import com.bigdata.btree.IEvictionListener;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.PO;
 import com.bigdata.cache.HardReferenceQueue;
 
 /**

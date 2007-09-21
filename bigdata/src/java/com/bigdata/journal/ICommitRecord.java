@@ -103,9 +103,9 @@ public interface ICommitRecord {
      * commit record.
      * 
      * @param index
-     *            The index of the root {@link Addr address}.
+     *            The index of the root address.
      * 
-     * @return The {@link Addr address} stored at that index.
+     * @return The address stored at that index.
      * 
      * @exception IndexOutOfBoundsException
      *                if the index is negative or too large.

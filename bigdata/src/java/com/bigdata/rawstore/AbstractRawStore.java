@@ -42,19 +42,62 @@ Modifications:
 
 */
 /*
- * Created on Feb 20, 2007
+ * Created on Sep 5, 2007
  */
 
-package com.bigdata.journal;
+package com.bigdata.rawstore;
 
-import com.bigdata.rawstore.IRawStore;
+import java.nio.ByteBuffer;
 
 /**
- * A marker interface for a store that supports Multiple Readers, One Writer.
+ * Abstract base class for {@link IRawStore} implementations. This class uses a
+ * delegation pattern for the {@link IStoreSerializer} interface and does not
+ * implement either the methods defined directly by the {@link IRawStore}
+ * interface nor the methods of the {@link IAddressManager} interface. As such
+ * it may be used as an abstract base class by any {@link IRawStore}
+ * implementation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMROW /*extends IRawStore*/ {
+abstract public class AbstractRawStore implements IRawStore, IStoreSerializer {
+
+    /**
+     * The object that handles serialization.
+     */
+    protected final IStoreSerializer serializer;
+    
+    /**
+     * The designated constructor.
+     */
+    public AbstractRawStore() {
+
+        serializer = new StoreSerializer(this);
+        
+    }
+
+    final public Object deserialize(byte[] b, int off, int len) {
+        
+        return serializer.deserialize(b, off, len);
+        
+    }
+
+    final public Object deserialize(byte[] b) {
+        
+        return serializer.deserialize(b,0,b.length);
+        
+    }
+
+    final public Object deserialize(ByteBuffer buf) {
+        
+        return serializer.deserialize(buf);
+        
+    }
+
+    final public byte[] serialize(Object obj) {
+
+        return serializer.serialize(obj);
+        
+    }
 
 }

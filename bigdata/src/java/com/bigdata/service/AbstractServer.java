@@ -196,6 +196,15 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      * {@link NonActivatableServiceDescriptor}.
      */
     private LifeCycle lifeCycle;
+
+    /**
+     * The exported proxy for the service implementation object.
+     */
+    public Remote getProxy() {
+        
+        return proxy;
+        
+    }
     
     /**
      * Return the assigned {@link ServiceID}. If this is a new service, then
@@ -218,6 +227,30 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
         return joinManager;
         
+    }
+
+    /**
+     * Conditionally install a suitable security manager if there is none in
+     * place. This is required before the server can download code. The code
+     * will be downloaded from the HTTP server identified by the codebase
+     * property specified for the VM running the service.
+     */
+    protected void setSecurityManager() {
+
+        SecurityManager sm = System.getSecurityManager();
+        
+        if (sm == null) {
+
+            System.setSecurityManager(new SecurityManager());
+         
+            log.info("Set security manager");
+
+        } else {
+            
+            log.info("Security manager already in place: "+sm.getClass());
+            
+        }
+
     }
     
     /**
@@ -251,9 +284,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             throw new IllegalArgumentException();
         
         this.lifeCycle = lifeCycle;
-        
-        // @todo verify that this belongs here vs in a main(String[]).
-        System.setSecurityManager(new SecurityManager());
+
+        setSecurityManager();
 
         Entry[] entries = null;
         LookupLocator[] unicastLocators = null;
@@ -532,7 +564,11 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
-     * Shutdown the server taking time only to unregister it from jini.
+     * This is run from within the {@link ShutdownThread} in response to a
+     * request to destroy the service. This method shutdowns the server by
+     * unregistering it from jini. If the service implements
+     * {@link IServiceShutdown} then its {@link IServiceShutdown#shutdownNow()}
+     * method will be invoked.
      */
     synchronized public void shutdownNow() {
 
@@ -574,6 +610,16 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
         unexport(true);
 
+        if(impl instanceof IServiceShutdown) {
+            
+            /*
+             * Invoke the services own logic to shutdown its processing.
+             */
+
+            ((IServiceShutdown)impl).shutdownNow();
+            
+        }
+        
     }
     
     /**
@@ -673,11 +719,12 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
-     * Contract is to shutdown the services and <em>destroys</em> its
+     * Contract is to shutdown the services and <em>destroy</em> its
      * persistent state. This implementation calls {@link #shutdownNow()} and
-     * then deletes the {@link #serviceIdFile}.
+     * then deletes the {@link #serviceIdFile}. {@link #shutdownNow()} will
+     * invoke {@link IServiceShutdown} if the service implements that interface.
      * <p>
-     * Concrete subclasses SHOULD extend this method to destroy their persistent
+     * Concrete subclasses MUST extend this method to destroy their persistent
      * state.
      */
     public void destroy() {

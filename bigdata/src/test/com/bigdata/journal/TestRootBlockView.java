@@ -47,15 +47,24 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.util.TimestampFactory;
+import com.bigdata.rawstore.TestWormAddressManager;
+import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.util.NanosecondTimestampFactory;
 
 /**
  * Test suite for {@link RootBlockView}.
+ * <p>
+ * Note: The tests use the {@link NanosecondTimestampFactory}, which has potentially nano
+ * second resolution, rather than {@link MillisecondTimestampFactory} so that
+ * they may complete faster.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -82,58 +91,192 @@ public class TestRootBlockView extends TestCase2 {
         
         final Random r = new Random();
         
-        final int limit = 10000;
+        final int nrounds = 10000;
         
-        for (int i = 0; i < limit; i++) {
+        final ChecksumUtility checker = new ChecksumUtility();
+        
+        for (int i = 0; i < nrounds; i++) {
 
             final boolean rootBlock0 = r.nextBoolean();
 //            final int segmentId = r.nextInt();
             final boolean anyTransactions = r.nextInt(100)>90;
-            final long firstTxId = anyTransactions?TimestampFactory.nextNanoTime():0L;
-            final long lastTxId = anyTransactions?TimestampFactory.nextNanoTime():0L;
-            // note: always greater than or equal to the last transaction timestamp.
-            final long commitTimestamp = anyTransactions?TimestampFactory.nextNanoTime():0L;
-            final int nextOffset = r.nextInt(Integer.MAX_VALUE);
-            final long commitCounter = r.nextInt(Integer.MAX_VALUE);
-            final long commitRecordAddr = r.nextInt(Integer.MAX_VALUE); // may be zero.
-            final long commitRecordIndexAddr = r.nextInt(Integer.MAX_VALUE); // may be zero.
+            final long firstCommitTime = anyTransactions?NanosecondTimestampFactory.nextNanoTime():0L;
+            // note: always greater than or equal to the first transaction timestamp.
+            final long lastCommitTime = anyTransactions?NanosecondTimestampFactory.nextNanoTime():0L;
+            // any legal value for offsetBits.
+            final int offsetBits = r.nextInt(WormAddressManager.MAX_OFFSET_BITS
+                    - WormAddressManager.MIN_OFFSET_BITS)
+                    + WormAddressManager.MIN_OFFSET_BITS;
+            final WormAddressManager am = new WormAddressManager(offsetBits);
+            final long nextOffset = anyTransactions?TestWormAddressManager.nextNonZeroOffset(r,am):0L;
+            final long commitCounter = anyTransactions?r.nextInt(Integer.MAX_VALUE-1)+1:0L;
+            final long commitRecordAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
+            final long commitRecordIndexAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final UUID uuid = UUID.randomUUID();
             
-            RootBlockView rootBlock = new RootBlockView(rootBlock0, //segmentId,
-                    nextOffset, firstTxId, lastTxId, commitTimestamp,
+            RootBlockView rootBlock = new RootBlockView(rootBlock0, offsetBits,
+                    nextOffset, firstCommitTime, lastCommitTime, 
                     commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    uuid);
+                    uuid, checker);
 
-            System.err.println("pass=" + i + " of " + limit + " : timestamp="
-                    + rootBlock.getRootBlockTimestamp());
+            System.err.println("pass=" + i + " of " + nrounds + " : challisField="
+                    + rootBlock.getChallisField());
 
-            // Verify the view.
-            rootBlock.valid();
-            assertEquals("rootBlock0", rootBlock0, rootBlock.isRootBlock0());
-//            assertEquals("segmentId", segmentId, rootBlock.getSegmentId());
-            assertEquals("nextOffset", nextOffset, rootBlock.getNextOffset());
-            assertEquals("firstTxId", firstTxId, rootBlock.getFirstCommitTime());
-            assertEquals("lastTxId", lastTxId, rootBlock.getLastCommitTime());
-            assertEquals("commitCounter", commitCounter, rootBlock.getCommitCounter());
-            assertEquals("commitTime", commitTimestamp, rootBlock.getCommitTimestamp());
-            assertEquals("commitRecordAddr", commitRecordAddr, rootBlock.getCommitRecordAddr());
-            assertEquals("commitRecordIndexAddr", commitRecordIndexAddr, rootBlock.getCommitRecordIndexAddr());
-
-            // create a view from the backing byte buffer.
-            rootBlock = new RootBlockView(rootBlock0,rootBlock.asReadOnlyBuffer());
+            // the local time stored on the root block.
+            final long localTime = rootBlock.getLocalTime();
+            final long challisField = rootBlock.getChallisField();
+            final long checksum = rootBlock.getChecksum(null); // read but do not validate.
+            rootBlock.getChecksum(checker); // compute and self-test.
             
             // Verify the view.
             rootBlock.valid();
             assertEquals("rootBlock0", rootBlock0, rootBlock.isRootBlock0());
-//            assertEquals("segmentId", segmentId, rootBlock.getSegmentId());
+            assertEquals("offsetBits", offsetBits, rootBlock.getOffsetBits());
             assertEquals("nextOffset", nextOffset, rootBlock.getNextOffset());
-            assertEquals("firstTxId", firstTxId, rootBlock.getFirstCommitTime());
-            assertEquals("lastTxId", lastTxId, rootBlock.getLastCommitTime());
+            assertEquals("firstCommitTime", firstCommitTime, rootBlock.getFirstCommitTime());
+            assertEquals("lastCommitTime", lastCommitTime, rootBlock.getLastCommitTime());
             assertEquals("commitCounter", commitCounter, rootBlock.getCommitCounter());
-            assertEquals("commitTime", commitTimestamp, rootBlock.getCommitTimestamp());
             assertEquals("commitRecordAddr", commitRecordAddr, rootBlock.getCommitRecordAddr());
             assertEquals("commitRecordIndexAddr", commitRecordIndexAddr, rootBlock.getCommitRecordIndexAddr());
+            assertEquals("uuid",uuid,rootBlock.getUUID());
 
+            // create a view from the backing byte buffer.
+            rootBlock = new RootBlockView(rootBlock0,rootBlock.asReadOnlyBuffer(),checker);
+            
+            // Verify the view.
+            assertEquals("challisField", challisField, rootBlock.getChallisField());
+            assertEquals("checksum", checksum, rootBlock.getChecksum(null));// read but do not validate.
+            assertEquals("rootBlock0", rootBlock0, rootBlock.isRootBlock0());
+            assertEquals("offsetBits", offsetBits, rootBlock.getOffsetBits());
+            assertEquals("localTime", localTime, rootBlock.getLocalTime());
+            assertEquals("nextOffset", nextOffset, rootBlock.getNextOffset());
+            assertEquals("firstCommitTime", firstCommitTime, rootBlock.getFirstCommitTime());
+            assertEquals("lastCommitTime", lastCommitTime, rootBlock.getLastCommitTime());
+            assertEquals("commitCounter", commitCounter, rootBlock.getCommitCounter());
+            assertEquals("commitRecordAddr", commitRecordAddr, rootBlock.getCommitRecordAddr());
+            assertEquals("commitRecordIndexAddr", commitRecordIndexAddr, rootBlock.getCommitRecordIndexAddr());
+            assertEquals("uuid",uuid,rootBlock.getUUID());
+            rootBlock.valid();
+
+            /*
+             * verify that each read only view has independent position, mark, and offset.
+             */
+            {
+                
+                ByteBuffer view1 = rootBlock.asReadOnlyBuffer();
+
+                ByteBuffer view2 = rootBlock.asReadOnlyBuffer();
+                
+                assertNotSame(view1, view2);
+                assertEquals(0,view1.position());
+                assertEquals(RootBlockView.SIZEOF_ROOT_BLOCK,view1.limit());
+                
+                // verify independent position, mark, and limit.
+                view1.position(1);
+                view1.mark();
+                view1.limit(view1.limit()-1);
+
+                // position and limit were unchanged (mark is not being tested).
+                assertEquals(0,view2.position());
+                assertEquals(RootBlockView.SIZEOF_ROOT_BLOCK,view2.limit());
+                
+            }
+         
+            /*
+             * Verify correct rejection when the root block data is partly
+             * overwritten.
+             */
+            {
+                
+                ByteBuffer view = rootBlock.asReadOnlyBuffer();
+                
+                /*
+                 * clone the view of the root block.
+                 */
+                byte[] tmp = new byte[view.limit()];
+                
+                view.get(tmp); // read into a byte[].
+                
+                ByteBuffer modified = ByteBuffer.wrap(tmp);
+                
+                // verify clone is valid.
+                new RootBlockView(rootBlock0,modified,checker);
+                
+                /*
+                 * modify the cloned data.
+                 */
+                modified.putLong(RootBlockView.OFFSET_COMMIT_CTR, rootBlock
+                        .getCommitCounter() + 1);
+
+                // verify modified buffer causes checksum error.
+                try {
+                    
+                    new RootBlockView(rootBlock0,modified,checker);
+                    
+                    fail("Expecting: "+RootBlockException.class);
+                    
+                } catch(RootBlockException ex) {
+                    
+                    System.err.println("Ignoring expected exception: "+ex);
+                    
+                }
+                
+                /*
+                 * verify that we can read that root block anyway if we provide
+                 * a [null] checksum utility.
+                 */
+                
+                new RootBlockView(rootBlock0,modified,null/*checker*/);
+
+            }
+            
+            /*
+             * Verify correct rejection when the checksum field is bad.
+             */
+            {
+
+                ByteBuffer view = rootBlock.asReadOnlyBuffer();
+                
+                /*
+                 * clone the view of the root block.
+                 */
+                byte[] tmp = new byte[view.limit()];
+                
+                view.get(tmp); // read into a byte[].
+                
+                ByteBuffer modified = ByteBuffer.wrap(tmp);
+                
+                // verify clone is valid.
+                new RootBlockView(rootBlock0,modified,checker);
+                
+                /*
+                 * modify the cloned data.
+                 */
+                modified.putInt(RootBlockView.OFFSET_CHECKSUM, rootBlock
+                        .getChecksum(null) + 1);
+
+                // verify modified buffer causes checksum error.
+                try {
+                    
+                    new RootBlockView(rootBlock0,modified,checker);
+                    
+                    fail("Expecting: "+RootBlockException.class);
+                    
+                } catch(RootBlockException ex) {
+                    
+                    System.err.println("Ignoring expected exception: "+ex);
+                    
+                }
+                
+                /*
+                 * verify that we can read that root block anyway if we provide
+                 * a [null] checksum utility.
+                 */
+                
+                new RootBlockView(rootBlock0,modified,null/*checker*/);
+
+            }
+            
         }
         
     }
@@ -149,32 +292,38 @@ public class TestRootBlockView extends TestCase2 {
         //
 //        final int segmentId = 0; // no constraint
         //
-        final int nextOffsetOk = 100;
-        final int nextOffsetBad = -1;
+        final int offsetBitsOk = WormAddressManager.DEFAULT_OFFSET_BITS;
+        final int offsetBitsBad = WormAddressManager.MIN_OFFSET_BITS - 1;
+        final int offsetBitsBad2 = WormAddressManager.MAX_OFFSET_BITS + 1;
+        // used to form valid addresses.
+        WormAddressManager am = new WormAddressManager(offsetBitsOk);
+        //
+        final long nextOffsetOk = 100;
+        final long nextOffsetBad = -1;
         // note: choose timestamps in named sets (first,last,commit) for tests.
-        final long firstTxIdOk = 0L;
-        final long lastTxIdOk = 0L;
-        final long commitTimeOk = 0L;
+        final long firstCommitTimeOk = 0L;
+        final long lastCommitTimeOk = 0L;
+//        final long commitTimeOk = 0L;
         //
-        final long firstTxIdOk2 = TimestampFactory.nextNanoTime();
-        final long lastTxIdOk2 = TimestampFactory.nextNanoTime();
-        final long commitTimeOk2 = TimestampFactory.nextNanoTime();
+        final long firstCommitTimeOk2 = NanosecondTimestampFactory.nextNanoTime();
+        final long lastCommitTimeOk2 = NanosecondTimestampFactory.nextNanoTime();
+//        final long commitTimeOk2 = TimestampFactory.nextNanoTime();
         //
-        final long firstTxIdBad1 = TimestampFactory.nextNanoTime();
-        final long lastTxIdBad1 = 0L;
-        final long commitTimeBad1 = TimestampFactory.nextNanoTime();
+        final long firstCommitTimeBad1 = NanosecondTimestampFactory.nextNanoTime();
+        final long lastCommitTimeBad1 = 0L;
+//        final long commitTimeBad1 = TimestampFactory.nextNanoTime();
         //
-        final long firstTxIdBad2 = 0L;
-        final long lastTxIdBad2 = TimestampFactory.nextNanoTime();
-        final long commitTimeBad2 = TimestampFactory.nextNanoTime();
+        final long firstCommitTimeBad2 = 0L;
+        final long lastCommitTimeBad2 = NanosecondTimestampFactory.nextNanoTime();
+//        final long commitTimeBad2 = TimestampFactory.nextNanoTime();
         //
-        final long lastTxIdBad3 = TimestampFactory.nextNanoTime(); // note: out of order.
-        final long firstTxIdBad3 = TimestampFactory.nextNanoTime(); // note: out of order.
-        final long commitTimeBad3 = TimestampFactory.nextNanoTime();
+        final long lastCommitTimeBad3 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
+        final long firstCommitTimeBad3 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
+//        final long commitTimeBad3 = TimestampFactory.nextNanoTime();
         //
-        final long firstTxIdBad4 = TimestampFactory.nextNanoTime();
-        final long commitTimeBad4 = TimestampFactory.nextNanoTime(); // note: out of order.
-        final long lastTxIdBad4 = TimestampFactory.nextNanoTime(); // note: out of order.
+//        final long commitTimeBad4 = TimestampFactory.nextNanoTime(); // note: out of order.
+        final long lastCommitTimeBad4 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
+        final long firstCommitTimeBad4 = NanosecondTimestampFactory.nextNanoTime();
         //
         // @todo present bad combinations of {commitCounter, rootsAddr, and commitRecordIndex}.
         //
@@ -182,36 +331,56 @@ public class TestRootBlockView extends TestCase2 {
         final long commitCounterBad = -1; // negative
         final long commitCounterBad2 = Long.MAX_VALUE; // too large.
         //
-        final long rootsAddrOk = 0L;
-        final long rootsAddrOk2 = 12L;
+        final long rootsAddrOk = 0L; // null reference
+        final long rootsAddrOk2 = am.toAddr(3, 12L); // non-null reference.
         final long rootsAddrBad = -1;
         //
-        final long commitRecordIndexOk = 0L;
-        final long commitRecordIndexOk2 = 23L;
+        final long commitRecordIndexOk = 0L; // null reference.
+        final long commitRecordIndexOk2 = am.toAddr(30,23L); // non-null reference.
         final long commitRecordIndexBad = -1L;
         //
         final UUID uuidOk = UUID.randomUUID();
         final UUID uuidBad = null;
-
+        //
+        final ChecksumUtility checkerOk = new ChecksumUtility();
+        final ChecksumUtility checkerBad = null;
         
         // legit.
-        new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
-                uuidOk);
-        // legit (firstTxIdOk2,lastTxIdOk2,commitTimeOK2).
-        new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk2,
-                lastTxIdOk2, commitTimeOk2, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
-                uuidOk);
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                lastCommitTimeOk, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
+                uuidOk, checkerOk);
+        // legit (firstCommitTimeOk2,lastCommitTimeOk2).
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk2,
+                lastCommitTimeOk2, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
+                uuidOk, checkerOk);
         // legit (rootsAddr2, commitRecordIndex2)
-        new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrOk2, commitRecordIndexOk2,
-                uuidOk);
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                lastCommitTimeOk, commitCounterOk, rootsAddrOk2, commitRecordIndexOk2,
+                uuidOk, checkerOk);
+
+        // bad offsetBits.
+        try {
+            new RootBlockView(rootBlock0, offsetBitsBad, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
+                    commitRecordIndexOk2, uuidOk, checkerOk);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        try {
+            new RootBlockView(rootBlock0, offsetBitsBad2, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
+                    commitRecordIndexOk2, uuidOk, checkerOk);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
 
         // bad next offset
         try {
-            new RootBlockView(rootBlock0, nextOffsetBad,
-                    firstTxIdOk, lastTxIdOk, commitTimeOk, commitCounterOk,
-                    rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetBad,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk,uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -219,33 +388,33 @@ public class TestRootBlockView extends TestCase2 {
         
         // bad first,last transaction start timestamps and commit timestamp.
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk,
-                    firstTxIdBad1, lastTxIdBad1, commitTimeBad1,
-                    commitCounterOk, rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad1,
+                    lastCommitTimeBad1, commitCounterOk, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk,
-                    firstTxIdBad2, lastTxIdBad2, commitTimeBad2,
-                    commitCounterOk, rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad2,
+                    lastCommitTimeBad2, commitCounterOk, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk,
-                    firstTxIdBad3, lastTxIdBad3, commitTimeBad3,
-                    commitCounterOk, rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad3,
+                    lastCommitTimeBad3, commitCounterOk, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk,
-                    firstTxIdBad4, lastTxIdBad4, commitTimeBad4,
-                    commitCounterOk, rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad4,
+                    lastCommitTimeBad4, commitCounterOk, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -253,16 +422,17 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad commit counter
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterBad, rootsAddrOk
-                    , commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterBad, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterBad2, rootsAddrOk, commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterBad2, rootsAddrOk,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -270,17 +440,17 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad {commit record, commit record index} combinations.
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
+                    commitRecordIndexOk2, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrOk2,
-                    commitRecordIndexBad,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrOk2,
+                    commitRecordIndexBad, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -290,9 +460,9 @@ public class TestRootBlockView extends TestCase2 {
              * Note: this combination is illegal since the commit record index
              * address is 0L while the commit record addr is defined.
              */
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrOk2,
-                    commitRecordIndexOk,uuidOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrOk2,
+                    commitRecordIndexOk, uuidOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -300,14 +470,24 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad UUID.
         try {
-            new RootBlockView(rootBlock0, nextOffsetOk, firstTxIdOk,
-                    lastTxIdOk, commitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2,uuidBad);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
+                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
+                    commitRecordIndexOk2, uuidBad, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
 
+        // bad checker
+        try {
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk,uuidOk, checkerBad);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+        
     }
 
 }

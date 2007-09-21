@@ -48,6 +48,8 @@ Modifications:
 package com.bigdata.rawstore;
 
 /**
+ * Test suite for {@link SimpleMemoryRawStore}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

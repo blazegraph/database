@@ -50,15 +50,15 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.net.InetAddress;
 
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.IResourceMetadata;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
+
+import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.scaleup.IResourceMetadata;
 
 /**
  * Abstract base class for tests of remote services.

@@ -59,7 +59,13 @@ package com.bigdata.journal;
 public interface ITimestampService {
 
     /**
-     * Return the next unique timestamp.
+     * Return the next unique timestamp. Timestamps must be strictly increasing.
+     * <p>
+     * Note: This method MUST return strictly increasing values, even when it is
+     * invoked by concurrent threads. While other implementations are possible
+     * and may be more efficient, one way to insure thread safety is to
+     * synchronize on some object such that the implementaiton exhibits a FIFO
+     * behavior.
      */
     public long nextTimestamp();
     

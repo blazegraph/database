@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -1363,5 +1365,49 @@ public class MasterJournal implements IJournal {
      * swept by the VM between uses.
      */
     private final WeakValueCache<String/*filename*/, IndexSegment> resourceCache;
+
+    /*
+     * Delegation to the slave journal.
+     */
+    
+    public Object deserialize(byte[] b, int off, int len) {
+        return slave.deserialize(b, off, len);
+    }
+
+    public Object deserialize(byte[] b) {
+        return slave.deserialize(b);
+    }
+
+    public Object deserialize(ByteBuffer buf) {
+        return slave.deserialize(buf);
+    }
+
+    public int getByteCount(long addr) {
+        return slave.getByteCount(addr);
+    }
+
+    public long getOffset(long addr) {
+        return slave.getOffset(addr);
+    }
+
+    public void packAddr(DataOutput out, long addr) throws IOException {
+        slave.packAddr(out, addr);
+    }
+
+    public byte[] serialize(Object obj) {
+        return slave.serialize(obj);
+    }
+
+    public long toAddr(int nbytes, long offset) {
+        return slave.toAddr(nbytes, offset);
+    }
+
+    public String toString(long addr) {
+        return slave.toString(addr);
+    }
+
+    public long unpackAddr(DataInput in) throws IOException {
+        return slave.unpackAddr(in);
+    }
     
 }

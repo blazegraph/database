@@ -56,8 +56,6 @@ import java.nio.ByteBuffer;
  */
 public class TransientBufferStrategy extends BasicBufferStrategy {
     
-    private boolean open = false;
-
     /**
      * The root blocks.
      */
@@ -68,7 +66,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
      */
     private int currentRootBlock = 0;
     
-    TransientBufferStrategy(long initialExtent, long maximumExtent,
+    TransientBufferStrategy(int offsetBits,long initialExtent, long maximumExtent,
             boolean useDirectBuffers) {
         
         /*
@@ -76,6 +74,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
          * a direct buffer for the transient mode.
          */
         super(  maximumExtent,
+                offsetBits,
                 0/* nextOffset */, //
                 0/*headerSize*/, //
                 initialExtent, //
@@ -83,14 +82,16 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
                 (useDirectBuffers ? ByteBuffer
                         .allocateDirect((int) initialExtent) : ByteBuffer
                         .allocate((int) initialExtent)));
-    
-        open = true;
         
     }
     
     public void deleteFile() {
         
-        if( open ) throw new IllegalStateException();
+        if( isOpen() ) {
+            
+            throw new IllegalStateException();
+            
+        }
 
         // NOP.
         
@@ -111,28 +112,10 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
-    public void close() {
-        
-        if( ! isOpen() ) {
-            
-            throw new IllegalStateException();
-            
-        }
-
-        open = false;
-        
-    }
-
     public void closeAndDelete() {
         
         close();
 
-    }
-
-    final public boolean isOpen() {
-
-        return open;
-        
     }
 
     final public boolean isStable() {

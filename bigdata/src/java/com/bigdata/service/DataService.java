@@ -82,9 +82,11 @@ import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.ResourceState;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.sun.corba.se.impl.orbutil.closure.Future;
@@ -97,8 +99,8 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * be invoked within a pool of request handler threads servicing a network
  * interface in order to decouple data service operations from client requests.
  * When using as part of an embedded database, the client operations MUST be
- * buffered by a thread pool with a FIFO policy so that client requests will be
- * decoupled from data service operations.
+ * buffered by a thread pool (with a FIFO? fair? policy) so that client requests
+ * will be decoupled from data service operations.
  * <p>
  * The {@link #txService} provides concurrency for transaction processing.
  * <p>
@@ -110,9 +112,9 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * {@link AbstractJournal#serialize(Callable)}. This ensures that each
  * unisolated write operation occurs within a single-theaded context and thereby
  * guarentees atomicity, consistency, and isolatation without requiring locking.
- * Unisolated writes either committing or aborting after each unisolated
- * operation using a restart-safe protocol. Successful unisolated write
- * operations are therefore ACID.
+ * Unisolated writes either commit or abort after each unisolated operation
+ * using a restart-safe protocol. Successful unisolated write operations are
+ * therefore ACID.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -216,19 +218,17 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       small.
  * 
  * FIXME support group commit for unisolated writes. i may have to refactor some
- *       to get group commit to work for both transaction commits and unisolated
- *       writes. basically, the tasks on the
- *       {@link AbstractJournal#writeService} need to get aggregated (or each
- *       commit examines the length of the write queue (basically, is there
- *       another write in the queue or is this the last one), latency and data
- *       volumn since the last commit and makes a decision whether or not to
- *       commit at that time; if the commit is deferred, then it is placed onto
- *       a queue of operations that have not finished and for which we can not
- *       yet report "success" - even though additional unisolated writes must
- *       continue to run; we also need to make sure that a commit will occur at
- *       the first opportunity following the minimum latency -- even if no
- *       unisolated writes are scheduled (or a single client would hang waiting
- *       for a commit).
+ * to get group commit to work for both transaction commits and unisolated
+ * writes. basically, the tasks on the {@link AbstractJournal#writeService} need
+ * to get aggregated (or each commit examines the length of the write queue
+ * (basically, is there another write in the queue or is this the last one),
+ * latency and data volumn since the last commit and makes a decision whether or
+ * not to commit at that time; if the commit is deferred, then it is placed onto
+ * a queue of operations that have not finished and for which we can not yet
+ * report "success" - even though additional unisolated writes must continue to
+ * run; we also need to make sure that a commit will occur at the first
+ * opportunity following the minimum latency -- even if no unisolated writes are
+ * scheduled (or a single client would hang waiting for a commit).
  * 
  * @todo add assertOpen() throughout
  * 
@@ -290,7 +290,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       these services (assuming that they can talk to Jini...).
  */
 abstract public class DataService implements IDataService,
-        IWritePipeline, IResourceTransfer {
+        IWritePipeline, IResourceTransfer, IServiceShutdown {
 
     IKeyBuilder keyBuilder;
     
@@ -749,6 +749,8 @@ abstract public class DataService implements IDataService,
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
+     * 
+     * @todo write tests when using an unpartitioned index on the data service.
      */
     protected void batchOp(long tx, String name, int partitionId, IBatchOperation op)
             throws InterruptedException, ExecutionException {
@@ -1090,7 +1092,7 @@ abstract public class DataService implements IDataService,
     }
     
     /**
-     * Abstract class for tasks on an index partition.
+     * Abstract class for tasks on an index or an index partition.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1387,6 +1389,8 @@ abstract public class DataService implements IDataService,
         public Object doTask() throws Exception {
 
             journal.dropIndex(name);
+            
+            log.info("Dropped index: name="+name);
             
             return null;
      
@@ -1915,11 +1919,13 @@ abstract public class DataService implements IDataService,
          * @param name
          *            The index name.
          * @param partitionId
-         *            The partition identifier.
+         *            The partition identifier (-1 indicates no partition).
          */
         public NoSuchIndexPartitionException(String name, int partitionId) {
 
-            super(name+", partitionId="+partitionId);
+            super(name
+                    + (partitionId == -1 ? " (not partitioned)"
+                            : ", partitionId=" + partitionId));
             
         }
 
@@ -1966,6 +1972,15 @@ abstract public class DataService implements IDataService,
     /**
      * Inner class permits adding of <code>synchronized</code> keyword to
      * select methods where there is a possibility for thread contention.
+     * 
+     * FIXME Either this class or its outer class MUST discover the
+     * {@link ITransactionManager} and delegate the methods on that interface to
+     * that service.
+     * 
+     * FIXME Either this class or its outer class MUST handle
+     * {@link #overflow()} events in a manner that coordinates with the
+     * {@link IMetadataService}. E.g., by re-factoring some logic from the
+     * {@link MasterJournal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

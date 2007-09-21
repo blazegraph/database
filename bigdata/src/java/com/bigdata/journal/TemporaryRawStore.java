@@ -51,17 +51,20 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * A non-restart-safe store for temporary data that buffers data in memory until
- * a maximum capacity has been reached and then converts to a disk-based store
- * with a maximum capacity of 2G. The maximum capacity constraint is imposed by
- * {@link Addr}. On conversion to a disk-backed store, the disk file is created
- * using the temporary file mechansism and is marked for eventual deletion no
- * later than when the JVM exits and as soon as the store is {@link #close()}.
+ * a {@link #maximumInMemoryExtent} has been reached and then converts to a
+ * disk-based store with a maximum capacity determined by the configuration of
+ * the {@link WormAddressManager}. On conversion to a disk-backed store, the
+ * disk file is created using the temporary file mechansism and is marked for
+ * eventual deletion no later than when the JVM exits and as soon as the store
+ * is {@link #close()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -76,7 +79,7 @@ import com.bigdata.rawstore.IRawStore;
  *       process such as a transaction and not by multiple threads (unlike the
  *       Journal which does support MROW).
  */
-public class TemporaryRawStore implements IRawStore {
+public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore {
 
     protected final static int DEFAULT_INITIAL_IN_MEMORY_EXTENT = Bytes.megabyte32 * 10;
 
@@ -125,13 +128,19 @@ public class TemporaryRawStore implements IRawStore {
      */
     public TemporaryRawStore() {
 
-        this( DEFAULT_INITIAL_IN_MEMORY_EXTENT, DEFAULT_MAXIMUM_IN_MEMORY_EXTENT, false );
+        this(WormAddressManager.DEFAULT_OFFSET_BITS,
+                DEFAULT_INITIAL_IN_MEMORY_EXTENT,
+                DEFAULT_MAXIMUM_IN_MEMORY_EXTENT, false);
         
     }
     
     /**
      * Create a {@link TemporaryRawStore} with the specified configuration.
      * 
+     * @param offsetBits
+     *            This determines the capacity of the store file and the maximum
+     *            length of a record.  The value is passed through to
+     *            {@link WormAddressManager#WormAddressManager(int)}.
      * @param initialInMemoryExtent
      *            The initial size of the in-memory buffer. This buffer will
      *            grow as necessary until <i>maximumInMemoryExtent</i> at which
@@ -143,11 +152,13 @@ public class TemporaryRawStore implements IRawStore {
      *            Whether or not the in-memory buffer will be direct. The use of
      *            a direct buffer here is NOT recommended.
      */
-    public TemporaryRawStore(long initialInMemoryExtent,
+    public TemporaryRawStore(int offsetBits, long initialInMemoryExtent,
             long maximumInMemoryExtent, boolean useDirectBuffers) {
         
-        buf = new TransientBufferStrategy(initialInMemoryExtent, maximumInMemoryExtent,
-                useDirectBuffers);
+        super(offsetBits);
+        
+        buf = new TransientBufferStrategy(offsetBits, initialInMemoryExtent,
+                maximumInMemoryExtent, useDirectBuffers);
         
         this.initialInMemoryExtent = initialInMemoryExtent;
         
@@ -303,13 +314,19 @@ public class TemporaryRawStore implements IRawStore {
         // Do not force writes since the store is not restart safe.
         final ForceEnum forceWrites = ForceEnum.No;
 
+        // The store is never pre-existing so we do not have a checksum to validate.
+        final boolean validateChecksum = false;
+        
+        // We still need an object to compute the checksum to be stored in the root blocks.
+        final ChecksumUtility checker = new ChecksumUtility();
+        
         /* Create a unique store file and setup the root blocks.  The file
          * will be pre-extended to the requested initialExtent.
          */
-        FileMetadata fileMetadata = new FileMetadata(file,
-                BufferMode.Disk, useDirectBuffers, initialExtent,
-                maximumDiskExtent, create, isEmptyFile, deleteOnExit,
-                readOnly, forceWrites);
+        FileMetadata fileMetadata = new FileMetadata(file, BufferMode.Disk,
+                useDirectBuffers, initialExtent, maximumDiskExtent, create,
+                isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                getOffsetBits(), validateChecksum, checker);
         
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,
@@ -324,7 +341,7 @@ public class TemporaryRawStore implements IRawStore {
             
             // setup the transfer source.
             ByteBuffer b = tmp.directBuffer;
-            b.limit(tmp.nextOffset);
+            b.limit((int)tmp.nextOffset);
             b.position(0);
             
             // write the data on the channel.
@@ -351,4 +368,14 @@ public class TemporaryRawStore implements IRawStore {
         
     }
     
+    /**
+     * The maximum length of a record that may be written on the store.
+     */
+    final public int getMaxRecordSize() {
+
+        return ((AbstractRawWormStore) buf).getAddressManger()
+                .getMaxByteCount();
+
+    }
+
 }

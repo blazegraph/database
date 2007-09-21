@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.MutableKeyBuffer;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

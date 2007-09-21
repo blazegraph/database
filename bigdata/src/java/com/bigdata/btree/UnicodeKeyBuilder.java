@@ -79,8 +79,6 @@ import com.ibm.icu.text.RuleBasedCollator;
  * less than the number returned by icu -- is this a serious error? - it
  * prevents the test suite from completing correctly. check on the mailing list.
  * 
- * FIXME Bundle a linux elf32 version of ICU.
- * 
  * FIXME Apply the 3.6.1 patch for ICU4JNI and rebuild the distribution.
  * 
  * @todo try out the ICU boyer-moore search implementation if it is defined for

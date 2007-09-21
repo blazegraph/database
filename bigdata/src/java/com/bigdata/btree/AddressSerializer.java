@@ -48,16 +48,14 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Serializes each address as an unpacked long integer.
- * 
- * @see PackedAddressSerializer
+ * Serializes each address as a long integer and does not attempt to pack or
+ * compress the addresses.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

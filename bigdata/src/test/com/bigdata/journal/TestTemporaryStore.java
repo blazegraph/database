@@ -54,6 +54,7 @@ import java.util.Random;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Test suite for {@link TemporaryRawStore}.
@@ -83,7 +84,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
     }
 
     /**
-     * Unit test for {@link AbstractBufferStrategy#overflow(int)}. The test
+     * Unit test for {@link AbstractBufferStrategy#overflow(long)}. The test
      * verifies that the extent and the user extent are correctly updated after
      * an overflow.
      */
@@ -100,11 +101,11 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
         
-        final int needed = Bytes.kilobyte32;
+        final long needed = Bytes.kilobyte32;
 
         assertTrue("overflow()", bufferStrategy.overflow(needed));
 
@@ -117,6 +118,69 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 
         store.close();
             
+    }
+
+    /**
+     * Write random bytes on the store.
+     * 
+     * @param store
+     *            The store.
+     * 
+     * @param nbytesToWrite
+     *            The #of bytes to be written. If this is larger than the
+     *            maximum record length then multiple records will be written.
+     * 
+     * @return The address of the last record written.
+     */
+    protected long writeRandomData(TemporaryRawStore store,final long nbytesToWrite) {
+
+        final int maxRecordSize = store.getMaxRecordSize();
+        
+        assert nbytesToWrite > 0;
+        
+        long addr = 0L;
+        
+        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+                .getBufferStrategy();
+        
+        int n = 0;
+
+        long leftover = nbytesToWrite;
+        
+        while (leftover > 0) {
+
+            // this will be an int since maxRecordSize is an int.
+            int nbytes = (int) Math.min(maxRecordSize, leftover);
+
+            assert nbytes>0;
+            
+            final byte[] b = new byte[nbytes];
+
+            Random r = new Random();
+
+            r.nextBytes(b);
+
+            ByteBuffer tmp = ByteBuffer.wrap(b);
+
+            addr = bufferStrategy.write(tmp);
+
+            n++;
+            
+            leftover -= nbytes;
+            
+            System.err.println("Wrote record#" + n + " with " + nbytes
+                    + " bytes: addr=" + store.toString(addr) + ", #leftover="
+                    + leftover);
+
+        }
+
+        System.err.println("Wrote " + nbytesToWrite + " bytes in " + n
+                + " records: last addr=" + store.toString(addr));
+
+        assert addr != 0L;
+        
+        return addr;
+
     }
 
     /**
@@ -136,17 +200,13 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
 
         long remaining = userExtent - nextOffset;
         
-        assertTrue(remaining<Integer.MAX_VALUE);
-        
-        ByteBuffer tmp = ByteBuffer.allocate((int)remaining);
-        
-        bufferStrategy.write(tmp);
+        writeRandomData(store, remaining);
 
         // no change in extent.
         assertEquals("extent",extent, bufferStrategy.getExtent());
@@ -177,7 +237,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
 
@@ -187,25 +247,27 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
          */
         long remaining = userExtent - nextOffset;
         
-        assertTrue(remaining<Integer.MAX_VALUE);
-        
-        final byte[] b = new byte[(int)remaining];
-        
-        Random r = new Random();
-        
-        r.nextBytes(b);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(b);
-        
-        final long addr = bufferStrategy.write(tmp);
+//        assertTrue(remaining<Integer.MAX_VALUE);
+//        
+//        final byte[] b = new byte[(int)remaining];
+//        
+//        Random r = new Random();
+//        
+//        r.nextBytes(b);
+//        
+//        ByteBuffer tmp = ByteBuffer.wrap(b);
+//        
+//        final long addr = bufferStrategy.write(tmp);
 
+        final long addr = writeRandomData(store, remaining);
+        
         // no change in extent.
         assertEquals("extent",extent, bufferStrategy.getExtent());
         
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
-        assertEquals(b, bufferStrategy.read(addr));
+        ByteBuffer b = bufferStrategy.read(addr);
         
         /*
          * now write some more random bytes forcing an extension of the buffer.
@@ -216,7 +278,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         
         final byte[] b2 = new byte[Bytes.kilobyte32];
         
-        r.nextBytes(b2);
+        new Random().nextBytes(b2);
         
         ByteBuffer tmp2 = ByteBuffer.wrap(b2);
         
@@ -256,7 +318,8 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
          * requirements. This should have no impact on the ability to test
          * correctness.
          */
-        TemporaryRawStore store = new TemporaryRawStore(Bytes.kilobyte*10,
+        TemporaryRawStore store = new TemporaryRawStore(
+                WormAddressManager.DEFAULT_OFFSET_BITS, Bytes.kilobyte * 10,
                 Bytes.kilobyte * 100, false);
         
         // verify that we are using an in-memory buffer.
@@ -273,7 +336,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 
             final long initialExtent = bufferStrategy.getInitialExtent();
 
-            final int nextOffset = bufferStrategy.getNextOffset();
+            final long nextOffset = bufferStrategy.getNextOffset();
 
             // will be zero for a transient buffer.
             assertEquals("nextOffset",0,nextOffset);
@@ -324,15 +387,17 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
             long remaining = userExtent
                     - store.getBufferStrategy().getNextOffset();
 
-            assertTrue(remaining < Integer.MAX_VALUE);
-
-            b = new byte[(int) remaining];
-
-            r.nextBytes(b);
-
-            ByteBuffer tmp = ByteBuffer.wrap(b);
-
-            addr = store.write(tmp);
+//            assertTrue(remaining < Integer.MAX_VALUE);
+//
+//            b = new byte[(int) remaining];
+//
+//            r.nextBytes(b);
+//
+//            ByteBuffer tmp = ByteBuffer.wrap(b);
+//
+//            addr = store.write(tmp);
+            
+            addr = writeRandomData(store, remaining);
 
             // verify that we are using an in-memory buffer.
             assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy);
@@ -345,8 +410,12 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
             assertEquals("userExtent", userExtent, store.getBufferStrategy()
                     .getUserExtent());
 
-            // verify the data.
-            assertEquals(b, store.read(addr));
+            // read back the data.
+            ByteBuffer tmp = store.read(addr);
+            
+            b = new byte[tmp.remaining()];
+            
+            tmp.get(b);
 
         }
 

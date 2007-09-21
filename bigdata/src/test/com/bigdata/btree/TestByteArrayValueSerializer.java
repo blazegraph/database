@@ -48,17 +48,13 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.ByteArrayValueSerializer;
-import com.bigdata.btree.IValueSerializer;
 import com.bigdata.io.DataOutputBuffer;
 
 /**

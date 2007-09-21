@@ -53,6 +53,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * A temporary store that supports named indices.
@@ -67,20 +68,26 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      */
     public TemporaryStore() {
 
-        this(DEFAULT_INITIAL_IN_MEMORY_EXTENT,
+        this(WormAddressManager.DEFAULT_OFFSET_BITS,
+                DEFAULT_INITIAL_IN_MEMORY_EXTENT,
                 DEFAULT_MAXIMUM_IN_MEMORY_EXTENT, false);
         
     }
 
     /**
+     * @param offsetBits
+     *            This determines the capacity of the store file and the maximum
+     *            length of a record.  The value is passed through to
+     *            {@link WormAddressManager#WormAddressManager(int)}.
      * @param initialInMemoryExtent
      * @param maximumInMemoryExtent
      * @param useDirectBuffers
      */
-    public TemporaryStore(long initialInMemoryExtent,
+    public TemporaryStore(int offsetBits, long initialInMemoryExtent,
             long maximumInMemoryExtent, boolean useDirectBuffers) {
 
-        super(initialInMemoryExtent, maximumInMemoryExtent, useDirectBuffers);
+        super(offsetBits, initialInMemoryExtent, maximumInMemoryExtent,
+                useDirectBuffers);
 
         setupName2AddrBTree();
 
@@ -89,7 +96,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
     /**
      * BTree mapping index names to the last metadata record committed for the
      * named index. The keys are index names (unicode strings). The values are
-     * the last known {@link Addr address} of the named btree.
+     * the last known address of the named btree.
      */
     private Name2Addr name2Addr;
 

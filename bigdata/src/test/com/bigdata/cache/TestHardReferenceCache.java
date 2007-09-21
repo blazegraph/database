@@ -52,7 +52,6 @@ import java.util.Stack;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.HardReferenceQueue.HardReferenceQueueEvictionListener;
 
 /**

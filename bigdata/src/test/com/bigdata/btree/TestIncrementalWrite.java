@@ -49,13 +49,6 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.DefaultEvictionListener;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-import com.bigdata.btree.PO;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;

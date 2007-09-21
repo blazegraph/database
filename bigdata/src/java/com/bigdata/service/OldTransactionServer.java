@@ -51,12 +51,11 @@ import java.util.BitSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.LocalTimestampService;
 import com.bigdata.journal.Options;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * @deprecated The transaction server is responsible for starting, preparing, and committing
@@ -126,7 +125,7 @@ public class OldTransactionServer {
      *       low-latency service for use with a distributed database commit
      *       protocol.
      */
-    protected final ITimestampService timestampFactory = LocalTimestampService.INSTANCE;
+    protected final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
     /**
      * Class modeling transaction metadata. An instance of this class is used to
@@ -283,7 +282,10 @@ public class OldTransactionServer {
 
         assert isolationLevel != null;
         
-        long ts = timestampFactory.nextTimestamp();
+        /*
+         * Wait for the next distinct millisecond.
+         */
+        long ts = timestampFactory.nextMillis();
         
         transactions.put(ts, new TxMetadata(ts,isolationLevel));
         

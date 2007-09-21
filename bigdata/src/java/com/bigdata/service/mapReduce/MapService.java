@@ -68,11 +68,6 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.mapReduce.MapReduceMaster.AbstractFileInputMapTask;
-import com.bigdata.service.mapReduce.MapReduceMaster.AbstractMapTask;
-import com.bigdata.service.mapReduce.MapReduceMaster.IMapTask;
-import com.bigdata.service.mapReduce.MapReduceMaster.IReduceTask;
-import com.bigdata.service.mapReduce.MapReduceMaster.Tuple;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -502,6 +497,14 @@ abstract public class MapService implements IServiceShutdown, IMapService {
             String name = reduceTask.toString();
 
             final int ntuples = tuples.length;
+
+            if(ntuples==0) {
+                
+                // No tuples for this reduce partition.
+                
+                return;
+                
+            }
             
             byte[][] keys = new byte[ntuples][];
             

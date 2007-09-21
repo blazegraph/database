@@ -50,11 +50,6 @@ package com.bigdata.cache;
 import java.util.Iterator;
 import java.util.Vector;
 
-import com.bigdata.cache.ICacheEntry;
-import com.bigdata.cache.ICacheListener;
-import com.bigdata.cache.ICachePolicy;
-import com.bigdata.cache.WeakValueCache;
-
 import junit.framework.TestCase2;
 
 /**

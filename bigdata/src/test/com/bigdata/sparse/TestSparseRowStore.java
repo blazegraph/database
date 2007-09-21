@@ -58,9 +58,7 @@ import java.util.Vector;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.TemporaryRawStore;

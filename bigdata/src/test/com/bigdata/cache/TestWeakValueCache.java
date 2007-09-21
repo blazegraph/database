@@ -46,11 +46,6 @@ Modifications:
  */
 package com.bigdata.cache;
 
-import com.bigdata.cache.ICacheListener;
-import com.bigdata.cache.ICachePolicy;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakCacheEntryFactory;
-import com.bigdata.cache.WeakValueCache;
 
 /**
  * Tests suite for the {@link WeakValueCache}. This class tests the weak cache

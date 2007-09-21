@@ -47,10 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IKeyBuffer;
-import com.bigdata.btree.MutableKeyBuffer;
-import com.bigdata.btree.Node;
 
 /**
  * Test code that chooses the child to search during recursive traversal of the

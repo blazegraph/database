@@ -59,28 +59,27 @@ import com.bigdata.journal.TemporaryRawStore;
  * A purely transient append-only implementation useful when data need to be
  * buffered in memory. The writes are stored in an {@link ArrayList}.
  * 
- * @see {@link TemporaryRawStore}, which provides a more scalable solution for temporary
- *      data.
+ * @see {@link TemporaryRawStore}, which provides a more scalable solution for
+ *      temporary data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleMemoryRawStore implements IRawStore {
+public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
     private boolean open = true;
     
     /**
-     * The #of bytes written so far. This is used to generate the
-     * {@link Addr address} values returned by {@link #write(ByteBuffer)}. This
-     * is necessary in order for this implementation to assign addresses in the
-     * same manner as they would be assigned by an implementation using an
-     * append only byte[] or file.
+     * The #of bytes written so far. This is used to generate the address values
+     * returned by {@link #write(ByteBuffer)}. This is necessary in order for
+     * this implementation to assign addresses in the same manner as they would
+     * be assigned by an implementation using an append only byte[] or file.
      */
     protected int nextOffset = 0;
     
     /**
-     * Maps an {@link Addr} onto the index in {@link #records} at which the
-     * data for that address was written.
+     * Maps an address onto the index in {@link #records} at which the data for
+     * that address was written.
      */
     private final Map<Long,Integer> addrs;
     
@@ -107,6 +106,13 @@ public class SimpleMemoryRawStore implements IRawStore {
      *            will be grown as necessary.
      */
     public SimpleMemoryRawStore(int capacity) {
+        
+        /*
+         * Note: The #of offset bits is restricted to 31 since we can not
+         * address more an array having more than 31 unsigned bits of length in
+         * Java's memory model.
+         */
+        super(31);
         
         if (capacity < 0)
             throw new IllegalArgumentException("capacity is negative");
@@ -167,9 +173,9 @@ public class SimpleMemoryRawStore implements IRawStore {
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
         
-//        final int offset = Addr.getOffset(addr);
+//        final int offset = (int)getOffset(addr);
         
-        final int nbytes = Addr.getByteCount(addr);
+        final int nbytes = getByteCount(addr);
 
         if(nbytes==0) {
             
@@ -236,7 +242,7 @@ public class SimpleMemoryRawStore implements IRawStore {
         records.add(b);
         
         // formulate the address that can be used to recover that record.
-        long addr = Addr.toLong(nbytes, offset);
+        long addr = toAddr(nbytes, offset);
         
         // save the mapping from the addr to the records[].
         addrs.put(addr,index);
@@ -249,9 +255,9 @@ public class SimpleMemoryRawStore implements IRawStore {
 //
 //        if(addr==0L) throw new IllegalArgumentException("Address is 0L");
 //        
-////        final int offset = Addr.getOffset(addr);
+////        final long offset = getOffset(addr);
 //        
-//        final int nbytes = Addr.getByteCount(addr);
+//        final int nbytes = getByteCount(addr);
 //
 //        if(nbytes==0) {
 //            

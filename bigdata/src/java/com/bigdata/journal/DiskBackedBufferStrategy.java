@@ -49,12 +49,15 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 
 /**
- * Abstract base class for implementations that use a direct buffer as a
- * write through cache to an image on the disk. This covers both the
+ * Abstract base class for implementations that use a direct buffer as a write
+ * through cache to an image on the disk. This covers both the
  * {@link BufferMode#Direct}, where we use explicit IO operations, and the
- * {@link BufferMode#Mapped}, where we memory-map the image. Common
- * features shared by these implementations deal mainly with initialization
- * of a new disk image.
+ * {@link BufferMode#Mapped}, where we memory-map the image. Common features
+ * shared by these implementations deal mainly with initialization of a new disk
+ * image.
+ * 
+ * @todo write tests of the disk-only mode operations when overflowing an int32
+ *       extent.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,11 +74,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
      * Interface for random access on the backing file.
      */
     final RandomAccessFile raf;
-
-    /**
-     * True iff the channel is open.
-     */
-    private boolean open = false;
 
     final public int getHeaderSize() {
         
@@ -95,12 +93,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
     
-    final public boolean isOpen() {
-        
-        return open;
-        
-    }
-
     final public boolean isStable() {
         
         return true;
@@ -128,8 +120,8 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
      * Closes the file.
      */
     public void close() {
-        
-        if( ! open ) throw new IllegalStateException();
+
+        super.close();
 
         try {
 
@@ -140,8 +132,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
             throw new RuntimeException(ex);
             
         }
-        
-        open = false;
         
     }
 
@@ -159,7 +149,11 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
     public void deleteFile() {
         
-        if( open ) throw new IllegalStateException();
+        if( isOpen() ) {
+            
+            throw new IllegalStateException();
+            
+        }
         
         if( ! file.delete() ) {
             
@@ -173,15 +167,14 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     DiskBackedBufferStrategy(long maximumExtent, BufferMode bufferMode,
             FileMetadata fileMetadata) {
 
-        super(maximumExtent, fileMetadata.nextOffset, fileMetadata.headerSize0,
-                fileMetadata.extent, bufferMode, fileMetadata.buffer);
+        super(maximumExtent, fileMetadata.offsetBits, fileMetadata.nextOffset,
+                fileMetadata.headerSize0, fileMetadata.extent, bufferMode,
+                fileMetadata.buffer);
 
         this.file = fileMetadata.file;
         
         this.raf = fileMetadata.raf;
         
-        this.open = true;
-
     }
    
     public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {

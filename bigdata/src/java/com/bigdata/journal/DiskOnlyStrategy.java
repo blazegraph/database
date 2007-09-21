@@ -54,7 +54,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -63,6 +62,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME Test at more than int32 bytes to verify that there are no inadvertent
+ * limits being imposed at {@link Integer#MAX_VALUE} bytes.
  * 
  * @see BufferMode#Disk
  */
@@ -100,8 +102,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * The backing channel.
      */
     final FileChannel channel;
-
-    private boolean open;
 
     /**
      * Enable or disabled use of Asynchronous IO.
@@ -142,8 +142,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
-        super(fileMetadata.extent, maximumExtent, fileMetadata.nextOffset,
-                BufferMode.Disk);
+        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
+                fileMetadata.nextOffset, BufferMode.Disk);
 
         this.file = fileMetadata.file;
 
@@ -151,15 +151,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         this.extent = fileMetadata.extent;
 
-        this.headerSize = fileMetadata.headerSize0;
+        this.headerSize = FileMetadata.headerSize0;
         
         this.userExtent = extent - headerSize;
         
         this.channel = raf.getChannel();
 
         startWriter();
-
-        open = true;
 
     }
 
@@ -290,12 +288,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    
-    final public boolean isOpen() {
-
-        return open;
-
-    }
 
     final public boolean isStable() {
         
@@ -343,8 +335,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     public void close() {
 
-        if (! open )
-            throw new IllegalStateException();
+        super.close();
         
         try {
 
@@ -355,8 +346,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             throw new RuntimeException(ex);
 
         }
-
-        open = false;
 
     }
 
@@ -374,7 +363,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     public void deleteFile() {
         
-        if( open ) throw new IllegalStateException();
+        if (isOpen()) {
+
+            throw new IllegalStateException();
+
+        }
         
         if( ! file.delete() ) {
             
@@ -400,16 +393,15 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     public ByteBuffer read(long addr) {
 
         if (addr == 0L)
-            throw new IllegalArgumentException("Address is 0L");
+            throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
 
-        final int offset = Addr.getOffset(addr);
+        final long offset = getOffset(addr);
 
-        final int nbytes = Addr.getByteCount(addr);
+        final int nbytes = getByteCount(addr);
 
         if (nbytes == 0) {
 
-            throw new IllegalArgumentException(
-                    "Address encodes record length of zero");
+            throw new IllegalArgumentException(ERR_RECORD_LENGTH_ZERO);
 
         }
 
@@ -417,11 +409,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             if (offset + nbytes > nextOffset) {
 
-                throw new IllegalArgumentException("Address never written.");
+                throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
 
             }
 
-            final long pos = (long) offset + headerSize;
+            final long pos = offset + headerSize;
 
             final ByteBuffer dst;
 
@@ -487,29 +479,26 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     public long write(ByteBuffer data) {
 
         if (data == null)
-            throw new IllegalArgumentException("Buffer is null");
+            throw new IllegalArgumentException(ERR_BUFFER_NULL);
 
         // #of bytes to store.
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
-            throw new IllegalArgumentException("No bytes remaining in buffer");
+            throw new IllegalArgumentException(ERR_NO_BYTES_REMAINING);
+
+        // test the maximum record length for a write.
+        am.assertByteCount(nbytes);
 
         try {
 
-            long pos = (long) nextOffset + (long) headerSize;
-
-            if (pos + nbytes > Integer.MAX_VALUE) {
-
-                throw new IOException("Would exceed int32 bytes in file.");
-
-            }
+            long pos = nextOffset + headerSize;
 
             final long needed = (nextOffset + nbytes) - userExtent;
 
             if (needed > 0) {
 
-                if (!overflow((int) needed)) {
+                if (!overflow( needed)) {
 
                     throw new OverflowException();
 
@@ -521,7 +510,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * The offset at which the record will be written (not adjusted for
              * the root blocks).
              */
-            final int offset = nextOffset;
+            final long offset = nextOffset;
 
             if (aio) {
 
@@ -552,7 +541,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             nextOffset += nbytes;
             
             // formulate the address that can be used to recover that record.
-            return Addr.toLong(nbytes, offset);
+            return toAddr(nbytes, offset);
 
         } catch (IOException ex) {
 
@@ -609,12 +598,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
 
-        if (newUserExtent > Integer.MAX_VALUE) {
-
-            throw new IllegalArgumentException("User extent would exceed int32 bytes");
-            
-        }
-        
         if(newUserExtent == getUserExtent()) {
             
             // NOP.

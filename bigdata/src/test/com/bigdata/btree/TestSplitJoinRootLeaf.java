@@ -49,11 +49,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-
 /**
  * Test split and join of the root leaf (the tree never has more than two
  * levels).

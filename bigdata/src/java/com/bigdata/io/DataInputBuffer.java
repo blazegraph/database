@@ -295,6 +295,8 @@ public class DataInputBuffer implements DataInput {
      * @throws IOException
      */
     final public long unpackLong() throws IOException {
+        if (off + 1 > len)
+            throw new EOFException();
         int b = buf[off++];
         int nbytes;
         long l;
@@ -310,6 +312,8 @@ public class DataInputBuffer implements DataInput {
             l = b & 0x0f; // starting value is lower nibble (clear the upper
                             // nibble).
         }
+        if (off + nbytes - 1 > len)
+            throw new EOFException();
         for (int i = 1; i < nbytes; i++) {
             // Read the next byte.
             b = buf[off++];
@@ -335,6 +339,8 @@ public class DataInputBuffer implements DataInput {
      * @throws IOException
      */
     final public short unpackShort() throws IOException {
+        if (off + 1 > len)
+            throw new EOFException();
         short b = (short) buf[off++];
         short v;
         if ((b & 0x80) != 0) { // high bit is set.
@@ -342,6 +348,8 @@ public class DataInputBuffer implements DataInput {
              * clear the high bit and shift over one byte.
              */
             v = (short) ((b & 0x7f) << 8);
+            if (off + 1 > len)
+                throw new EOFException();
             b = buf[off++]; // read the next byte.
             v |= (b & 0xff); // and combine it together with the high byte.
         } else {

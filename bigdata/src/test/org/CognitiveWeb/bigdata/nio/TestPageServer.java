@@ -46,38 +46,13 @@ Modifications:
  */
 package org.CognitiveWeb.bigdata.nio;
 
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.nio.channels.spi.AbstractSelectableChannel;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Random;
-import java.util.Set;
 
 import junit.framework.TestCase;
-
-//import org.CognitiveWeb.bigdata.IPageServer;
-//import org.CognitiveWeb.bigdata.OId;
-//import org.CognitiveWeb.dbcache.DBCache;
-import org.apache.log4j.Logger;
 
 /**
  * Test class uses non-blocking I/O to communicate between collection of clients

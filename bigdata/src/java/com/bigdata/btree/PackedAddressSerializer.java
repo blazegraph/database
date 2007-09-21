@@ -48,26 +48,34 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 
-import org.CognitiveWeb.extser.LongPacker;
-
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.IRawStore;
 
 /**
- * Packs the addresses using {@link LongPacker}.
+ * Packs the addresses using the {@link IAddressManager} for the backing
+ * {@link IRawStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class PackedAddressSerializer implements IAddressSerializer {
 
-    public static final IAddressSerializer INSTANCE = new PackedAddressSerializer();
+    /**
+     * Required to (de-)serialize addresses,
+     */
+    protected final IRawStore store;
     
-    private PackedAddressSerializer() {}
+    PackedAddressSerializer(IRawStore store) {
+        
+        if(store==null) throw new IllegalArgumentException();
+        
+        this.store = store;
+        
+    }
     
     /**
      * This over-estimates the space requirements.
@@ -95,7 +103,7 @@ public class PackedAddressSerializer implements IAddressSerializer {
 
             }
 
-            Addr.pack(os, addr);
+            store.packAddr(os, addr);
 
         }
 
@@ -106,7 +114,7 @@ public class PackedAddressSerializer implements IAddressSerializer {
 
         for (int i = 0; i < nchildren; i++) {
 
-            final long addr = Addr.unpack(is);
+            final long addr = store.unpackAddr(is);
 
             if (addr == 0L) {
 

@@ -52,28 +52,29 @@ import junit.framework.TestCase;
 import com.bigdata.journal.RootBlockView;
 
 /**
- * Test suite for {@link TimestampFactory}.
+ * Test suite for {@link NanosecondTimestampFactory}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTimestampFactory extends TestCase {
+public class TestNanosecondTimestampFactory extends TestCase {
 
-    public TestTimestampFactory() {
+    public TestNanosecondTimestampFactory() {
         
     }
 
-    public TestTimestampFactory(String arg0) {
+    public TestNanosecondTimestampFactory(String arg0) {
 
         super(arg0);
         
     }
 
     /**
-     * Test verifies that nano times are always distinct from the last generated
-     * nanos time (as assigned by {@link System#nanoTime()}.  If this test passes
-     * then it shows that nanos can not be assigned quickly enough to result in
-     * duplicate values.
+     * Test determines whether nano times are always distinct from the last
+     * generated nanos time (as assigned by {@link System#nanoTime()}.
+     * <p>
+     * Note: This test is NOT designed to pass/fail but simply to test determine
+     * a characteristic of the platform on which it is executing.
      */
     public void test_nextNanoTime() {
 
@@ -87,7 +88,14 @@ public class TestTimestampFactory extends TestCase {
 
             nanoTime = System.nanoTime();
             
-            if( nanoTime == lastNanoTime ) fail("Same nano time?");
+            if (nanoTime == lastNanoTime) {
+
+                System.err
+                        .println("This platform can generate identical timestamps with nanosecond resolution");
+            
+                return;
+                
+            }
 
             long diff = nanoTime - lastNanoTime;
             
@@ -98,7 +106,9 @@ public class TestTimestampFactory extends TestCase {
             lastNanoTime = nanoTime;
             
         }
-        
+
+        System.err.println("Nano times appear to be distinct on this platorm.");
+
         System.err.println("Minimum difference in nanos is " + minDiff
                 + " over " + limit + " trials");
         
@@ -106,7 +116,7 @@ public class TestTimestampFactory extends TestCase {
     
     /**
      * Test verifies that nano times are always distinct from the last generated
-     * nanos time (as assigned by {@link RootBlockView#nextNanoTime()}.
+     * nanos time (as assigned by {@link NanosecondTimestampFactory#nextNanoTime()}.
      */
     public void test_nextNanoTime2() {
 
@@ -118,7 +128,7 @@ public class TestTimestampFactory extends TestCase {
         
         for( int i=0; i<limit; i++ ) {
 
-            nanoTime = TimestampFactory.nextNanoTime();
+            nanoTime = NanosecondTimestampFactory.nextNanoTime();
             
             if( nanoTime == lastNanoTime ) fail("Same nano time?");
 

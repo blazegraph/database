@@ -48,9 +48,9 @@ Modifications:
 package com.bigdata.journal;
 
 
-import com.bigdata.service.OldTransactionServer;
-
 import junit.framework.TestCase;
+
+import com.bigdata.service.OldTransactionServer;
 
 /**
  * Test suite for semantics of the {@link OldTransactionServer}.

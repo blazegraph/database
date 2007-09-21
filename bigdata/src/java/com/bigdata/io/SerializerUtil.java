@@ -54,6 +54,9 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IStoreSerializer;
+
 /**
  * Helper utilities for (de-)serialization of {@link Serializable} objects using
  * the Java serialization mechanisms.
@@ -62,6 +65,11 @@ import java.nio.ByteBuffer;
  * @version $Id$
  * 
  * @todo write test suite.
+ * 
+ * @deprecated by {@link IStoreSerializer} which allows the serialized object to
+ *             access the {@link IRawStore} reference (actually, this is still
+ *             useful for serialization of application data that does not
+ *             include addresses into a store).
  */
 public class SerializerUtil {
 

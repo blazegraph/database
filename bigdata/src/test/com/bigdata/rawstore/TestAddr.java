@@ -51,7 +51,12 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
-
+/**
+ * @deprecated along with {@link Addr}.
+ *
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class TestAddr extends TestCase {
 
     public TestAddr() {

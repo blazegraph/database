@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.Collection;
@@ -63,7 +62,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.rawstore.Addr;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -477,7 +475,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
 
                 } else {
 
-                    buf = ByteBuffer.allocate(Addr.getByteCount(record.addr));
+                    buf = ByteBuffer.allocate(store.getByteCount(record.addr));
 
                     buf = store.read(record.addr);
 

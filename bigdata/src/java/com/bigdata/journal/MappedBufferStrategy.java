@@ -46,8 +46,6 @@ package com.bigdata.journal;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileLock;
 
-import com.bigdata.rawstore.Addr;
-
 /**
  * <p>
  * Memory-mapped journal strategy (this mode is NOT recommended).
@@ -85,9 +83,9 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      * operations.
      * <p>
      * Note: The buffer is mapped onto the user extent from the first byte after
-     * the root blocks through the last byte of the file.  This means that we do
-     * not need to translate the offset of an {@link Addr address} when writing
-     * onto the buffer.
+     * the root blocks through the last byte of the file. This means that we do
+     * not need to translate the offset of an address when writing onto the
+     * buffer.
      */
     final MappedByteBuffer mappedBuffer;
 
@@ -114,7 +112,11 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      */
     public void deleteFile() {
         
-        if( isOpen() ) throw new IllegalStateException();
+        if( isOpen() ) {
+            
+            throw new IllegalStateException();
+            
+        }
         
         if( ! file.delete() ) {
             

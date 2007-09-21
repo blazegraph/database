@@ -61,6 +61,7 @@ import com.bigdata.btree.IndexSegmentBuilder.NOPNodeFactory;
 import com.bigdata.btree.IndexSegmentBuilder.SimpleLeafData;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.WormAddressManager;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
@@ -161,7 +162,7 @@ public class IndexSegmentMerger {
         nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
                 m,
                 0 /*initialBufferCapacity will be estimated*/,
-                new IndexSegment.CustomAddressSerializer(),
+                new IndexSegment.CustomAddressSerializer(WormAddressManager.INSTANCE),
                 in1.nodeSer.keySerializer,
                 in1.nodeSer.valueSerializer,
                 null, //new RecordCompressor(),

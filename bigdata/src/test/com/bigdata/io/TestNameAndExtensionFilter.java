@@ -52,8 +52,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
 
-import com.bigdata.io.NameAndExtensionFilter;
-
 import junit.framework.TestCase;
 
 /**

@@ -49,14 +49,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.EntryIterator;
-import com.bigdata.btree.IAbstractNode;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-
 /**
  * Test suite for iterators. The tests are presented from the least dependencies
  * to the most dependencies ((traversal of the entries for a single leaf, then

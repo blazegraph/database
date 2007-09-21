@@ -196,7 +196,7 @@ public class TestCommitHistory extends ProxyTestCase {
 
         assertEquals(commitTime1, commitRecord1.getTimestamp());
         
-        assertEquals(commitTime1, journal.getRootBlockView().getCommitTimestamp());
+        assertEquals(commitTime1, journal.getRootBlockView().getLastCommitTime());
         
         /*
          * Close and then re-open the store and verify that the correct commit

@@ -82,7 +82,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
     public long write(ByteBuffer data) {
 
         if (data == null)
-            throw new IllegalArgumentException("Buffer is null");
+            throw new IllegalArgumentException(ERR_BUFFER_NULL);
 
         /*
          * The #of bytes to be written (this is modified as a side effect by the
@@ -95,15 +95,21 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         final long addr = super.write(data);
 
         // Position the buffer on the current slot.
-        final int offset = Addr.getOffset(addr);
+        final long offset = getOffset(addr);
 
+        if (offset + remaining > Integer.MAX_VALUE) {
+            
+            throw new RuntimeException("Would exceed int32 bytes in buffer.");
+            
+        }
+        
         /*
          * Set limit to write just those bytes that were written on the buffer.
          */
-        directBuffer.limit( offset + remaining );
+        directBuffer.limit( (int) offset + remaining );
         
         // Set position on the buffer.
-        directBuffer.position( offset );
+        directBuffer.position( (int) offset );
 
         try {
 

@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -73,30 +75,32 @@ import com.bigdata.cache.WeakValueCache;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
-//import com.bigdata.scaleup.MasterJournal.Options;
+import com.bigdata.service.IDataService;
+import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * <p>
- * The {@link IJournal} is an append-only persistence capable data structure
- * supporting atomic commit, named indices, and transactions. Writes are
- * logically appended to the journal to minimize disk head movement. This is an
- * abstract implementation of the {@link IJournal} interface that does not
- * implement services that are independent in a scale-out solution (transaction
- * management, scale-out index metadata management)
+ * An append-only persistence capable data structure supporting atomic commit,
+ * named indices, and transactions. Writes are logically appended to the journal
+ * to minimize disk head movement. This is an abstract implementation of the
+ * {@link IJournal} interface that does not implement services that are
+ * independent in a scale-out solution (transaction management, partitioned
+ * indices, and index metadata management).
  * </p>
  * <p>
  * Commit processing. The journal maintains two root blocks. Commit updates the
  * root blocks using the Challis algorithm. (The root blocks are updated using
- * an alternating pattern and timestamps are recorded at the head and tail of
- * each root block to detect partial writes.) When the journal is backed by a
- * disk file, the data
- * {@link Options#FORCE_ON_COMMIT optionally flushed to disk on commit}. If
+ * an alternating pattern and "timestamps" are recorded at the head and tail of
+ * each root block to detect partial writes. See {@link IRootBlockView} and
+ * {@link RootBlockView}.) When the journal is backed by a disk file, the data
+ * are {@link Options#FORCE_ON_COMMIT optionally flushed to disk on commit}. If
  * desired, the writes may be flushed before the root blocks are updated to
  * ensure that the writes are not reordered - see {@link Options#DOUBLE_SYNC}.
  * </p>
@@ -105,6 +109,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * {@link IRawStore} API. Writes on the store MUST be serialized. Transactions
  * that write on the store are automatically serialized by {@link #commit(long)}
  * using the {@link #writeService}, e.g., via {@link #serialize(Callable)}.
+ * See {@link IDataService} for a thread-safe store.
  * </p>
  * <p>
  * Note: transaction processing MAY occur be concurrent since the write set of a
@@ -113,7 +118,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * than one concurrent thread. Typically, a thread pool of some fixed size is
  * created and transctions are assigned to threads when they start on the
  * journal. If and as necessary, the {@link TemporaryRawStore} will spill from
- * memory onto disk allowing scalable transactions (up to 2G per transactions).
+ * memory onto disk allowing scale-up transactions.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -131,7 +136,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * concurrent readers with the writer in an unisolated mode. If concurrent
  * readers actually read from the same btree instance as the writer then
  * exceptions would arise from concurrent modification. This problem is
- * trivially avoided maintaining a distinction between a concurrent read-only
+ * trivially avoided by maintaining a distinction between a concurrent read-only
  * btree emerging from the last committed state and a single non-concurrent
  * access btree for the writer. In this manner readers may read from the
  * unisolated state of the database with concurrent modification -- to another
@@ -141,19 +146,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * view to a reader (or the reader could always switch to read from the then
  * current btree after a commit - just like the distinction between an isolated
  * reader and a read-committed reader).</li>
- * <li> Network api (data service).</li>
  * <li> Group commit for higher transaction throughput.<br>
  * Note: For short transactions, TPS is basically constant for a given
  * combination of the buffer mode and whether or not commits are forced to disk.
  * This means that the #of clients is not a strong influence on performance. The
- * big wins are Transient and Force := No since neither conditions synchs to
+ * big wins are Transient and Force := No since neither conditions syncs to
  * disk. This suggests that the big win for TPS throughput is going to be group
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts. </li>
- * <li> Scale-up database (automatic re-partitioning of indices and processing
- * of deletion markers). Note that the split point must be choosen with some
- * awareness of the application keys in order to provide an atomic row update
- * guarentee when using keys formed as { primaryKey, columnName, timestamp }.</li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration, including: support for primary key (clustered) indices;
  * using queues from GOM to journal/database segment server supporting both
@@ -163,21 +163,21 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <li> Scale-out database, including:
  * <ul>
  * <li> Data server (mixture of journal server and read-optimized database
- * server).</li>
+ * server). Implemented, but needs optimized network IO.</li>
+ * <li> Media replication for data service failover </li>
+ * <li> Automatic management of partitioned indices. Note that the split point
+ * must be choosen with some awareness of the application keys in order to
+ * provide an atomic row update guarentee when using keys formed as {
+ * primaryKey, columnName, timestamp }.</li>
  * <li> Transaction service (low-latency with failover instances that keep track
  * of the current transaction metadata).</li>
- * <li> Metadata index services (one per named index with failover).</li>
+ * <li> Metadata index services (one per named index with failover).
+ * Implemented, but uses static partitioning.</li>
  * <li> Resource reclaimation. </li>
  * <li> Job scheduler to map functional programs across the data (possible
  * Hadoop integration point).</li>
  * </ul>
  * </ol>
- * 
- * @todo Move Addr methods onto IRawStore and store the bitsplit point in the
- *       root block. This will let us provision the journal to have more
- *       distinct offsets at which records can be written (e.g., 35 bits for
- *       that vs 32) by accepting a maximum record length with fewer bytes (29
- *       vs 32). The bitsplit point can be choosen differently for each store.
  * 
  * @todo Define distributed transaction protocol. Pay attention to 2-phase or
  *       3-phase commits when necessary, but take advantage of locality when
@@ -204,8 +204,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       nice to factor their application out a bit into a layered api - as long
  *       as the right layering is correctly re-established on load of the
  *       persistence data structure.
+ * 
+ * @todo The UUID of the store file should make it into all error messages and
+ *       log messages so that they can be aggregated in a distributed
+ *       enviornment.
  */
-public abstract class AbstractJournal implements IJournal, ITimestampService, ITxCommitProtocol {
+public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     /**
      * Logger.
@@ -253,6 +257,13 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     final protected IBufferStrategy _bufferStrategy;
 
     /**
+     * The object used by the journal to compute the checksums of its root
+     * blocks (this object is NOT thread-safe so there is one instance per
+     * journal).
+     */
+    private final ChecksumUtility checker = new ChecksumUtility();
+    
+    /**
      * The current root block. This is updated each time a new root block is
      * written.
      */
@@ -272,7 +283,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     /**
      * BTree mapping index names to the last metadata record committed for the
      * named index. The keys are index names (unicode strings). The values are
-     * the names and the last known {@link Addr address} of the named btree.
+     * the names and the last known address of the named btree.
      * 
      * @todo this should be private, but {@link DumpJournal} is using it to
      *       report on the state of named btrees.
@@ -282,8 +293,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     /**
      * BTree mapping commit timestamps to the address of the corresponding
      * {@link ICommitRecord}. The keys are timestamps (long integers). The
-     * values are the {@link Addr address} of the {@link ICommitRecord} with
-     * that commit timestamp.
+     * values are the address of the {@link ICommitRecord} with that commit
+     * timestamp.
      * 
      * @todo this should be private, but {@link DumpJournal} is using it to
      *       report on the historical states of named btrees.
@@ -338,6 +349,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
         long maximumExtent = Options.DEFAULT_MAXIMUM_EXTENT;
+        int offsetBits = Options.DEFAULT_OFFSET_BITS;
+        boolean validateChecksum = true;
         boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
         boolean create = Options.DEFAULT_CREATE;
         boolean createTempFile = Options.DEFAULT_CREATE_TEMP_FILE;
@@ -390,29 +403,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         }
 
-//        /*
-//         * "segment".
-//         */
-//
-//        val = properties.getProperty(Options.SEGMENT);
-//
-//        if (val == null) {
-//
-//            if (bufferMode == BufferMode.Transient) {
-//
-//                val = "0";
-//
-//            } else {
-//
-//                throw new RuntimeException("Required property: '"
-//                        + Options.SEGMENT + "'");
-//
-//            }
-//
-//        }
-//
-//        segmentId = Integer.parseInt(val);
-
         /*
          * "initialExtent"
          */
@@ -459,6 +449,45 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         this.maximumExtent = maximumExtent;
 
+        /*
+         * "offsetBits"
+         */
+        
+        val = properties.getProperty(Options.OFFSET_BITS);
+        
+        if(val != null) {
+            
+            offsetBits = Integer.parseInt(val);
+            
+            WormAddressManager.assertOffsetBits(offsetBits);
+            
+            log.info(Options.OFFSET_BITS+"="+offsetBits);
+
+            if(offsetBits!=WormAddressManager.DEFAULT_OFFSET_BITS) {
+                
+                /*
+                 * FIXME The problem is that the CommitRecordIndex and the
+                 * Name2Addr class both define IValueSerializer objects that
+                 * need to know how to pack and unpack addresses. Those objects
+                 * are serialized into the BTreeMetadata records using Java
+                 * default serialization. When when they are de-serialized they
+                 * no longer have a reference to the store and therefore do not
+                 * know the #of offset bits to use when encoding and decoding
+                 * addresses. This has been patched by requiring the use of the
+                 * default #of offset bits. A proper solution would take an
+                 * approach similar to the extSer package which provides a
+                 * marker interface used to identify objects who need to have
+                 * the store reference set during de-serialization.
+                 */
+                
+                throw new RuntimeException("Only "
+                        + WormAddressManager.DEFAULT_OFFSET_BITS
+                        + " is supported at this time");
+                
+            }
+            
+        }
+        
         /*
          * "createTempFile"
          */
@@ -515,6 +544,20 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             
         }
             
+        /*
+         * "validateChecksum"
+         */
+
+        val = properties.getProperty(Options.VALIDATE_CHECKSUM);
+
+        if (val != null) {
+
+            validateChecksum = Boolean.parseBoolean(val);
+
+            log.info(Options.VALIDATE_CHECKSUM+"="+validateChecksum);
+
+        }
+
         /*
          * "readOnly"
          */
@@ -678,28 +721,26 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
             fileMetadata = null;
             
-            _bufferStrategy = new TransientBufferStrategy(initialExtent,
-                    0L/* soft limit for maximumExtent */, useDirectBuffers);
+            _bufferStrategy = new TransientBufferStrategy(offsetBits,
+                    initialExtent, 0L/* soft limit for maximumExtent */,
+                    useDirectBuffers);
 
             /*
              * setup the root blocks.
              */
             final int nextOffset = 0;
-            final long commitTimestamp = 0L;
-            final long firstTxId = 0L;
-            final long lastTxId = 0L;
+            final long firstCommitTime = 0L;
+            final long lastCommitTime = 0L;
             final long commitCounter = 0L;
             final long commitRecordAddr = 0L;
             final long commitRecordIndexAddr = 0L;
             final UUID uuid = UUID.randomUUID();
-            IRootBlockView rootBlock0 = new RootBlockView(true, 
-                    nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    uuid);
-            IRootBlockView rootBlock1 = new RootBlockView(false, 
-                    nextOffset, firstTxId, lastTxId, commitTimestamp,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    uuid);
+            IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
+                    nextOffset, firstCommitTime, lastCommitTime, commitCounter,
+                    commitRecordAddr, commitRecordIndexAddr, uuid, checker);
+            IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
+                    nextOffset, firstCommitTime, lastCommitTime, commitCounter,
+                    commitRecordAddr, commitRecordIndexAddr, uuid, checker);
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -718,7 +759,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             fileMetadata = new FileMetadata(file,
                     BufferMode.Direct, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
-                    readOnly, forceWrites);
+                    readOnly, forceWrites, offsetBits, validateChecksum,
+                    checker);
 
             _bufferStrategy = new DirectBufferStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -738,7 +780,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             fileMetadata = new FileMetadata(file,
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
-                    readOnly, forceWrites);
+                    readOnly, forceWrites, offsetBits, validateChecksum,
+                    checker);
 
             /*
              * Note: the maximumExtent is a hard limit in this case only since
@@ -763,7 +806,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
             fileMetadata = new FileMetadata(file,
                     BufferMode.Disk, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
-                    readOnly, forceWrites);
+                    readOnly, forceWrites, offsetBits, validateChecksum,
+                    checker);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -821,6 +865,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      * Shutdown the journal politely. Active writes, active transactions and
      * transactions pending commit will run to completion, but no new
      * transactions will be accepted.
+     * <p>
+     * Note: You SHOULD use this method rather than {@link #close()} for normal
+     * shutdown of the journal.
      */
     public void shutdown() {
 
@@ -828,7 +875,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
 
         final long begin = System.currentTimeMillis();
         
-        log.warn("#active="+activeTx.size()+", shutting down...");
+        log.info("#active="+activeTx.size()+", shutting down...");
         
         /*
          * allow all pending tasks to complete, but no new tasks will be
@@ -841,7 +888,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.warn("Journal is shutdown: elapsed="+elapsed);
+        log.info("Journal is shutdown: elapsed="+elapsed);
 
     }
 
@@ -876,19 +923,22 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * live data.
              */
 
-            _delete();
+            delete();
             
         }
 
     }
 
     /**
-     * Core implementation of delete handles event reporting.
+     * Deletes the backing file(s) (if any).
+     * <p>
+     * Note: This is the core implementation of delete and handles event
+     * reporting.
      * 
      * @exception IllegalStateException
      *                if the journal is open.
      */
-    protected void _delete() {
+    public void delete() {
 
         log.info("");
         
@@ -926,7 +976,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
              * was already deleted by _close().
              */
             
-            _delete();
+            delete();
             
         }
         
@@ -980,8 +1030,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      * objects).
      * 
      * @param rootSlot
-     *            The slot in the root block where the {@link Addr address} of
-     *            the {@link ICommitter} will be recorded.
+     *            The slot in the root block where the address of the
+     *            {@link ICommitter} will be recorded.
      * 
      * @param committer
      *            The commiter.
@@ -1088,13 +1138,13 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     /**
      * An atomic commit is performed by directing each registered
      * {@link ICommitter} to flush its state onto the store using
-     * {@link ICommitter#handleCommit()}. The {@link Addr address} returned by
-     * that method is the address from which the {@link ICommitter} may be
-     * reloaded (and its previous address if its state has not changed). That
-     * address is saved in the {@link ICommitRecord} under the index for which
-     * that committer was {@link #registerCommitter(int, ICommitter) registered}.
-     * We then force the data to stable store, update the root block, and force
-     * the root block and the file metadata to stable store.
+     * {@link ICommitter#handleCommit()}. The address returned by that method
+     * is the address from which the {@link ICommitter} may be reloaded (and its
+     * previous address if its state has not changed). That address is saved in
+     * the {@link ICommitRecord} under the index for which that committer was
+     * {@link #registerCommitter(int, ICommitter) registered}. We then force
+     * the data to stable store, update the root block, and force the root block
+     * and the file metadata to stable store.
      * 
      * @param commitTime
      *            The commit time either of a transaction or of an unisolated
@@ -1190,24 +1240,45 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         {
 
             /*
-             * Update the firstTxId the first time a transaction commits and the
-             * lastTxId each time a transaction commits.
-             * 
-             * Note: These are commit time timestamps.
+             * Update the firstCommitTime the first time a transaction commits
+             * and the lastCommitTime each time a transaction commits (these are
+             * commit timestamps of isolated or unisolated transactions).
              */
 
             final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
                     : old.getFirstCommitTime());
 
+            final long priorCommitTime = old.getLastCommitTime();
+            
+            if(priorCommitTime != 0L) {
+                
+                /*
+                 * This is a local sanity check to make sure that the commit
+                 * timestamps are strictly increasing. An error will be reported
+                 * if the commit time for the current (un)isolated transaction
+                 * is not strictly greater than the last commit time on the
+                 * store as read back from the current root block.
+                 */
+
+                if(commitTime<= priorCommitTime) {
+                    
+                    throw new RuntimeException(
+                            "Time goes backwards: commitTime=" + commitTime
+                                    + ", but lastCommitTime=" + priorCommitTime
+                                    + " on the current root block");
+                    
+                }
+                
+            }
+            
             final long lastCommitTime = commitTime;
 
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
-                    !old.isRootBlock0(), /*old.getSegmentId(),*/ _bufferStrategy
+                    !old.isRootBlock0(), old.getOffsetBits(), _bufferStrategy
                             .getNextOffset(), firstCommitTime, lastCommitTime,
-                    commitTime, newCommitCounter,
-                    commitRecordAddr, commitRecordIndexAddr,
-                    old.getUUID());
+                    newCommitCounter, commitRecordAddr, commitRecordIndexAddr,
+                    old.getUUID(), checker);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
@@ -1222,7 +1293,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
          */
         {
 
-            final int nextOffset = _bufferStrategy.getNextOffset();
+            final long nextOffset = _bufferStrategy.getNextOffset();
 
             /*
              * Choose maximum of the target maximum extent and the current user
@@ -1317,11 +1388,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     }
 
     /**
-     * Returns a read-only view of the root {@link Addr addresses}. The caller
-     * may modify the returned array without changing the effective state of
-     * those addresses as used by the store.
+     * Returns a read-only view of the root addresses. The caller may modify the
+     * returned array without changing the effective state of those addresses as
+     * used by the store.
      * 
-     * @return The root {@link Addr addresses}.
+     * @return The root addresses.
      */
     public ICommitRecord getCommitRecord() {
 
@@ -1532,8 +1603,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
     
     /**
      * A cache that is used by the {@link Journal} to provide a canonicalizing
-     * mapping from an {@link Addr address} to the instance of a read-only
-     * historical object loaded from that {@link Addr address}.
+     * mapping from an address to the instance of a read-only historical object
+     * loaded from that address.
      * <p>
      * Note: the "live" version of an object MUST NOT be placed into this cache
      * since its state will continue to evolve with additional writes while the
@@ -1582,7 +1653,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
      * A canonicalizing mapping for index objects.
      * 
      * @param addr
-     *            The {@link Addr address} of the index object.
+     *            The address of the index object.
      *            
      * @return The index object.
      */
@@ -2115,6 +2186,70 @@ public abstract class AbstractJournal implements IJournal, ITimestampService, IT
         
         return tx.getIndex(name);
         
+    }
+
+    /*
+     * IStoreSerializer
+     */
+    
+    final public Object deserialize(byte[] b, int off, int len) {
+        return _bufferStrategy.deserialize(b, off, len);
+    }
+
+    final public Object deserialize(byte[] b) {
+        return _bufferStrategy.deserialize(b);
+    }
+
+    final public Object deserialize(ByteBuffer buf) {
+        return _bufferStrategy.deserialize(buf);
+    }
+
+    final public byte[] serialize(Object obj) {
+        return _bufferStrategy.serialize(obj);
+    }
+
+    /*
+     * IAddressManager
+     */
+
+    final public long getOffset(long addr) {
+        return _bufferStrategy.getOffset(addr);
+    }
+
+    final public int getByteCount(long addr) {
+        return _bufferStrategy.getByteCount(addr);
+    }
+
+    final public void packAddr(DataOutput out, long addr) throws IOException {
+        _bufferStrategy.packAddr(out, addr);
+    }
+
+    final public long toAddr(int nbytes, long offset) {
+        return _bufferStrategy.toAddr(nbytes, offset);
+    }
+
+    final public String toString(long addr) {
+        return _bufferStrategy.toString(addr);
+    }
+
+    final public long unpackAddr(DataInput in) throws IOException {
+        return _bufferStrategy.unpackAddr(in);
+    }
+
+    final public int getOffsetBits() {
+        
+        return ((AbstractRawWormStore)_bufferStrategy).getOffsetBits();
+        
+    }
+    
+    /**
+     * The maximum length of a record that may be written on the store.
+     */
+    final public int getMaxRecordSize() {
+
+        return ((AbstractRawWormStore) _bufferStrategy).getAddressManger()
+                .getMaxByteCount();
+
     }
 
 }

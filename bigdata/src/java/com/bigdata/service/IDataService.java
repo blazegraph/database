@@ -50,6 +50,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.IValueBuffer;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
@@ -295,8 +296,13 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
-     * @todo modify to use {@link IKeyBuffer} and IValueBuffer.
+     * @todo modify to use {@link IKeyBuffer} and {@link IValueBuffer} so that
+     *       we can get good compression for the wire. Note that on the wire
+     *       compression could be different from in the index compression and
+     *       could take advantage of application knowledge.
+     *       
      * @todo javadoc update.
+     * 
      * @todo support extension operations (read or mutable).
      */
     public byte[][] batchInsert(long tx, String name, int partitionId,
@@ -326,6 +332,11 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * is returned or the {@link ResultSet#isLast()} flag is set, indicating
      * that all keys up to (but not including) the <i>startKey</i> have been
      * visited.
+     * </p>
+     * <p>
+     * Note: Both the {@link ClientIndexView} (scale-out indicex) and
+     * {@link RangeQuery} (unpartitioned indices) provide iterators that
+     * encapsulate this method.
      * </p>
      * 
      * @param tx

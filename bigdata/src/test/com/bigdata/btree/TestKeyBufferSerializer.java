@@ -47,9 +47,7 @@ Modifications:
 
 package com.bigdata.btree;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInput;
-import java.io.DataInputStream;
 import java.io.IOException;
 
 import com.bigdata.io.DataInputBuffer;

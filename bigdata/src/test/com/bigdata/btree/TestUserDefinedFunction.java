@@ -49,11 +49,6 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.ConditionalInsert;
-import com.bigdata.btree.ConditionalInsertNoValue;
-import com.bigdata.btree.UserDefinedFunction;
-
 /**
  * Test suite for {@link UserDefinedFunction}.
  * 
