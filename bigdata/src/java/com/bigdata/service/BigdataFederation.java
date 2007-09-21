@@ -117,9 +117,21 @@ public class BigdataFederation implements IBigdataFederation {
 
     public void disconnect() {
 
+        if(client==null) {
+            
+            // Already disconnected.
+            
+            return;
+            
+        }
+        
         client = null;
 
-        clientTempStore.close();
+        if(clientTempStore.isOpen()) {
+
+            clientTempStore.close();
+            
+        }
 
         partitions.clear();
 

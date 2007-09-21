@@ -56,7 +56,6 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.rawstore.Addr;
 
 /**
  * Class delegates the {@link #overflow()} event to a {@link MasterJournal}.
@@ -79,8 +78,8 @@ public class SlaveJournal extends Journal {
     /**
      * BTree mapping btree names to the last metadata record committed for the
      * {@link MetadataIndex} for the named btree. The keys are index names
-     * (unicode strings). The values are the last known {@link Addr address} of
-     * the {@link MetadataIndex} for the named btree.
+     * (unicode strings). The values are the last known address of the
+     * {@link MetadataIndex} for the named btree.
      */
     protected Name2MetadataAddr name2MetadataAddr;
 

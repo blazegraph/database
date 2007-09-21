@@ -312,6 +312,30 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     }
     
     /**
+     * Conditionally install a suitable security manager if there is none in
+     * place. This is required before the client can download code. The code
+     * will be downloaded from the HTTP server identified by the codebase
+     * property specified for the VM running the service.
+     */
+    protected void setSecurityManager() {
+
+        SecurityManager sm = System.getSecurityManager();
+        
+        if (sm == null) {
+
+            System.setSecurityManager(new SecurityManager());
+         
+            log.info("Set security manager");
+
+        } else {
+            
+            log.info("Security manager already in place: "+sm.getClass());
+            
+        }
+
+    }
+    
+    /**
      * Client startup reads {@link Configuration} data from the file(s) named by
      * <i>args</i>, starts the client, attempts to discover one or more
      * registrars and establishes a lookup cache for {@link MetadataService}s.
@@ -323,8 +347,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public BigdataClient(String[] args) {
 
-        // @todo verify that this belongs here.
-        System.setSecurityManager(new SecurityManager());
+        setSecurityManager();
 
         LookupLocator[] unicastLocators = null;
         String[] groups = null;

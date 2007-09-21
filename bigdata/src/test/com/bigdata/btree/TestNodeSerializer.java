@@ -55,16 +55,6 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IAbstractNode;
-import com.bigdata.btree.ImmutableKeyBuffer;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-import com.bigdata.btree.NodeSerializer;
-import com.bigdata.btree.PO;
-import com.bigdata.btree.RecordCompressor;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
@@ -92,182 +82,13 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         super(arg0);
     }
     
-//    /**
-//     * Prints out the offsets and various other sizing information for nodes and
-//     * leaves given the slotSize for the journal and the branching factor for
-//     * the object index. Note that this information reflects the maximum space
-//     * requirement. Actual serialization uses a variety of techniques to produce
-//     * a more compact format.
-//     * 
-//     * @param slotSize
-//     *            The size of a slot on the journal.
-//     * @param branchingFactor
-//     *            The #of keys in a node of the object index (aka the branching
-//     *            factor).
-//     * 
-//     * @todo this test helper is rather specific to the concept of an object
-//     *       index and therefore somewhat dated.  Also, it presumes that much
-//     *       of the serialized format is fixed, but we actually pack everything
-//     *       except the header.
-//     */
-//    public void showInfo(int slotSize,int branchingFactor) {
-//
-//        // @todo drop use of the slotMath and the computation of #of slots used.
-//        final SlotMath slotMath = new SlotMath(slotSize);
-//        
-//        final IndexEntrySerializer valueSer = new IndexEntrySerializer(slotMath);
-//        
-//        final NodeSerializer nodeSer = new NodeSerializer(
-//                BTree.NodeFactory.INSTANCE, PackedAddressSerializer.INSTANCE,
-//                Int32OIdKeySerializer.INSTANCE, valueSer);
-//
-//        System.err.println("Shared record format:");
-//
-//        System.err.println("slotSize : " + slotSize);
-//        
-//        System.err
-//                .println("pageSize : " + branchingFactor + " (aka branching factor)");
-//        
-//        System.err.println(" checksum: offset="
-//                + NodeSerializer.OFFSET_CHECKSUM + ", size="
-//                + NodeSerializer.SIZEOF_CHECKSUM);
-//        
-//        System.err.println(" nbytes  : offset=" + NodeSerializer.OFFSET_NBYTES
-//                + ", size=" + NodeSerializer.SIZEOF_NBYTES);
-//
-//        System.err.println(" nodeType: offset=" + NodeSerializer.OFFSET_NODE_TYPE
-//                + ", size=" + NodeSerializer.SIZEOF_NODE_TYPE);
-//        
-//        System.err.println(" version : offset=" + NodeSerializer.OFFSET_VERSION
-//                + ", size=" + NodeSerializer.SIZEOF_VERSION);
-//
-//        /*
-//         * iff a linked leaf (not used for node or unlinked leaf).
-//         */
-//        System.err.println(" prior   : offset=" + NodeSerializer.OFFSET_PRIOR
-//                + ", size=" + NodeSerializer.SIZEOF_REF);
-//
-//        System.err.println(" next    : offset=" + NodeSerializer.OFFSET_NEXT
-//                + ", size=" + NodeSerializer.SIZEOF_REF);
-//
-//        /*
-//         * the different fixed length header sizes.
-//         */
-//        System.err.println(" node header    : size=" + NodeSerializer.SIZEOF_NODE_HEADER);
-//        System.err.println(" leaf header    : size=" + NodeSerializer.SIZEOF_LEAF_HEADER);
-//        System.err.println(" linked leaf hdr: size=" + NodeSerializer.SIZEOF_LINKED_LEAF_HEADER);
-//
-//
-//        /*
-//         * a node
-//         */
-//        {
-//
-//            int nkeys = branchingFactor - 1;
-//            int nchildren = branchingFactor;
-//            int keysSize = nodeSer.keySerializer.getSize(nkeys);
-//            int valuesSize = (nchildren * NodeSerializer.SIZEOF_REF);
-////            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
-//            
-//            System.err.println("Node specific record format:");
-//            
-//            System.err.println(" key[]" +
-////                    ": offset="+ NodeSerializer.OFFSET_KEYS +
-////                    ", size="+ NodeSerializer.SIZEOF_KEY +
-//                    ": #keys=" + nkeys
-//                    + ", #bytes=" + keysSize);
-//            
-//            System.err.println(" value   : child node ref         ("
-//                    + NodeSerializer.SIZEOF_REF + ")");
-//            
-//            System.err.println(" value   : total node value       ("
-//                    + NodeSerializer.SIZEOF_REF + ")");
-//            
-//            System.err.println(" value[]"+
-////                    + " : offset="+offsetValues +
-//                    ": size="+NodeSerializer.SIZEOF_REF +
-//                    ", #values="+nchildren +
-//                    ", #bytes="+ valuesSize );
-//
-//            final int nodeSize = nodeSer.getSize(false, branchingFactor);
-//
-//            final int slotsPerNode = slotMath.getSlotCount(nodeSize);
-//
-//            System.err.println(" totals  : nodeSize=" + nodeSize
-//                    + ", slotsPerNode=" + slotsPerNode
-//                    + ", #bytesInThoseSlots=" + (slotsPerNode * slotSize)
-//                    + ", wastePerNode=" + (slotsPerNode * slotSize - nodeSize));
-//
-//        }
-//
-//        /*
-//         * a leaf
-//         */
-//        {
-//            // assume #of keys == branching factor.
-//            int nkeys = branchingFactor;
-//            int keysSize = nodeSer.keySerializer.getSize(nkeys);
-//            int valuesSize = valueSer.getSize(nkeys);
-////            int offsetValues = NodeSerializer.OFFSET_KEYS + keysSize;
-//
-//            System.err.println("Leaf specific record format:");
-//            
-//            System.err.println(" key[]"+
-////                    ": offset="+ NodeSerializer.OFFSET_KEYS +
-////                    ", size="+ NodeSerializer.SIZEOF_KEY +
-//                    ": #keys=" + branchingFactor
-//                    + ", #bytes=" + keysSize);
-//            
-//            System.err.println(" value   : versionCounter         ("
-//                    + IndexEntrySerializer.SIZEOF_VERSION_COUNTER + ")");
-//            
-//            System.err.println(" value   : currentVersion ref     ("
-//                    + IndexEntrySerializer.SIZEOF_SLOTS + ")");
-//            
-//            System.err.println(" value   : preExistingVersion ref ("
-//                    + IndexEntrySerializer.SIZEOF_SLOTS + ")");
-//            
-//            System.err.println(" value   : total leaf value       ("
-//                    + IndexEntrySerializer.SIZEOF_LEAF_VALUE + ")");
-//
-//            System.err.println(" value[] : #values=" + nkeys + ", #bytes="
-//                    + valuesSize);
-//
-//            final int leafSize = nodeSer.getSize(true, branchingFactor - 1);
-//
-//            final int slotsPerLeaf = slotMath.getSlotCount(leafSize);
-//
-//            System.err.println(" totals  : leafSize=" + leafSize
-//                    + ", slotsPerLeaf=" + slotsPerLeaf
-//                    + ", #bytesInThoseSlots=" + (slotsPerLeaf * slotSize)
-//                    + ", wastePerLeaf=" + (slotsPerLeaf * slotSize - leafSize));
-//        }
-//        
-//    }
-//
-//    /**
-//     * Show size info.
-//     */
-//    public void test_sizeInfo_slotSize64_pageSize512() {
-//        
-//        showInfo(64, 512);
-//        
-//    }
-    
-//    /**
-//     * Show size info.
-//     */
-//    public void test_sizeInfo_slotSize256_pageSize1024() {
-//        
-//        showInfo(256,1024);
-//        
-//    }
-    
     /**
      * Overrides to use the {@link SimpleEntry.Serializer}.
      */
     public BTree getBTree(int branchingFactor) {
+        
         return getBTree(branchingFactor,false);
+        
     }
     
     /**
@@ -312,7 +133,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
 //        expected.dump(System.err);
         
-        final Leaf actual = (Leaf)doRoundTripTest( true, ndx, expected );
+//        final Leaf actual = (Leaf)
+        doRoundTripTest( true, ndx, expected );
 
 //        actual.dump(System.err);
         
@@ -332,7 +154,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
 //        expected.dump(System.err);
         
-        final Leaf actual = (Leaf)doRoundTripTest( true, ndx, expected );
+//        final Leaf actual = (Leaf)
+        doRoundTripTest( true, ndx, expected );
 
 //        actual.dump(System.err);
         
@@ -430,7 +253,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
 //        expected.dump(System.err);
 
-        final Node actual = (Node)doRoundTripTest( true, ndx, expected);
+//        final Node actual = (Node)
+        doRoundTripTest( true, ndx, expected);
 
 //        actual.dump(System.err);
 
@@ -450,7 +274,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
 //        expected.dump(System.err);
 
-        final Node actual = (Node)doRoundTripTest( true, ndx, expected);
+//        final Node actual = (Node)
+        doRoundTripTest( true, ndx, expected);
 
 //        actual.dump(System.err);
 
@@ -488,7 +313,10 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             buf = clone(nodeSer.putNode((Node)expected));
             
         }
-        
+
+        if (verbose)
+            expected.dump(Level.DEBUG,System.err);
+
         if (verbose)
             System.err.println("buf: " + Arrays.toString(buf.array()));
         
@@ -610,11 +438,12 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     /**
      * Creates a new buffer containing a copy of the data in the given buffer.
      * 
-     * @param buf The buffer (in).  The data between the position and the limit
-     * will be copied.
+     * @param buf
+     *            The buffer (in). The data between the position and the limit
+     *            will be copied.
      * 
-     * @return The buffer (out). The position will be zero and the limit will
-     * be the capacity.
+     * @return The buffer (out). The position will be zero and the limit will be
+     *         the capacity.
      */
     private ByteBuffer clone(ByteBuffer buf) {
        

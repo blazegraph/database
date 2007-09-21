@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.scaleup;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentMerger;
 import com.bigdata.isolation.UnisolatedBTree;

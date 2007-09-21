@@ -55,6 +55,11 @@ import com.bigdata.isolation.IsolatedBTree;
 public interface ITx extends IIndexStore {
 
     /**
+     * The transaction identifier that is used for unisolated transactions (0L).
+     */
+    public static final long UNISOLATED = 0L;
+    
+    /**
      * The start time for the transaction as assigned by a centralized
      * transaction manager service. Transaction start times are unique and also
      * serve as transaction identifiers. Note that this is NOT the time at which

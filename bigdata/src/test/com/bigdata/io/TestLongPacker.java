@@ -46,13 +46,17 @@ Modifications:
  */
 package com.bigdata.io;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
-
 import junit.framework.TestCase;
+
+import org.CognitiveWeb.extser.LongPacker;
 
 /**
  * Test suite for packing and unpacking unsigned long integers.
@@ -374,7 +378,7 @@ public class TestLongPacker extends TestCase {
     }
  
     /**
-     * Random long values (32 bits of random long), including negatives,
+     * Random long values (64 bits of random long), including negatives,
      * with a uniform distribution.
      * 
      * @author thompsonbry
@@ -390,6 +394,81 @@ public class TestLongPacker extends TestCase {
 
         public long nextLong() {
             return _rnd.nextLong();
+        }
+        
+    }
+
+//    /**
+//     * Random non-negative long values (64 bits of random long) with a uniform
+//     * distribution.
+//     * 
+//     * @author thompsonbry
+//     */
+//    private static class RandomNonNegativeLong implements LongGenerator
+//    {
+//        
+//        Random _rnd;
+//        
+//        public RandomNonNegativeLong( Random rnd ) {
+//            _rnd = rnd;
+//        }
+//
+//        public long nextLong() {
+//            return _rnd.nextLong() & 0x7fffffffffffffffL;
+//        }
+//        
+//    }
+
+    /**
+     * Random non-negative long values with between 1 and 63 bits of leading
+     * zeros.  The advantage of this random number generator is that it can
+     * look for edge conditions based on the #of leading zeros in the value
+     * to be packed.
+     * 
+     * @author thompsonbry
+     */
+    private static class RandomNonNegativeLeadingZerosLong implements LongGenerator
+    {
+        
+        Random _rnd;
+        long[] masks = new long[63];
+        
+        public RandomNonNegativeLeadingZerosLong( Random rnd ) {
+            
+            _rnd = rnd;
+            
+            for(int i=0; i<masks.length; i++){
+                
+                long mask = 0L;
+                
+                for(int j=0; j<=i; j++) {
+                    
+                    long bit = 1L<<j;
+                    
+                    mask |= bit;
+                    
+                }
+                
+//                mask &= 1L<<63; // always set the high bit so that the values are non-negative.
+                
+                //System.err.println("mask["+i+"] = "+Long.toHexString(mask));
+            
+                masks[i] = mask;
+                
+            }
+            
+        }
+
+        public long nextLong() {
+            
+            long v = _rnd.nextLong();
+            
+            long mask = masks[_rnd.nextInt(masks.length)];
+            
+            long rnd = v & mask;
+            
+            return rnd;
+            
         }
         
     }
@@ -423,6 +502,22 @@ public class TestLongPacker extends TestCase {
 
         // test on 1M random long values.
         doStressTest( 1000000, new RandomLong( new Random() ) );
+        
+    }
+
+    /**
+     * Run a large #of random pack/unpack operations to sample the space while
+     * showing correctness on those samples. The samples are drawn from the
+     * non-negative longs and have a random number of leading bits set to zero.
+     * Since the values are non-negative there will always be at least one bit
+     * (the high bit) that is zero.
+     * 
+     * @throws IOException
+     */
+    public void testStressRandomNonNegativeLeadingZeros() throws IOException {
+
+        // test on 1M random long values.
+        doStressTest( 1000000, new RandomNonNegativeLeadingZerosLong( new Random() ) );
         
     }
 
@@ -513,4 +608,129 @@ public class TestLongPacker extends TestCase {
         }
     }
     
+    /**
+     * This test packs the data using the {@link LongPacker} and unpacks it
+     * using a {@link DataInputBuffer}.
+     */
+    public void test_compatiblity_LongPacker_DataInputBuffer()
+            throws IOException {
+
+        final int limit = 10000;
+        
+        Random r = new Random();
+        
+        LongGenerator gen = new RandomNonNegativeLeadingZerosLong(r);
+        
+        long[] expected = new long[limit];
+
+        /*
+         * Pack a sequence of random non-negative long integers.
+         */
+        final byte[] serialized;
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(limit * 8);
+
+            DataOutputStream os = new DataOutputStream(baos);
+
+            for (int i = 0; i < limit; i++) {
+
+                long v = gen.nextLong();
+
+                LongPacker.packLong(os, v);
+
+                expected[i] = v;
+
+            }
+
+            os.flush();
+            
+            serialized = baos.toByteArray();
+            
+        }
+
+        /*
+         * Deserialize, checking the unpacked values.
+         */
+        {
+
+            DataInputBuffer in = new DataInputBuffer(serialized);
+            
+            for(int i=0; i<limit; i++) {
+                
+                long v = in.unpackLong();
+                
+                if(v!=expected[i]) {
+
+                    assertEquals("index="+i,expected[i],v);
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
+
+    /**
+     * This test packs the data using a {@link DataOutputBuffer} and unpacks it
+     * using the {@link LongPacker}.
+     */
+    public void test_compatiblity_DataOutputBuffer_LongPacker()
+            throws IOException {
+
+        final int limit = 10000;
+        
+        Random r = new Random();
+
+        LongGenerator gen = new RandomNonNegativeLeadingZerosLong(r);
+        
+        long[] expected = new long[limit];
+
+        /*
+         * Pack a sequence of random non-negative long integers.
+         */
+        final byte[] serialized;
+        {
+
+            DataOutputBuffer os = new DataOutputBuffer();
+            
+            for (int i = 0; i < limit; i++) {
+
+                final long v = gen.nextLong();
+
+                os.packLong(v);
+
+                expected[i] = v;
+
+            }
+
+            serialized = os.toByteArray();
+            
+        }
+
+        /*
+         * Deserialize, checking the unpacked values.
+         */
+        {
+
+            ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+            
+            DataInput in = new DataInputStream(bais);
+            
+            for(int i=0; i<limit; i++) {
+                
+                long v = LongPacker.unpackLong( in );
+                
+                if(v!=expected[i]) {
+
+                    assertEquals("index="+i,expected[i],v);
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
+
 }

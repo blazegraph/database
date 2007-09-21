@@ -45,6 +45,8 @@ package com.bigdata.btree;
 
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -54,8 +56,11 @@ import java.nio.ByteBuffer;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.AbstractRawStore;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * A read-only store backed by a file. The section of the file containing the
@@ -63,13 +68,13 @@ import com.bigdata.rawstore.IRawStore;
  * <p>
  * Note: An LRU disk cache is a poor choice for the leaves. Since the btree
  * already maintains a cache of the recently touched leaf objects, a recent read
- * against the disk is the best indication that we have that we will not want to
+ * against the disk is the best indication that we have that we will NOT want to
  * read that region again soon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentFileStore implements IRawStore {
+public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore {
 
     /**
      * Logger.
@@ -77,6 +82,11 @@ public class IndexSegmentFileStore implements IRawStore {
     protected static final Logger log = Logger
             .getLogger(IndexSegmentFileStore.class);
 
+    /**
+     * Used to delegate the {@link IAddressManager} interface.
+     */
+    private WormAddressManager addressManager;
+    
     /**
      * A buffer containing the disk image of the nodes in the index segment.
      * While some nodes will be held in memory by the hard reference queue
@@ -164,6 +174,8 @@ public class IndexSegmentFileStore implements IRawStore {
 
             IndexSegment.log.info(metadata.toString());
 
+            this.addressManager = new WormAddressManager(metadata.offsetBits);
+            
             /*
              * Read in the extension metadata record.
              */
@@ -176,8 +188,21 @@ public class IndexSegmentFileStore implements IRawStore {
              * be a deserialized object and the file will not be buffered in
              * memory.
              */
-            this.buf_nodes = (metadata.nnodes > 0 ? bufferIndexNodes(raf)
-                    : null);
+            if(metadata.nnodes == 0) {
+                
+                this.buf_nodes = null;
+                
+            } else {
+            
+                // @todo configurable : we will not buffer more than this much data.
+                final long MAX_NODE_REGION_LENGTH = Bytes.megabyte * 100; 
+            
+                final long nodesByteCount = getByteCount(metadata.addrLeaves);
+                
+                this.buf_nodes = (nodesByteCount < MAX_NODE_REGION_LENGTH ? bufferIndexNodes(raf)
+                        : null);
+            
+            }
 
             /*
              * Mark as open so that we can use read(long addr) to read other
@@ -328,11 +353,11 @@ public class IndexSegmentFileStore implements IRawStore {
         if (!open)
             throw new IllegalStateException();
 
-        final int offset = Addr.getOffset(addr);
+        final long offset = addressManager.getOffset(addr);
 
-        final int length = Addr.getByteCount(addr);
+        final int length = addressManager.getByteCount(addr);
         
-        final int offsetNodes = Addr.getOffset(metadata.addrNodes);
+        final long offsetNodes = addressManager.getOffset(metadata.addrNodes);
 
         ByteBuffer dst;
 
@@ -346,15 +371,15 @@ public class IndexSegmentFileStore implements IRawStore {
              */
 
             // correct the offset so that it is relative to the buffer.
-            int off = offset - offsetNodes;
+            long off = offset - offsetNodes;
 
             // System.err.println("offset="+offset+", length="+length);
 
             // set the limit on the buffer to the end of the record.
-            buf_nodes.limit(off + length);
+            buf_nodes.limit((int)(off + length));
 
             // set the position on the buffer to the start of the record.
-            buf_nodes.position(off);
+            buf_nodes.position((int)off);
 
             // create a slice of that view.
             dst = buf_nodes.slice();
@@ -405,9 +430,9 @@ public class IndexSegmentFileStore implements IRawStore {
             
         }
         
-        final int offset = Addr.getOffset(metadata.addrNodes);
+        final long offset = addressManager.getOffset(metadata.addrNodes);
 
-        final int nbytes = Addr.getByteCount(metadata.addrLeaves);
+        final int nbytes = addressManager.getByteCount(metadata.addrLeaves);
 
         /*
          * Note: The direct buffer imposes a higher burden on the JVM and all
@@ -440,11 +465,11 @@ public class IndexSegmentFileStore implements IRawStore {
             
         }
         
-        log.info("reading bloom filter: "+Addr.toString(addr));
+        log.info("reading bloom filter: "+addressManager.toString(addr));
         
-        final int off = Addr.getOffset(addr);
+        final long off = addressManager.getOffset(addr);
         
-        final int len = Addr.getByteCount(addr);
+        final int len = addressManager.getByteCount(addr);
         
         ByteBuffer buf = ByteBuffer.allocate(len);
 
@@ -518,11 +543,11 @@ public class IndexSegmentFileStore implements IRawStore {
         
         assert addr != 0L;
         
-        log.info("reading extension metadata record: "+Addr.toString(addr));
+        log.info("reading extension metadata record: "+addressManager.toString(addr));
         
-        final int off = Addr.getOffset(addr);
+        final long off = addressManager.getOffset(addr);
         
-        final int len = Addr.getByteCount(addr);
+        final int len = addressManager.getByteCount(addr);
         
         ByteBuffer buf = ByteBuffer.allocate(len);
 
@@ -555,6 +580,34 @@ public class IndexSegmentFileStore implements IRawStore {
 
         return extensionMetadata;
 
+    }
+
+    /*
+     * IAddressManager
+     */
+    
+    final public int getByteCount(long addr) {
+        return addressManager.getByteCount(addr);
+    }
+
+    final public long getOffset(long addr) {
+        return addressManager.getOffset(addr);
+    }
+
+    final public void packAddr(DataOutput out, long addr) throws IOException {
+        addressManager.packAddr(out, addr);
+    }
+
+    final public long toAddr(int nbytes, long offset) {
+        return addressManager.toAddr(nbytes, offset);
+    }
+
+    final public String toString(long addr) {
+        return addressManager.toString(addr);
+    }
+
+    final public long unpackAddr(DataInput in) throws IOException {
+        return addressManager.unpackAddr(in);
     }
     
 }

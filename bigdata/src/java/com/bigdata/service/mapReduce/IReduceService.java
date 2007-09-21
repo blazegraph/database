@@ -52,7 +52,6 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
-import com.bigdata.service.mapReduce.MapReduceMaster.IReduceTask;
 
 /**
  * Interface for the map/reduce client service.

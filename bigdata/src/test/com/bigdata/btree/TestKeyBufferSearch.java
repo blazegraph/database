@@ -47,12 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.AbstractKeyBuffer;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IKeyBuffer;
-import com.bigdata.btree.ImmutableKeyBuffer;
-import com.bigdata.btree.MutableKeyBuffer;
-
 import junit.framework.TestCase2;
 
 /**

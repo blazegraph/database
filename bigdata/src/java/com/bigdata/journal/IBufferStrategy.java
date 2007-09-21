@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 
 import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IMROW;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -55,10 +56,6 @@ import com.bigdata.rawstore.IRawStore;
  * {@link BufferMode}. This interface is designed to encapsulate the
  * specifics of reading and writing slots and performing operations to make
  * an atomic commit.
- * </p>
- * <p>
- * Note: Implementations of this interface SHOULD NOT provide thread-safety.
- * This interface is always used within a single-threaded context.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -69,7 +66,7 @@ public interface IBufferStrategy extends IRawStore, IMROW {
     /**
      * The next offset at which a data item would be written on the store.
      */
-    public int getNextOffset();
+    public long getNextOffset();
     
     /**
      * The buffer mode supported by the implementation
@@ -123,12 +120,13 @@ public interface IBufferStrategy extends IRawStore, IMROW {
     /**
      * Either truncates or extends the journal.
      * 
-     * @param extent The new extent.
+     * @param extent
+     *            The new extent.
      * 
      * @exception IllegalArgumentException
-     *                The user extent MAY NOT be increased beyond
-     *                {@link Integer#MAX_VALUE} since that is the largest offset
-     *                that may be addressed by an {@link Addr address}.
+     *                The user extent MAY NOT be increased beyond the maximum
+     *                offset for which the journal was provisioned by
+     *                {@link Options#OFFSET_BITS}.
      */
     public void truncate(long extent);
 
@@ -136,7 +134,7 @@ public interface IBufferStrategy extends IRawStore, IMROW {
      * Delete the backing file for the journal if any.
      * 
      * @exception IllegalStateException
-     *                if the journal is not closed.
+     *                if the journal is open.
      */
     public void deleteFile();
 

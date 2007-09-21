@@ -54,10 +54,6 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.IValueSerializer;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;

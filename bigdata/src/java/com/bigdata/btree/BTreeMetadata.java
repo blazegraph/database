@@ -53,9 +53,8 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IStoreObjectInputStream;
 
 /**
  * <p>
@@ -77,6 +76,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
 
     private static final long serialVersionUID = 4370669592664382720L;
 
+    private transient IRawStore store;
+    
     private long addrRoot;
     
     private int branchingFactor;
@@ -100,6 +101,15 @@ public class BTreeMetadata implements Serializable, Externalizable {
     private UUID indexUUID;
     
     private long counter;
+    
+    /**
+     * The backing store.
+     */
+    public final IRawStore getStore() {
+       
+        return store;
+        
+    }
     
     /**
      * The address of the root node or leaf.
@@ -173,10 +183,9 @@ public class BTreeMetadata implements Serializable, Externalizable {
     protected transient /*final*/ long addrMetadata;
     
     /**
-     * The {@link Addr address} that can be used to read this metadata record
-     * from the store.
+     * The address that can be used to read this metadata record from the store.
      */
-    public long getMetadataAddr() {
+    final public long getMetadataAddr() {
         
         return addrMetadata;
         
@@ -198,6 +207,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
     protected BTreeMetadata(BTree btree) {
         
         assert btree.isOpen();
+        
+        this.store = btree.store;
         
         this.addrRoot = btree.root.getIdentity();
         
@@ -234,7 +245,7 @@ public class BTreeMetadata implements Serializable, Externalizable {
     
     /**
      * Write out the metadata record for the btree on the store and return the
-     * {@link Addr address}.
+     * address.
      * 
      * @param btree
      *            The btree whose metadata record is being written.
@@ -246,12 +257,15 @@ public class BTreeMetadata implements Serializable, Externalizable {
      */
     protected long write(BTree btree, IRawStore store) {
 
-        return store.write(ByteBuffer.wrap(SerializerUtil.serialize(this)));
+        return store.write(ByteBuffer.wrap(store.serialize(this)));
 
     }
 
     /**
      * Read the metadata record from the store.
+     * <p>
+     * See {@link BTree#load(IRawStore, long)}, which will load the
+     * {@link BTree} or derived subclass not just the {@link BTreeMetadata}.
      * 
      * @param store
      *            the store.
@@ -259,13 +273,10 @@ public class BTreeMetadata implements Serializable, Externalizable {
      *            the address of the metadata record.
      * 
      * @return the metadata record.
-     * 
-     * @see #load(IRawStore, long), which will load the {@link BTree} or derived
-     *      subclass not just the {@link BTreeMetadata}.
      */
     public static BTreeMetadata read(IRawStore store, long addr) {
         
-        BTreeMetadata metadata = (BTreeMetadata) SerializerUtil.deserialize(store.read(addr));
+        BTreeMetadata metadata = (BTreeMetadata) store.deserialize(store.read(addr));
         
         // save the address from which the metadata record was loaded.
         metadata.addrMetadata = addr;
@@ -281,13 +292,13 @@ public class BTreeMetadata implements Serializable, Externalizable {
         
         StringBuilder sb = new StringBuilder();
 
-        sb.append("addrRoot=" + Addr.toString(addrRoot));
+        sb.append("addrRoot=" + store.toString(addrRoot));
         sb.append(", branchingFactor=" + branchingFactor);
         sb.append(", height=" + height);
         sb.append(", nnodes=" + nnodes);
         sb.append(", nleaves=" + nleaves);
         sb.append(", nentries=" + nentries);
-        sb.append(", addrMetadata=" + Addr.toString(addrMetadata));
+        sb.append(", addrMetadata=" + store.toString(addrMetadata));
         sb.append(", valueSerializer=" + valueSer.getClass().getName());
         sb.append(", recordCompressor="
                 + (recordCompressor == null ? null : recordCompressor
@@ -303,6 +314,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
     
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
+        final IStoreObjectInputStream is = (IStoreObjectInputStream)in;
+        
         final int version = (int)LongPacker.unpackLong(in);
         
         if (version != VERSION0) {
@@ -311,7 +324,9 @@ public class BTreeMetadata implements Serializable, Externalizable {
             
         }
 
-        addrRoot = Addr.unpack(in);
+        store = is.getStore();
+        
+        addrRoot = store.unpackAddr(in);
         
         branchingFactor = (int)LongPacker.unpackLong(in);
 
@@ -341,7 +356,7 @@ public class BTreeMetadata implements Serializable, Externalizable {
         
         LongPacker.packLong(out,VERSION0);
         
-        Addr.pack(out, addrRoot);
+        store.packAddr(out, addrRoot);
         
         LongPacker.packLong(out, branchingFactor);
         

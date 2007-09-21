@@ -135,7 +135,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
     }
      
     /**
-     * Unit test for {@link AbstractBufferStrategy#overflow(int)}. The test
+     * Unit test for {@link AbstractBufferStrategy#overflow(long)}. The test
      * verifies that the extent and the user extent are correctly updated after
      * an overflow.
      */
@@ -152,20 +152,25 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
         
-        final int needed = Bytes.kilobyte32;
+        final long needed = Bytes.kilobyte32;
         
         if(bufferStrategy.getBufferMode()==BufferMode.Mapped) {
 
             // operation is not supported for mapped files.
             try {
+                
                 bufferStrategy.overflow(needed);
+                
                 fail("Expecting: " + UnsupportedOperationException.class);
+                
             } catch (UnsupportedOperationException ex) {
+                
                 System.err.println("Ignoring expected exception: " + ex);
+                
             }
             
         } else {
@@ -203,17 +208,13 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
 
         long remaining = userExtent - nextOffset;
-        
-        assertTrue(remaining<Integer.MAX_VALUE);
-        
-        ByteBuffer tmp = ByteBuffer.allocate((int)remaining);
-        
-        bufferStrategy.write(tmp);
+
+        writeRandomData(store,remaining);
 
         // no change in extent.
         assertEquals("extent",extent, bufferStrategy.getExtent());
@@ -222,6 +223,69 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
         store.closeAndDelete();
+
+    }
+    
+    /**
+     * Write random bytes on the store.
+     * 
+     * @param store
+     *            The store.
+     * 
+     * @param nbytesToWrite
+     *            The #of bytes to be written. If this is larger than the
+     *            maximum record length then multiple records will be written.
+     * 
+     * @return The address of the last record written.
+     */
+    protected long writeRandomData(Journal store,final long nbytesToWrite) {
+
+        final int maxRecordSize = store.getMaxRecordSize();
+        
+        assert nbytesToWrite > 0;
+        
+        long addr = 0L;
+        
+        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+                .getBufferStrategy();
+        
+        int n = 0;
+
+        long leftover = nbytesToWrite;
+        
+        while (leftover > 0) {
+
+            // this will be an int since maxRecordSize is an int.
+            int nbytes = (int) Math.min(maxRecordSize, leftover);
+
+            assert nbytes>0;
+            
+            final byte[] b = new byte[nbytes];
+
+            Random r = new Random();
+
+            r.nextBytes(b);
+
+            ByteBuffer tmp = ByteBuffer.wrap(b);
+
+            addr = bufferStrategy.write(tmp);
+
+            n++;
+            
+            leftover -= nbytes;
+            
+            System.err.println("Wrote record#" + n + " with " + nbytes
+                    + " bytes: addr=" + store.toString(addr) + ", #leftover="
+                    + leftover);
+
+        }
+
+        System.err.println("Wrote " + nbytesToWrite + " bytes in " + n
+                + " records: last addr=" + store.toString(addr));
+
+        assert addr != 0L;
+        
+        return addr;
 
     }
     
@@ -250,27 +314,13 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         final long initialExtent = bufferStrategy.getInitialExtent();
         
-        final int nextOffset = bufferStrategy.getNextOffset();
+        final long nextOffset = bufferStrategy.getNextOffset();
         
         assertEquals("extent",initialExtent, extent);
 
-        /*
-         * now write random bytes that exactly fill the remaining space and
-         * verify that write.
-         */
         long remaining = userExtent - nextOffset;
-        
-        assertTrue(remaining<Integer.MAX_VALUE);
-        
-        final byte[] b = new byte[(int)remaining];
-        
-        Random r = new Random();
-        
-        r.nextBytes(b);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(b);
-        
-        final long addr = bufferStrategy.write(tmp);
+
+        long addr = writeRandomData(store,remaining);
 
         // no change in extent.
         assertEquals("extent",extent, bufferStrategy.getExtent());
@@ -278,7 +328,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
-        assertEquals(b, bufferStrategy.read(addr));
+        // read back the last record of random data written on the store.
+        ByteBuffer b = bufferStrategy.read(addr);
         
         /*
          * now write some more random bytes forcing an extension of the buffer.
@@ -286,20 +337,21 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
          * this helps to ensure that data was copied correctly into the extended
          * buffer.
          */
-        
+
         final byte[] b2 = new byte[Bytes.kilobyte32];
         
-        r.nextBytes(b2);
+        new Random().nextBytes(b2);
         
         ByteBuffer tmp2 = ByteBuffer.wrap(b2);
         
-        final long addr2 = bufferStrategy.write(tmp2);
+        final long addr2 = store.write(tmp2);
+//        final long addr2 = writeRandomData(store,Bytes.kilobyte32);
         
         // verify extension of buffer.
-        assertTrue("extent", extent + b2.length <= bufferStrategy.getExtent());
+        assertTrue("extent", extent + store.getByteCount(addr2) <= bufferStrategy.getExtent());
 
         // verify extension of buffer.
-        assertTrue("userExtent", userExtent + b2.length <= bufferStrategy
+        assertTrue("userExtent", userExtent + store.getByteCount(addr2) <= bufferStrategy
                 .getUserExtent());
 
         // verify data written before we overflowed the buffer.

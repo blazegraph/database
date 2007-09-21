@@ -52,8 +52,6 @@ import it.unimi.dsi.mg4j.util.BloomFilter;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.bigdata.btree.IndexSegment;
-
 import junit.framework.TestCase2;
 
 /**

@@ -130,7 +130,11 @@ public class TestServiceDiscovery extends TestCase {
          * run the client and the service, so you have to specify the codebase
          * property when running the test.
          */
-        System.setSecurityManager(new SecurityManager());
+        if(System.getSecurityManager()==null) {
+
+            System.setSecurityManager(new SecurityManager());
+            
+        }
 
         /*
          * Launch the server to which we will connect (this is being done by the

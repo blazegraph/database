@@ -46,6 +46,7 @@ Modifications:
  */
 package com.bigdata.btree;
 
+import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
@@ -61,8 +62,8 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -398,7 +399,7 @@ public class NodeSerializer {
         assert keySerializer != null;
 
         assert valueSerializer != null;
-
+        
         this.nodeFactory = nodeFactory;
         
         this.branchingFactor = branchingFactor;
@@ -497,32 +498,6 @@ public class NodeSerializer {
         
     }
 
-//    /**
-//     * Extends the internal buffer used to serialize nodes and leaves.
-//     * <p>
-//     * Note: large buffer requirements are not at all uncommon so we grow the
-//     * buffer rapidly to avoid multiple resizing and the expense of a too large
-//     * buffer.
-//     * 
-//     * FIXME We can encapsulate the extension of the buffer within a class
-//     * derived from or using the {@link ByteBufferOutputStream} and simply copy
-//     * the data when we need to extend the buffer rather than restarting
-//     * serialization. This will make underestimates of the required buffer
-//     * capacity much less costly.
-//     */
-//    protected void extendBuffer() {
-//
-//        int capacity = _buf.capacity();
-//        
-//        capacity *= 2;
-//
-//        System.err.println("Extending buffer to capacity=" + capacity
-//                + " bytes.");
-//
-//        _buf = alloc(capacity);
-//
-//    }
-
     /**
      * De-serialize a node or leaf. This method is used when the caller does not
      * know a-priori whether the reference is to a node or leaf. The decision is
@@ -532,8 +507,7 @@ public class NodeSerializer {
      * @param btree
      *            The btree.
      * @param addr
-     *            The address of the node or leaf being de-serialized - see
-     *            {@link Addr}.
+     *            The address of the node or leaf being de-serialized.
      * @param buf
      *            The buffer containing the serialized data.
      * 
@@ -820,7 +794,7 @@ public class NodeSerializer {
      * @param btree
      *            The btree to which the node belongs.
      * @param addr
-     *            The address of the node - see {@link Addr}.
+     *            The address of the node.
      * @param buf
      *            The buffer containing the serialized node.
      * @param decompressed
@@ -893,13 +867,26 @@ public class NodeSerializer {
         
         /*
          * Setup input stream reading from the buffer.
+         * 
+         * Note: The buffer is never backed by an array since it is read-only
+         * (per the IRawStore contract for read) and read-only buffers do not
+         * expose the backing array. This means that we would have to duplicate
+         * the data in order to use the DataInputBuffer rather than read from
+         * the Buffer.
          */
-        final DataInputStream is = new DataInputStream(
+        final DataInput is;
+//        if(false) {
+//            byte[] data = new byte[buf.remaining()];
+//            buf.get(data);
+//            is = new DataInputBuffer(data);
+//        } else {
+            is = new DataInputStream(
                 new ByteBufferInputStream(buf));
+//        }
 
         try {
 
-            // branching factor.
+            // branching factor
             final int branchingFactor = (int) LongPacker.unpackLong(is);
 
             assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
@@ -1142,7 +1129,7 @@ public class NodeSerializer {
      * @param btree
      *            The owning btree.
      * @param addr
-     *            The address of the leaf - see {@link Addr}.
+     *            The address of the leaf.
      * @param buf
      *            The buffer containing the serialized leaf.
      * @param decompressed
@@ -1326,7 +1313,7 @@ public class NodeSerializer {
      *            The #of elements of that array that are defined.
      * @throws IOException
      */
-    protected void getChildEntryCounts(DataInputStream is,
+    protected void getChildEntryCounts(DataInput is,
             int[] childEntryCounts, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {

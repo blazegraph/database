@@ -47,10 +47,12 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -68,6 +70,8 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.EmbeddedBigdataFederation.Options;
+import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -103,24 +107,25 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo measure the time in the RPC calls, including marshalling and
  *       unmarshalling of the arguments, and use those measurements to guide
- *       performance tuning.
+ *       performance tuning. This can be done by comparing an embedded data
+ *       service (no RPC) with a data service connected by JINI (RPC).
  * 
  * @todo This test could be used to get group commit working.
  * 
  * @todo This test could be used to get concurrent writes on different indices
  *       working (also requires MRMW for the underlying {@link IBufferStrategy}s).
  * 
- * @todo get the comparison support working in main (it is commented out).
- *       Paramterize the {@link DataService} configuration from the test suite
- *       so that we can test Disk vs Direct, forceCommit=No vs default, and
- *       other properties that might have interesting effects. These things can
- *       be directly manipulated in the mean time by editing the
- *       DataServer0.properties file.
+ * @todo get the comparison support working. Parameterize the
+ *       {@link DataService} configuration from the test suite so that we can
+ *       test Disk vs Direct, forceCommit=No vs default, and other properties
+ *       that might have interesting effects. These things can be directly
+ *       manipulated in the mean time by editing the DataServer0.properties
+ *       file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StressTestConcurrent extends AbstractServerTestCase {
+public class StressTestConcurrent extends AbstractServerTestCase { //implements IComparisonTest {
 
     /**
      * 
@@ -135,18 +140,46 @@ public class StressTestConcurrent extends AbstractServerTestCase {
         super(arg0);
     }
     
+    public void setUpComparisonTest() throws Exception {
+
+        setUp();
+        
+    }
+    
+    public void tearDownComparisonTest() throws Exception {
+        
+        tearDown();
+        
+    }
+
+//    /**
+//     * Starts in {@link #setUp()}.
+//     */
+//    MetadataServer metadataServer0;
+//    /**
+//     * Starts in {@link #setUp()}.
+//     */
+//    DataServer dataServer0;
+
     /**
      * Starts in {@link #setUp()}.
      */
-    MetadataServer metadataServer0;
+    IBigdataClient client;
+    
     /**
-     * Starts in {@link #setUp()}.
+     * 
      */
-    DataServer dataServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    BigdataClient client;
+    IBigdataFederation federation;
+    
+    public Properties getProperties() {
+        
+        Properties properties = new Properties(super.getProperties());
+        
+        properties.setProperty(Options.DATA_DIR,getName());
+        
+        return properties;
+        
+    }
     
     /**
      * Starts a {@link DataServer} ({@link #dataServer1}) and then a
@@ -157,56 +190,9 @@ public class StressTestConcurrent extends AbstractServerTestCase {
 
         log.info(getName());
 
-//        final String groups = ".groups = new String[]{\"" + getName() + "\"}";
+        client = new EmbeddedBigdataClient(getProperties());
         
-        /*
-         * Start the metadata server.
-         */
-        metadataServer0 = new MetadataServer(
-                new String[] { "src/resources/config/standalone/MetadataServer0.config"
-//                        , AbstractServer.ADVERT_LABEL+groups
-                        });
-        
-        new Thread() {
-
-            public void run() {
-                
-                metadataServer0.run();
-                
-            }
-            
-        }.start();
-
-        /*
-         * Start up a data server after the metadata server so that we can make
-         * sure that it is detected by the metadata server once it starts up.
-         */
-        dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config"
-//                        , AbstractServer.ADVERT_LABEL+groups
-                        });
-
-        new Thread() {
-
-            public void run() {
-                
-                dataServer0.run();
-                
-            }
-            
-        }.start();
-
-        // Wait until all the services are up.
-        getServiceID(metadataServer0);
-        getServiceID(dataServer0);
-
-        client = new BigdataClient(
-                new String[] { "src/resources/config/standalone/Client.config"
-//                        , BigdataClient.CLIENT_LABEL+groups
-                        });
-
-        // verify that the client has/can get the metadata service.
-        assertNotNull("metadataService", client.getMetadataService());
+        federation = client.connect();
 
     }
     
@@ -214,23 +200,7 @@ public class StressTestConcurrent extends AbstractServerTestCase {
      * Destroy the test services.
      */
     public void tearDown() throws Exception {
-        
-        if(metadataServer0!=null) {
-
-            metadataServer0.destroy();
-        
-            metadataServer0 = null;
-
-        }
-
-        if(dataServer0!=null) {
-
-            dataServer0.destroy();
-        
-            dataServer0 = null;
-
-        }
-        
+                
         if(client!=null) {
 
             client.terminate();
@@ -244,14 +214,15 @@ public class StressTestConcurrent extends AbstractServerTestCase {
     }
     
     /**
-     * Test concurrency of N concurrent operations against one
-     * {@link DataService}.
+     * Test of N concurrent operations against one {@link DataService}.
      * 
      * @throws Exception
      */
     public void test_queueDepth() throws Exception {
 
-        doConcurrentClientTest(client, dataServer0, 20, 20, 10000, 3, 100);
+        DataService dataService = ((EmbeddedBigdataFederation)federation).getDataService(0);
+        
+        doConcurrentClientTest(client, dataService, 20, 20, 10000, 3, 100);
 
     }
 
@@ -282,27 +253,44 @@ public class StressTestConcurrent extends AbstractServerTestCase {
      * @todo can this also be a correctness test if we choose the
      *       read/write/delete operations carefully and maintain a ground truth
      *       index?
+     * 
+     * @todo factor out the operation to be run.
+     * 
+     * @todo factor out the setup for the federation so that we can test
+     *       embedded or distributed (either one process, many processes, or
+     *       many hosts). Setup of a distributed federation is more complex,
+     *       whether on one host or many hosts, since it requires Jini
+     *       configurations for each service. Finally, if the test index exists
+     *       then it must be dropped.
+     *       <p>
+     *       In a distributed configuration, the clients can also be distributed
+     *       which raises the complexity further. In all, we really need a means
+     *       to setup a cluster as a bigdata federation based on a master
+     *       configuration. E.g., something to generate the individual
+     *       configuration files from a master description of the federation and
+     *       something to deploy those files together with the necessary
+     *       software onto the cluster. SCA probably addresses this issue.
      */
-    static public String doConcurrentClientTest(BigdataClient client,
-            DataServer dataServer0, int nclients, long timeout, int ntrials,
-            int keyLen, int nops) throws InterruptedException {
+    static public Result doConcurrentClientTest(IBigdataClient client,
+            DataService dataService, int nclients, long timeout, int ntrials,
+            int keyLen, int nops) throws InterruptedException, IOException {
         
         // name of the scale-out index for the test.
         final String name = "testIndex";
 
         // connect to the federation.
-        final BigdataFederation fed = (BigdataFederation) client.connect();
+        final IBigdataFederation federation = client.connect();
         
         /*
          * Register the scale-out index.
          */
-        UUID indexUUID = fed.registerIndex(name, new byte[][] {//
+        UUID indexUUID = federation.registerIndex(name, new byte[][] {//
                 new byte[] {} }, //
                 new UUID[] {//
-                JiniUtil.serviceID2UUID(dataServer0.getServiceID()), });
+                dataService.getServiceUUID(), });
 
         // request index view.
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED, name);
+        IIndex ndx = federation.getIndex(IBigdataFederation.UNISOLATED, name);
         
         assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
         
@@ -370,18 +358,28 @@ public class StressTestConcurrent extends AbstractServerTestCase {
             }
             
         }
+        
+//        String msg = "#clients=" + nclients + ", nops=" + nops + ", ntrials="
+//                + ntrials + ", ncomitted=" + ncommitted + ", nfailed="
+//                + nfailed + ", nuncommitted=" + nuncommitted + ", " + elapsed
+//                + "ms, " + ncommitted * 1000 / elapsed
+//                + " operations per second";
 
-        fed.disconnect();
+        Result ret = new Result();
         
-        String msg = "#clients=" + nclients + ", nops=" + nops + ", ntrials="
-                + ntrials + ", ncomitted=" + ncommitted + ", nfailed="
-                + nfailed + ", nuncommitted=" + nuncommitted + ", " + elapsed
-                + "ms, " + ncommitted * 1000 / elapsed
-                + " operations per second";
+        // @todo these are conditions not results
+        ret.put("nops", ""+nops);
+        ret.put("ntx", ""+ntrials);
         
-        System.err.println(msg);
+        ret.put("ncommitted",""+ncommitted);
+        ret.put("nfailed",""+nfailed);
+        ret.put("nuncommitted", ""+nuncommitted);
+        ret.put("elapsed(ms)", ""+elapsed);
+        ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
+
+        System.err.println(ret.toString());
         
-        return msg;
+        return ret;
        
     }
     
@@ -509,129 +507,5 @@ public class StressTestConcurrent extends AbstractServerTestCase {
         }
         
     }
-
-//    /**
-//     * Runs a single instance of the test as configured in the code.
-//     * 
-//     * @todo try running the test out more than 30 seconds. Note that a larger
-//     *       journal maximum extent is required since the journal will otherwise
-//     *       overflow.
-//     * 
-//     * @todo compute the bytes/second rate on the journal for this test.
-//     * 
-//     * @todo test with more than one named index in use.
-//     * 
-//     * @todo try to make this a correctness test since there are lots of little
-//     *       ways in which things can go wrong.
-//     * 
-//     * @todo the data service should use a thread pool to limit the #of started
-//     *       transations.
-//     * 
-//     * @todo There may be a memory leak with concurrent transactions. I was able
-//     *       to get rid of an {@link OutOfMemoryError} by setting the
-//     *       {@link TemporaryRawStore#buf} to to null when the store was closed.
-//     *       However, there is still going to be something that was causing
-//     *       those transactions and their stores to be hanging around -- perhaps
-//     *       the writeService in the Journal which might be holding onto
-//     *       {@link Future}s?
-//     * 
-//     * @see ComparisonTestDriver, which parameterizes the use of this stress
-//     *      test. That information should be used to limit the #of transactions
-//     *      allowed to start at one time on the server and should guide a search
-//     *      for thinning down resource consumption, e.g., memory usage by
-//     *      btrees, the node serializer, and
-//     */
-//    public static void main(String[] args) throws Exception {
-//
-//        Properties properties = new Properties();
-//
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
-//        
-//        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
-//        
-////        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
-//
-////        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
-//
-////        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-//
-//        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-//        
-//        properties.setProperty(TestOptions.TIMEOUT,"10");
-//
-//        properties.setProperty(TestOptions.NCLIENTS,"100");
-//
-//        properties.setProperty(TestOptions.KEYLEN,"4");
-//
-//        properties.setProperty(TestOptions.NOPS,"4");
-//        
-//        new StressTestConcurrent().doComparisonTest(properties);
-//
-//    }
-//    
-//    /**
-//     * Additional properties understood by this test.
-//     */
-//    public static class TestOptions extends Options {
-//
-//        /**
-//         * The timeout for the test.
-//         */
-//        public static final String TIMEOUT = "timeout";
-//        /**
-//         * The #of concurrent clients to run.
-//         */
-//        public static final String NCLIENTS = "nclients";
-//
-//        /**
-//         * The #of trials (aka transactions) to run.
-//         */
-//        public static final String NTRIALS = "ntrials";
-//        /**
-//         * The length of the keys used in the test. This directly impacts the
-//         * likelyhood of a write-write conflict. Shorter keys mean more
-//         * conflicts. However, note that conflicts are only possible when there
-//         * are at least two concurrent clients running.
-//         */
-//        public static final String KEYLEN = "keyLen";
-//        /**
-//         * The #of operations in each trial.
-//         */
-//        public static final String NOPS = "nops";
-//    
-//    }
-//
-//    public String doComparisonTest(Properties properties) throws Exception {
-//
-//        String val;
-//        
-//        val = properties.getProperty(TestOptions.TIMEOUT);
-//
-//        final long timeout = (val ==null ? 30 : Long.parseLong(val));
-//
-//        val = properties.getProperty(TestOptions.NCLIENTS);
-//
-//        final int nclients = (val == null ? 10 : Integer.parseInt(val));
-//
-//        val = properties.getProperty(TestOptions.NTRIALS);
-//
-//        final int ntrials = (val == null ? 10000 : Integer.parseInt(val));
-//
-//        val = properties.getProperty(TestOptions.KEYLEN);
-//
-//        final int keyLen = (val == null ? 4 : Integer.parseInt(val));
-//
-//        val = properties.getProperty(TestOptions.NOPS);
-//
-//        final int nops = (val == null ? 100 : Integer.parseInt(val));
-//
-//        Journal journal = new Journal(properties);
-//
-//        String msg = doConcurrentClientTest(journal, timeout, nclients, ntrials,
-//                keyLen, nops);
-//
-//        return msg;
-//
-//    }
-
+    
 }

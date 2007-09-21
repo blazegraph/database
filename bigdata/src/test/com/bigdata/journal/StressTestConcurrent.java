@@ -47,10 +47,14 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
@@ -64,7 +68,10 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.ComparisonTestDriver.IComparisonTest;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.test.ExperimentDriver;
+import com.bigdata.test.ExperimentDriver.IComparisonTest;
+import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -80,6 +87,14 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
     public StressTestConcurrent(String name) {
         super(name);
+    }
+    
+    public void setUpComparisonTest() throws Exception {
+        
+    }
+    
+    public void tearDownComparisonTest() throws Exception {
+        
     }
     
     /**
@@ -138,8 +153,13 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * @todo can this also be a correctness test if we choose the
      *       read/write/delete operations carefully and maintain a ground truth
      *       index?
+     * 
+     * @todo modify to use byte[] keys per the service variant for more shared
+     *       code?
+     * 
+     * @todo factor out the operation to be run.
      */
-    static public String doConcurrentClientTest(Journal journal,
+    static public Result doConcurrentClientTest(Journal journal,
             long timeout, int nclients, int ntrials, int keyLen, int nops)
             throws InterruptedException {
         
@@ -223,21 +243,35 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         journal.shutdown();
         
-        if(journal.getFile()!=null) {
- 
-            journal.getFile().delete();
-            
-        }
+        journal.delete();
+//        if(journal.getFile()!=null) {
+// 
+//            journal.getFile().delete();
+//            
+//        }
                 
-        String msg = "#clients="
-                + nclients + ", nops=" + nops + ", ntx=" + ntrials + ", ncomitted="
-                + ncommitted + ", naborted=" + naborted + ", nfailed=" + nfailed
-                + ", nuncommitted=" + nuncommitted + ", " + elapsed + "ms, "
-                + ncommitted * 1000 / elapsed + " tps";
+        Result ret = new Result();
         
-        System.err.println(msg);
+        // Note: these are conditions not results
+//        ret.put("#clients",""+nclients);
+//        ret.put("nops", ""+nops);
+//        ret.put("ntx", ""+ntrials);
+
+        // these are the results.
+        ret.put("ncommitted",""+ncommitted);
+        ret.put("nuncommitted", ""+nuncommitted);
+        ret.put("elapsed(ms)", ""+elapsed);
+        ret.put("tps", ""+(ncommitted * 1000 / elapsed));
         
-        return msg;
+//        String msg = "#clients="
+//                + nclients + ", nops=" + nops + ", ntx=" + ntrials + ", ncomitted="
+//                + ncommitted + ", naborted=" + naborted + ", nfailed=" + nfailed
+//                + ", nuncommitted=" + nuncommitted + ", " + elapsed + "ms, "
+//                + ncommitted * 1000 / elapsed + " tps";
+        
+        System.err.println(ret.toString());
+        
+        return ret;
        
     }
     
@@ -370,11 +404,14 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      *       the writeService in the Journal which might be holding onto
      *       {@link Future}s?
      * 
-     * @see ComparisonTestDriver, which parameterizes the use of this stress
-     *      test. That information should be used to limit the #of transactions
+     * @see ExperimentDriver, which parameterizes the use of this stress test.
+     *      That information should be used to limit the #of transactions
      *      allowed to start at one time on the server and should guide a search
      *      for thinning down resource consumption, e.g., memory usage by
-     *      btrees, the node serializer, and
+     *      btrees, the node serializer, etc.
+     * 
+     * @see GenerateExperiment, which may be used to generate a set of
+     *      conditions to be run by the {@link ExperimentDriver}.
      */
     public static void main(String[] args) throws Exception {
 
@@ -395,6 +432,8 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         properties.setProperty(TestOptions.TIMEOUT,"10");
 
         properties.setProperty(TestOptions.NCLIENTS,"100");
+
+        properties.setProperty(TestOptions.NTRIALS,"10000");
 
         properties.setProperty(TestOptions.KEYLEN,"4");
 
@@ -436,37 +475,152 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
     
     }
 
-    public String doComparisonTest(Properties properties) throws Exception {
+    /**
+     * Setup and run a test.
+     * 
+     * @param properties
+     *            There are no "optional" properties - you must make sure that
+     *            each property has a defined value.
+     */
+    public Result doComparisonTest(Properties properties) throws Exception {
 
-        String val;
-        
-        val = properties.getProperty(TestOptions.TIMEOUT);
+        final long timeout = Long.parseLong(properties.getProperty(TestOptions.TIMEOUT));
 
-        final long timeout = (val ==null ? 30 : Long.parseLong(val));
+        final int nclients = Integer.parseInt(properties.getProperty(TestOptions.NCLIENTS));
 
-        val = properties.getProperty(TestOptions.NCLIENTS);
+        final int ntrials = Integer.parseInt(properties.getProperty(TestOptions.NTRIALS));
 
-        final int nclients = (val == null ? 10 : Integer.parseInt(val));
+        final int keyLen = Integer.parseInt(properties.getProperty(TestOptions.KEYLEN));
 
-        val = properties.getProperty(TestOptions.NTRIALS);
-
-        final int ntrials = (val == null ? 10000 : Integer.parseInt(val));
-
-        val = properties.getProperty(TestOptions.KEYLEN);
-
-        final int keyLen = (val == null ? 4 : Integer.parseInt(val));
-
-        val = properties.getProperty(TestOptions.NOPS);
-
-        final int nops = (val == null ? 100 : Integer.parseInt(val));
+        final int nops = Integer.parseInt(properties.getProperty(TestOptions.NOPS));
 
         Journal journal = new Journal(properties);
 
-        String msg = doConcurrentClientTest(journal, timeout, nclients, ntrials,
+        Result result = doConcurrentClientTest(journal, timeout, nclients, ntrials,
                 keyLen, nops);
 
-        return msg;
+        return result;
 
     }
 
+    /**
+     * Experiment generation utility class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class GenerateExperiment extends ExperimentDriver {
+        
+        /**
+         * Generates an XML file that can be run by {@link ExperimentDriver}.
+         * 
+         * @param args
+         */
+        public static void main(String[] args) throws Exception {
+            
+            // this is the test to be run.
+            String className = StressTestConcurrent.class.getName();
+            
+            Map<String,String> defaultProperties = new HashMap<String,String>();
+
+            // force delete of the files on close of the journal under test.
+            defaultProperties.put(Options.CREATE_TEMP_FILE,"true");
+
+            // avoids journal overflow when running out to 60 seconds.
+            defaultProperties.put(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);
+
+            /* 
+             * Set defaults for each condition.
+             */
+            
+            defaultProperties.put(TestOptions.TIMEOUT,"30");
+
+            defaultProperties.put(TestOptions.NTRIALS,"10000");
+
+            defaultProperties.put(TestOptions.KEYLEN,"4");
+
+            defaultProperties.put(TestOptions.NOPS,"100");
+
+            List<Condition>conditions = new ArrayList<Condition>();
+
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "1") }));
+
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "2") }));
+    
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "10") }));
+    
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "20") }));
+    
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "100") }));
+    
+            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
+                    TestOptions.NCLIENTS, "200") }));
+            
+            Experiment exp = new Experiment(className,defaultProperties,conditions);
+
+            // copy the output into a file and then you can run it later.
+            System.err.println(exp.toXML());
+
+        }
+        
+        /**
+         * Sets up a series of {@link Condition}s based on the use of different
+         * {@link BufferMode}s and also sets up {@link Condition}s for
+         * {@link BufferMode}s that are backed by disk where
+         * {@link Options#FORCE_ON_COMMIT} is set to {@link ForceEnum#No}
+         */
+        static public List<Condition> getBasicConditions(Map<String,String>properties, NV[] params) throws Exception {
+
+            properties = new HashMap<String,String>(properties);
+            
+            for(int i=0; i<params.length; i++) {
+                
+                properties.put(params[i].name,params[i].value);
+                
+            }
+            
+            Condition[] conditions = new Condition[] { //
+                    getCondition(properties, new NV[] { //
+                            new NV(Options.BUFFER_MODE, BufferMode.Transient), //
+                            }), //
+//                    getCondition(
+//                            properties,
+//                            new NV[] { //
+//                                    new NV(Options.BUFFER_MODE,
+//                                            BufferMode.Transient), //
+//                                    new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
+//                            }), //
+                    getCondition(properties, new NV[] { //
+                            new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+                            }), //
+//                    getCondition(
+//                            properties,
+//                            new NV[] { //
+//                                    new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+//                                    new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
+//                            }), //
+                    getCondition(properties, new NV[] { //
+                            new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
+                            }), //
+                    getCondition(properties, new NV[] { //
+                            new NV(Options.BUFFER_MODE, BufferMode.Disk), //
+                            }), //
+                    getCondition(properties, new NV[] { //
+                            new NV(Options.BUFFER_MODE, BufferMode.Disk), //
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
+                            }), //
+            };
+            
+            return Arrays.asList(conditions);
+
+        }
+        
+    }
+    
 }

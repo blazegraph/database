@@ -49,11 +49,6 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexSegmentMerger;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 

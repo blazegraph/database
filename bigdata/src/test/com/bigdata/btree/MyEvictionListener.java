@@ -47,8 +47,6 @@ import java.util.Stack;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.btree.DefaultEvictionListener;
-import com.bigdata.btree.PO;
 import com.bigdata.cache.HardReferenceQueue;
 
 /**

@@ -49,10 +49,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-
 /**
  * Test suite for copy-on-write semantics. Among other things the tests in this
  * suite are responsible for verifying the contents of {@link Node#childAddr}[]

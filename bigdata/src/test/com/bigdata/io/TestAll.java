@@ -47,12 +47,10 @@ Modifications:
 
 package com.bigdata.io;
 
-import com.bigdata.btree.TestDataOutputBuffer;
-import com.bigdata.io.TestByteBufferStreams;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
 
 /**
  * Aggregates test suites in increasing dependency order.
@@ -83,6 +81,9 @@ public class TestAll extends TestCase {
     {
 
         TestSuite suite = new TestSuite("IO");
+
+        // test suite for locating journal files.
+        suite.addTestSuite(TestNameAndExtensionFilter.class);
 
         // test classes that let us treat a ByteBuffer as an input/output stream.
         suite.addTestSuite( TestByteBufferStreams.class );

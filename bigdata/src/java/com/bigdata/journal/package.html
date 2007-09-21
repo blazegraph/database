@@ -1,152 +1,80 @@
 <html>
 <head>
-<title>Persistent Object Journal</title>
+<title>Journal</title>
 </head>
 <body>
 
 <p>
-The persistent object journal is a per-segment write through cache.
-The design is intended to provide maximum throughput when writing to a
-segment by buffering in an append only journal, thereby minimizing
-disk head movement.  The journal buffers for a per-segment
-read-optimized database file (DB).  For maximum speed, serialized
-objects are written into a memory-image of the journal, which in turn
-writes through to a journal file on disk (a write through persistent
-cache).  The journal is provisioned when the segment is created,
-specifying both its (initial) extent and unit of allocation.  While
-the journal is logically append-only, it is in fact a ring buffer.
+
+The journal is an append-only persistence capable data structure
+supporting atomic commit, named indices, and transactions. Writes are
+logically appended to the journal to minimize disk head movement.  An
+individual journal will scale up to 4 terabytes and allows records up
+to 4 megabytes in length.  The journal supports the concept of
+"overflow", which is triggered when the journal exceeds a threshold
+extent.  An implementation that handles overflow will expunge B+Trees
+from the journal onto read-optimized index segments, thereby creating
+a database of range partitioned indices.
+
+</p>
+
+<p> 
+
+The journal may be used as a Write Once Read Many (WORM) store. An
+index is maintained over the historical commit points for the store,
+so a journal may also be used as an immortal store in which all
+historical consistent states may be accessed.  A read-write
+architecture may be realized by limiting the journal to a few
+gigabytes in length.  Both incrementally and when the journal
+overflows, key ranges of indices are expunged from the journal onto
+read-only index segments.  When used in this manner, a consistent read
+on an index partition requires a fused view of the data on the journal
+and the data in the active index segments.
+
 </p>
 
 <p>
-The journal can be either wired into memory (by reading or mapping it
-into a direct byte buffer) or accessed in place on disk.  The
-advantage of wiring the journal into memory is that the disk head does
-not move for reads from the journal.  Since the journal is a buffer of
-recently written objects, it is effectively an MRU.  Whether or not
-recently written objects need to be read depends entirely on the
-application.  However, objects are read when they are migrated from
-the journal to the DB file for that segment.  Therefore, wiring the
-journal into memory offers great performance benefits as writes are
-absorbed in a persistent buffer and migrated to a read-optimized file.
+
+The journal can be either wired into memory or accessed in place on
+disk.  The advantage of wiring the journal into memory is that the
+disk head does not move for reads from the journal.  Wiring the
+journal into memory can offer performance benefits if writes are to be
+absorbed in a persistent buffer and migrated to a read-optimized index
+segments.  However, the B+Tree implementation provides caching for
+recently used nodes and leaves.  In addition, wiring a journal limits
+the maximum size of the journal to less than 2 gigabytes (it must fit
+into the JVM memory pool) and can cause contention for system RAM.
+
 </p>
-
-<p> The journal is divided into addressable slots, which represent the
-minimum unit of allocation.  A write on the journal files free slots
-at the logical tail of the journal, updating both an object index map
-and a slot usage map.  Updates to those maps have copy on write
-semantics, so each transaction has its own view of the changes
-introduced by that transaction into those maps.  Map updates are
-buffered in memory, but may be incrementally written through to the
-journal just like standard objects (@todo Is this true, is it
-necessary, is it wise?).  A commit results in dirty object index and
-slot usage nodes being written through to the tail of the journal
-followed by a commit record.  An abort discards the modified object
-index and usage map nodes such that slots which were allocated during
-the transaction are available for reuse the next time the journal
-wraps around.  A logical journal overflow results where there are
-insufficient slots for a write and forces migration of objects to the
-DB file for the segment.  Proactive migration of objects MUST be used
-to prevent overflow, which can impose a latency on writes.
-</p>
-
-<p> From the perspective of the journal, an object is a byte[] or byte
-stream.  Object writes occur within native transactions, which are
-serialized and atomic but not durable (a full commit is required for a
-durable write).  The purpose of native transactions is to serialize
-writes and to make it possible for multiple objects to be written in a
-batch by a single transaction.
-</p>
-
-<p> Each object has an int64 identifier.  That identifier is assigned
-based on the <em>logical page</em> at which the object will be written
-in the DB file for that segment.  (That is, the application must have
-already determined how to cluster the object before it may be written
-on the journal.)  Since the identifiers are always segment local, only
-the page and slot information from the int64 identifier needs to be
-represented within the object index map (an int32 value).  The object
-index maps this int32 value into a slot address within the journal.
-(Note that both the journal and the DB have slots, the former are
-ordered int32 byte offsets from the start of the journal while the
-latter are int16 identifiers that address into a DB page -- see the DB
-file architecture for more information.)
-</p>
-
-<p> @todo Describe the object index map (mapping int32
-{DB:page,DB:slot} to int32 {journal:slot}), how copy on write works,
-how validation above the store level ensures object consistent
-histories, and how reading from prior historical states works (until
-migration moves the data to the DB).  (The migration approach presumes
-that there is a history retention mechanism in the DB or the data
-records themselves, and _some_ mechamism is required to ensure that we
-never overwrite data that could be read by any active transaction --
-this is the big missing point in the model so far, and I believe that
-it is addressed by an MVCC scheme.)</p>
-
-<p> @todo Describe the usage map.  This needs to efficiently mark free
-and used slots and be addressable by the slot address.  I do not think
-that we need to support rollback with the usage map if we only update
-the reference to the current usage map with a full commit.  (An abort
-record is not strictly necessary either.)  What I want to minimize is
-the amount of data that needs to be written on each commit.  This
-implies that the usage map is a tree, like the object map, with int32
-journal slot keys and bit flag values.  Note that we do not attempt to
-reuse slots that were allocated and have become free during a
-transaction since we are always writing on the tail of the journal.
-(An alternative to a tree-based design for the usage map is a bit
-vector, but then we always write the entire bit vector on each full
-commit.  If the bit vector is small enough, then this is Ok, and it is
-much simpler.)</p>
-
-<p> @todo Handle full commits on the journal.  We have to somehow mark
-the logical head and tail of the journal, even if we do so by marking
-the root node of the object and usage maps.  This may require use of
-the challis algorithm with a seek to either the primary or alternate
-meta record (flush can be deferred with replication).  A native commit
-does not need to flush anything and must not update the root nodes of
-the object and usage maps since a native commit merely formats data
-into the journal, advancing the the head/tail in memory only.  On
-restart without a full commit, all native transactions are lost and
-writes begin from the start of the journal at the last full commit.
-Therefore the in-memory head/tail metadata tracks usage across all
-native transactions, while the on disk metadata reflects only the
-metadata for the last full commit.</p>
-
-<p> @todo Review the Safe in DBCache and Flask and the object journal
-in Thor.  Compare and contrast with this design. </p>
-
-<h3>Discussion</h3>
 
 <p>
 
-There are interactions between assumptions of segment size, journal
-size, application read and write profiles, server configuration and
-QOS.  Some use cases are described below: <ul>
+The journal relies on the {@link com.bigdata.btree.BTree} to provide a
+persistent mapping from keys to values, including for the special
+cases of object identifiers and variable length byte[] keys. When used
+as an object store, the B+Tree naturally clusters serialized objects
+within the leaves of the B+Tree based on their object identifier and
+provides IO efficiencies. (From the perspective of the journal, an
+object is a byte[] or byte stream.)  If the database generalizes the
+concept of an object identifier to a variable length byte[], then the
+application can take control over the clustering behavior by simply
+choosing how to code a primary key for their objects.
 
-<li>If segments are on the order of a few hundred MB and are
-replicated across n>=3 hosts, then the entire RW segment may be wired
-into memory and recovery is provided through redundency.  Since writes
-can now be ordered we can minimize disk head movement without the use
-of a journal.  @todo This suggests that an object journal is NOT
-necessary, but the DB MUST handle concurrent transactions.  However,
-the design for handling concurrent transactions currently presumes
-transactional isolation for object maps and we would like to use
-direct addressing for the DB (int16:pageId directly addresses the
-logical page, int16:slotId indirects to the row on the page with
-possible overflow to continuation page.)</li>
+</p>
 
-<li> If segments are on the order of 100G, then a 1-2GB journal may be
-wired into memory to buffer writes.  The downside of wiring a large
-journal file into memory is that it requires significant memory
-resources on the server in exchange for high throughput on writes.  On
-a server with 8 GB and 4x150G 14k RPM disk drives, it might be
-possible to have only 4 100G segments, each of which could accept
-concurrent writes with high throughput.  </li>
+<p>
 
-<li> Large objects (or streams) should not be written into a journal.
-When using segments of a few 100MB, a single large object would span
-multiple segments.  In such cases it may be better to use the file
-system directly.  E.g., to have the blob reference an entry in the
-file system. </li>
+When using journals with an overflow limit of a few 100MB, a single
+large object would cause the journal to overflow.  In such cases
+applications may be better off writing very large objects (or streams)
+into the file system and then managing their metadata within the
+journal.  E.g., to have the blob reference an entry in the file
+system.  An alternative is to provision parts of a distributed
+database for larger records and larger extents or to distribute the
+chunks of the large object across multiple data services using a hash
+function.
+
+</p>
 
 </ul>
 </p>

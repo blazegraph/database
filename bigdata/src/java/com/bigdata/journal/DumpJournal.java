@@ -61,8 +61,11 @@ import com.bigdata.rawstore.Bytes;
  * A utility class that opens the journal in a read-only mode and dumps the root
  * blocks and metadata about the indices on a journal file.
  * 
- * @todo add an option to dump the index data as well? or histograms of the
- *       index records?
+ * @todo add an option to collect histograms over index records so that "fat" in
+ *       the indices may be targetted. We can always report histograms for the
+ *       raw key and value data. However, with either an extensible serializer
+ *       or with some application aware logic we are also able to report type
+ *       specific histograms.
  * 
  * @todo add an option to dump only as of a specified commitTime?
  * 
@@ -74,7 +77,7 @@ import com.bigdata.rawstore.Bytes;
  * @todo allow dump even on a journal that is open (e.g., only request a read
  *       lock or do not request a lock). An error is reported when you actually
  *       begin to read from the file once it is opened in a read-only mode if
- *       there is another process with an exclusive lock.  In fact, since the
+ *       there is another process with an exclusive lock. In fact, since the
  *       root blocks must be consistent when they are read, a reader would have
  *       to have a lock at the moment that it read the root blocks...
  * 
@@ -258,7 +261,7 @@ public class DumpJournal {
                     final CommitRecordIndex.Entry entry = (CommitRecordIndex.Entry)itr.next();
                     
                     System.err.print("Commit Record: " + entry.commitTime
-                            + ", addr=" + Addr.toString(entry.addr)+", ");
+                            + ", addr=" + journal.toString(entry.addr)+", ");
                     
                     final ICommitRecord commitRecord = journal
                             .getCommitRecord(entry.commitTime);
@@ -309,7 +312,7 @@ public class DumpJournal {
             Name2Addr.Entry entry = (Name2Addr.Entry) itr.next();
 
             System.err.print("name=" + entry.name + ", addr="
-                    + Addr.toString(entry.addr) + " : ");
+                    + journal.toString(entry.addr) + " : ");
 
             BTree ndx = (BTree) journal.getIndex(entry.name, commitRecord);
 

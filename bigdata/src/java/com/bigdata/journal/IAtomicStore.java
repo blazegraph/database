@@ -94,11 +94,11 @@ public interface IAtomicStore extends IRawStore {
      * Set a persistence capable data structure for callback during the commit
      * protocol.
      * <p>
-     * Note: the committers must be reset after restart or whenever 
+     * Note: the committers must be reset after restart or whenever
      * 
      * @param index
-     *            The slot in the root block where the {@link Addr address} of
-     *            the {@link ICommitter} will be recorded.
+     *            The slot in the root block where the address of the
+     *            {@link ICommitter} will be recorded.
      * 
      * @param committer
      *            The commiter.
@@ -110,9 +110,9 @@ public interface IAtomicStore extends IRawStore {
      * committed state of the store.
      * 
      * @param index
-     *            The index of the root {@link Addr address}.
+     *            The index of the root address to be retrieved.
      * 
-     * @return The {@link Addr address} stored at that index.
+     * @return The address stored at that index.
      * 
      * @exception IndexOutOfBoundsException
      *                if the index is negative or too large.

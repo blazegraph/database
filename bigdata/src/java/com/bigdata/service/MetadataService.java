@@ -139,7 +139,7 @@ import com.bigdata.scaleup.PartitionMetadata;
  *       notifying the metadata service that the split is complete.
  */
 abstract public class MetadataService extends DataService implements
-        IMetadataService, IServiceShutdown {
+        IMetadataService {
 
     /**
      * Return the name of the metadata index.

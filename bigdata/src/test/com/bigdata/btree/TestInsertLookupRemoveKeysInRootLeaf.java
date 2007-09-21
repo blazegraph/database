@@ -54,10 +54,6 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.Leaf;
-
 /**
  * Test insert, lookup, and value scan for leaves.
  * 

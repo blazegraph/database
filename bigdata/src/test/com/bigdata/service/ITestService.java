@@ -51,10 +51,6 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
-import com.sun.jini.admin.DestroyAdmin;
-
-import net.jini.admin.Administrable;
-
 /**
  * The public interface for a test service.
  * <p>

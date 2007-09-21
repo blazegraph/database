@@ -48,14 +48,13 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 
 import com.bigdata.io.DataOutputBuffer;
 
 /**
  * Interface for (de-)serialization of addresses of child nodes and leaves as
- * recorded on a node.
+ * recorded on a {@link Node}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -86,8 +85,8 @@ public interface IAddressSerializer {
      *            [0:n-1] are defined and must be read from the buffer and
      *            written on the array.
      */
-    public void getChildAddresses(DataInput is, long[] childAddr,
-            int nchildren) throws IOException;
+    public void getChildAddresses(DataInput is, long[] childAddr, int nchildren)
+            throws IOException;
 
     /**
      * Serialize the child addresses for a node.

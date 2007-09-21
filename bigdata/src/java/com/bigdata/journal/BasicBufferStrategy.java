@@ -48,8 +48,6 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import com.bigdata.rawstore.Addr;
-
 /**
  * Implements logic to read from and write on a buffer. This is sufficient
  * for a {@link BufferMode#Transient} implementation or a
@@ -101,10 +99,11 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
     }
 
-    BasicBufferStrategy(long maximumExtent, int nextOffset, int headerSize,
-            long extent, BufferMode bufferMode, ByteBuffer buffer) {
+    BasicBufferStrategy(long maximumExtent, int offsetBits, long nextOffset,
+            int headerSize, long extent, BufferMode bufferMode,
+            ByteBuffer buffer) {
 
-        super(extent, maximumExtent, nextOffset, bufferMode);
+        super(extent, maximumExtent, offsetBits, nextOffset, bufferMode);
 
         this.directBuffer = buffer;
 
@@ -116,25 +115,39 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     }
 
+    /**
+     * Releases the {@link #directBuffer}.
+     */
+    public void close() {
+
+        super.close();
+        
+        directBuffer = null;
+
+    }
+    
     public long write(ByteBuffer data) {
         
         if (data == null)
-            throw new IllegalArgumentException("Buffer is null");
+            throw new IllegalArgumentException(ERR_BUFFER_NULL);
 
         // #of bytes to store.
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
-            throw new IllegalArgumentException("No bytes remaining in buffer");
+            throw new IllegalArgumentException(ERR_NO_BYTES_REMAINING);
 
+        // assert the maximum record length for a write.
+        am.assertByteCount(nbytes);
+        
         // the next offset.
-        final int offset = nextOffset;
+        final long offset = nextOffset;
         
         final long needed = (offset + nbytes) - userExtent;
 
         if (needed > 0) {
 
-            if (!overflow((int) needed)) {
+            if (!overflow(needed)) {
                 
                 throw new OverflowException();
                 
@@ -142,8 +155,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             
         }
        
-        directBuffer.limit(offset + nbytes);
-        directBuffer.position(offset);
+        directBuffer.limit((int)offset + nbytes);
+        directBuffer.position((int)offset);
         
         directBuffer.put(data);
         
@@ -151,7 +164,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         nextOffset += nbytes;
         
         // formulate the address that can be used to recover that record.
-        long addr = Addr.toLong(nbytes, offset);
+        final long addr = toAddr(nbytes, offset);
 
         return addr;
 
@@ -160,22 +173,21 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
     public ByteBuffer read(long addr) {
         
         if (addr == 0L)
-            throw new IllegalArgumentException("Address is 0L");
+            throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
         
-        final int offset = Addr.getOffset(addr);
+        final long offset = getOffset(addr);
         
-        final int nbytes = Addr.getByteCount(addr);
+        final int nbytes = getByteCount(addr);
 
         if(nbytes==0) {
             
-            throw new IllegalArgumentException(
-                    "Address encodes record length of zero");
+            throw new IllegalArgumentException(ERR_RECORD_LENGTH_ZERO);
             
         }
         
         if (offset + nbytes > nextOffset) {
             
-            throw new IllegalArgumentException("Address never written.");
+            throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
 
         }
         
@@ -189,8 +201,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         // return a read-only view onto the data in the store.
 
-        view.limit(offset + nbytes);
-        view.position(offset);
+        view.limit((int) offset + nbytes);
+        view.position((int) offset);
 
         return view.slice();
 
@@ -208,6 +220,10 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         if (newUserExtent > Integer.MAX_VALUE) {
 
+            /*
+             * Constraint when using a buffered mode.
+             */
+            
             throw new IllegalArgumentException("User extent would exceed int32 bytes");
             
         }
@@ -230,7 +246,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         /*
          * Copy at most those bytes that have been written on.
          */
-        directBuffer.limit(Math.min(nextOffset,newCapacity));
+        directBuffer.limit((int)Math.min(nextOffset,newCapacity));
         directBuffer.position(0);
         
         // Copy to the new buffer.
@@ -256,11 +272,11 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         // current position on the output channel.
         final long toPosition = outChannel.position();
 
-        if(toPosition + count > Integer.MAX_VALUE) {
-            
-            throw new IOException("Index segment exceeds int32 bytes.");
-            
-        }
+//        if(toPosition + count > Integer.MAX_VALUE) {
+//            
+//            throw new IOException("Would exceed int32 bytes.");
+//            
+//        }
         
         /*
          * use a single nio operation to write all the data onto the output
@@ -270,7 +286,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         final long begin = System.currentTimeMillis();
         
         // setup the buffer for the operation.
-        directBuffer.limit(nextOffset);
+        directBuffer.limit((int)nextOffset);
         directBuffer.position(0);
         
         // write the data.

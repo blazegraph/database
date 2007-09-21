@@ -51,45 +51,62 @@ import java.io.File;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.journal.Journal;
+import com.bigdata.journal.AbstractJournal;
 
 /**
  * <p>
  * A low-level interface for reading and writing data. This interface is not
  * isolated and operations do not possess ACID semantics. Implementations may or
- * may not be durable. All operations are expressed in terms of long integers,
- * constructed and examined using {@link Addr}, that encode both the offset on
- * the store at which the data exists and the length of the data in bytes.
+ * may not be durable. All operations are expressed in terms of long integers
+ * that are often called "addresses" but which should be understood as opaque
+ * identifiers.
  * </p>
  * <p>
- * The {@link Journal} is the principle implementation of this interface and
- * provides both transient and durable options and the facilities for atomic
- * commit. {@link BTree} provides a higher level interface for operations on a
- * {@link Journal}. The {@link BTree} uses a copy-on-write policy designed to
- * support transactional semantics by making it possible to read from a
- * consistent historical state.
+ * The {@link AbstractJournal} is the principle implementation of this interface
+ * and provides both transient and durable options and the facilities for atomic
+ * commit. {@link BTree} provides a higher level interface for operations on an
+ * {@link IRawStore} and uses a copy-on-write policy designed to support
+ * transactional semantics by making it possible to read from a consistent
+ * historical state. The {@link AbstractJournal} provides the necessary
+ * mechansims to support transactions based on the copy-on-write semantics of
+ * the {@link BTree}.
+ * </p>
+ * <p>
+ * The {@link IRawStore} supports write and read back on immutable addresses and
+ * does NOT directly support update of data for an immutable address once that
+ * data has been written. Applications seeking Create, Read, Update, Delete
+ * (CRUD) semantics should use a {@link BTree} to map from persistent object
+ * identifiers to their application data objects. Unlike this interface, the
+ * {@link BTree} can correctly support update and delete of application data
+ * using a persistent identifier.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see Addr
- * @see Journal
+ * @see AbstractJournal
  * @see BTree
  * 
- * @todo It is possible to implement this interface using an int64 address space
- *       without embedding the record length into the address. this will require
- *       a means to translate from logical addresses to physical addresses. we
- *       could use a copy-on-write btree for that purpose. delete() should be
- *       defined so that we can release storage that is no longer required for
- *       data versions that can be accessed by any current transaction
- *       (supporting gc). a free list should offer fast best-fit or good fit
- *       access to chunks in the store that are available for reuse. this would
- *       make it possible for us to implement a scale up store based on a single
- *       monolithic file.
+ * @todo The existing implementations of this interface do NOT support the
+ *       release and reuse of allocated records - that is, they are all
+ *       {@link IWORM Write Once Read Many} stores rather than read/write
+ *       stores. A read-write implementation of this interface is of course
+ *       possible and will require a means to allocate, release, and reallocate
+ *       chunks of varying sizes within the store. Those chunks may either be
+ *       drawn from a set of fixed sized allocation pools spanning a variety of
+ *       useful record sizes or can use a stategy where records are allocated on
+ *       an exact fit basis the first time and reallocated on a best/good fit
+ *       basis. A free list can offer fast best-fit or good fit access to chunks
+ *       in the store that are available for reuse. Any such approach must
+ *       serialize allocations by one means or another, even though different
+ *       allocation pools might be used concurrently. A delete() operation on
+ *       {@link IRawStore} should be defined so that we can release storage that
+ *       is no longer required for data versions that can not be accessed by any
+ *       current transaction (a gc strategy). This would make it possible for us
+ *       to implement a scale up store based on a single monolithic file.
  */
-public interface IRawStore {
-
+public interface IRawStore extends IAddressManager, IStoreSerializer {
+    
     /**
      * Write the data (unisolated).
      * 
@@ -102,9 +119,9 @@ public interface IRawStore {
      *            modify the contents of the buffer without changing the state
      *            of the store (i.e., the data are copied into the store).
      * 
-     * @return A long integer formed using {@link Addr} that encodes both the
-     *         offset from which the data may be read and the #of bytes to be
-     *         read.
+     * @return A long integer formed that encodes both the offset from which the
+     *         data may be read and the #of bytes to be read. See
+     *         {@link IAddressManager}.
      * 
      * @exception IllegalArgumentException
      *                if <i>data</i> is <code>null</code>.
@@ -112,11 +129,13 @@ public interface IRawStore {
      *                if <i>data</i> has zero bytes
      *                {@link ByteBuffer#remaining()}.
      * 
+     * @todo define exception if the maximum extent would be exceeded.
+     * 
      * @todo the addresses need to reflect the ascending offset at which the
      *       data are written, at least for a class of append only store. some
      *       stores, such as the Journal, also have an offset from the start of
-     *       the file to the start of the data region (in the case of the Journal
-     *       it is used to hold the root blocks).
+     *       the file to the start of the data region (in the case of the
+     *       Journal it is used to hold the root blocks).
      */
     public long write(ByteBuffer data);
 
@@ -135,7 +154,7 @@ public interface IRawStore {
 //     *                If the address is known to be invalid (never written or
 //     *                deleted). Note that the address 0L is always invalid.
 //     * 
-//     * @deprecated This method will be discarded. It is only applicable in the
+//     * @deprecated This method has been discarded. It is only applicable in the
 //     *             context of a garbage collection strategy. With an append only
 //     *             store and with eviction of btrees into index segments there
 //     *             is no reason to delete anything on the store - and nothing to
@@ -147,9 +166,9 @@ public interface IRawStore {
      * Read the data (unisolated).
      * 
      * @param addr
-     *            A long integer formed using {@link Addr} that encodes both the
-     *            offset from which the data will be read and the #of bytes to
-     *            be read.
+     *            A long integer that encodes both the offset from which the
+     *            data will be read and the #of bytes to be read. See
+     *            {@link IAddressManager#toAddr(int, long)}.
      * 
      * @return The data read. The buffer will be flipped to prepare for reading
      *         (the position will be zero and the limit will be the #of bytes
@@ -207,6 +226,9 @@ public interface IRawStore {
      * 
      * @exception IllegalStateException
      *                if the store is not open.
+     * 
+     * @todo add delete() which deletes any backing files and requires the store
+     *       to be closed as a pre-condition.
      */
     public void close();
     

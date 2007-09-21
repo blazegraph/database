@@ -81,10 +81,15 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("raw store");
 
+        // test management of locators encoding byte offset + byte count.
+        suite.addTestSuite(TestWormAddressManager.class);
+        
         // test address encoding and decoding;
         suite.addTestSuite( TestAddr.class );
+        
         // test memory-resident implementation of IRawStore.
         suite.addTestSuite( TestSimpleMemoryRawStore.class );
+        
         // test file-based implementation of IRawStore.
         suite.addTestSuite( TestSimpleFileRawStore.class );
 

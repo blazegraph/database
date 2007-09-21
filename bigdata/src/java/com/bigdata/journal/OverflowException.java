@@ -49,7 +49,7 @@ package com.bigdata.journal;
 
 /**
  * An instance of this class is thrown if an
- * {@link AbstractBufferStrategy#overflow(int)} request is denied.
+ * {@link AbstractBufferStrategy#overflow(long)} request is denied.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

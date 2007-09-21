@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IndexSegment;
-
 /**
  * Test suite for verification of fast forward and reverse leaf scans for
  * {@link IndexSegment}.

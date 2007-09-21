@@ -43,15 +43,14 @@ Modifications:
 */
 package com.bigdata.journal;
 
-import com.bigdata.rawstore.Addr;
 
 /**
  * An interface implemented by a persistence capable data structure such as a
  * btree so that it can participate in the commit protocol for the store.
  * <p>
  * This interface is invoked by {@link Journal#commit()} for each registered
- * {@link ICommitter}. The {@link Addr} returned by {@link #handleCommit()}
- * will be saved in the {@link ICommitRecord} under the index identified by the
+ * {@link ICommitter}. The address returned by {@link #handleCommit()} will be
+ * saved in the {@link ICommitRecord} under the index identified by the
  * {@link ICommitter} when it was registered.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -63,13 +62,12 @@ public interface ICommitter {
 
     /**
      * Flush dirty state to the store in preparation for an atomic commit and
-     * return the {@link Addr address} from which the persistence capable data
-     * structure may be reloaded.
+     * return the address from which the persistence capable data structure may
+     * be reloaded.
      * 
-     * @return The {@link Addr address} of the record from which the persistence
-     *         capable data structure may be reloaded. If no changes have been
-     *         made then the previous address should be returned as it is still
-     *         valid.
+     * @return The address of the record from which the persistence capable data
+     *         structure may be reloaded. If no changes have been made then the
+     *         previous address should be returned as it is still valid.
      */
     public long handleCommit();
 

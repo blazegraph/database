@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.rawstore.Addr;
 
 
 /**
@@ -130,7 +129,8 @@ public class CommitRecord implements ICommitRecord {
             
             if(i>0) sb.append(", ");
             
-            sb.append(Addr.toString(roots[i]));
+//            sb.append(Addr.toString(roots[i]));
+            sb.append(roots[i]);
             
         }
         

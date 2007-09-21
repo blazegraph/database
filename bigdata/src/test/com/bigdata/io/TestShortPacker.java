@@ -46,11 +46,15 @@ Modifications:
  */
 package com.bigdata.io;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
+import org.CognitiveWeb.extser.ShortPacker;
 
 import junit.framework.TestCase;
 
@@ -398,6 +402,143 @@ public class TestShortPacker extends TestCase {
         for( int i=0; i<expected.length; i++ ) {
             assertEquals( msg+": byte[i="+i+"]", expected[i], actual[i] );
         }
+    }
+
+    /**
+     * This test packs the data using the {@link ShortPacker} and unpacks it
+     * using a {@link DataInputBuffer}.
+     */
+    public void test_compatiblity_ShortPacker_DataInputBuffer()
+            throws IOException {
+
+        final int limit = 10000;
+        
+        Random r = new Random();
+        
+        short[] expected = new short[limit];
+
+        /*
+         * Pack a sequence of random non-negative short integers.
+         */
+        final byte[] serialized;
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(limit * 2);
+
+            DataOutputStream os = new DataOutputStream(baos);
+
+            for (int i = 0; i < limit; i++) {
+
+                /*
+                 * Random non-negative short integer. 1% of the time we will use
+                 * 0 instead.
+                 */
+
+                final short v = (short) ((r.nextInt(100) < 1) ? 0 : r
+                        .nextInt(Short.MAX_VALUE));
+
+                assert v >= 0;
+
+                ShortPacker.packShort(os, v);
+
+                expected[i] = v;
+
+            }
+
+            os.flush();
+            
+            serialized = baos.toByteArray();
+            
+        }
+
+        /*
+         * Deserialize, checking the unpacked values.
+         */
+        {
+
+            DataInputBuffer in = new DataInputBuffer(serialized);
+            
+            for(int i=0; i<limit; i++) {
+                
+                short v = in.unpackShort();
+                
+                if(v!=expected[i]) {
+
+                    assertEquals("index="+i,expected[i],v);
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
+
+    /**
+     * This test packs the data using a {@link DataOutputBuffer} and unpacks it
+     * using the {@link ShortPacker}.
+     */
+    public void test_compatiblity_DataOutputBuffer_ShortPacker()
+            throws IOException {
+
+        final int limit = 10000;
+        
+        Random r = new Random();
+        
+        short[] expected = new short[limit];
+
+        /*
+         * Pack a sequence of random non-negative short integers.
+         */
+        final byte[] serialized;
+        {
+
+            DataOutputBuffer os = new DataOutputBuffer();
+            
+            for (int i = 0; i < limit; i++) {
+
+                /*
+                 * Random non-negative short integer. 1% of the time we will use
+                 * 0L instead.
+                 */
+
+                final short v = (short) ((r.nextInt(100) < 1) ? 0L : r
+                        .nextInt(Short.MAX_VALUE));
+
+                assert v >= 0;
+
+                os.packShort(v);
+
+                expected[i] = v;
+
+            }
+
+            serialized = os.toByteArray();
+            
+        }
+
+        /*
+         * Deserialize, checking the unpacked values.
+         */
+        {
+
+            ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+            
+            DataInput in = new DataInputStream(bais);
+            
+            for(int i=0; i<limit; i++) {
+                
+                short v = ShortPacker.unpackShort( in );
+                
+                if(v!=expected[i]) {
+
+                    assertEquals("index="+i,expected[i],v);
+                    
+                }
+                
+            }
+            
+        }
+        
     }
 
 }

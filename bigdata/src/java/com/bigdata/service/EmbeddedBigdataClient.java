@@ -51,13 +51,29 @@ import java.util.Properties;
 import java.util.UUID;
 
 /**
+ * A client for an embedded federation (the client and the data services all run
+ * in the same process).
+ * 
+ * @see EmbeddedBigdataFederation
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class EmbeddedBigdataClient implements IBigdataClient {
 
     protected final Properties properties;
+
+    protected void assertConnected() {
+        
+        if (fed == null)
+            throw new IllegalStateException("Not connected");
+        
+    }
     
+    /**
+     * 
+     * @param properties See {@link EmbeddedBigdataFederation.Options}.
+     */
     public EmbeddedBigdataClient(Properties properties) {
         
         if(properties==null) throw new IllegalArgumentException(); 
@@ -98,6 +114,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
      */
     public IDataService getDataService(UUID serviceUUID) {
 
+        assertConnected();
+
         return ((EmbeddedBigdataFederation)fed).getDataService(serviceUUID);
         
     }
@@ -107,6 +125,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
      */
     public IMetadataService getMetadataService() {
 
+        assertConnected();
+        
         return ((EmbeddedBigdataFederation)fed).getMetadataService();
         
     }

@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IKeyBuffer;
 
 
 /**

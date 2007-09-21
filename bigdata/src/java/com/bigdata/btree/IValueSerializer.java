@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.io.Serializable;
 
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.IAddressManager;
 
 /**
  * (De-)serialize the values in a {@link Leaf}.

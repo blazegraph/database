@@ -42,28 +42,17 @@ Modifications:
 
 */
 /*
- * Created on Feb 16, 2007
+ * Created on Feb 20, 2007
  */
 
-package com.bigdata.journal;
-
-import com.bigdata.util.TimestampFactory;
+package com.bigdata.rawstore;
 
 /**
- * A purely local implementation of an {@link ITimestampService} using a
- * {@link TimestampFactory} to assign distinct timestamps.
+ * A marker interface for a store that supports Multiple Readers, One Writer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalTimestampService implements ITimestampService {
-
-    public static final transient ITimestampService INSTANCE = new LocalTimestampService();
-
-    public long nextTimestamp() {
-
-        return TimestampFactory.nextNanoTime();
-
-    }
+public interface IMROW /*extends IRawStore*/ {
 
 }

@@ -51,12 +51,6 @@ import java.util.Arrays;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.NoSuccessorException;
-import com.bigdata.btree.Node;
-
 /**
  * Test suite for the "linear list" access methods.
  * 

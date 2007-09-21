@@ -47,10 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.MutableKeyBuffer;
 
 /**
  * Test suite for various utility methods, both static and instance, on

@@ -43,12 +43,11 @@ Modifications:
 */
 package com.bigdata.scaleup;
 
-import com.bigdata.io.TestNameAndExtensionFilter;
-import com.bigdata.scaleup.TestMetadataIndex;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.io.TestNameAndExtensionFilter;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -79,9 +78,6 @@ public class TestAll extends TestCase {
     {
 
         TestSuite suite = new TestSuite("scaleup");
-
-        // test suite for locating journal files.
-        suite.addTestSuite(TestNameAndExtensionFilter.class);
 
         /*
          * journal overflow

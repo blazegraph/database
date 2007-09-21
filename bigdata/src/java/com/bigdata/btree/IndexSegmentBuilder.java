@@ -70,9 +70,9 @@ import com.bigdata.isolation.Value;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -116,12 +116,18 @@ import com.bigdata.rawstore.IRawStore;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
+ * FIXME Make sure that we can build and read index segments that are larger
+ * than int32 bytes in length.
+ * 
  * FIXME support build from a key range rather than just an entire source tree.
  * this is required to support partitioned indices.
  * 
  * FIXME support efficient prior/next leaf scans.
  * 
  * FIXME use the shortest separator key.
+ * 
+ * @todo there is an int32 limit on the length of the nodes region in the
+ *       generated file.
  * 
  * @see IndexSegment
  * @see IndexSegmentFile
@@ -222,6 +228,21 @@ public class IndexSegmentBuilder {
     final NodeSerializer nodeSer;
 
     /**
+     * Used to encode and decode the addresses for the nodes and leaves in the
+     * generated index segment. Note that the {@link CustomAddressSerializer} is
+     * used to actually (de-)serialize those addresses since some additional bit
+     * math is used to mark addresses that are nodes vs leaves.
+     */
+    final WormAddressManager addressManager = WormAddressManager.INSTANCE;
+
+    /**
+     * The object that is used to (de-)serialize addresses for nodes and leaves
+     * in the generated {@link IndexSegment}.
+     */
+    final CustomAddressSerializer addressSerializer = new IndexSegment.CustomAddressSerializer(
+            addressManager);
+    
+    /**
      * The errorRate parameter from the constructor which determines whether or
      * not we build a bloom filter and what the target false positive error rate
      * will be for that filter if we do build one.
@@ -236,7 +257,7 @@ public class IndexSegmentBuilder {
     /**
      * The offset in the output file of the last leaf written onto that file.
      * Together with {@link #lastLeafSize} this is used to compute the
-     * {@link Addr} of the prior leaf.
+     * address of the prior leaf.
      */
     long lastLeafOffset = -1L;
     
@@ -244,8 +265,8 @@ public class IndexSegmentBuilder {
      * The size in bytes of the last leaf written onto the output file (the size
      * of the compressed record that is actually written onto the output file
      * NOT the size of the serialized leaf before it is compressed). Together
-     * with {@link #lastLeafOffset} this is used to compute the {@link Addr} of
-     * the prior leaf.
+     * with {@link #lastLeafOffset} this is used to compute the address of the
+     * prior leaf.
      */
     int lastLeafSize = -1;
 
@@ -565,7 +586,7 @@ public class IndexSegmentBuilder {
             nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
                     m,
                     0, /*initialBufferCapacity - will be estimated. */
-                    new IndexSegment.CustomAddressSerializer(),
+                    addressSerializer,
                     KeyBufferSerializer.INSTANCE,
                     valueSerializer,
                     recordCompressor,
@@ -857,7 +878,7 @@ public class IndexSegmentBuilder {
 
     /**
      * Close out a node or leaf. When a node or leaf is closed we write it out
-     * to obtain its {@link Addr} and set its address on its direct parent using
+     * to obtain its address and set that address on its direct parent using
      * {@link #addChild(com.bigdata.btree.IndexSegmentBuilder.SimpleNodeData, long)}.
      * This also updates the per-child counters of the #of entries spanned by a
      * node.
@@ -903,9 +924,9 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Record the persistent {@link Addr address} of a child on its parent and
-     * the #of entries spanned by that child. If all children on the parent
-     * become assigned then the parent is closed.
+     * Record the persistent address of a child on its parent and the #of
+     * entries spanned by that child. If all children on the parent become
+     * assigned then the parent is closed.
      * 
      * @param parent
      *            The parent.
@@ -961,7 +982,7 @@ public class IndexSegmentBuilder {
             log.debug("setting child at index=" + parent.nchildren
                 + " on node at level=" + parent.level + ", col="
                 + writtenInLevel[parent.level] + ", addr="
-                + Addr.toString(childAddr));
+                + addressManager.toString(childAddr));
         
         int nchildren = parent.nchildren;
         
@@ -1082,10 +1103,10 @@ public class IndexSegmentBuilder {
      * Serialize, compress, and write the node or leaf onto the appropriate
      * output channel.
      * 
-     * @return The {@link Addr} that may be used to read the compressed node or
-     *         leaf from the file. Note that the address of a node is relative
-     *         to the start of the node channel and therefore must be adjusted
-     *         before reading the node from the final index segment file.
+     * @return The address that may be used to read the compressed node or leaf
+     *         from the file. Note that the address of a node is relative to the
+     *         start of the node channel and therefore must be adjusted before
+     *         reading the node from the final index segment file.
      */
     protected long writeNodeOrLeaf(AbstractSimpleNodeData node)
             throws IOException {
@@ -1098,8 +1119,8 @@ public class IndexSegmentBuilder {
     /**
      * Serialize, compress, and write the leaf onto the leaf output channel.
      * 
-     * @return The {@link Addr} that may be used to read the compressed leaf
-     *         from the file.
+     * @return The address that may be used to read the compressed leaf from the
+     *         file.
      * 
      * @todo write prior; compute next from offset+size during IndexSegment
      *       scans. Basically, we can only record one of the references in the
@@ -1120,14 +1141,15 @@ public class IndexSegmentBuilder {
 
         final long addr1 = leafBuffer.write(buf);
         
-        final int nbytes = Addr.getByteCount(addr1);
+        final int nbytes = addressManager.getByteCount(addr1);
 
         /*
          * Note: The offset is adjusted by the size of the metadata record such
          * that the offset is correct for the generated file NOT the buffer into
          * which the leaves are being written.
          */
-        final int offset = Addr.getOffset(addr1) + IndexSegmentMetadata.SIZE;
+        final long offset = addressManager.getOffset(addr1)
+                + IndexSegmentMetadata.SIZE;
         
         assert nbytes == buf.limit();
         
@@ -1153,8 +1175,7 @@ public class IndexSegmentBuilder {
          * Encode the address of the leaf. Since this is a leaf address we know
          * the absolute offset into the file at which the leaf was written.
          */
-        final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
-                true);
+        final long addr = addressSerializer.encode(nbytes, offset, true);
         
         return addr;
         
@@ -1163,9 +1184,9 @@ public class IndexSegmentBuilder {
     /**
      * Serialize, compress, and write the node onto the node output channel.
      * 
-     * @return An <em>relative</em> {@link Addr} that must be correctly
-     *         decoded before you can read the compressed node from the file.
-     *         This value is also set on {@link SimpleNodeData#addr}.
+     * @return An <em>relative</em> address that must be correctly decoded
+     *         before you can read the compressed node from the file. This value
+     *         is also set on {@link SimpleNodeData#addr}.
      * 
      * @see SimpleNodeData, which describes the decoding required.
      */
@@ -1179,9 +1200,9 @@ public class IndexSegmentBuilder {
         // write the node on the buffer.
         final long addr2 = nodeBuffer.write(buf);
 
-        final int offset = Addr.getOffset(addr2);
+        final long offset = addressManager.getOffset(addr2);
         
-        final int nbytes = Addr.getByteCount(addr2);
+        final int nbytes = addressManager.getByteCount(addr2);
         
         if( nbytes > maxNodeOrLeafLength ) { 
          
@@ -1200,8 +1221,7 @@ public class IndexSegmentBuilder {
          * region in the file containing the nodes (NOT to the start of the
          * file).
          */
-        final long addr = CustomAddressSerializer.encode(nbytes, (int) offset,
-                false);
+        final long addr = addressSerializer.encode(nbytes, offset, false);
         
         node.addr = addr;
         
@@ -1239,18 +1259,18 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Writes the complete file format for the index segment.
      * <p>
-     * The file is divided up as follows:
+     * Writes the complete file format for the index segment. The file is
+     * divided up as follows:
+     * <ol>
      * 
-     * <pre>
-     *  fixed length metadata record (required)
-     *  leaves (required)
-     *  nodes (may be empty)
-     *  the bloom filter (optional).
-     *  the extension metadata record (required, but extensible).
-     * </pre>
-     * 
+     * <li>fixed length metadata record (required)</li>
+     * <li>leaves (required)</li>
+     * <li>nodes (may be empty)</li>
+     * <li>the bloom filter (optional)</li>
+     * <li>the extension metadata record (required, but extensible)</li>
+     * </ol>
+     * </p>
      * <p>
      * The index segment metadata is divided into a base
      * {@link IndexSegmentMetadata} record with a fixed format containing only
@@ -1259,20 +1279,19 @@ public class IndexSegmentBuilder {
      * {@link IndexSegmentExtensionMetadata} record. the latter is where we
      * write variable length metadata including the _name_ of the index, or
      * additional metadata defined by a specific class of index.
-     * 
+     * </p>
      * <p>
      * Once all nodes and leaves have been buffered we are ready to start
      * writing the data. We skip over a fixed size metadata record since
      * otherwise we are unable to pre-compute the offset to the leaves and hence
-     * the {@link Addr addresses} of the leaves. The node {@link Addr addresses}
-     * are written in an encoding that requires active translation by the
-     * receiver who must be aware of the offset to the start of the node region.
-     * We can not write the metadata record until we know the size and length of
-     * each of these regions (leaves, nodes, and the bloom filter, or other
-     * metadata records) since that information is required in order to be able
-     * to form their {@link Addr addresses} for insertion in the metadata
-     * record.
-     * <p>
+     * the addresses of the leaves. The node addresses are written in an
+     * encoding that requires active translation by the receiver who must be
+     * aware of the offset to the start of the node region. We can not write the
+     * metadata record until we know the size and length of each of these
+     * regions (leaves, nodes, and the bloom filter, or other metadata records)
+     * since that information is required in order to be able to form their
+     * addresses for insertion in the metadata record.
+     * </p>
      * 
      * @param outChannel
      * 
@@ -1326,7 +1345,7 @@ public class IndexSegmentBuilder {
             assert outChannel.position() == offsetNodes;
 
             // Address for the contiguous region containing the leaves.
-            addrLeaves = Addr.toLong((int)count,IndexSegmentMetadata.SIZE);
+            addrLeaves = addressManager.toAddr((int)count,IndexSegmentMetadata.SIZE);
             
         }
         
@@ -1355,16 +1374,16 @@ public class IndexSegmentBuilder {
             
             long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
             
-            int offset = (int)offsetNodes + Addr.getOffset(addr); // add offset.
+            long offset = offsetNodes + addressManager.getOffset(addr); // add offset.
             
-            int nbytes = Addr.getByteCount(addr); // #of bytes in root node.
+            int nbytes = addressManager.getByteCount(addr); // #of bytes in root node.
             
-            addrRoot = Addr.toLong(nbytes, offset); // form correct addr.
+            addrRoot = addressManager.toAddr(nbytes, offset); // form correct addr.
 
             // Address for the contiguous region containing the nodes.
-            addrNodes = Addr.toLong((int)count,(int)offsetNodes);
+            addrNodes = addressManager.toAddr((int)count,offsetNodes);
 
-            log.info("addrRoot(Node): "+addrRoot+", "+Addr.toString(addrRoot));
+            log.info("addrRoot(Node): "+addrRoot+", "+addressManager.toString(addrRoot));
             
         } else {
 
@@ -1375,9 +1394,9 @@ public class IndexSegmentBuilder {
             // This MUST be 0L in the metadata record if there are no leaves.
             addrNodes = 0L;
             
-            addrRoot = Addr.toLong(lastLeafSize, (int)lastLeafOffset);
+            addrRoot = addressManager.toAddr(lastLeafSize, lastLeafOffset);
             
-            log.info("addrRoot(Leaf): "+addrRoot+", "+Addr.toString(addrRoot));
+            log.info("addrRoot(Leaf): "+addrRoot+", "+addressManager.toString(addrRoot));
             
         }
         
@@ -1395,9 +1414,7 @@ public class IndexSegmentBuilder {
 
             byte[] bloomBytes = serializeBloomFilter(bloomFilter);
 
-            assert out.length() < Integer.MAX_VALUE;
-            
-            final int offset = (int)out.length(); 
+            final long offset = out.length(); 
 
             // seek to the end of the file.
             out.seek(offset);
@@ -1406,7 +1423,7 @@ public class IndexSegmentBuilder {
             out.write(bloomBytes, 0, bloomBytes.length);
             
             // note its address.
-            addrBloom = Addr.toLong(bloomBytes.length,offset);
+            addrBloom = addressManager.toAddr(bloomBytes.length,offset);
             
         }
         
@@ -1439,9 +1456,7 @@ public class IndexSegmentBuilder {
             final byte[] extensionMetadataBytes = SerializerUtil
                     .serialize(extensionMetadata);
 
-            assert out.length() < Integer.MAX_VALUE;
-            
-            final int offset = (int)out.length(); 
+            final long offset = out.length(); 
 
             // seek to the end of the file.
             out.seek(offset);
@@ -1450,7 +1465,7 @@ public class IndexSegmentBuilder {
             out.write(extensionMetadataBytes, 0, extensionMetadataBytes.length);
 
             // note its address.
-            addrExtensionMetadata = Addr.toLong(extensionMetadataBytes.length,
+            addrExtensionMetadata = addressManager.toAddr(extensionMetadataBytes.length,
                     offset);
             
         }
@@ -1465,11 +1480,12 @@ public class IndexSegmentBuilder {
             
             outChannel.position(0);
             
-            IndexSegmentMetadata md = new IndexSegmentMetadata(plan.m,
-                    plan.height, useChecksum, plan.nleaves, nnodesWritten,
-                    plan.nentries, maxNodeOrLeafLength, addrLeaves, addrNodes,
-                    addrRoot, addrExtensionMetadata, addrBloom, errorRate, out
-                            .length(), indexUUID, segmentUUID, now);
+            IndexSegmentMetadata md = new IndexSegmentMetadata(addressManager
+                    .getOffsetBits(), plan.m, plan.height, useChecksum,
+                    plan.nleaves, nnodesWritten, plan.nentries,
+                    maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
+                    addrExtensionMetadata, addrBloom, errorRate, out.length(),
+                    indexUUID, segmentUUID, now);
 
             md.write(out);
             

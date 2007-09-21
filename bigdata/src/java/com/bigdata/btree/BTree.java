@@ -53,7 +53,6 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -279,12 +278,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      */
     static public final int DEFAULT_HARD_REF_QUEUE_SCAN = 20;
     
-    public int getBranchingFactor() {
-        
-        return branchingFactor;
-        
-    }
-
     public int getHeight() {
         
         return height;
@@ -437,7 +430,9 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
                 branchingFactor,
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue,
-                PackedAddressSerializer.INSTANCE, valueSer,
+//                FIXME new PackedAddressSerializer(store),
+                AddressSerializer.INSTANCE,
+                valueSer,
                 NodeFactory.INSTANCE, //
                 recordCompressor, //
                 /*
@@ -497,8 +492,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      *            The hard reference queue for {@link Leaf}s.
      * 
      * @see #load(IRawStore, long), which will re-load a {@link BTree} or
-     *      derived class from the {@link Addr address} of its
-     *      {@link BTreeMetadata metadata} record.
+     *      derived class from the address of its {@link BTreeMetadata metadata}
+     *      record.
      * 
      * @see #newMetadata(), which must be overriden if you subclass
      *      {@link BTreeMetadata}
@@ -509,7 +504,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         super(store, metadata.getBranchingFactor(),
                 0/* initialBufferCapacity will be estimated */,
                 hardReferenceQueue, 
-                PackedAddressSerializer.INSTANCE, 
+//                FIXME new PackedAddressSerializer(store),
+                AddressSerializer.INSTANCE,
                 metadata.getValueSerializer(), NodeFactory.INSTANCE,
                 metadata.getRecordCompressor(),//
                 metadata.getUseChecksum(), // use checksum iff used on create.
@@ -691,8 +687,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * current in this case).</li>
      * </ol>
      * 
-     * @return The {@link Addr address} of a metadata record from which the
-     *         btree may be reloaded.
+     * @return The address of a metadata record from which the btree may be
+     *         reloaded.
      */
     public long handleCommit() {
 

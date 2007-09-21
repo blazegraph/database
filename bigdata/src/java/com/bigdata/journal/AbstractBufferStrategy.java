@@ -51,8 +51,10 @@ import java.text.NumberFormat;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Abstract base class for {@link IBufferStrategy} implementation.
@@ -60,12 +62,52 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractBufferStrategy implements IBufferStrategy {
+public abstract class AbstractBufferStrategy extends AbstractRawWormStore implements IBufferStrategy {
     
     /**
      * Log for btree opeations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
+
+    /**
+     * Text of the error message used when a {@link ByteBuffer} with zero bytes
+     * remaining is passed to {@link #write(ByteBuffer)}.
+     */
+    protected static final String ERR_NO_BYTES_REMAINING = "No bytes remaining in buffer";
+    
+    /**
+     * Text of the error message used when a <code>null</code> reference is
+     * provided for a {@link ByteBuffer}.
+     */
+    protected static final String ERR_BUFFER_NULL = "Buffer is null";
+
+    /**
+     * Text of the error message used when an address is given has never been
+     * written. Since the journal is an append-only store, an address whose
+     * offset plus record length exceeds the {@link #nextOffset} on which data
+     * would be written may be easily detected.
+     */
+    protected static final String ERR_ADDRESS_NOT_WRITTEN = "Address never written.";
+    
+    /**
+     * Text of the error message used when a ZERO (0L) is passed as an address
+     * to {@link IRawStore#read(long)} or similar methods. This value 0L is
+     * reserved to indicate a persistent null reference and may never be read.
+     */
+    protected static final String ERR_ADDRESS_IS_NULL = "Address is 0L";
+    
+    /**
+     * Text of the error message used when an address provided to
+     * {@link IRawStore#read(long)} or a similar method encodes a record length
+     * of zero (0). Empty records are not permitted on write and addresses with
+     * a zero length are rejected on read.
+     */
+    protected static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
+    
+    /**
+     * True iff the {@link IBufferStrategy} is open.
+     */
+    private boolean open = false;
 
     protected final long initialExtent;
     protected final long maximumExtent;
@@ -90,7 +132,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      * However, you can not discard the writes of those objects unless the
      * entire store is being restarted, e.g., after a shutdown or a crash.
      */
-    protected int nextOffset;
+    protected long nextOffset;
 
     static final NumberFormat cf;
     
@@ -120,7 +162,7 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         
     }
 
-    final public int getNextOffset() {
+    final public long getNextOffset() {
 
         return nextOffset;
         
@@ -133,6 +175,10 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      *            as defined by {@link #getInitialExtent()}
      * @param maximumExtent -
      *            as defined by {@link #getMaximumExtent()}.
+     * @param offsetBits
+     *            The #of bits that will be used to represent the byte offset in
+     *            the 64-bit long integer addresses for the store. See
+     *            {@link WormAddressManager}.
      * @param nextOffset
      *            The next offset within the buffer on which a record will be
      *            written. Note that the buffer begins _after_ the root blocks
@@ -141,8 +187,10 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      *            The {@link BufferMode}.
      */
     AbstractBufferStrategy(long initialExtent, long maximumExtent,
-            int nextOffset, BufferMode bufferMode) {
+            int offsetBits, long nextOffset, BufferMode bufferMode) {
 
+        super(offsetBits);
+        
         assert nextOffset >= 0;
         
         if( bufferMode == null ) throw new IllegalArgumentException();
@@ -155,32 +203,57 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         
         this.bufferMode = bufferMode;
         
+        this.open = true;
+        
     }
     
     public final long size() {
         
-        return (long)nextOffset;
+        return nextOffset;
+        
+    }
+
+    final public boolean isOpen() {
+        
+        return open;
         
     }
 
     /**
+     * Manages the {@link #open} flag state.
+     */
+    public void close() {
+        
+        if (!open)
+            throw new IllegalStateException();
+        
+        open = false;
+
+    }
+    
+    /**
      * Invoked if the store would overflow on {@link #write(ByteBuffer)}. The
      * default behavior extends the capacity of the buffer by the maximum of 32M
-     * or the {@link Options#INITIAL_EXTENT} up to a maximum capacity of
-     * {@link Integer#MAX_VALUE} bytes.
+     * or the {@link Options#INITIAL_EXTENT}.
      * 
      * @return true if the capacity of the store was extended and the write
-     *         operation should be retried.
+     *         operation should be retried. If the data are fully buffered, the
+     *         the maximum store size is limited to int32 bytes which is the
+     *         maximum #of bytes that can be addressed in RAM (the pragmatic
+     *         maximum is slightly less than 2G due to the limits of the JVM to
+     *         address system memory).
      */
-    final public boolean overflow(int needed) {
+    final public boolean overflow(long needed) {
 
         final long userExtent = getUserExtent();
         
         final long required = userExtent + needed;
         
-        if ( required > Integer.MAX_VALUE) {
+        if (required > Integer.MAX_VALUE && bufferMode != BufferMode.Disk) {
             
-            // Would overflow int32 bytes.
+            /*
+             * Would overflow int32 bytes and data are buffered in RAM.
+             */
 
             log.error("Would overflow int32 bytes.");
             
@@ -209,9 +282,11 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         long newExtent = userExtent
                 + Math.max(initialExtent, Bytes.megabyte * 32);
         
-        if( newExtent > Integer.MAX_VALUE) {
+        if( newExtent > Integer.MAX_VALUE && bufferMode != BufferMode.Disk) {
 
-            // Do not allocate more than int32 bytes.
+            /*
+             * Do not allocate more than int32 bytes when using a buffered mode.
+             */
             newExtent = Integer.MAX_VALUE;
             
         }
@@ -237,12 +312,6 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
      *            The extent.
      * 
      * @return The extent.
-     * 
-     * @deprecated All buffer modes are now limited to int32 offsets since the
-     *             offset is encoded in the high word of an {@link Addr}. It is
-     *             possible that a disk-only mode could address a longer extent
-     *             simply because the offset + nbytes could run beyond the int32
-     *             boundary, but that is not worth it.
      */
     static long assertNonDiskExtent(long extent) {
 
@@ -255,8 +324,8 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
              * disk-based strategy.
              */
            
-            throw new RuntimeException(
-                    "The extent requires the 'disk' mode: extent=" + extent);
+            throw new RuntimeException("The extent requires the "
+                    + BufferMode.Disk + " mode: extent=" + extent);
             
         }
 
@@ -291,11 +360,11 @@ public abstract class AbstractBufferStrategy implements IBufferStrategy {
         // current position on the output channel.
         final long toPosition = outChannel.position();
         
-        if(toPosition + count > Integer.MAX_VALUE) {
-            
-            throw new IOException("Index segment exceeds int32 bytes.");
-            
-        }
+//        if(toPosition + count > Integer.MAX_VALUE) {
+//            
+//            throw new IOException("Index segment exceeds int32 bytes.");
+//            
+//        }
 
         /* 
          * Transfer data from channel to channel.

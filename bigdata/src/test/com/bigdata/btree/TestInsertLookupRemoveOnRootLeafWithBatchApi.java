@@ -49,12 +49,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.Leaf;
-
 /**
  * batch api tests for insert, lookup, and remove on the root leaf.
  * 

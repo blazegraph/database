@@ -49,13 +49,6 @@ import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
-
 /**
  * Test suite based on a small btree with known keys and values.
  * 

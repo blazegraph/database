@@ -56,19 +56,18 @@ import org.CognitiveWeb.extser.ShortPacker;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Addr;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * BTree mapping index names to the last metadata record committed for the named
  * index. The keys are Unicode strings using the default {@link Locale}. The
  * values are {@link Entry} objects recording the name of the index and the last
- * known {@link Addr address} of the {@link BTreeMetadata} record for the named
- * index.
+ * known address of the {@link BTreeMetadata} record for the named index.
  * <p>
  * Note: The {@link Journal} maintains an instance of this class that evolves
  * with each {@link Journal#commit()}. However, the journal also makes use of
@@ -115,7 +114,7 @@ public class Name2Addr extends BTree {
     public Name2Addr(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                ValueSerializer.INSTANCE);
+                new ValueSerializer());
 
 //        this.journal = store;
         
@@ -138,11 +137,10 @@ public class Name2Addr extends BTree {
     }
 
     /**
-     * Extends the default behavior to cause each named btree to flush
-     * itself to the store, updates the {@link Addr address} from which that
-     * btree may be reloaded within its internal mapping, and finally
-     * flushes itself and returns the address from which this btree may be
-     * reloaded.
+     * Extends the default behavior to cause each named btree to flush itself to
+     * the store, updates the address from which that btree may be reloaded
+     * within its internal mapping, and finally flushes itself and returns the
+     * address from which this btree may be reloaded.
      */
     public long handleCommit() {
 
@@ -239,8 +237,8 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Return the {@link Addr address} from which the historical state of the
-     * named index may be loaded.
+     * Return the address from which the historical state of the named index may
+     * be loaded.
      * <p>
      * Note: This is a lower-level access mechanism that is used by
      * {@link Journal#getIndex(String, ICommitRecord)} when accessing historical
@@ -385,8 +383,8 @@ public class Name2Addr extends BTree {
         public final String name;
         
         /**
-         * The {@link Addr address} of the last known {@link BTreeMetadata}
-         * record for the index with that name.
+         * The address of the last known {@link BTreeMetadata} record for the
+         * index with that name.
          */
         public final long addr;
         
@@ -410,12 +408,25 @@ public class Name2Addr extends BTree {
 
         private static final long serialVersionUID = 6428956857269979589L;
 
-        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
+//        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
 
         final public static transient short VERSION0 = 0x0;
 
+        // FIXME This is not parameterized by the actual offsetBits. 
+//        final protected transient IRawStore store;
+        final private static transient IAddressManager addressManager = WormAddressManager.INSTANCE;
+
         public ValueSerializer() {
+            
         }
+        
+//        public ValueSerializer(IRawStore store) {
+//            
+//            if(store==null) throw new IllegalArgumentException();
+//            
+//            this.store = store;
+//            
+//        }
 
         public void putValues(DataOutputBuffer os, Object[] values, int n)
                 throws IOException {
@@ -428,7 +439,7 @@ public class Name2Addr extends BTree {
 
                 os.writeUTF(entry.name);
 
-                Addr.pack(os, entry.addr);
+                addressManager.packAddr(os, entry.addr);
 
 //                if (packedLongs) {
 //
@@ -468,7 +479,7 @@ public class Name2Addr extends BTree {
 //
 //                }
                 
-                addr = Addr.unpack(is);
+                addr = addressManager.unpackAddr(is);
                 
                 values[i] = new Entry(name,addr);
 

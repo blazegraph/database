@@ -45,16 +45,14 @@ Modifications:
  * Created on Apr 9, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.io;
 
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.io.DataOutputBuffer;
-
-import junit.framework.TestCase;
 import junit.framework.TestCase2;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
  * Test suite for {@link DataOutputBuffer}.
@@ -118,28 +116,28 @@ public class TestDataOutputBuffer extends TestCase2
 
     }
 
-    /*
+    /**
      * correct rejection tests.
      */
-    {
+    public void test_ctor_correctRejection() {
+
         try {
             new DataOutputBuffer(-1);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
-    }
 
-    {
         try {
             new DataOutputBuffer(20, new byte[10]);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
+
     }
 
-    public void test_DataOutputBuffer_ensureCapacity() {
+    public void test_ensureCapacity() {
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
 
@@ -166,7 +164,7 @@ public class TestDataOutputBuffer extends TestCase2
         assertTrue(originalBuffer == DataOutputBuffer.buf); // same buffer.
     }
 
-    public void test_DataOutputBuffer_ensureCapacity02() {
+    public void test_ensureCapacity02() {
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
 
@@ -187,7 +185,7 @@ public class TestDataOutputBuffer extends TestCase2
     /**
      * verify that existing data is preserved if the capacity is extended.
      */
-    public void test_DataOutputBuffer_ensureCapacity03() {
+    public void test_ensureCapacity03() {
 
         Random r = new Random();
         byte[] expected = new byte[20];
@@ -213,7 +211,7 @@ public class TestDataOutputBuffer extends TestCase2
 
     }
 
-    public void test_DataOutputBuffer_ensureFree() {
+    public void test_ensureFree() {
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
 
@@ -233,7 +231,7 @@ public class TestDataOutputBuffer extends TestCase2
      * Tests ability to append to the buffer, including with overflow of the
      * buffer capacity.
      */
-    public void test_DataOutputBuffer_append_bytes() throws IOException {
+    public void test_append_bytes() throws IOException {
 
         // setup buffer with some data and two(2) free bytes.
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(5, new byte[] {
@@ -274,7 +272,7 @@ public class TestDataOutputBuffer extends TestCase2
     /**
      * Test ability to extract and return a key.
      */
-    public void test_DataOutputBuffer_getKey() {
+    public void test_getKey() {
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(5, new byte[] {
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 });
@@ -289,7 +287,7 @@ public class TestDataOutputBuffer extends TestCase2
     /**
      * Verify returns zero length byte[] when the key has zero bytes.
      */
-    public void test_DataOutputBuffer_getKey_len0() {
+    public void test_getKey_len0() {
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer();
 
@@ -303,7 +301,7 @@ public class TestDataOutputBuffer extends TestCase2
      * Test ability to reset the key buffer (simply zeros the #of valid bytes in
      * the buffer without touching the buffer itself).
      */
-    public void test_DataOutputBuffer_reset() {
+    public void test_reset() {
 
         byte[] expected = new byte[10];
 

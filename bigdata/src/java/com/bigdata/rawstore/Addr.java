@@ -50,6 +50,7 @@ import java.io.IOException;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.io.SerializerUtil;
 
 /**
  * An address encodes both an int32 length and an int32 offset into a single
@@ -64,24 +65,24 @@ import com.bigdata.btree.IndexSegmentBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo FIXME Make this an interface that is extended by {@link IRawStore} such
- *       that each store may be provisioned for a different split between the
- *       bits dedicated to the offset and the bits dedicated to the length of
- *       the data record. Only {@link #toLong(int, int)},
- *       {@link #getOffset(long)}, and {@link #getByteCount(long)} will need to
- *       become instance methods. The metadata required to recover the
- *       provisioned bit split must be stored in the root block of a persistence
- *       store so that it may be recovered without record to decoding an
- *       {@link Addr}. (This is also going to cause a lot of javadoc comments
- *       to refer to the "Addr" interface, which will be the base interface for
- *       {@link IRawStore} and that will be confusing and should be cleaned up.)
- * 
- * @todo consider address segments to support fast combination of buffers each
- *       containing its own address space. A prime candidate for this is the
- *       {@link IndexSegmentBuilder} which currently jumps through hoops in
- *       order to make the nodes resolvable. When considering segments, note
- *       that addresses may currently be directly tested for order since the
- *       offset is in the high int32 word.
+ * @deprecated This is now an interface that is extended by {@link IRawStore}
+ *             such that each store may be provisioned for a different split
+ *             between the bits dedicated to the offset and the bits dedicated
+ *             to the length of the data record. Only {@link #toLong(int, int)},
+ *             {@link #getOffset(long)}, and {@link #getByteCount(long)} will
+ *             need to become instance methods. The metadata required to recover
+ *             the provisioned bit split must be stored in the root block of a
+ *             persistence store so that it may be recovered without record to
+ *             decoding an {@link Addr}. (This is also going to cause a lot of
+ *             javadoc comments to refer to the "Addr" interface, which will be
+ *             the base interface for {@link IRawStore} and that will be
+ *             confusing and should be cleaned up.)
+ *             <p>
+ *             Other consequences are that offset and nextOffset are always long
+ *             integers and that packing and unpacking of addresses requires
+ *             knowledge of the #offset bits (so {@link SerializerUtil} should
+ *             not be used for those cases). This change to serialization also
+ *             effects how btree nodes and leaves are stored.
  */
 final public class Addr {
 

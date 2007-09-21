@@ -54,7 +54,6 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.service.DataService;
-import com.bigdata.service.mapReduce.MapReduceMaster.IMapTask;
 
 /**
  * Interface for the map service (the "map" client).

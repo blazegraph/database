@@ -254,7 +254,7 @@ public class KeyBufferSerializer implements IKeySerializer {
         final int bufferLength = (int) LongPacker.unpackLong(is);
         
         /*
-         * Read in deltas for each key and re-created the offsets.
+         * Read in deltas for each key and re-create the offsets.
          */
         int[] offsets = new int[nkeys];
         

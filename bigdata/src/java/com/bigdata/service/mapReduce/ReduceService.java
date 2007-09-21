@@ -49,6 +49,8 @@ package com.bigdata.service.mapReduce;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -61,13 +63,14 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.journal.ITx;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.RangeQuery;
-import com.bigdata.service.mapReduce.MapReduceMaster.IReduceTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -100,15 +103,14 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
     final protected ExecutorService taskService;
 
     /**
-     * The default is N=1 threads per CPU.
+     * The default is N=4 threads per CPU.
      */
-    final int threadPoolSize = 1 * SystemUtil.numProcessors();
+    final int threadPoolSize = 4 * SystemUtil.numProcessors();
 
     /**
      * @param properties
      * 
-     * @todo define properties, including the thread pool sizes, the directory
-     *       to be used for temporary files, etc.
+     * @todo define properties (the thread pool size).
      */
     public ReduceService(Properties properties) {
         
@@ -224,20 +226,6 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
     /**
      * A worker for a reduce task.
      * 
-     * @todo reduce tasks may begin running as soon as intermediate output files
-     *       become available; the input to each reduce task is M index segments
-     *       (one per map task); the data in those segments are already in
-     *       sorted order, but they need to be placed into a total sorted order
-     *       before running the reduce task. Given the tools on hand, the
-     *       easiest way to achieve a total order over the reduce task inputs is
-     *       to build a partitioned index. Since each reduce task input is
-     *       already in sorted order, we can build the total sorted order by
-     *       reading from the M input segments in parallel (an M-way merge).
-     *       Since M can be quite high and the keys are randomly distributed
-     *       across the input by the user-defined hash function, this merge
-     *       operation will need to scale up to a large fan-in (100,000+).
-     * 
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -271,16 +259,18 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
          * <p>
          * This does a key scan, invoking
          * {@link IReduceTask#reduce(byte[], Iterator)} for each distinct
-         * application key. The key in the index are comprised of an application
-         * key, followed by the map task UUID and then an int32 tuple counter.
-         * Since the prefix is variable length, we have to count backwards from
-         * the end of the key to extract the application key. Any sequence of
-         * entries having the same application key will be processed by a single
-         * invocation of {@link IReduceTask#reduce(byte[], Iterator)}
+         * application key. The keys in the index are comprised of an
+         * application key, followed by the map task UUID and then an int32
+         * tuple counter. Since the prefix is variable length, we have to count
+         * backwards from the end of the key to extract the application key. Any
+         * sequence of entries having the same application key will be processed
+         * by a single invocation of
+         * {@link IReduceTask#reduce(byte[], Iterator)}
          * 
          * @return <code>null</code>
          * 
-         * FIXME Implement!
+         * @exception Exception
+         *                if something goes wrong.
          */
         public Object call() throws Exception {
 
@@ -311,10 +301,46 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
 
             long ntuples = 0L;
             
+            // the last distinct key prefix.
+            byte[] lastDistinctKey = null;
+            
+            // buffers all values for a distinct key prefix.
+            List<byte[]> vals = new LinkedList<byte[]>();
+            
             while(itr.hasNext()) {
                 
-                itr.next();
+                byte[] val = (byte[])itr.next();
                 
+                byte[] key = itr.getKey();
+                
+                int len = key.length;
+                
+                // last byte of the application key.
+                int end = len - Bytes.SIZEOF_UUID - Bytes.SIZEOF_INT;
+                
+                if (lastDistinctKey == null
+                        || BytesUtil.compareBytesWithLenAndOffset(0,
+                                lastDistinctKey.length, lastDistinctKey, 0, end, key) != 0) {
+                    
+                    if(!vals.isEmpty()) {
+                        
+                        // emit to the reduce task.
+                        task.reduce(lastDistinctKey, vals.iterator());
+                        
+                        vals.clear();
+                        
+                    }
+                    
+                    // copy the new distinct prefix.
+                    lastDistinctKey = new byte[end];
+                    
+                    System.arraycopy(key, 0, lastDistinctKey, 0, end);
+                    
+                }
+
+                // buffer values.
+                vals.add(val);
+
                 ntuples++;
                 
             }

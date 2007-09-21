@@ -228,7 +228,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             final int offset = 10;
             
-            store.read( Addr.toLong(nbytes, offset) );
+            store.read( store.toAddr(nbytes, offset) );
             
             fail("Expecting: "+IllegalArgumentException.class);
                 
@@ -255,7 +255,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             final int offset = 0;
             
-            store.read( Addr.toLong(nbytes, offset) );
+            store.read( store.toAddr(nbytes, offset) );
             
             fail("Expecting: "+IllegalArgumentException.class);
                 

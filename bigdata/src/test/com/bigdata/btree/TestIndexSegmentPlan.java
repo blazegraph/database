@@ -47,10 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.IndexSegmentPlan;
 
 /**
  * Test suite for efficient post-order rebuild of an index in an external index

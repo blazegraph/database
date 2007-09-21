@@ -59,6 +59,16 @@ import java.nio.ByteBuffer;
 /**
  * Fast special purpose serialization onto a managed byte[] buffer.
  * 
+ * @todo The OutputBitStream class from the FAST package would be a possible
+ *       replacement for this class in combination with either a backing byte[]
+ *       or a FastByteArrayOutputStream. The OutputBitStream provides several
+ *       options for coding, including a nibble coding scheme that seems to be a
+ *       fair replacement for {@link #packLong(long)} and also allows coding of
+ *       signed long integers.
+ * 
+ * @todo rewrite <code>if(len + 1 > buf.lenth)</code> as
+ *       <code>if(len==buf.length)</code>?
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -315,7 +325,7 @@ public class DataOutputBuffer implements DataOutput {
     }
 
     /**
-     * Return a copy of the buffer.
+     * Return a copy of the valid data in the buffer.
      * 
      * @return A new array containing data in the buffer.
      * 
@@ -785,11 +795,15 @@ public class DataOutputBuffer implements DataOutput {
         }
         if( v > 127 ) {
             // the value requires two bytes.
+            if (len + 2 > buf.length)
+                ensureCapacity(len + 2);
             buf[len++] = ( (byte)((0xff & (v >> 8))|0x80) ); // note: set the high bit.
             buf[len++] = ( (byte)(0xff & v) );
             return 2;
         } else {
             // the value fits in one byte.
+            if (len + 1 > buf.length)
+                ensureCapacity(len + 1);
             buf[len++] = ( (byte)(0xff & v) );
             return 1;
         }

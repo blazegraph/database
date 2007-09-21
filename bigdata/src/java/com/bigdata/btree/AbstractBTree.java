@@ -57,7 +57,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -81,8 +80,8 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link RuleBaseCollator}s are NOT compable and applications that use Unicode
  * data in their keys MUST make sure that they use a {@link RuleBasedCollator}
  * that imposes the same sort order each time they provision a
- * {@link UnicodeKeyBuilder}. ICU4J provides a version number that is changed each
- * time a software revision would result in a change in the generated sort
+ * {@link UnicodeKeyBuilder}. ICU4J provides a version number that is changed
+ * each time a software revision would result in a change in the generated sort
  * order.
  * </p>
  * <p>
@@ -103,6 +102,21 @@ import cutthecrap.utils.striterators.Striterator;
  * @see RuleBasedCollator
  * @see http://icu.sourceforge.net
  * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
+ * 
+ * @todo The B+Tree implementation does not support limits on the serialized
+ *       size of a node or leaf. The design strategy is to allow flexible sizes
+ *       for serialized node and leaf records since larger branching factors and
+ *       continuous IO are cheaper and nothing in particular requires the use of
+ *       fixed size records when accessing disk. However, it would still be
+ *       useful to be able to place an upper bound on the serialized size of a
+ *       node or leaf. Nodes and leaves are only serialized on eviction, so this
+ *       would require the ability to split nodes and/or leaves immediately
+ *       before eviction if they would be likely to overflow the upper bound on
+ *       the record size. Probably the node or leaf needs to be made immutable,
+ *       the serialized size checked, and then a split operation invoked if the
+ *       record would exceed the upper bound.  If this happens a lot, then the
+ *       branching factor is too high for the data and would have to be lowered
+ *       to regain performance.
  */
 abstract public class AbstractBTree implements IIndex, ILinearList {
 
@@ -481,7 +495,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * The backing store.
      */
-    public IRawStore getStore() {
+    final public IRawStore getStore() {
 
         return store;
 
@@ -1343,7 +1357,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         final long addr = store.write(buf);
 
-        counters.bytesWritten += Addr.getByteCount(addr);
+        counters.bytesWritten += store.getByteCount(addr);
 
         /*
          * The node or leaf now has a persistent identity and is marked as
@@ -1388,7 +1402,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         // ByteBuffer tmp = store.read(addr, nodeSer._buf);
         ByteBuffer tmp = store.read(addr);
         assert tmp.position() == 0;
-        assert tmp.limit() == Addr.getByteCount(addr);
+        assert tmp.limit() == store.getByteCount(addr);
 
         final int bytesRead = tmp.limit();
 

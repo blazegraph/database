@@ -48,8 +48,12 @@ import java.io.RandomAccessFile;
 import java.util.Date;
 import java.util.UUID;
 
-import com.bigdata.rawstore.Addr;
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * The metadata record for an {@link IndexSegment}.
@@ -63,6 +67,9 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * FIXME The {@link IAddressManager} needs to be customized for the
+ * {@link IndexSegmentFileStore}.  See {@link CustomAddressSerializer}.
+ * 
  * @todo the checksum of the index segment file should be stored in the
  *       partitioned index so that it can be validated after being moved around,
  *       etc. it would also be good to checksum the {@link IndexSegmentMetadata}
@@ -70,8 +77,15 @@ import com.bigdata.rawstore.Bytes;
  */
 public class IndexSegmentMetadata {
 
+    /**
+     * Logger.
+     */
+    protected static final Logger log = Logger
+            .getLogger(IndexSegmentMetadata.class);
+
     static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
+    static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_BYTE;
     static final int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_INT;
     static final int SIZEOF_COUNTS = Bytes.SIZEOF_INT;
     static final int SIZEOF_NBYTES = Bytes.SIZEOF_INT;
@@ -85,7 +99,7 @@ public class IndexSegmentMetadata {
      * As the unused bytes are allocated in new versions the value in this field
      * MUST be adjusted down from its original value of 256.
      */
-    static final int SIZEOF_UNUSED = 240;
+    static final int SIZEOF_UNUSED = 239;
 
     /**
      * The #of bytes required by the current metadata record format.
@@ -95,6 +109,7 @@ public class IndexSegmentMetadata {
             SIZEOF_VERSION + //
             Bytes.SIZEOF_LONG + // timestamp0
             Bytes.SIZEOF_UUID + // segment UUID.
+            SIZEOF_OFFSET_BITS + // #of bits used to represent a byte offset.
             SIZEOF_BRANCHING_FACTOR + // branchingFactor
             SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
             SIZEOF_NBYTES + // max record length
@@ -125,6 +140,18 @@ public class IndexSegmentMetadata {
      */
     final public UUID segmentUUID;
 
+    /**
+     * The #of bits in an 64-bit long integer address that are used to represent
+     * the byte offset into the {@link IndexSegmentFileStore}.
+     */
+    final public int offsetBits;
+
+    /**
+     * The {@link IAddressManager} used to interpret addresses in the
+     * {@link IndexSegmentFileStore}.
+     */
+    final IAddressManager am;
+    
     /**
      * Branching factor for the index segment.
      */
@@ -169,8 +196,8 @@ public class IndexSegmentMetadata {
     final public boolean useChecksum;
     
     /**
-     * The {@link Addr address} of the contiguous region containing the
-     * serialized leaves in the file.
+     * The address of the contiguous region containing the serialized leaves in
+     * the file.
      * <p>
      * Note: The offset component of this address must be equal to {@link #SIZE}
      * since the leaves are written immediately after the
@@ -179,16 +206,13 @@ public class IndexSegmentMetadata {
     final public long addrLeaves;
     
     /**
-     * The {@link Addr address} of the contiguous region containing the
-     * serialized nodes in the file or <code>0L</code> iff there are no nodes
-     * in the file.
+     * The address of the contiguous region containing the serialized nodes in
+     * the file or <code>0L</code> iff there are no nodes in the file.
      */
     final public long addrNodes;
     
     /**
      * Address of the root node or leaf in the file.
-     * 
-     * @see Addr
      */
     final public long addrRoot;
 
@@ -200,8 +224,6 @@ public class IndexSegmentMetadata {
     /**
      * Address of the optional bloom filter and 0L iff no bloom filter
      * was constructed.
-     * 
-     * @see Addr
      */
     final public long addrBloom;
     
@@ -268,6 +290,10 @@ public class IndexSegmentMetadata {
         final long timestamp0 = raf.readLong();
         
         segmentUUID = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
+
+        offsetBits = raf.readByte();
+        
+        am = new WormAddressManager(offsetBits); 
         
         branchingFactor = raf.readInt();
 
@@ -315,6 +341,8 @@ public class IndexSegmentMetadata {
         }
         
         this.timestamp = timestamp0;
+
+        log.info(this.toString());
         
     }
 
@@ -324,12 +352,16 @@ public class IndexSegmentMetadata {
      * 
      * @todo javadoc.
      */
-    public IndexSegmentMetadata(int branchingFactor, int height,
+    public IndexSegmentMetadata(int offsetBits,int branchingFactor, int height,
             boolean useChecksum, int nleaves, int nnodes, int nentries,
             int maxNodeOrLeafLength, long addrLeaves, long addrNodes,
             long addrRoot, long addrExtensionMetadata, long addrBloom,
             double errorRate, long length, UUID indexUUID, UUID segmentUUID,
             long timestamp) {
+        
+//        assert WormAddressManager.assertOffsetBits(offsetBits);
+        
+        am = new WormAddressManager(offsetBits);
         
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -347,21 +379,21 @@ public class IndexSegmentMetadata {
         assert maxNodeOrLeafLength > 0;
         
         assert addrLeaves != 0L;
-        assert Addr.getOffset(addrLeaves)==SIZE;
-        assert Addr.getByteCount(addrLeaves) > 0;
+        assert am.getOffset(addrLeaves)==SIZE;
+        assert am.getByteCount(addrLeaves) > 0;
 
         if(nnodes == 0) {
             // the root is a leaf.
             assert addrNodes == 0L;
-            assert Addr.getOffset(addrLeaves) < length;
-            assert Addr.getOffset(addrRoot) >= Addr.getOffset(addrLeaves);
-            assert Addr.getOffset(addrRoot) < length;
+            assert am.getOffset(addrLeaves) < length;
+            assert am.getOffset(addrRoot) >= am.getOffset(addrLeaves);
+            assert am.getOffset(addrRoot) < length;
         } else {
             // the root is a node.
-            assert Addr.getOffset(addrNodes) > Addr.getOffset(addrLeaves);
-            assert Addr.getOffset(addrNodes) < length;
-            assert Addr.getOffset(addrRoot) >= Addr.getOffset(addrNodes);
-            assert Addr.getOffset(addrRoot) < length;
+            assert am.getOffset(addrNodes) > am.getOffset(addrLeaves);
+            assert am.getOffset(addrNodes) < length;
+            assert am.getOffset(addrRoot) >= am.getOffset(addrNodes);
+            assert am.getOffset(addrRoot) < length;
         }
 
         if( addrBloom == 0L ) assert errorRate == 0.;
@@ -376,6 +408,8 @@ public class IndexSegmentMetadata {
         
         this.segmentUUID = segmentUUID;
 
+        this.offsetBits = offsetBits;
+        
         this.branchingFactor = branchingFactor;
 
         this.height = height;
@@ -408,6 +442,8 @@ public class IndexSegmentMetadata {
         
         this.timestamp = timestamp;
         
+        log.info(this.toString());
+
     }
 
     /**
@@ -421,7 +457,9 @@ public class IndexSegmentMetadata {
     public void write(RandomAccessFile raf) throws IOException {
 
 //        raf.seek(0);
-        
+
+        log.info("wrote: pos="+raf.getFilePointer());
+
         raf.writeInt(MAGIC);
 
         raf.writeInt(VERSION0);
@@ -432,6 +470,8 @@ public class IndexSegmentMetadata {
 
         raf.writeLong(segmentUUID.getLeastSignificantBits());
 
+        raf.writeByte(offsetBits);
+        
         raf.writeInt(branchingFactor);
                         
         raf.writeInt(height);
@@ -464,9 +504,19 @@ public class IndexSegmentMetadata {
 
         raf.writeLong(indexUUID.getLeastSignificantBits());
 
-        raf.skipBytes(SIZEOF_UNUSED);
+        /*
+         * skip over this many bytes. Note that skipBytes() does not seem to
+         * really skip over bytes when writing while this approach definately
+         * writes out those bytes and advances the file pointer.  seek() also
+         * works.
+         */
+//        raf.skipBytes(SIZEOF_UNUSED);
+//        raf.write(new byte[SIZEOF_UNUSED]);
+        raf.seek(raf.getFilePointer()+SIZEOF_UNUSED);
         
         raf.writeLong(timestamp);
+
+        log.info("wrote: pos="+raf.getFilePointer());
         
     }
     
@@ -479,6 +529,7 @@ public class IndexSegmentMetadata {
         
         sb.append("magic="+Integer.toHexString(MAGIC));
         sb.append(", segmentUUID="+segmentUUID);
+        sb.append(", offsetBits="+offsetBits);
         sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
         sb.append(", nleaves=" + nleaves);
@@ -486,11 +537,11 @@ public class IndexSegmentMetadata {
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
         sb.append(", useChecksum=" + useChecksum);
-        sb.append(", addrLeaves=" + Addr.toString(addrLeaves));
-        sb.append(", addrNodes=" + Addr.toString(addrNodes));
-        sb.append(", addrRoot=" + Addr.toString(addrRoot));
-        sb.append(", addrExtensionMetadata=" + Addr.toString(addrExtensionMetadata));
-        sb.append(", addrBloom=" + Addr.toString(addrBloom));
+        sb.append(", addrLeaves=" + am.toString(addrLeaves));
+        sb.append(", addrNodes=" + am.toString(addrNodes));
+        sb.append(", addrRoot=" + am.toString(addrRoot));
+        sb.append(", addrExtensionMetadata=" + am.toString(addrExtensionMetadata));
+        sb.append(", addrBloom=" + am.toString(addrBloom));
         sb.append(", errorRate=" + errorRate);
         sb.append(", length=" + length);
         sb.append(", indexUUID="+indexUUID);
