@@ -106,45 +106,77 @@ abstract public class AbstractMapTask implements IMapTask {
     }
 
     /**
-     * Forms a unique key using the data already in {@link #keyBuilder} and
-     * appending the task UUID and the int32 tuple counter and then invokes
-     * {@link #output(byte[], byte[])} to output the key-value pair. The
-     * resulting key preserves the key order, groups all keys with the same
-     * value for the same map task, and finally distinguishes individual
-     * key-value pairs using the tuple counter.
+     * Hash partitions the tuple based on the key already in {@link #keyBuilder}
+     * into one of {@link #nreduce} output buckets. Forms a unique key using the
+     * data already in {@link #keyBuilder} and appending the task UUID and the
+     * int32 tuple counter. Finally, invokes {@link #output(byte[], byte[])} to
+     * output the key-value pair. The resulting key preserves the key order,
+     * groups all keys with the same value for the same map task, and finally
+     * distinguishes individual key-value pairs using the tuple counter.
      * 
      * @param val
      *            The value for the tuple.
      * 
-     * @see #output(byte[], byte[])
+     * @see #output(int,byte[], byte[])
      */
     public void output(byte[] val) {
     
-        byte[] key = keyBuilder.append(uuid).append(tuples.size()).getKey();
+        // The hash is computed using ONLY the application key.
+        byte[] key = keyBuilder.getKey();
+
+        // Note: We have to fix up the sign when the hash code is negative!
+        final int hashCode = hashFunction.hashCode(key);
+
+        // The reduce partition into which this tuple was hash partitioned.
+        final int partition = (hashCode<0?-hashCode:hashCode) % nreduce;
         
-        output(key,val);
+        // Now build the complete key.
+        //
+        // @todo We could use an int32 or int64 identifier from the master for
+        // this map task in place of the UUID here and save some bytes in the
+        // key.
+        key = keyBuilder.append(uuid).append(tuples.size()).getKey();
+
+        // Buffer the key for this output partition.
+        output(partition,key,val);
         
     }
     
     /**
-     * Map tasks MUST invoke this method to report key-value pairs. The data
-     * will be buffered until the map task is complete.
+     * Output a key-value pair (tuple) to the appropriate reduce task. For
+     * example, the key could be a token and the value could be the #of times
+     * that the token was identified in the input. All tuples will be buffered
+     * until the map task completes successfully and the written onto the
+     * appropriate reduce partitions.
+     * 
+     * @param partition
+     *            The output partition in [0:{@link #nreduce}}.
+     * @param key
+     *            The complete key. The key MUST be encoded such that the keys
+     *            may be placed into a total order by interpreting them as an
+     *            <em>unsigned</em> byte[]. See {@link KeyBuilder}.
+     * @param val
+     *            The value. The value encoding is essentially arbitrary but the
+     *            {@link DataOutputBuffer} may be helpful here.
      */
-    public void output(byte[] key, byte[] val) {
+    protected void output(int partition, byte[] key, byte[] val) {
 
+        if(partition<0||partition>nreduce) {
+            
+            throw new IllegalArgumentException("Partition must be in [0:"+nreduce+"], not "+partition);
+            
+        }
+        
         if (key == null)
             throw new IllegalArgumentException();
 
         if (val == null)
             throw new IllegalArgumentException();
 
-        // Note: We have to fix up the sign when the hash code is negative!
-        final int hashCode = hashFunction.hashCode(key);
-        
-        final int partition = (hashCode<0?-hashCode:hashCode) % nreduce;
-        
         histogram[partition]++;
         
+        // @todo could insert into the appropriate partition immediately rather
+        // than storing that data on the Tuple.
         tuples.add(new Tuple(partition,key,val));
 
     }

@@ -377,6 +377,11 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             }
         
         }
+
+        // true if temp files are being requested.
+        final boolean createTempFile = Boolean.parseBoolean(properties
+                .getProperty(Options.CREATE_TEMP_FILE,
+                        ""+Options.DEFAULT_CREATE_TEMP_FILE));
         
         /*
          * Start the metadata service.
@@ -386,8 +391,10 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             Properties p = new Properties(properties);
             
             // name of the metadata journal.
-            p.setProperty(Options.FILE, new File(dataDir,
-                    metadataBasename + Options.JNL).toString());
+            if (!createTempFile) {
+                p.setProperty(Options.FILE, new File(dataDir, metadataBasename
+                        + Options.JNL).toString());
+            }
             
             metadataService = new EmbeddedMetadataService(this, UUID
                     .randomUUID(), p);
@@ -406,10 +413,11 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 Properties p = new Properties(properties);
 
                 // name of the data journal.
-                p.setProperty(Options.FILE, new File(dataDir,
-                        dataBasename + "_" + i + Options.JNL)
-                        .toString());
-
+                if (!createTempFile) {
+                    p.setProperty(Options.FILE, new File(dataDir, dataBasename
+                            + "_" + i + Options.JNL).toString());
+                }
+                
                 dataService[i] = new EmbeddedDataService(UUID
                         .randomUUID(), p);
                 

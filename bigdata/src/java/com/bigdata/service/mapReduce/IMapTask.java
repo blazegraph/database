@@ -27,19 +27,4 @@ public interface IMapTask {
      */
     public UUID getUUID();
     
-    /**
-     * Output a key-value pair to the appropriate reduce task. For example,
-     * the key could be a token and the value could be the #of times that
-     * the token was identified in the input.
-     * 
-     * @param key
-     *            The key. The key MUST be encoded such that the keys may be
-     *            placed into a total order by interpreting them as an
-     *            <em>unsigned</em> byte[]. See {@link KeyBuilder}.
-     * @param val
-     *            The value. The value encoding is essentially arbitrary but
-     *            the {@link DataOutputBuffer} may be helpful here.
-     */
-    public void output(byte[] key, byte[] val);
-
 }
