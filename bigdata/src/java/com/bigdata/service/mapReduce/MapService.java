@@ -53,7 +53,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -71,17 +70,8 @@ import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * The client service for map/reduce processing.
- * <p>
- * A map/reduce client can run either {@link IMapTask}s or {@link IReduceTask}s.
- * Those tasks are distributed to the client by the
+ * A service for {@link IMapTask} processing. Those tasks are distributed by the
  * {@link MapReduceMaster}.
- * <p>
- * 
- * @todo Each map/reduce job has a unique job identifier. The client creates the
- *       map output file (aka reduce input file) in a temporary directory. The
- *       file is named using that unique job identifier so that it may be purged
- *       once the map/reduce job is finished.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -151,30 +141,33 @@ abstract public class MapService implements IServiceShutdown, IMapService {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class JobState {
+    static class JobState extends AbstractJobState {
 
-        // the job identifier.
-        final UUID uuid;
-
-        // the reduce task identifiers.
+        /**
+         * The reduce task identifiers. There is one entry in this array per
+         * reduce partition. The reduce task identifier is used to name the
+         * index on the corresponding {@link DataService} in
+         * {@link #dataServices} on which the output for that reduce partition
+         * will be written.
+         */
         final UUID[] reduceTasks;
         
-        // the data services on which the map task will write.
+        /**
+         * The UUIDs of the {@link DataService}s on which the map task will
+         * write.  There is one entry in this array per reduce partition.
+         */
         final UUID[] dataServices;
 
-        // the job start time.
-        final long begin = System.currentTimeMillis();
-        
         public JobState(UUID uuid,UUID[] reduceTasks, UUID[] dataServices) {
        
-            this.uuid = uuid;
+            super(uuid);
             
             this.reduceTasks = reduceTasks;
             
             this.dataServices = dataServices;
             
         }
-        
+
     }
 
     /**
@@ -216,21 +209,20 @@ abstract public class MapService implements IServiceShutdown, IMapService {
         
     }
 
-    /**
-     * @todo should this should probably cancel any tasks running or pending for
-     *       that job. the master is currently handling this, but it would be
-     *       nice to have that expectation fulfilled here as well.
-     */
     public void endJob(UUID uuid) {
 
         if(uuid==null) throw new IllegalArgumentException();
 
-        if(jobs.remove(uuid)==null) {
+        JobState jobState = jobs.remove(uuid);
+        
+        if(jobState==null) {
             
             throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
             
         }
 
+        jobState.cancelAll();
+        
         log.info("job=" + uuid );
 
     }
@@ -245,10 +237,27 @@ abstract public class MapService implements IServiceShutdown, IMapService {
         log.info("job=" + uuid+", task="+task.getUUID());
 
         // @todo make this work for distributed services also.
-        return taskService
+        Future<Object> future = taskService
                 .submit(new MapTaskWorker(((EmbeddedMapService) this).client,
                         uuid, input, task, jobState));
         
+        jobState.futures.put(task.getUUID(), future);
+        
+        return future;
+        
+    }
+    
+    public boolean cancel(UUID job, UUID task) {
+
+        JobState jobState = jobs.get(job);
+        
+        if (jobState == null)
+            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+job);
+
+        log.info("job=" + job+", task="+task);
+        
+        return jobState.cancel(task);
+
     }
 
     /**
@@ -257,18 +266,14 @@ abstract public class MapService implements IServiceShutdown, IMapService {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class MapTaskWorker implements Callable<Object> {
+    static class MapTaskWorker extends AbstractTaskWorker {
 
-        protected final IBigdataClient client;
-        protected final UUID uuid;
         protected final File input;
         protected final IMapTask task;
         protected final JobState jobState;
         
         /**
          * 
-         * @param uuid
-         *            The task UUID.
          * @param input
          *            The input file (typically read from a network file
          *            system).
@@ -277,11 +282,7 @@ abstract public class MapService implements IServiceShutdown, IMapService {
          */
         public MapTaskWorker(IBigdataClient client, UUID uuid, File input, IMapTask task, JobState jobState) {
 
-            if (client == null)
-                throw new IllegalArgumentException();
-
-            if (uuid == null)
-                throw new IllegalArgumentException();
+            super(client,uuid);
 
             if (task == null)
                 throw new IllegalArgumentException();
@@ -291,10 +292,6 @@ abstract public class MapService implements IServiceShutdown, IMapService {
 
             if (jobState == null)
                 throw new IllegalArgumentException();
-
-            this.client = client;
-            
-            this.uuid = uuid;
 
             this.input = input;
 
@@ -394,21 +391,6 @@ abstract public class MapService implements IServiceShutdown, IMapService {
          * @throws IOException 
          * @throws ExecutionException 
          * @throws InterruptedException 
-         * 
-         * @todo As an alternative, buffer the intermediate results for each map
-         *       task on M buffers (indexed by the user-defined hash of the
-         *       intermediate key); the buffers are btrees multiplexed on a
-         *       journal; on the overflow, evict one index segment per btree
-         *       resulting in N index segments per map task (so that the reduce
-         *       task will start with each input partition in sorted order);
-         * 
-         * @todo Iff the write on the reduce output files is to be atomic (so
-         *       the map task has no effect unless it completes successfully),
-         *       then we need to use a transaction (since we are actually
-         *       writing onto N distinct reduce input files). (The writes on the
-         *       individual reduce input files will always be atomic, but a
-         *       failure of some operations would leave part of the effect of
-         *       the map task in some of the reduce input files.)
          */
         public void bulkLoad(AbstractMapTask task) throws InterruptedException, ExecutionException, IOException {
             

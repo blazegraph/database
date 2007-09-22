@@ -73,7 +73,8 @@ public interface IReduceService extends Remote {
     public void startJob(UUID uuid) throws IOException;
     
     /**
-     * Terminate a job.
+     * Terminate a job. The service will no longer accept tasks for this job.
+     * Any running tasks will be terminated.
      * 
      * @param uuid
      *            The job identifier.
@@ -92,5 +93,17 @@ public interface IReduceService extends Remote {
      *            The reduce task.
      */
     public Future submit(UUID uuid, IReduceTask task) throws IOException;
+
+    /**
+     * Cancel a queued or running {@link IReduceTask} (synchronous).
+     * 
+     * @param job
+     *            The job identifier.
+     * @param task
+     *            The task identifier.
+     * 
+     * @return True if the job was running at the time this request was made.
+     */
+    public boolean cancel(UUID job, UUID task) throws IOException;
     
 }

@@ -2,9 +2,6 @@ package com.bigdata.service.mapReduce;
 
 import java.util.UUID;
 
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataOutputBuffer;
-
 /**
  * Interface for a map task to be executed on a map/reduce client.
  * <p>

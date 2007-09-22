@@ -79,7 +79,9 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
 
 
 /**
+ * <p>
  * The master for running parallel map/reduce jobs distributed across a cluster.
+ * </p>
  * <p>
  * Map/reduce is a functional programming style in which a program is broken
  * down into a <i>map</i> and a <i>reduce</i> operation. Those operations are
@@ -89,6 +91,7 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * reduce tasks are distinct services. In particular, this means that the job
  * state resides with the master while the intermediate state for the reduce
  * tasks is decoupled from the reduce logic.
+ * </p>
  * <p>
  * Logically, each map operation processes a key-value pair, writing a set of
  * intermediate key-value pairs as its output. In practice, the inputs are often
@@ -100,6 +103,7 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * counter. The map operation outputs are buffered and automatically partitioned
  * into N temporary stores (one per reduce task) using a hash function of the
  * key module the #of reduce tasks.
+ * </p>
  * <p>
  * Each reduce task reads the intermediate store having data for the
  * intermediate key-value partition assigned to that reduce task. The keys in
@@ -108,6 +112,7 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * guarentees that the key-value pairs will be fully ordered. The reduce task is
  * then run on the total order, writing its outputs onto a local output file or
  * loading the data into scale-out indices.
+ * </p>
  * <p>
  * The map/reduce master selects map and reduce services on which to run a
  * map/reduce job and is responsible for re-assigning tasks that fail or that
@@ -115,12 +120,85 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * "close" to the intermediate data (in terms of the network topology) but not
  * necessarily on the same host - this decouples the reduce operation from the
  * input state and lets us failover to another reduce service as necessary.
+ * </p>
+ * <h4>Design alternatives</h4>
+ * Note: I considered several design alternatives for reduce state and behavior,
+ * including:
+ * <ol>
+ * 
+ * <li>Reduce client uses local temporary stores. These are created when a
+ * map/reduce job starts and released when it ends.</li>
+ * 
+ * <li>Reduce client uses {@link DataService}s as the store files. A set of
+ * {@link DataService}s would either be dedicated to map/reduce tasks or
+ * multiplexed with other operations.</li>
+ * 
+ * </ol>
+ * The advantages of using {@link DataService}s are (a) reuse of failover for
+ * data services; and (b) reduce behavior is separated from reduce state. The
+ * advantage of using local temporary stores is that it is faster since there is
+ * no network IO for the reduce task (there is always going to be network IO for
+ * the map task). Local stores also simplifies management of temporary state.
+ * However the use of local stores tightly couples the reduce task execution
+ * with the reduce state and requires that you re-execute the entire map/reduce
+ * job in the reduce task fails - this is unacceptable.
+ * </p>
+ * <p>
+ * Another design choice was the use of B+Trees for the intermediate stores. The
+ * B+Tree automatically forces the tuples into a total order within each reduce
+ * partition. The use of buffering (potentially across multiple map tasks for a
+ * single map job) and group commit help to improve bulk insert performance on
+ * the index. The most obvious alternative would be to use an external sort
+ * program to sort the tuples in a reduce partition before the reduce job
+ * executes. The keys are variable length (unsigned) byte[]s and the values are
+ * variable length byte[]s, so the standard Un*x sort utilities will not work.
+ * While many sort algorithms preserve duplicate keys, the B+Tree does not.
+ * Therefore we make sure that the application key is extended to include a map
+ * task identifier and map task local tuple counter so that key collision can
+ * only arise when the same map task executes more than once - for example, when
+ * retrying a failed or long running map task. In such cases the most recent run
+ * of the task will simply overwrite the earlier run.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Use some map/reduce jobs to drive performance testing of group commit
- *       and concurrent writes on distinct indices on the same data service.
+ * FIXME Explore the parameter space (m,n,# map services, # reduce services,
+ * buffer mode, flush on commit, overflow, group commit, job size, # of
+ * machines). Look at job completion rate, scaling, bytes read/written per
+ * second, etc.
+ * 
+ * @todo Offer options for the behavior in the face of failed map tasks.
+ *       <p>
+ *       One option is that the task is simply retried, partial data may be
+ *       present if the task never succeeds, and if the task eventually succeeds
+ *       then the data will reflect the full execution of that task (a purely
+ *       additive model with atomic append only on the individual reduce stores
+ *       and not across the reduce stores on which a given map task writes).
+ *       <p>
+ *       Another alternative is that the output from map tasks that do not
+ *       complete within this many retries will not participate in the reduce
+ *       task. In order to guarentee this we need to do a
+ *       <em>distributed transactional</em> atomic "append" of tuples across
+ *       all reduce stores on which a map task writes. Since we know that there
+ *       will never be collision from different map tasks (the map task UUID is
+ *       part of the key), we can could optimize this distributed transaction in
+ *       a number of ways. First, write-write conflicts can not arise. Second,
+ *       we could avoid the use of real transactions (since there will never be
+ *       conflicts) if we support the concept of a distributed "unisolated"
+ *       atomic commit.
+ * 
+ * @todo Generalize {@link IMapSource} so that we can read input 2-tuples from a
+ *       variety of sources, including indices, other map reduce jobs, etc. This
+ *       interface currently assumes that the inputs for the map operations are
+ *       files in a (networked) file system.
+ * 
+ * @todo Iff the write on the reduce output files is to be atomic (so the map
+ *       task has no effect unless it completes successfully), then we need to
+ *       use a transaction (since we are actually writing onto N distinct reduce
+ *       input files). (The writes on the individual reduce input files will
+ *       always be atomic, but a failure of some operations would leave part of
+ *       the effect of the map task in some of the reduce input files.)
  * 
  * @todo A good example of a map/reduce job would be bulk loading a large Lehigh
  *       Benchmark data set. The map job would parse the files that were local
@@ -130,91 +208,21 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  *       <p>
  *       Another example would be to bulk index terms in documents, etc.
  * 
- * FIXME Explore the parameter space (m,n,# map services, # reduce services,
- * buffer mode, flush on commit, overflow, group commit, job size, # of
- * machines). Look at job completion rate, scaling, bytes read/written per
- * second, etc.
+ * @todo consider a BFS - a bigdata file system using the local file system to
+ *       store files and a bigdata federation to store metadata. The file system
+ *       would support atomic append, read, write, and delete operations. This
+ *       should be trivial to implement over the existing infrastructure
+ *       (failover would require sending the files about as well as the file
+ *       metadata so that would be a little more complex). BFS could then be
+ *       used as a distributed file system for fan-in to map/reduce jobs.
  * 
- * FIXME Explore design alternatives for reduce state and behavior.
- * 
- * A) Reduce client uses local temporary stores. These are created when a
- * map/reduce job starts and released when it ends.
- * 
- * B) Reduce client uses {@link DataService}s as the store files. A set of
- * {@link DataService}s would either be dedicated to map/reduce tasks or
- * multiplexed with other operations.
- * 
- * The advantages of (B) are (1) reuse of failover for data services; and (2)
- * reduce behavior is separated from reduce state.
- * 
- * The advantage of (A) is that it will be faster since there is no network IO
- * for the reduce task (there is always going to be network IO for the map
- * task). It will also simplify management of temporary state.
- * 
- * The disadvantage (A) is that a single host failure will cause the entire
- * map/reduce job to need re-execution. This is a fairly substantial penalty
- * (and it is true anyway unless you are using data service failover).
- * 
- * For both approaches, it may be significantly cleaner to refactor the client
- * into a map client and a reduce client. The master would then recruit a set of
- * M map clients and N reduce clients for a job. Internally, each of these would
- * have a thread pool that they use to multiplex their tasks.
- * 
- * @todo reduce tasks may begin running as soon as intermediate output files
- *       become available; the input to each reduce task is M index segments
- *       (one per map task); the data in those segments are already in sorted
- *       order, but they need to be placed into a total sorted order before
- *       running the reduce task. Given the tools on hand, the easiest way to
- *       achieve a total order over the reduce task inputs is to build a
- *       partitioned index. Since each reduce task input is already in sorted
- *       order, we can build the total sorted order by reading from the M input
- *       segments in parallel (an M-way merge). Since M can be quite high and
- *       the keys are randomly distributed across the input by the user-defined
- *       hash function, this merge operation will need to scale up to a large
- *       fan-in (100,000+).
- * 
- * @todo don't bother adding a map/reduce job schedule yet - first get the basic
- *       thing working well. we can worry about scheduling jobs (and master
- *       failover) once we are running interesting jobs. Until then, focus on a
- *       master that provides a robust mechanism for running complex jobs to
- *       completion in the face of individual failures. We can store the
- *       evolving job state in memory and use replication to secondary masters
- *       for failover (it can also be logged). We only need to persist the
- *       evolving job state if we want the job to be restart-safe across total
- *       cluster failure or without secondary masters. We do not even need to
- *       make the master a "service" until we add secondary master - it can just
- *       run as a command line utility using {@link #main(String[])}.
- * 
- * @todo the reduce output is written to an arbitrary sink. common uses are
- *       probably a NOP (the N merged indices are the outputs) a 2nd stage
- *       reduce (producing a total merge of the intermediate values) or various
- *       kinds of local flat files.
- * 
- * @todo measure the scaling factor as we add hardware for a fixed problem.
- * 
- * @todo the master needs to keep track of the state each worker task on each
- *       host.
- * 
- * @todo the master needs a queue for input jobs and should expose an HTML
- *       monitor for job status, as well as email notification of results.
- * 
- * @todo support "debugging" using a version that executes tasks for a single
- *       partition of subset of the data.
+ * @todo Support a job schedule in the master and master failover?. Expose an
+ *       HTML monitor if the master is made into a service?
  */
 public class MapReduceMaster {
 
     public static final transient Logger log = Logger
             .getLogger(MapReduceMaster.class);
-
-    /**
-     * @todo define lookup of the bigdata instance against which the named
-     *       indices will be resolved.
-     * 
-     * @param properties
-     */
-    public MapReduceMaster(Properties properties) {
-
-    }
 
     /**
      * A map reduce job.
@@ -626,12 +634,6 @@ public class MapReduceMaster {
 
         /**
          * Notify everyone that the job is done.
-         * 
-         * @todo the map services should use this notice to forceably terminate
-         *       any remaining map tasks for the job.
-         * 
-         * @todo the reduce services should use this notice to delete the reduce
-         *       store for the job.
          */
         public void end() {
             
@@ -686,21 +688,6 @@ public class MapReduceMaster {
          *            to complete successfully within the <i>delay</i>. A value
          *            of ZERO (0) disables retry.
          * 
-         * @todo The output from map tasks that do not complete within this many
-         *       retries will not participate in the reduce task.
-         *       <p>
-         *       Note: the promise that input files that could not be
-         *       successfully processed requires that we completely buffer the
-         *       tuples from the map task until it has successfully complete and
-         *       then do a <em>distributed transactional</em> atomic "append"
-         *       of those tuples to the reduce input stores. This the
-         *       distributed transaction has additional cost and should be done
-         *       when the job requires those semantics.
-         *       <p>
-         *       Likewise, the job can give a requirement for successful
-         *       completion. For example: do so many retries and move on; at
-         *       least some percentage of map tasks suceed; etc.
-         * 
          * @param clients
          *            The clients on which the map tasks will be run.
          * 
@@ -721,9 +708,9 @@ public class MapReduceMaster {
          * redesign so as to limit the maximum concurrency. Since the executor
          * service can already do this, maybe we can queue up the input files
          * (blocking queue of at least m) and drain them through an executor
-         * service (m concurrent tasks).  the executor service just submits 
-         * the task to the remove service.  tasks that fail are re-queued on
-         * the local input queue unless their retry count has been exceeded.
+         * service (m concurrent tasks). the executor service just submits the
+         * task to the remove service. tasks that fail are re-queued on the
+         * local input queue unless their retry count has been exceeded.
          * 
          * @todo Long running tasks should be replicated once we are "mostly"
          *       done.

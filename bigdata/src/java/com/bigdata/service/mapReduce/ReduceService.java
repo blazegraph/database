@@ -54,7 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -137,27 +136,11 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class JobState {
+    static class JobState extends AbstractJobState {
 
-        // the job identifier.
-        final UUID uuid;
-//
-//        // the reduce task identifier.
-//        final UUID reduceTask;
-//        
-//        // the data service identifier from which the reduce task will read.
-//        final UUID dataService;
-        
-        // the job start time.
-        final long begin = System.currentTimeMillis();
-        
-        public JobState(UUID uuid) {//, UUID reduceTask, UUID dataService) {
+        public JobState(UUID uuid) {
        
-            this.uuid = uuid;
-            
-//            this.reduceTask = reduceTask;
-//            
-//            this.dataService = dataService;
+            super(uuid);
             
         }
         
@@ -168,7 +151,7 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
      */
     final protected Map<UUID,JobState> jobs = new ConcurrentHashMap<UUID, JobState>();
 
-    public void startJob(UUID uuid) {//, UUID reduceTask, UUID dataService) {
+    public void startJob(UUID uuid) {
         
         if (uuid == null)
             throw new IllegalArgumentException();
@@ -189,11 +172,6 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
         
     }
 
-    /**
-     * @todo should this should probably cancel any tasks running or pending for
-     *       that job. the master is currently handling this, but it would be
-     *       nice to have that expectation fulfilled here as well.
-     */
     public void endJob(UUID uuid) {
 
         if(uuid==null) throw new IllegalArgumentException();
@@ -205,6 +183,8 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
             throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
             
         }
+
+        jobState.cancelAll();
         
         log.info("job="+uuid);
 
@@ -223,39 +203,46 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
         log.info("job=" + uuid+", task="+task.getUUID());
 
         // @todo make this work for a non-embedded federation also.
-        return taskService.submit(new ReduceTaskWorker(
+        Future<Object> future = taskService.submit(new ReduceTaskWorker(
                 ((EmbeddedReduceService) this).client, uuid, task));
+        
+        jobState.futures.put(task.getUUID(), future);
+        
+        return future;
     
     }
     
+    public boolean cancel(UUID job, UUID task) {
+
+        JobState jobState = jobs.get(job);
+        
+        if (jobState == null)
+            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+job);
+
+        log.info("job=" + job+", task="+task);
+        
+        return jobState.cancel(task);
+
+    }
+
     /**
      * A worker for a reduce task.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class ReduceTaskWorker implements Callable<Object> {
+    protected static class ReduceTaskWorker extends AbstractTaskWorker {
 
-        protected final IBigdataClient client;
-        protected final UUID uuid;
         protected final IReduceTask task;
         
         public ReduceTaskWorker(IBigdataClient client, UUID uuid, IReduceTask task) {
 
-            if (client == null)
-                throw new IllegalArgumentException();
-
-            if (uuid == null)
-                throw new IllegalArgumentException();
+            super(client,uuid);
 
             if (task == null)
                 throw new IllegalArgumentException();
 
-            this.client = client;
-            
-            this.uuid = uuid;
-
-            this.task = task;
+             this.task = task;
 
         }
         
