@@ -82,7 +82,8 @@ public interface IMapService extends Remote {
             throws IOException;
     
     /**
-     * Terminate a job.
+     * Terminate a job. The service will no longer accept tasks for this job.
+     * Any running tasks will be terminated.
      * 
      * @param uuid
      *            The job identifier.
@@ -105,5 +106,17 @@ public interface IMapService extends Remote {
      */
     public Future submit(UUID uuid, File input, IMapTask task)
             throws IOException;
+
+    /**
+     * Cancel a queued or running {@link IMapTask} (synchronous).
+     * 
+     * @param job
+     *            The job identifier.
+     * @param task
+     *            The task identifier.
+     * 
+     * @return True if the job was running at the time this request was made.
+     */
+    public boolean cancel(UUID job, UUID task) throws IOException;
 
 }
