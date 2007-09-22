@@ -122,12 +122,7 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * @todo Use some map/reduce jobs to drive performance testing of group commit
  *       and concurrent writes on distinct indices on the same data service.
  * 
- * @todo Do a Map/Reduce service. Map an operation over a set of files,
- *       distributing the results across a cluster using a hash function. Reduce
- *       distributes an aggregation operation over the cluster, first sorting
- *       the data and then applying some operation to that sorted data.
- *       <p>
- *       A good example of a map/reduce job would be bulk loading a large Lehigh
+ * @todo A good example of a map/reduce job would be bulk loading a large Lehigh
  *       Benchmark data set. The map job would parse the files that were local
  *       on each host, distributing triples across the cluster using a hash
  *       function. The reduce job would sort the triplets arriving at each host
@@ -697,8 +692,14 @@ public class MapReduceMaster {
          *       Note: the promise that input files that could not be
          *       successfully processed requires that we completely buffer the
          *       tuples from the map task until it has successfully complete and
-         *       then do an atomic "append" of those tuples to the reduce input
-         *       store.
+         *       then do a <em>distributed transactional</em> atomic "append"
+         *       of those tuples to the reduce input stores. This the
+         *       distributed transaction has additional cost and should be done
+         *       when the job requires those semantics.
+         *       <p>
+         *       Likewise, the job can give a requirement for successful
+         *       completion. For example: do so many retries and move on; at
+         *       least some percentage of map tasks suceed; etc.
          * 
          * @param clients
          *            The clients on which the map tasks will be run.
@@ -710,14 +711,19 @@ public class MapReduceMaster {
          * FIXME [m] should limit the #of active map tasks for this job. This
          * helps to give the user control over the parallelism and also makes
          * the "delay" interpretable in terms of the time since the job was
-         * submitted.
-         * <p>
-         * This requires that we monitor the state of each map task that has
-         * been started so that we know when to start a new map task. For each
-         * task started for a given job we need to know: input file, Task UUID,
-         * client UUID, start time, #of tries. The client should give us a
-         * heartbeat (when realized as a service). Until then, the client will
-         * either report success or failure.
+         * submitted. Right now all inputs are mapped immediately and just queue
+         * up in the map service(s) so the map services themselves are limiting
+         * the parallelism. The logic here needs to be modified to have no more
+         * than [m] map tasks "out there" for execution at any given time. This
+         * is going to make the logic more complicated since we have to notice
+         * tasks that finish asynchronously. Try to refactor the logic for
+         * running the map and reduce ops first into shared code and then
+         * redesign so as to limit the maximum concurrency. Since the executor
+         * service can already do this, maybe we can queue up the input files
+         * (blocking queue of at least m) and drain them through an executor
+         * service (m concurrent tasks).  the executor service just submits 
+         * the task to the remove service.  tasks that fail are re-queued on
+         * the local input queue unless their retry count has been exceeded.
          * 
          * @todo Long running tasks should be replicated once we are "mostly"
          *       done.
@@ -1099,7 +1105,67 @@ public class MapReduceMaster {
      */
     public static void main(String[] args) {
 
-        MapReduceJob job = new TestCountKeywordJob(100/* m */, 4/* n */);
+        /*
+         * FIXME  Map processing is faster when N is smaller - why?
+         * 
+         * Given M=100
+         * 
+         * N = 1 : 12 seconds maptime; 2 seconds reduce time.
+         * N = 2 : 16 seconds maptime; 2 seconds reduce time.
+         * N = 3 : 23 seconds maptime; 3 seconds reduce time.
+         * N = 4 : 29 seconds maptime; 3 seconds reduce time.
+         * 
+         * This is measured with 2 data services and bufferMode=Transient.
+         * 
+         * With bufferMode=Disk and forceOnCommit=No the results are:
+         * 
+         * N = 1 : 23 seconds maptime; 3 seconds reduce time.
+         * N = 2 : 19 seconds maptime; 3 seconds reduce time.
+         * N = 3 : 25 seconds maptime; 3 seconds reduce time.
+         * N = 4 : 28 seconds maptime; 3 seconds reduce time.
+         * 
+         * which is even stranger.
+         * 
+         * I would expect the average write queue length on the data
+         * services for the reduce partitions to be M/P, where P is
+         * min(#of data services available,N) (or P=N if using group
+         * commit).  So, if N = P = 1 and M = 100 then 100 tasks will
+         * be trying to write on 1 data service concurrently.  However,
+         * the #s above appear to go the other way.
+         * 
+         * FIXME setting m here has no effect since the size of the thread
+         * pool in the MapService is actually limiting concurrency since we
+         * are not throttling the #of concurrent jobs submitted to the map
+         * service.
+         * 
+         * Note: the above is also true for the reduce service but there is
+         * never the less a clear effect which must be due to the #of data
+         * services in use (the fewer data services in use the better the
+         * system is performing above).
+         * 
+         * Ok. The answers to the above observations are: (a) we write 
+         * smaller batches on each partition as there are more partitions.
+         * If we extract on the order of 1000 keywords per task and have
+         * 10 partitions then a map task writes 100 keywords per partition.
+         * Smaller writes are more expensive; (b) we are doing one commit
+         * per map task per partition - more commits are more expensive;
+         * (c) each commit makes the nodes and leaves of the btree immutable,
+         * so we are doing more (de-)serialization of nodes and leaves.
+         * 
+         * Group commit will fix most of these issues - perhaps all.  However
+         * there is going to be a practical limit on the #of reduce tasks to
+         * run based on the expected #of tuples output per map task.  At some
+         * point each map task will write zero or one tuples per reduce task.
+         * Still, that might be necessary for very large map fan ins.  Consider
+         * if you have billions of documents to process.  Each document is still
+         * going to be very small, but the #of reduce partitions must be high
+         * enough to make the intermediate files fit in local storage and to
+         * make the reduce computation not too long.  The #of reduce tasks may
+         * also be set by the #of machines that you are going to use to serve
+         * the resulting data, e.g., a cluster of 100 machines serving a large
+         * text index.
+         */
+        MapReduceJob job = new TestCountKeywordJob(100/* m */, 2/* n */);
 //        MapReduceJob job = new TestCountKeywordJob(1/* m */, 2/* n */);
 
         /**
@@ -1126,18 +1192,28 @@ public class MapReduceMaster {
             Properties properties = new Properties();
 
             /*
-             * @todo use the disk-only mode since we expect large jobs. Right
-             * now this is transient since there is a problem with restart for
-             * the embedded federation.
+             * A distributed federation should be using bufferMode=Disk since
+             * the intermediate results can be quite large.
              */
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
+            // Note: using temp files for testing purposes w/ an embedded federation.
+            properties.setProperty(Options.CREATE_TEMP_FILE, Boolean.TRUE.toString());
+            
+            // Note: No disk at all, but consumes more RAM to buffer the data.
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
                     .toString());
           
-            // #of data services to run in the federation @todo use more than one.
-            properties.setProperty(Options.NDATA_SERVICES, "2");
+            /*
+             * #of data services to run in the federation.
+             * 
+             * Note: At most one data service will be used per reduce fan in
+             * (N). Excess data services will not be used.  There should not
+             * be much overhead to unused data services since even the fully
+             * buffered modes extend the buffer in response to use.
+             */
+//            properties.setProperty(Options.NDATA_SERVICES, "10");
 
             properties.setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
 

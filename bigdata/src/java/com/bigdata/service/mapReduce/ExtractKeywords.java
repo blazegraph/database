@@ -10,104 +10,105 @@ import java.util.UUID;
 
 
 /**
-     * Tokenizes an input file, writing <code>{key, term}</code> tuples. The
-     * key is an compressed Unicode sort key. The term is a UTF-8 serialization
-     * of the term (it can be deserialized to recover the exact Unicode term).
-     * 
-     * @see CountKeywords
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+ * Tokenizes an input file, writing <code>{key, term}</code> tuples. The
+ * key is an compressed Unicode sort key. The term is a UTF-8 serialization
+ * of the term (it can be deserialized to recover the exact Unicode term).
+ * 
+ * @see CountKeywords
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class ExtractKeywords extends AbstractFileInputMapTask {
+
+    /**
+     * The encoding used to serialize the term (the value of each tuple).
      */
-    public class ExtractKeywords extends AbstractFileInputMapTask {
+    public static final String UTF8 = "UTF-8";
 
-        /**
-         * The encoding used to serialize the term (the value of each tuple).
-         */
-        public static final String UTF8 = "UTF-8";
-        
-//        /**
-//         * A byte array representing a packed long integer whose value is ONE
-//         * (1L).
-//         */
-//        final byte[] val;
+    //        /**
+    //         * A byte array representing a packed long integer whose value is ONE
+    //         * (1L).
+    //         */
+    //        final byte[] val;
 
-        public ExtractKeywords(UUID uuid, Integer nreduce, IHashFunction hashFunction) {
+    public ExtractKeywords(UUID uuid, Integer nreduce,
+            IHashFunction hashFunction) {
 
-            super(uuid, nreduce, hashFunction);
+        super(uuid, nreduce, hashFunction);
 
-//            try {
-//
-//                valBuilder.reset().packLong(1L);
-//
-//            } catch (IOException ex) {
-//
-//                throw new RuntimeException(ex);
-//
-//            }
-//
-//            val = valBuilder.toByteArray();
+        //            try {
+        //
+        //                valBuilder.reset().packLong(1L);
+        //
+        //            } catch (IOException ex) {
+        //
+        //                throw new RuntimeException(ex);
+        //
+        //            }
+        //
+        //            val = valBuilder.toByteArray();
 
-        }
+    }
 
-        public void input(File file, InputStream is) throws Exception {
+    public void input(File file, InputStream is) throws Exception {
 
-            // @todo encoding guesser.
+        // @todo encoding guesser.
 
-            Reader r = new BufferedReader(new InputStreamReader(is));
+        Reader r = new BufferedReader(new InputStreamReader(is));
 
-            StreamTokenizer tok = new StreamTokenizer(r);
+        StreamTokenizer tok = new StreamTokenizer(r);
 
-            int nterms = 0;
-            
-            boolean done = false;
-            
-            while (!done) {
+        int nterms = 0;
 
-                int ttype = tok.nextToken();
+        boolean done = false;
 
-                switch (ttype) {
+        while (!done) {
 
-                case StreamTokenizer.TT_EOF:
-                    
-                    done = true;
-                    
-                    break;
+            int ttype = tok.nextToken();
 
-                case StreamTokenizer.TT_NUMBER: {
+            switch (ttype) {
 
-                    double d = tok.nval;
+            case StreamTokenizer.TT_EOF:
 
-                    String s = Double.toString(d);
-                    
-                    keyBuilder.reset().append(s);
+                done = true;
 
-                    output(s.getBytes(UTF8));
+                break;
 
-                    nterms++;
-                    
-                    break;
+            case StreamTokenizer.TT_NUMBER: {
 
-                }
+                double d = tok.nval;
 
-                case StreamTokenizer.TT_WORD: {
+                String s = Double.toString(d);
 
-                    String s = tok.sval;
+                keyBuilder.reset().append(s);
 
-                    keyBuilder.reset().append(s);
+                output(s.getBytes(UTF8));
 
-                    output(s.getBytes(UTF8));
+                nterms++;
 
-                    nterms++;
-                    
-                    break;
+                break;
 
-                }
+            }
 
-                }
+            case StreamTokenizer.TT_WORD: {
+
+                String s = tok.sval;
+
+                keyBuilder.reset().append(s);
+
+                output(s.getBytes(UTF8));
+
+                nterms++;
+
+                break;
+
+            }
 
             }
 
         }
 
     }
+
+}

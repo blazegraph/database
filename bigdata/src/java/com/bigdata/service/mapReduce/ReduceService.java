@@ -189,6 +189,11 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
         
     }
 
+    /**
+     * @todo should this should probably cancel any tasks running or pending for
+     *       that job. the master is currently handling this, but it would be
+     *       nice to have that expectation fulfilled here as well.
+     */
     public void endJob(UUID uuid) {
 
         if(uuid==null) throw new IllegalArgumentException();
