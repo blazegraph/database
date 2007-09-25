@@ -6,7 +6,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.UUID;
 
-
 /**
  * Abstract base class for {@link IMapTask}s accepting a filename as the
  * "key" and the file contents as the "value".
@@ -17,13 +16,21 @@ import java.util.UUID;
 abstract public class AbstractFileInputMapTask extends
         AbstractMapTask {
 
-    protected AbstractFileInputMapTask(UUID uuid, int nreduce,
+    protected AbstractFileInputMapTask(UUID uuid, Object source, int nreduce,
             IHashFunction hashFunction) {
 
-        super(uuid, nreduce, hashFunction);
+        super(uuid, source, nreduce, hashFunction);
 
     }
     
+    /**
+     * Used to read from the {@link #getSource()} when it is a {@link File}.
+     * 
+     * @param file
+     *            The data source.
+     *            
+     * @throws Exception
+     */
     final public void input(File file) throws Exception {
 
         MapReduceMaster.log.info("Start file: " + file);

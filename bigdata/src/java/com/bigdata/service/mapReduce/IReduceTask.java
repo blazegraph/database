@@ -11,15 +11,8 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IReduceTask {
+public interface IReduceTask extends ITask {
 
-    /**
-     * The unique identifier for this reduce task. If a reduce task is
-     * retried then the new instance of the task will have the <em>same</em>
-     * identifier.
-     */
-    public UUID getUUID();
-    
     /**
      * The {@link IDataService}  from which the reduce task will read its
      * input.

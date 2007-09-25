@@ -1,6 +1,5 @@
 package com.bigdata.service.mapReduce;
 
-import java.io.File;
 import java.util.Iterator;
 
 /**
@@ -13,6 +12,6 @@ public interface IMapSource {
      * An iterator that will visit each source to be read by the map task in
      * turn.
      */
-    public Iterator<File> getSources();
+    public Iterator<Object> getSources();
 
 }

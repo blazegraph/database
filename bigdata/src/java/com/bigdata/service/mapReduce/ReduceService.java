@@ -51,16 +51,10 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
-import org.apache.system.SystemUtil;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
@@ -70,7 +64,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.RangeQuery;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by
@@ -79,150 +72,28 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ReduceService implements IServiceShutdown, IReduceService {
+abstract public class ReduceService extends AbstractJobAndTaskService<ReduceJobMetadata, AbstractReduceTask> implements IServiceShutdown {
 
     public static final transient Logger log = Logger
             .getLogger(ReduceService.class);
 
     /**
-     * Text of the error message used when the UUID of a job is already known to
-     * the service.
-     */
-    public static final String ERR_JOB_EXISTS = "job already registered";
-    
-    /**
-     * Text of the error message used when the UUID of a job is not know to this
-     * service.
-     */
-    public static final String ERR_NO_SUCH_JOB = "job not registered";
-    
-    /**
-     * Queue of executing {@link IReduceTask}s.
-     */
-    final protected ExecutorService taskService;
-
-    /**
-     * The default is N=4 threads per CPU.
-     */
-    final int threadPoolSize = 4 * SystemUtil.numProcessors();
-
-    /**
      * @param properties
-     * 
-     * @todo define properties (the thread pool size).
      */
     public ReduceService(Properties properties) {
-        
-        taskService = Executors.newFixedThreadPool(threadPoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
-        
-    }
 
-    public void shutdown() {
-
-        taskService.shutdown();
-        
-    }
-
-    public void shutdownNow() {
-
-        taskService.shutdownNow();
-
-    }
-    
-    /**
-     * The state of a map/reduce job that is relevant to this service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class JobState extends AbstractJobState {
-
-        public JobState(UUID uuid) {
-       
-            super(uuid);
-            
-        }
+        super( properties );
         
     }
 
     /**
-     * Running jobs.
+     * Returns instances of {@link ReduceTaskWorker}.
      */
-    final protected Map<UUID,JobState> jobs = new ConcurrentHashMap<UUID, JobState>();
-
-    public void startJob(UUID uuid) {
+    AbstractTaskWorker<ReduceJobMetadata, AbstractReduceTask> 
+        newTaskWorker(JobState<ReduceJobMetadata> jobState, AbstractReduceTask task) {
         
-        if (uuid == null)
-            throw new IllegalArgumentException();
-
-        synchronized (jobs) {
-
-            if (jobs.containsKey(uuid)) {
-
-                throw new IllegalStateException(ERR_JOB_EXISTS+" : "+uuid);
-
-            }
-
-            jobs.put(uuid, new JobState(uuid));
-
-        }
-
-        log.info("job=" + uuid );
+        return new ReduceTaskWorker(jobState, task);
         
-    }
-
-    public void endJob(UUID uuid) {
-
-        if(uuid==null) throw new IllegalArgumentException();
-
-        JobState jobState = jobs.remove(uuid);
-        
-        if(jobState==null) {
-            
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
-            
-        }
-
-        jobState.cancelAll();
-        
-        log.info("job="+uuid);
-
-    }
-
-    public Future submit(UUID uuid, IReduceTask task) {
-
-        JobState jobState = jobs.get(uuid);
-        
-        if (jobState == null) {
-
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
-            
-        }
-
-        log.info("job=" + uuid+", task="+task.getUUID());
-
-        // @todo make this work for a non-embedded federation also.
-        Future<Object> future = taskService.submit(new ReduceTaskWorker(
-                ((EmbeddedReduceService) this).client, uuid, task));
-        
-        jobState.futures.put(task.getUUID(), future);
-        
-        return future;
-    
-    }
-    
-    public boolean cancel(UUID job, UUID task) {
-
-        JobState jobState = jobs.get(job);
-        
-        if (jobState == null)
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+job);
-
-        log.info("job=" + job+", task="+task);
-        
-        return jobState.cancel(task);
-
     }
 
     /**
@@ -231,18 +102,11 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class ReduceTaskWorker extends AbstractTaskWorker {
+    protected static class ReduceTaskWorker extends AbstractTaskWorker<ReduceJobMetadata, AbstractReduceTask> {
 
-        protected final IReduceTask task;
-        
-        public ReduceTaskWorker(IBigdataClient client, UUID uuid, IReduceTask task) {
+        public ReduceTaskWorker(JobState<ReduceJobMetadata> jobState, AbstractReduceTask task) {
 
-            super(client,uuid);
-
-            if (task == null)
-                throw new IllegalArgumentException();
-
-             this.task = task;
+            super(jobState,task);
 
         }
         
@@ -259,20 +123,21 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
          * by a single invocation of
          * {@link IReduceTask#reduce(byte[], Iterator)}
          * 
-         * @return <code>null</code>
-         * 
          * @exception Exception
          *                if something goes wrong.
          */
-        public Object call() throws Exception {
+        protected void run() throws Exception {
 
-            log.info("Now running: job=" + uuid+", task="+task.getUUID());
+            log.info("Now running: job=" + jobState.getUUID() + ", task="
+                    + task.getUUID());
 
             UUID dataService = task.getDataService();
 
             log.info("Reading from dataService="+dataService);
             
-            IDataService ds = client.getDataService(dataService);
+            assert jobState.client != null;
+            
+            IDataService ds = jobState.client.getDataService(dataService);
 
             if (ds == null)
                 throw new RuntimeException("Could not locate dataService: "
@@ -339,8 +204,6 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
             
             log.info("Read " + ntuples + " tuples on dataService="
                     + dataService + " for reduceTask=" + task.getUUID());
-
-            return null;
             
         }
         
@@ -379,7 +242,13 @@ abstract public class ReduceService implements IServiceShutdown, IReduceService 
             return serviceUUID;
             
         }
-        
+
+        public IBigdataClient getBigdataClient() {
+
+            return client;
+            
+        }
+
     }
 
 }

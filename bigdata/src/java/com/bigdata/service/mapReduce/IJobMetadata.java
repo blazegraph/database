@@ -42,47 +42,26 @@ Modifications:
 
 */
 /*
- * Created on Sep 22, 2007
+ * Created on Sep 24, 2007
  */
 
 package com.bigdata.service.mapReduce;
 
+import java.io.Serializable;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-
-import com.bigdata.service.IBigdataClient;
 
 /**
- * Abstract base class for task workers running in the {@link MapService} or the
- * {@link ReduceService}.
+ * Interface for job metadata provided to an {@link IJobAndTaskService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractTaskWorker implements Callable<Object> {
+public interface IJobMetadata extends Serializable {
 
     /**
-     * Used to access the intermediate store for the map/reduce operation.
+     * The job identifier.
      */
-    protected final IBigdataClient client;
-    
-    /**
-     * The task identifier.
-     */
-    protected final UUID uuid;
-    
-    public AbstractTaskWorker(IBigdataClient client, UUID uuid) {
-
-        if (client == null)
-            throw new IllegalArgumentException();
-
-        if (uuid == null)
-            throw new IllegalArgumentException();
-
-        this.client = client;
-        
-        this.uuid = uuid;
-        
-    }
+    public UUID getUUID();
     
 }
+

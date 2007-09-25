@@ -42,58 +42,28 @@ Modifications:
 
 */
 /*
- * Created on Feb 4, 2007
+ * Created on Sep 23, 2007
  */
 
-package com.bigdata;
+package com.bigdata.service.mapReduce;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.io.Serializable;
+import java.util.UUID;
 
 /**
- * Aggregates test suites in increase dependency order.
+ * A task to be run by an {@link IJobAndTaskService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public interface ITask extends Serializable {
 
     /**
-     * 
+     * The unique identifier for the task.
+     * <p>
+     * Note: if a task is retried then the new instance of that task MUST have
+     * the <em>same</em> identifier.
      */
-    public TestAll() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Aggregates the tests in increasing dependency order.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("bigdata");
-
-        suite.addTest( com.bigdata.cache.TestAll.suite() );
-        suite.addTest( com.bigdata.io.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
-        suite.addTest( com.bigdata.rawstore.TestAll.suite() );
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
-        suite.addTest( com.bigdata.sparse.TestAll.suite() );
-        suite.addTest( com.bigdata.journal.TestAll.suite() );
-        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
-        suite.addTest( com.bigdata.service.TestAll.suite() );
-        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
-
-        return suite;
-        
-    }
-
+    public UUID getUUID();
+    
 }
