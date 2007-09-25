@@ -1,7 +1,9 @@
-package com.bigdata.service.mapReduce;
+package com.bigdata.service.mapReduce.tasks;
 
 import java.util.Iterator;
 import java.util.UUID;
+
+import com.bigdata.service.mapReduce.AbstractReduceTask;
 
 /**
  * Summarizes tuples of the form <code>{key, term}</code>.
@@ -17,6 +19,11 @@ import java.util.UUID;
  * @version $Id$
  */
 public class CountKeywords extends AbstractReduceTask {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -4264802500123849163L;
 
     public CountKeywords(UUID uuid, UUID dataService) {
         

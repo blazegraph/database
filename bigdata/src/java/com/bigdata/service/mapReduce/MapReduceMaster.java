@@ -47,20 +47,13 @@
 
 package com.bigdata.service.mapReduce;
 
-import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import java.text.Format;
+import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -77,6 +70,8 @@ import com.bigdata.service.EmbeddedBigdataFederation.Options;
 import com.bigdata.service.mapReduce.MapService.EmbeddedMapService;
 import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
 
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
@@ -121,28 +116,40 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * necessarily on the same host - this decouples the reduce operation from the
  * input state and lets us failover to another reduce service as necessary.
  * </p>
+ * 
  * <h4>Design alternatives</h4>
- * Note: I considered several design alternatives for reduce state and behavior,
+ * 
+ * Note: There are several design alternatives for reduce state and behavior,
  * including:
  * <ol>
  * 
- * <li>Reduce client uses local temporary stores. These are created when a
- * map/reduce job starts and released when it ends.</li>
+ * <li>Map writes on stores local to the reduce service via RMI. The reduce
+ * local stores are created when a map/reduce job starts and released when it
+ * ends.</li>
  * 
- * <li>Reduce client uses {@link DataService}s as the store files. A set of
+ * <li>Map and reduce use {@link DataService}s as the store files. A set of
  * {@link DataService}s would either be dedicated to map/reduce tasks or
- * multiplexed with other operations.</li>
+ * multiplexed with other operations. If dedicated data services are used, then
+ * use {@link BufferMode#Disk} and set the overflow threshold quite high since
+ * large temporary data sets are to be expected. (The advantage of this design
+ * is that state and behavior are isolated: if a service fails you can just
+ * re-run the specific tasks since the state is not lost; you can have state
+ * failover using the existing {@link DataService} infrastructure.)</li>
+ * 
+ * <li>Map writes sorted data for each reduce partition on local disk; reduce
+ * copies the data from the fan-in map services and either uses a merge sort or
+ * a fused view to provide a total ordering. The map output stores are created
+ * when a map operation starts and released when the reduce operation ends. The
+ * reduce store (if any) is created when the reduce operation starts and
+ * released when it ends. (The advantage here is that you mostly read and write
+ * on local storage, except for copying data from the map service outputs to the
+ * reduce service inputs. The disadvantage is that state is local to services
+ * such that a map server failure during reduce setup could lead to the
+ * re-execution of the entire job.)</li>
  * 
  * </ol>
- * The advantages of using {@link DataService}s are (a) reuse of failover for
- * data services; and (b) reduce behavior is separated from reduce state. The
- * advantage of using local temporary stores is that it is faster since there is
- * no network IO for the reduce task (there is always going to be network IO for
- * the map task). Local stores also simplifies management of temporary state.
- * However the use of local stores tightly couples the reduce task execution
- * with the reduce state and requires that you re-execute the entire map/reduce
- * job in the reduce task fails - this is unacceptable.
  * </p>
+ * 
  * <p>
  * Another design choice was the use of B+Trees for the intermediate stores. The
  * B+Tree automatically forces the tuples into a total order within each reduce
@@ -168,6 +175,21 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  * machines). Look at job completion rate, scaling, bytes read/written per
  * second, etc.
  * 
+ * FIXME get group commit working.
+ * 
+ * FIXME get working with a distributed federation as well.
+ * 
+ * @todo offer option to buffer map outputs across map tasks within the service
+ *       to increase the size of write operations and improve performance.
+ *       <p>
+ *       Note: Any time that we buffer output tuples across tasks we are faced
+ *       with the possibility that we must re-execute those tasks if the service
+ *       fails since their state has not been transferred to the reduce worker.
+ *       <p>
+ *       If the intermediate state is not too large, then we could do a sort on
+ *       each reduce partition split from each map worker (in memory) and then a
+ *       merge sort of the reduce partition splits.
+ * 
  * @todo Offer options for the behavior in the face of failed map tasks.
  *       <p>
  *       One option is that the task is simply retried, partial data may be
@@ -187,6 +209,19 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  *       we could avoid the use of real transactions (since there will never be
  *       conflicts) if we support the concept of a distributed "unisolated"
  *       atomic commit.
+ * 
+ * @todo map/reduce with suitable temporary storage could likely be reused to do
+ *       distributed joins. Take a look at the client index view for how
+ *       iterators are being range partitioned and see if this could be
+ *       refactored for a distributed join.
+ * 
+ * @todo Map and reduce could be abstracted decomposed tasks reading and writing
+ *       data in parallel. Map/Reduce becomes a 2-stage chain with slight
+ *       specialization for its stages (e.g., hash partitioning output tuples
+ *       and writing onto a sorted store for map while reduce reads from a
+ *       sorted store). This generalization might require letting the user write
+ *       the run() method that is executed by the task worker on the service so
+ *       that more input and output options are enabled.
  * 
  * @todo Generalize {@link IMapSource} so that we can read input 2-tuples from a
  *       variety of sources, including indices, other map reduce jobs, etc. This
@@ -215,9 +250,9 @@ import com.bigdata.service.mapReduce.ReduceService.EmbeddedReduceService;
  *       (failover would require sending the files about as well as the file
  *       metadata so that would be a little more complex). BFS could then be
  *       used as a distributed file system for fan-in to map/reduce jobs.
- * 
- * @todo Support a job schedule in the master and master failover?. Expose an
- *       HTML monitor if the master is made into a service?
+ *       <p>
+ *       While Java clients for BFS might be easy enough, what challenges are
+ *       involved in supporting BFS to Windows and Un*x clients?
  */
 public class MapReduceMaster {
 
@@ -225,200 +260,12 @@ public class MapReduceMaster {
             .getLogger(MapReduceMaster.class);
 
     /**
-     * A map reduce job.
+     * The state of a map/reduce job that is being executed by the master.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class MapReduceJob implements IMapReduceJob {
-
-        // the UUID of this job.
-        private final UUID uuid;
-
-        // #of map tasks to run.
-        private final int m;
-
-        // #of reduce tasks to run.
-        private final int n;
-
-        // object responsible for enumerating the inputs to the map task.
-
-        private final IMapSource mapSource;
-
-        private final Class<? extends IMapTask> mapTaskClass;
-
-        private final Constructor<? extends IMapTask> mapTaskCtor;
-        
-        private final Class<? extends IReduceTask> reduceTaskClass;
-
-        private final Constructor<? extends IReduceTask> reduceTaskCtor;
-        
-        private final IHashFunction hashFunction;
-
-        public MapReduceJob(int m, int n,
-                IMapSource mapSource,
-                Class<? extends IMapTask> mapTaskClass,
-                Class<? extends IReduceTask> reduceTaskClass,
-                IHashFunction hashFunction
-                ) {
-
-            if (m <= 0)
-                throw new IllegalArgumentException();
-
-            if (n <= 0)
-                throw new IllegalArgumentException();
-
-            if (mapSource == null)
-                throw new IllegalArgumentException();
-
-            if (mapTaskClass == null)
-                throw new IllegalArgumentException();
-
-            if (reduceTaskClass == null)
-                throw new IllegalArgumentException();
-
-            if (hashFunction == null)
-                throw new IllegalArgumentException();
-
-            // assign a job UUID.
-            this.uuid = UUID.randomUUID();
-
-            this.m = m;
-
-            this.n = n;
-
-            this.mapSource = mapSource;
-
-            this.mapTaskClass = mapTaskClass;
-
-            try {
-                this.mapTaskCtor = mapTaskClass.getConstructor(new Class[] {
-                        UUID.class, Integer.class, IHashFunction.class });
-            } catch (SecurityException e) {
-                throw new RuntimeException(e);
-            } catch (NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            } 
-            
-            this.reduceTaskClass = reduceTaskClass;
-
-            try {
-                this.reduceTaskCtor = reduceTaskClass
-                        .getConstructor(new Class[] { UUID.class, UUID.class });
-            } catch (SecurityException e) {
-                throw new RuntimeException(e);
-            } catch (NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            } 
-
-            this.hashFunction = hashFunction;
-
-        }
-
-        public UUID getUUID() {
-
-            return uuid;
-
-        }
-
-        public int getMapTaskCount() {
-
-            return m;
-
-        }
-
-        public int getReduceTaskCount() {
-
-            return n;
-
-        }
-
-        public IMapSource getMapSource() {
-
-            return mapSource;
-
-        }
-
-        public IHashFunction getHashFunction() {
-
-            return hashFunction;
-
-        }
-
-        public IMapTask getMapTask() {
-            
-            return getMapTask( UUID.randomUUID() );
-           
-        }
-        
-        public IMapTask getMapTask(UUID task) {
-
-            try {
-
-                return mapTaskCtor.newInstance(new Object[] {
-                        task,
-                        Integer.valueOf(getReduceTaskCount()),
-                        getHashFunction() }
-                );
-                
-            } catch (InstantiationException e) {
-                
-                throw new RuntimeException(e);
-                
-            } catch (IllegalAccessException e) {
-                
-                throw new RuntimeException(e);
-                
-            } catch (IllegalArgumentException e) {
-
-                throw new RuntimeException(e);
-                
-            } catch (InvocationTargetException e) {
-                
-                throw new RuntimeException(e);
-
-            }
-
-        }
-
-        public IReduceTask getReduceTask(UUID task, UUID dataService) {
-
-            try {
-
-                return reduceTaskCtor.newInstance(new Object[] {
-                        task,
-                        dataService}
-                );
-                
-            } catch (InstantiationException e) {
-                
-                throw new RuntimeException(e);
-                
-            } catch (IllegalAccessException e) {
-                
-                throw new RuntimeException(e);
-                
-            } catch (IllegalArgumentException e) {
-
-                throw new RuntimeException(e);
-                
-            } catch (InvocationTargetException e) {
-                
-                throw new RuntimeException(e);
-
-            }
-
-        }
-
-    }
-
-    /**
-     * The state of a map/reduce job.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class JobState {
+    abstract static class JobState {
         
         /**
          * The job to be run.
@@ -432,11 +279,11 @@ public class MapReduceMaster {
         /**
          * The map services.
          */
-        IMapService[] mapServices;
+        IJobAndTaskService<MapJobMetadata, AbstractMapTask>[] mapServices;
         /**
          * The reduce services.
          */
-        IReduceService[] reduceServices;
+        IJobAndTaskService<ReduceJobMetadata,AbstractReduceTask>[]reduceServices;
         /**
          * The UUID assigned to each reduce task.
          */
@@ -446,7 +293,121 @@ public class MapReduceMaster {
          * service is named by the UUID of the corresponding reduce task.
          */
         UUID[] dataServices;
+
+        /**
+         * Metadata for the map operation.
+         */
+        MapJobMetadata mapJobMetadata;
         
+        /**
+         * Metadata for the reduce operation.
+         */
+        ReduceJobMetadata reduceJobMetadata;
+
+        /**
+         * The object that runs the map tasks.
+         */
+        RemoteTaskRunner<MapJobMetadata, AbstractMapTask> mapTaskRunner;
+        
+        /**
+         * The object that runs the reduce tasks.
+         */
+        RemoteTaskRunner<ReduceJobMetadata, AbstractReduceTask> reduceTaskRunner;
+        
+        /**
+         * The #of map tasks submitted so far (retries are not counted).
+         */
+        public long getMapTaskCount() {
+            
+            return mapTaskRunner == null ? 0 : mapTaskRunner.ntasks;
+            
+        }
+        
+        /**
+         * The #of reduce tasks submitted so far (retries are not counted).
+         */
+        public long getReduceTaskCount() {
+            
+            return reduceTaskRunner == null ? 0 : reduceTaskRunner.ntasks;
+            
+        }
+        
+        /**
+         * The elapsed time for the map operation (the clock stops once
+         * the map operation is over).
+         */
+        public long getMapElapsedTime() {
+            
+            return mapTaskRunner == null ? 0 : mapTaskRunner.elapsed();
+            
+        }
+        
+        /**
+         * The elapsed time for the reduce operation (the clock stops once the
+         * reduce operation is over).
+         */
+        public long getReduceElapsedTime() {
+            
+            return reduceTaskRunner == null ? 0 : reduceTaskRunner.elapsed();
+            
+        }
+        
+        /**
+         * The #of map tasks that eventually succeeded.
+         */
+        public long getMapSuccessCount() {
+            
+            return mapTaskRunner == null ? 0 : mapTaskRunner.nsuccess;
+            
+        }
+
+        /**
+         * The #of reduce tasks that eventually succeeded.
+         */
+        public long getReduceSuccessCount() {
+            
+            return reduceTaskRunner == null ? 0 : reduceTaskRunner.nsuccess;
+            
+        }
+
+        /**
+         * The #of map tasks that were retried (this counts each retry of each
+         * task).
+         */
+        public long getMapRetryCount() {
+
+            return mapTaskRunner == null ? 0 : mapTaskRunner.nretried;
+
+        }
+
+        /**
+         * The #of reduce tasks that were retried (this counts each retry of
+         * each task).
+         */
+        public long getReduceRetryCount() {
+            
+            return reduceTaskRunner == null ? 0 : reduceTaskRunner.nretried;
+            
+        }
+
+        /**
+         * The #of map tasks that permanently failed.
+         */
+        public long getMapFailedCount() {
+            
+            return mapTaskRunner == null ? 0 : mapTaskRunner.nfailed;
+            
+        }
+
+        /**
+         * The #of reduce tasks that permanently failed.
+         */
+        public long getReduceFailedCount() {
+            
+            return reduceTaskRunner == null ? 0 : reduceTaskRunner.nfailed;
+            
+        }
+
         public JobState(MapReduceJob job, IBigdataClient client) {
 
             if (job == null)
@@ -459,10 +420,8 @@ public class MapReduceMaster {
             
             this.client = client;
         
-            setUp();
-            
         }
-
+        
         /**
          * Select the map, reduce, and data services to be used by the job.
          * 
@@ -473,72 +432,20 @@ public class MapReduceMaster {
          *       than one task to each service. In general, a map service can
          *       run 100s of tasks in parallel while a reduce service can run
          *       10s of tasks in parallel.
-         * 
-         * @todo cleanly separate the notion of M and N (#of map tasks and #of
-         *       reduce tasks) from the notion of the #of map services and the
-         *       #of reduce services and from the notion of the number of map
-         *       inputs (fan-in to the map operations). N is the fan-in to the
-         *       reduce operations.
          */
         protected void setUp() {
 
-            /**
-             * Since we are running everything in process, this is the #of map
-             * services to be start. The actual #of map tasks to run is based on
-             * the #of input files and is discovered dynamically. The #of map
-             * services to be started is based on an expectation that we will
-             * distribute 100 concurrent map tasks to each map service. Since we
-             * do not know the fan in (the #of input files) we are not able to
-             * tell how many sets of map tasks will be run through the map
-             * services before the input has been consumed.
+            /*
+             * Note: concrete implementation MUST initialize [mapServices] and
+             * [reduceServices] before calling this method.
              */
-            final int numMapServicesToStart = 1; //Math.max(1, job.m / 100);
-
-            /**
-             * Since we are running everything in process, this is the #of
-             * reduce services to start. The #of reduce tasks to be run is given
-             * by job.n - this is a fixed input parameter from the user.
-             */
-            final int numReduceServicestoStart = 1;// Math.max(1, job.n/10);
-
-            /**
-             * The map services. Each services is capable of running a large #of
-             * map tasks in parallel.
-             */
-            mapServices = new IMapService[numMapServicesToStart];
-            {
-
-                // client properties.
-                Properties properties = new Properties();
-
-                for (int i = 0; i < numMapServicesToStart; i++) {
-
-                    mapServices[i] = new EmbeddedMapService(UUID.randomUUID(),
-                            properties, client);
-
-                }
-
+            if(mapServices==null||reduceServices==null) {
+                
+                throw new IllegalStateException(
+                        "map/reduce services are not initialized");
+                
             }
-
-            /**
-             * The reduce services. Each service is capable of running a few
-             * reduce tasks in parallel.
-             */
-            reduceServices = new IReduceService[numReduceServicestoStart];
-            {
-
-                // client properties.
-                Properties properties = new Properties();
-
-                for (int i = 0; i < numReduceServicestoStart; i++) {
-
-                    reduceServices[i] = new EmbeddedReduceService(UUID
-                            .randomUUID(), properties, client);
-                    
-                }
-
-            }
-
+            
             /**
              * The reduce task identifiers.
              * 
@@ -557,31 +464,27 @@ public class MapReduceMaster {
                 }
                 
             }
+
+            setUpDataStores();
+            
+            mapJobMetadata = new MapJobMetadata(job.uuid,reduceTasks,dataServices);
+            
+            reduceJobMetadata = new ReduceJobMetadata(job.uuid);
             
         }
         
         /**
-         * Notify everyone that the job is starting.
+         * Setup intermediate indices on the data services (one per reduce
+         * task). The same data service MAY be used for more than one reduce
+         * task.
          * 
-         * @todo parallelize notice so that we can start/end jobs faster.
-         * 
-         * @todo handle map service and reduce service failover (take the
-         *       service off line and perhaps find a new one to use).
-         * 
-         * @todo handle data service failover
+         * @todo in order for the map and reduce tasks to have automatic
+         *       failover they need to query the metadata service if the given
+         *       data service fails and find the replacement data service (this
+         *       presumes that a media redundency chain is in effect).
          */
-        public void start() {
-            
-            /*
-             * Setup intermediate indices on the data services (one per reduce
-             * task). The same data service MAY be used for more than one reduce
-             * task.
-             * 
-             * @todo in order for the map and reduce tasks to have automatic
-             * failover they need to query the metadata service if the given
-             * data service fails and find the replacement data service (this
-             * presumes that a media redundency chain is in effect).
-             */
+        protected void setUpDataStores() {
+
             dataServices = new UUID[reduceTasks.length];
             {
                 IMetadataService metadataService = client.getMetadataService();
@@ -603,56 +506,54 @@ public class MapReduceMaster {
                     }
                 }
             }
-            
-            // notify map services of new job.
-            {
-                final int nmapServices = mapServices.length;
-                for (int i = 0; i < nmapServices; i++) {
-                    try {
-                        mapServices[i].startJob(job.uuid, reduceTasks,
-                                dataServices);
-                    } catch (IOException e) {
-                        log.warn("Map service not available: " + e);
-                    }
+
+        }
+
+        /**
+         * Tear down the embedded services.
+         */
+        protected void tearDown() {
+
+            for(int i=0; i<mapServices.length; i++) {
+                
+                if(mapServices[i] instanceof EmbeddedMapService) {
+                
+                    ((EmbeddedMapService)mapServices[i]).shutdown();
+                    
                 }
+                
             }
             
-            // notify reduce services of new job.
-            {
-                final int nreduceServices = reduceServices.length;
-                for (int i = 0; i < nreduceServices; i++) {
-                    try {
-                        reduceServices[i].startJob(job.uuid);
-//                        , reduceTasks[i], dataServices[i]);
-                    } catch (IOException e) {
-                        log.warn("Reduce service not available: " + e);
-                    }
+            for(int i=0; i<reduceServices.length; i++) {
+
+                if(reduceServices[i] instanceof EmbeddedReduceService) {
+                    
+                    ((EmbeddedReduceService)reduceServices[i]).shutdown();
+                    
                 }
+
             }
+            
+        }
+        
+        /**
+         * Start the job.
+         */
+        protected void start() {
+
+            setUp();
             
         }
 
         /**
-         * Notify everyone that the job is done.
+         * Terminate the job.
          */
-        public void end() {
-            
-            for(int i=0; i<mapServices.length; i++) {
-                try {
-                    mapServices[i].endJob(job.uuid);
-                } catch(IOException e) {
-                    log.warn("Map service: "+e);
-                }
-            }
-            
-            for(int i=0; i<reduceServices.length; i++) {
-                try {
-                    reduceServices[i].endJob(job.uuid);
-                } catch(IOException e) {
-                    log.warn("Reduce service: "+e);
-                }
-            }
-            
+        protected void terminate() {
+
+            /*
+             * Release the intermediate stores.
+             */
+
             for(int i=0; i<dataServices.length; i++) {
                 try {
                     IDataService ds = client.getDataService(dataServices[i]);
@@ -666,226 +567,46 @@ public class MapReduceMaster {
                     log.warn("Data service: "+e);
                 }
             }
+
+            tearDown();
             
         }
 
         /**
          * Distribute the map tasks and wait for them to complete.
-         * <p>
-         * Note: This presumes that we are using network storage for the input
-         * sources. We simply assign each file to one map task.
-         * 
-         * @param delay
-         *            The maximum time (in milliseconds) that we will wait for a
-         *            task to complete.
-         * 
-         * @param maxTasks
-         *            When non-zero, this is the maximum #of input files that
-         *            will be mapped.
-         * 
-         * @param maxRetry
-         *            The maximum #of times that we will retry a task that fails
-         *            to complete successfully within the <i>delay</i>. A value
-         *            of ZERO (0) disables retry.
-         * 
-         * @param clients
-         *            The clients on which the map tasks will be run.
-         * 
-         * @todo run the map task on the client that is 'closest' to the data
-         *       that it will read while also making sure that we distribute the
-         *       map tasks among the available clients.
-         * 
-         * FIXME [m] should limit the #of active map tasks for this job. This
-         * helps to give the user control over the parallelism and also makes
-         * the "delay" interpretable in terms of the time since the job was
-         * submitted. Right now all inputs are mapped immediately and just queue
-         * up in the map service(s) so the map services themselves are limiting
-         * the parallelism. The logic here needs to be modified to have no more
-         * than [m] map tasks "out there" for execution at any given time. This
-         * is going to make the logic more complicated since we have to notice
-         * tasks that finish asynchronously. Try to refactor the logic for
-         * running the map and reduce ops first into shared code and then
-         * redesign so as to limit the maximum concurrency. Since the executor
-         * service can already do this, maybe we can queue up the input files
-         * (blocking queue of at least m) and drain them through an executor
-         * service (m concurrent tasks). the executor service just submits the
-         * task to the remove service. tasks that fail are re-queued on the
-         * local input queue unless their retry count has been exceeded.
-         * 
-         * @todo Long running tasks should be replicated once we are "mostly"
-         *       done.
          * 
          * @return The percentage tasks that completed successfully.
          * 
-         * @todo Can the return value mislead the caller? E.g., is it possible
-         *       for a task to succeed twice, resulting in double counting such
-         *       that we can not rely on the return to indicate whether all map
-         *       tasks completed successfully?
+         * @throws InterruptedException
+         *             if the excecuting map tasks are interrupted.
          */
-        public double map(long delay, long maxTasks, int maxRetry) {
+        protected double map() throws InterruptedException { 
 
-            final int nservices = mapServices.length;
+            Iterator<AbstractMapTask> tasks = new Striterator(job
+                    .getMapSource().getSources()).addFilter(new Resolver() {
 
-            // #of input sources assigned to map tasks.
-            int nstarted = 0;
-            
-            int nretries = 0;
+                        protected Object resolve(Object arg0) {
 
-            // the files to be mapped over the clients.
-            Iterator<File> itr = job.getMapSource().getSources();
-
-            /*
-             * A queue of map tasks that have been submitted and on which we are
-             * waiting for completion.
-             */
-            DelayQueue<MapTaskState> waiting = new DelayQueue<MapTaskState>();
-
-            while (itr.hasNext()) {
-
-                // the input source.
-                File file = itr.next();
-                
-                // do not map more than this many input files.
-                if(maxTasks!=0L && nstarted>=maxTasks) break;
-
-                // choose a client to run this input source.
-                final int index = (int) (nstarted % nservices);
-
-                log
-                        .info("Mapping file " + file.toString() + " on client #"
-                                + index);
-
-                // the client to which this input source will be assigned.
-                IMapService client = mapServices[index];
-
-                // run the map task.
-                Future future;
-                final IMapTask mapTask = job.getMapTask();
-                try {
-                    // @todo the Future will go away with a remote service refactor.
-                    future = client.submit(job.uuid, file, mapTask);
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-
-                // add to the queue of tasks on which we will wait.
-                waiting.add(new MapTaskState(delay, mapTask.getUUID(), 0,
-                        future, file));
-
-                nstarted++;
-
-            }
-
-            /*
-             * Wait for the queue to drain.
-             */
-            int nended = 0;
-            int nfailed = 0; // #of tasks that do not succeed (retries also fail).
-            
-            while (nended < nstarted) {
-
-                MapTaskState taskState;
-                
-                try {
-                    
-                    taskState = waiting.poll(1, TimeUnit.SECONDS);
-
-                    if (taskState == null) {
-
-                        // still waiting on a task to complete.
-                        continue;
-                        
-                    }
-                    
-                } catch (InterruptedException ex) {
-
-                    log.warn("Interrupted: "+ex,ex);
-
-                    // @todo ignore or abort processing?
-                    continue;
-                    
-                }
-
-                nended++;
-                
-                taskState.cancelIfStillRunning();
-
-                if (taskState.error() == null) {
-                    log.info("Done: "
-                            + taskState.uuid
-                            + " "
-                                + (taskState.success() ? "success"
-                                        : (taskState.future.isCancelled() ? "cancelled"
-                                                : taskState.error())) + "("
-                                                + nended + " of " + nstarted + ")");
-                } else {
-                    log.warn("Error: " + taskState.uuid + " " + "(" + nended
-                            + " of " + nstarted + ")", taskState.error());
-
-                }
-
-                /*
-                 * If the task was not successful, then re-try it up to N times.
-                 */
-                if (!taskState.success()) {
-
-                    if (taskState.ntries < maxRetry) {
-
-                        final int ntries2 = taskState.ntries + 1;
-
-                        // choose a client to run this input source.
-                        final int index = (int) (nstarted % nservices);
-
-                        log.info("Mapping file " + taskState.file.toString()
-                                + " on client #" + index + "(ntries=" + ntries2
-                                + ")");
-
-                        // the client to which this input source will be
-                        // assigned.
-                        IMapService client = mapServices[index];
-
-                        // run the map task.
-                        Future future;
-                        final IMapTask mapTask = job.getMapTask(taskState.uuid);
-                        try {
-                            // @todo the Future will go away with a remote
-                            // service refactor.
-                            future = client.submit(job.uuid, taskState.file,
-                                    mapTask);
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
+                            return job.getMapTask(arg0);
+                            
                         }
 
-                        // add to the queue of tasks on which we will wait.
-                        waiting
-                                .add(new MapTaskState(taskState.delay,
-                                        taskState.uuid, ntries2, future,
-                                        taskState.file));
+            });
+            
+            mapTaskRunner =
+                new RemoteTaskRunner<MapJobMetadata, AbstractMapTask>(
+                        mapServices,
+                        mapJobMetadata,
+                        tasks,
+                        job.getMaxMapTasks(),
+                        job.m, //maxConcurrency,
+                        job.getMaxMapTaskRetry(),
+                        job.getMapTaskTimeout()
+                        );
+            
+            mapTaskRunner.awaitTermination(/*maxMapOpRuntime(ms)*/);
 
-                        nstarted++;
-
-                        nretries++;
-
-                    } else {
-
-                        /*
-                         * A task has failed more times than we are willing to
-                         * retry so mark this as a permanent failure.
-                         */
-                        
-                        log.warn("Could not map: " + taskState.file);
-
-                        nfailed++;
-
-                    }
-
-                }
-
-            }
-
-            System.err.println("Ran " + nstarted + " map tasks ("+nretries+" retries, "+nfailed+" failed).");
-
-            return (double)(nstarted-nfailed)/nstarted;
+            return ((double)mapTaskRunner.nsuccess)/mapTaskRunner.ntasks;
             
         }
 
@@ -894,169 +615,226 @@ public class MapReduceMaster {
          * 
          * @return The percentage tasks that completed successfully.
          * 
-         * @todo Can the return value mislead the caller? E.g., is it possible
-         *       for a task to succeed twice, resulting in double counting such
-         *       that we can not rely on the return to indicate whether all
-         *       tasks completed successfully?
+         * @exception InterruptedException
+         *                if the executing tasks are interrupted.
          */
-        public double reduce(long delay, int maxRetry) {
-
-            final int nservices = reduceServices.length;
-
-            // #of reduce tasks run.
-            int nstarted = 0;
-
-            // #of reduce tasks that get retried.
-            int nretries = 0;
-            
-            /*
-             * A queue of map tasks that have been submitted and on which we are
-             * waiting for completion.
-             */
-            DelayQueue<ReduceTaskState> waiting = new DelayQueue<ReduceTaskState>();
-
-            final int n = job.getReduceTaskCount();
-
-            for (int i = 0; i < n; i++) {
-
-                // the service on which this reduce task will be executed.
-                IReduceService reduceService = reduceServices[i % reduceServices.length];
-
-                // the service from which it will read its data.
-                UUID dataService = dataServices[i % reduceTasks.length];
-
-                // run the task.
-                // @todo the Future will go away with the remove service refactor.
-                Future<Object> future;
-                IReduceTask reduceTask = job.getReduceTask(reduceTasks[i],dataService);
-                try {
-                    future = reduceService.submit(job.getUUID(), reduceTask);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                // add to the queue of tasks on which we will wait.
-                waiting.add(new ReduceTaskState(delay, reduceTask.getUUID(), 0, future, dataService));
-
-                nstarted++;
-
-            }
+        protected double reduce() throws InterruptedException {
 
             /*
-             * Wait for the queue to drain.
+             * There is a fixed fan-in for the reduce operation.  It is the #of
+             * reduce partitions declared by the map/reduce job.  Therefore we
+             * put all of the tasks in an executor service with a maximum parallism
+             * set by the caller.
              */
-            int nended = 0;
-            int nfailed = 0;
             
-            while (nended < nstarted) {
-
-                ReduceTaskState taskState;
+            AbstractReduceTask[] tasks = new AbstractReduceTask[job.n];
+            
+            for(int i=0; i<job.n; i++) {
                 
-                try {
+                tasks[i] = (AbstractReduceTask) job.getReduceTask(reduceTasks[i], dataServices[i]);
+                
+            }
+            
+            reduceTaskRunner =
+                new RemoteTaskRunner<ReduceJobMetadata, AbstractReduceTask>(
+                        reduceServices,
+                        reduceJobMetadata,
+                        Arrays.asList(tasks).iterator(),
+                        0L /* maxTasks */,
+                        job.n, // maxConcurrency,
+                        job.getMaxReduceTaskRetry(),
+                        job.getReduceTaskTimeout()
+                        );
+            
+            reduceTaskRunner.awaitTermination(/*timeout(ms)*/);
+
+            return ((double)reduceTaskRunner.nsuccess)/reduceTaskRunner.ntasks;
+            
+        }
+        
+        /**
+         * A summary of the current job state.
+         */
+        public String status() {
+
+            final double mapPercent = (mapTaskRunner == null ? 0d
+                    : ((double) mapTaskRunner.nsuccess) / mapTaskRunner.ntasks);
+
+            final double reducePercent = (reduceTaskRunner == null ? 0d
+                    : ((double) reduceTaskRunner.nsuccess)
+                            / reduceTaskRunner.ntasks);
+            
+            final String map = "map( m=" + job.m + ", ntasks="
+                    + getMapTaskCount() + ", nretried=" + getMapRetryCount()
+                    + ", success=" + percent.format(mapPercent) + ", elapsed="
+                    + getMapElapsedTime() + "ms )";
+
+            final String reduce = "reduce( n=" + job.n + ", ntasks="
+                    + getReduceTaskCount() + ", nretried="
+                    + getReduceRetryCount() + ", success="
+                    + percent.format(reducePercent) + ", elapsed="
+                    + getReduceElapsedTime() + "ms )";
+
+            return map + "\n" + reduce;
+            
+        }
+        
+        // used to format percentages.
+        final protected Format percent = NumberFormat.getPercentInstance();
+        
+        /**
+         * Run the job.
+         * 
+         * @return <i>this</i>
+         */
+        public JobState run(double minMapSuccessRate, double minReduceSuccessRate) {
+            
+            try {
+
+                /*
+                 * Notify everyone that this job is starting.
+                 */
+                start();
+
+                /*
+                 * Distribute the map tasks and wait for them to complete.
+                 */
+                final double percentMapSuccess;
+                {
+
+                    percentMapSuccess = map();
                     
-                    taskState = waiting.poll(1, TimeUnit.SECONDS);
-
-                    if (taskState == null) {
-
-                        // still waiting on a task to complete.
-                        continue;
+                    System.out.println("Map operation "+percentMapSuccess+" success.");
+                    
+                    if(percentMapSuccess<minMapSuccessRate) {
+                        
+                        log.warn("Success rate less than threshold - aborting");
+                        
+                        return this;
                         
                     }
                     
-                } catch (InterruptedException ex) {
-                    
-                    log.warn("Interrupted: "+ex,ex);
-                    
-                    // @todo ignore or abort processing?
-                    continue;
-                    
-                }
-
-                nended++;
-                
-                taskState.cancelIfStillRunning();
-
-                if (taskState.error() == null) {
-                    log.info("Done: "
-                            + taskState.uuid
-                            + " "
-                                + (taskState.success() ? "success"
-                                        : (taskState.future.isCancelled() ? "cancelled"
-                                                : taskState.error())) + "("
-                                                + nended + " of " + nstarted + ")");
-                } else {
-                    log.warn("Error: " + taskState.uuid + " " + "(" + nended
-                            + " of " + nstarted + ")", taskState.error());
-
                 }
 
                 /*
-                 * If the task was not successful, then re-try it up to N times.
+                 * Distribute the reduce tasks and wait for them to complete.
                  */
-                if (!taskState.success()) {
+                final double percentReduceSuccess;
+                {
 
-                    if (taskState.ntries < maxRetry) {
+                    percentReduceSuccess = reduce();
+                   
+                    System.out.println("Reduce operation "+percentReduceSuccess+" success.");
 
-                        final int ntries2 = taskState.ntries + 1;
-
-                        // choose a client to run this input source.
-                        final int index = (int) (nstarted % nservices);
-
-                        log.info("Reducing " + taskState.dataService
-                                + " on client #" + index + "(ntries=" + ntries2
-                                + ")");
-
-                        /*
-                         * The service on which this reduce task will be
-                         * executed.
-                         */
-                        IReduceService client = reduceServices[index];
-
-                        // run the map task.
-                        Future future;
-                        IReduceTask reduceTask = job.getReduceTask(
-                                taskState.uuid, taskState.dataService);
-                        try {
-                            // @todo the Future will go away with a remote
-                            // service refactor.
-                            future = client.submit(job.uuid, reduceTask);
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-
-                        // add to the queue of tasks on which we will wait.
-                        waiting.add(new ReduceTaskState(taskState.delay,
-                                taskState.uuid, ntries2, future,
-                                taskState.dataService));
-
-                        nstarted++;
-
-                        nretries++;
-
-                    } else {
-
-                        /*
-                         * A task has failed more times than we are willing to
-                         * retry so mark this as a permanent failure.
-                         */
-
-                        log.warn("Could not map: " + taskState.uuid);
-
-                        nfailed++;
-
+                    if(percentReduceSuccess<minReduceSuccessRate) {
+                        
+                        log.warn("Success rate less than threashold - aborting");
+                        
+                        return this;
+                        
                     }
+
+                }
+
+                log.info("Done: "+status());
+                
+            } catch (Throwable t) {
+                
+                log.error( "Problem running job: "+t, t );
+                
+            } finally {
+
+                /*
+                 * Terminate the job.
+                 */
+
+                terminate();
+                
+            }
+
+            return this;
+            
+        }
+        
+    }
+
+    /**
+     * Sets up embedded map and reduce services.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class EmbeddedJobState extends JobState {
+        
+        public EmbeddedJobState(MapReduceJob job, IBigdataClient client) {
+
+            super(job,client);
+            
+        }
+        
+        protected void setUp() {
+            
+            /**
+             * Since we are running everything in process, this is the #of map
+             * services to be start. The actual #of map tasks to run is based on
+             * the #of input files and is discovered dynamically. The #of map
+             * services to be started is based on an expectation that we will
+             * distribute 100 concurrent map tasks to each map service. Since we
+             * do not know the fan in (the #of input files) we are not able to
+             * tell how many sets of map tasks will be run through the map
+             * services before the input has been consumed.
+             */
+            final int numMapServicesToStart = 1; //Math.max(1, job.m / 100);
+
+            /**
+             * Since we are running everything in process, this is the #of
+             * reduce services to start. The #of reduce tasks to be run is given
+             * by job.n - this is a fixed input parameter from the user.
+             */
+            final int numReduceServicestoStart = 1;// Math.max(1, job.n/10);
+
+            /**
+             * The map services. Each services is capable of running map tasks
+             * in parallel.
+             */
+            mapServices = new IJobAndTaskService[numMapServicesToStart];
+            {
+
+                // client properties.
+                Properties properties = new Properties();
+
+                for (int i = 0; i < numMapServicesToStart; i++) {
+
+                    mapServices[i] = new EmbeddedMapService(UUID.randomUUID(),
+                            properties, client);
 
                 }
 
             }
 
-            System.err.println("Ran " + nstarted + " reduce tasks (" + nretries
-                    + " retries, " + nfailed + " failed).");
+            /**
+             * The reduce services. Each service is capable of running reduce
+             * tasks in parallel.
+             */
+            reduceServices = new IJobAndTaskService[numReduceServicestoStart];
+            {
 
-            return (double)(nstarted-nfailed)/nstarted;
+                // client properties.
+                Properties properties = new Properties();
 
+                for (int i = 0; i < numReduceServicestoStart; i++) {
+
+                    reduceServices[i] = new EmbeddedReduceService(UUID
+                            .randomUUID(), properties, client);
+                    
+                }
+
+            }
+
+            super.setUp();
+            
         }
-
+        
     }
     
     /**
@@ -1064,31 +842,7 @@ public class MapReduceMaster {
      * 
      * @param args
      * 
-     * FIXME describe the job using an XML file and refactor
-     * {@link ExtractKeywords}, {@link CountKeywords}, and
-     * {@link TestCountKeywordJob} into some test suites for this class.
-     * 
-     * @todo Normally the #of map clients will exceed the actual number of
-     *       available {@link MapService}s. In this case, each client will be
-     *       expected to execute multiple map task and those tasks will be
-     *       parallelized both across the clients and within each clients thread
-     *       pool. Likewise, there can be more reduce tasks than
-     *       {@link MapService}s. However, reduce tasks tend to be heavier so
-     *       the proportion of reduce tasks to clients might be on the order of
-     *       2:1 while the proportion of map tasks to clients might be on the
-     *       order of 100:1. Does this suggest that we should have separate map
-     *       and reduce thread pools in the clients?
-     *       <p>
-     *       The #of reduce tasks MUST be choosen such that the intermediate
-     *       file may be handled on a single machine. (There must be enough free
-     *       disk to store the file and enough resources to sort the file,
-     *       producing a sorted version. So you need 2X disk plus lots of RAM.
-     *       The sort should really be in C so that we can leverage more than 2G
-     *       of RAM.)
-     * 
-     * FIXME There is confusion in reporting M vs the #of map operations
-     * actually run vs the #of map services available vs the #of map services
-     * used. (Likewise for reduce).
+     * @todo Support description and execution of a map/reduce using XML.
      */
     public static void main(String[] args) {
 
@@ -1120,16 +874,6 @@ public class MapReduceMaster {
          * be trying to write on 1 data service concurrently.  However,
          * the #s above appear to go the other way.
          * 
-         * FIXME setting m here has no effect since the size of the thread
-         * pool in the MapService is actually limiting concurrency since we
-         * are not throttling the #of concurrent jobs submitted to the map
-         * service.
-         * 
-         * Note: the above is also true for the reduce service but there is
-         * never the less a clear effect which must be due to the #of data
-         * services in use (the fewer data services in use the better the
-         * system is performing above).
-         * 
          * Ok. The answers to the above observations are: (a) we write 
          * smaller batches on each partition as there are more partitions.
          * If we extract on the order of 1000 keywords per task and have
@@ -1152,8 +896,23 @@ public class MapReduceMaster {
          * the resulting data, e.g., a cluster of 100 machines serving a large
          * text index.
          */
-        MapReduceJob job = new TestCountKeywordJob(100/* m */, 2/* n */);
-//        MapReduceJob job = new TestCountKeywordJob(1/* m */, 2/* n */);
+        MapReduceJob job = new CountKeywordJob(100/* m */, 1/* n */);
+//        MapReduceJob job = new TestCountKeywordJob(1/* m */, 1/* n */);
+
+        // non-zero to submit no more than this many map inputs.
+        job.setMaxMapTasks( 10 );
+
+        // the timeout for a map task.
+//        job.setMapTaskTimeout(2*1000/*millis*/);
+        
+        // the timeout for a reduce task.
+//        job.setReduceTaskTimeout(2*1000/*millis*/);
+        
+        // the maximum #of times a map task will be retried (zero disables retry).
+//        job.setMaxMapTaskRetry(3);
+
+        // the maximum #of times a reduce task will be retried (zero disables retry).
+//        job.setMaxReduceTaskRetry(3);
 
         /**
          * Setup the client that will connect to federation on which the
@@ -1163,25 +922,12 @@ public class MapReduceMaster {
          *       keep an option for testing that uses an embedded federation.
          *       For this we will need to specify the federation identifier so
          *       that the client can connect.
-         * 
-         * @todo when used for map/reduce a larger disk-only journal and no
-         *       overflow would improve performance since we expect to only read
-         *       back the data once (in a given reduce task) and the bulk index
-         *       build is at least that expensive. There really may be a role
-         *       for "temporary" data services -- data services optimized for
-         *       short-term but robust data storage -- for both map/reduce and
-         *       for intermediate results in data processing such as closure of
-         *       an RDFS store or join results.
          */
         final IBigdataClient client;
         {
             
             Properties properties = new Properties();
 
-            /*
-             * A distributed federation should be using bufferMode=Disk since
-             * the intermediate results can be quite large.
-             */
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
@@ -1200,7 +946,7 @@ public class MapReduceMaster {
              * be much overhead to unused data services since even the fully
              * buffered modes extend the buffer in response to use.
              */
-//            properties.setProperty(Options.NDATA_SERVICES, "10");
+            properties.setProperty(Options.NDATA_SERVICES, ""+Math.min(10,job.n));
 
             properties.setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
 
@@ -1210,383 +956,19 @@ public class MapReduceMaster {
             
         }
 
-        JobState jobState = new JobState(job,client);
-        
-        // The minimum success rate required for the map stage.
-        final double minSuccessRate = .9d;
-        
-        try {
-
-            /*
-             * Notify everyone that this job is starting.
-             */
-            jobState.start();
-
-            /*
-             * Distribute the map tasks and wait for them to complete.
-             */
-            final long elapsedMap;
-            {
-
-                final long beginMap = System.currentTimeMillis();
-
-                // the maximum time a map task may run.
-                final long delay = 60 * 1000;
-
-                // non-zero to run at most that many input files.
-                final long maxTasks = 0L;
-//                final long maxTasks = 1L; // @todo remove
-
-                // the maximum #of times a map task will be retried (zero disables retry).
-//                final int maxRetry = 3;
-                final int maxRetry = 0; // @todo remove
-
-                final double percentSuccess = jobState.map(delay, maxTasks, maxRetry);
-                
-                System.out.println("Map operation "+percentSuccess+" success.");
-                
-                if(percentSuccess<minSuccessRate) {
-                    
-                    log.warn("Success rate less than threshold - aborting");
-                    
-                    System.exit(1);
-                    
-                }
-
-                elapsedMap = System.currentTimeMillis() - beginMap;
-                
-            }
-
-            /*
-             * Distribute the reduce tasks and wait for them to complete.
-             */
-            final long elapsedReduce;
-            {
-            
-                final long beginReduce = System.currentTimeMillis();
-
-                // the maximum time a reduce task may run.
-                final long delay = 60 * 1000;
-
-                // the maximum #of times a reduce task will be retried (zero disables retry).
-//                final int maxRetry = 3;
-                final int maxRetry = 0; // @todo remove
-
-                final double percentSuccess = jobState.reduce(delay, maxRetry);
-               
-                System.out.println("Reduce operation "+percentSuccess+" success.");
-
-                if(percentSuccess<minSuccessRate) {
-                    
-                    log.warn("Success rate less than threashold - aborting");
-                    
-                    System.exit(1);
-                    
-                }
-                
-                elapsedReduce = System.currentTimeMillis() - beginReduce;
-
-            }
-
-            System.out.println("Done: map( " + elapsedMap + " ms, " + job.m
-                    + " tasks ), reduce( " + elapsedReduce + " ms" + ", "
-                    + job.n + " tasks )");
-            
-        } catch (Throwable t) {
-            
-            log.error( "Problem running job: "+t, t );
-            
-        } finally {
-
-            /*
-             * Notify everyone that this job is over.
-             */
-
-            jobState.end();
-
-            /*
-             * Disconnect from the federation.
-             */
-            
-            client.terminate();
-            
-        }
-
-    }
-
-    /**
-     * A task that has been submitted and on which we are awaiting completion.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    abstract static class TaskState implements Delayed {
-
-        // maximum grace period (ms).
-        final long delay;
-
-        // task UUID.
-        final UUID uuid;
-
-        // #of times that this task has been tried.
-        final int ntries;
-
-        // start time.
-        final long begin = System.currentTimeMillis();
-
         /*
-         * @todo this needs to be handled differently for a remote service.
-         */
-        final Future<Object> future;
-
-        /**
-         * @param uuid
-         *            The task UUID.
-         * @param delay
-         *            The length of time in milliseconds that we are willing
-         *            to wait for this task to complete.
-         * @param ntries
-         *            The #of times that this task has already been
-         *            attempted.
-         * @param future
-         */
-        protected TaskState(long delay, UUID uuid, int ntries,
-                Future<Object> future) {
-
-            this.delay = delay;
-
-            this.uuid = uuid;
-
-            this.future = future;
-
-            this.ntries = ntries;
-
-        }
-
-        /**
-         * Returns the remaining delay associated with this object
+         * Run the map/reduce operation.
          * 
-         * @return 0L if the task is done (whether an error or success).
-         *         Otherwise, the remaining time for this task to run.
+         * Note: This is using embedded services to test map/reduce.
          */
-        public long getDelay(TimeUnit unit) {
-
-            if (future.isDone()) {
-
-                // The task is done (any kind of completion).
-                return 0;
-
-            }
-
-            // the remaining delay (it is actually in milliseconds).
-            long elapsed = System.currentTimeMillis() - begin;
-
-            long remaining = delay - elapsed;
-
-            return unit.convert(remaining, TimeUnit.MILLISECONDS);
-
-        }
-
-        public int compareTo(Delayed arg0) {
-
-            if (this == arg0)
-                return 0;
-
-            return uuid.compareTo(((TaskState) arg0).uuid);
-
-        }
-
-        // /**
-        // * Return true iff the task is still running at the time that this
-        // * method was invoked.
-        // */
-        // public boolean running() {
-        //                
-        // return ! future.isDone();
-        //                
-        // }
-
-        /**
-         * Return true iff the task had completed successfully at the time
-         * that this method was invoked
-         */
-        public boolean success() {
-
-            if (future.isDone() && !future.isCancelled()) {
-
-                try {
-
-                    future.get();
-
-                    return true;
-
-                } catch (InterruptedException ex) {
-                    // will not happen since the task is done.
-                    throw new AssertionError();
-                } catch (CancellationException ex) {
-                    // will not happen since we checked this above.
-                    throw new AssertionError();
-                } catch (ExecutionException ex) {
-                    return false;
-                }
-
-            }
-
-            // not successful (might not be done yet).
-            return false;
-
-        }
-
-        /**
-         * Return the {@link Throwable} object take caused the task to fail
-         * or <code>null</code> if the task has not completed or if the
-         * task has completed by no error was generated.
-         */
-        public Throwable error() {
-
-            if (future.isDone() && !future.isCancelled()) {
-
-                try {
-
-                    future.get();
-
-                    // no exception.
-                    return null;
-
-                } catch (InterruptedException ex) {
-                    // will not happen since the task is done.
-                    throw new AssertionError();
-                } catch (CancellationException ex) {
-                    // will not happen since we checked this above.
-                    throw new AssertionError();
-                } catch (ExecutionException ex) {
-                    // the cause of the exception.
-                    return ex.getCause();
-                }
-
-            }
-
-            // not done yet or cancelled.
-            return null;
-
-        }
-
-        /**
-         * Cancel the task if it is still running.
-         * 
-         * @todo this implementation is synchronous since it relies on
-         *       {@link Future#cancel(boolean)}.  It will block the code
-         *       that is polling the queue of waiting tasks, but it will
-         *       not block the running tasks themselves.
-         */
-        public void cancelIfStillRunning() {
-
-            if (!future.isDone()) {
-
-                future.cancel(true/* mayInterruptIfRunning */);
-
-            }
-
-        }
-
-    }
-    
-    /**
-     * The state for a running {@link IMapTask}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class MapTaskState extends TaskState {
-
-        // the input file to the map task.
-        final File file;
-
-        /**
-         * @param delay
-         * @param uuid
-         * @param ntries
-         * @param future
-
-         * @param file
-         *            The input file for the map task.
-         */
-        protected MapTaskState(long delay, UUID uuid, int ntries, Future<Object> future, File file) {
-            super(delay, uuid, ntries, future);
-
-            this.file = file;
+        System.out.println(new EmbeddedJobState(job, client).run(.9d, .9d)
+                .status());
         
-        }
-
-    }
-
-    /**
-     * The state for a running {@link IReduceTask}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class ReduceTaskState extends TaskState {
-
-        // the data service from which the reduce task will read.
-        final UUID dataService;
-
-        /**
-         * @param delay
-         * @param uuid
-         * @param ntries
-         * @param future
-         * 
-         * @param dataService
-         *            The data service from which the reduce task will read its
-         *            input.
+        /*
+         * Disconnect from the federation.
          */
-        protected ReduceTaskState(long delay, UUID uuid, int ntries, Future<Object> future, UUID dataService) {
-            
-            super(delay, uuid, ntries, future);
-
-            this.dataService = dataService;
         
-        }
-
-    }
-
-    public static class TestCountKeywordJob extends MapReduceJob {
-
-        public TestCountKeywordJob(int m, int n) {
-
-            super(m, n, new FileSystemMapSource(new File("."),
-                    new FileFilter() {
-
-                        public boolean accept(File pathname) {
-
-                            if (pathname.isDirectory()) {
-
-                                // i.e., recursive processing of directories.
-
-                                return true;
-
-                            }
-
-                            String name = pathname.getName();
-
-                            return name.endsWith(".java");
-
-                        }
-
-                    }),
-                    
-                    // map task
-//                    new NopMapTask(),
-//                    new ReadOnlyMapTask(),
-                    ExtractKeywords.class,
-                    
-                    // reduce task.
-                    CountKeywords.class,
-                    
-                    DefaultHashFunction.INSTANCE);
-
-        }
+        client.terminate();
 
     }
 

@@ -49,13 +49,13 @@ public class FileSystemMapSource implements IMapSource {
 
     }
 
-    public Iterator<File> getSources() {
+    public Iterator<Object> getSources() {
 
         return getSources(dir);
 
     }
 
-    protected Iterator<File> getSources(File dir) {
+    protected Iterator<Object> getSources(File dir) {
 
         File[] files = (filter == null ? dir.listFiles() : dir
                 .listFiles(filter));

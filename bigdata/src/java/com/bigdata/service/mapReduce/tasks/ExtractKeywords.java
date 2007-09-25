@@ -1,4 +1,4 @@
-package com.bigdata.service.mapReduce;
+package com.bigdata.service.mapReduce.tasks;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -7,6 +7,9 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StreamTokenizer;
 import java.util.UUID;
+
+import com.bigdata.service.mapReduce.AbstractFileInputMapTask;
+import com.bigdata.service.mapReduce.IHashFunction;
 
 
 /**
@@ -22,6 +25,11 @@ import java.util.UUID;
 public class ExtractKeywords extends AbstractFileInputMapTask {
 
     /**
+     * 
+     */
+    private static final long serialVersionUID = -6942113098953937858L;
+    
+    /**
      * The encoding used to serialize the term (the value of each tuple).
      */
     public static final String UTF8 = "UTF-8";
@@ -32,10 +40,10 @@ public class ExtractKeywords extends AbstractFileInputMapTask {
     //         */
     //        final byte[] val;
 
-    public ExtractKeywords(UUID uuid, Integer nreduce,
+    public ExtractKeywords(UUID uuid, Object source, Integer nreduce,
             IHashFunction hashFunction) {
 
-        super(uuid, nreduce, hashFunction);
+        super(uuid, source, nreduce, hashFunction);
 
         //            try {
         //

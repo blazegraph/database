@@ -1,8 +1,11 @@
-package com.bigdata.service.mapReduce;
+package com.bigdata.service.mapReduce.tasks;
 
 import java.io.File;
 import java.io.InputStream;
 import java.util.UUID;
+
+import com.bigdata.service.mapReduce.AbstractFileInputMapTask;
+import com.bigdata.service.mapReduce.IHashFunction;
 
 /**
  * Reads the bytes and throws them away.
@@ -12,9 +15,14 @@ import java.util.UUID;
  */
 public class ReadOnlyMapTask extends AbstractFileInputMapTask {
 
-    public ReadOnlyMapTask(UUID uuid, Integer nreduce, IHashFunction hashFunction) {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 2055918237931155126L;
 
-        super(uuid, nreduce, hashFunction);
+    public ReadOnlyMapTask(UUID uuid, Object source, Integer nreduce, IHashFunction hashFunction) {
+
+        super(uuid, source, nreduce, hashFunction);
 
     }
     

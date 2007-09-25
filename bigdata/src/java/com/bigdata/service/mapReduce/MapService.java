@@ -50,24 +50,17 @@ package com.bigdata.service.mapReduce;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
-import org.apache.system.SystemUtil;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A service for {@link IMapTask} processing. Those tasks are distributed by the
@@ -76,188 +69,28 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class MapService implements IServiceShutdown, IMapService {
+abstract public class MapService extends AbstractJobAndTaskService<MapJobMetadata, AbstractMapTask> implements IServiceShutdown {
 
     public static final transient Logger log = Logger
             .getLogger(MapService.class);
 
     /**
-     * Text of the error message used when the UUID of a job is already known to
-     * the service.
-     */
-    public static final String ERR_JOB_EXISTS = "job already registered";
-    
-    /**
-     * Text of the error message used when the UUID of a job is not know to this
-     * service.
-     */
-    public static final String ERR_NO_SUCH_JOB = "job not registered";
-    
-    /**
-     * Queue of executing {@link IMapTask}s.
-     */
-    final protected ExecutorService taskService;
-
-    /**
-     * The default is N=50 threads per CPU.
-     */
-    final int threadPoolSize = 50 * SystemUtil.numProcessors();
-
-    /**
      * @param properties
-     * 
-     * @todo define properties, including the thread pool sizes, the directory
-     *       to be used for temporary files, etc.
      */
     public MapService(Properties properties) {
 
-        taskService = Executors.newFixedThreadPool(threadPoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
-
-    }
-
-    public void shutdown() {
-
-        taskService.shutdown();
-        
-    }
-
-    public void shutdownNow() {
-
-        taskService.shutdownNow();
-        
-    }
-    
-    /**
-     * The unique identifier for this service.
-     * 
-     * @return The unique service identifier.
-     */
-    public abstract UUID getServiceUUID() throws IOException;
-
-    /**
-     * The state of a map/reduce job that is relevant to this service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class JobState extends AbstractJobState {
-
-        /**
-         * The reduce task identifiers. There is one entry in this array per
-         * reduce partition. The reduce task identifier is used to name the
-         * index on the corresponding {@link DataService} in
-         * {@link #dataServices} on which the output for that reduce partition
-         * will be written.
-         */
-        final UUID[] reduceTasks;
-        
-        /**
-         * The UUIDs of the {@link DataService}s on which the map task will
-         * write.  There is one entry in this array per reduce partition.
-         */
-        final UUID[] dataServices;
-
-        public JobState(UUID uuid,UUID[] reduceTasks, UUID[] dataServices) {
-       
-            super(uuid);
-            
-            this.reduceTasks = reduceTasks;
-            
-            this.dataServices = dataServices;
-            
-        }
+        super(properties);
 
     }
 
     /**
-     * Running jobs.
+     * Returns instances of {@link MapTaskWorker}.
      */
-    final protected Map<UUID,JobState> jobs = new ConcurrentHashMap<UUID, JobState>();
-
-    public void startJob(UUID uuid, UUID[] reduceTasks, UUID[] dataServices) {
+    AbstractTaskWorker<MapJobMetadata, AbstractMapTask> 
+        newTaskWorker(JobState<MapJobMetadata> jobState, AbstractMapTask task) {
         
-        if(uuid==null) throw new IllegalArgumentException();
-
-        if(reduceTasks==null) throw new IllegalArgumentException();
+        return new MapTaskWorker(jobState, task);
         
-        if(reduceTasks.length==0) throw new IllegalArgumentException();
-
-        if(dataServices==null) throw new IllegalArgumentException();
-
-        if(dataServices.length != reduceTasks.length) throw new IllegalArgumentException();
-
-        for (int i = 0; i < reduceTasks.length; i++) {
-
-            if (reduceTasks[i] == null)
-                throw new IllegalArgumentException();
-
-            if (dataServices[i] == null)
-                throw new IllegalArgumentException();
-            
-        }
-        
-        if(jobs.containsKey(uuid)) {
-            
-            throw new IllegalStateException(ERR_JOB_EXISTS+" : "+uuid);
-            
-        }
-        
-        jobs.put(uuid,new JobState(uuid,reduceTasks,dataServices));
-
-        log.info("job=" + uuid + ", nreduceServices=" + reduceTasks.length);
-        
-    }
-
-    public void endJob(UUID uuid) {
-
-        if(uuid==null) throw new IllegalArgumentException();
-
-        JobState jobState = jobs.remove(uuid);
-        
-        if(jobState==null) {
-            
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
-            
-        }
-
-        jobState.cancelAll();
-        
-        log.info("job=" + uuid );
-
-    }
-
-    public Future submit(UUID uuid, File input, IMapTask task) {
-
-        JobState jobState = jobs.get(uuid);
-        
-        if (jobState == null)
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+uuid);
-
-        log.info("job=" + uuid+", task="+task.getUUID());
-
-        // @todo make this work for distributed services also.
-        Future<Object> future = taskService
-                .submit(new MapTaskWorker(((EmbeddedMapService) this).client,
-                        uuid, input, task, jobState));
-        
-        jobState.futures.put(task.getUUID(), future);
-        
-        return future;
-        
-    }
-    
-    public boolean cancel(UUID job, UUID task) {
-
-        JobState jobState = jobs.get(job);
-        
-        if (jobState == null)
-            throw new IllegalStateException(ERR_NO_SUCH_JOB+" : "+job);
-
-        log.info("job=" + job+", task="+task);
-        
-        return jobState.cancel(task);
-
     }
 
     /**
@@ -266,49 +99,21 @@ abstract public class MapService implements IServiceShutdown, IMapService {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class MapTaskWorker extends AbstractTaskWorker {
+    static class MapTaskWorker extends AbstractTaskWorker<MapJobMetadata, AbstractMapTask> {
 
-        protected final File input;
-        protected final IMapTask task;
-        protected final JobState jobState;
-        
-        /**
-         * 
-         * @param input
-         *            The input file (typically read from a network file
-         *            system).
-         * @param task
-         *            The map task.
-         */
-        public MapTaskWorker(IBigdataClient client, UUID uuid, File input, IMapTask task, JobState jobState) {
+        public MapTaskWorker(JobState<MapJobMetadata> jobState, AbstractMapTask task) {
 
-            super(client,uuid);
+            super(jobState,task);
 
-            if (task == null)
-                throw new IllegalArgumentException();
-
-            if (input == null)
-                throw new IllegalArgumentException();
-
-            if (jobState == null)
-                throw new IllegalArgumentException();
-
-            this.input = input;
-
-            this.task = task;
-            
-            this.jobState = jobState;
-            
         }
 
         /**
          * Run the {@link IMapTask}.
-         * 
-         * @return <code>null</code>
          */
-        public Object call() throws Exception {
-
-            log.info("Now running: job=" + uuid+", task="+task.getUUID());
+        protected void run() throws Exception {
+            
+            log.info("Now running: job=" + jobState.getUUID() + ", task="
+                    + task.getUUID());
             
             final long begin1 = System.currentTimeMillis();
             
@@ -320,9 +125,11 @@ abstract public class MapService implements IServiceShutdown, IMapService {
 
                     /*
                      * Run the task.
+                     * 
+                     * @todo assumes that we are reading from a file.
                      */
 
-                    t.input(input);
+                    t.input((File)t.getSource());
 
                     final long elapsed1 = System.currentTimeMillis() - begin1;
 
@@ -342,7 +149,7 @@ abstract public class MapService implements IServiceShutdown, IMapService {
                             + "ms - total operation time is "
                             + (elapsed1 + elapsed2) + "ms");
 
-                    return null;
+                    return;
 
                 } catch (Throwable t) {
 
@@ -454,8 +261,10 @@ abstract public class MapService implements IServiceShutdown, IMapService {
                     
                     Arrays.sort( a );
 
-                    write(client, jobState.reduceTasks[i],
-                            jobState.dataServices[i], a);
+                    write( jobState.client,
+                           jobState.metadata.getReduceTasks()[i],
+                           jobState.metadata.getDataServices()[i],
+                           a );
 
                 }
             
@@ -526,27 +335,33 @@ abstract public class MapService implements IServiceShutdown, IMapService {
         
         final private UUID serviceUUID;
         
-        final public IBigdataClient client;
+        final public IBigdataClient bigdataClient;
         
-        public EmbeddedMapService(UUID serviceUUID, Properties properties, IBigdataClient client) {
+        public EmbeddedMapService(UUID serviceUUID, Properties properties, IBigdataClient bigdataClient) {
             
             super(properties);
             
             if (serviceUUID == null)
                 throw new IllegalArgumentException();
         
-            if (client == null)
+            if (bigdataClient == null)
                 throw new IllegalArgumentException();
             
             this.serviceUUID = serviceUUID;
             
-            this.client = client;
+            this.bigdataClient = bigdataClient;
             
         }
 
         public UUID getServiceUUID() throws IOException {
 
             return serviceUUID;
+            
+        }
+
+        public IBigdataClient getBigdataClient() {
+
+            return bigdataClient;
             
         }
         
