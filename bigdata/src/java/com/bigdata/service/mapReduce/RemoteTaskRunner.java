@@ -98,6 +98,11 @@ public class RemoteTaskRunner<M extends IJobMetadata,T extends ITask> {
     /**
      * The services that can be choosen from. This array is updated from time to
      * time as services are discovered or become unavailable.
+     * 
+     * Note: the reverse conversion from the service UUID to the service proxy
+     * is not necessary since we have the service proxy already on hand and can
+     * just use that reference rather than the UUID (the problem is that getting
+     * the UUID from the reference is an RPC.)
      */
     private UUID[] serviceUUIDs;
     
@@ -339,7 +344,7 @@ public class RemoteTaskRunner<M extends IJobMetadata,T extends ITask> {
                     
                 } catch (Exception ex) {
 
-                    log.warn("Could not obtain UUID for service# "+i);
+                    log.warn("Could not obtain UUID for service# "+i, ex);
 
                     continue;
 
@@ -361,7 +366,7 @@ public class RemoteTaskRunner<M extends IJobMetadata,T extends ITask> {
 
                 } catch (Exception ex) {
 
-                    log.warn("Could not start job on service: " + serviceUUID);
+                    log.warn("Could not start job on service: " + serviceUUID, ex);
 
                     continue;
 
@@ -885,7 +890,7 @@ public class RemoteTaskRunner<M extends IJobMetadata,T extends ITask> {
             
         } catch(IOException ex) {
        
-            log.warn("Could not submit task: service="+serviceUUID+", task="+taskUUID);
+            log.warn("Could not submit task: service="+serviceUUID+", task="+taskUUID, ex);
             
             return false;
             

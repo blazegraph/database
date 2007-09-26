@@ -8,6 +8,7 @@ import java.io.Reader;
 import java.io.StreamTokenizer;
 import java.util.UUID;
 
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.service.mapReduce.AbstractFileInputMapTask;
 import com.bigdata.service.mapReduce.IHashFunction;
 
@@ -32,7 +33,7 @@ public class ExtractKeywords extends AbstractFileInputMapTask {
     /**
      * The encoding used to serialize the term (the value of each tuple).
      */
-    public static final String UTF8 = "UTF-8";
+    public static final transient String UTF8 = "UTF-8";
 
     //        /**
     //         * A byte array representing a packed long integer whose value is ONE
@@ -63,6 +64,8 @@ public class ExtractKeywords extends AbstractFileInputMapTask {
 
         // @todo encoding guesser.
 
+        KeyBuilder keyBuilder = getKeyBuilder();
+        
         Reader r = new BufferedReader(new InputStreamReader(is));
 
         StreamTokenizer tok = new StreamTokenizer(r);

@@ -12,9 +12,14 @@ import com.bigdata.io.DataOutputBuffer;
 /**
  * Abstract base class for {@link IMapTask}s.
  * <p>
- * Note: The presumption is that there is a distinct instance of the map
- * task for each task executed and that each task is executed within a
+ * Note: The presumption is that there is a distinct instance of the map task
+ * for each task executed and that each task is executed within a
  * single-threaded environment.
+ * <p>
+ * Note: Any declared fields are materialized on the master and the service, so
+ * make the field <strong>transient</strong> unless you need to send it to the
+ * service and do not initialize anything large on the master (unless it is
+ * transient). Lazy initialization is nice since we only do it on the service.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -26,8 +31,43 @@ abstract public class AbstractMapTask implements IMapTask {
     protected final int nreduce;
     protected final IHashFunction hashFunction;
 
-    private final List tuples = new ArrayList<Tuple>(1000);
-    private final int[] histogram;
+    // service side data structures (all transient).
+    private transient List tuples;
+    private transient int[] histogram;
+    private transient KeyBuilder keyBuilder;
+    private transient DataOutputBuffer valBuilder;
+    static private transient final Tuple[] EMPTY = new Tuple[]{};
+
+    /**
+     * The {@link KeyBuilder} MUST be used by the {@link IMapTask} so that
+     * the generated keys will have a total ordering determined by their
+     * interpretation as an <em>unsigned</em> byte[].
+     * 
+     * @todo does not always have to support unicode
+     * @todo could configure the buffer size for some tasks.
+     * @todo could choose the collation sequence for unicode.
+     */
+    protected KeyBuilder getKeyBuilder() {
+        if(keyBuilder==null) {
+            keyBuilder = new UnicodeKeyBuilder();
+        }
+        return keyBuilder;
+    }
+    
+    /**
+     * The values may be formatted using this utility class. The basic
+     * pattern is:
+     * 
+     * <pre>
+     * valBuilder.reset().append(foo).toByteArray();
+     * </pre>
+     */
+    protected DataOutputBuffer getDataOutputBuffer() {
+        if(valBuilder==null) {
+            valBuilder = new DataOutputBuffer();
+        }
+        return valBuilder;
+    }
 
     /**
      * @param uuid
@@ -67,8 +107,6 @@ abstract public class AbstractMapTask implements IMapTask {
         
         this.hashFunction = hashFunction;
 
-        this.histogram = new int[nreduce];
-        
     }
 
     public UUID getUUID() {
@@ -95,39 +133,20 @@ abstract public class AbstractMapTask implements IMapTask {
      */
     public Tuple[] getTuples() {
     
-        int ntuples = tuples.size();
+        int ntuples = getTupleCount();
+        
+        if(ntuples==0) return EMPTY;
         
         return (Tuple[]) tuples.toArray(new Tuple[ntuples]);
         
     }
-
-    /**
-     * The {@link KeyBuilder} MUST be used by the {@link IMapTask} so that
-     * the generated keys will have a total ordering determined by their
-     * interpretation as an <em>unsigned</em> byte[].
-     * 
-     * @todo does not always have to support unicode
-     * @todo could configure the buffer size for some tasks.
-     * @todo could choose the collation sequence for unicode.
-     */
-    protected final KeyBuilder keyBuilder = new UnicodeKeyBuilder();
-
-    /**
-     * The values may be formatted using this utility class. The basic
-     * pattern is:
-     * 
-     * <pre>
-     * valBuilder.reset().append(foo).toByteArray();
-     * </pre>
-     */
-    protected final DataOutputBuffer valBuilder = new DataOutputBuffer();
-
+    
     /**
      * The #of tuples written by the task.
      */
     public int getTupleCount() {
 
-        return tuples.size();
+        return tuples==null?0:tuples.size();
 
     }
 
@@ -147,6 +166,25 @@ abstract public class AbstractMapTask implements IMapTask {
      */
     public void output(byte[] val) {
     
+        if(keyBuilder==null) {
+            
+            throw new IllegalStateException("No key?");
+            
+        }
+        
+        // @todo try LinkedList vs ArrayList.
+        if(tuples==null) {
+          
+            /*
+             * Note: Lazy initialization of data structures on the service only.
+             */
+            
+            tuples = new ArrayList<Tuple>(1000);
+           
+            histogram = new int[nreduce];
+            
+        }
+        
         // The hash is computed using ONLY the application key.
         byte[] key = keyBuilder.getKey();
 
