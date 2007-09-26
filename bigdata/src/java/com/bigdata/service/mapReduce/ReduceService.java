@@ -72,7 +72,10 @@ import com.bigdata.service.RangeQuery;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ReduceService extends AbstractJobAndTaskService<ReduceJobMetadata, AbstractReduceTask> implements IServiceShutdown {
+abstract public class ReduceService
+    extends AbstractJobAndTaskService<ReduceJobMetadata, AbstractReduceTask>
+    implements IServiceShutdown, IReduceService
+{
 
     public static final transient Logger log = Logger
             .getLogger(ReduceService.class);

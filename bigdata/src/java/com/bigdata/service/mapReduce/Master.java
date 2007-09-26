@@ -78,7 +78,11 @@ public class Master extends AbstractMaster {
 
         super(job,client);
         
-        // @todo test for active also.
+        // @todo test for active (vs terminated) also since this can be
+        // reused across master instances (a master runs a single job,
+        // but the discovery stuff can be reused to run many jobs on
+        // as many masters).
+
         if (serviceDiscoveryManager == null)
             throw new IllegalArgumentException();
         
@@ -109,9 +113,9 @@ public class Master extends AbstractMaster {
         private final ServiceTemplate reduceServiceTemplate = new ServiceTemplate(
                 null, new Class[] { IReduceService.class }, null);
 
-        private ServiceItemFilter mapServiceFilter = null; //new MapServiceFilter();
+        private ServiceItemFilter mapServiceFilter = null;
 
-        private ServiceItemFilter reduceServiceFilter = null; //new ReduceServiceFilter();
+        private ServiceItemFilter reduceServiceFilter = null;
 
         public MapReduceServiceDiscoveryManager(BigdataClient client) {
 
@@ -139,9 +143,6 @@ public class Master extends AbstractMaster {
              * 
              * @todo provide filtering by attributes identiying the bigdata
              * federation?
-             * 
-             * @todo only do map/reduce service discovery on demand (setup this
-             * stuff lazily) since it is not used by all client operations.
              */
             try {
 
@@ -154,7 +155,7 @@ public class Master extends AbstractMaster {
                 terminate();
 
                 throw new RuntimeException(
-                        "Could not setup MapService LookupCache", ex);
+                        "Could not setup discovery for MapServices", ex);
 
             }
 
@@ -177,7 +178,7 @@ public class Master extends AbstractMaster {
                 terminate();
 
                 throw new RuntimeException(
-                        "Could not setup ReduceService LookupCache", ex);
+                        "Could not setup discovery for ReduceServices", ex);
 
             }
 
@@ -219,12 +220,12 @@ public class Master extends AbstractMaster {
          */
         public void status() {
 
-            // wait a bit for services to be discovered.
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                // ignore
-            }
+//            // wait a bit for services to be discovered.
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                // ignore
+//            }
 
             ServiceItem[] mapServiceItems = mapServiceLookupCache.lookup(
                     mapServiceFilter, Integer.MAX_VALUE);
@@ -240,72 +241,72 @@ public class Master extends AbstractMaster {
         
     }
     
-    /**
-     * Filter matches only {@link ServiceItem}s for map services
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class MapServiceFilter implements ServiceItemFilter {
-
-        public boolean check(ServiceItem item) {
-
-            if(item.service==null) {
-                
-                log.warn("Service is null: "+item);
-
-                return false;
-                
-            }
-            
-            if(!(item.service instanceof IMapService)) {
-               
-                log.info("Matched: "+item);
-                
-                return true;
-                
-            }
-
-            log.debug("Ignoring: "+item);
-            
-            return false;
-            
-        }
-        
-    }
-    
-    /**
-     * Filter matches only {@link ServiceItem}s for reduce services
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class ReduceServiceFilter implements ServiceItemFilter {
-
-        public boolean check(ServiceItem item) {
-
-            if(item.service==null) {
-                
-                log.warn("Service is null: "+item);
-
-                return false;
-                
-            }
-            
-            if(!(item.service instanceof IReduceService)) {
-               
-                log.info("Matched: "+item);
-                
-                return true;
-                
-            }
-
-            log.debug("Ignoring: "+item);
-            
-            return false;
-            
-        }
-        
-    }
+//    /**
+//     * Filter matches only {@link ServiceItem}s for map services
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static public class MapServiceFilter implements ServiceItemFilter {
+//
+//        public boolean check(ServiceItem item) {
+//
+//            if(item.service==null) {
+//                
+//                log.warn("Service is null: "+item);
+//
+//                return false;
+//                
+//            }
+//
+//            if (item.service instanceof IMapService) {
+//
+//                log.info("Matched: " + item);
+//
+//                return true;
+//
+//            }
+//
+//            log.debug("Ignoring: "+item);
+//            
+//            return false;
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Filter matches only {@link ServiceItem}s for reduce services
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static public class ReduceServiceFilter implements ServiceItemFilter {
+//
+//        public boolean check(ServiceItem item) {
+//
+//            if(item.service==null) {
+//                
+//                log.warn("Service is null: "+item);
+//
+//                return false;
+//                
+//            }
+//
+//            if (item.service instanceof IReduceService) {
+//
+//                log.info("Matched: " + item);
+//
+//                return true;
+//
+//            }
+//
+//            log.debug("Ignoring: "+item);
+//            
+//            return false;
+//            
+//        }
+//        
+//    }
     
 }
