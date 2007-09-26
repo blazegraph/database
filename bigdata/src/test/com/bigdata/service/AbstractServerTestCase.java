@@ -47,8 +47,11 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
@@ -59,6 +62,7 @@ import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
+import com.sun.jini.tool.ClassServer;
 
 /**
  * Abstract base class for tests of remote services.
@@ -66,9 +70,28 @@ import com.bigdata.scaleup.IResourceMetadata;
  * Note: jini MUST be running. You can get the jini starter kit and install it
  * to get jini running.
  * </p>
+ * <p>
+ * Note: You MUST specify a security policy that is sufficiently lax.
+ * </p>
+ * <p>
+ * Note: You MUST specify the codebase for downloadable code.
+ * </p>
+ * <p>
+ * Note: A {@link ClassServer} will be started on port 8081 by default.  If
+ * that port is in use then you MUST specify another port.
+ * </p>
+ * 
+ * The following system properties will do the trick unless you have something
+ * running on port 8081.
  * 
  * <pre>
- * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+ * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://localhost:8081
+ * </pre>
+ * 
+ * To use another port, try:
+ * 
+ * <pre>
+ * -Djava.security.policy=policy.all -Dbigdata.test.port=8082 -Djava.rmi.server.codebase=http://localhost:8082
  * </pre>
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -92,6 +115,159 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      */
     public AbstractServerTestCase(String arg0) {
         super(arg0);
+    }
+
+//    /**
+//     * Return an open port on current machine. Try the suggested port first. If
+//     * suggestedPort is zero, just select a random port
+//     */
+//    private static int getPort(int suggestedPort) throws IOException {
+//        ServerSocket openSocket;
+//        try {
+//            openSocket = new ServerSocket(suggestedPort);
+//        } catch (BindException ex) {
+//            // the port is busy, so look for a random open port
+//            openSocket = new ServerSocket(0);
+//        }
+//
+//        int port = openSocket.getLocalPort();
+//        openSocket.close();
+//
+//        return port;
+//    }
+
+    /**
+     * This may be used to verify that a specific port is available. The method
+     * will return iff the port is available at the time that this method was
+     * called. The method will retry a few times since sometimes it takes a bit
+     * for a socket to get released and we are reusing the same socket for the
+     * {@link ClassServer} for each test.
+     * 
+     * @param port
+     *            The port to try.
+     * 
+     * @exception AssertionFailedError
+     *                if the port is not available.
+     */
+    protected static void assertOpenPort(int port) throws IOException {
+        
+        ServerSocket openSocket;
+
+        int i = 0;
+        
+        final int maxTries = 3;
+        
+        while (i < maxTries) {
+        
+            try {
+
+                // try to open a server socket on that port.
+                openSocket = new ServerSocket(port);
+
+                // close the socket - it is available for the moment.
+                openSocket.close();
+
+                return;
+
+            } catch (BindException ex) {
+
+                if(i++<maxTries) {
+
+                    log.warn("Port is busy - retrying: " + ex);
+                    
+                    try {
+                        Thread.sleep(100/*ms*/);
+                    } catch(InterruptedException t) {
+                        /* ignore */
+                    }
+                    
+                } else {
+                    
+                    fail("Port is busy: "+ex+" - use "+PORT_OPTION+" to specify another port?");
+
+                }
+
+            }
+
+        }
+        
+    }
+
+    private ClassServer classServer;
+    
+    /**
+     * The name of the System property that may be used to change the port on which
+     * the {@link ClassServer} will be started.
+     */
+    public static final String PORT_OPTION = "bigdata.test.port";
+    
+    /**
+     * The default port on which the {@link ClassServer} will be started.
+     */
+    public static final String DEFAULT_PORT = "8081";
+    
+    /**
+     * Starts a {@link ClassServer} that supports downloadable code for the unit
+     * test. The {@link ClassServer} will start on the port named by the System
+     * property {@link #PORT_OPTION} and on port {@link #DEFAULT_PORT} if that
+     * system property is not set.
+     * 
+     * @throws IOException 
+     */
+    protected void startClassServer() throws IOException {
+
+        /*
+         * Obtain port from System.getProperties() so that other ports may be
+         * used.
+         */
+        final int port = Integer.parseInt(System.getProperty(PORT_OPTION,DEFAULT_PORT));
+        
+        /*
+         * The directories containing the JARs and the compiled classes for the
+         * bigdata project.
+         */
+        String dirlist = 
+            "lib"+File.pathSeparatorChar+
+            "lib"+File.separatorChar+"icu"+File.pathSeparatorChar+
+            "lib"+File.separatorChar+"jini"+File.pathSeparatorChar+
+            "bin";
+        
+        assertOpenPort(port);
+        
+        classServer = new ClassServer(
+                port,
+                dirlist,
+                true, // trees - serve up files inside of JARs,
+                true // verbose
+                );
+        
+        classServer.start();
+
+    }
+    
+    public void setUp() throws Exception {
+
+        log.info(getName());
+        
+        startClassServer();
+        
+    }
+
+    /**
+     * Stops the {@link ClassServer}.
+     */
+    public void tearDown() throws Exception {
+        
+        if(classServer!=null) {
+
+            classServer.terminate();
+            
+        }
+        
+        super.tearDown();
+
+        log.info(getName());
+        
     }
     
     /**

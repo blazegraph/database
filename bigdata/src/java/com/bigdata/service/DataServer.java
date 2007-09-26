@@ -137,9 +137,9 @@ public class DataServer extends AbstractServer {
 
             IJournal journal = service.journal;
             
-            log.info("Closing and deleting: "+journal.getFile());
+            log.info("Deleting: "+journal.getFile());
             
-            journal.closeAndDelete();
+            journal.delete();
 
             log.info("Journal deleted.");
 

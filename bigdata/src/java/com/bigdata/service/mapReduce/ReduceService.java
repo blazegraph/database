@@ -67,7 +67,7 @@ import com.bigdata.service.RangeQuery;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by
- * the {@link MapReduceMaster}.
+ * the {@link Master}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

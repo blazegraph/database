@@ -7,6 +7,10 @@ import java.util.UUID;
 /**
  * A map reduce job.
  * 
+ * @todo Support description of a map/reduce using XML (parse and serialize).
+ *       This will give us a handy means to describe jobs that are then executed
+ *       on the command line using {@link Master}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

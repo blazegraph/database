@@ -56,6 +56,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 
 /**
+ * Interface allowing clients to connect to {@link IBigdataFederation}s.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -79,12 +81,9 @@ public interface IBigdataClient {
     public IBigdataFederation connect();
     
     /**
-     * Terminate any background processing that is being performed on the
-     * behalf of the client.
-     * 
-     * @todo add IBigdataFederation#disconnect() which disconnects from a
-     *       specific federation. When the client is terminated, first
-     *       disconnect from each federation and then terminate the client.
+     * Disconnects from any connected federation(s) and then terminate any
+     * background processing that is being performed on the behalf of the
+     * client.
      */
     public void terminate();
 

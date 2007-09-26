@@ -230,7 +230,15 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         open = false;
 
     }
-    
+
+    final public void closeAndDelete() {
+        
+        close();
+
+        delete();
+        
+    }
+
     /**
      * Invoked if the store would overflow on {@link #write(ByteBuffer)}. The
      * default behavior extends the capacity of the buffer by the maximum of 32M

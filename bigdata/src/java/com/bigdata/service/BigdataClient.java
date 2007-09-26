@@ -86,7 +86,7 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * communications from the application. The {@link IIndex} objects provided by
  * the factory are responsible for transparently discovering the
  * {@link IDataService}s on which the index partitions are located and
- * directing read and write operations appropriately.
+ * directing read and write operations appropriately.  See {@link ClientIndexView}.
  * <p>
  * A client may discover and use an {@link ITransactionManager} if needs to use
  * transactions as opposed to unisolated reads and writes. When the client
@@ -102,11 +102,6 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * the transaction manager and it simply specifies <code>0L</code> as the
  * transaction identifier for its read and write operations.
  * 
- * @todo if possible, reconcile index interfaces and a client interface such
- *       that a bigdata client application can use the same code regardless
- *       whether the client is embedded, uses jini, or uses another services
- *       architectre such as OSGi, WSDL, etc.
- * 
  * @todo write tests where an index is static partitioned over multiple data
  *       services and verify that the {@link ClientIndexView} is consistent.
  *       <p>
@@ -116,13 +111,8 @@ import com.bigdata.scaleup.IPartitionMetadata;
  *       the 2-/3-phase commit protocol has not been implemented on the
  *       journal).
  * 
- * @todo Write or refactor logic to map operations across multiple partitions.
- * 
  * @todo reuse cached information across transactional and non-transactional
  *       views of the same index.
- * 
- * @todo Use lambda expressions (and downloaded code) for server-side logic for
- *       batch operations.
  * 
  * @todo support failover metadata service discovery.
  * 
@@ -314,8 +304,9 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     /**
      * Conditionally install a suitable security manager if there is none in
      * place. This is required before the client can download code. The code
-     * will be downloaded from the HTTP server identified by the codebase
-     * property specified for the VM running the service.
+     * will be downloaded from the HTTP server identified by the
+     * <code>java.rmi.server.codebase</code> property specified for the VM
+     * running the service.
      */
     protected void setSecurityManager() {
 
@@ -472,20 +463,18 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
     }
 
-    /**
-     * Terminates various background processes.
-     * 
-     * @todo add IBigdataFederation#disconnect() which disconnects from a
-     *       specific federation. When the client is terminated, first
-     *       disconnect from each federation and then terminate the client.
-     */
     public void terminate() {
 
         if( fed != null ) {
-            
+
+            // disconnect from the federation.
             fed.disconnect();
             
         }
+        
+        /*
+         * Stop various discovery processes.
+         */
         
         if (metadataServiceLookupCache != null) {
 

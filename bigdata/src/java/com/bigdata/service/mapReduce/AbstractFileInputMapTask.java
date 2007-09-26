@@ -33,7 +33,7 @@ abstract public class AbstractFileInputMapTask extends
      */
     final public void input(File file) throws Exception {
 
-        MapReduceMaster.log.info("Start file: " + file);
+        Master.log.info("Start file: " + file);
 
         final InputStream is = new BufferedInputStream(new FileInputStream(
                 file));
@@ -42,7 +42,7 @@ abstract public class AbstractFileInputMapTask extends
 
             input(file, is);
 
-            MapReduceMaster.log.info("Done file : " + file + ", ntuples="
+            Master.log.info("Done file : " + file + ", ntuples="
                             + getTupleCount());
 
         } finally {
@@ -53,7 +53,7 @@ abstract public class AbstractFileInputMapTask extends
 
             } catch (Throwable t) {
 
-                MapReduceMaster.log.warn("Problem closing input stream: " + file, t);
+                Master.log.warn("Problem closing input stream: " + file, t);
 
             }
 
