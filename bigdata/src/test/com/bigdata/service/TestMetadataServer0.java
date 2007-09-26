@@ -242,12 +242,12 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
             Thread.sleep(500);
 
-            assertNotNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService0ID));
+            assertNotNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService0ID));
 
-            assertNotNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService1ID));
+            assertNotNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService1ID));
 
             assertEquals("#dataServices", 2, metadataServer0.
-                    dataServiceMap.getDataServiceCount());
+                    dataServiceMap.getServiceCount());
 
         } finally {
 
@@ -264,12 +264,12 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
                 Thread.sleep(500);
 
                 assertEquals("#dataServices", 1, metadataServer0
-                        .dataServiceMap.getDataServiceCount());
+                        .dataServiceMap.getServiceCount());
 
-                assertNull(metadataServer0.dataServiceMap.getDataServiceByID(dataService0ID));
+                assertNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService0ID));
 
                 assertNotNull(metadataServer0
-                        .dataServiceMap.getDataServiceByID(dataService1ID));
+                        .dataServiceMap.getServiceItemByID(dataService1ID));
 
             }
 

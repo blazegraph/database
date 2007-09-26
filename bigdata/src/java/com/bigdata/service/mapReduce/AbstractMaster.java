@@ -393,13 +393,14 @@ public abstract class AbstractMaster {
     
     /**
      * Select the map, reduce, and data services to be used by the job.
+     * <p>
+     * 
+     * @exception IllegalStateException
+     *                if {@link #mapServices} and {@link #reduceServices} have
+     *                not been initialized before calling this method.
      */
     protected void setUp() {
 
-        /*
-         * Note: concrete implementation MUST initialize [mapServices] and
-         * [reduceServices] before calling this method.
-         */
         if(mapServices==null||reduceServices==null) {
             
             throw new IllegalStateException(
@@ -498,15 +499,6 @@ public abstract class AbstractMaster {
     }
     
     /**
-     * Start the job.
-     */
-    protected void start() {
-
-        setUp();
-        
-    }
-
-    /**
      * Terminate the job.
      */
     protected void terminate() {
@@ -515,18 +507,34 @@ public abstract class AbstractMaster {
          * Release the intermediate stores.
          */
 
-        for(int i=0; i<dataServices.length; i++) {
-            try {
-                IDataService ds = client.getDataService(dataServices[i]);
-                if(ds==null) {
-                    log.warn("Could not locate data service: "+dataServices[i]);
+        if (dataServices != null) {
+
+            for (int i = 0; i < dataServices.length; i++) {
+
+                try {
+                
+                    IDataService ds = client.getDataService(dataServices[i]);
+                    
+                    if (ds == null) {
+                        
+                        log.warn("Could not locate data service: "
+                                + dataServices[i]);
+                        
+                    }
+                    
+                    // the index name (local on the data service).
+                    String name = reduceTasks[i].toString();
+                    
+                    ds.dropIndex(name);
+                    
+                } catch (Exception e) {
+                    
+                    log.warn("Data service: " + e);
+                    
                 }
-                // the index name (local on the data service).
-                String name = reduceTasks[i].toString();
-                ds.dropIndex(name);
-            } catch(Exception e) {
-                log.warn("Data service: "+e);
+                
             }
+
         }
 
         tearDown();
@@ -612,29 +620,41 @@ public abstract class AbstractMaster {
         return ((double)reduceTaskRunner.nsuccess)/reduceTaskRunner.ntasks;
         
     }
+
+    /**
+     * The percent success for the map operation [0:1].
+     */
+    public double getMapPercentSuccess() {
+
+        return (mapTaskRunner == null ? 0d : ((double) mapTaskRunner.nsuccess)
+                / mapTaskRunner.ntasks);
+        
+    }
+    
+    /**
+     * The percent success for the reduce operation [0:1].
+     */
+    public double getReducePercentSuccess() {
+        
+        return (reduceTaskRunner == null ? 0d
+                : ((double) reduceTaskRunner.nsuccess)
+                        / reduceTaskRunner.ntasks);
+    }
     
     /**
      * A summary of the current job state.
      */
     public String status() {
 
-        final double mapPercent = (mapTaskRunner == null ? 0d
-                : ((double) mapTaskRunner.nsuccess) / mapTaskRunner.ntasks);
-
-        final double reducePercent = (reduceTaskRunner == null ? 0d
-                : ((double) reduceTaskRunner.nsuccess)
-                        / reduceTaskRunner.ntasks);
-        
-        final String map = "map( m=" + job.m + ", ntasks="
-                + getMapTaskCount() + ", nretried=" + getMapRetryCount()
-                + ", success=" + percent.format(mapPercent) + ", elapsed="
+        final String map = "map( m=" + job.m + ", ntasks=" + getMapTaskCount()
+                + ", nretried=" + getMapRetryCount() + ", success="
+                + percent.format(getMapPercentSuccess()) + ", elapsed="
                 + getMapElapsedTime() + "ms )";
 
         final String reduce = "reduce( n=" + job.n + ", ntasks="
-                + getReduceTaskCount() + ", nretried="
-                + getReduceRetryCount() + ", success="
-                + percent.format(reducePercent) + ", elapsed="
-                + getReduceElapsedTime() + "ms )";
+                + getReduceTaskCount() + ", nretried=" + getReduceRetryCount()
+                + ", success=" + percent.format(getReducePercentSuccess())
+                + ", elapsed=" + getReduceElapsedTime() + "ms )";
 
         return map + "\n" + reduce;
         
@@ -650,12 +670,12 @@ public abstract class AbstractMaster {
      */
     public AbstractMaster run(double minMapSuccessRate, double minReduceSuccessRate) {
         
-        try {
+        /*
+         * Notify everyone that this job is starting.
+         */
+        setUp();
 
-            /*
-             * Notify everyone that this job is starting.
-             */
-            start();
+        try {
 
             /*
              * Distribute the map tasks and wait for them to complete.
@@ -709,7 +729,11 @@ public abstract class AbstractMaster {
              * Terminate the job.
              */
 
-            terminate();
+            try {
+                terminate();
+            } catch(Throwable t) {
+                log.warn("Problem terminating master: "+t,t);
+            }
             
         }
 

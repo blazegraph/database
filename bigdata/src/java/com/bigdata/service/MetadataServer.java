@@ -59,7 +59,6 @@ import net.jini.core.lookup.ServiceTemplate;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
-import net.jini.lookup.ServiceItemFilter;
 
 /**
  * A metadata server.
@@ -96,7 +95,7 @@ public class MetadataServer extends DataServer {
      * Provides direct cached lookup of {@link DataService}s by their
      * {@link ServiceID}.
      */
-    public DataServiceMap dataServiceMap = new DataServiceMap();
+    public ServiceCache dataServiceMap = new ServiceCache();
 
     protected LookupCache getDataServiceLookupCache() {
         
@@ -122,14 +121,13 @@ public class MetadataServer extends DataServer {
             
         } catch(IOException ex) {
             
-            log.error("Could not initiate service discovery manager", ex);
-            
-            System.exit(1);
+            throw new RuntimeException(
+                    "Could not initiate service discovery manager", ex);
             
         }
 
         /*
-         * Setup a dataServiceLookupCache that will be populated with all services that match a
+         * Setup a LookupCache that will be populated with all services that match a
          * filter. This is used to keep track of all data services registered
          * with any service registrar to which the metadata server is listening.
          */
@@ -144,9 +142,7 @@ public class MetadataServer extends DataServer {
             
         } catch(RemoteException ex) {
             
-            log.error("Could not setup lookup dataServiceLookupCache", ex);
-            
-            System.exit(1);
+            throw new RuntimeException("Could not setup LookupCache", ex);
             
         }
              
@@ -168,61 +164,13 @@ public class MetadataServer extends DataServer {
         
     }
     
-    /**
-     * Filter matches a {@link DataService} but not a {@link MetadataService}.
-     * <p>
-     * 
-     * @todo This explicitly filters out service variants that extend
-     *       {@link DataService} but which are not tasked as a
-     *       {@link DataService} by the {@link MetadataService}. It would be
-     *       easier if we refactored the interface hierarchy a bit so that there
-     *       was a common interface and abstract class extended by both the
-     *       {@link DataService} and the {@link MetadataService} such that we
-     *       could match on their specific interfaces without the possibility of
-     *       confusion.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class DataServiceFilter implements ServiceItemFilter {
-
-        public boolean check(ServiceItem item) {
-
-            if(item.service==null) {
-                
-                log.warn("Service is null: "+item);
-
-                return false;
-                
-            }
-            
-            if(!(item.service instanceof IMetadataService)) {
-               
-                log.info("Matched: "+item);
-                
-                return true;
-                
-            }
-
-            log.debug("Ignoring: "+item);
-            
-            return false;
-            
-        }
-        
-    }
-    
-    /**
-     * Extends the behavior to terminate {@link LookupCache} and
-     * {@link ServiceDiscoveryManager} processing.
-     */
-    public void destroy() {
+    protected void terminateServiceManagementThreads() {
         
         dataServiceLookupCache.terminate();
         
         serviceDiscoveryManager.terminate();
         
-        super.destroy();
+        super.terminateServiceManagementThreads();
 
     }
 
@@ -288,7 +236,7 @@ public class MetadataServer extends DataServer {
         public IDataService getDataServiceByUUID(UUID dataService) throws IOException {
             
             return (IDataService) server.dataServiceMap
-                    .getDataServiceByID(JiniUtil.uuid2ServiceID(dataService)).service;
+                    .getServiceItemByID(JiniUtil.uuid2ServiceID(dataService)).service;
             
         }
         

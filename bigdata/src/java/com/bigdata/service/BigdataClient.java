@@ -70,6 +70,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.service.mapReduce.IMapService;
+import com.bigdata.service.mapReduce.IReduceService;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -146,25 +148,25 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     private LookupCache dataServiceLookupCache = null;
     
     /**
-     * Used to provide {@link DataService} lookup by {@link ServiceID} once the
-     * appropriate partition of an index has been identified. Note that this
-     * will wind up tracking all local data services. I am not filtering to only
-     * those that the client actually uses since the notification events will be
-     * generated anyway and we will be storing at most 1000s of
-     * {@link DataService}s in this map.
+     * Used to provide {@link DataService} lookup by {@link ServiceID}.
      */
-    private DataServiceMap dataServiceMap = new DataServiceMap();
+    private ServiceCache dataServiceMap = new ServiceCache();
 
     private final ServiceTemplate metadataServiceTemplate = new ServiceTemplate(
             null, new Class[] { IMetadataService.class }, null);
 
     private final ServiceTemplate dataServiceTemplate = new ServiceTemplate(
             null, new Class[] { IDataService.class }, null);
-
     private ServiceItemFilter metadataServiceFilter = null;
 
-    private ServiceItemFilter dataServiceFilter = new MetadataServer.DataServiceFilter();
+    private ServiceItemFilter dataServiceFilter = new DataServiceFilter();
 
+    public DiscoveryManagement getDiscoveryManagement() {
+        
+        return discoveryManager;
+        
+    }
+    
     /**
      * Return the {@link IMetadataService} from the cache. If there is a cache
      * miss, then this will wait a bit for a {@link IMetadataService} to show up
@@ -239,19 +241,17 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      * Resolve the {@link ServiceID} to an {@link IDataService} using a local
      * cache.
      * 
-     * @param serviceID
+     * @param serviceUUID
      *            The identifier for a {@link DataService}.
      * 
      * @return The proxy for that {@link DataService} or <code>null</code> iff
      *         the {@link DataService} could not be discovered.
-     * 
-     * @todo change to accept the UUID so that JINI may be encapsulated.
      */
     public IDataService getDataService(UUID serviceUUID) {
         
         ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
         
-        ServiceItem item = dataServiceMap.getDataServiceByID(serviceID);
+        ServiceItem item = dataServiceMap.getServiceItemByID(serviceID);
         
         if (item == null) {
 
@@ -329,7 +329,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     /**
      * Client startup reads {@link Configuration} data from the file(s) named by
      * <i>args</i>, starts the client, attempts to discover one or more
-     * registrars and establishes a lookup cache for {@link MetadataService}s.
+     * registrars and establishes a lookup cache for {@link MetadataService}s
+     * and {@link DataService}s.
      * 
      * @param args
      *            The command line arguments.
@@ -340,7 +341,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
         setSecurityManager();
 
-        LookupLocator[] unicastLocators = null;
+        LookupLocator[] lookupLocators = null;
         String[] groups = null;
 
         try {
@@ -355,15 +356,20 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             groups = (String[]) config.getEntry(CLIENT_LABEL, "groups",
                     String[].class, LookupDiscovery.ALL_GROUPS/* default */);
 
-            unicastLocators = (LookupLocator[]) config
+            /*
+             * Note: multicast discovery is used regardless if
+             * LookupDiscovery.ALL_GROUPS is selected above. That is why there
+             * is no default for the lookupLocators. The default "ALL_GROUPS"
+             * means that the lookupLocators are ignored.
+             */
+            
+            lookupLocators = (LookupLocator[]) config
                     .getEntry(CLIENT_LABEL, "unicastLocators",
                             LookupLocator[].class, null/* default */);
 
         } catch (ConfigurationException ex) {
 
-            log.fatal("Configuration error: " + ex, ex);
-
-            System.exit(1);
+            throw new RuntimeException("Configuration error: " + ex, ex);
             
         }
         
@@ -377,18 +383,17 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
              * multicast discovery.
              */
             discoveryManager = new LookupDiscoveryManager(
-                    groups, unicastLocators, null /*DiscoveryListener*/
+                    groups, lookupLocators, null /*DiscoveryListener*/
             );
             
 //            discoveryManager = new LookupDiscovery(groups);
 
         } catch (IOException ex) {
 
-            log.fatal("Lookup service discovery error: " + ex, ex);
-
             terminate();
 
-            System.exit(1);
+            throw new RuntimeException("Lookup service discovery error: " + ex,
+                    ex);
 
         }
 
@@ -403,11 +408,9 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         } catch(IOException ex) {
             
-            log.error("Could not initiate service discovery manager", ex);
-            
             terminate();
             
-            System.exit(1);
+            throw new RuntimeException("Could not initiate service discovery manager", ex);
             
         }
 
@@ -428,11 +431,9 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         } catch(RemoteException ex) {
             
-            log.error("Could not setup MetadataService LookupCache", ex);
-
             terminate();
             
-            System.exit(1);
+            throw new RuntimeException("Could not setup MetadataService LookupCache", ex);
             
         }
 
@@ -442,7 +443,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
          * listening.
          * 
          * @todo provide filtering by attributes to select the primary vs
-         * failover metadata servers? by attributes identiying the bigdata
+         * failover data servers? by attributes identiying the bigdata
          * federation?
          */
         try {
@@ -453,11 +454,10 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         } catch(RemoteException ex) {
             
-            log.error("Could not setup DataService LookupCache", ex);
-
             terminate();
             
-            System.exit(1);
+            throw new RuntimeException(
+                    "Could not setup DataService LookupCache", ex);
             
         }
 
@@ -475,7 +475,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         /*
          * Stop various discovery processes.
          */
-        
+         
         if (metadataServiceLookupCache != null) {
 
             metadataServiceLookupCache.terminate();

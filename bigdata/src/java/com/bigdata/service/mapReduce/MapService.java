@@ -69,13 +69,27 @@ import com.bigdata.service.IServiceShutdown;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class MapService extends AbstractJobAndTaskService<MapJobMetadata, AbstractMapTask> implements IServiceShutdown {
+abstract public class MapService
+    extends AbstractJobAndTaskService<MapJobMetadata, AbstractMapTask>
+    implements IMapService, IServiceShutdown 
+{
 
     public static final transient Logger log = Logger
             .getLogger(MapService.class);
 
     /**
+     * Options for the {@link MapService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Options extends com.bigdata.service.mapReduce.AbstractJobAndTaskService.Options {
+        
+    }
+    
+    /**
      * @param properties
+     *            See {@link Options}.
      */
     public MapService(Properties properties) {
 
