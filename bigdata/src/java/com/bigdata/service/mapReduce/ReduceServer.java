@@ -55,6 +55,7 @@ import java.util.UUID;
 import net.jini.config.Configuration;
 
 import com.bigdata.service.AbstractServer;
+import com.bigdata.service.BigdataClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.JiniUtil;
 
@@ -171,10 +172,11 @@ public class ReduceServer extends AbstractServer {
             
         }
         
-        @Override
         public IBigdataClient getBigdataClient() {
-            // TODO Auto-generated method stub
-            return null;
+        
+            // @todo this assumes the default federation.
+            return new BigdataClient(new String[]{});
+
         }
 
     }

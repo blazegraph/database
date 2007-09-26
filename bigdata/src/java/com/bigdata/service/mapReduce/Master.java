@@ -88,7 +88,15 @@ public class Master extends AbstractMaster {
         
         this.serviceDiscoveryManager = serviceDiscoveryManager;
 
-        serviceDiscoveryManager.status();
+//        serviceDiscoveryManager.status();
+
+        mapServices = serviceDiscoveryManager.getMapServices();
+        
+        reduceServices = serviceDiscoveryManager.getReduceServices();
+        
+        log.info("Discovered "+mapServices.length+" map services");
+
+        log.info("Discovered "+reduceServices.length+" reduce services");
 
     }
 
@@ -216,28 +224,69 @@ public class Master extends AbstractMaster {
         }
 
         /**
-         * @todo remove this.
+         * Return an array of all discovered map services.
          */
-        public void status() {
+        public IMapService[] getMapServices() {
 
-//            // wait a bit for services to be discovered.
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                // ignore
-//            }
-
-            ServiceItem[] mapServiceItems = mapServiceLookupCache.lookup(
+            ServiceItem[] serviceItems = mapServiceLookupCache.lookup(
                     mapServiceFilter, Integer.MAX_VALUE);
+        
+            IMapService[] mapServices = new IMapService[serviceItems.length];
             
-            ServiceItem[] reduceServiceItems = reduceServiceLookupCache.lookup(
-                    reduceServiceFilter, Integer.MAX_VALUE);
-
-            System.err.println("Discovered "+mapServiceItems.length+" map services");
-
-            System.err.println("Discovered "+reduceServiceItems.length+" reduce services");
-
+            for(int i=0; i<serviceItems.length; i++) {
+                
+                mapServices[i] = (IMapService)serviceItems[i].service;
+                
+            }
+            
+            return mapServices;
+            
         }
+        
+        /**
+         * Return an array of all discovered reduce services.
+         */
+        public IReduceService[] getReduceServices() {
+
+            ServiceItem[] serviceItems = reduceServiceLookupCache.lookup(
+                    reduceServiceFilter, Integer.MAX_VALUE);
+        
+            IReduceService[] reduceServices = new IReduceService[serviceItems.length];
+            
+            for(int i=0; i<serviceItems.length; i++) {
+                
+                reduceServices[i] = (IReduceService)serviceItems[i].service;
+                
+            }
+            
+            return reduceServices;
+            
+        }
+        
+
+//        /**
+//         * @todo remove this.
+//         */
+//        public void status() {
+//
+////            // wait a bit for services to be discovered.
+////            try {
+////                Thread.sleep(1000);
+////            } catch (InterruptedException e) {
+////                // ignore
+////            }
+//
+//            ServiceItem[] mapServiceItems = mapServiceLookupCache.lookup(
+//                    mapServiceFilter, Integer.MAX_VALUE);
+//            
+//            ServiceItem[] reduceServiceItems = reduceServiceLookupCache.lookup(
+//                    reduceServiceFilter, Integer.MAX_VALUE);
+//
+//            System.err.println("Discovered "+mapServiceItems.length+" map services");
+//
+//            System.err.println("Discovered "+reduceServiceItems.length+" reduce services");
+//
+//        }
         
     }
     
