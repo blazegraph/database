@@ -349,19 +349,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
-    public void closeAndDelete() {
-        
-        close();
-        
-        if(!file.delete()) {
-            
-            System.err.println("WARN: Could not delete: "+file.getAbsolutePath());
-            
-        }
-        
-    }
-
-    public void deleteFile() {
+    public void delete() {
         
         if (isOpen()) {
 
@@ -377,7 +365,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    
+
     final public long getExtent() {
 
         return extent;

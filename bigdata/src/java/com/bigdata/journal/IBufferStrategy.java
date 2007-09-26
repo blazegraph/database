@@ -131,14 +131,6 @@ public interface IBufferStrategy extends IRawStore, IMROW {
     public void truncate(long extent);
 
     /**
-     * Delete the backing file for the journal if any.
-     * 
-     * @exception IllegalStateException
-     *                if the journal is open.
-     */
-    public void deleteFile();
-
-    /**
      * Write the root block onto stable storage (ie, flush it through to disk).
      * 
      * @param rootBlock

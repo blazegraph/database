@@ -51,7 +51,8 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates tests in dependency order.
+ * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
+ * <strong>required</strong> system properties in order to run this test suite.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -68,12 +69,6 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite(TestAll.class.getName());
 
         //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
-
-        /*
-         * Test case used to develop code for Jini-based service advertisment
-         * and discovery.
-         */
-        suite.addTestSuite( TestServiceDiscovery.class );
 
         /*
          * Test of a single client talking to a single data service instance

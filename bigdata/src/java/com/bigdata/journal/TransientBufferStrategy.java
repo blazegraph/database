@@ -85,7 +85,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
     
-    public void deleteFile() {
+    public void delete() {
         
         if( isOpen() ) {
             
@@ -110,12 +110,6 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
         return null;
         
-    }
-
-    public void closeAndDelete() {
-        
-        close();
-
     }
 
     final public boolean isStable() {

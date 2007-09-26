@@ -95,7 +95,7 @@ import com.sun.jini.start.ServiceStarter;
  * The recommended way to start a server is using the {@link ServiceStarter}.
  * 
  * <pre>
- *       java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ *         java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
  * </pre>
  * 
  * Other command line options MAY be recommended depending on the server that
@@ -113,14 +113,15 @@ import com.sun.jini.start.ServiceStarter;
  * </pre>
  * 
  * <p>
- * The service may be <em>terminated</em> by terminating the server process. A
- * {@link Runtime#addShutdownHook(Thread)} is installed by the server so that
- * you can also stop the server using ^C (Windows) and possibly
+ * The service may be <em>terminated</em> by terminating the server process.
+ * Termination implies that the server stops execution but that it MAY be
+ * restarted. A {@link Runtime#addShutdownHook(Thread)} is installed by the
+ * server so that you can also stop the server using ^C (Windows) and possibly
  * <code>kill</code> <i>pid</i> (Un*x). You can record the PID of the process
  * running the server when you start it under Un*x using a shell script. Note
  * that if you are starting multiple services at once with the
- * {@link ServiceStarter} then these methods will take down all servers running
- * in the same VM.
+ * {@link ServiceStarter} then these methods (^C or kill <i>pid</i>) will take
+ * down all servers running in the same VM.
  * </p>
  * <p>
  * Services are <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
@@ -232,8 +233,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     /**
      * Conditionally install a suitable security manager if there is none in
      * place. This is required before the server can download code. The code
-     * will be downloaded from the HTTP server identified by the codebase
-     * property specified for the VM running the service.
+     * will be downloaded from the HTTP server identified by the
+     * <code>java.rmi.server.codebase</code> property specified for the VM
+     * running the service.
      */
     protected void setSecurityManager() {
 

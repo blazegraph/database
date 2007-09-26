@@ -47,6 +47,10 @@ Modifications:
 
 package com.bigdata.service;
 
+import java.io.File;
+import java.io.InputStream;
+import java.util.UUID;
+
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -111,4 +115,45 @@ import com.bigdata.rawstore.IRawStore;
  */
 public interface IWritePipeline {
 
+//    /**
+//     * Write a record onto the pipeline (useful for the primary when a write is
+//     * made on the journal since the record is fully materialized).
+//     * 
+//     * @param addr
+//     *            The address at which the record is written.
+//     * @param data
+//     *            The record.
+//     */
+//    public void write(long addr,byte[] data);
+//    
+//    /**
+//     * Stream a record onto the pipeline (useful for the secondary to stream
+//     * further downstream).
+//     * 
+//     * @param addr
+//     *            The address at which the record is written.
+//     * @param is
+//     *            The data is read from this stream.
+//     */
+//    public void write(long addr,InputStream is);
+//    
+//    /**
+//     * Stream a file onto the pipeline (useful for replicating file system data
+//     * on the pipeline).
+//     * 
+//     * @param file
+//     *            The file name.
+//     * @param is
+//     *            The file contents are read from this stream.
+//     */
+//    public void write(File file,InputStream is);
+//    
+//    /**
+//     * The pipeline of data replication services. The location of this service
+//     * in the pipeline may be found by scanning the returned UUIDs.
+//     * 
+//     * @return
+//     */
+//    public UUID[] getPipline();
+    
 }

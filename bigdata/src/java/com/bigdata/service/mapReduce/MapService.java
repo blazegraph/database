@@ -64,7 +64,7 @@ import com.bigdata.service.IServiceShutdown;
 
 /**
  * A service for {@link IMapTask} processing. Those tasks are distributed by the
- * {@link MapReduceMaster}.
+ * {@link Master}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

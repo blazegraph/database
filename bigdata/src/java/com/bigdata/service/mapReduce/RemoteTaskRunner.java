@@ -157,7 +157,7 @@ public class RemoteTaskRunner<M extends IJobMetadata,T extends ITask> {
      * 
      * FIXME This should be a delay queue so that we do not wait forever on a
      * task that was submitted to a service which has since died. Combine
-     * {@link RetryTask} with {@link MapReduceMaster#TaskState} (in CVS).
+     * {@link RetryTask} with {@link Master#TaskState} (in CVS).
      * 
      * FIXME If the service dies, then retry all jobs that were running (vs
      * already completed) on that service.

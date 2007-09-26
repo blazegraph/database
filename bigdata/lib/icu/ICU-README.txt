@@ -8,4 +8,4 @@ on your platform.
 Note: Under Win32 platforms, the native libraries are located using the PATH vs
 java.library.path.
 
-java -Djava.library.path=c:\icu4jni\build\lib -classpath ;c:\icu4jni\build\classes; com.ibm.icu4jni.test.TestAll
+java -Djava.library.path=c:\icu4jni\build\lib\icu -classpath ;c:\icu4jni\build\classes; com.ibm.icu4jni.test.TestAll

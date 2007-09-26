@@ -851,9 +851,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * The delegate that implements the {@link BufferMode}.
      * <p>
      * Note: this method MUST NOT check to see whether the journal is open since
-     * we need to use it if we want to invoke
-     * {@link IBufferStrategy#deleteFile()} and we can only invoke that method
-     * once the journal is closed.
+     * we need to use it if we want to invoke {@link IBufferStrategy#delete()}
+     * and we can only invoke that method once the journal is closed.
      */
     final public IBufferStrategy getBufferStrategy() {
 
@@ -942,13 +941,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info("");
         
-        if (_bufferStrategy.isOpen()) {
-
-            throw new IllegalStateException();
-
-        }
-        
-        _bufferStrategy.deleteFile();
+        _bufferStrategy.delete();
 
         ResourceManager.deleteJournal(getFile() == null ? null : getFile()
                 .toString());

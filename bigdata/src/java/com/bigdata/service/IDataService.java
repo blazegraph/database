@@ -54,6 +54,7 @@ import com.bigdata.btree.IValueBuffer;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.ITxCommitProtocol;
 import com.bigdata.scaleup.JournalMetadata;
 
@@ -101,7 +102,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * operation is <em>unisolated</em> (non-transactional).  The value of
      * this constant is ZERO (0L).
      */
-    public static final long UNISOLATED = 0L;
+    public static final long UNISOLATED = ITx.UNISOLATED;
     
     /**
      * A constant that may be used as the partition identifier when the target
@@ -138,7 +139,12 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * concurrency control).
      * 
      * @param name
-     *            The name that can be used to recover the index.
+     *            The name that can be used to recover the index. In order to
+     *            create a partition of an index you must form the name of the
+     *            index partition using
+     *            {@link DataService#getIndexPartitionName(String, int)} (this
+     *            operation is generally performed by the
+     *            {@link IMetadataService} which manages scale-out indices).
      * 
      * @param indexUUID
      *            The UUID that identifies the index. When the mutable B+Tree is
@@ -148,7 +154,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * 
      * @param className
      *            The name of the implementation class for the index (must
-     *            extend {@link BTree}). Normally this is
+     *            extend {@link BTree}). This MUST be formed using
+     *            {@link Class#getName()}. Normally this is
      *            {@link UnisolatedBTree} for an unpartitioned index and
      *            {@link UnisolatedBTreePartition} for a partitioned index.
      * 
@@ -193,7 +200,11 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * Drops the named index (unisolated).
      * 
      * @param name
-     *            The index name.
+     *            The index name. In order to drop a partition of an index you
+     *            must form the name of the index partition using
+     *            {@link DataService#getIndexPartitionName(String, int)} (this
+     *            operation is generally performed by the
+     *            {@link IMetadataService} which manages scale-out indices).
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> does not identify a registered index.

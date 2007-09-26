@@ -135,40 +135,24 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
-    public void closeAndDelete() {
-        
-        close();
+    public void delete() {
+
+        if(isOpen()) throw new IllegalStateException();
         
         if(!file.delete()) {
             
-            System.err.println("WARN: Could not delete: "+file.getAbsolutePath());
+            throw new RuntimeException("Could not delete: "
+                    + file.getAbsolutePath());
             
         }
         
     }
 
-    public void deleteFile() {
-        
-        if( isOpen() ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        if( ! file.delete() ) {
-            
-            throw new RuntimeException("Could not delete file: "
-                    + file.getAbsoluteFile());
-            
-        }
-        
-    }
-    
     DiskBackedBufferStrategy(long maximumExtent, BufferMode bufferMode,
             FileMetadata fileMetadata) {
 
         super(maximumExtent, fileMetadata.offsetBits, fileMetadata.nextOffset,
-                fileMetadata.headerSize0, fileMetadata.extent, bufferMode,
+                FileMetadata.headerSize0, fileMetadata.extent, bufferMode,
                 fileMetadata.buffer);
 
         this.file = fileMetadata.file;

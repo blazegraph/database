@@ -96,6 +96,8 @@ public class TestDataServer0 extends AbstractServerTestCase {
     // start server in its own thread.
     public void setUp() throws Exception {
         
+        super.setUp();
+        
         dataServer0 = new DataServer(new String[]{
                 "src/resources/config/standalone/DataServer0.config"
         });
@@ -118,6 +120,8 @@ public class TestDataServer0 extends AbstractServerTestCase {
     public void tearDown() throws Exception {
         
         dataServer0.destroy();
+
+        super.tearDown();
         
     }
    
@@ -191,12 +195,18 @@ public class TestDataServer0 extends AbstractServerTestCase {
         /*
          * Register an index partition on the data service.
          */
-        proxy.registerIndex(DataService.getIndexPartitionName(name, partitionId),//
-                UUID.randomUUID(), UnisolatedBTreePartition.class
-                .toString(),new UnisolatedBTreePartition.Config(new PartitionMetadataWithSeparatorKeys(
-                partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
-                new IResourceMetadata[] {/* @todo resource metadata */},
-                new byte[] {}, null/* no right sibling */)));
+        proxy
+                .registerIndex(
+                        DataService.getIndexPartitionName(name, partitionId),//
+                        UUID.randomUUID(),
+                        UnisolatedBTreePartition.class.getName(),
+                        new UnisolatedBTreePartition.Config(
+                                new PartitionMetadataWithSeparatorKeys(
+                                        partitionId,
+                                        new UUID[] { JiniUtil
+                                                .serviceID2UUID(serviceID) },
+                                        new IResourceMetadata[] {/* @todo resource metadata */},
+                                        new byte[] {}, null/* no right sibling */)));
         
 //        proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
 //                partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
@@ -287,7 +297,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
             
         }
         
-        proxy.dropIndex(name);
+        proxy.dropIndex(DataService.getIndexPartitionName(name, partitionId));
 
     }
     

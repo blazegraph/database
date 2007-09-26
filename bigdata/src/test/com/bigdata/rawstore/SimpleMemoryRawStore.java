@@ -162,9 +162,21 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
 
+    public void delete() {
+        
+        if(open) throw new IllegalStateException();
+        
+        /*
+         * NOP.
+         */
+        
+    }
+    
     public void closeAndDelete() {
         
         close();
+        
+        delete();
         
     }
 

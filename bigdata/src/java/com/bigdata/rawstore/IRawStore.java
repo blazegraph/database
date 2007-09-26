@@ -226,11 +226,19 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * 
      * @exception IllegalStateException
      *                if the store is not open.
-     * 
-     * @todo add delete() which deletes any backing files and requires the store
-     *       to be closed as a pre-condition.
      */
     public void close();
+    
+    /**
+     * Deletes the backing file(s) (if any).
+     * 
+     * @exception IllegalStateException
+     *                if the store is open.
+     * 
+     * @exception RuntimeException
+     *                if the backing file exists and could not be deleted.
+     */
+    public void delete();
     
     /**
      * Closes the store immediately and releases its persistent resources.

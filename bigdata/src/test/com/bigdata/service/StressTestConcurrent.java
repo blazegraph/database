@@ -175,7 +175,9 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         
         Properties properties = new Properties(super.getProperties());
         
-        properties.setProperty(Options.DATA_DIR,getName());
+//        properties.setProperty(Options.DATA_DIR,getName());
+        
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
         return properties;
         
@@ -188,6 +190,8 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
      */
     public void setUp() throws Exception {
 
+        super.setUp();
+        
         log.info(getName());
 
         client = new EmbeddedBigdataClient(getProperties());
@@ -202,7 +206,7 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
     public void tearDown() throws Exception {
                 
         if(client!=null) {
-
+            
             client.terminate();
 
             client = null;
@@ -210,6 +214,8 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         }
         
         log.info(getName());
+
+        super.tearDown();
         
     }
     

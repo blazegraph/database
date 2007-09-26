@@ -163,34 +163,6 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       exception might be certain shared indices, which tend not to be named,
  *       such as the commit record index itself).
  * 
- * @todo break out a map/reduce service - at least at an interface level. There
- *       is a distinction between map/reduce where the inputs (outputs) are
- *       index partitions and map/reduce when the inputs (outputs) are files.
- *       The basic issue is that index reads (and to a much greater extent index
- *       writes) contend with other data service processes. Map file or index
- *       read operations may run with full concurrency, as may map file write
- *       and reduce file write operations. Reduce operations that complete with
- *       non-indexed outputs may also have full concurrency. Reduce operations
- *       that seek to build a scale-out index from the individual reduce inputs
- *       will conduct unisolated writes on index partitions, which would of
- *       necessity be distributed since the hash function does not produce a
- *       total ordering. (There may well be optimizations available for
- *       partitioned bulk index builds from the reduce operation that would then
- *       be migrated to the appropriate data service and merged into the current
- *       index view for the appropriate index partition).
- *       <p>
- *       So, the take away for map processes is that they always have full
- *       concurrency since they never write directly on indices. Index reads
- *       will be advantaged if they can occur in the data service on which the
- *       input index partition exists.
- *       <p>
- *       Likewise, the take away for reduce processes is that they are
- *       essentially clients rather than data service processes. As such, the
- *       reduce process should run fully concurrently with a data service for
- *       the machine on which the reduce inputs reside (its own execution
- *       thread, and perhaps its own top-level service), but index writes will
- *       be distributed across the network to various data services.
- * 
  * @todo consider that all getIndex() methods on the various tasks should be
  *       getIndexPartition() methods. The getIndexPartition() method could be
  *       implemented by a single static helper method. The IIndexPartition could
@@ -241,8 +213,6 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       leases with the metadata index locator service; abstract IO for
  *       different client platforms (e.g., support PHP, C#). Bundle ICU4J with
  *       the client.
- * 
- * @todo JobScheduler service for map/reduce (or Hadoop integration).
  * 
  * @todo another data method will need to be defined to support GOM with
  *       pre-fetch. the easy way to do this is to get 50 objects to either side
@@ -913,42 +883,6 @@ abstract public class DataService implements IDataService,
         
     }
     
-//    /**
-//     * @todo if unisolated or isolated at the read-commit level, then the
-//     *       operation really needs to be broken down by partition or perhaps by
-//     *       index segment leaf so that we do not have too much latency during a
-//     *       read (this could be done for rangeQuery as well).
-//     * 
-//     * @todo if fully isolated, then there is no problem running map.
-//     * 
-//     * @todo The definition of a row is different if using a key formed from the
-//     *       column name, application key, and timestamp.
-//     * 
-//     * @todo For at least GOM we need to deserialize rows from byte[]s, so we
-//     *       need to have the (de-)serializer to the application level value on
-//     *       hand.
-//     */
-//    public void map(long tx, String name, byte[] fromKey, byte[] toKey,
-//            IMapOp op) throws InterruptedException, ExecutionException {
-//
-//            if( name == null ) throw new IllegalArgumentException();
-//            
-//            if (tx == 0L)
-//                throw new UnsupportedOperationException(
-//                        "Unisolated context not allowed");
-//            
-//            int flags = 0; // @todo set to deliver keys + values for map op.
-//            
-//            ResultSet result = (ResultSet) txService.submit(
-//                new RangeQueryTask(tx, name, fromKey, toKey, flags)).get();
-//
-//            // @todo resolve the reducer service.
-//            IReducer reducer = null;
-//            
-//            op.apply(result.itr, reducer);
-//            
-//    }
-
     protected abstract class AbstractIndexTask implements Callable<Object> {
     
         /**
@@ -1258,7 +1192,7 @@ abstract public class DataService implements IDataService,
 
         protected AbstractUnisolatedIndexManagementTask(boolean readOnly, String name) {
         
-            super(0L/*unisolated*/,readOnly, name );
+            super(UNISOLATED,readOnly, name );
             
         }
 
@@ -1288,7 +1222,7 @@ abstract public class DataService implements IDataService,
             final Class cls;
             
             try {
-                // @todo review choice of class loader.
+
                 cls = Class.forName(className);
                 
             } catch(Exception ex) {

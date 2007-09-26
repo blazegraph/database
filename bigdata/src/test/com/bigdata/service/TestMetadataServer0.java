@@ -100,6 +100,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
      */
     public void setUp() throws Exception {
         
+        super.setUp();
+
         /*
          * Start up a data server before the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
@@ -149,6 +151,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             destroyDataServer0();
             
         }
+
+        super.tearDown();
         
     }
 

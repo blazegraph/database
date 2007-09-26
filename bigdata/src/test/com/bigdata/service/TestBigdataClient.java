@@ -101,8 +101,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
      */
     public void setUp() throws Exception {
 
-        log.info(getName());
-
+        super.setUp();
+        
 //        final String groups = ".groups = new String[]{\"" + getName() + "\"}";
         
         /*
@@ -223,7 +223,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }
         
-        log.info(getName());
+        super.tearDown();
         
     }
     

@@ -158,15 +158,24 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
 
-    public void closeAndDelete() {
+    public void delete() {
         
-        close();
+        if(open) throw new IllegalStateException();
         
         if(!file.delete()) {
             
-            System.err.println("WARN: Could not delete: "+file.getAbsolutePath());
+            throw new RuntimeException("Could not delete: "
+                    + file.getAbsolutePath());
             
         }
+
+    }
+    
+    public void closeAndDelete() {
+        
+        close();
+
+        delete();
         
     }
 

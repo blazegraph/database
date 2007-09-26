@@ -1191,6 +1191,10 @@ public class MasterJournal implements IJournal {
         slave.close();
     }
 
+    public void delete() {
+        slave.delete();
+    }
+    
     public void closeAndDelete() {
         // @todo implement full delete on the database.
         slave.closeAndDelete();

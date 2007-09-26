@@ -61,7 +61,7 @@ import com.bigdata.btree.IReadOnlyOperation;
  * be available to the {@link IDataService} on which it will execute. This can
  * be as simple as bundling the procedure into a JAR that is part of the
  * CLASSPATH used to start a {@link DataService} or you can use downloaded code
- * with the JINI codebase mechanism.
+ * with the JINI codebase mechanism (<code>java.rmi.server.codebase</code>).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

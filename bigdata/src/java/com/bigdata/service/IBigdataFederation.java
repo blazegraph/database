@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.service.DataService.NoSuchIndexException;
@@ -24,7 +25,7 @@ public interface IBigdataFederation {
      * operation is <em>unisolated</em> (non-transactional).  The value of
      * this constant is ZERO (0L).
      */
-    public static final long UNISOLATED = 0L;
+    public static final long UNISOLATED = ITx.UNISOLATED;
 
     /**
      * Return the metadata service (or a proxy for the metadata service).
