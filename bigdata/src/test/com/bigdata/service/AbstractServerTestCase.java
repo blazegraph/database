@@ -173,7 +173,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
 
                 if(i++<maxTries) {
 
-                    log.warn("Port is busy - retrying: " + ex);
+                    log.warn("Port "+port+" is busy - retrying: " + ex);
                     
                     try {
                         Thread.sleep(100/*ms*/);
@@ -216,6 +216,9 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      */
     protected void startClassServer() throws IOException {
 
+        // Note: See below.
+        if(true) return;
+        
         /*
          * Obtain port from System.getProperties() so that other ports may be
          * used.
@@ -230,7 +233,17 @@ public abstract class AbstractServerTestCase extends TestCase2 {
             "lib"+File.pathSeparatorChar+
             "lib"+File.separatorChar+"icu"+File.pathSeparatorChar+
             "lib"+File.separatorChar+"jini"+File.pathSeparatorChar+
-            "bin";
+            /*
+             * FIXME This does not seem to be resolving the bigdata classes
+             * necessitating that we list that jar explictly below (and that it
+             * be up to date). The problem can be seen in the Jini Service
+             * Browser and the console for the Service Browser.  In fact, the
+             * test suite executes just fine if you do NOT use the ClassServer!
+             */
+//            ""
+            "bin"+File.pathSeparatorChar+
+            "bigdata.jar"
+            ;
         
         assertOpenPort(port);
         

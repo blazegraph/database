@@ -15,16 +15,11 @@ services:
 
 <dl>
 
-<dt>metadata service</dt><dd>The metadata service manages indices and
- is used to locate index partitions.</dd>
+<dt>metadata service</dt><dd>The metadata service manages scale-out indices
+and is used to locate index partitions.</dd>
 
 <dt>data service</dt><dd>The data service supports reads and writes on
 index partitions.</dd>
-
-<dt>transaction manager service</dt><dd>Clients use the transaction
-manager service to start new transactions and to coordinate the
-distributed commit protocol.  The transaction manager also provides a
-centralized timestamp factory.</dd>
 
 </dl>
 
@@ -39,14 +34,19 @@ using JINI, but other service locator protocols are possible.
 
 <p>
 
-bigdata provides the following value added services.  These are not
+bigdata provides the following optional services.  These are not
 considered essential since (a) they are not required by clients that
 make direct use of bigdata as a distributed database; and (b) they are
-themsevles applications of the services briefly described above.
+themselves applications of the services briefly described above.
 
 <dl>
 
-<dt>map/reduce service</dt><dd>Manages the distributed execution of a
+<dt>transaction manager service</dt><dd>Clients use the transaction
+manager service to start new transactions and to coordinate the
+distributed commit protocol.  The transaction manager also provides a
+centralized timestamp factory.</dd>
+
+<dt>map and reduce service</dt><dd>Manages the distributed execution of a
 functional program.</dd>
 
 </dl>
@@ -107,17 +107,16 @@ running.
 
 <li>jini 2.x is installed and running.  This will be used to register
 and lookup services.  It helps if jini is running before you try to
-start the bigdata sercices since they will be able to register
+start the bigdata services since they will be able to register
 themselves immediately in that case.</li>
 
-<li>the metadata service is running (this is part of the
-bigdata-server distribution).</li>
+<li>a metadata server is running.</li>
 
-<li>the transaction manager service is running (this is part of the
-bigdata-server distribution).</li>
+<li>one or more data server(s) are running.</li>
 
-<li>the optional map/reduce service is running (this is part of the
-bigdata-server distribution).</li>
+<li>a transaction server is running (optional).</li>
+
+<li>one or more map and reduce servers are running (optional).</li>
 
 </ul>
 

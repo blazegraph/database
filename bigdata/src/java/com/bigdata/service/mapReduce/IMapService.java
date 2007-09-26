@@ -42,59 +42,20 @@ Modifications:
 
 */
 /*
- * Created on Aug 10, 2007
+ * Created on Sep 26, 2007
  */
 
 package com.bigdata.service.mapReduce;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
 /**
+ * Interface for a map service.
+ * <p>
+ * Note: This interface facilitates service discovery.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public interface IMapService extends
+        IJobAndTaskService<MapJobMetadata, AbstractMapTask> {
 
-    /**
-     * 
-     */
-    public TestAll() {
-        super();
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("Map/Reduce");
-
-        suite.addTestSuite(TestAbstractJobAndTaskService.class);
-        
-        suite.addTestSuite(TestRemoteTaskRunner.class);
-
-        suite.addTestSuite(TestEmbeddedMaster.class);
-        
-        /*
-         * 
-         * @todo test map/reduce service with known outcome for correctness. For
-         * example, on the extract and count keyword problem.
-         * 
-         */
-        
-        return suite;
-        
-    }
-    
 }

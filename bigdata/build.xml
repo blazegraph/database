@@ -3,8 +3,8 @@
 	<property file="build.properties" />
 
 	<path id="build.classpath">
-		<fileset dir="${bigdata.dir}/lib">
-			<include name="*.jar" />
+		<fileset dir="${bigdata.dir}/lib" >
+			<include name="**/*.jar" />
 		</fileset>
 	</path>
 
@@ -78,7 +78,9 @@
 	
 	Finally, the code that will expose services with downloadable code MUST set
 	
-	-Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+	-Djava.rmi.server.codebase=http://.../
+	
+	where "..." is your host and path
 	
 	in order for the correct codebase property to be communicated to clients that
 	will then download code from that HTTP server.  Note: the trailing '/' is

@@ -78,7 +78,18 @@ abstract public class ReduceService extends AbstractJobAndTaskService<ReduceJobM
             .getLogger(ReduceService.class);
 
     /**
+     * Options for the {@link ReduceService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Options extends com.bigdata.service.mapReduce.AbstractJobAndTaskService.Options {
+        
+    }
+    
+    /**
      * @param properties
+     *            See {@link Options}.
      */
     public ReduceService(Properties properties) {
 
