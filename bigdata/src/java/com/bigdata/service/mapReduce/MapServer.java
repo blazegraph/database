@@ -107,8 +107,10 @@ public class MapServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableMapService extends MapService implements
-            RemoteAdministrable, RemoteDestroyAdmin {
+    public static class AdministrableMapService
+        extends MapService
+        implements RemoteAdministrable, RemoteDestroyAdmin
+    {
         
         protected AbstractServer server;
         private UUID serviceUUID;

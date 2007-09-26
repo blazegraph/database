@@ -52,6 +52,8 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
@@ -217,7 +219,9 @@ public abstract class AbstractServerTestCase extends TestCase2 {
     protected void startClassServer() throws IOException {
 
         // Note: See below.
-        if(true) return;
+//        if(true) return;
+        
+        Logger.getLogger("com.sun.jini.tool.ClassServer").setLevel(Level.ALL);
         
         /*
          * Obtain port from System.getProperties() so that other ports may be
@@ -232,17 +236,23 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         String dirlist = 
             "lib"+File.pathSeparatorChar+
             "lib"+File.separatorChar+"icu"+File.pathSeparatorChar+
-            "lib"+File.separatorChar+"jini"+File.pathSeparatorChar+
+            "lib"+File.separatorChar+"jini"+File.pathSeparatorChar
             /*
              * FIXME This does not seem to be resolving the bigdata classes
              * necessitating that we list that jar explictly below (and that it
              * be up to date). The problem can be seen in the Jini Service
              * Browser and the console for the Service Browser.  In fact, the
              * test suite executes just fine if you do NOT use the ClassServer!
+             * 
+             * I can only get this working right now by placing bigdata.jar into
+             * the lib directory (or some other directory below the current
+             * working directory, but not ant-build since that gives the ant
+             * script fits).
              */
-//            ""
-            "bin"+File.pathSeparatorChar+
-            "bigdata.jar"
+//            +
+//            "bin"
+            //+File.pathSeparatorChar+
+//            "ant-build"
             ;
         
         assertOpenPort(port);

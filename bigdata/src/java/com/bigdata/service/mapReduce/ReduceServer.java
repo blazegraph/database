@@ -97,7 +97,7 @@ public class ReduceServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
         
-        return new AdministrableMapService(this,properties);
+        return new AdministrableReduceService(this,properties);
         
     }
 
@@ -107,13 +107,15 @@ public class ReduceServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableMapService extends MapService implements
-            RemoteAdministrable, RemoteDestroyAdmin {
+    public static class AdministrableReduceService
+        extends ReduceService
+        implements RemoteAdministrable, RemoteDestroyAdmin
+    {
         
         protected AbstractServer server;
         private UUID serviceUUID;
         
-        public AdministrableMapService(AbstractServer server,Properties properties) {
+        public AdministrableReduceService(AbstractServer server,Properties properties) {
             
             super(properties);
             

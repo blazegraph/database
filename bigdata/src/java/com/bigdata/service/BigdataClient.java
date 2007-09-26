@@ -70,8 +70,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.service.mapReduce.IMapService;
-import com.bigdata.service.mapReduce.IReduceService;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
