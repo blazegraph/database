@@ -58,6 +58,8 @@ import com.bigdata.service.EmbeddedBigdataFederation.Options;
 import junit.framework.TestCase;
 
 /**
+ * Test suite for {@link EmbeddedMaster}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -87,7 +89,7 @@ public class TestEmbeddedMaster extends TestCase {
         
         super.setUp();
 
-            // inherit system properties.
+        // inherit system properties.
         Properties properties = new Properties(System.getProperties());
 
         // Note: when using disk use temp files so that the reduce stores
@@ -99,8 +101,12 @@ public class TestEmbeddedMaster extends TestCase {
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         // Note: No disk at all, but consumes more RAM to buffer the data.
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
-                .toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+//                .toString());
+
+        // Note: Turn on if testing group commit performance.
+        properties
+                .setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
 
         /*
          * #of data services to run in the federation.
@@ -111,11 +117,7 @@ public class TestEmbeddedMaster extends TestCase {
          * extend the buffer in response to use.
          */
         properties
-                .setProperty(Options.NDATA_SERVICES, "2");
-
-        // Note: Turn on if testing group commit performance.
-        properties
-                .setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
+                .setProperty(Options.NDATA_SERVICES, "1");
 
         // Create the federation.
         client = new EmbeddedBigdataClient(properties);

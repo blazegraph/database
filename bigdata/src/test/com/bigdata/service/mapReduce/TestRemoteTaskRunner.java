@@ -61,9 +61,33 @@ import com.bigdata.service.IBigdataClient;
 /**
  * Test suite for {@link RemoteTaskRunner}.
  * 
- * FIXME write lots of tests for this -- this is the heart of the distributed
- * robustness for the map/reduce operations.
+ * @todo write lots of tests for this -- this is the heart of the distributed
+ *       robustness for the map/reduce operations.
+ *       <p>
+ *       Some kinds of tests can only be performed when the services are created
+ *       and destroyed during execution of the operation, thereby testing
+ *       discovery and use of new services and removal of unavailable services.
+ *       <p>
+ *       There are also possible dependencies between map and reduce operations
+ *       where a map service failure after the map operation has completed could
+ *       require re-execution of the map tasks run on that service - this case
+ *       arises when the map services write their reduce partitions outputs onto
+ *       local files which are later read by the reduce services.
  * 
+ * @todo test correct rejection (no services, all dead, bad parameters, etc).
+ * 
+ * @todo test with services that are really remote (requires identification of
+ *       the federation to those services, perhaps as part of the job metadata).
+ *       Also look into the downloadable code issue here.
+ * 
+ * @todo test execution metadata that can be reported by the task runner (#of
+ *       tasks submitted, start time, end time, #of tasks completed {success,
+ *       error, cancel}. Since we might retry (or multiply execute) some tasks,
+ *       these counters need to be defined in terms of either the final state of
+ *       the tasks (which has more obvious meaning) or simply in terms of the
+ *       simple sums of the outcomes (in which case some tasks will be double
+ *       counted).
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -110,23 +134,6 @@ public class TestRemoteTaskRunner extends TestCase {
         }
         
     }
-
-    /*
-     * @todo test correct rejection (no services, all dead, bad parameters,
-     * etc).
-     * 
-     * @todo test with services that are really remote (requires identification
-     * of the federation to those services, perhaps as part of the job
-     * metadata). Also look into the downloadable code issue here.
-     * 
-     * @todo test execute metadata that can be reported by the task runner (#of
-     * tasks submitted, start time, end time, #of tasks completed {success,
-     * error, cancel}. Since we might retry (or multiply execute) some tasks,
-     * these counters need to be defined in terms of either the final state of
-     * the tasks (which has more obvious meaning) or simply in terms of the
-     * simple sums of the outcomes (in which case some tasks will be double
-     * counted).
-     */
     
     /**
      * Simple test creates a {@link RemoteTaskRunner}, submits a NOP task, and
@@ -313,7 +320,7 @@ public class TestRemoteTaskRunner extends TestCase {
         }
 
         com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.AbstractJobAndTaskService.JobState<M> jobState,
+                com.bigdata.service.mapReduce.JobState<M> jobState,
                 T task) {
 
             return new MyTaskWorker(jobState, task);

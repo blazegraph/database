@@ -45,6 +45,9 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through
@@ -76,38 +79,45 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
     
     /**
      * Extends the basic behavior to write through to the backing file.
+     * <p>
+     * Note: {@link ClosedChannelException} can be thrown out of this method.
+     * This exception is an indication that the backing channel was closed while
+     * a writer was still running.
+     * <p>
+     * Note: {@link ClosedByInterruptException} can be thrown out of this method
+     * (wrapped as a {@link RuntimeException}). This exception is an indication
+     * that a writer was interrupted. This will occur if you are using
+     * {@link ExecutorService#shutdownNow()} on a service that is running one or
+     * more writers. In such cases this should not be considered an error but
+     * the expected result of interrupting the writer.
+     * <p>
+     * However, note that {@link ClosedByInterruptException} means that the
+     * channel was actually <strong>closed</strong> when the writer was
+     * interrupted. This means that you basically can not interrupt running
+     * writers without having to re-open the channel.
      */
     public long write(ByteBuffer data) {
 
-        if (data == null)
-            throw new IllegalArgumentException(ERR_BUFFER_NULL);
-
         /*
-         * The #of bytes to be written (this is modified as a side effect by the
-         * call to our superclass to we have to get it before we make that
-         * call).
+         * write the record on the buffer - this also detects and handles
+         * overflow, error checks the address range, etc.
          */
-        final int remaining = data.remaining();
-
-        // write on the buffer - this also detects and handles overflow.
         final long addr = super.write(data);
 
-        // Position the buffer on the current slot.
+        // The offset into the buffer for this record.
         final long offset = getOffset(addr);
 
-        if (offset + remaining > Integer.MAX_VALUE) {
-            
-            throw new RuntimeException("Would exceed int32 bytes in buffer.");
-            
-        }
+        // The length of the record.
+        final int nbytes = getByteCount(addr);
         
-        /*
-         * Set limit to write just those bytes that were written on the buffer.
-         */
-        directBuffer.limit( (int) offset + remaining );
+        // obtain a view in case there are concurrent writes on the buffer.
+        final ByteBuffer buffer = directBuffer.duplicate();
+        
+        // Set limit to just those bytes that were written on the buffer.
+        buffer.limit( (int) offset + nbytes );
         
         // Set position on the buffer.
-        directBuffer.position( (int) offset );
+        buffer.position( (int) offset );
 
         try {
 
@@ -118,14 +128,18 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              * memory buffer so that transfer to the disk cache should be
              * optimized by Java and the OS.
              */
-            final int nwritten = raf.getChannel().write(directBuffer,
+
+            final int count = raf.getChannel().write(buffer,
                     headerSize + offset);
             
-            assert nwritten == remaining;
-            
-        }
+            if (count != nbytes) {
 
-        catch( IOException ex ) {
+                throw new RuntimeException("Expected to write " + nbytes
+                        + " bytes but wrote " + count);
+
+            }
+            
+        } catch( IOException ex ) {
             
             throw new RuntimeException( ex );
             
@@ -135,7 +149,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
     }
     
-    public void truncate(long newExtent) {
+    synchronized public void truncate(long newExtent) {
         
         super.truncate(newExtent);
         

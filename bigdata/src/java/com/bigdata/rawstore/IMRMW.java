@@ -42,46 +42,24 @@ Modifications:
 
 */
 /*
- * Created on Feb 17, 2007
+ * Created on Sep 27, 2007
  */
 
-package com.bigdata.journal;
+package com.bigdata.rawstore;
 
 /**
- * Tests of concurrent transactions schedules designed to look for correct
- * execution of non-conflicting concurrent schedules and correct detection of
- * conflicts.
+ * A marker interface for an {@link IRawStore} that supports Multiple Readers,
+ * Multiple Writers (full read-write concurrency).
  * <p>
- * Note that only write-write conflicts may occur since the {@link Journal} uses
- * an MVCC style concurrency control algorithm.
- * 
- * @todo refactor test and schedule support from dbcache. there is perhaps no
- *       need for the kinds of tests that I developed for dbcache since I had to
- *       put into place infrastructure there designed to test locking mechanism
- *       that is simply not needed here.
+ * Note: this interface ONLY makes a statement about the implementation of the
+ * {@link IRawStore} interface, not any other methods that might be declared by
+ * the implementation class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see IMROW
  */
-public class TestConcurrentSchedules extends ProxyTestCase {
-
-    /**
-     * 
-     */
-    public TestConcurrentSchedules() {
-    }
-
-    /**
-     * @param name
-     */
-    public TestConcurrentSchedules(String name) {
-        super(name);
-    }
-    
-    public void test_something() {
-        
-        fail("write tests");
-        
-    }
+public interface IMRMW {
 
 }

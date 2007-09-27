@@ -129,23 +129,26 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * 
  * @todo With the change to the submit method, it is now trivial to process
  *       writes on distinct indices mapped on the same data service
- *       concurrently. The can be done as follows: Modify the journal's
- *       IRawStore implementation to support concurrent writers (it is MROW now
- *       and will become MRMW). The change is limited to a very small section of
- *       code where the next address is computed. Commits are still
- *       single-threaded of course and will continue to run in the
- *       "writeService" which could be renamed "commitService". Create an
- *       executor thread (write service) per named index mapped onto a journal.
- *       There are a variety of strategies here. The easiest is one thread per
- *       named index, but that does not provide governance over the #of threads
- *       that can run directly. An alternative is a thread pool with a lock per
- *       named index such that new writes on an index block until the lock is
- *       released by the current writer. The size of the pool could be
- *       configured. In any case, index writes run concurrently on different
- *       indices with concurrent writes against the backing IRawStore and then
- *       index commits are serialized. This preserves consistency and might make
- *       group commit trivial by accepting all commit requests in the commit
- *       queue periodically, e.g., at intervals of no more than 100ms latency.
+ *       concurrently. The can be done as follows:
+ *       <P>
+ *       Modify the journal's IRawStore implementation to support concurrent
+ *       writers (it is MROW now and will become MRMW). The change is limited to
+ *       a very small section of code where the next address is computed.
+ *       Commits are still single-threaded of course and will continue to run in
+ *       the "writeService".
+ *       <P>
+ *       Create an executor thread (write service) per named index mapped onto a
+ *       journal. There are a variety of strategies here. The easiest is one
+ *       thread per named index, but that does not provide governance over the
+ *       #of threads that can run directly. An alternative is a thread pool with
+ *       a lock per named index such that new writes on an index block until the
+ *       lock is released by the current writer. The size of the pool could be
+ *       configured. In any case, writes run concurrently on different indices
+ *       with concurrent writes against the backing IRawStore and then index
+ *       commits are serialized. This preserves consistency and might make group
+ *       commit trivial by accepting all commit requests in the commit queue
+ *       periodically, e.g., at intervals bounded by the maximum sync rate for
+ *       the disk (or by an ~100ms latency when not writing on disk).
  *       <p>
  *       Note: The commit protocol for indices needs to be modified slightly. As
  *       it stands, all dirty indices are flushed when the journal commits. In
@@ -162,6 +165,15 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       should be discarded unless an explicit commit is requested (the
  *       exception might be certain shared indices, which tend not to be named,
  *       such as the commit record index itself).
+ *       <p>
+ *       Write access to indices used by the journal itself will require
+ *       serialization. In particular, the index used to lookup indices by name.
+ *       Adding and dropping a named index will therefore remain a serialized
+ *       operation.
+ *       <p>
+ *       Overflow processing only occurs during commits, and commits will remain
+ *       serialized. (Likewise, writes on the commit record index are always
+ *       serialized since they only occur during commits.)
  * 
  * @todo consider that all getIndex() methods on the various tasks should be
  *       getIndexPartition() methods. The getIndexPartition() method could be
@@ -834,7 +846,9 @@ abstract public class DataService implements IDataService,
         } else {
             
             /*
-             * @todo do unisolated read operations need to get serialized?!?
+             * @todo unisolated read operations do not need to get serialized as
+             * long as they read from the last committed state of the index.
+             * 
              * check rangeQuery also.
              */
             return (Integer) journal.serialize(task).get();

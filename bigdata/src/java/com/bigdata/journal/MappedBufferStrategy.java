@@ -65,9 +65,12 @@ import java.nio.channels.FileLock;
  * handling the overflow event (e.g., throw a "CommitRetryException").
  * </p>
  * <p>
- * Note that the use of mapped files might not prove worth the candle due to the
- * difficulties with resource deallocation for this strategy and the good
- * performance of some alternative strategies.
+ * The mapped mode has nearly the performance of the transient mode in some
+ * tests. However the use of mapped files might not prove worth the candle due
+ * to the difficulties with resource deallocation for this strategy and the good
+ * performance of some alternative strategies.  There are also some other issues
+ * that have shown up in some of the tests suites -- look carefully if you are
+ * going to pursue this!
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -160,7 +163,8 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      * JDK since there is no way to guarentee that the mapped file will be
      * unmapped in a timely manner.
      * 
-     * @exception UnsupportedOperationException Always thrown.
+     * @exception UnsupportedOperationException
+     *                Always thrown.
      */
     public void truncate(long newExtent) {
 

@@ -68,7 +68,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.EmbeddedBigdataClient;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.mapReduce.AbstractJobAndTaskService.JobState;
 import com.bigdata.service.mapReduce.AbstractJobAndTaskService.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -485,9 +484,6 @@ public class TestAbstractJobAndTaskService extends TestCase {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo refactor to use in the master and do lazy service resolution or
-     *       pass in the service interface (as it already does)?
      */
     public static class SubmitRemoteTask<M extends IJobMetadata,T extends ITask> implements Callable<Object> {
 
@@ -667,7 +663,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
         }
 
         com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.AbstractJobAndTaskService.JobState<M> jobState,
+                com.bigdata.service.mapReduce.JobState<M> jobState,
                 T task) {
 
             return new MyTaskWorker(jobState, task);
@@ -721,7 +717,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
         }
 
         com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.AbstractJobAndTaskService.JobState<M> jobState,
+                com.bigdata.service.mapReduce.JobState<M> jobState,
                 T task) {
 
             return new MySleepyTaskWorker(jobState, task);

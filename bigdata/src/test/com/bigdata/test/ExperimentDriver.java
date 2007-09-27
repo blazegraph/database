@@ -136,7 +136,7 @@ public class ExperimentDriver {
                 
                 if(!first) {
                     
-                    sb.append(", ");
+                    sb.append(",\n");
                     
                 }
                 

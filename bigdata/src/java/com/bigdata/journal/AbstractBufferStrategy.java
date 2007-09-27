@@ -71,9 +71,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     /**
      * Text of the error message used when a {@link ByteBuffer} with zero bytes
-     * remaining is passed to {@link #write(ByteBuffer)}.
+     * {@link ByteBuffer#remaining()} is passed to {@link #write(ByteBuffer)}.
      */
-    protected static final String ERR_NO_BYTES_REMAINING = "No bytes remaining in buffer";
+    protected static final String ERR_BUFFER_EMPTY = "Zero bytes remaining in buffer";
     
     /**
      * Text of the error message used when a <code>null</code> reference is
@@ -103,6 +103,14 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * a zero length are rejected on read.
      */
     protected static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
+    
+    /**
+     * Text of the error message used when a write operation would exceed the
+     * #of bytes that can be addressed by a {@link ByteBuffer} backed by an
+     * array or native memory (both are limited to int32 bytes since they
+     * are addressed by a Java <code>int</code>).
+     */
+    protected static final String ERR_INT32 = "Would exceed int32 bytes.";
     
     /**
      * True iff the {@link IBufferStrategy} is open.
@@ -263,7 +271,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
              * Would overflow int32 bytes and data are buffered in RAM.
              */
 
-            log.error("Would overflow int32 bytes.");
+            log.error(ERR_INT32);
             
             return false;
             

@@ -45,11 +45,11 @@ Modifications:
  * Created on Nov 1, 2006
  */
 
-package com.bigdata.journal;
-
+package com.bigdata.service;
 
 import junit.framework.TestCase;
 
+import com.bigdata.journal.IsolationEnum;
 import com.bigdata.service.OldTransactionServer;
 
 /**

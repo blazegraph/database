@@ -57,13 +57,11 @@ import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -160,196 +158,6 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
      * service.
      */
     public static final String ERR_NO_SUCH_JOB = "job not registered";
-    
-    /**
-     * Job state that is relevant to this service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class JobState<M> {
-
-        /**
-         * The job identifier.
-         */
-        final UUID uuid;
-
-        /**
-         * The job metadata.
-         */
-        final M metadata;
-        
-        /**
-         * Used to access the federation from which inputs will be read/written.
-         * 
-         * @todo break into an input federation and an output federation so that
-         * you can run a map/reduce across federations.
-         */
-        final IBigdataClient client;
-        
-        /**
-         * The job start time.
-         */
-        final long begin = System.currentTimeMillis();
-        
-        /**
-         * The time at which the last heartbeat was received for this job.
-         */
-        long heartbeat = begin;
-        
-        /**
-         * The #of tasks started for this job on this service.
-         */
-        long nstarted = 0L;
-        
-        /**
-         * The #of tasks ended that have produced an {@link Outcome} for this
-         * job on this service.
-         */
-        long nended = 0L;
-
-        /**
-         * The running tasks for this job. The key is the task UUID. The value
-         * is the {@link Future} for that task.
-         */
-        Map<UUID,Future<Object>> futures = new ConcurrentHashMap<UUID, Future<Object>>();
-        
-        /**
-         * The {@link Outcome}s for the completed tasks. {@link Outcome}s are
-         * placed into this queue by the {@link AbstractTaskWorker}.
-         */
-        BlockingQueue<Outcome> outcomes = new LinkedBlockingQueue<Outcome>(/*no capacity limit*/);
-        
-        /**
-         * The job identifier.
-         */
-        public UUID getUUID() {
-            
-            return uuid;
-            
-        }
-        
-        public JobState(UUID uuid, M metadata, IBigdataClient client) {
-
-            if (uuid == null)
-                throw new IllegalArgumentException();
-
-            if (metadata == null)
-                throw new IllegalArgumentException();
-
-            if (client == null)
-                throw new IllegalArgumentException();
-
-            this.uuid = uuid;
-            
-            this.metadata = metadata;
-            
-            this.client = client;
-            
-        }
-
-        /**
-         * Cancel all running tasks for this job.
-         * <p>
-         * Note: The job MUST be cancelled first since otherwise tasks could
-         * continue to be queued while this method is running.
-         * <p>
-         * Note: {@link Outcome}s are discarded when the job is cancelled.
-         */
-        public void cancelAll() {
-
-            int n = 0;
-            
-            Iterator<Future<Object>> itr = futures.values().iterator();
-            
-            while(itr.hasNext()) {
-                
-                Future<Object> future;
-                
-                try {
-                 
-                    future = itr.next();
-                    
-                } catch(NoSuchElementException ex) {
-                    
-                    MapService.log.info("Exhausted by concurrent completion.");
-                    
-                    break;
-                    
-                }
-                
-                future.cancel(true/*may interrupt if running*/);
-                
-                n++;
-                
-                try {
-                    
-                    itr.remove();
-                    
-                } catch(NoSuchElementException ex) {
-                    
-                    MapService.log.info("Task already gone.");
-                    
-                }
-                
-            }
-            
-            MapService.log.info("Cancelled "+n+" tasks for job="+uuid);
-
-            // discard the outcomes when the job is cancelled.
-            outcomes.clear();
-            
-        }
-
-        /**
-         * Cancel the task if it is running.
-         * 
-         * @param task
-         *            The task identifier.
-         * 
-         * @return true if the job was cancelled.
-         */
-        public boolean cancel(UUID task) {
-            
-            Future<Object> future = futures.remove(task);
-            
-            if(future!=null && future.cancel(true/*may interrupt if running*/)) {
-
-                MapService.log.info("Cancelled task: job="+uuid+", task="+task);
-                
-                // Note: This is done by the AbstractTaskWorker.
-//                outcomes.add(new Outcome(task,Status.Cancelled,null));
-                
-                return true;
-                
-            } else {
-                
-                MapService.log.info("Could not cancel task - not running? : job="+uuid+", task="+task);
-
-                return false;
-                
-            }
-            
-        }
-
-        /**
-         * A human readable summary of the {@link JobState}.
-         */
-        public String status() {
-            
-            // #of active tasks at this instant (can change asynchronously).
-            final int nactive = futures.size();
-            
-            // #of outcomes at this instant (can change asynchronously).
-            final int noutcomes = outcomes.size();
-
-            return "job=" + uuid + ", nactive=" + nactive + ", noutcomes="
-                    + noutcomes + ", nstarted=" + nstarted + ", nended="
-                    + nended;
-            
-        }
-        
-    }
     
     /**
      * Abstract base class for task workers running in the {@link MapService} or the
@@ -569,21 +377,24 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
     }
 
     /**
-     * @deprecated The {@link IBigdataClient} should be initialized from the
-     *             {@link IJobMetadata} a per job basis. This will let us: (a)
-     *             reuse these services across federations; and (b) avoid mishap
-     *             when the client is connected to one federation and it tries
-     *             to discover services connected to another federation.
-     *             <p>
-     *             This approach requires a weak value hash map of the clients
-     *             and a hard reference to the client in the job. Once no job
-     *             references a client that client should be disconnected from
-     *             its federation.  Rather than always minting a client for a
-     *             job, we could also first check the hash map for an existing
-     *             client for the same federation.
-     *             <p>
-     *             It also makes sense to allow a different client for input and
-     *             output so that a map/reduce job can cross federations.
+     * @todo The {@link IBigdataClient} should be initialized from the
+     *       {@link IJobMetadata} a per job basis. This will let us: (a) reuse
+     *       these services across federations; and (b) avoid mishap when the
+     *       client is connected to one federation and it tries to discover
+     *       services connected to another federation.  Of course, this does
+     *       not matter until we support multiple federations....
+     *       <p>
+     *       This approach requires a weak value hash map of the clients and a
+     *       hard reference to the client in the job. Once no job references a
+     *       client that client should be disconnected from its federation.
+     *       Rather than always minting a client for a job, we could also first
+     *       check the hash map for an existing client for the same federation.
+     *       Will the client explicitly disconnect from federations or should
+     *       that be automatic when there is no longer a hard reference to a
+     *       given federation? plus a delay?
+     *       <p>
+     *       It also makes sense to allow a different client for input and
+     *       output so that a map/reduce job can cross federations.
      * 
      * @return The client used to read/write data.
      */
@@ -641,11 +452,6 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
             
         }
         
-        /*
-         * FIXME The bigdata client should be initialized based on the
-         * jobMetadata so that different jobs map run against different
-         * federations.
-         */
         jobs.put(job, newJobState(job,jobMetadata,getBigdataClient()));
 
         log.info("job=" + job );
@@ -815,7 +621,6 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
     // Empty array used when there are no outcomes.
     private static final Outcome[] EMPTY = new Outcome[]{};
 
-    // @todo move the input<File> into the IMapTask.
     public void submit(UUID job, T task, long timeout) {
 
         JobState<M> jobState = jobs.get(job);

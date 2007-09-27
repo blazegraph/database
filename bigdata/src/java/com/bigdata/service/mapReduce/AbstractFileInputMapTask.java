@@ -28,7 +28,7 @@ abstract public class AbstractFileInputMapTask extends
      * 
      * @param file
      *            The data source.
-     *            
+     * 
      * @throws Exception
      */
     final public void input(File file) throws Exception {

@@ -88,9 +88,6 @@ public class TestJournalBasics extends TestCase {
 
         TestSuite suite = new TestSuite("Core Journal Test Suite");
 
-        // @todo basic journal tests (none are defined yet).
-        suite.addTestSuite( TestJournal.class );
-
         // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite( TestNamedIndices.class );
         
@@ -113,8 +110,6 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestReadCommittedTx.class );
         // todo tests of write-write conflict resolution.
         suite.addTestSuite(TestConflictResolution.class);
-        // @todo tests of concurrent schedules and conflict detection.
-        suite.addTestSuite( TestConcurrentSchedules.class );
         
         /*
          * @todo tests of batch api and group commit mechanisms for very high
