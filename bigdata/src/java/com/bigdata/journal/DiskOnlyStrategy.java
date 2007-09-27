@@ -47,6 +47,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -62,9 +64,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Test at more than int32 bytes to verify that there are no inadvertent
- * limits being imposed at {@link Integer#MAX_VALUE} bytes.
  * 
  * @see BufferMode#Disk
  */
@@ -378,6 +377,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
+    /**
+     * Note: {@link ClosedChannelException} and
+     * {@link AsynchronousCloseException} can get thrown out of this method
+     * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
+     */
     public ByteBuffer read(long addr) {
 
         if (addr == 0L)
@@ -431,7 +435,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     // allocate a new buffer of the exact capacity.
                     dst = ByteBuffer.allocate(nbytes);
 
-                    raf.getChannel().read(dst, pos);
+                    final int nread = raf.getChannel().read(dst, pos);
+                    
+                    if(nread != nbytes) {
+                        
+                        throw new RuntimeException("Expected to read " + nbytes
+                                + "but read " + nread);
+                        
+                    }
 
                 }
 
@@ -440,9 +451,43 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 // allocate a new buffer of the exact capacity.
                 dst = ByteBuffer.allocate(nbytes);
 
-                synchronized (this) {
+                /*
+                 * FIXME While I am not sure why this is required it appears to
+                 * be necessary since corrupt data can otherwise be demonstrated
+                 * by AbstractMRMWTestCase.
+                 * 
+                 * Note: this appears to be an interaction with the OS or
+                 * hardware disk cache as the problem is generally demonstrated
+                 * only after the cache has been given some time to "clear". I
+                 * have seen this problem using Java 1.5.0_07 (-server -Xms1g
+                 * -Xmx1g -XX:MaxDirectMemorySize=256M) and Windows/XP service
+                 * pack 2 but I have not tested on other platforms yet.
+                 * 
+                 * Performance is somewhat better if you do not synchronize this
+                 * block of code. However, the differences are not that extreme.
+                 * As measured by AbstractMRMWTestCase (timeout=10, nclients=20,
+                 * percentReaders=.8) the performance is:
+                 * 
+                 * write 3.3, read 11.4 mb/s with sychronized(this)
+                 * 
+                 * write 3.6, read 13.2 mb/s without sychronized(this)
+                 * 
+                 * FIXME Also of interest, the JRockit VM corresponding to
+                 * 1.5.0_06 performs significantly worse on the same test. Check
+                 * out some other VM and OS versions and see what is going on
+                 * here!
+                 */
+                synchronized (this)
+                {
 
-                    raf.getChannel().read(dst, pos);
+                    final int nread = raf.getChannel().read(dst, pos);
+
+                    if (nread != nbytes) {
+
+                        throw new RuntimeException("Expected to read " + nbytes
+                                + " bytes but read " + nread);
+
+                    }
 
                 }
 
@@ -473,14 +518,26 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
-            throw new IllegalArgumentException(ERR_NO_BYTES_REMAINING);
+            throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
 
-        // test the maximum record length for a write.
-        am.assertByteCount(nbytes);
+        final long addr; // address in the store.
+        final long pos; // position in the file.
+        synchronized(this) {
+            
+            /*
+             * The offset at which the record will be written (not adjusted for
+             * the root blocks).
+             */
+            final long offset = nextOffset;
+            
+            // formulate the address that can be used to recover that record.
+            addr = toAddr(nbytes, offset);
 
-        try {
-
-            long pos = nextOffset + headerSize;
+            /*
+             * the position in the file at which the record will be written
+             * (this is adjusted for the root blocks).
+             */
+            pos = nextOffset + headerSize;
 
             final long needed = (nextOffset + nbytes) - userExtent;
 
@@ -494,11 +551,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             }
 
-            /*
-             * The offset at which the record will be written (not adjusted for
-             * the root blocks).
-             */
-            final long offset = nextOffset;
+            // increment by the #of bytes written.
+            nextOffset += nbytes;
+            
+        }
+        
+        try {
 
             if (aio) {
 
@@ -508,10 +566,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
                 writerExecutor.submit(new WriterTask(pos, data));
                 
-            } else synchronized(this) {
+            } else /*synchronized(this)*/ {
 
                 /* 
-                 * Write the data synchronously onto the end of the file.
+                 * Write the data onto the channel.
                  */
 
                 final int count = raf.getChannel().write(data, pos);
@@ -525,17 +583,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
             }
 
-            // increment by the #of bytes written.
-            nextOffset += nbytes;
-            
-            // formulate the address that can be used to recover that record.
-            return toAddr(nbytes, offset);
-
         } catch (IOException ex) {
 
             throw new RuntimeException(ex);
 
         }
+        
+        return addr;
 
     }
     
@@ -576,7 +630,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
-    public void truncate(long newExtent) {
+    synchronized public void truncate(long newExtent) {
 
         long newUserExtent =  newExtent - headerSize;
         
@@ -623,7 +677,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-    public long transferTo(RandomAccessFile out) throws IOException {
+    synchronized public long transferTo(RandomAccessFile out)
+            throws IOException {
         
         return super.transferFromDiskTo(this, out);
         

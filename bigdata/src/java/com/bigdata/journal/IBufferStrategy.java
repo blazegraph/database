@@ -46,7 +46,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IMROW;
 import com.bigdata.rawstore.IRawStore;
 
@@ -119,6 +118,9 @@ public interface IBufferStrategy extends IRawStore, IMROW {
     
     /**
      * Either truncates or extends the journal.
+     * <p>
+     * Note: Implementations of this method MUST be synchronized so that the
+     * operation is atomic with respect to concurrent writers.
      * 
      * @param extent
      *            The new extent.
@@ -150,6 +152,9 @@ public interface IBufferStrategy extends IRawStore, IMROW {
      * on portion of the user extent) en mass from the buffer onto an output
      * file. The buffered records are written "in order" starting at the current
      * position on the output file. The file is grown if necessary.
+     * <p>
+     * Note: Implementations of this method MUST be synchronized so that the
+     * operation is atomic with respect to concurrent writers.
      * 
      * @param out
      *            The file to which the buffer contents will be transferred.

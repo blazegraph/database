@@ -1814,8 +1814,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     final Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
 
     /**
-     * A thread that serializes writes on the unisolated store, including
-     * serializing atomic transaction prepare-commit operations.
+     * A thread used to {@link #serialize(Callable)} operations on the
+     * unisolated store, including serializing atomic transaction prepare-commit
+     * operations.
      * <p>
      * A writable transaction that attempts to {@link #commit()} is added as a
      * {@link TxCommitTask} and queued for execution by this thread. When its
@@ -1833,7 +1834,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * 
      * @param task
      *            The task.
-     *            
+     * 
      * @return The future for the task.
      */
     public Future serialize(Callable task) {

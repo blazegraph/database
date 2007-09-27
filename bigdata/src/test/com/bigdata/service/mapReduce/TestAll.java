@@ -89,7 +89,9 @@ public class TestAll extends TestCase {
         /*
          * 
          * @todo test map/reduce service with known outcome for correctness. For
-         * example, on the extract and count keyword problem.
+         * example, on the extract and count keyword problem. Use the
+         * correctness test to validate groupCommit and the distributed
+         * federation and map/reduce services as well as the embedded variant.
          * 
          */
         

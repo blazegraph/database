@@ -49,7 +49,8 @@ package com.bigdata.rawstore;
 
 /**
  * A marker interface for a store that supports Write Once Read Many (eg, an
- * append only store).
+ * append only store vs a store where storage may be reused as records are
+ * logically deleted).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -93,6 +93,9 @@ public class TestDiskJournal extends AbstractTestCase {
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
 
+        // test suite for MRMW correctness.
+        suite.addTestSuite( TestMRMW.class );
+
         // test suite for btree on the journal.
         suite.addTestSuite( TestBTree.class );
 
@@ -199,6 +202,30 @@ public class TestDiskJournal extends AbstractTestCase {
         
     }
 
+    /**
+     * Test suite integration for {@link AbstractMRMWTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestMRMW extends AbstractMRMWTestCase {
+        
+        public TestMRMW() {
+            super();
+        }
+
+        public TestMRMW(String name) {
+            super(name);
+        }
+
+        protected BufferMode getBufferMode() {
+            
+            return BufferMode.Disk;
+            
+        }
+        
+    }
+    
     /**
      * Test suite integration for {@link AbstractBTreeWithJournalTestCase}.
      * 

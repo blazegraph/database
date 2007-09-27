@@ -717,7 +717,7 @@ public abstract class AbstractMaster {
 
             }
 
-            log.info("Done: "+status());
+            log.info("Done:\n"+status());
             
         } catch (Throwable t) {
             

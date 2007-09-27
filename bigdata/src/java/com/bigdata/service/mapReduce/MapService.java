@@ -150,12 +150,15 @@ abstract public class MapService
                     log.info("Ran map operation in "+elapsed1+"ms");
                     
                     /*
-                     * Bulk insert the ordered tuples into the reduce index.
+                     * Output the tuples.
+                     * 
+                     * @todo buffer tuples across tasks, but be sure to flush
+                     * when the map operation is "done".
                      */
                     
                     final long begin2 = System.currentTimeMillis();
                     
-                    bulkLoad(t);
+                    output(t);
                     
                     final long elapsed2 = System.currentTimeMillis() - begin2;
 
@@ -213,7 +216,7 @@ abstract public class MapService
          * @throws ExecutionException 
          * @throws InterruptedException 
          */
-        public void bulkLoad(AbstractMapTask task) throws InterruptedException, ExecutionException, IOException {
+        public void output(AbstractMapTask task) throws InterruptedException, ExecutionException, IOException {
             
             // the tuples with the partition identifiers.
             final Tuple[] tuples = task.getTuples();
@@ -295,7 +298,9 @@ abstract public class MapService
          * @throws ExecutionException 
          * @throws InterruptedException 
          */
-        protected void write( IBigdataClient client, UUID reduceTask, UUID dataService, Tuple[] tuples ) throws InterruptedException, ExecutionException, IOException {
+        protected void write(IBigdataClient client, UUID reduceTask,
+                UUID dataService, Tuple[] tuples) throws InterruptedException,
+                ExecutionException, IOException {
             
             IDataService ds = client.getDataService(dataService);
 

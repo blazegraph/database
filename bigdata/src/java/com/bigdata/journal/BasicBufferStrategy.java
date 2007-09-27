@@ -65,8 +65,12 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * begins after the root blocks, making it impossible to write on the root
      * blocks using the buffer. The offset of the image into the backing file is
      * given by {@link AbstractBufferStrategy#headerSize}.
+     * <p>
+     * Note: The {@link #directBuffer} reference is updated by
+     * {@link #truncate(long)}. Since both readers and writers MUST use the
+     * current value for this variable it is marked as <code>volatile</code>.
      */
-    protected ByteBuffer directBuffer;
+    protected volatile ByteBuffer directBuffer;
 
     /**
      * The size of the journal header, including MAGIC, version, and both root
@@ -116,7 +120,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
     }
 
     /**
-     * Releases the {@link #directBuffer}.
+     * Releases the buffer.
      */
     public void close() {
 
@@ -135,36 +139,51 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
-            throw new IllegalArgumentException(ERR_NO_BYTES_REMAINING);
+            throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
 
-        // assert the maximum record length for a write.
-        am.assertByteCount(nbytes);
+        /*
+         * Write the record on the buffer.
+         * 
+         * Note: This is synchronized in order to support concurrent writers.
+         */
         
-        // the next offset.
-        final long offset = nextOffset;
-        
-        final long needed = (offset + nbytes) - userExtent;
-
-        if (needed > 0) {
-
-            if (!overflow(needed)) {
-                
-                throw new OverflowException();
-                
-            }
+        final long addr;
+        synchronized(this) 
+        {
             
+            // the next offset.
+            final long offset = nextOffset;
+            
+            // formulate the address that can be used to recover that record.
+            addr = toAddr(nbytes, offset);
+
+            final long needed = (offset + nbytes) - userExtent;
+
+            if (offset + nbytes > Integer.MAX_VALUE) {
+
+                throw new RuntimeException(ERR_INT32);
+
+            }
+
+            if (needed > 0) {
+
+                if (!overflow(needed)) {
+
+                    throw new OverflowException();
+
+                }
+
+            }
+
+            directBuffer.limit((int) offset + nbytes);
+            directBuffer.position((int) offset);
+
+            directBuffer.put(data);
+
+            // increment by the #of bytes written.
+            nextOffset += nbytes;
+
         }
-       
-        directBuffer.limit((int)offset + nbytes);
-        directBuffer.position((int)offset);
-        
-        directBuffer.put(data);
-        
-        // increment by the #of bytes written.
-        nextOffset += nbytes;
-        
-        // formulate the address that can be used to recover that record.
-        final long addr = toAddr(nbytes, offset);
 
         return addr;
 
@@ -197,18 +216,35 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
          * in turn supports concurrent execution of concurrent transactions
          * reading from various historical states.
          */
-        ByteBuffer view = directBuffer.asReadOnlyBuffer();
+        final ByteBuffer view;
+        synchronized(this) {
+            /*
+             * Note: Synchronization is required to have asReadOnlyBuffer()
+             * construct a consistent view with concurrent writers. If you do
+             * not synchronize then an IllegalArgumentException can get tossed
+             * out of here. The problem is that the operation is not atomic
+             * without synchronization. This problem was revealed by the
+             * AbstractMRMWTestCase, but it does not show up on every run.
+             */
+            view = directBuffer.asReadOnlyBuffer();
+        }
 
         // return a read-only view onto the data in the store.
 
         view.limit((int) offset + nbytes);
         view.position((int) offset);
 
+        // the slice will show only the record being read.
+        
         return view.slice();
 
     }
 
-    public void truncate(long newExtent) {
+    /**
+     * Note: This is synchronized since it MAY be invoked directly while
+     * concurrent writers are running and not just from {@link #overflow(long)}.
+     */
+    synchronized public void truncate(long newExtent) {
 
         long newUserExtent =  newExtent - headerSize;
         
@@ -224,7 +260,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
              * Constraint when using a buffered mode.
              */
             
-            throw new IllegalArgumentException("User extent would exceed int32 bytes");
+            throw new IllegalArgumentException(ERR_INT32);
             
         }
         
@@ -251,7 +287,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
         // Copy to the new buffer.
         tmp.put(directBuffer);
-     
+
         // Replace the buffer reference.
         directBuffer = tmp;
         
@@ -263,7 +299,12 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     }
     
-    public long transferTo(RandomAccessFile out) throws IOException {
+    /**
+     * Note: This is synchronized so that concurrent writers must block during
+     * this operation.
+     */
+    synchronized public long transferTo(RandomAccessFile out)
+            throws IOException {
         
         long count = nextOffset;
         

@@ -62,6 +62,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.test.ExperimentDriver;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -76,9 +77,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * approach as a fully buffered strategy even though data may not always reside
  * in memory.
  * 
- * @todo This test suite could also be used to tune AIO (asynchronous IO)
- *       support for the {@link DirectBufferStrategy} and the
- *       {@link DiskOnlyStrategy}.
+ * @todo Support {@link ExperimentDriver}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -102,7 +101,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
      * Correctness/stress test verifies that the implementation supports
      * Multiple Readers One Writer (MROW).
      */
-    public void test_mrow() throws Exception {
+    public void testMROW() throws Exception {
 
         IBufferStrategy store = ((Journal)getStore()).getBufferStrategy();
 
@@ -122,6 +121,8 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
         
         doMROWTest(store, nwrites, writeDelayMillis, timeout,
                 nclients, ntrials, reclen, nreads);
+        
+        store.closeAndDelete();
         
     }
 
@@ -278,8 +279,6 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
                 + ", ncancelled=" + ncancelled + ", nerrors=" + nerr + " in "
                 + elapsed + "ms (" + nok * 1000 / elapsed
                 + " reads per second); nwritten=" + nwritten);
-        
-        store.closeAndDelete();
        
     }
 
@@ -538,11 +537,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
         
         journal.shutdown();
         
-        if(journal.getFile()!=null) {
-            
-            journal.getFile().delete();
-            
-        }
+        journal.delete();
         
     }
 

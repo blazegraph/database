@@ -86,7 +86,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
     }
 
     public StressTestConcurrent(String name) {
+
         super(name);
+        
     }
     
     public void setUpComparisonTest() throws Exception {
@@ -393,12 +395,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * @todo try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong.
      * 
-     * @todo the data service should use a thread pool to limit the #of started
-     *       transations.
-     * 
      * @todo There may be a memory leak with concurrent transactions. I was able
      *       to get rid of an {@link OutOfMemoryError} by setting the
-     *       {@link TemporaryRawStore#buf} to to null when the store was closed.
+     *       {@link TemporaryRawStore#buf} to null when the store was closed.
      *       However, there is still going to be something that was causing
      *       those transactions and their stores to be hanging around -- perhaps
      *       the writeService in the Journal which might be holding onto
@@ -508,6 +507,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * FIXME refactor so that we can pass in the default properties and then reuse
+     * this for {@link AbstractMRMWTestCase} to generate a set of experiments.
      */
     public static class GenerateExperiment extends ExperimentDriver {
         
