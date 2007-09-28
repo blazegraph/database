@@ -51,10 +51,13 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Vector;
@@ -67,6 +70,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
@@ -480,13 +484,13 @@ abstract public class AbstractMRMWTestCase
         ret.put("nerrors", ""+nerr);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("nwritten", ""+nwritten);
-        ret.put("bytesWritten", bytesFormat.format(groundTruth.bytesWritten.get()));
-        ret.put("bytesWrittenPerSec", bytesFormat.format(bytesWrittenPerSecond));
+        ret.put("bytesWritten", ""+groundTruth.bytesWritten.get());
+        ret.put("bytesWrittenPerSec", ""+bytesWrittenPerSecond);
         ret.put("nread", ""+nverified);
-        ret.put("bytesVerified", bytesFormat.format(groundTruth.bytesVerified.get()));
-        ret.put("bytesVerifiedPerSec", bytesFormat.format(bytesVerifiedPerSecond));
+        ret.put("bytesVerified", ""+groundTruth.bytesVerified.get());
+        ret.put("bytesVerifiedPerSec", ""+bytesVerifiedPerSecond);
         
-        System.err.println(ret.toString());
+        System.err.println(ret.toString(true/*newline*/));
         
         store.closeAndDelete();
 
@@ -824,19 +828,6 @@ abstract public class AbstractMRMWTestCase
 
     /**
      * Correctness/stress/performance test for MRMW behavior.
-     * 
-     * @todo setup as experiment. test with 100% writers and 100% readers as
-     *       well as with an expected mix of readers to writes (70-80%). test
-     *       all buffer strategies using interesting options. Note that this is
-     *       never doing a commit - just straight writes and reads.
-     * 
-     * @todo The big puzzle here is why Disk (write 3, read 12 mb/s) is so much
-     *       slower than Direct (write 5, read 20 mb/s). This is odd since both
-     *       methods are writing on the disk! If reads are dragging down
-     *       performance, then maybe read cache for the {@link DiskOnlyStrategy}
-     *       would be useful?  Note that this class uses random selection of
-     *       addresses to read back so this will defeat any cache once the #of
-     *       bytes/records written grows large enough.
      */
     public static void main(String[] args) throws Exception {
                 
@@ -866,25 +857,160 @@ abstract public class AbstractMRMWTestCase
 
 //      properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
         
-      properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
-        new AbstractMRMWTestCase() {
+        new StressTestMRMW().doComparisonTest(properties);
 
-            @Override
-            protected BufferMode getBufferMode() {
-                // TODO Auto-generated method stub
-                return null;
-            }
-            
-        }.doComparisonTest(properties);
-//        
-//        Journal journal = new Journal(properties);
-//
-//        doMRMWTest(journal.getBufferStrategy(), timeout, ntrials, nclients,
-//                percentReaders, reclen, nwrites, nreads);
-//                
     }
 
+    /**
+     * Concrete instance for running stress tests and comparisons.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class StressTestMRMW extends AbstractMRMWTestCase {
+
+        protected BufferMode getBufferMode() {
+        
+            throw new UnsupportedOperationException();
+            
+        }
+            
+    }
+    
+    /**
+     * Experiment generation utility class.
+     * <p>
+     * The follow result summary is for 20 clients with 80% read tasks
+     * (9/27/07). The timeout was 30 and the store files grew up to ~160M (for
+     * transient).
+     * </p>
+     * 
+     * <pre>
+     *   bufferMode   readBytes/s writeBytes/s    read    write
+     *   Transient     22,372,313  5,666,728 
+     *   Direct        18,560,143  4,823,312      83%      85%
+     *   Disk          11,315,786  3,001,315      51%      53%
+     * </pre>
+     * 
+     * <p>
+     * The big puzzle here is why Disk is so much slower than Direct. You can
+     * see that Direct runs at 83% (reads) or 85% (writes) of Transient while
+     * Disk runs at a significantly slow percentage of the Transient
+     * performance. This is odd since both methods are writing on the disk! If
+     * reads are dragging down performance, then maybe read cache for the
+     * {@link DiskOnlyStrategy} would be useful? Note that this class uses
+     * random selection of addresses to read back so this will defeat any cache
+     * once the #of bytes/records written grows large enough.
+     * </p>
+     * 
+     * @todo Compare the results above with the performance of index writes
+     *       using a suitable stress test or application. The question is
+     *       whether the slower performance of the Disk mode is reflected there
+     *       as well. There are various reasons why it might not, including
+     *       memory usage, heap churn, and access patterns all of which are
+     *       different once indices are introduced. For example, this test does
+     *       random reads but indices buffer nodes and leaves and pay a high
+     *       cost for (de-)serialization. Also, less available memory means more
+     *       frequent garbage collection and the indices do more object
+     *       allocation (measure the heap churn for both this test and one with
+     *       indices to get a sense of this and see if there are ways to reduce
+     *       the allocation for the indices and thereby reduce the need to do
+     *       GCs).
+     * 
+     * @todo we do not need to test forceOnCommit here since we are never doing
+     *       a commit during this stress test. However, useDirectBuffers is an
+     *       interesting variable that can be substituted. Change this by
+     *       further refactoring of the generator classes to support better
+     *       parameterization.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class GenerateExperiment extends ExperimentDriver {
+        
+        /**
+         * Generates an XML file that can be run by {@link ExperimentDriver}.
+         * 
+         * @param args
+         */
+        public static void main(String[] args) throws Exception {
+            
+            // this is the test to be run.
+            String className = StressTestMRMW.class.getName();
+            
+            Map<String,String> defaultProperties = new HashMap<String,String>();
+
+            // force delete of the files on close of the journal under test.
+            defaultProperties.put(Options.CREATE_TEMP_FILE,"true");
+
+            // avoids journal overflow when running out to 60 seconds.
+            defaultProperties.put(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);
+
+            /* 
+             * Set defaults for each condition.
+             */
+            
+            defaultProperties.put(TestOptions.TIMEOUT,"30");
+
+            defaultProperties.put(TestOptions.NTRIALS,"100000");
+
+//            defaultProperties.put(TestOptions.NCLIENTS, "20");
+            
+            defaultProperties.put(TestOptions.PERCENT_READERS,".8");
+
+            defaultProperties.put(TestOptions.RECLEN, "1024");
+
+            defaultProperties.put(TestOptions.NWRITES,"100");
+
+            defaultProperties.put(TestOptions.NREADS,"100");
+            
+            List<Condition>conditions = new ArrayList<Condition>();
+
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "1") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "2") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "10") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "20") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "20"), new NV(TestOptions.PERCENT_READERS,"0.0"),
+                            new NV(TestOptions.TIMEOUT,"10") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "20"), new NV(TestOptions.PERCENT_READERS,"1.0"),
+                            new NV(TestOptions.TIMEOUT,"10")}));
+
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "100") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "200") }));
+            
+            Experiment exp = new Experiment(className,defaultProperties,conditions);
+
+            // copy the output into a file and then you can run it later.
+            System.err.println(exp.toXML());
+
+        }
+        
+    }
+    
 }

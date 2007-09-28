@@ -119,12 +119,18 @@ public class ExperimentDriver {
             return result;
             
         }
+
+        public String toString() {
+            
+            return toString(false);
+            
+        }
         
         /**
          * Converts to a human readable representation using {name=value, ...}.
          * The attributes are listed in sorted order.
          */
-        public String toString() {
+        public String toString(boolean newline) {
             
             StringBuilder sb = new StringBuilder();
             
@@ -136,7 +142,7 @@ public class ExperimentDriver {
                 
                 if(!first) {
                     
-                    sb.append(",\n");
+                    sb.append(newline?"\n":", ");
                     
                 }
                 
@@ -269,7 +275,7 @@ public class ExperimentDriver {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class NV {
+    public static class NV {
         public final String name;
         public final String value;
         public NV(String name,Object value) {
@@ -290,7 +296,7 @@ public class ExperimentDriver {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class Condition {
+    public static class Condition {
 
 //        public final String name;
         
