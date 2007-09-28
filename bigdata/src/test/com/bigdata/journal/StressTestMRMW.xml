@@ -1,0 +1,100 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<experiment class="com.bigdata.journal.AbstractMRMWTestCase$StressTestMRMW">
+ <defaults>
+  <property name="maximumExtent">419430400</property>
+  <property name="timeout">30</property>
+  <property name="createTempFile">true</property>
+  <property name="nreads">100</property>
+  <property name="nwrites">100</property>
+  <property name="ntrials">100000</property>
+  <property name="reclen">1024</property>
+  <property name="percentReaders">.8</property>
+ </defaults>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Transient</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+  <property name="forceOnCommit">No</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Transient</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">0.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">0.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+  <property name="timeout">10</property>
+  <property name="forceOnCommit">No</property>
+  <property name="percentReaders">0.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">0.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+  <property name="timeout">10</property>
+  <property name="forceOnCommit">No</property>
+  <property name="percentReaders">0.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Transient</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">1.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">1.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Direct</property>
+  <property name="timeout">10</property>
+  <property name="forceOnCommit">No</property>
+  <property name="percentReaders">1.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+  <property name="timeout">10</property>
+  <property name="percentReaders">1.0</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="bufferMode">Disk</property>
+  <property name="timeout">10</property>
+  <property name="forceOnCommit">No</property>
+  <property name="percentReaders">1.0</property>
+ </condition>
+</experiment>

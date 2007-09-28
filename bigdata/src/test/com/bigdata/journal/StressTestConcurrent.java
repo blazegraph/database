@@ -271,7 +271,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 //                + ", nuncommitted=" + nuncommitted + ", " + elapsed + "ms, "
 //                + ncommitted * 1000 / elapsed + " tps";
         
-        System.err.println(ret.toString());
+        System.err.println(ret.toString(true/*newline*/));
         
         return ret;
        
@@ -507,9 +507,6 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * FIXME refactor so that we can pass in the default properties and then reuse
-     * this for {@link AbstractMRMWTestCase} to generate a set of experiments.
      */
     public static class GenerateExperiment extends ExperimentDriver {
         
@@ -545,81 +542,34 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
             List<Condition>conditions = new ArrayList<Condition>();
 
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "1") }));
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "1") }));
 
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "2") }));
-    
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "10") }));
-    
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "20") }));
-    
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "100") }));
-    
-            conditions.addAll(getBasicConditions(defaultProperties, new NV[] { new NV(
-                    TestOptions.NCLIENTS, "200") }));
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "2") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "10") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "20") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "100") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "200") }));
             
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 
             // copy the output into a file and then you can run it later.
             System.err.println(exp.toXML());
-
-        }
-        
-        /**
-         * Sets up a series of {@link Condition}s based on the use of different
-         * {@link BufferMode}s and also sets up {@link Condition}s for
-         * {@link BufferMode}s that are backed by disk where
-         * {@link Options#FORCE_ON_COMMIT} is set to {@link ForceEnum#No}
-         */
-        static public List<Condition> getBasicConditions(Map<String,String>properties, NV[] params) throws Exception {
-
-            properties = new HashMap<String,String>(properties);
-            
-            for(int i=0; i<params.length; i++) {
-                
-                properties.put(params[i].name,params[i].value);
-                
-            }
-            
-            Condition[] conditions = new Condition[] { //
-                    getCondition(properties, new NV[] { //
-                            new NV(Options.BUFFER_MODE, BufferMode.Transient), //
-                            }), //
-//                    getCondition(
-//                            properties,
-//                            new NV[] { //
-//                                    new NV(Options.BUFFER_MODE,
-//                                            BufferMode.Transient), //
-//                                    new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
-//                            }), //
-                    getCondition(properties, new NV[] { //
-                            new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-                            }), //
-//                    getCondition(
-//                            properties,
-//                            new NV[] { //
-//                                    new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-//                                    new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
-//                            }), //
-                    getCondition(properties, new NV[] { //
-                            new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
-                            }), //
-                    getCondition(properties, new NV[] { //
-                            new NV(Options.BUFFER_MODE, BufferMode.Disk), //
-                            }), //
-                    getCondition(properties, new NV[] { //
-                            new NV(Options.BUFFER_MODE, BufferMode.Disk), //
-                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
-                            }), //
-            };
-            
-            return Arrays.asList(conditions);
 
         }
         

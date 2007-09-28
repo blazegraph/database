@@ -131,24 +131,25 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       writes on distinct indices mapped on the same data service
  *       concurrently. The can be done as follows:
  *       <P>
- *       Modify the journal's IRawStore implementation to support concurrent
- *       writers (it is MROW now and will become MRMW). The change is limited to
- *       a very small section of code where the next address is computed.
- *       Commits are still single-threaded of course and will continue to run in
- *       the "writeService".
+ *       (done) Modify the journal's IRawStore implementation to support
+ *       concurrent writers (it is MROW now and will become MRMW). The change is
+ *       limited to a very small section of code where the next address is
+ *       computed. Commits are still single-threaded of course and will continue
+ *       to run in the "writeService".
  *       <P>
  *       Create an executor thread (write service) per named index mapped onto a
- *       journal. There are a variety of strategies here. The easiest is one
- *       thread per named index, but that does not provide governance over the
- *       #of threads that can run directly. An alternative is a thread pool with
- *       a lock per named index such that new writes on an index block until the
- *       lock is released by the current writer. The size of the pool could be
- *       configured. In any case, writes run concurrently on different indices
- *       with concurrent writes against the backing IRawStore and then index
- *       commits are serialized. This preserves consistency and might make group
- *       commit trivial by accepting all commit requests in the commit queue
- *       periodically, e.g., at intervals bounded by the maximum sync rate for
- *       the disk (or by an ~100ms latency when not writing on disk).
+ *       journal. (I am thinking of hash partitioning the indices onto a fixed
+ *       size thread pool.) There are a variety of strategies here. The easiest
+ *       is one thread per named index, but that does not provide governance
+ *       over the #of threads that can run directly. An alternative is a thread
+ *       pool with a lock per named index such that new writes on an index block
+ *       until the lock is released by the current writer. The size of the pool
+ *       could be configured. In any case, writes run concurrently on different
+ *       indices with concurrent writes against the backing IRawStore and then
+ *       index commits are serialized. This preserves consistency and might make
+ *       group commit trivial by accepting all commit requests in the commit
+ *       queue periodically, e.g., at intervals bounded by the maximum sync rate
+ *       for the disk (or by an ~100ms latency when not writing on disk).
  *       <p>
  *       Note: The commit protocol for indices needs to be modified slightly. As
  *       it stands, all dirty indices are flushed when the journal commits. In
@@ -166,14 +167,17 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       exception might be certain shared indices, which tend not to be named,
  *       such as the commit record index itself).
  *       <p>
- *       Write access to indices used by the journal itself will require
- *       serialization. In particular, the index used to lookup indices by name.
- *       Adding and dropping a named index will therefore remain a serialized
- *       operation.
+ *       Write access to indices used by the journal itself may require
+ *       additional synchronization or serialization of data service operations.
+ *       In particular, the index used to lookup indices by name. Adding and
+ *       dropping a named index will therefore remain a serialized operation.
  *       <p>
  *       Overflow processing only occurs during commits, and commits will remain
  *       serialized. (Likewise, writes on the commit record index are always
  *       serialized since they only occur during commits.)
+ *       <p>
+ *       The abstract journal and the buffer strategies should implement MRMW
+ *       now but watch out for the add/drop index operations!
  * 
  * @todo consider that all getIndex() methods on the various tasks should be
  *       getIndexPartition() methods. The getIndexPartition() method could be
@@ -187,7 +191,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       moved (shed) while a client has a lease.
  * 
  * @todo make sure that all service methods that create a {@link Future} do a
- *       get() so that the will block until the serialized task actually runs.
+ *       get() so that they will block until the serialized task actually runs.
  * 
  * @todo Note that "auto-commit" is provided for unisolated writes. This relies
  *       on two things. First, only the {@link UnisolatedBTree} recoverable from
@@ -216,8 +220,6 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * 
  * @todo add assertOpen() throughout
  * 
- * @todo declare interface for managing service shutdown()/shutdownNow()?
- * 
  * @todo implement NIODataService, RPCDataService(possible), EmbeddedDataService
  *       (uses queue to decouple operations), DataServiceClient (provides
  *       translation from {@link ISimpleBTree} to {@link IBatchBTree}, provides
@@ -226,15 +228,18 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       different client platforms (e.g., support PHP, C#). Bundle ICU4J with
  *       the client.
  * 
- * @todo another data method will need to be defined to support GOM with
- *       pre-fetch. the easy way to do this is to get 50 objects to either side
- *       of the object having the supplied key. This is easy to compute using
- *       the {@link ILinearList} interface. I am not sure about unisolated
- *       operations for GOM.... Isolated operations are straight forward. The
- *       other twist is supporting scalable link sets, link set indices (not
- *       named, unless the identity of the object collecting the link set is
- *       part of the key), and non-OID indices (requires changes to
- *       generic-native).
+ * @todo Support GOM pre-fetch using a rangeQuery iterator - that will
+ *       materialize N records on the client and could minimize trips to the
+ *       server. I am not sure about unisolated operations for GOM.... Isolated
+ *       operations are straight forward. The other twist is supporting scalable
+ *       link sets, link set indices (not named, unless the identity of the
+ *       object collecting the link set is part of the key), and non-OID indices
+ *       (requires changes to generic-native). I think that link sets might have
+ *       to become indices in order to scale (to break the cycle of updating
+ *       both the object collecting the link set and the head/tail and
+ *       prior/next members in the link set). Or perhaps all those could be
+ *       materialized on the client and then an unisolated operation (perhaps
+ *       with conflict resolution?!?) would persist the results...
  * 
  * @todo Have the {@link DataService} notify the transaction manager when a
  *       write is performed on that service so that all partitipating
@@ -249,10 +254,6 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * @todo narrow file access permissions so that we only require
  *       {read,write,create,delete} access to a temporary directory and a data
  *       directory.
- * 
- * @todo all of the interfaces implemented by this class need to extend
- *       {@link Remote} in order to be made visible on the proxy object exported
- *       by JERI.
  * 
  * @todo Write benchmark test to measure interhost transfer rates. Should be
  *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
