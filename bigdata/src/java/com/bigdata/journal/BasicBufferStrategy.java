@@ -64,13 +64,42 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * A buffer containing a write through image of the backing file. The image
      * begins after the root blocks, making it impossible to write on the root
      * blocks using the buffer. The offset of the image into the backing file is
-     * given by {@link AbstractBufferStrategy#headerSize}.
+     * given by {@link FileMetadata#headerSize0}.
      * <p>
-     * Note: The {@link #directBuffer} reference is updated by
+     * Note: The {@link #buffer} reference is updated by
      * {@link #truncate(long)}. Since both readers and writers MUST use the
      * current value for this variable it is marked as <code>volatile</code>.
      */
-    protected volatile ByteBuffer directBuffer;
+    private volatile ByteBuffer buffer;
+    
+    protected ByteBuffer getBuffer() {
+        
+        return buffer;
+        
+    }
+    
+    /**
+     * 
+     * @param readOnly
+     * @return
+     */
+    protected ByteBuffer getBufferView(boolean readOnly) {
+
+        synchronized (buffer) {
+
+            if (readOnly) {
+
+                return buffer.asReadOnlyBuffer();
+
+            } else {
+
+                return buffer.duplicate();
+
+            }
+
+        }
+
+    }
 
     /**
      * The size of the journal header, including MAGIC, version, and both root
@@ -109,7 +138,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         super(extent, maximumExtent, offsetBits, nextOffset, bufferMode);
 
-        this.directBuffer = buffer;
+        this.buffer = buffer;
 
         this.extent = extent;
         
@@ -126,7 +155,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         super.close();
         
-        directBuffer = null;
+        buffer = null;
 
     }
     
@@ -175,10 +204,16 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
             }
 
-            directBuffer.limit((int) offset + nbytes);
-            directBuffer.position((int) offset);
+            /*
+             * Note: The data MUST be copied within the synchronized() block
+             * since otherwise overflow() could cause the buffer reference to be
+             * invalidated.
+             */
+            
+            buffer.limit((int) offset + nbytes);
+            buffer.position((int) offset);
 
-            directBuffer.put(data);
+            buffer.put(data);
 
             // increment by the #of bytes written.
             nextOffset += nbytes;
@@ -226,7 +261,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
              * without synchronization. This problem was revealed by the
              * AbstractMRMWTestCase, but it does not show up on every run.
              */
-            view = directBuffer.asReadOnlyBuffer();
+            view = buffer.asReadOnlyBuffer();
         }
 
         // return a read-only view onto the data in the store.
@@ -246,11 +281,11 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      */
     synchronized public void truncate(long newExtent) {
 
-        long newUserExtent =  newExtent - headerSize;
+        final long newUserExtent = newExtent - headerSize;
         
         if (newUserExtent < getNextOffset() ) {
            
-            throw new IllegalArgumentException("Would truncate written data.");
+            throw new IllegalArgumentException(ERR_TRUNCATE);
             
         }
 
@@ -271,7 +306,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             
         }
         
-        final boolean isDirect = directBuffer.isDirect();
+        final boolean isDirect = buffer.isDirect();
 
         final int newCapacity = (int) newUserExtent;
         
@@ -282,14 +317,14 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         /*
          * Copy at most those bytes that have been written on.
          */
-        directBuffer.limit((int)Math.min(nextOffset,newCapacity));
-        directBuffer.position(0);
+        buffer.limit((int)Math.min(nextOffset,newCapacity));
+        buffer.position(0);
         
         // Copy to the new buffer.
-        tmp.put(directBuffer);
+        tmp.put(buffer);
 
         // Replace the buffer reference.
-        directBuffer = tmp;
+        buffer = tmp;
         
         extent = newUserExtent + headerSize;
         
@@ -327,11 +362,11 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         final long begin = System.currentTimeMillis();
         
         // setup the buffer for the operation.
-        directBuffer.limit((int)nextOffset);
-        directBuffer.position(0);
+        buffer.limit((int)nextOffset);
+        buffer.position(0);
         
         // write the data.
-        final long nwritten = outChannel.write(directBuffer);
+        final long nwritten = outChannel.write(buffer);
         
         if( nwritten != count ) {
             

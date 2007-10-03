@@ -173,14 +173,15 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
         assertTrue(journal.activeTx.containsKey(ts0));
         assertFalse(journal.preparedTx.containsKey(ts0));
 
+        // abort is synchronous
         journal.abort(ts0);
         
-        /*
-         * note: when the abort is asynchronous, i.e., for a read-write
-         * transaction, this causes the test to wait until the abort task has
-         * been executed.
-         */ 
-        journal.writeService.shutdown();
+//        /*
+//         * note: when the abort is asynchronous, i.e., for a read-write
+//         * transaction, this causes the test to wait until the abort task has
+//         * been executed.
+//         */ 
+//        journal.writeService.shutdown();
 
         assertFalse(tx0.isActive());
         assertFalse(tx0.isPrepared());

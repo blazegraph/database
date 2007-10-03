@@ -113,6 +113,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     protected static final String ERR_INT32 = "Would exceed int32 bytes.";
     
     /**
+     * Text of the error message used when
+     * {@link IBufferStrategy#truncate(long)} would truncate data that has
+     * already been written.
+     */
+    protected static final String ERR_TRUNCATE = "Would truncate written data.";
+    
+    /**
      * True iff the {@link IBufferStrategy} is open.
      */
     private boolean open = false;
@@ -127,10 +134,11 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     
     /**
      * The next offset at which a data item would be written on the store as an
-     * offset into the <em>user extent</em>. This is updated each time a new
-     * record is written on the store. On restart, the value is initialized from
-     * the current root block. The current value is written as part of the new
-     * root block during each commit.
+     * offset into the <em>user extent</em> (offset zero(0) addresses the
+     * first byte after the root blocks). This is updated each time a new record
+     * is written on the store. On restart, the value is initialized from the
+     * current root block. The current value is written as part of the new root
+     * block during each commit.
      * <p>
      * Note: It is NOT safe to reload the current root block and therefore reset
      * this to an earlier offset unless all transactions are discarded. The

@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,7 +90,11 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         
     }
     
-    public void setUpComparisonTest() throws Exception {
+    Journal journal;
+
+    public void setUpComparisonTest(Properties properties) throws Exception {
+        
+        journal = new Journal(properties);
         
     }
     
@@ -116,7 +119,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
              * looked into further.
              */
             
-            fail("Mapped buffer strategy has problem with concurrency");
+            fail("Mapped buffer strategy may have problem with tx concurrency");
             
         }
 
@@ -130,7 +133,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * @param journal
      *            The database.
      * 
-     * @param name
+     * @param resource
      *            The name of the index on which the transactions will
      *            operation.
      * 
@@ -152,14 +155,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * @param nops
      *            The #of operations to be performed in each transaction.
      * 
-     * @todo can this also be a correctness test if we choose the
-     *       read/write/delete operations carefully and maintain a ground truth
-     *       index?
-     * 
-     * @todo modify to use byte[] keys per the service variant for more shared
-     *       code?
-     * 
-     * @todo factor out the operation to be run.
+     * @todo factor out the operation to be run as a test parameter?
      */
     static public Result doConcurrentClientTest(Journal journal,
             long timeout, int nclients, int ntrials, int keyLen, int nops)
@@ -311,7 +307,8 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         /**
          * Executes random operations in the transaction.
          * 
-         * @return The commit time of the transaction.
+         * @return The commit time of the transactions and <code>0L</code> IFF
+         *         the transaction was aborted.
          */
         public Long call() throws Exception {
             
@@ -392,8 +389,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
      * 
      * @todo test with more than one named index in use.
      * 
-     * @todo try to make this a correctness test since there are lots of little
-     *       ways in which things can go wrong.
+     * @todo Try to make this a correctness test since there are lots of little
+     *       ways in which things can go wrong. Note that the actual execution 
+     *       execution order is important for transactions.
      * 
      * @todo There may be a memory leak with concurrent transactions. I was able
      *       to get rid of an {@link OutOfMemoryError} by setting the
@@ -416,9 +414,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         Properties properties = new Properties();
 
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
-        
         properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
+        
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
         
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
@@ -428,9 +426,9 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
-        properties.setProperty(TestOptions.TIMEOUT,"10");
+        properties.setProperty(TestOptions.TIMEOUT,"60");
 
-        properties.setProperty(TestOptions.NCLIENTS,"100");
+        properties.setProperty(TestOptions.NCLIENTS,"10");
 
         properties.setProperty(TestOptions.NTRIALS,"10000");
 
@@ -438,7 +436,27 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         properties.setProperty(TestOptions.NOPS,"4");
         
-        new StressTestConcurrent().doComparisonTest(properties);
+        IComparisonTest test = new StressTestConcurrent();
+        
+        test.setUpComparisonTest(properties);
+        
+        try {
+
+            test.doComparisonTest(properties);
+        
+        } finally {
+
+            try {
+                
+                test.tearDownComparisonTest();
+                
+            } catch(Throwable t) {
+
+                log.warn("Tear down problem: "+t, t);
+                
+            }
+            
+        }
 
     }
     
@@ -493,8 +511,6 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         final int nops = Integer.parseInt(properties.getProperty(TestOptions.NOPS));
 
-        Journal journal = new Journal(properties);
-
         Result result = doConcurrentClientTest(journal, timeout, nclients, ntrials,
                 keyLen, nops);
 
@@ -535,6 +551,8 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
             defaultProperties.put(TestOptions.TIMEOUT,"30");
 
             defaultProperties.put(TestOptions.NTRIALS,"10000");
+
+//            defaultProperties.put(TestOptions.NCLIENTS,"10");
 
             defaultProperties.put(TestOptions.KEYLEN,"4");
 

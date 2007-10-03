@@ -192,8 +192,6 @@ abstract public class AbstractMRMWTestCase
         
         final int nreadsPerTask = Integer.parseInt(properties.getProperty(TestOptions.NREADS));
 
-        Journal journal = new Journal(properties);
-
         Result result = doMRMWTest(journal, timeout, ntrials, nclients,
                 percentReaders, reclen, nwritesPerTask, nreadsPerTask);
 
@@ -201,8 +199,12 @@ abstract public class AbstractMRMWTestCase
 
     }
 
-    public void setUpComparisonTest() throws Exception {
+    private Journal journal;
+    
+    public void setUpComparisonTest(Properties properties) throws Exception {
         
+        journal = new Journal(properties);
+
     }
 
     public void tearDownComparisonTest() throws Exception {
@@ -693,7 +695,7 @@ abstract public class AbstractMRMWTestCase
                 
             } catch(Throwable t) {
                 
-                log.warn(t.getMessage());
+                log.warn(t.getMessage(),t);
 
                 throw new RuntimeException( t );
                 
@@ -771,7 +773,7 @@ abstract public class AbstractMRMWTestCase
             
             } catch(Throwable t) {
                 
-                log.warn(t.getMessage());
+                log.warn(t.getMessage(),t);
                 
                 throw new RuntimeException( t );
                 
@@ -834,7 +836,7 @@ abstract public class AbstractMRMWTestCase
         Properties properties = new Properties();
         
         // timeout in seconds.
-        properties.setProperty(TestOptions.TIMEOUT,"10");
+        properties.setProperty(TestOptions.TIMEOUT,"60");
         
         // You must increase the timeout to do 100k trials.
         properties.setProperty(TestOptions.NTRIALS, "100000");

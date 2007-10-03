@@ -48,10 +48,13 @@ Modifications:
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
@@ -66,11 +69,14 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
+import com.bigdata.test.ExperimentDriver;
+import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -90,7 +96,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       mode should be faster if there are sufficent resources available (its
  *       main advantage occurs during overflow since that operation requires
  *       reads against partly random locations in the journal to build up the
- *       index segments).
+ *       index segments). (The problem is also that we are not IO bound - the
+ *       btree search and node/leaf serialization are the main bottlenecks.)
  * 
  * @todo The primary metrics reported by the test are elapsed time and
  *       operations per second. Compute the through put in terms of bytes per
@@ -112,9 +119,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo This test could be used to get group commit working.
  * 
- * @todo This test could be used to get concurrent writes on different indices
- *       working (also requires MRMW for the underlying {@link IBufferStrategy}s).
- * 
  * @todo get the comparison support working. Parameterize the
  *       {@link DataService} configuration from the test suite so that we can
  *       test Disk vs Direct, forceCommit=No vs default, and other properties
@@ -125,7 +129,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StressTestConcurrent extends AbstractServerTestCase { //implements IComparisonTest {
+public class StressTestConcurrent extends AbstractServerTestCase implements IComparisonTest {
 
     /**
      * 
@@ -140,27 +144,6 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         super(arg0);
     }
     
-    public void setUpComparisonTest() throws Exception {
-
-        setUp();
-        
-    }
-    
-    public void tearDownComparisonTest() throws Exception {
-        
-        tearDown();
-        
-    }
-
-//    /**
-//     * Starts in {@link #setUp()}.
-//     */
-//    MetadataServer metadataServer0;
-//    /**
-//     * Starts in {@link #setUp()}.
-//     */
-//    DataServer dataServer0;
-
     /**
      * Starts in {@link #setUp()}.
      */
@@ -219,6 +202,34 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         
     }
     
+    public void setUpComparisonTest(Properties properties) throws Exception {
+
+        super.setUp();
+        
+        log.info(getName());
+
+        client = new EmbeddedBigdataClient( properties );
+        
+        federation = client.connect();
+        
+    }
+    
+    public void tearDownComparisonTest() throws Exception {
+        
+        if(client!=null) {
+            
+            client.terminate();
+
+            client = null;
+            
+        }
+        
+        log.info(getName());
+
+        super.tearDown();
+        
+    }
+
     /**
      * Test of N concurrent operations against one {@link DataService}.
      * 
@@ -228,7 +239,14 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
 
         DataService dataService = ((EmbeddedBigdataFederation)federation).getDataService(0);
         
-        doConcurrentClientTest(client, dataService, 20, 20, 10000, 3, 100);
+        int nclients = 20;
+        long timeout = 20;
+        int ntrials = 10000;
+        int keyLen = 3;
+        int nops = 100;
+        
+        doConcurrentClientTest(client, dataService, nclients, timeout, ntrials,
+                keyLen, nops);
 
     }
 
@@ -256,10 +274,6 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
      * @param nops
      *            The #of rows in each operation.
      * 
-     * @todo can this also be a correctness test if we choose the
-     *       read/write/delete operations carefully and maintain a ground truth
-     *       index?
-     * 
      * @todo factor out the operation to be run.
      * 
      * @todo factor out the setup for the federation so that we can test
@@ -276,6 +290,8 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
      *       configuration files from a master description of the federation and
      *       something to deploy those files together with the necessary
      *       software onto the cluster. SCA probably addresses this issue.
+     * 
+     * @todo allow operations on more than a single data service.
      */
     static public Result doConcurrentClientTest(IBigdataClient client,
             DataService dataService, int nclients, long timeout, int ntrials,
@@ -373,9 +389,9 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
 
         Result ret = new Result();
         
-        // @todo these are conditions not results
-        ret.put("nops", ""+nops);
-        ret.put("ntx", ""+ntrials);
+//        // @todo these are conditions not results
+//        ret.put("nops", ""+nops);
+//        ret.put("ntx", ""+ntrials);
         
         ret.put("ncommitted",""+ncommitted);
         ret.put("nfailed",""+nfailed);
@@ -383,7 +399,7 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
 
-        System.err.println(ret.toString());
+        System.err.println(ret.toString(true/*newline*/));
         
         return ret;
        
@@ -513,5 +529,241 @@ public class StressTestConcurrent extends AbstractServerTestCase { //implements 
         }
         
     }
-    
+
+    /**
+     * Runs a single instance of the test as configured in the code.
+     * 
+     * @todo try running the test out more than 30 seconds. Note that a larger
+     *       journal maximum extent is required since the journal will otherwise
+     *       overflow.
+     * 
+     * @todo compute the bytes/second rate (read/written).
+     * 
+     * FIXME Parameterize so that test with more than one named index in use. If
+     * we are only writing on a single named index then groupCommmit will only
+     * defer syncs to disk since operations on the same index must be
+     * serialized. If we are using more than one named index then those
+     * operations can be parallelized and we should see additional performance
+     * gains (for map/reduce this means that we are not going to find large
+     * performance gains in group commit since writes on the same index will not
+     * be parallelized - try using local map writes instead).
+     * 
+     * @todo Try to make this a correctness test since there are lots of little
+     *       ways in which things can go wrong. Note that the actual execution
+     *       order is important....
+     * 
+     * @todo Test for correct aborts. E.g., seed some tasks with keys or values
+     *       that are never allowed to enter the index - the presence of those
+     *       data means that the operation will choose to abort rather than to
+     *       continue. Since we have written the data on the index this will let
+     *       us test that abort() correctly rolls back the index writes. If we
+     *       observe those keys/values in an index then we know that either
+     *       abort is not working correctly or concurrent operations are being
+     *       executed on the _same_ named index.
+     * 
+     * @see ExperimentDriver, which parameterizes the use of this stress test.
+     *      That information should be used to limit the #of transactions
+     *      allowed to start at one time on the server and should guide a search
+     *      for thinning down resource consumption, e.g., memory usage by
+     *      btrees, the node serializer, etc.
+     * 
+     * @see GenerateExperiment, which may be used to generate a set of
+     *      conditions to be run by the {@link ExperimentDriver}.
+     */
+    public static void main(String[] args) throws Exception {
+
+        Properties properties = new Properties();
+
+//        properties.setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
+
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+
+        // properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
+
+        // properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
+
+         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+        properties.setProperty(TestOptions.TIMEOUT, "10");
+
+        properties.setProperty(TestOptions.NCLIENTS, "10");
+
+        properties.setProperty(TestOptions.NTRIALS, "10000");
+
+        properties.setProperty(TestOptions.KEYLEN, "4");
+
+        properties.setProperty(TestOptions.NOPS, "4");
+
+        IComparisonTest test = new StressTestConcurrent();
+        
+        test.setUpComparisonTest(properties);
+        
+        try {
+
+            test.doComparisonTest(properties);
+        
+        } finally {
+
+            try {
+                
+                test.tearDownComparisonTest();
+                
+            } catch(Throwable t) {
+
+                log.warn("Tear down problem: "+t, t);
+                
+            }
+            
+        }
+
+    }
+
+    /**
+     * Additional properties understood by this test.
+     */
+    public static class TestOptions extends Options {
+
+        /**
+         * The timeout for the test.
+         */
+        public static final String TIMEOUT = "timeout";
+
+        /**
+         * The #of concurrent clients to run.
+         */
+        public static final String NCLIENTS = "nclients";
+
+        /**
+         * The #of trials (aka transactions) to run.
+         */
+        public static final String NTRIALS = "ntrials";
+
+        /**
+         * The length of the keys used in the test. This directly impacts the
+         * likelyhood of a write-write conflict. Shorter keys mean more
+         * conflicts. However, note that conflicts are only possible when there
+         * are at least two concurrent clients running.
+         */
+        public static final String KEYLEN = "keyLen";
+
+        /**
+         * The #of operations in each trial.
+         */
+        public static final String NOPS = "nops";
+
+    }
+
+    /**
+     * Setup and run a test.
+     * 
+     * @param properties
+     *            There are no "optional" properties - you must make sure that
+     *            each property has a defined value.
+     */
+    public Result doComparisonTest(Properties properties) throws Exception {
+
+        final long timeout = Long.parseLong(properties
+                .getProperty(TestOptions.TIMEOUT));
+
+        final int nclients = Integer.parseInt(properties
+                .getProperty(TestOptions.NCLIENTS));
+
+        final int ntrials = Integer.parseInt(properties
+                .getProperty(TestOptions.NTRIALS));
+
+        final int keyLen = Integer.parseInt(properties
+                .getProperty(TestOptions.KEYLEN));
+
+        final int nops = Integer.parseInt(properties
+                .getProperty(TestOptions.NOPS));
+
+        DataService dataService = ((EmbeddedBigdataFederation) federation)
+                .getDataService(0);
+
+        Result result = doConcurrentClientTest(client, dataService, nclients,
+                timeout, ntrials, keyLen, nops);
+
+        return result;
+
+    }
+
+    /**
+     * Experiment generation utility class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class GenerateExperiment extends ExperimentDriver {
+
+        /**
+         * Generates an XML file that can be run by {@link ExperimentDriver}.
+         * 
+         * @param args
+         */
+        public static void main(String[] args) throws Exception {
+
+            // this is the test to be run.
+            String className = StressTestConcurrent.class.getName();
+
+            Map<String, String> defaultProperties = new HashMap<String, String>();
+
+            // force delete of the files on close of the journal under test.
+            defaultProperties.put(Options.CREATE_TEMP_FILE, "true");
+
+            // avoids journal overflow when running out to 60 seconds.
+            defaultProperties.put(Options.MAXIMUM_EXTENT, "" + Bytes.megabyte32
+                    * 400);
+
+            /*
+             * Set defaults for each condition.
+             */
+
+            defaultProperties.put(TestOptions.TIMEOUT, "30");
+
+            defaultProperties.put(TestOptions.NTRIALS, "10000");
+
+            // defaultProperties.put(TestOptions.NCLIENTS,"10");
+
+            defaultProperties.put(TestOptions.KEYLEN, "4");
+
+            defaultProperties.put(TestOptions.NOPS, "100");
+
+            List<Condition> conditions = new ArrayList<Condition>();
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "1") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "2") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "10") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "20") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "100") }));
+
+            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+                            "200") }));
+
+            Experiment exp = new Experiment(className, defaultProperties,
+                    conditions);
+
+            // copy the output into a file and then you can run it later.
+            System.err.println(exp.toXML());
+
+        }
+
+    }
+
 }

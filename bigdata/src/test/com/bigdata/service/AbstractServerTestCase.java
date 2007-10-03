@@ -79,8 +79,13 @@ import com.sun.jini.tool.ClassServer;
  * Note: You MUST specify the codebase for downloadable code.
  * </p>
  * <p>
- * Note: A {@link ClassServer} will be started on port 8081 by default.  If
- * that port is in use then you MUST specify another port.
+ * Note: The <code>bigdata</code> JAR must be current in order for the client
+ * and the service to agree on interface definitions, etc. You can use
+ * <code>build.xml</code> in the root of this module to update that JAR.
+ * </p>
+ * <p>
+ * Note: A {@link ClassServer} will be started on port 8081 by default. If that
+ * port is in use then you MUST specify another port.
  * </p>
  * 
  * The following system properties will do the trick unless you have something
@@ -95,7 +100,7 @@ import com.sun.jini.tool.ClassServer;
  * <pre>
  * -Djava.security.policy=policy.all -Dbigdata.test.port=8082 -Djava.rmi.server.codebase=http://localhost:8082
  * </pre>
- *
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

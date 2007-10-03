@@ -71,7 +71,7 @@ import com.bigdata.isolation.IIsolatedIndex;
  * Since a read-committed transaction does not allow writes, the commit and
  * abort protocols are identical.
  * 
- * @todo In order to release the resourcs associated with a commit point
+ * @todo In order to release the resources associated with a commit point
  *       (historical journals and index segments) we need a protocol by which a
  *       delegate index view is explicitly closed (or collected using a weak
  *       value cache) once it is no longer in use for an operation. The index

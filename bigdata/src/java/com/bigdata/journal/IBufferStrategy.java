@@ -46,7 +46,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-import com.bigdata.rawstore.IMROW;
+import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -60,7 +60,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBufferStrategy extends IRawStore, IMROW {
+public interface IBufferStrategy extends IRawStore, IMRMW {
     
     /**
      * The next offset at which a data item would be written on the store.

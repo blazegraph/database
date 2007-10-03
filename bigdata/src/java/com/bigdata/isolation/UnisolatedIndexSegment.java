@@ -76,8 +76,9 @@ import com.bigdata.isolation.UnisolatedBTree.DeletedEntryFilter;
  * 
  * @todo define extension that stores the index name for a named index to which
  *       the segment belongs (add method to {@link AbstractBTree} to allow
- *       subclassing {@link IndexSegmentExtensionMetadata})? (Note that we already
- *       store the indexUUID).
+ *       subclassing {@link IndexSegmentExtensionMetadata})? (Note that we
+ *       already store the indexUUID and indices might be renamed so this may
+ *       not be a good idea).
  * 
  * @todo add a boolean flag to mark index segments that are the final result of
  *       a compacting merge. This will make it possible to reconstruct from the
@@ -86,10 +87,8 @@ import com.bigdata.isolation.UnisolatedBTree.DeletedEntryFilter;
  * 
  * @todo consider caching the first/last key in support of both correct
  *       rejection of queries directed to the wrong index segment and managing
- *       the metadataMap for a distributed index.
- * 
- * @todo examine the format of the segmentUUID. can we use part of it as the
- *       unique basis for one up identifiers within a parition?
+ *       the metadataMap for a distributed index (it could be part of the
+ *       extension metadata record).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

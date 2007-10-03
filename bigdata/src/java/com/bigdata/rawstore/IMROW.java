@@ -48,8 +48,9 @@ Modifications:
 package com.bigdata.rawstore;
 
 /**
- * A marker interface for an {@link IRawStore} that supports Multiple Readers,
- * One Writer (full read concurrency, but no write concurrency).
+ * A marker interface for an {@link IRawStore} that declares support for
+ * Multiple Readers and One Writer (full read concurrency, but single-threaded
+ * writer).
  * <p>
  * Note: this interface ONLY makes a statement about the implementation of the
  * {@link IRawStore} interface, not any other methods that might be declared by

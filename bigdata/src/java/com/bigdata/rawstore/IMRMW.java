@@ -48,8 +48,8 @@ Modifications:
 package com.bigdata.rawstore;
 
 /**
- * A marker interface for an {@link IRawStore} that supports Multiple Readers,
- * Multiple Writers (full read-write concurrency).
+ * A marker interface for an {@link IRawStore} that declares support for
+ * Multiple Readers and Multiple Writers (full read-write concurrency).
  * <p>
  * Note: this interface ONLY makes a statement about the implementation of the
  * {@link IRawStore} interface, not any other methods that might be declared by
@@ -60,6 +60,6 @@ package com.bigdata.rawstore;
  * 
  * @see IMROW
  */
-public interface IMRMW {
+public interface IMRMW extends IMROW {
 
 }

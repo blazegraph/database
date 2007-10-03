@@ -206,12 +206,12 @@ public interface ITx extends IIndexStore {
      * @param name
      *            The index name.
      * 
-     * @param name
-     *            The name of the index.
-     * 
      * @return The named index or <code>null</code> if no index is registered
      *         under that name.
      * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>
+     *                
      * @exception IllegalStateException
      *                if the transaction is not active.
      */

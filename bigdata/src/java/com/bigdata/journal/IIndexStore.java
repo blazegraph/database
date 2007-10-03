@@ -47,7 +47,7 @@ import com.bigdata.btree.IIndex;
 
 /**
  * Interface for reading and writing persistent data using one or more named
- * indices. Persistent data are stored as ordered key-value tuples in indices.
+ * indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

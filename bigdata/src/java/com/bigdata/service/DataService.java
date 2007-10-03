@@ -49,13 +49,14 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.rmi.Remote;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -71,7 +72,6 @@ import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.ReadOnlyIndex;
@@ -124,6 +124,9 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
+ * @todo update the javadoc regarding unisolated writes above - it should be
+ *       stricken per the changes in AbstractJournal.
+ * 
  * @todo Validation of partition indices during the PREPARE phase of a
  *       transaction should proceed in parallel.
  * 
@@ -144,7 +147,7 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  *       over the #of threads that can run directly. An alternative is a thread
  *       pool with a lock per named index such that new writes on an index block
  *       until the lock is released by the current writer. The size of the pool
- *       could be configured. In any case, writes run concurrently on different
+ *       could be configured. In any case, writers run concurrently on different
  *       indices with concurrent writes against the backing IRawStore and then
  *       index commits are serialized. This preserves consistency and might make
  *       group commit trivial by accepting all commit requests in the commit
@@ -303,19 +306,20 @@ abstract public class DataService implements IDataService,
     protected volatile int nunisolated = 0;
 
     /**
-     * Pool of threads for handling unisolated reads.
-     */
-    final protected ExecutorService readService;
-    
-    /**
      * Pool of threads for handling concurrent transactions.
      */
     final protected ExecutorService txService;
     
     /**
-     * Thread printing out periodic service status information (counters).
+     * Pool of threads for handling concurrent unisolated read operations.
      */
-    final protected Thread statusService;
+    final protected ExecutorService readService;
+    
+    /**
+     * Runs a {@link StatusTask} printing out periodic service status
+     * information (counters).
+     */
+    final protected ScheduledExecutorService statusService;
 
     /**
      * Options understood by the {@link DataService}.
@@ -325,19 +329,6 @@ abstract public class DataService implements IDataService,
      */
     public static class Options extends com.bigdata.journal.Options {
         
-        /**
-         * <code>readServicePoolSize</code> - The #of threads in the pool
-         * handling concurrent unisolated read requests.
-         * 
-         * @see #DEFAULT_READ_SERVICE_POOL_SIZE
-         */
-        public static final String READ_SERVICE_POOL_SIZE = "readServicePoolSize";
-        
-        /**
-         * The default #of threads in the read service thread pool.
-         */
-        public final static int DEFAULT_READ_SERVICE_POOL_SIZE = 20;
-
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool
          * handling concurrent transactions.
@@ -349,8 +340,21 @@ abstract public class DataService implements IDataService,
         /**
          * The default #of threads in the transaction service thread pool.
          */
-        public final static int DEFAULT_TX_SERVICE_POOL_SIZE = 100;
+        public final static String DEFAULT_TX_SERVICE_POOL_SIZE = "100";
         
+        /**
+         * <code>readServicePoolSize</code> - The #of threads in the pool
+         * handling concurrent unisolated read requests on named indices.
+         * 
+         * @see #DEFAULT_READ_SERVICE_POOL_SIZE
+         */
+        public static final String READ_SERVICE_POOL_SIZE = "readServicePoolSize";
+        
+        /**
+         * The default #of threads in the read service thread pool.
+         */
+        public final static String DEFAULT_READ_SERVICE_POOL_SIZE = "20";
+
     }
     
     /**
@@ -364,33 +368,10 @@ abstract public class DataService implements IDataService,
         final int txServicePoolSize;
         final int readServicePoolSize;
         
-        /*
-         * "readServicePoolSize"
-         */
-
-        val = properties.getProperty(Options.READ_SERVICE_POOL_SIZE);
-
-        if (val != null) {
-
-            readServicePoolSize = Integer.parseInt(val);
-
-            if (readServicePoolSize < 1 ) {
-
-                throw new RuntimeException("The '"
-                        + Options.READ_SERVICE_POOL_SIZE
-                        + "' must be at least one.");
-
-            }
-
-        } else readServicePoolSize = Options.DEFAULT_READ_SERVICE_POOL_SIZE;
-
-        /*
-         * "txServicePoolSize"
-         */
-
-        val = properties.getProperty(Options.TX_SERVICE_POOL_SIZE);
-
-        if (val != null) {
+        // txServicePoolSize
+        {
+        
+            val = properties.getProperty(Options.TX_SERVICE_POOL_SIZE,Options.DEFAULT_TX_SERVICE_POOL_SIZE);
 
             txServicePoolSize = Integer.parseInt(val);
 
@@ -402,26 +383,58 @@ abstract public class DataService implements IDataService,
 
             }
 
-        } else txServicePoolSize = Options.DEFAULT_TX_SERVICE_POOL_SIZE;
+            log.info(Options.TX_SERVICE_POOL_SIZE+"="+txServicePoolSize);
 
+        }
+        
+        // readServicePoolSize
+        {
+
+            val = properties.getProperty(Options.READ_SERVICE_POOL_SIZE,
+                    Options.DEFAULT_READ_SERVICE_POOL_SIZE);
+
+            readServicePoolSize = Integer.parseInt(val);
+
+            if (readServicePoolSize < 1) {
+
+                throw new RuntimeException("The '"
+                        + Options.READ_SERVICE_POOL_SIZE
+                        + "' must be at least one.");
+
+            }
+
+            log.info(Options.READ_SERVICE_POOL_SIZE+"="+readServicePoolSize);
+            
+        }
+        
         /*
          * The journal's write service will be used to handle unisolated writes
          * and transaction commits.
          */
         journal = new DataServiceJournal(properties);
 
-        // setup thread pool for unisolated read operations.
-        readService = Executors.newFixedThreadPool(readServicePoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
-
         // setup thread pool for concurrent transactions.
         txService = Executors.newFixedThreadPool(txServicePoolSize,
                 DaemonThreadFactory.defaultThreadFactory());
 
-        // thread for periodic status messages.
-        statusService = new StatusThread();
-        
-        statusService.start();
+        // setup thread pool for unisolated read operations.
+        readService = Executors.newFixedThreadPool(readServicePoolSize,
+                DaemonThreadFactory.defaultThreadFactory());
+
+        // schedule runnable for periodic status messages.
+        {
+            
+            final long initialDelay = 100;
+            final long delay = 2500;
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+            
+            statusService = Executors
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
+    
+            statusService.scheduleWithFixedDelay(new StatusTask(), initialDelay, delay, unit );
+            
+        }
         
     }
 
@@ -435,7 +448,7 @@ abstract public class DataService implements IDataService,
         
         txService.shutdown();
         
-        statusService.interrupt();
+        statusService.shutdown();
         
         journal.shutdown();
         
@@ -451,7 +464,7 @@ abstract public class DataService implements IDataService,
         
         txService.shutdownNow();
 
-        statusService.interrupt();
+        statusService.shutdownNow();
         
         journal.close();
         
@@ -460,52 +473,40 @@ abstract public class DataService implements IDataService,
     /**
      * Writes out periodic status information about the {@link DataService}.
      * 
-     * @todo I am not convinced that the shutdown logic is correctly bringing
-     *       down the status thread - what is a more robust way to write the
-     *       status service, e.g., using a scheduled executor service?
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class StatusThread extends Thread {
-        
-        final public long millis = 2500;
-        
-        public StatusThread() {
-            
-            setDaemon(true);
-            
-        }
+    protected class StatusTask implements Runnable {
         
         public void run() {
 
-            while (true) {
-
-                if(isInterrupted()) {
-                    
-                    System.err.println("Status thread was interrupted(1)");
-                    
-                    return;
-                    
-                }
-                
-                try {
-
-                    Thread.sleep(millis);
-                    
-                    status();
-
-                } catch (InterruptedException ex) {
-
-                    System.err.println("Status thread was interrupted(2)");
-
-                    status();
-
-                    return;
-
-                }
-
-            }
+            status();
+            
+//            while (true) {
+//
+//                if(isInterrupted()) {
+//                    
+//                    System.err.println("Status thread was interrupted(1)");
+//                    
+//                    return;
+//                    
+//                }
+//                
+//                try {
+//                    
+//                    status();
+//
+//                } catch (InterruptedException ex) {
+//
+//                    System.err.println("Status thread was interrupted(2)");
+//
+//                    status();
+//
+//                    return;
+//
+//                }
+//
+//            }
             
         }
         
@@ -898,6 +899,12 @@ abstract public class DataService implements IDataService,
         
     }
     
+    /**
+     * Abstract base class for data service operations.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     protected abstract class AbstractIndexTask implements Callable<Object> {
     
         /**
