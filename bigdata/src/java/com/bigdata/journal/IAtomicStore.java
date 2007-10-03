@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 
 /**

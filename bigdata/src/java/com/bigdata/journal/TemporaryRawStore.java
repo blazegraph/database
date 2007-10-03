@@ -64,7 +64,7 @@ import com.bigdata.util.ChecksumUtility;
  * the {@link WormAddressManager}. On conversion to a disk-backed store, the
  * disk file is created using the temporary file mechansism and is marked for
  * eventual deletion no later than when the JVM exits and as soon as the store
- * is {@link #close()}.
+ * is {@link #close() closed}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -355,17 +355,19 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
              */
             
             // setup the transfer source.
-            ByteBuffer b = tmp.directBuffer;
+            ByteBuffer b = tmp.getBuffer();
             b.limit((int)tmp.nextOffset);
             b.position(0);
             
-            // write the data on the channel.
-            diskBuf.channel.write(b,diskBuf.headerSize);
+            diskBuf.writeOnDisk(b, 0L);
+            
+//            // write the data on the channel.
+//            diskBuf.getChannel().write(b,diskBuf.getHeaderSize());
             
             // increment the offset.
             diskBuf.nextOffset += tmp.nextOffset;
             
-        } catch(IOException ex) {
+        } catch(Throwable t) {
             
             try {
 
@@ -375,7 +377,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
                 
             }
             
-            throw new RuntimeException();
+            throw new RuntimeException(t);
             
         }
         

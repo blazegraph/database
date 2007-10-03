@@ -126,12 +126,7 @@ public class TestJournalBasics extends TestCase {
          */
         
         /*
-         * @todo stress tests of concurrent transactions parameterized so that
-         * we can also test overflow handling and scale up. Scale out testing
-         * may require a refactor of the clients to lookup services. This could
-         * be moved out of the per-journal strategy test suite and performed
-         * only for the target strategy, e.g., Direct. Measure throughput rates
-         * and compare TPS and write/read rates with other systems.
+         * Stress test of concurrent transactions.
          * 
          * @todo we could add tests based on known transaction processing
          * benchmarks here as well.

@@ -105,13 +105,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * ensure that the writes are not reordered - see {@link Options#DOUBLE_SYNC}.
  * </p>
  * <p>
- * Note: This class does NOT provide a thread-safe implementation of the
- * {@link IRawStore} API. Writes on the store MUST be serialized. Transactions
- * that write on the store are automatically serialized by {@link #commit(long)}
- * using the {@link #writeService}, e.g., via {@link #serialize(Callable)}.
- * See {@link IDataService} for a thread-safe store.
- * </p>
- * <p>
  * Note: transaction processing MAY occur be concurrent since the write set of a
  * each transaction is written on a distinct {@link TemporaryRawStore}.
  * However, each transaction is NOT thread-safe and MUST NOT be executed by more
@@ -123,6 +116,19 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo the following javadoc is being outmoded - remove it once the journal is
+ *       thread-safe. Also update the text on transaction processing above - a
+ *       {@link BTree} is not thread-safe, but a transaction could (potentially)
+ *       decompose its work across multiple threads, each of which read or wrote
+ *       on a different named index.
+ *       <p>
+ *       Note: This class does NOT provide a thread-safe implementation of the
+ *       {@link IJournal} API. Writes on the store MUST be serialized.
+ *       Transactions that write on the store are automatically serialized by
+ *       {@link #commit(long)} using the {@link #writeService}, e.g., via
+ *       {@link #serialize(Callable)}. See {@link IDataService} for a
+ *       thread-safe store.
  * 
  * FIXME Priority items are:
  * <ol>
@@ -861,33 +867,48 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     }
 
     /**
-     * Shutdown the journal politely. Active writes, active transactions and
-     * transactions pending commit will run to completion, but no new
-     * transactions will be accepted.
+     * Shutdown the journal (running tasks will run to completion, but no new
+     * tasks will start).
      * <p>
      * Note: You SHOULD use this method rather than {@link #close()} for normal
      * shutdown of the journal.
+     * 
+     * @see #shutdownNow()
      */
     public void shutdown() {
 
         assertOpen();
 
-        final long begin = System.currentTimeMillis();
+        log.info("");
         
-        log.info("#active="+activeTx.size()+", shutting down...");
-        
-        /*
-         * allow all pending tasks to complete, but no new tasks will be
-         * accepted.
-         */
+        // shutdown the write service. 
         writeService.shutdown();
 
         // close immediately.
         close();
         
-        final long elapsed = System.currentTimeMillis() - begin;
+        log.info("Shutdown complete.");
+
+    }
+
+    /**
+     * Immediate shutdown (running tasks are cancelled rather than being
+     * permitted to complete).
+     * 
+     * @see #shutdown()
+     */
+    public void shutdownNow() {
         
-        log.info("Journal is shutdown: elapsed="+elapsed);
+        assertOpen();
+
+        log.info("");
+        
+        writeService.shutdownNow();
+
+        // close immediately.
+        close();
+
+        log.info("Shutdown complete.");
 
     }
 
@@ -1730,10 +1751,6 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     }
 
     /**
-     * Return the named index (unisolated). Writes on the returned index will be
-     * made restart-safe with the next {@link #commit()} unless discarded by
-     * {@link #abort()}. Transactional writes must use the same named method on
-     * the {@link Tx} in order to obtain an isolated version of the named btree.
      * 
      * @todo add hard reference queue for {@link AbstractBTree} to the journal
      *       and track the #of instances of each {@link AbstractBTree} on the
@@ -1823,7 +1840,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * turn comes, it will validate its write set and commit iff validation
      * succeeds.
      */
-    final protected ExecutorService writeService = Executors
+    final private ExecutorService writeService = Executors
             .newSingleThreadExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
     
@@ -1859,19 +1876,40 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         if (tx == null)
             throw new IllegalArgumentException("No such tx: " + ts);
         
-        if(tx.isReadOnly()) {
-         
-            // abort is synchronous.
-            tx.abort();
-            
-        } else {
-
-            // queue the abort request.
-            writeService.submit(new TxAbortTask(tx));
-            
-        }
-        
+        // abort is synchronous.
+        tx.abort();
+                
     }
+
+//    /**
+//     * Abort a transaction (synchronous, low latency for read-only transactions
+//     * but aborts for read-write transactions are serialized since there may be
+//     * latency in communications with the transaction server or deletion of the
+//     * temporary backing store for the transaction).
+//     * 
+//     * @param ts
+//     *            The transaction identifier (aka start time).
+//     */
+//    public void abort(long ts) {
+//
+//        ITx tx = getTx(ts);
+//        
+//        if (tx == null)
+//            throw new IllegalArgumentException("No such tx: " + ts);
+//        
+//        if(tx.isReadOnly()) {
+//         
+//            // abort is synchronous.
+//            tx.abort();
+//            
+//        } else {
+//
+//            // queue the abort request.
+//            writeService.submit(new TxAbortTask(tx));
+//            
+//        }
+//        
+//    }
 
     /**
      * Commit a transaction (synchronous).
@@ -2023,38 +2061,38 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         
     }
     
-    /**
-     * Task aborts a transaction when it is run by the
-     * {@link Journal#writeService}. This is used to serialize some abort
-     * processing which would otherwise be concurrent with commit processing.
-     * {@link Journal#abort()} makes some assumptions that it is a
-     * single-threaded environment and those assumptions would be violated
-     * without serialization aborts and commits on the same queue.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class TxAbortTask implements Callable<Long> {
-        
-        private final ITx tx;
-        
-        public TxAbortTask(ITx tx) {
-            
-            assert tx != null;
-            
-            this.tx = tx;
-            
-        }
-
-        public Long call() throws Exception {
-            
-            tx.abort();
-            
-            return 0L;
-           
-        }
-        
-    }
+//    /**
+//     * Task aborts a transaction when it is run by the
+//     * {@link Journal#writeService}. This is used to serialize some abort
+//     * processing which would otherwise be concurrent with commit processing.
+//     * {@link Journal#abort()} makes some assumptions that it is a
+//     * single-threaded environment and those assumptions would be violated
+//     * without serialization aborts and commits on the same queue.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class TxAbortTask implements Callable<Long> {
+//        
+//        private final ITx tx;
+//        
+//        public TxAbortTask(ITx tx) {
+//            
+//            assert tx != null;
+//            
+//            this.tx = tx;
+//            
+//        }
+//
+//        public Long call() throws Exception {
+//            
+//            tx.abort();
+//            
+//            return 0L;
+//           
+//        }
+//        
+//    }
 
     /**
      * Notify the journal that a new transaction is being activated (starting on

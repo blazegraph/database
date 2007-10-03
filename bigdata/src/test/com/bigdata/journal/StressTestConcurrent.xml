@@ -5,6 +5,7 @@
   <property name="maximumExtent">419430400</property>
   <property name="timeout">5</property>
   <property name="createTempFile">true</property>
+  <property name="nclients">10</property>
   <property name="ntrials">10000</property>
   <property name="nops">100</property>
   <property name="keyLen">4</property>

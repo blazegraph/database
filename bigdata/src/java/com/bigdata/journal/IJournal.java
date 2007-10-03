@@ -45,8 +45,9 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.rawstore.IMROW;
+import com.bigdata.rawstore.IMRMW;
 
 /**
  * <p>
@@ -58,7 +59,7 @@ import com.bigdata.rawstore.IMROW;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
+public interface IJournal extends IMRMW, IAtomicStore, IIndexManager {
 
     /**
      * A copy of the properties used to initialize this journal.
@@ -93,20 +94,26 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
     public void shutdown();
 
     /**
-     * Return the named index which MAY may be invalidated by a
-     * {@link IAtomicStore#commit()}.
+     * Return the named index (unisolated). Writes on the returned index will be
+     * made restart-safe with the next {@link #commit()} unless discarded by
+     * {@link #abort()}.
      * 
      * @param name
      *            The name of the index.
      * 
-     * @return The named index or <code>null</code> iff there is no index
+     * @return The unisolated index or <code>null</code> iff there is no index
      *         registered with that name.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>
      */
     public IIndex getIndex(String name);
 
     /**
-     * Return the named index as isolated by the transaction having the
-     * specified transaction start time.
+     * Return the named index (isolated). Writes will be allowed iff the
+     * transaction is {@link IsolationEnum#ReadWrite}. Writes on the returned
+     * index will be made restart-safe iff the transaction
+     * {@link ITx#commit() commits}.
      * 
      * @param name
      *            The index name.
@@ -114,7 +121,8 @@ public interface IJournal extends IMROW, IAtomicStore, IIndexManager {
      *            The transaction start time, which serves as the unique
      *            identifier for the transaction.
      * 
-     * @return The isolated index.
+     * @return The isolated index or <code>null</code> iff there is no index
+     *         registered with that name.
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> is <code>null</code>

@@ -63,15 +63,6 @@ import com.bigdata.service.DataService.NoSuchIndexPartitionException;
  * <p>
  * Note: This test uses the <code>DataServer0.config</code> file from the
  * src/resources/config/standalone package.
- * <p>
- * Note: The <code>bigdata</code> JAR must be current in order for the client
- * and the service to agree on interface definitions, etc. You can use
- * <code>build.xml</code> in the root of this module to update that JAR.
- * <p>
- * Note: You MUST grant sufficient permissions for the tests to execute, e.g.,
- * <pre>
- * -Djava.security.policy=policy.all
- * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

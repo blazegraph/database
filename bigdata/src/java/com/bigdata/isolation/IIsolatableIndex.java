@@ -175,9 +175,6 @@ import com.bigdata.scaleup.IsolatablePartitionedIndexView;
  * handling of deletion markers. Review applications for correct use of
  * {@link BTree} vs {@link UnisolatedBTree}.
  * 
- * @todo support transactions {@link Tx} on the {@link Journal} and bring back
- *       the test suite for transactional isolation or just write a new one.
- * 
  * @todo update the basic merge rule in {@link IndexSegmentMerger} so that it
  *       will process delete markers.
  * 

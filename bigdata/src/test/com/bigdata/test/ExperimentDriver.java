@@ -84,6 +84,10 @@ import com.bigdata.journal.ProxyTestCase;
 /**
  * A harness for running comparison of different journal configurations.
  * 
+ * @todo modify output to extract all columns whose values are constants for a
+ *       given run and write them out once at the top of the run. This will
+ *       simplify looking for conditions and variables in the results.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -171,16 +175,11 @@ public class ExperimentDriver {
         /**
          * ala JUnit, but allows us to run {@link ProxyTestCase}s as well.
          * 
-         * @throws Exception
-         */
-        public void setUpComparisonTest() throws Exception;
-        
-        /**
-         * ala JUnit, but allows us to run {@link ProxyTestCase}s as well.
+         * @param properties May be used to configure the test fixture.
          * 
          * @throws Exception
          */
-        public void tearDownComparisonTest() throws Exception;
+        public void setUpComparisonTest(Properties properties) throws Exception;
         
         /**
          * Run a test.
@@ -191,6 +190,13 @@ public class ExperimentDriver {
          * @return The test result to report.
          */
         public Result doComparisonTest(Properties properties) throws Exception;
+        
+        /**
+         * ala JUnit, but allows us to run {@link ProxyTestCase}s as well.
+         * 
+         * @throws Exception
+         */
+        public void tearDownComparisonTest() throws Exception;
         
     }
     
@@ -540,7 +546,7 @@ public class ExperimentDriver {
                     try {
 
                         // setup
-                        test.setUpComparisonTest();
+                        test.setUpComparisonTest(condition.properties);
                         
                         // run and record the result.
                         condition.result = test

@@ -128,5 +128,15 @@ public class Journal extends AbstractJournal implements ITransactionManager, IIn
         return startTime;
         
     }
+
+    public void lock(long tx, String name) {
+        // FIXME lock() Auto-generated method stub
+        
+    }
+
+    public void releaseLocks(long tx) {
+        // FIXME releaseLocks() Auto-generated method stub
+        
+    }
     
 }

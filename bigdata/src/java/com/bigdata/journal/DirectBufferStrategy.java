@@ -111,7 +111,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         final int nbytes = getByteCount(addr);
         
         // obtain a view in case there are concurrent writes on the buffer.
-        final ByteBuffer buffer = directBuffer.duplicate();
+        final ByteBuffer buffer = getBufferView(false/* readOnly */);
         
         // Set limit to just those bytes that were written on the buffer.
         buffer.limit( (int) offset + nbytes );

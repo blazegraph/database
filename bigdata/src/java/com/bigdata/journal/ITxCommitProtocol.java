@@ -63,6 +63,16 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo Since the overall concurrency control algorithm is MVCC, the
+ *       {@link ITransactionManager} becomes aware of the required locks during
+ *       the active {@link ITx#isActive()} phase of the transaction. By the time
+ *       the transaction is done executing and a COMMIT is requested by the
+ *       client the {@link ITransactionManager} knows the set of resources
+ *       (named indices) on which the transaction has written. As its first step
+ *       in the commit protocol the {@link ITransactionManager} acquires the
+ *       necessary exclusive locks on those resources. The locks are eventually
+ *       released when the transaction either commits or aborts.
+ * 
  * FIXME in order to support 2-/3-phase commit, the [commitTime] from the
  * transaction manager service must be passed through to the journal rather than
  * being returned from {@link #commit(long)}. There also needs to be a distinct
@@ -75,13 +85,44 @@ import com.bigdata.service.IDataService;
 public interface ITxCommitProtocol {
 
     /**
-     * Request commit of the transaction write set.
+     * Request commit of the transaction write set (synchronous).
+     * 
+     * @param tx
+     *            The transaction identifier.
      */
     public long commit(long tx) throws ValidationError;
 
     /**
      * Request abort of the transaction write set.
+     * 
+     * @param tx
+     *            The transaction identifier.
      */
     public void abort(long tx);
 
+    /**
+     * Obtain a lock on a named index (synchronous).
+     * <p>
+     * Note: Clients DO NOT use this method. Locks are NOT required during the
+     * active phrase of a transaction. Locks are only required during the commit
+     * phase of a transaction where they are used to coordinate execution with
+     * concurrent unisolated operations. The transaction manager automatically
+     * acquires the necessary locks during the commit and will cause those locks
+     * to be released before the transaction is complete.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param name
+     *            The index name.
+     */
+    public void lock(long tx,String name);
+
+    /**
+     * Release all locks held by the transaction.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     */
+    public void releaseLocks(long tx);
+    
 }
