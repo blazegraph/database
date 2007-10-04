@@ -42,17 +42,17 @@ Modifications:
 
 */
 /*
- * Created on Feb 4, 2007
+ * Created on Oct 14, 2006
  */
 
-package com.bigdata;
+package com.bigdata.concurrent;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites in increase dependency order.
+ * Aggregates tests in dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,36 +73,22 @@ public class TestAll extends TestCase {
     }
 
     /**
-     * Aggregates the tests in increasing dependency order.
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("bigdata");
+        TestSuite suite = new TestSuite("concurrent");
+        
+//        suite.addTest(com.bigdata.concurrent.schedule.TestAll.suite());
+//        
+//        suite.addTest(com.bigdata.concurrent.locking.TestAll.suite());
 
-        suite.addTest( com.bigdata.cache.TestAll.suite() );
-        suite.addTest( com.bigdata.io.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
-        suite.addTest( com.bigdata.rawstore.TestAll.suite() );
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
-        suite.addTest( com.bigdata.sparse.TestAll.suite() );
-        suite.addTest( com.bigdata.journal.TestAll.suite() );
-        suite.addTest( com.bigdata.concurrent.TestAll.suite() );
-        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
-
-        /*
-         * Note: The service tests require that Jini is running, that you have
-         * specified a suitable security policy, and that the codebase parameter
-         * is set correctly. See the test suites for more detail on how to setup
-         * to run these tests.
-         */
-
-        suite.addTest( com.bigdata.service.TestAll.suite() );
-        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
-
+        suite.addTestSuite(TestConcurrencyControl.class);
+        
         return suite;
         
     }
-
+    
 }
