@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<experiment class="com.bigdata.concurrent.TestConcurrencyControl">
+ <defaults>
+  <property name="ntasks">1000</property>
+  <property name="maxLocks">3</property>
+  <property name="lockTimeout">1000</property>
+  <property name="minLocks">1</property>
+  <property name="nthreads">20</property>
+  <property name="maxLockTries">1</property>
+  <property name="testTimeout">30</property>
+  <property name="nresources">100</property>
+ </defaults>
+ <condition>
+  <property name="nthreads">2</property>
+ </condition>
+ <condition>
+ </condition>
+ <condition>
+  <property name="percentTaskDeath">.10</property>
+ </condition>
+ <condition>
+  <property name="nthreads">100</property>
+ </condition>
+ <condition>
+  <property name="nthreads">100</property>
+  <property name="percentTaskDeath">.10</property>
+ </condition>
+ <condition>
+  <property name="maxLocks">1</property>
+  <property name="nresources">1</property>
+ </condition>
+ <condition>
+  <property name="minLocks">3</property>
+  <property name="nresources">3</property>
+ </condition>
+</experiment>
+

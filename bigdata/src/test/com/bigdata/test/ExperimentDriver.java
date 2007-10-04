@@ -82,11 +82,7 @@ import org.xml.sax.ext.EntityResolver2;
 import com.bigdata.journal.ProxyTestCase;
 
 /**
- * A harness for running comparison of different journal configurations.
- * 
- * @todo modify output to extract all columns whose values are constants for a
- *       given run and write them out once at the top of the run. This will
- *       simplify looking for conditions and variables in the results.
+ * A harness for running comparison of different configurations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -497,7 +493,7 @@ public class ExperimentDriver {
         /**
          * Run the experiment, writing the results onto a CSV file.
          */
-        public void run() throws Exception {
+        public void run(int nruns) throws Exception {
             
             File outFile = new File(className+".exp.csv");
 
@@ -516,89 +512,94 @@ public class ExperimentDriver {
             
             final int nconditions = conditions.size();
             
-            Set<Object> conditionColumns = new TreeSet<Object>();
-            Set<Object> resultColumns = new TreeSet<Object>();
-
             final Properties systemProperties = getInterestingSystemProperties();
             
             try {
-                
-                System.err.println("Running comparison of " + nconditions
-                        + " conditions for " + className);
 
-                // show interesting system properties.
-                systemProperties.list(System.err);
-                
-                Class cl = Class.forName(className);
+                for (int run = 0; run < nruns; run++) {
 
-                Iterator<Condition> itr = conditions.iterator();
+                    System.err.println("Running comparison of " + nconditions
+                            + " conditions for " + className);
 
-                int i = 0;
-                
-                while (itr.hasNext()) {
+                    // show interesting system properties.
+                    systemProperties.list(System.err);
 
-                    Condition condition = itr.next();
+                    Class cl = Class.forName(className);
 
-                    IComparisonTest test = (IComparisonTest) cl.newInstance();
+                    Iterator<Condition> itr = conditions.iterator();
 
-                    System.err.println("Running "+i+" of "+nconditions);
-                    
-                    try {
+                    int i = 0;
 
-                        // setup
-                        test.setUpComparisonTest(condition.properties);
-                        
-                        // run and record the result.
-                        condition.result = test
-                                .doComparisonTest(condition.properties);
+                    while (itr.hasNext()) {
 
-                    } catch (Throwable t) {
+                        Condition condition = itr.next();
 
-                        log.warn("Error running condition: " + t, t);
-                        
-                        // record error result.
-                        condition.result = Result.errorFactory( t );
-                        
+                        IComparisonTest test = (IComparisonTest) cl
+                                .newInstance();
+
+                        System.err.println("Run " + run + " of " + nruns
+                                + ", Running condition " + i + " of "
+                                + nconditions);
+
+                        try {
+
+                            // setup
+                            test.setUpComparisonTest(condition.properties);
+
+                            // run and record the result.
+                            condition.result = test
+                                    .doComparisonTest(condition.properties);
+
+                        } catch (Throwable t) {
+
+                            log.warn("Error running condition: " + t, t);
+
+                            // record error result.
+                            condition.result = Result.errorFactory(t);
+
+                        }
+
+                        try {
+
+                            // tear down.
+                            test.tearDownComparisonTest();
+
+                        } catch (Throwable t) {
+
+                            System.err.println("Could not tear down test: "
+                                    + t.getMessage());
+
+                        }
+
+                        // add the run date for the condition.
+                        condition.properties.setProperty("Date", new Date(
+                                System.currentTimeMillis()).toString());
+
+                        // add the run number
+                        condition.properties.setProperty("Run", "" + i);
+
+                        // add the sequence number
+                        condition.properties.setProperty("Sequence", "" + i);
+
+                        // add the "interesting" system properties.
+                        condition.properties.putAll(systemProperties);
+
+                        // the memory currently in use.
+                        condition.result.put("java.Runtime.totalMemory", ""
+                                + Runtime.getRuntime().totalMemory());
+
+                        // the memory currently in use.
+                        condition.result.put("java.Runtime.freeMemory", ""
+                                + Runtime.getRuntime().freeMemory());
+
+                        System.err.println(condition.result.toString());
+
+                        i++;
+
                     }
-                    
-                    try {
-                        
-                        // tear down.
-                        test.tearDownComparisonTest();
-                        
-                    } catch(Throwable t) {
-                        
-                        System.err.println("Could not tear down test: "+t.getMessage());
-                        
-                    }
 
-                    // add the run date for the condition.
-                    condition.properties.setProperty("Date", new Date(System.currentTimeMillis()).toString()); 
-
-                    // add the sequence number
-                    condition.properties.setProperty("Sequence", ""+i);
-                    
-                    // add the "interesting" system properties.
-                    condition.properties.putAll(systemProperties);
-
-                    // collect unique condition columns.
-                    conditionColumns.addAll(PropertyUtil.flatten(condition.properties).keySet());
-
-                    // the memory currently in use.
-                    condition.result.put("java.Runtime.totalMemory", ""+Runtime.getRuntime().totalMemory());
-
-                    // the memory currently in use.
-                    condition.result.put("java.Runtime.freeMemory", ""+Runtime.getRuntime().freeMemory());
-
-                    System.err.println(condition.result.toString());
-
-                    // collect unique result columns.
-                    resultColumns.addAll(condition.result.keySet());
-
-                    i++;
-
-                }
-                
+                } // next run.
+            
             }
             
             finally {
@@ -615,6 +616,145 @@ public class ExperimentDriver {
                 }
                 
                 writer.write("Run: "+new Date(runStartTime)+"\n\n");
+
+                /*
+                 * Collect the distinct condition and result columns.
+                 * 
+                 * Note: This extracts all columns whose values are constants
+                 * for a given run and write them out once at the top of the
+                 * run. This simplifies looking for invariants, conditions and
+                 * variables in the results.
+                 */
+                Set<Object> conditionColumns = new TreeSet<Object>();
+                Set<Object> resultColumns = new TreeSet<Object>();
+                Map<Object,Object> invariants = new HashMap<Object,Object>();
+                {
+
+                    boolean first = true;
+                    
+                    Iterator<Condition> itr = conditions.iterator();
+
+                    while (itr.hasNext()) {
+
+                        Condition condition = itr.next();
+
+                        Map<Object,Object> conditions = PropertyUtil.flatten(condition.properties);
+                        
+                        // collect unique condition columns.
+                        conditionColumns.addAll(conditions.keySet());
+
+                        // collect unique result columns.
+                        resultColumns.addAll(condition.result.keySet());
+
+                        if(first) {
+                            
+                            invariants.putAll(conditions);
+                            
+                            invariants.putAll(condition.result);
+                            
+                        } else {
+                            
+                            // disprove invariants from conditions.
+                            {
+                                Iterator<Map.Entry<Object,Object>> itr2 = conditions.entrySet().iterator();
+                                
+                                while(itr2.hasNext()) {
+                                    
+                                    Map.Entry entry = itr2.next();
+                                    
+                                    Object key = entry.getKey();
+                                    
+                                    Object val = entry.getValue();
+                                    
+                                    if(!val.equals(invariants.get(key))) {
+                                        
+                                        // proven not to be an invariant.
+                                        invariants.remove(key);
+                                        
+                                    }
+                                    
+                                }
+                                
+                            }
+                            
+                            // disprove invariants from results.
+                            {
+                                Iterator<Map.Entry<String,String>> itr2 = condition.result.entrySet().iterator();
+                                
+                                while(itr2.hasNext()) {
+                                    
+                                    Map.Entry entry = itr2.next();
+                                    
+                                    Object key = entry.getKey();
+                                    
+                                    Object val = entry.getValue();
+                                    
+                                    if(!val.equals(invariants.get(key))) {
+                                        
+                                        // proven not to be an invariant.
+                                        invariants.remove(key);
+                                        
+                                    }
+                                    
+                                }
+                                
+                            }
+                            
+                        }
+                        
+                        first = false;
+                        
+                    }
+
+                    /*
+                     * Remove column headings that were identified as invariants.
+                     */
+                    {
+                        
+                        Iterator<Object> itr2 = invariants.keySet().iterator();
+                        
+                        while(itr2.hasNext()) {
+                        
+                            Object key = itr2.next();
+                            
+                            conditionColumns.remove(key);
+
+                            resultColumns.remove(key);
+                            
+                        }
+                        
+                    }
+                    
+                }
+
+                /*
+                 * Write out the invariants across the runs.
+                 */
+                {
+                    
+                    writer.write("Invariants:\n");
+
+                    Iterator<Map.Entry<Object, Object>> itr = invariants.entrySet().iterator();
+                    
+                    while(itr.hasNext()) {
+
+                        writer.write(itr.next().getKey()+"\t");
+                    
+                    }
+
+                    writer.write("\n");
+                    
+                    itr = invariants.entrySet().iterator();
+                    
+                    while(itr.hasNext()) {
+
+                        writer.write(invariants.get(itr.next().getKey())+"\t");
+                    
+                    }
+
+                    writer.write("\n\n");
+                    
+                }
                 
                 // write the condition column headings, building cols[] as we go.
                 final String[] conditionCols = new String[conditionColumns.size()];
@@ -674,10 +814,8 @@ public class ExperimentDriver {
                                 .flatten(condition.properties), conditionCols,
                                 false));
 
-                        // note: since we collect up the columns first,
-                        // [showAll] has no effect.
                         writer.write(ExperimentDriver.toString(
-                                condition.result, resultCols, true));
+                                condition.result, resultCols, false));
 
                         writer.write("\n");
 
@@ -691,6 +829,8 @@ public class ExperimentDriver {
                 
             }
 
+            // @todo this is using a different representation from the file which
+            // is more difficult to read.
             {
             
                 System.err.println("Result summary:");
@@ -992,7 +1132,7 @@ public class ExperimentDriver {
 
         if(args.length==0) {
             
-            System.err.println("usage: <experiment.xml>");
+            System.err.println("usage: <experiment.xml> #runs?");
             
             System.exit( 1 );
             
@@ -1001,7 +1141,15 @@ public class ExperimentDriver {
         Experiment exp = new DTDParserHelper().parse(new InputSource(
                 new FileReader(args[0])));
         
-        exp.run();
+        int nruns = 0;
+        
+        if(args.length==1) {
+
+            nruns = Integer.parseInt(args[1]);
+            
+        }
+        
+        exp.run(nruns);
         
     }
 

@@ -42,20 +42,18 @@ Modifications:
 
 */
 /*
- * Created on Feb 4, 2007
+ * Created on Mar 3, 2006
  */
-
-package com.bigdata;
+package com.bigdata.concurrent.schedule;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites in increase dependency order.
+ * Aggregates tests in dependency order.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @author thompsonbry
  */
 public class TestAll extends TestCase {
 
@@ -63,46 +61,29 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
+        super();
     }
 
     /**
-     * @param arg0
+     * @param name
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public TestAll(String name) {
+        super(name);
     }
 
     /**
-     * Aggregates the tests in increasing dependency order.
+     * Aggregates the test suites into something approximating increasing
+     * dependency.
      */
-    public static Test suite()
-    {
 
-        TestSuite suite = new TestSuite("bigdata");
+    public static Test suite() {
 
-        suite.addTest( com.bigdata.cache.TestAll.suite() );
-        suite.addTest( com.bigdata.io.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
-        suite.addTest( com.bigdata.rawstore.TestAll.suite() );
-        suite.addTest( com.bigdata.btree.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
-        suite.addTest( com.bigdata.sparse.TestAll.suite() );
-        suite.addTest( com.bigdata.journal.TestAll.suite() );
-        suite.addTest( com.bigdata.concurrent.TestAll.suite() );
-        suite.addTest( com.bigdata.scaleup.TestAll.suite() );
+        TestSuite suite = new TestSuite(TestAll.class.getPackage().getName());
 
-        /*
-         * Note: The service tests require that Jini is running, that you have
-         * specified a suitable security policy, and that the codebase parameter
-         * is set correctly. See the test suites for more detail on how to setup
-         * to run these tests.
-         */
-
-        suite.addTest( com.bigdata.service.TestAll.suite() );
-        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
-
+        suite.addTestSuite( TestSchedule.class );
+        
         return suite;
         
     }
-
+    
 }
