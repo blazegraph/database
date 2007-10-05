@@ -48,23 +48,19 @@ Modifications:
 package com.bigdata.concurrent;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
@@ -74,7 +70,6 @@ import org.CognitiveWeb.concurrent.locking.TxDag;
 import org.CognitiveWeb.concurrent.locking.LockContextManager.LockContext;
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.TestConcurrentJournal.ConcurrentJournal;
 import com.bigdata.service.DataService;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -111,6 +106,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       {@link ThreadLocal} variable. Borrow the test suite for the
  *       {@link LockContext}.
  * 
+ * @todo verify more necessary outcomes of the different tests using assertions.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -130,651 +127,12 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
     }
 
     /**
-     * Access to "resource"s is constrained using {@link ResourceQueue}s to
-     * administer locks and {@link TxDag} to detect deadlocks.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @param T
-     *            The type of the object that represents an operation,
-     *            transaction, etc. This is often a Thread.
-     * 
-     * @param R
-     *            The type of the object that identifies a resource for the
-     *            purposes of the locking system. This is typically the name of
-     *            an index.
-     * 
-     * @todo abstract the relationship to the task and then refactor into the
-     *       source tree for integration with {@link ConcurrentJournal}.
-     */
-    public static class LockManager</*T,*/R> {
-
-        /**
-         * Each resource that can be locked has an associated queue.
-         * <p>
-         * Note: This is a concurrent collection since new resources may be
-         * added while concurrent operations resolve resources to their queues.
-         */
-        final Map<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
-                1000/* nresources */);
-
-        /**
-         * The set of locks held by each transaction.
-         */
-        final ConcurrentHashMap<Thread, Collection<R>> lockedResources;
-
-//        /**
-//         * Used to lock regions of code that add and drop resources.
-//         * 
-//         * @todo if used in lock()/releaseLocks() then we need to also use a
-//         *       {@link Condition} so that we do not block progress by other
-//         *       tasks while holding this lock.
-//         */
-//        final Lock resourceManagementLock = new ReentrantLock();
-
-        /**
-         * Used to track dependencies among transactions.
-         */
-        final TxDag waitsFor;
-
-        // counters
-        AtomicLong nstarted = new AtomicLong(0);
-
-        AtomicLong nended = new AtomicLong(0);
-
-        AtomicLong nerror = new AtomicLong(0);
-
-        AtomicLong ndeadlock = new AtomicLong(0);
-
-        AtomicLong ntimeout = new AtomicLong(0);
-
-        // #of tasks holding all their locks.
-        AtomicLong nrunning = new AtomicLong(0);
-        
-        // Maximum #of tasks all holding their locks at once.
-        AtomicLong maxrunning = new AtomicLong(0); 
-        
-        /**
-         * 
-         * @param maxConcurrency
-         *            The maximum multi-programming level.
-         */
-        LockManager(int maxConcurrency) {
-
-            lockedResources = new ConcurrentHashMap<Thread, Collection<R>>(
-                    maxConcurrency);
-
-            waitsFor = new TxDag(maxConcurrency);
-
-        }
-
-        /**
-         * Add a resource.
-         * 
-         * @param resource
-         *            The resource.
-         * 
-         * @throws IllegalStateException
-         *             if the resource already exists.
-         */
-        void addResource(R resource) {
-
-//            resourceManagementLock.lock();
-//
-//            try {
-
-            // synchronize before possible modification.
-            synchronized(resourceQueues) {
-            
-                if (resourceQueues.containsKey(resource)) {
-
-                    throw new IllegalStateException("Resource exists: "
-                            + resource);
-
-                }
-
-                resourceQueues.put(resource, new ResourceQueue<R,Thread>(
-                        resource, waitsFor));
-
-            }
-            
-//            } finally {
-//
-//                resourceManagementLock.unlock();
-//
-//            }
-
-        }
-
-        /**
-         * Drop a resource.
-         * 
-         * The caller must have lock on the resource. All tasks blocked waiting
-         * for that resource will be aborted.
-         * 
-         * @param resource
-         *            The resource.
-         * 
-         * @throws IllegalArgumentException
-         *             if the resource does not exist.
-         * @throws IllegalStateException
-         *             if the caller does not have a lock on the resource.
-         */
-        void dropResource(R resource) {
-
-//            resourceManagementLock.lock();
-
-//            try {
-
-            Thread tx = Thread.currentThread();
-
-            // synchronize before possible modification.
-            synchronized(resourceQueues) {
-                
-                ResourceQueue<R,Thread> resourceQueue = resourceQueues.get(resource);
-
-                if (resourceQueue == null) {
-
-                    throw new IllegalArgumentException("No such resource: "
-                            + resource);
-                    
-                }
-
-                /*
-                 * If the caller has the lock then aborts anyone waiting on that
-                 * resource and releases the lock; otherwise throws an
-                 * exception.
-                 */
-                resourceQueue.clear(tx);
-
-                resourceQueues.remove(resource);
-
-            }
-                
-//            } finally {
-//
-//                resourceManagementLock.unlock();
-//
-//            }
-
-        }
-
-        /**
-         * Lock resource(s).
-         * <p>
-         * Note: If you can not obtain the required lock(s) then you MUST use
-         * {@link #releaseLocks()} to make sure that you release any locks that
-         * you might have obtained.
-         * 
-         * @param resource
-         *            The resource(s) to be locked.
-         * @param timeout
-         *            The lock timeout -or- 0L to wait forever.
-         * 
-         * @throws InterruptedException
-         * @throws DeadlockException
-         * @throws TimeoutException
-         */
-        public void lock(R[] resource, long timeout)
-                throws InterruptedException, DeadlockException,
-                TimeoutException {
-
-            if(resource==null) throw new NullPointerException(); 
-            
-            for(int i=0; i<resource.length; i++) {
-                
-                if (resource[i] == null)
-                    throw new NullPointerException();
-
-            }
-
-            if (timeout < 0)
-                throw new IllegalArgumentException();
-            
-            log.info("Acquiring lock(s): " + resource);
-
-            for (int i = 0; i < resource.length; i++) {
-
-                lock(resource[i], timeout);
-
-            }
-
-            log.info("Acquired lock(s): " + resource);
-
-        }
-        
-        /**
-         * Obtain a lock on a resource.
-         * 
-         * @param resource
-         *            The resource to be locked.
-         * @param timeout
-         *            The lock timeout -or- 0L to wait forever.
-         * 
-         * @throws InterruptedException
-         */
-        private void lock(R resource,long timeout) throws InterruptedException {
-
-//            resourceManagementLock.lock();
-
-//            try {
-
-            Thread tx = Thread.currentThread();
-
-            ResourceQueue<R,Thread> resourceQueue = resourceQueues.get(resource);
-
-            if (resourceQueue == null)
-                throw new IllegalArgumentException("No such resource: "
-                        + resource);
-
-            resourceQueue.lock(tx,timeout);
-
-            Collection<R> resources = lockedResources.get(tx);
-            
-            if(resources==null) {
-
-                resources = new LinkedList<R>();
-            
-                lockedResources.put(tx, resources);
-                
-            }
-            
-            resources.add(resource);
-
-//            } finally {
-
-//                resourceManagementLock.unlock();
-
-//            }
-
-        }
-
-        /**
-         * Release all locks.
-         * 
-         * @todo could be optimized to update the {@link TxDag} more efficiently
-         *       on normal completion (success). The logic below works
-         *       regardless of whether the tx completed normally or not but uses
-         *       incremental updates of the WAITS_FOR graph.
-         */
-        void releaseLocks() {
-
-//            resourceManagementLock.lock();
-
-            Thread tx = Thread.currentThread();
-
-            try {
-
-                log.info("Releasing locks");
-
-                Collection<R> resources = lockedResources.remove(tx);
-
-                if (resources == null) {
-                    
-                    log.info("No locks: "+tx);
-
-                    return;
-
-                }
-
-                /*
-                 * @todo does releasing locks needs to be atomic so that blocked
-                 * operations can not get moving until we have released all of
-                 * our locks?  I would not think that this matters....
-                 */
-
-                log.info("Releasing resource locks: resources=" + resources);
-
-                Iterator<R> itr = resources.iterator();
-
-                while (itr.hasNext()) {
-
-                    R resource = itr.next();
-
-                    ResourceQueue<R, Thread> resourceQueue = resourceQueues
-                            .get(resource);
-
-                    if (resourceQueue == null)
-                        throw new IllegalStateException(
-                                "No queue for resource: " + resource);
-
-                    try {
-
-                        // release a lock on a resource.
-
-                        resourceQueue.unlock(tx);
-
-                    } catch (Throwable t) {
-
-                        log.warn("Could not release lock", t);
-
-                        // Note: release the rest of the locks anyway.
-
-                        continue;
-
-                    }
-
-                }
-
-            } catch (Throwable t) {
-
-                log.error("Could not release locks: " + t, t);
-
-            } finally {
-
-                /*
-                 * Release the vertex (if any) in the WAITS_FOR graph.
-                 * 
-                 * Note: A vertex is created iff a dependency chain is
-                 * established. Therefore it is possible for a transaction to
-                 * obtain a lock without a vertex begin created for that
-                 * tranasaction. Hence it is Ok if this method returns [false].
-                 */
-
-                waitsFor.releaseVertex(tx);
-
-//                resourceManagementLock.unlock();
-
-            }
-
-        }
-
-        void didStart(Callable<Object> task) {
-
-            nstarted.incrementAndGet();
-
-            log.info("Started: nstarted=" + nstarted);
-
-        }
-
-        void didError(Callable<Object> task, Throwable t) {
-
-            nerror.incrementAndGet();
-
-            // log.warn("Error: #error="+nerror);
-
-        }
-
-        /**
-         * Always invoked on task end regardless of success or error.
-         */
-        void didEnd(Callable<Object> task) {
-            
-            nended.incrementAndGet();
-
-            try {
-
-                /*
-                 * Force release of locks (if any) and removal of the vertex (if
-                 * any) from the WAITS_FOR graph.
-                 */
-                
-                releaseLocks();
-                
-            } catch(Throwable t) {
-
-                log.warn("Problem(s) releasing locks: "+t, t);
-                
-                didError(task,t);
-                
-            }
-
-            log.info("Ended: nended=" + nended);
-
-        }
-
-        String status() {
-
-            return "nthreads=" + waitsFor.capacity() + ", maxrunning="
-                    + maxrunning + ", nrunning=" + nrunning + ", nstarted="
-                    + nstarted + ", nended=" + nended + ", nerror=" + nerror
-                    + ", ndeadlock=" + ndeadlock+", ntimeout="+ntimeout;
-            
-        }
-
-    }
-
-    /**
-     * A test class used to model a task reading or writing on an index.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @param R
-     *            The type of the object that identifies a resource for the
-     *            purposes of the locking system. This is typically the name of
-     *            an index.
-     */
-    public static abstract class AbstractResourceTask<R> implements Callable<Object> {
-
-        protected final LockManager<R> db;
-        private final R[] resource;
-        private int maxLockTries = 1;
-        private long lockTimeout = 0L;
-
-        public int setMaxLockTries(int newValue) {
-            
-            if(newValue<1) throw new IllegalArgumentException();
-            
-            int t = this.maxLockTries;
-            
-            this.maxLockTries = newValue;
-            
-            return t;
-            
-        }
-        
-        public int getMaxLockTries() {
-            
-            return maxLockTries;
-            
-        }
-
-        public long setLockTimeout(long newValue) {
-            
-            long t = this.lockTimeout;
-            
-            this.lockTimeout = newValue;
-            
-            return t;
-            
-        }
-        
-        public long getLockTimeout() {
-            
-            return lockTimeout;
-            
-        }
-        
-        /**
-         * 
-         * @param db
-         *            The lock manager.
-         * 
-         * @param resource
-         *            The resource(s) to be locked.
-         */
-        protected AbstractResourceTask(LockManager<R> db, R[] resource) {
-
-            if (db == null)
-                throw new NullPointerException();
-
-            if (resource == null)
-                throw new NullPointerException();
-
-            for (int i = 0; i < resource.length; i++) {
-
-                if (resource[i] == null)
-                    throw new NullPointerException();
-
-            }
-            
-            this.db = db;
-            
-            this.resource = resource;
-            
-        }
-
-        /**
-         * Attempt to acquire locks on resources required by the task.
-         * <p>
-         * Up to {@link #getMaxLockTries()} attempts will be made.
-         * 
-         * @exception DeadlockException
-         *                if the locks could not be acquired (last exception
-         *                encountered only).
-         * @exception TimeoutException
-         *                if the locks could not be acquired (last exception
-         *                encountered only).
-         */
-        protected void acquireLocks() throws Exception {
-            
-            boolean locked = false;
-            
-            RuntimeException ex2 = null;
-            
-            for (int i = 0; i < maxLockTries && !locked; i++) {
-            
-                try {
-
-                    db.lock(resource,lockTimeout);
-
-                    locked = true;
-
-                } catch (DeadlockException ex) {
-
-                    /*
-                     * A deadlock is not the same as an error since we
-                     * can try to obtain the locks again.
-                     */
-
-                    db.ndeadlock.incrementAndGet();
-
-                    ex2 = ex;
-
-                    db.releaseLocks();
-                    
-                } catch (TimeoutException ex) {
-
-                    /*
-                     * A timeout is not the same as an error since we can
-                     * try to obtain the locks again.
-                     */
-
-                    db.ntimeout.incrementAndGet();
-
-                    ex2 = ex;
-
-                    db.releaseLocks();
-
-                }
-                
-            }
-            
-            if (!locked) {
-
-                db.didError(this, ex2);
-                
-                throw ex2;
-
-            }
-
-        }
-        
-        
-        final public Object call() throws Exception {
-
-            db.didStart(this);
-
-            final Object ret;
-            try {
-
-                acquireLocks();
-                
-                /*
-                 * Run the task now that we have the necessary lock(s).
-                 */
-                try {
-                    
-                    long nrunning = db.nrunning.incrementAndGet();
-
-                    // Note: not really atomic and hence only approximate.
-                    db.maxrunning.set(Math.max(db.maxrunning.get(), nrunning));
-                    
-//                    System.err.println("#running="+db.nrunning);
-
-                    try {
-
-                        log.info(toString() + ": run - start");
-                        
-                        ret = run();
-                        
-                        log.info(toString() + ": run - end");
-                                                
-                    } catch (Throwable t) {
-
-                        if(t instanceof HorridTaskDeath) {
-
-                            // An expected error.
-                            
-                            db.didError(this, t);
-
-                            throw (HorridTaskDeath)t;
-                            
-                        }
-
-                        // An unexpected error.
-
-                        log.error("Problem running task: " + this, t);
-                        
-                        db.didError(this, t);
-
-                        throw new RuntimeException(t);
-                    
-                    }
-
-                } finally {
-                
-                    db.nrunning.decrementAndGet();
-                    
-                }
-
-            } finally {
-
-                db.didEnd(this);
-
-            }
-
-            log.info(toString() + ": done");
-
-            return ret;
-
-        }
-
-        public String toString() {
-
-            return super.toString() + " resources=" + Arrays.toString(resource);
-
-        }
-
-        /**
-         * Run the task (resources have already been locked and will be unlocked
-         * on completion).
-         * 
-         * @throws Exception
-         */
-        abstract protected Object run() throws Exception;
-
-    }
-
-    /**
      * Waits 10ms once it acquires its locks.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Wait10ResourceTask<R> extends AbstractResourceTask<R> {
+    public static class Wait10ResourceTask<R extends Comparable<R>> extends AbstractResourceTask<R> {
 
         Wait10ResourceTask(LockManager<R> db, R[] resource) {
 
@@ -800,7 +158,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class DeathResourceTask<R> extends AbstractResourceTask<R> {
+    public static class DeathResourceTask<R extends Comparable<R>> extends AbstractResourceTask<R> {
 
         DeathResourceTask(LockManager<R> db, R[] resource) {
 
@@ -877,7 +235,15 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         final int maxLockTries = Integer
                 .parseInt(properties.getProperty(TestOptions.MAX_LOCK_TRIES,
                         TestOptions.DEFAULT_MAX_LOCK_TRIES));
-    
+
+        final boolean predeclareLocks = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.PREDECLARE_LOCKS,
+                        TestOptions.DEFAULT_PREDECLARE_LOCKS));
+        
+        final boolean sortLockRequests = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.SORT_LOCK_REQUESTS,
+                        TestOptions.DEFAULT_SORT_LOCK_REQUESTS));
+        
         /*
          * Note: without pre-declaration of locks, you can expect high deadlock
          * rates when minLocks=maxLocks=nresources since all tasks will contend
@@ -895,7 +261,9 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         Collection<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
                 ntasks);
 
-        LockManager<String> db = new LockManager<String>(nthreads/* multi-programming level */);
+        LockManager<String> db = new LockManager<String>(
+                nthreads/* multi-programming level */, predeclareLocks,
+                sortLockRequests);
 
         // distinct resource names. references are reused by reach task.
         final String[] resources = new String[nresources];
@@ -1123,6 +491,27 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         public static final String MAX_LOCK_TRIES = "maxLockTries";
 
         /**
+         * When true, operations MUST pre-declare their locks (default true).
+         * <p>
+         * Note: The {@link LockManager} uses this information to avoid
+         * deadlocks by the simple expediency of sorting the resources in each
+         * lock request into a common order. With this option deadlocks are NOT
+         * possible but all locks MUST be pre-declared by the operation before
+         * it begins to execute.
+         */
+        public static final String PREDECLARE_LOCKS = "predeclareLocks";
+        
+        /**
+         * When true, the resources in a lock request are sorted before the lock
+         * requests are issued (default true). This option is ONLY turned off
+         * for testing purposes. Since predeclaration plus sorting makes
+         * deadlocks impossible, this option MAY be turned off in order to
+         * exercise the deadlock detection logic in {@link TxDag} and the
+         * handling of deadlocks when they are detected.
+         */
+        public static final String SORT_LOCK_REQUESTS = "sortLockRequest";
+        
+        /**
          * The default is no timeout for the test.
          */
         public static final String DEFAULT_TIMEOUT = "0";
@@ -1141,6 +530,16 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
          * By default we do not force any tasks to die.
          */
         public static final String DEFAULT_PERCENT_TASK_DEATHS = "0.0";
+        
+        /**
+         * By default the operations will predeclare their locks.
+         */
+        public static final String DEFAULT_PREDECLARE_LOCKS = "true";
+        
+        /**
+         * By default lock requests will be sorted.
+         */
+        public static final String DEFAULT_SORT_LOCK_REQUESTS = "true";
         
     }
     
@@ -1164,6 +563,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.NRESOURCES,"100");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1181,6 +582,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.NRESOURCES,"100");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1198,6 +601,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.NRESOURCES,"100");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1216,6 +621,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.NRESOURCES,"1");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1236,6 +643,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
 //        properties.setProperty(TestOptions.LOCK_TIMEOUT,"0"); // Note: timeout==0 when debugging.
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1257,6 +666,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
 //        properties.setProperty(TestOptions.LOCK_TIMEOUT,"0"); // Note: timeout==0 when debugging.
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         properties.setProperty(TestOptions.PERCENT_TASK_DEATH,".10");
         
         doComparisonTest(properties);
@@ -1278,6 +689,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
 //        properties.setProperty(TestOptions.LOCK_TIMEOUT,"0");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         doComparisonTest(properties);
         
@@ -1300,17 +713,26 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
         properties.setProperty(TestOptions.LOCK_TIMEOUT,"1000");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
-        doComparisonTest(properties);
+        Result result = doComparisonTest(properties);
+        
+        /*
+         * Deadlocks should not be possible with only one resource.
+         */
+        assertEquals("ndeadlock","0",result.get("ndeadlock"));
         
     }
 
     /**
      * Test where each operation locks one or more resources.
+     * <p>
+     * Note: This condition provides the basis for deadlocks.
      * 
      * @throws Exception
      */
-    public void test_multipleResourceLocking() throws Exception {
+    public void test_multipleResourceLocking_resources3_locktries_3() throws Exception {
 
         Properties properties = new Properties();
         
@@ -1319,7 +741,69 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         properties.setProperty(TestOptions.NRESOURCES,"100");
         properties.setProperty(TestOptions.MIN_LOCKS,"3");
         properties.setProperty(TestOptions.MAX_LOCKS,"3");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES,"3");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
+        doComparisonTest(properties);
+        
+    }
+
+    /**
+     * Test where each operation locks one or more resources.
+     * <p>
+     * Note: This condition provides the basis for deadlocks. In fact, since we
+     * have 10 resource locks for each operation and only 100 operations the
+     * chances of a deadlock on any given operation are extremely high. However,
+     * since we are predeclaring our locks and the lock requests are being
+     * sorted NO deadlocks should result.
+     * 
+     * @throws Exception
+     */
+    public void test_multipleResourceLocking_resources10_locktries10_predeclareLocks() throws Exception {
+
+        Properties properties = new Properties();
+        
+        properties.setProperty(TestOptions.NTHREADS,"20");
+        properties.setProperty(TestOptions.NTASKS,"1000");
+        properties.setProperty(TestOptions.NRESOURCES,"100");
+        properties.setProperty(TestOptions.MIN_LOCKS,"10");
+        properties.setProperty(TestOptions.MAX_LOCKS,"10");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES,"10");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"true");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"true");
+                
+        Result result = doComparisonTest(properties);
+        
+        /*
+         * Deadlocks should not be possible when we predeclare and sort locks.
+         */
+        assertEquals("ndeadlock","0",result.get("ndeadlock"));
+
+    }
+
+    /**
+     * Test where each operation locks one or more resources.
+     * <p>
+     * Note: This condition provides the basis for deadlocks. In fact, since we
+     * have 10 resource locks for each operation and only 100 operations the
+     * chances of a deadlock on any given operation are extremely high.
+     * 
+     * @throws Exception
+     */
+    public void test_multipleResourceLocking_resources10_locktries10() throws Exception {
+
+        Properties properties = new Properties();
+        
+        properties.setProperty(TestOptions.NTHREADS,"20");
+        properties.setProperty(TestOptions.NTASKS,"1000");
+        properties.setProperty(TestOptions.NRESOURCES,"100");
+        properties.setProperty(TestOptions.MIN_LOCKS,"10");
+        properties.setProperty(TestOptions.MAX_LOCKS,"10");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES,"10");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
+                
         doComparisonTest(properties);
         
     }
@@ -1334,9 +818,17 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo write tests above and here that test conditions with and without
-     *       lock timeout to make sure that the timeout itself does not put the
-     *       CC system into an unhappy state!
+     * FIXME write an "apply" method that accepts a list of conditions and an
+     * array of NV[]s and returns a new list of conditions in each original
+     * condition has been expanded into N new conditions, one per element of the
+     * NV[]s array. This can be used to systematically build up hypercubes in
+     * the experimental design that can then be analyzed with a pivot table.
+     * 
+     * @todo refactor the tests generated below to use apply() and run each
+     *       basic condition with and without lock timeout and with and without
+     *       predeclaration of locks (and without sorting when locks are NOT
+     *       predeclared so that we can exercise the deadlock detection stuff).
+     *       We could also run each condition at (2), (20), and (100) threads.
      */
     static public class Generate extends ExperimentDriver {
         
@@ -1363,6 +855,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
             defaultProperties.put(TestOptions.MIN_LOCKS,"1");
             defaultProperties.put(TestOptions.MAX_LOCKS,"3");
             defaultProperties.put(TestOptions.MAX_LOCK_TRIES,"1");
+            defaultProperties.put(TestOptions.PREDECLARE_LOCKS,"false");
+            defaultProperties.put(TestOptions.SORT_LOCK_REQUESTS,"false");
             defaultProperties.put(TestOptions.LOCK_TIMEOUT,"1000"); // ms
 
             List<Condition>conditions = new ArrayList<Condition>();

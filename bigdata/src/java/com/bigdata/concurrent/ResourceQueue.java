@@ -14,6 +14,7 @@ import org.CognitiveWeb.concurrent.locking.TimeoutException;
 import org.CognitiveWeb.concurrent.locking.TxDag;
 import org.apache.log4j.Logger;
 
+
 /**
  * Unbounded queue of operations waiting to gain an exclusive lock on a
  * resource. Deadlocks are detected using a WAITS_FOR graph that is shared by
@@ -74,6 +75,12 @@ public class ResourceQueue<R, T> {
 
     /**
      * The WAITS_FOR graph shared by all transactions and all resources.
+     * <p>
+     * Note: This MAY be null. When it is null deadlock detection is
+     * <strong>disabled</strong>. This is Ok if the operations are (1)
+     * pre-declaring their locks; and (2) the resources in each lock request are
+     * sorted into a common order. Under those conditions deadlocks are
+     * impossible and we do not need to maintain a WAITS_FOR graph.
      */
     final TxDag waitsFor;
 
@@ -151,20 +158,24 @@ public class ResourceQueue<R, T> {
     }
 
     /**
+     * Create a queue of lock requests for a resource.
      * 
      * @param resource
      *            The resource.
      * @param waitsFor
      *            The WAITS_FOR graph shared by all transactions and all
-     *            resources.
+     *            resources (optional). When NOT specified operations MUST
+     *            pre-declare their locks and the {@link LockManager} MUST sort
+     *            the resources in each lock request into a common order such
+     *            that deadlocks CAN NOT occur.
      */
     public ResourceQueue(R resource, TxDag waitsFor) {
 
         if (resource == null)
             throw new NullPointerException();
 
-        if (waitsFor == null)
-            throw new NullPointerException();
+//        if (waitsFor == null)
+//            throw new NullPointerException();
 
         this.resource = resource;
 
@@ -312,7 +323,7 @@ public class ResourceQueue<R, T> {
              * correct WAITS_FOR edges remain when a predecessor is granted the
              * lock.
              */
-            {
+            if (waitsFor != null) {
 
                 Object[] predecessors = queue.toArray();
                 
@@ -430,7 +441,7 @@ public class ResourceQueue<R, T> {
                  * depend on this tx since it is going to be removed, and then
                  * remove the tx from the pending queue.
                  * 
-                 * FIXME If we timeout this request then we need to back it out
+                 * Note: If we timeout this request then we need to back it out
                  * of the queue, including the edges that we added above. The
                  * same procedure should be used regardless of the error
                  * condition, e.g., if we are interrupted or if a spurious error
@@ -441,23 +452,36 @@ public class ResourceQueue<R, T> {
                  * remove(int pos) that also update the WAITS_FOR graph
                  * atomically while we have a lock on the resource queue.
                  */
-                
-                synchronized(waitsFor) {
+                if (waitsFor != null) {
 
-                    /*
-                     * Note: If the transaction is at the head of the queue then
-                     * it is probably NOT waiting. However, this case should be
-                     * quite rare in lock().
-                     */
+                    synchronized (waitsFor) {
 
-                    try {
-                        waitsFor.removeEdges(tx, true/*assume that tx is waiting on something*/);
-                    } catch(Throwable t2) {
-                        log.warn(t2);
+                        /*
+                         * Note: If the transaction is at the head of the queue
+                         * then it is probably NOT waiting. However, this case
+                         * should be quite rare in lock().
+                         */
+
+                        try {
+                            
+                            /*
+                             * Note: Assume that tx is waiting on something
+                             * unless we have absolute proof to the contrary.
+                             */
+                            
+                            final boolean waiting = true;
+                            
+                            waitsFor.removeEdges(tx, waiting);
+                            
+                        } catch (Throwable t2) {
+                            
+                            log.warn(t2);
+                            
+                        }
+
                     }
-                    
                 }
-                
+
                 // and remove it from the queue - we are done w/ our correcting action.
                 queue.remove(tx);
                 
@@ -519,7 +543,8 @@ public class ResourceQueue<R, T> {
              * transaction (for this resource) since those transactions are
              * waiting on the transaction that just released the lock.
              */
-            {
+            
+            if (waitsFor != null) {
 
                 Iterator<T> itr = queue.iterator();
 

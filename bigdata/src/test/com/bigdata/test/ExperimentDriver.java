@@ -499,6 +499,17 @@ public class ExperimentDriver {
                 throw new IllegalArgumentException(
                         "nruns must be at least one, not " + nruns);
 
+            if(nruns>1) {
+                /*
+                 * FIXME refactor to output each run in turn (breaks into
+                 * multiple runs which I do not like) or to collect all results
+                 * so that both the output file and the run summary show all
+                 * data. The run summary should also use the same logic to break
+                 * down the invariants.
+                 */
+                throw new UnsupportedOperationException("Not collecting results across all runs");
+            }
+            
             File outFile = new File(className+".exp.csv");
 
             final boolean exists = outFile.exists();
