@@ -86,6 +86,8 @@ public class TestAll extends TestCase {
 //        suite.addTest(com.bigdata.concurrent.locking.TestAll.suite());
 
         suite.addTestSuite(TestConcurrencyControl.class);
+
+//        suite.addTestSuite(TestConcurrentJournal.class);
         
         return suite;
         

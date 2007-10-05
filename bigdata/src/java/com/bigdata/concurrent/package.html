@@ -1,0 +1,45 @@
+<html>
+<head>
+<title>Concurrent.</title>
+</head>
+<body>
+
+<p>
+
+This package supports concurrency control using exclusive locks on resources.  The
+use case for bigdata is during operations on unisolated named indices on a single
+journal.  (Note that index partitions which are just modeled as named indices).
+Exclusive locks are required for the unisolated indices since the B+Tree implementation
+is NOT thread-safe for concurrent writers.  The concurrency control package provides a
+"sufficiently" serialized schedule.  Operations that require access to the same unisolated
+index are serialized while operations that require access to non-overlapping sets of
+unisolated indices may run in parallel (depending on the #of available worker tasks).
+
+</p>
+
+<p>
+
+The data service provides for two kinds of operations: unisolated and transactional.  The 
+unisolated API of the data service ensures that operations use only a single named index
+(or index partition) at a time.  Coordination of distributed locks is not required making
+this the unisolated API suiteable for scale-out "row stores".  Deadlock cycles can not
+arise for such unisolated operations since they require a lock on only a single resource.
+
+</p>
+
+<p>
+
+A transaction may issue multiple requests against the data service API, and each request
+MAY touch a different named index (or index partition).  However, due to the underlying
+MVCC (multi-version concurrency control) scheme, a transaction never waits to read data
+and proceeds without locking until it is "done" with its active phase.  When the "commit"
+is requested the transaction MUST obtain an exclusive lock on each index (partition) that
+it needs to (a) validate; and (b) make its writes durable.  This puts us in the envyable
+position of being able to <strong>pre-declare</strong> the set of exclusive locks required
+by the transaction commit.  In this situation we avoid deadlocks by the simple expediency
+of sorting the lock requests into a total order by the resource (the index name).
+
+</p>
+
+</body>
+</html>
