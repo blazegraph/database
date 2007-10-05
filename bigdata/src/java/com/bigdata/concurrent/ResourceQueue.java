@@ -251,9 +251,6 @@ public class ResourceQueue<R, T> {
      * @throws DeadlockException
      *             if the request would cause a deadlock among the running
      *             transactions.
-     *             
-     * @todo Currently CC deadlock problems can be observed with an infinite
-     *       timeout.
      */
     public void lock(T tx, long timeout) throws InterruptedException,
             DeadlockException {
@@ -349,63 +346,131 @@ public class ResourceQueue<R, T> {
 
             queue.add(tx);
 
-            while (true) {
+            try {
 
-                long elapsed = System.currentTimeMillis() - begin;
+                while (true) {
+    
+                    long elapsed = System.currentTimeMillis() - begin;
+    
+                    if (timeout != 0L && elapsed >= timeout) {
+    
+                        throw new TimeoutException("After " + elapsed + " ms: tx="
+                                + tx + ", queue=" + this);
+    
+                    }
+    
+                    log.info("Awaiting resource: tx=" + tx + ", queue=" + this);
+    
+                    final long remaining = timeout - elapsed;
+    
+                    if (timeout == 0L) {
+    
+                        // wait w/o timeout.
+    
+                        available.await();
+    
+                    } else {
+   
+                        // wait w/ timeout.
+                        
+                        if (!available.await(remaining, TimeUnit.MILLISECONDS)) {
 
-                if (timeout != 0L && elapsed >= timeout) {
+                            throw new TimeoutException("After " + elapsed
+                                    + " ms: tx=" + tx + ", queue=" + this);
 
-                    throw new TimeoutException("After " + elapsed + " ms: tx="
-                            + tx + ", queue=" + this);
-
-                }
-
-                log.info("Awaiting resource: tx=" + tx + ", queue=" + this);
-
-                final long remaining = timeout - elapsed;
-
-                if (timeout == 0L) {
-
-                    // wait w/o timeout.
-
-                    available.await();
-
-                } else if (!available.await(remaining, TimeUnit.MILLISECONDS)) {
-
-                    throw new TimeoutException("After " + elapsed + " ms: tx="
-                            + tx + ", queue=" + this);
-
-                }
+                        }
+    
+                    }
+    
+                    /*
+                     * Note: We can continue here either because the Condition
+                     * that we were awaiting has been signalled -or- because of
+                     * a timeout (handled above) -or- for no reason.
+                     */
+    
+                    log.info("Continuing after wait: tx=" + tx + ", queue=" + this);
+    
+                    if (dead.get()) {
+    
+                        throw new InterruptedException("Resource is dead: "
+                                + resource);
+    
+                    }
+    
+                    if (queue.peek() == tx) {
+    
+                        /*
+                         * Note: tx is at the head of the queue while it holds
+                         * the lock.
+                         */
+    
+                        log.info("Lock granted after wait: tx=" + tx + ", queue="
+                                + this);
+    
+                        return;
+    
+                    }
+    
+                } // while(true)
+                
+            } catch(Throwable t) {
 
                 /*
-                 * Note: We can continue here either because the Condition
-                 * that we were awaiting has been signalled -or- because of
-                 * a timeout (handled above) -or- for no reason.
+                 * At this point there are edges in the WAITS_FOR graph and the
+                 * tx is on the queue. While we appended it to the end of the
+                 * queue above it can have "moved" since both due to locks that
+                 * have been granted to other transactions and due to other
+                 * transactions that are now also waiting in the queue. In fact,
+                 * it can even in the 1st position (the "granted" position).
+                 * Regardless it is definately not running since it is still in
+                 * "lock()".
+                 * 
+                 * What we need to do now is perform a correcting action to
+                 * restore the WAITS_FOR graph, remove any edges that might
+                 * depend on this tx since it is going to be removed, and then
+                 * remove the tx from the pending queue.
+                 * 
+                 * FIXME If we timeout this request then we need to back it out
+                 * of the queue, including the edges that we added above. The
+                 * same procedure should be used regardless of the error
+                 * condition, e.g., if we are interrupted or if a spurious error
+                 * occurs then we still need to perform this correcting action.
+                 * 
+                 * @todo If we get into adjusting schedules to suit priorities
+                 * then it may make sense to write insert(int pos) and
+                 * remove(int pos) that also update the WAITS_FOR graph
+                 * atomically while we have a lock on the resource queue.
                  */
-
-                log.info("Continuing after wait: tx=" + tx + ", queue=" + this);
-
-                if (dead.get()) {
-
-                    throw new InterruptedException("Resource is dead: "
-                            + resource);
-
-                }
-
-                if (queue.peek() == tx) {
+                
+                synchronized(waitsFor) {
 
                     /*
-                     * Note: tx is at the head of the queue while it holds
-                     * the lock.
+                     * Note: If the transaction is at the head of the queue then
+                     * it is probably NOT waiting. However, this case should be
+                     * quite rare in lock().
                      */
 
-                    log.info("Lock granted after wait: tx=" + tx + ", queue="
-                            + this);
-
-                    return;
-
+                    try {
+                        waitsFor.removeEdges(tx, true/*assume that tx is waiting on something*/);
+                    } catch(Throwable t2) {
+                        log.warn(t2);
+                    }
+                    
                 }
+                
+                // and remove it from the queue - we are done w/ our correcting action.
+                queue.remove(tx);
+                
+                // minimize masquerading of exceptions.
+                
+                if (t instanceof RuntimeException)
+                    throw (RuntimeException) t;
 
+                if (t instanceof InterruptedException)
+                    throw (InterruptedException) t;
+
+                throw new RuntimeException(t);
+                
             }
 
         } finally {
@@ -531,9 +596,13 @@ public class ResourceQueue<R, T> {
 
             assertOwnsLock(tx);
 
-            // FIXME This needs to remove any edge involving any pending tx.
-            if (true)
+            if (true) {
+              
+                // @todo This needs to remove any edge involving any pending tx.
+                
                 throw new UnsupportedOperationException();
+                
+            }
 
             queue.clear();
 

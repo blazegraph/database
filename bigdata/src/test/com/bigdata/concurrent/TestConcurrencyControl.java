@@ -1286,24 +1286,8 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
     /**
      * Test where each operation locks only a single resource and there is only
      * one resource to be locked so that all operations MUST be serialized with
-     * a non-zero lock timeout.
-     * 
-     * @todo throws exceptions IFF the lock timeout is non-zero, e.g., 1000ms.
-     * 
-     * <pre>
-     * WARN : com.bigdata.concurrent.ResourceQueue.unlock(ResourceQueue.java:481): unknown transaction: tx1=Thread[pool-1-thread-241,5,main]
-     * java.lang.IllegalStateException: unknown transaction: tx1=Thread[pool-1-thread-241,5,main]
-     *     at org.CognitiveWeb.concurrent.locking.TxDag.removeEdge(TxDag.java:1346)
-     *     at com.bigdata.concurrent.ResourceQueue.unlock(ResourceQueue.java:469)
-     *     at com.bigdata.concurrent.TestConcurrencyControl$LockManager.releaseLocks(TestConcurrencyControl.java:446)
-     *     at com.bigdata.concurrent.TestConcurrencyControl$LockManager.didEnd(TestConcurrencyControl.java:513)
-     *     at com.bigdata.concurrent.TestConcurrencyControl$AbstractResourceTask.call(TestConcurrencyControl.java:745)
-     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-     *     at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-     *     at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-     *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-     *     at java.lang.Thread.run(Thread.java:595)
-     * </pre>
+     * a non-zero lock timeout. This test stresses the logic in lock() that is
+     * responsible for backing out a lock request on timeout.
      */
     public void test_singleResourceLocking_serialized_highConcurrency_lockTimeout() throws Exception {
 

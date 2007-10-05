@@ -494,7 +494,11 @@ public class ExperimentDriver {
          * Run the experiment, writing the results onto a CSV file.
          */
         public void run(int nruns) throws Exception {
-            
+                        
+            if (nruns < 1)
+                throw new IllegalArgumentException(
+                        "nruns must be at least one, not " + nruns);
+
             File outFile = new File(className+".exp.csv");
 
             final boolean exists = outFile.exists();
@@ -600,6 +604,12 @@ public class ExperimentDriver {
 
                 } // next run.
             
+            }
+
+            catch(Throwable t) {
+                
+                t.printStackTrace(System.err);
+                                
             }
             
             finally {
@@ -1141,9 +1151,9 @@ public class ExperimentDriver {
         Experiment exp = new DTDParserHelper().parse(new InputSource(
                 new FileReader(args[0])));
         
-        int nruns = 0;
+        int nruns = 1;
         
-        if(args.length==1) {
+        if(args.length==2) {
 
             nruns = Integer.parseInt(args[1]);
             
