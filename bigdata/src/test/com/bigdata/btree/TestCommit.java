@@ -94,7 +94,7 @@ public class TestCommit extends TestCase2 {
 
             BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
                     SimpleEntry.Serializer.INSTANCE);
-
+            
             assertTrue(btree.root.isDirty());
 
             // Commit of tree with dirty root.
@@ -116,7 +116,7 @@ public class TestCommit extends TestCase2 {
 
             // Load the tree.
             BTree btree = BTree.load(store, addrMetadata);
-
+            
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());
             assertFalse(btree.root.isDirty());
@@ -151,5 +151,5 @@ public class TestCommit extends TestCase2 {
         }
         
     }
-
+    
 }

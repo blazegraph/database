@@ -42,48 +42,24 @@ Modifications:
 
 */
 /*
- * Created on Mar 3, 2006
+ * Created on Oct 10, 2007
  */
-package com.bigdata.concurrent.schedule;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.journal;
 
-/**
- * Aggregates tests in dependency order.
- * 
- * @author thompsonbry
- */
-public class TestAll extends TestCase {
+public class IndexExistsException extends IllegalStateException {
 
     /**
      * 
      */
-    public TestAll() {
-        super();
-    }
+    private static final long serialVersionUID = -2151894480947760726L;
 
     /**
-     * @param name
+     * @param message The index name.
      */
-    public TestAll(String name) {
-        super(name);
+    public IndexExistsException(String message) {
+        super(message);
     }
 
-    /**
-     * Aggregates the test suites into something approximating increasing
-     * dependency.
-     */
 
-    public static Test suite() {
-
-        TestSuite suite = new TestSuite(TestAll.class.getPackage().getName());
-
-        suite.addTestSuite( TestSchedule.class );
-        
-        return suite;
-        
-    }
-    
 }

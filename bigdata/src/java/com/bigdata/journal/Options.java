@@ -222,13 +222,21 @@ public class Options {
 
     /**
      * <code>createTempFile</code> - This boolean option causes a new file to
-     * be created using the
-     * {@link File#createTempFile(String, String, File) temporary file mechanism}.
-     * If {@link #DELETE_ON_EXIT} is also specified, then the temporary file
-     * will be {@link File#deleteOnExit() marked for deletion} when the JVM
-     * exits. This option is often used when preparing a journal for a unit
-     * test. The default temporary directory is used unless it is overriden by
+     * be created using the {@link File#createTempFile(String, String, File)}
+     * temporary file mechanism.
+     * <p>
+     * Note: If {@link #DELETE_ON_EXIT} is also specified, then the temporary
+     * file will be {@link File#deleteOnExit() marked for deletion} when the JVM
+     * exits.
+     * <p>
+     * Note: This option is often used when preparing a journal for a unit test.
+     * <p>
+     * Note: The default temporary directory is used unless it is overriden by
      * the {@link #TMP_DIR} option.
+     * <p>
+     * Note: In order to re-open a journal that was created with this option you
+     * MUST (a) set this option to <code>false</code> and (b) set
+     * {@link #FILE} to the value returned by {@link AbstractJournal#getFile()}.
      */
     public final static String CREATE_TEMP_FILE = "createTempFile";
     

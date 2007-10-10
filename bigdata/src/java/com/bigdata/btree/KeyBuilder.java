@@ -68,11 +68,14 @@ import com.ibm.icu.text.RuleBasedCollator;
  * 
  * @see UnicodeKeyBuilder
  * 
- * @see SuccessorUtil, which may be used to compute the successor of a value before
- *      encoding it as a component of a key.
+ * @see SuccessorUtil, which may be used to compute the successor of a value
+ *      before encoding it as a component of a key.
  * 
  * @see BytesUtil#successor(byte[]), which may be used to compute the successor
  *      of an encoded key.
+ * 
+ * @todo provide a synchronization factory for the keybuilder using a delegation
+ *       model.  KeyBuilder.synchronizedKeyBuilder():KeyBuilder.
  */
 public class KeyBuilder implements IKeyBuilder {
 

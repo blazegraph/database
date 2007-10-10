@@ -1,3 +1,50 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Oct 3, 2007
+ */
+
 package com.bigdata.concurrent;
 
 import java.util.Arrays;
@@ -5,33 +52,40 @@ import java.util.concurrent.Callable;
 
 import org.CognitiveWeb.concurrent.locking.DeadlockException;
 import org.CognitiveWeb.concurrent.locking.TimeoutException;
+import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.TestConcurrencyControl.HorridTaskDeath;
 
 /**
- * Abstract base class for an operation requiring exclusive access to one or
- * more resources. This implementation requires that operations predeclare
- * their locks and coordinates with a {@link LockManager}.
+ * Class encapsulates handshaking with the {@link LockManager} for an operation
+ * requiring exclusive access to one or more resources and that are willing to
+ * pre-declare their resource requirements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @param R
- *            The type of the object that identifies a resource for the
- *            purposes of the locking system. This is typically the name of
- *            an index.
+ *            The type of the object that identifies a resource for the purposes
+ *            of the locking system. This is typically the name of an index.
  */
-public abstract class AbstractResourceTask<R extends Comparable<R>> implements
+public class LockManagerTask<R extends Comparable<R>> implements
         Callable<Object> {
 
+    protected static final Logger log = Logger.getLogger(LockManagerTask.class);
+    
     private final LockManager<R> lockManager;
 
     private final R[] resource;
 
+    private final Callable<Object> target;
+    
     private int maxLockTries = 1;
 
     private long lockTimeout = 0L;
 
+    /**
+     * The {@link LockManager}.
+     */
     public LockManager<R> getLockManager() {
         
         return lockManager;
@@ -62,6 +116,10 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
 
     }
 
+    /**
+     * The maximum #of times that the task will attempt to acquire its locks
+     * (positive integer).
+     */
     public int getMaxLockTries() {
 
         return maxLockTries;
@@ -78,6 +136,9 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
 
     }
 
+    /**
+     * The timeout (milliseconds) or ZERO (0L) for an infinite timeout.
+     */
     public long getLockTimeout() {
 
         return lockTimeout;
@@ -91,8 +152,12 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
      * 
      * @param resource
      *            The resource(s) to be locked.
+     * 
+     * @param target
+     *            The {@link Runnable} target that will be invoked iff the locks
+     *            are successfully acquired.
      */
-    protected AbstractResourceTask(LockManager<R> lockManager, R[] resource) {
+    public LockManagerTask(LockManager<R> lockManager, R[] resource, Callable<Object> target) {
 
         if (lockManager == null)
             throw new NullPointerException();
@@ -100,6 +165,9 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
         if (resource == null)
             throw new NullPointerException();
 
+        if (resource.length == 0)
+            throw new IllegalArgumentException();
+        
         for (int i = 0; i < resource.length; i++) {
 
             if (resource[i] == null)
@@ -107,9 +175,13 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
 
         }
 
+        if(target==null) throw new NullPointerException();
+        
         this.lockManager = lockManager;
 
         this.resource = resource;
+        
+        this.target = target;
 
     }
 
@@ -163,7 +235,13 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
     }
 
     /**
-     * Acquires pre-declared locks and then runs the operation.
+     * Acquires pre-declared locks and then runs the operation identified to the
+     * constructor.
+     * 
+     * @return <code>null</code>
+     * 
+     * @throws Exception
+     *             if something goes wrong.
      */
     final public Object call() throws Exception {
 
@@ -190,7 +268,7 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
 
             acquireLocks();
 
-            TestConcurrencyControl.log.info("Acquired locks");
+            log.info("Acquired locks");
 
         } catch (Exception ex) {
 
@@ -223,14 +301,14 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
 
         try {
 
-            TestConcurrencyControl.log.info(toString() + ": run - start");
+            log.info(toString() + ": run - start");
 
-            final Object ret = run();
+            final Object ret = target.call();
 
             // done "running".
             lockManager.nrunning.decrementAndGet();
 
-            TestConcurrencyControl.log.info(toString() + ": run - end");
+            log.info(toString() + ": run - end");
 
             lockManager.didSucceed(this);
 
@@ -277,13 +355,5 @@ public abstract class AbstractResourceTask<R extends Comparable<R>> implements
         return super.toString() + " resources=" + Arrays.toString(resource);
 
     }
-
-    /**
-     * Run the task (resources have already been locked and will be unlocked
-     * on completion).
-     * 
-     * @throws Exception
-     */
-    abstract protected Object run() throws Exception;
 
 }

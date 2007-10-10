@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -63,7 +64,6 @@ import junit.framework.TestSuite;
  * @see AbstractTestCase
  * @see ProxyTestCase
  */
-
 public class TestJournalBasics extends TestCase {
 
     public TestJournalBasics() {
@@ -86,11 +86,17 @@ public class TestJournalBasics extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Core Journal Test Suite");
+        TestSuite suite = new TestSuite(TestJournalBasics.class.getPackage().getName());
 
         // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite( TestNamedIndices.class );
-        
+
+        // verify that an index is restart-safe iff the journal commits.
+        suite.addTestSuite( TestRestartSafe.class );
+
+        // tests of the commit list for named indices.
+        suite.addTestSuite( TestCommitList.class );
+
         // tests the ability to recover and find historical commit records.
         suite.addTestSuite( TestCommitHistory.class );
         
@@ -112,18 +118,19 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite(TestConflictResolution.class);
         
         /*
-         * @todo tests of batch api and group commit mechanisms for very high
-         * volume updates. These tests might be more relevent to the data server
-         * since group commit can be achieved by transparently collecting small
-         * non-conflicting updates into a transaction that succeeds or fails all
-         * updates in the group. in this model transactions are local and
-         * updates do not have atomicity across journals. another alternative is
-         * to use a pulse to commit a global group update transaction with a
-         * frequency that trades off the size of the commit groups against
-         * latency. the advantage of the latter approach is that it can be
-         * combined with normal transaction processing in a trivial manner and I
-         * am not sure whether or not that is true of the former approach.
+         * Tests of concurrent execution of readers, writers, and transactions
+         * and group commit.
+         * 
+         * @todo refactor since concurrency is basic and things like add/drop
+         * already use the CC mechanisms but are also being tested above.
          */
+        
+        // test tasks to add and drop named indices.
+        suite.addTestSuite(TestAddDropIndexTask.class);
+        // test task running a sequence of tasks.
+        suite.addTestSuite(TestSequenceTask.class);
+        // stress tests of the concurrent journal.
+        suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
         
         /*
          * Stress test of concurrent transactions.

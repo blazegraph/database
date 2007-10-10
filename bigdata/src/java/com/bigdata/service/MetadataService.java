@@ -53,7 +53,9 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.scaleup.AbstractPartitionTask;
+import com.bigdata.journal.AbstractIndexTask;
+import com.bigdata.journal.ConcurrentJournal;
+import com.bigdata.journal.ITx;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
 import com.bigdata.scaleup.JournalMetadata;
@@ -110,8 +112,7 @@ import com.bigdata.scaleup.PartitionMetadata;
  *       could be input to the load balanced as well as info about the partition
  *       use that would inform MDS decision making).
  * 
- * @todo reconcile with the {@link AbstractPartitionTask} family. Those tasks
- *       run on the data service and manage the data on the journal and in the
+ * @todo Tasks on the data service and manage the data on the journal and in the
  *       index segments while the corresponding tasks here update the partition
  *       metadata definitions. The general paradigm is that the data service
  *       operations need to be "safe" (idempotent) so that we can reexecute them
@@ -159,8 +160,6 @@ abstract public class MetadataService extends DataService implements
     /**
      * Options for the {@link MetadataService}.
      *  
-     * @todo define options for the {@link MetadataService}.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -198,8 +197,8 @@ abstract public class MetadataService extends DataService implements
             UUID[] dataServices) throws IOException, InterruptedException,
             ExecutionException {
         
-        final UUID managedIndexUUID = (UUID) journal.serialize(
-                new RegisterMetadataIndexWithPartitionsTask(name,
+        final UUID managedIndexUUID = (UUID) journal.submit(
+                new RegisterMetadataIndexWithPartitionsTask(journal,name,
                         separatorKeys, dataServices))
                 .get();
 
@@ -230,8 +229,8 @@ abstract public class MetadataService extends DataService implements
                 
         };
 
-        final UUID managedIndexUUID = (UUID) journal.serialize(
-                new RegisterMetadataIndexTask(name, dataServiceUUIDs)).get();
+        final UUID managedIndexUUID = (UUID) journal.submit(
+                new RegisterMetadataIndexTask(journal,name, dataServiceUUIDs)).get();
         
         return managedIndexUUID; 
                 
@@ -279,8 +278,8 @@ abstract public class MetadataService extends DataService implements
         // @todo setup the failover data services.
         UUID[] dataServiceUUIDs = new UUID[] { dataServiceUUID };
 
-        IPartitionMetadata pmd = (IPartitionMetadata) journal.serialize(
-                new CreateIndexPartitionTask(name, separatorKey,
+        IPartitionMetadata pmd = (IPartitionMetadata) journal.submit(
+                new CreateIndexPartitionTask(journal,name, separatorKey,
                         dataServiceUUIDs)).get();
 
         return pmd;
@@ -501,9 +500,11 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class RegisterMetadataIndexWithPartitionsTask extends AbstractUnisolatedIndexManagementTask {
-        
-        final int npartitions;
+    protected class RegisterMetadataIndexWithPartitionsTask extends AbstractIndexTask {
+
+        // the name of the index as specified by the caller.
+        final private String name; 
+        final private int npartitions;
         final private byte[][] separatorKeys;
         final private UUID[] dataServiceUUIDs;
         final private IDataService[] dataServices;
@@ -524,10 +525,11 @@ abstract public class MetadataService extends DataService implements
          *            in this array MUST agree with the #of entries in the
          *            <i>separatorKeys</i> array.
          */
-        public RegisterMetadataIndexWithPartitionsTask(String name,
-                byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
+        public RegisterMetadataIndexWithPartitionsTask(
+                ConcurrentJournal journal, String name, byte[][] separatorKeys,
+                UUID[] dataServiceUUIDs) {
 
-            super(false,name);
+            super(journal, ITx.UNISOLATED, false/* readOnly */, getMetadataName(name));
             
             if(separatorKeys==null) 
                 throw new IllegalArgumentException();
@@ -544,6 +546,8 @@ abstract public class MetadataService extends DataService implements
             if( separatorKeys.length != dataServiceUUIDs.length )
                 throw new IllegalArgumentException();
 
+            this.name = name;
+            
             this.npartitions = separatorKeys.length;
             
             this.separatorKeys = separatorKeys;
@@ -760,14 +764,17 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class RegisterMetadataIndexTask extends AbstractUnisolatedIndexManagementTask {
-        
+    protected class RegisterMetadataIndexTask extends AbstractIndexTask {
+
+        final private String name;
         final private UUID[] dataServiceUUIDs;
         final private IDataService[] dataServices;
         
-        public RegisterMetadataIndexTask(String name,UUID[] dataServiceUUIDs) {
+        public RegisterMetadataIndexTask(ConcurrentJournal journal,String name,UUID[] dataServiceUUIDs) {
 
-            super(false/* readOnly */, name);
+            super(journal,ITx.UNISOLATED,false/* readOnly */, getMetadataName(name));
+            
+            this.name = name;
             
             if (dataServiceUUIDs == null)
                 throw new IllegalArgumentException();
@@ -971,7 +978,9 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class CreateIndexPartitionTask extends AbstractUnisolatedIndexManagementTask {
+    protected class CreateIndexPartitionTask extends AbstractIndexTask {
+
+        final private String name;
         
         /**
          * The left separator key specified by the caller.
@@ -982,11 +991,13 @@ abstract public class MetadataService extends DataService implements
         
         final private IDataService[] dataServices;
         
-        public CreateIndexPartitionTask(String name, byte[] separatorKey,
-                UUID[] dataServiceUUIDs) {
+        public CreateIndexPartitionTask(ConcurrentJournal journal, String name,
+                byte[] separatorKey, UUID[] dataServiceUUIDs) {
 
-            super(false/*readOnly*/,name);
+            super(journal,ITx.UNISOLATED,false/*readOnly*/,getMetadataName(name));
 
+            this.name = name;
+            
             if(separatorKey==null) 
                 throw new IllegalArgumentException();
 

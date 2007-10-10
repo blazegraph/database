@@ -45,7 +45,7 @@ Modifications:
  * Created on Feb 3, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,12 +54,19 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.SimpleEntry;
 import com.bigdata.rawstore.IRawStore;
 
 /**
+ * Test suite for restart-safety of {@link BTree}s backed by an
+ * {@link IJournal}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -84,12 +91,12 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
 
             properties = super.getProperties();
 
+            // we need to use a persistent mode of the journal (not transient).
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
                     .toString());
 
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-//            properties.setProperty(Options.FILE, getName()+".jnl");
-//            properties.setProperty(Options.DELETE_ON_CLOSE,"false");
+
             properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
         }

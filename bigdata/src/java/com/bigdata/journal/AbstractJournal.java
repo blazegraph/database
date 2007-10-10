@@ -57,10 +57,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -77,13 +73,11 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * <p>
@@ -287,14 +281,23 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     private ICommitRecord _commitRecord;
 
     /**
-     * BTree mapping index names to the last metadata record committed for the
-     * named index. The keys are index names (unicode strings). The values are
-     * the names and the last known address of the named btree.
-     * 
-     * @todo this should be private, but {@link DumpJournal} is using it to
-     *       report on the state of named btrees.
+     * The "live" BTree mapping index names to the last metadata record
+     * committed for the named index. The keys are index names (unicode
+     * strings). The values are the names and the last known address of the
+     * named btree.
+     * <p>
+     * The "live" name2addr index is required for unisolated writers regardless
+     * whether they are adding an index, dropping an index, or just recovering
+     * the "live" version of an existing named index.
+     * <p>
+     * Operations that read on historical {@link Name2Addr} objects can of
+     * course be concurrent. Those objects are loaded from an
+     * {@link ICommitRecord}. See {@link #getIndex(String, ICommitRecord)}.
+     * <p>
+     * Note: access to the "live" {@link Name2Addr} index MUST be bracketed with
+     * <code>synchronized({@link #name2Addr})</code>.
      */
-    /*private*/ Name2Addr name2Addr;
+    protected Name2Addr name2Addr;
 
     /**
      * BTree mapping commit timestamps to the address of the corresponding
@@ -881,11 +884,11 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info("");
         
-        // shutdown the write service. 
-        writeService.shutdown();
+//        // shutdown the write service. 
+//        writeService.shutdown();
 
         // close immediately.
-        close();
+        _close();
         
         log.info("Shutdown complete.");
 
@@ -903,10 +906,10 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info("");
         
-        writeService.shutdownNow();
+//        writeService.shutdownNow();
 
         // close immediately.
-        close();
+        _close();
 
         log.info("Shutdown complete.");
 
@@ -927,8 +930,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info("");
         
-        // force the commit thread to quit immediately.
-        writeService.shutdownNow();
+//        // force the commit thread to quit immediately.
+//        writeService.shutdownNow();
         
         _bufferStrategy.close();
 
@@ -969,11 +972,14 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
     
+    /**
+     * Invokes {@link #shutdownNow()}.
+     */
     public void close() {
 
         log.info("");
         
-        _close();
+        shutdownNow();
 
     }
 
@@ -981,7 +987,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info("");
         
-        _close();
+        shutdownNow();
         
         if (!deleteOnClose) {
 
@@ -1173,6 +1179,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         assertOpen();
 
+        log.info("");
+        
         /*
          * First, run each of the committers accumulating the updated root
          * addresses in an array. In general, these are btrees and they may have
@@ -1194,11 +1202,13 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
              * No data was written onto the store so the commit can not achieve
              * any useful purpose.
              */
+            
+            log.info("Nothing to commit");
 
             return 0L;
 
         }
-
+        
         /*
          * Write the commit record onto the store.
          */
@@ -1248,6 +1258,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         }
 
+        // next offset at which user data would be written.
+        final long nextOffset = _bufferStrategy.getNextOffset();
+
         /*
          * update the root block.
          */
@@ -1289,10 +1302,10 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
             // Create the new root block.
             IRootBlockView newRootBlock = new RootBlockView(
-                    !old.isRootBlock0(), old.getOffsetBits(), _bufferStrategy
-                            .getNextOffset(), firstCommitTime, lastCommitTime,
-                    newCommitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    old.getUUID(), checker);
+                    !old.isRootBlock0(), old.getOffsetBits(), nextOffset,
+                    firstCommitTime, lastCommitTime, newCommitCounter,
+                    commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                    checker);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
@@ -1306,8 +1319,6 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * Look for overflow condition.
          */
         {
-
-            final long nextOffset = _bufferStrategy.getNextOffset();
 
             /*
              * Choose maximum of the target maximum extent and the current user
@@ -1337,6 +1348,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         }
 
+        log.info("Done: nextOffset="+nextOffset);
+        
         return commitTime;
 
     }
@@ -1574,6 +1587,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * accomplished by wrapping the returned object in class that will throw an
      * exception for writes such as {@link ReadOnlyIndex},
      * {@link ReadOnlyIsolatedIndex}, or {@link ReadCommittedIndex}.
+     * 
+     * @return The named index -or- <code>null</code> iff the named index did
+     *         not exist as of that commit record.
      */
     protected IIndex getIndex(String name, ICommitRecord commitRecord) {
 
@@ -1588,6 +1604,13 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * indices for the historical state associated with this commit record.
          */
         final long metaAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
+        
+        if (metaAddr == 0L) {
+
+            throw new RuntimeException(
+                    "No name2addr entry in this commit record: " + commitRecord);
+            
+        }
 
         /*
          * Resolve the address of the historical Name2Addr object using the
@@ -1726,31 +1749,12 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     }
     
     /**
-     * Note: You MUST {@link #commit()} before the registered index will be
-     * either restart-safe or visible to new transactions.
-     */
-    public IIndex registerIndex(String name, IIndex btree) {
-
-        assertOpen();
-
-        if (getIndex(name) != null) {
-
-            throw new IllegalStateException("Index already registered: name="
-                    + name);
-
-        }
-
-        // add to the persistent name map.
-        name2Addr.add(name, btree);
-
-        // report event (the application has access to the named index).
-        ResourceManager.openUnisolatedBTree(name);
-
-        return btree;
-
-    }
-
-    /**
+     * Return the mutable view of the named index (aka the "live" index). This
+     * object is NOT thread-safe. You MUST NOT write on this index unless you
+     * KNOW that you are the only writer. Other consumers SHOULD wrap this as a
+     * {@link ReadOnlyIndex} to avoid the possibility of mishap.
+     * 
+     * @return The mutable view of the index.
      * 
      * @todo add hard reference queue for {@link AbstractBTree} to the journal
      *       and track the #of instances of each {@link AbstractBTree} on the
@@ -1781,24 +1785,11 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         if (name == null)
             throw new IllegalArgumentException();
 
-        IIndex ndx = name2Addr.get(name);
+        synchronized (name2Addr) {
 
-        return ndx;
+            return name2Addr.get(name);
 
-    }
-
-    /**
-     * You must actually {@link #commit()} the journal for this action to be
-     * restart safe.
-     */
-    public void dropIndex(String name) {
-
-        assertOpen();
-        
-        name2Addr.dropIndex(name);
-
-        // report event.
-        ResourceManager.dropUnisolatedBTree(name);
+        }
 
     }
 
@@ -1830,57 +1821,36 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     final Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
 
-    /**
-     * A thread used to {@link #serialize(Callable)} operations on the
-     * unisolated store, including serializing atomic transaction prepare-commit
-     * operations.
-     * <p>
-     * A writable transaction that attempts to {@link #commit()} is added as a
-     * {@link TxCommitTask} and queued for execution by this thread. When its
-     * turn comes, it will validate its write set and commit iff validation
-     * succeeds.
-     */
-    final private ExecutorService writeService = Executors
-            .newSingleThreadExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+//    /**
+//     * A thread used to {@link #serialize(Callable)} operations on the
+//     * unisolated store, including serializing atomic transaction prepare-commit
+//     * operations.
+//     * <p>
+//     * A writable transaction that attempts to {@link #commit()} is added as a
+//     * {@link TxCommitTask} and queued for execution by this thread. When its
+//     * turn comes, it will validate its write set and commit iff validation
+//     * succeeds.
+//     */
+//    final private ExecutorService writeService = Executors
+//            .newSingleThreadExecutor(DaemonThreadFactory
+//                    .defaultThreadFactory());
+//    
+//    /**
+//     * Submit a task for eventual serialized execution by the
+//     * {@link #writeService}. This method may be used to ensure serial
+//     * execution of tasks that write on unisolated indices.
+//     * 
+//     * @param task
+//     *            The task.
+//     * 
+//     * @return The future for the task.
+//     */
+//    public Future serialize(Callable task) {
+//        
+//        return writeService.submit(task);
+//        
+//    }
     
-    /**
-     * Submit a task for eventual serialized execution by the
-     * {@link #writeService}. This method may be used to ensure serial
-     * execution of tasks that write on unisolated indices.
-     * 
-     * @param task
-     *            The task.
-     * 
-     * @return The future for the task.
-     */
-    public Future serialize(Callable task) {
-        
-        return writeService.submit(task);
-        
-    }
-    
-    /**
-     * Abort a transaction (synchronous, low latency for read-only transactions
-     * but aborts for read-write transactions are serialized since there may be
-     * latency in communications with the transaction server or deletion of the
-     * temporary backing store for the transaction).
-     * 
-     * @param ts
-     *            The transaction identifier (aka start time).
-     */
-    public void abort(long ts) {
-
-        ITx tx = getTx(ts);
-        
-        if (tx == null)
-            throw new IllegalArgumentException("No such tx: " + ts);
-        
-        // abort is synchronous.
-        tx.abort();
-                
-    }
-
 //    /**
 //     * Abort a transaction (synchronous, low latency for read-only transactions
 //     * but aborts for read-write transactions are serialized since there may be
@@ -1911,156 +1881,6 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 //        
 //    }
 
-    /**
-     * Commit a transaction (synchronous).
-     * <p>
-     * Read-only transactions and transactions without write sets are processed
-     * immediately and will have a commit time of zero (0L).
-     * <p>
-     * Transactions with non-empty write sets are placed onto the
-     * {@link #writeService} and the caller will block until the transaction
-     * either commits or aborts. For this reason, this method MUST be invoked
-     * from within a worker thread for the transaction so that concurrent
-     * transactions may continue to execute.
-     * 
-     * @param ts
-     *            The transaction identifier (aka start time).
-     * 
-     * @return The transaction commit time.
-     * 
-     * @exception ValidationError
-     *                If the transaction could not be validated. A transaction
-     *                that can not be validated is automatically aborted. The
-     *                caller MAY re-execute the transaction.
-     * 
-     * @todo support 2-phase or 3-phase commit protocol for transactions whose
-     *       write sets are distributed across more than one data service.
-     * 
-     * @todo Implement group commit. large transactions do not get placed into
-     *       commit groups. Group commit collects up to N 'small' transactions
-     *       with at most M milliseconds of latency and perform a single atomic
-     *       commit for that group of transactions, forcing the data to disk and
-     *       then returning control to the clients. Note that we need to collect
-     *       transactions once they have completed but not yet validated. Any
-     *       transaction in the group that fails validation must be aborted.
-     *       Validation needs to be against then current state of the database,
-     *       so the process is serialized (validate+commit) with transactions
-     *       that fail validation being placed onto an abort queue. A single
-     *       unisolated commit is then performed for the group, so there is one
-     *       SYNC per commit.
-     */
-    public long commit(long ts) throws ValidationError {
-
-        ITx tx = getTx(ts);
-        
-        if (tx == null)
-            throw new IllegalArgumentException("No such tx: " + ts);
-
-        /*
-         * A read-only transaction can commit immediately since validation and
-         * commit are basically NOPs.
-         */
-
-        if(tx.isReadOnly()) {
-        
-            // read-only transactions do not get a commit time.
-            tx.prepare(0L);
-
-            return tx.commit();
-            
-        }
-        
-        /*
-         * A transaction with an empty write set can commit immediately since
-         * validation and commit are basically NOPs (@todo the only difference
-         * from the read-only case is that a commit time is being assigned, but
-         * I am not sure if we need to do that.)
-         */
-        if(tx.isEmptyWriteSet()) {
-
-            tx.prepare(nextTimestamp());
-
-            return tx.commit();
-
-        }
-        
-        try {
-
-            long commitTime = writeService.submit(new TxCommitTask(tx)).get();
-            
-            if(DEBUG) {
-                
-                log.debug("committed: startTime="+tx.getStartTimestamp()+", commitTime="+commitTime);
-                
-            }
-            
-            return commitTime;
-            
-        } catch(InterruptedException ex) {
-            
-            // interrupted, perhaps during shutdown.
-            throw new RuntimeException(ex);
-            
-        } catch(ExecutionException ex) {
-            
-            Throwable cause = ex.getCause();
-            
-            if(cause instanceof ValidationError) {
-                
-                throw (ValidationError) cause;
-                
-            }
-
-            // this is an unexpected error.
-            throw new RuntimeException(cause);
-            
-        }
-        
-    }
-    
-    /**
-     * Task validates and commits a transaction when it is run by the
-     * {@link Journal#writeService}.
-     * <p>
-     * Note: The commit protocol does not permit unisolated writes on the
-     * journal once a transaction begins to prepare until the transaction has
-     * either committed or aborted (if such writes were allowed then we would
-     * have to re-validate any prepared transactions in order to enforce
-     * serializability).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class TxCommitTask implements Callable<Long> {
-        
-        private final ITx tx;
-        
-        public TxCommitTask(ITx tx) {
-            
-            assert tx != null;
-            
-            this.tx = tx;
-            
-        }
-
-        public Long call() throws Exception {
-            
-            /*
-             * The commit time is assigned when we prepare the transaction.
-             * 
-             * @todo resolve this against a service in a manner that will
-             * support a distributed database commit protocol.
-             */
-            final long commitTime = ((Tx)tx).journal.nextTimestamp();
-            
-            tx.prepare(commitTime);
-            
-            return tx.commit();
-            
-        }
-        
-    }
-    
 //    /**
 //     * Task aborts a transaction when it is run by the
 //     * {@link Journal#writeService}. This is used to serialize some abort

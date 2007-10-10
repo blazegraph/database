@@ -100,29 +100,29 @@ public interface ITxCommitProtocol {
      */
     public void abort(long tx);
 
-    /**
-     * Obtain a lock on a named index (synchronous).
-     * <p>
-     * Note: Clients DO NOT use this method. Locks are NOT required during the
-     * active phrase of a transaction. Locks are only required during the commit
-     * phase of a transaction where they are used to coordinate execution with
-     * concurrent unisolated operations. The transaction manager automatically
-     * acquires the necessary locks during the commit and will cause those locks
-     * to be released before the transaction is complete.
-     * 
-     * @param tx
-     *            The transaction identifier.
-     * @param name
-     *            The index name.
-     */
-    public void lock(long tx,String name);
-
-    /**
-     * Release all locks held by the transaction.
-     * 
-     * @param tx
-     *            The transaction identifier.
-     */
-    public void releaseLocks(long tx);
+//    /**
+//     * Obtain a lock on a named index (synchronous).
+//     * <p>
+//     * Note: Clients DO NOT use this method. Locks are NOT required during the
+//     * active phrase of a transaction. Locks are only required during the commit
+//     * phase of a transaction where they are used to coordinate execution with
+//     * concurrent unisolated operations. The transaction manager automatically
+//     * acquires the necessary locks during the commit and will cause those locks
+//     * to be released before the transaction is complete.
+//     * 
+//     * @param tx
+//     *            The transaction identifier.
+//     * @param name
+//     *            The resource name(s).
+//     */
+//    public void lock(long tx,String resource[]);
+//
+//    /**
+//     * Release all locks held by the transaction.
+//     * 
+//     * @param tx
+//     *            The transaction identifier.
+//     */
+//    public void releaseLocks(long tx);
     
 }

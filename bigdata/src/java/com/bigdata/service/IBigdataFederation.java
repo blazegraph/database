@@ -6,9 +6,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * The client-facing interface to a bigdata federation.

@@ -52,7 +52,7 @@ import com.bigdata.util.MillisecondTimestampFactory;
  * introduces a trivial {@link ITransactionManager} and does NOT handle
  * {@link #overflow()} events.
  */
-public class Journal extends AbstractJournal implements ITransactionManager, IIndexManager {
+public class Journal extends ConcurrentJournal implements ITransactionManager {
 
     /**
      * 
@@ -93,7 +93,7 @@ public class Journal extends AbstractJournal implements ITransactionManager, IIn
      * the same underlying factory.
      */
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-    
+
     /**
      * Waits for the next millsecond.
      */
@@ -129,13 +129,11 @@ public class Journal extends AbstractJournal implements ITransactionManager, IIn
         
     }
 
-    public void lock(long tx, String name) {
-        // FIXME lock() Auto-generated method stub
+    public void wroteOn(long startTime, String[] resource) {
         
-    }
-
-    public void releaseLocks(long tx) {
-        // FIXME releaseLocks() Auto-generated method stub
+        /*
+         * Ignored since the information is also in the local ITx.
+         */
         
     }
     

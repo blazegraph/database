@@ -415,4 +415,18 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         
     }
 
+    public String[] getDirtyResource() {
+
+        if(isReadOnly()) {
+
+            return EMPTY;
+            
+        }
+        
+        return btrees.keySet().toArray(new String[btrees.size()]);
+        
+    }
+
+    private static transient final String[] EMPTY = new String[0];
+
 }

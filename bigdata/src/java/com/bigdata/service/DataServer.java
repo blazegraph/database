@@ -52,6 +52,8 @@ import java.rmi.RemoteException;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.MDC;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.journal.IJournal;
@@ -67,6 +69,9 @@ import com.bigdata.journal.Journal;
  * <p>
  * 
  * @see src/resources/config for sample configurations.
+ * 
+ * @todo identify the minimum set of permissions required to run a
+ *       {@link DataServer}.
  * 
  * @todo describe and implement the media replication mechanism and service
  *       failover. only the primary service is mutable. service instances for
@@ -223,7 +228,7 @@ public class DataServer extends AbstractServer {
                 serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
                 
             }
-            
+
             return serviceUUID;
             
         }

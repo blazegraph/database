@@ -68,11 +68,11 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.scaleup.PartitionedIndexView;
-import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * A client-side view of an index.
@@ -482,7 +482,7 @@ public class ClientIndexView implements IIndex {
         // index.
         final int capacity = 1000;
 
-        return new PartitionedRangeQuery(this, tx, fromKey, toKey, capacity,
+        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
                 IDataService.KEYS | IDataService.VALS);
 
     }
@@ -490,7 +490,7 @@ public class ClientIndexView implements IIndex {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags) {
 
-        return new PartitionedRangeQuery(this, tx, fromKey, toKey, capacity,
+        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
                 flags);
         
     }
@@ -507,7 +507,7 @@ public class ClientIndexView implements IIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class PartitionedRangeQuery implements IEntryIterator {
+    static class PartitionedRangeQueryIterator implements IEntryIterator {
 
         /**
          * Error message used by {@link #getKey()} when the iterator was not
@@ -669,7 +669,7 @@ public class ClientIndexView implements IIndex {
             
         }
         
-        public PartitionedRangeQuery(ClientIndexView ndx, long tx,
+        public PartitionedRangeQueryIterator(ClientIndexView ndx, long tx,
                 byte[] fromKey, byte[] toKey, int capacity, int flags) {
 
             if (ndx == null) {

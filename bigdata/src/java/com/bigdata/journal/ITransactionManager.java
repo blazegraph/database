@@ -50,6 +50,7 @@ package com.bigdata.journal;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.service.DataService;
 
 /**
  * A client-facing interface for managing transaction life cycles. An instance
@@ -177,4 +178,27 @@ public interface ITransactionManager extends ITimestampService {
      */
     public long commit(long startTime) throws ValidationError;
 
+    /**
+     * Invoked by tasks executing a transaction to notify the transaction
+     * manager that they have written on the named resource(s). This information
+     * is used when submitting the task(s) that will handle the validation and
+     * commit (or abort) of the transaction.
+     * 
+     * @param startTime
+     *            The transaction identifier.
+     * @param resource
+     *            The named resources.
+     * 
+     * @todo pass the {@link DataService} identifier also (or instead) to make
+     *       it easier for a distributed transaction manager to locate the
+     *       {@link DataService}s holding the write sets for the transaction?
+     *       <p>
+     *       Note: In a failover situation we need to know the specific
+     *       resources on which the transaction wrote on each
+     *       {@link DataService} unless the media replication strategy for the
+     *       data services also sends along this piece of otherwise transient
+     *       state.
+     */
+    public void wroteOn(long startTime, String[] resource);
+    
 }

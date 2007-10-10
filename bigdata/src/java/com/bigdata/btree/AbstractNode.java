@@ -450,7 +450,15 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                 // Update the root node on the btree.
                 log.info("Copy-on-write : replaced root node on btree.");
 
+                final boolean wasDirty = btree.root.dirty;
+                
                 btree.root = newNode;
+                
+                if (!wasDirty) {
+                    
+                    btree.fireDirtyEvent();
+                    
+                }
 
             } else {
 

@@ -42,48 +42,42 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Oct 10, 2007
  */
 
-package com.bigdata.concurrent;
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.journal;
 
 /**
- * Aggregates tests in dependency order.
+ * Test suite for {@link SequenceTask}
+ * 
+ * @todo test that a sequence of unisolated write tasks is atomic.
+ * 
+ * @todo test sequence of transaction tasks.
+ * 
+ * @todo test that the factory produces the expected data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestSequenceTask extends ProxyTestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestSequenceTask() {
+        super();
     }
 
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestSequenceTask(String arg0) {
         super(arg0);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("concurrent");
+    public void test_nothing() {
         
-        suite.addTestSuite(TestConcurrencyControl.class);
-
-        return suite;
+        fail("write tests");
         
     }
     

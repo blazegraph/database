@@ -63,7 +63,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.RangeQuery;
+import com.bigdata.service.RangeQueryIterator;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by
@@ -167,7 +167,7 @@ abstract public class ReduceService
             final int flags = IDataService.KEYS | IDataService.VALS;
 
             // index scan.
-            IEntryIterator itr = new RangeQuery(ds, name, ITx.UNISOLATED,
+            IEntryIterator itr = new RangeQueryIterator(ds, name, ITx.UNISOLATED,
                     null/* fromKey */, null/* toKey */, capacity, flags);
 
             long ntuples = 0L;

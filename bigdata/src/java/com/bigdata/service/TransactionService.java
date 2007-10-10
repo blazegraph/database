@@ -551,4 +551,9 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
         
     }
 
+    public void wroteOn(long startTime, String[] resource) {
+        // TODO Auto-generated method stub
+        
+    }
+
 }

@@ -49,6 +49,8 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.journal.TestRestartSafe;
+
 /**
  * Test suite for {@link BTree#removeAll()}.
  * 

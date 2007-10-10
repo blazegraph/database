@@ -1,10 +1,56 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Oct 3, 2007
+ */
+
 package com.bigdata.concurrent;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -70,7 +116,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *       corresponding {@link ResourceQueue} so that {@link ResourceQueue}s
      *       are not cleared while they are in use.
      */
-    final Map<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
+    final ConcurrentHashMap<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
             1000/* nresources */);
 
     /**
@@ -113,14 +159,14 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
     /**
      * The #of tasks that start execution (enter
-     * {@link AbstractResourceTask#call()}). This counter is incremented
+     * {@link LockManagerTask#call()}). This counter is incremented
      * BEFORE the task attempts to acquire its resource lock(s).
      */
     AtomicLong nstarted = new AtomicLong(0);
 
     /**
      * The #of tasks that end execution (exit
-     * {@link AbstractResourceTask#call()}).
+     * {@link LockManagerTask#call()}).
      */
     AtomicLong nended = new AtomicLong(0);
 
@@ -145,7 +191,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
     /**
      * #of tasks that are concurrently executing in
-     * {@link AbstractResourceTask#run()}.
+     * {@link LockManagerTask#run()}.
      */
     AtomicLong nrunning = new AtomicLong(0);
 
@@ -269,33 +315,57 @@ public class LockManager</*T,*/R extends Comparable<R>> {
     }
 
     /**
+     * Add resource(s).
+     * 
+     * @param resource
+     *            The resource(s).
+     */
+    public void addResource(R[] resource) {
+        
+        for(int i=0; i<resource.length; i++) {
+            
+            addResource(resource[i]);
+            
+        }
+        
+    }
+    
+    /**
      * Add a resource.
      * 
      * @param resource
      *            The resource.
      * 
-     * @throws IllegalStateException
-     *             if the resource already exists.
+     * @return true if the resource was not already declared.
      */
-    void addResource(R resource) {
+    public boolean addResource(R resource) {
 
         //            resourceManagementLock.lock();
         //
         //            try {
 
-        // synchronize before possible modification.
-        synchronized (resourceQueues) {
+//        // synchronize before possible modification.
+//        synchronized (resourceQueues) {
 
             if (resourceQueues.containsKey(resource)) {
 
-                throw new IllegalStateException("Resource exists: " + resource);
+                /*
+                 * test 1st to avoid creating a resource queue if we do not need
+                 * one.
+                 */
+                
+                return false;
 
             }
 
-            resourceQueues.put(resource, new ResourceQueue<R, Thread>(resource,
-                    waitsFor));
+            ResourceQueue<R, Thread> resourceQueue = new ResourceQueue<R, Thread>(resource,
+                waitsFor);
+            
+            ResourceQueue tmp = resourceQueues.putIfAbsent(resource, resourceQueue );
 
-        }
+            return tmp == null;
+            
+//        }
 
         //            } finally {
         //

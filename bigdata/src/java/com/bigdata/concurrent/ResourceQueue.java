@@ -17,8 +17,12 @@ import org.apache.log4j.Logger;
 
 /**
  * Unbounded queue of operations waiting to gain an exclusive lock on a
+ * resource. By default, the queue imposes a "fair" schedule for access to the
  * resource. Deadlocks are detected using a WAITS_FOR graph that is shared by
  * all resources and transactions for a given database instance.
+ * <p>
+ * Note: deadlock detection MAY be disabled when all lock requests are (a)
+ * pre-declared; and (b) sorted.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -32,6 +36,7 @@ import org.apache.log4j.Logger;
  *            implementations MAY choose to let operations migrate from thread
  *            to thread.
  * 
+ * @see LockManager
  * @see TxDag
  */
 public class ResourceQueue<R, T> {

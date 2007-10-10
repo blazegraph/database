@@ -467,18 +467,26 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      */
     private void newRootLeaf() {
 
-        this.height = 0;
+        height = 0;
 
-        this.nnodes = 0;
+        nnodes = 0;
         
-        this.nentries = 0;
-        
-        this.root = new Leaf(this);
-        
-        this.nleaves = 1;
-        
-        this.counter = 0L;
+        nentries = 0;
 
+        final boolean wasDirty = root != null && root.dirty;
+        
+        root = new Leaf(this);
+        
+        nleaves = 1;
+        
+        counter = 0L;
+
+        if(!wasDirty) {
+            
+            fireDirtyEvent();
+            
+        }
+        
     }
     
     /**
@@ -589,6 +597,45 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         }
 
     }
+
+    /**
+     * Return the listener.
+     * 
+     * @return
+     */
+    public IDirtyListener getListener() {
+        
+        return listener;
+        
+    }
+
+    /**
+     * Set or clear the listener (there can be only one).
+     * 
+     * @param listener The listener.
+     */
+    public void setDirtyListener(IDirtyListener listener) {
+
+        this.listener = listener;
+        
+    }
+    
+    private IDirtyListener listener;
+
+    /**
+     * Fire an event to the listener (iff set).
+     */
+    void fireDirtyEvent() {
+        
+        IDirtyListener l = this.listener;
+        
+        if(l==null) return;
+        
+        l.dirtyEvent(this);
+        
+        log.info("");
+        
+    }
     
     /**
      * Writes dirty nodes using a post-order traversal that first writes any
@@ -599,11 +646,10 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * use of alternating root blocks and (for transactions) validating and
      * merging down onto the corresponding global index.
      * 
-     * @return The persistent identity of the metadata record for the btree. The
-     *         btree can be reloaded from this metadata record. When used as
-     *         part of an atomic commit protocol, the metadata record address
-     *         must be written into a slot on the root block or a named root
-     *         object.
+     * @return The address at which the metadata record for the btree was
+     *         written onto the store. The btree can be reloaded from this
+     *         metadata record. A reference to the metadata record is set on
+     *         {@link #metadata}.
      */
     public long write() {
         
@@ -631,8 +677,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         metadata.addrMetadata = metadata.write(this,store);
         
         this.metadata = metadata;
-        
-//        this.metadata = newMetadata();
         
         return metadata.addrMetadata;
 
@@ -667,6 +711,65 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         
     }
 
+//    /**
+//     * Used to (en|dis)able auto-commit.
+//     * <p>
+//     * Note: If you disabled auto-commit you MUST explicitly invoke
+//     * {@link #write()} in order to update the metadata record before the
+//     * current state of the {@link BTree} can become restart safe using a commit
+//     * protocol built with {@link #handleCommit()}. The primary reason to
+//     * disable auto-commit is to ensure that concurrent writes on distinct
+//     * {@link BTree}s backed by the same store do not result in their becoming
+//     * restart safe if the store performs an atomic commit until each writer has
+//     * explicitly indicated that it has reached a checkpoint by calling
+//     * {@link #write()}.
+//     * 
+//     * @param newValue
+//     *            The new value.
+//     * 
+//     * @return The old value.
+//     * 
+//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
+//     *             support of group commit. If auto-commit is not required for
+//     *             this purpose then it will be removed.
+//     */
+//    public boolean setAutoCommit(boolean newValue) {
+//
+//        boolean tmp = autoCommit;
+//        
+//        autoCommit = newValue;
+//        
+//        log.info("autoCommit="+newValue);
+//        
+//        return tmp;
+//        
+//    }
+//
+//    /**
+//     * Return true iff auto-commit is enabled (default true). When auto-commit
+//     * is disabled {@link #handleCommit()} ALWAYS returns the last written
+//     * metadata record.
+//     * 
+//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
+//     *             support of group commit. If auto-commit is not required for
+//     *             this purpose then it will be removed.
+//     */
+//    public boolean isAutoCommit() {
+//
+//        return autoCommit;
+//        
+//    }
+//    
+//    /**
+//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
+//     *             support of group commit. If auto-commit is not required for
+//     *             this purpose then it will be removed.
+//     */
+//    private boolean autoCommit = true;
+//    
+//    * <li> autocommit is turned off and the btree has not been marked for
+//    * commit </li>
+    
     /**
      * Handle request for a commit by {@link #write()}ing dirty nodes and
      * leaves onto the store, writing a new metadata record, and returning the
@@ -677,10 +780,10 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * <ol>
      * <li> the metadata record is defined (it is not defined when a btree is
      * first created) -AND- </li>
-     * <li> the root of the btree is NOT dirty and the persistent address of the
+     * <li> the root of the btree is NOT dirty, the persistent address of the
      * root of the btree is the same as the address record in the metadata
-     * record (and the {@link #counter} value agrees with the counter on the
-     * metadata record) -OR- </li>
+     * record, and the {@link #counter} value agrees with the counter on the
+     * metadata record -OR- </li>
      * <li> the root is <code>null</code>, indicating that the index is
      * closed (flushing the index to disk and updating the metadata record is
      * part of the close protocol so we know that the metadata address is
@@ -692,7 +795,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      */
     public long handleCommit() {
 
-        if (metadata != null
+        if ( metadata != null
                 && (root == null || !root.dirty
                         && metadata.getRootAddr() == root.getIdentity()
                         && metadata.getCounter() == counter
@@ -700,16 +803,19 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
              ) {
 
             /*
-             * There have not been any writes on this btree.
+             * There have not been any writes on this btree or auto-commit is
+             * disabled.
              */
+            
             return metadata.addrMetadata;
             
         }
         
         /*
          * Flush the btree, write its metadata record, and return the address of
-         * that metadata record.
+         * that metadata record. The [metadata] reference is also updated.
          */
+        
         return write();
         
     }
@@ -854,5 +960,5 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         }
         
     }
-    
+
 }

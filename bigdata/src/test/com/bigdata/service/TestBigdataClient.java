@@ -59,7 +59,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
+import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
 import com.bigdata.service.ClientIndexView.Split;
 
 /**
@@ -674,14 +674,14 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
 
-        PartitionedRangeQuery itr = null;
+        PartitionedRangeQueryIterator itr = null;
         
         /*
          * Query entire key range.
          */
         {
             
-            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
 
             assertEquals("nvisited",0,itr.getVisitedCount());
             assertEquals("npartitions",1,itr.getPartitionCount());
@@ -718,7 +718,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
 
-        PartitionedRangeQuery itr = null;
+        PartitionedRangeQueryIterator itr = null;
 
         /*
          * Insert an entry into the first partition.
@@ -730,7 +730,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          */
         {
 
-            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
 
             assertTrue("hasNext",
                     itr.hasNext()
@@ -769,7 +769,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
 
-        PartitionedRangeQuery itr = null;
+        PartitionedRangeQueryIterator itr = null;
 
         /*
          * Insert an entry into the 2nd partition.
@@ -781,7 +781,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          */
         {
 
-            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
 
             assertTrue("hasNext",
                     itr.hasNext()
@@ -820,7 +820,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
 
-        PartitionedRangeQuery itr = null;
+        PartitionedRangeQueryIterator itr = null;
 
         /*
          * Insert an entry into the first partition.
@@ -837,7 +837,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          */
         {
 
-            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null);
+            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
 
             assertTrue("hasNext",
                     itr.hasNext()
@@ -886,7 +886,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         ClientIndexView ndx = (ClientIndexView) fed.getIndex(
                 IBigdataFederation.UNISOLATED, name);
 
-        PartitionedRangeQuery itr = null;
+        PartitionedRangeQueryIterator itr = null;
 
         /*
          * Insert the entries into the first partition.
@@ -904,7 +904,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
             final int flags = IDataService.KEYS | IDataService.VALS;
             
-            itr = (PartitionedRangeQuery) ndx.rangeIterator(null, null,
+            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null,
                     capacity, flags);
 
             assertTrue("hasNext",

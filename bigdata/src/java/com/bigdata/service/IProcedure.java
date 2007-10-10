@@ -51,6 +51,8 @@ import java.io.Serializable;
 
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IReadOnlyOperation;
+import com.bigdata.journal.AbstractIndexTask;
+import com.bigdata.journal.Journal;
 
 /**
  * An arbitrary index procedure to be executed on an {@link IDataService}.
@@ -62,6 +64,13 @@ import com.bigdata.btree.IReadOnlyOperation;
  * be as simple as bundling the procedure into a JAR that is part of the
  * CLASSPATH used to start a {@link DataService} or you can use downloaded code
  * with the JINI codebase mechanism (<code>java.rmi.server.codebase</code>).
+ * <p>
+ * Note: While we could define a "procedure" operation on multiple named
+ * indices, clients of the {@link IDataService} API would be unable to exploit
+ * that operation without unreasonable knowledge of the location of index
+ * partitions throughout the federation. People requiring those semantics who
+ * are operating against an embedded {@link Journal} can trivially realize them
+ * by extending {@link AbstractIndexTask}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

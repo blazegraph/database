@@ -52,7 +52,6 @@ import java.util.UUID;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -97,6 +96,9 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      * BTree mapping index names to the last metadata record committed for the
      * named index. The keys are index names (unicode strings). The values are
      * the last known address of the named btree.
+     * <p>
+     * Note: This is a mutable {@link BTree} so it is NOT thread-safe. We always
+     * synchronize on this object before accessing it.
      */
     private Name2Addr name2Addr;
 
@@ -125,22 +127,25 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
     
     public IIndex registerIndex(String name, IIndex btree) {
 
-        if( getIndex(name) != null ) {
-            
-            throw new IllegalStateException("Index already registered: name="+name);
-            
+        synchronized (name2Addr) {
+
+            // add to the persistent name map.
+            name2Addr.add(name, btree);
+
+            return btree;
+
         }
-        
-        // add to the persistent name map.
-        name2Addr.add(name, btree);
-        
-        return btree;
         
     }
     
     public void dropIndex(String name) {
         
-        name2Addr.dropIndex(name);
+        synchronized(name2Addr) {
+
+            // drop from the persistent name map.
+            name2Addr.dropIndex(name);
+            
+        }
         
     }
 
@@ -153,10 +158,11 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      */
     public IIndex getIndex(String name) {
 
-        if (name == null)
-            throw new IllegalArgumentException();
-        
-        return name2Addr.get(name);
+        synchronized(name2Addr) {
+
+            return name2Addr.get(name);
+            
+        }
 
     }
 
