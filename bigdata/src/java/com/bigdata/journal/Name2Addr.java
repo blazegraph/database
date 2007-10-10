@@ -46,18 +46,23 @@ package com.bigdata.journal;
 import java.io.DataInput;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.cache.ICacheEntry;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
@@ -79,44 +84,81 @@ import com.bigdata.rawstore.WormAddressManager;
  * a canonicalizing mapping but that current evolving {@link Name2Addr} instance
  * is NOT part of that mapping.
  */
-public class Name2Addr extends BTree {
+public class Name2Addr extends BTree implements IDirtyListener {
 
     /*
      * @todo parameterize the {@link Locale} on the Journal and pass through to
      * this class. this will make it easier to configure non-default locales.
-     * 
-     * @todo refactor a default instance of the keybuilder that is wrapped in a
-     * synchonization interface for multi-threaded use or move an instance onto
-     * the store since it already has a single-threaded contract for its api?
      */
     private UnicodeKeyBuilder keyBuilder = new UnicodeKeyBuilder();
 
+//    /**
+//     * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
+//     * "live" {@link Name2Addr} instance. Only the indices found in this cache
+//     * are candidates for the commit protocol. The use of this cache also
+//     * minimizes the use of the {@link #keyBuilder} and therefore minimizes the
+//     * relatively expensive operation of encoding unicode names to byte[] keys.
+//     * 
+//     * FIXME This never lets go of an unisolated index once it has been looked
+//     * up and placed into this cache. Therefore, modify this class to use a
+//     * combination of a weak value cache (so that we can let go of the
+//     * unisolated named indices) and a commit list (so that we have hard
+//     * references to any dirty indices up to the next invocation of
+//     * {@link #handleCommit()}. This will require a protocol by which we notice
+//     * writes on the named index, probably using a listener API so that we do
+//     * not have to wrap up the index as a different kind of object.
+//     */
+//    private Map<String, IIndex> indexCache = new HashMap<String, IIndex>();
+
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
-     * "live" {@link Name2Addr} instance. Only the indices found in this cache
-     * are candidates for the commit protocol. The use of this cache also
-     * minimizes the use of the {@link #keyBuilder} and therefore minimizes the
-     * relatively expensive operation of encoding unicode names to byte[] keys.
+     * "live" {@link Name2Addr} instance.
+     * <p>
+     * Map from the name of an index to a weak reference for the corresponding
+     * "live" version of the named index. Entries will be cleared from this map
+     * if they are weakly reachable. In order to prevent dirty indices from
+     * being cleared, we register an {@link IDirtyListener}. When it is
+     * informed that an index is dirty it places a hard reference to that index
+     * into the {@link #commitList}.
+     * <p>
+     * Note: The capacity of the backing hard reference LRU effects how many
+     * _clean_ indices can be held in the cache. Dirty indices remain strongly
+     * reachable owing to their existence in the {@link #commitList}.
      * 
-     * FIXME This never lets go of an unisolated index once it has been looked
-     * up and placed into this cache. Therefore, modify this class to use a
-     * combination of a weak value cache (so that we can let go of the
-     * unisolated named indices) and a commit list (so that we have hard
-     * references to any dirty indices up to the next invocation of
-     * {@link #handleCommit()}. This will require a protocol by which we notice
-     * writes on the named index, probably using a listener API so that we do
-     * not have to wrap up the index as a different kind of object.
+     * @todo make the capacity of the backing LRU a configuration option for the
+     *       journal. It indirectly effects how many writable indices the
+     *       journal will hold open (the effect is indirect owning to the
+     *       semantics of weak references and the control of the JVM over when
+     *       they are cleared). The capacity will be most important as a tuning
+     *       parameter for a data service on which several hot indices are
+     *       multiplexed absorbing writes. In this scenario a low capacity could
+     *       starve the data service forcing frequent reloading of indices from
+     *       the store rather than reuse of the existing mutable index.
      */
-    private Map<String, IIndex> indexCache = new HashMap<String, IIndex>();
-    
-//    protected final Journal journal;
+    private WeakValueCache<String, IIndex> indexCache = new WeakValueCache<String, IIndex>(
+            new LRUCache<String, IIndex>(10));
+
+    /**
+     * Hard references for the dirty indices. This collection prevents dirty
+     * indices from being cleared from the {@link #indexCache}, which would
+     * result in lost updates.
+     * <p>
+     * Note: Operations on unisolated indices always occur on the "current"
+     * state of that index. The "current" state is either unchanged (following a
+     * successful commit) or rolled back to the last saved state (by an abort
+     * following an unsuccessful commit). Therefore all unisolated index write
+     * operations MUST complete before a commit and new unisolated operations
+     * MUST NOT begin until the commit has either succeeded or been rolled back.
+     * Failure to observe this constraint can result in new unisolated
+     * operations writing on indices that should have been rolled back if the
+     * commit is not successfull.
+     */
+    private Set<IIndex> commitList = new HashSet<IIndex>();
     
     public Name2Addr(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 new ValueSerializer());
-
-//        this.journal = store;
         
     }
 
@@ -131,11 +173,74 @@ public class Name2Addr extends BTree {
     public Name2Addr(IRawStore store, BTreeMetadata metadata) {
 
         super(store, metadata);
-
-//        this.journal = store;
         
     }
 
+    /**
+     * We register ourselves with each index that we administer to listen for
+     * events indicating that the index is dirty.  When we get that event we
+     * stick the index on the {@link #commitList}.
+     * 
+     * @param btree
+     */
+    public void dirtyEvent(BTree btree) {
+        
+        /*
+         * FIXME disable this - it is just a paranoia test. it looks for cases
+         * where we have failed to set the listener on the btree and therefore
+         * are recieving events that should be going to another instance of this
+         * class.
+         */
+
+        if(true) {
+            
+            Iterator<ICacheEntry<String,IIndex>> itr = indexCache.entryIterator();
+
+            String name = null;
+            
+            while(itr.hasNext()) {
+
+                ICacheEntry<String, IIndex> entry = itr.next();
+                
+                if(entry.getObject()==btree) {
+                    
+                    name = entry.getKey();
+                    
+                    break;
+                    
+                }
+                
+            }
+            
+            if(name==null) {
+                
+                throw new AssertionError("Received event for unknown index");
+                
+            }
+            
+            log.info("placing dirty index on commit list: name=" + name);
+            
+        }
+        
+        log.info("Adding dirty index to commit list");
+        
+        commitList.add(btree);
+        
+    }
+
+    /**
+     * True iff the index is on the commit list.
+     * 
+     * @param btree
+     * 
+     * @return
+     */
+    boolean willCommit(IIndex btree) {
+    
+        return commitList.contains(btree);
+        
+    }
+    
     /**
      * Extends the default behavior to cause each named btree to flush itself to
      * the store, updates the address from which that btree may be reloaded
@@ -151,26 +256,53 @@ public class Name2Addr extends BTree {
          * journal since only trees that have been touched can have data for the
          * current commit.
          */
-        Iterator<Map.Entry<String,IIndex>> itr = indexCache.entrySet().iterator();
+//        Iterator<Map.Entry<String,IIndex>> itr = indexCache.entrySet().iterator();
         
+        Iterator<ICacheEntry<String,IIndex>> itr = indexCache.entryIterator();
+
         while(itr.hasNext()) {
             
-            Map.Entry<String, IIndex> entry = itr.next();
+//            Map.Entry<String, IIndex> entry = itr.next();
+            ICacheEntry<String,IIndex> entry = itr.next();
             
             String name = entry.getKey();
             
-            IIndex btree = entry.getValue();
+            IIndex btree = entry.getObject();
+            
+            if(!commitList.contains(btree)) {
+                
+                /*
+                 * Not on the commit list.
+                 */
+                
+                continue;
+                
+            }
             
             // request commit.
             long addr = ((ICommitter)btree).handleCommit();
             
-            // update persistent mapping.
-            insert(getKey(name),new Entry(name,addr));
+            // encode the index name as a key.
+            final byte[] key = getKey(name);
+            
+            // lookup the current entry (if any) for that index.
+            Entry oldValue = (Entry) lookup(key);
+            
+            // if there is no existing entry or if the addr has changed.
+            if (oldValue == null || oldValue.addr != addr) {
+
+                // then update persistent mapping.
+                insert(key, new Entry(name, addr));
+                
+            }
             
 //            // place into the object cache on the journal.
 //            journal.touch(addr, btree);
             
         }
+
+        // Clear the commit list.
+        commitList.clear();
         
         // and flushes out this btree as well.
         return super.handleCommit();
@@ -200,9 +332,15 @@ public class Name2Addr extends BTree {
      * 
      * @return The named index or <code>null</code> iff there is no index with
      *         that name.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>.
      */
     public IIndex get(String name) {
 
+        if (name == null)
+            throw new IllegalArgumentException();
+        
         IIndex btree = indexCache.get(name);
         
         if (btree != null)
@@ -226,8 +364,12 @@ public class Name2Addr extends BTree {
         btree = BTree.load(this.store, entry.addr);
         
         // save name -> btree mapping in transient cache.
-        indexCache.put(name,btree);
+//        indexCache.put(name,btree);
+        indexCache.put(name, btree, false/*dirty*/);
 
+        // listen for dirty events so that we know when to add this to the commit list.
+        ((BTree)btree).setDirtyListener(this);
+        
         // report event (loaded btree).
         ResourceManager.openUnisolatedBTree(name);
 
@@ -303,7 +445,7 @@ public class Name2Addr extends BTree {
      *                if <i>name</i> is <code>null</code>.
      * @exception IllegalArgumentException
      *                if <i>btree</i> is <code>null</code>.
-     * @exception IllegalArgumentException
+     * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
     public void add(String name,IIndex btree) {
@@ -325,7 +467,7 @@ public class Name2Addr extends BTree {
         
         if(super.contains(key)) {
             
-            throw new IllegalArgumentException("already registered: "+name);
+            throw new IndexExistsException(name);
             
         }
         
@@ -339,14 +481,28 @@ public class Name2Addr extends BTree {
 //        journal.touch(addr, btree);
         
         // add name -> btree mapping to the transient cache.
-        indexCache.put(name, btree);
+        indexCache.put(name, btree, true/*dirty*/);
+        
+        // add to the commit list.
+        commitList.add(btree);
+
+        // listen for dirty events so that we know when to add this to the commit list.
+        ((BTree)btree).setDirtyListener(this);
         
     }
 
     /**
+     * Removes the entry for the named index.
+     * 
      * @param name
-     *
-     * @todo mark the index as invalid
+     *            The index name.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>.
+     * @exception NoSuchIndexException
+     *                if the index does not exist.
+     * 
+     * @todo mark the index as invalid in case anyone holds a reference to it?
      */
     public void dropIndex(String name) {
 
@@ -357,14 +513,35 @@ public class Name2Addr extends BTree {
         
         if(!super.contains(key)) {
             
-            throw new IllegalArgumentException("Not registered: "+name);
+            throw new NoSuchIndexException("Not registered: "+name);
             
         }
         
-        // remove the name -> btree mapping to the transient cache.
-        indexCache.remove(name);
+        // remove the name -> btree mapping from the transient cache.
+        IIndex btree = indexCache.remove(name);
+        
+        if (btree != null) {
 
-        // remove the entry from the persistent index.
+            /*
+             * Make sure that the index is not on the commit list.
+             * 
+             * Note: If the index is not in the index cache then it WILL NOT be
+             * in the commit list.
+             */
+            
+            commitList.remove(btree);
+            
+            // clear our listener.
+            ((BTree)btree).setDirtyListener(null);
+
+        }
+
+        /*
+         * Remove the entry from the persistent index. After a commit you will
+         * no longer be able to find the metadata record for this index from the
+         * current commit record (it will still exist of course in historical
+         * commit records).
+         */
         super.remove(key);
 
     }

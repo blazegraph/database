@@ -54,7 +54,6 @@ import java.util.Properties;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.Bytes;
 
 /**

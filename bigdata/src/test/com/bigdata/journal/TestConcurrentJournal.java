@@ -42,33 +42,47 @@ Modifications:
 
 */
 /*
- * Created on Mar 3, 2006
+ * Created on Oct 3, 2007
  */
-package com.bigdata.concurrent.locking.action;
 
-import com.bigdata.concurrent.TestConcurrencyControl.ResourceQueue;
-import com.bigdata.concurrent.schedule.Action;
-import com.bigdata.concurrent.schedule.Tx;
+package com.bigdata.journal;
+
+import java.util.Properties;
 
 /**
- * Helper class defines an action used to unlock a resource.
+ * Test suite for the {@link ConcurrentJournal}.
  * 
- * @author thompsonbry
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
+public class TestConcurrentJournal extends ProxyTestCase {
 
-public class UnlockAction<R,T extends Tx> extends Action<T> {
-    final private ResourceQueue<R,T> queue;
-
-    public UnlockAction(T tx, ResourceQueue<R,T> queue) {
-        super(tx, "unlock(" + tx + "," + queue.getResource() + ")");
-        this.queue = queue;
+    public TestConcurrentJournal() {
+        super();
+    }
+    
+    public TestConcurrentJournal(String name) {
+        super(name);
     }
 
-    public void run() {
-    	if( getTx() != Thread.currentThread() ) {
-    		// Verify execution context.
-    		throw new AssertionError();
-    	}
-        queue.unlock(getTx());
+    /**
+     * Test ability to create a {@link ConcurrentJournal} and then shut it down.
+     */
+    public void test_ctor() {
+
+        Properties properties = getProperties();
+        
+//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+//
+//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+        
+        Journal journal = new Journal(properties);
+        
+        journal.shutdown();
+        
+        journal.delete();
+        
     }
+    
 }

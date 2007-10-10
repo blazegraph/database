@@ -454,8 +454,8 @@ abstract public class AbstractMRMWTestCase
         }
 
         // used to format bytes.
-        final NumberFormat bytesFormat = NumberFormat.getNumberInstance();
-        bytesFormat.setGroupingUsed(true);
+//        final NumberFormat bytesFormat = NumberFormat.getNumberInstance();
+//        bytesFormat.setGroupingUsed(true);
 
         long seconds = TimeUnit.SECONDS.convert(elapsed, TimeUnit.MILLISECONDS);
         

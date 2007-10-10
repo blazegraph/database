@@ -205,7 +205,7 @@ public class TestAccount extends TestCase {
          * Validate the transaction against the current account balance.
          * </p>
          * <p>
-         * Note: Validation is currently invoked from within the {@link #commit},
+         * Note: Validation is currently invoked from within the {@link #commit()},
          * which handles atomicity with respect to the account balance.
          * </p>
          */

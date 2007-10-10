@@ -53,8 +53,8 @@ import java.util.concurrent.ExecutionException;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}

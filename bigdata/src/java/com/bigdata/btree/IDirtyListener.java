@@ -42,31 +42,35 @@ Modifications:
 
 */
 /*
- * Created on Mar 3, 2006
+ * Created on Oct 8, 2007
  */
-package com.bigdata.concurrent.schedule;
+
+package com.bigdata.btree;
 
 /**
- * Abstract base class for pre-condition or post-condition checks run before
- * (after) an action has is executed by a transaction.
- * 
- * @author thompsonbry
+ * An interface that may be used to learn when a {@link BTree} becomes
+ * dirty.
+ *  
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-abstract public class Condition {
-
-    public Condition() {
-    }
+public interface IDirtyListener {
 
     /**
-     * Test the state of the transaction.
+     * The btree has become dirty.
+     * <p>
+     * Note: This event is always generated for a new btree. Once a btree is
+     * created it remains dirty until the root (and any dirty children) have
+     * been flushed to the backing store. A btree that is read from the backing
+     * store is always clean and consists of "immutable" nodes and/or leaves. A
+     * btree remains clean until there is a write on some node or leaf. That
+     * write triggers copy-on-write, which percolates from the point of the
+     * write up to the root node and results in the reference to the root node
+     * being replaced.  When that happens a dirty event is generated.
      * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @exception RuntimeException
-     *                If the condition was violated.
+     * @param btree
+     *            The btree.
      */
-
-    abstract public void check(Tx tx);
-
+    public void dirtyEvent(BTree btree);
+    
 }

@@ -59,12 +59,15 @@ import com.bigdata.rawstore.IRawStore;
 public interface IAtomicStore extends IRawStore {
 
     /**
-     * Abandon the current write set (immediate, synchronous).
+     * Abandon the current write set (synchronous).
      */
     public void abort();
     
     /**
-     * Atomic commit (immediate, synchronous).
+     * Atomic commit (synchronous).
+     * <p>
+     * Note: if the commit fails (by throwing any kind of exception) then you
+     * MUST invoke {@link #abort()} to abandon the current write set.
      * 
      * @return The timestamp assigned to the {@link ICommitRecord} -or- 0L if
      *         there were no data to commit.

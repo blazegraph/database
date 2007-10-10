@@ -50,12 +50,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.DataService.NoSuchIndexException;
 
 /**
  * This class encapsulates access to the metadata and data services for a

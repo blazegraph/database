@@ -53,8 +53,8 @@ import java.util.concurrent.ExecutionException;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IResourceMetadata;
-import com.bigdata.service.DataService.NoSuchIndexPartitionException;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
@@ -151,7 +151,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
                         1, new byte[][] { new byte[] { 1 } });
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
+                if(!(ex.getCause() instanceof NoSuchIndexException)) {
+                    fail("Unexpected exception: "+ex, ex);
+                } else {
+                    log.info("Ignoring expected exception: "+ex);
+                }
             }
 
             try {
@@ -159,7 +163,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
                         1, new byte[][] { new byte[] { 1 } });
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
+                if(!(ex.getCause() instanceof NoSuchIndexException)) {
+                    fail("Unexpected exception: "+ex,ex);
+                } else {
+                    log.info("Ignoring expected exception: "+ex);
+                }
             }
 
             try {
@@ -169,7 +177,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
                 );
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
+                if(!(ex.getCause() instanceof NoSuchIndexException)) {
+                    fail("Unexpected exception: "+ex,ex);
+                } else {
+                    log.info("Ignoring expected exception: "+ex);
+                }
             }
 
             try {
@@ -178,7 +190,11 @@ public class TestDataServer0 extends AbstractServerTestCase {
                 );
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof NoSuchIndexPartitionException);
+                if(!(ex.getCause() instanceof NoSuchIndexException)) {
+                    fail("Unexpected exception: "+ex,ex);
+                } else {
+                    log.info("Ignoring expected exception: "+ex);
+                }
             }
 
         }

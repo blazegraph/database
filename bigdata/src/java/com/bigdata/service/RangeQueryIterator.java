@@ -53,7 +53,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
+import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -65,16 +65,16 @@ import com.bigdata.service.ClientIndexView.PartitionedRangeQuery;
  * @todo if unisolated or read-committed, then we may need to re-assess the
  *       toIndex during the query.
  * 
- * @todo this is derived from {@link PartitionedRangeQuery} and needs its own
+ * @todo this is derived from {@link PartitionedRangeQueryIterator} and needs its own
  *       test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RangeQuery implements IEntryIterator {
+public class RangeQueryIterator implements IEntryIterator {
     
     public static final transient Logger log = Logger
-            .getLogger(RangeQuery.class);
+            .getLogger(RangeQueryIterator.class);
 
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -203,7 +203,7 @@ public class RangeQuery implements IEntryIterator {
         
     }
     
-    public RangeQuery(IDataService dataService, String name, long tx,
+    public RangeQueryIterator(IDataService dataService, String name, long tx,
             byte[] fromKey, byte[] toKey, int capacity, int flags) {
 
         if (dataService == null) {

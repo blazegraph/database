@@ -280,10 +280,10 @@ public class Node extends AbstractNode implements INodeData {
     }
 
     /**
-     * This constructor is used when splitting the either the root {@link Leaf}
-     * or a root {@link Node}. The resulting node has a single child reference
-     * and NO keys.  The #of entries allocated to the child is the #of remaining
-     * in that child <em>after</em> the split.
+     * This constructor is used when splitting the a root {@link Leaf} or a root
+     * {@link Node}. The resulting node has a single child reference and NO
+     * keys. The #of entries allocated to the child is the #of remaining in that
+     * child <em>after</em> the split.
      * 
      * @param btree
      *            A mutable btree.
@@ -318,7 +318,16 @@ public class Node extends AbstractNode implements INodeData {
         /*
          * Replace the root node on the tree.
          */
+        
+        final boolean wasDirty = btree.root.dirty;
+        
         btree.root = this;
+        
+        if (!wasDirty) {
+            
+            btree.fireDirtyEvent();
+            
+        }
 
         /*
          * Attach the old root to this node.
@@ -2093,8 +2102,17 @@ public class Node extends AbstractNode implements INodeData {
                     System.err.println("this"); this.dump(Level.DEBUG,System.err);
                     System.err.println("lastChild"); lastChild.dump(Level.DEBUG,System.err);
                 }
+                
+                final boolean wasDirty = btree.root.dirty;
+                
                 // replace the root node with a root leaf.
                 btree.root = lastChild;
+                
+                if (!wasDirty) {
+                    
+                    btree.fireDirtyEvent();
+                    
+                }
                 
                 // clear the parent reference since this is now the root.
                 lastChild.parent = null;

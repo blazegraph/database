@@ -57,6 +57,7 @@ import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
@@ -66,45 +67,26 @@ import com.bigdata.rawstore.IRawStore;
  * for each index partition mapped onto that data service. The class extends
  * {@link UnisolatedBTree} to carry additional metadata for a specific index
  * partition (the partition identifier, left- and right-separator keys, etc).
+ * <p>
+ * Note: Having the partition metadata for mapped index partitions available
+ * locally means that we do not need to do a network operation in order to
+ * validate that a partition was mapped onto the {@link DataService} or to
+ * validate that a key lies within the key range of the partition.
+ * 
+ * @todo Overflow handling: Since the partition metadata is stored locally in
+ *       the btree metadata record, then we need to create a new btree each time
+ *       we overflow the journal. For this purpose, it would be nice if we did
+ *       not have to write out the empty root leaf as well. This means that on
+ *       overflow of a journal with 1000 mapped index partitions, that we need
+ *       to create 1000 btree metadata records just in case there is a write on
+ *       any of those partitions - and to be able to recovered the global
+ *       metadata index from the local state. Of couse, writing a 1000 records
+ *       on the journal is insanely fast so this could be no problem at all.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @todo write tests for restart safety of the partition metadata.
- * 
- * @todo provide optional range checking on keys.
- * 
- * FIXME The {@link UnisolatedBTree} is named according to a convention such as
- * "name#partitionId" (since this is a key it would be nice if the btree name
- * came across as an unsigned byte[] so that we can use the same key formation
- * conventions, but that will make error messages more cryptic since there will
- * only be the compressed sort key and the index UUID available locally).
- * <p>
- * If I extend the btree metadata record then I can include a fromKey/toKey
- * constraint and the rest of the partition metadata right there. The only
- * awkward bit then is the named indices map on overflow. We need the partition
- * metadata in order to know which journal resources and index segments comprise
- * the view of the partition. If that is only stored locally in the btree
- * metadata record, then we need to create a new btree each time we overflow the
- * journal. For this purpose, it would be nice if we did not have to write out
- * the empty root leaf as well. This means that on overflow of a journal with
- * 1000 mapped index partitions, that we need to create 1000 btree metadata
- * records just in case there is a write on any of those partitions - and to be
- * able to recovered the global metadata index from the local state. Of couse,
- * writing a 1000 records on the journal is insanely fast so this could be no
- * problem at all. Having the partition metadata for mapped index partitions
- * available locally also means that we do not need to do a network operation in
- * order to validate that a partition was mapped onto the {@link DataService}.
- * <p>
- * Another advantage of this approach is that we can create a thread pool for
- * index writers where the pool size is configured to limit the #of concurrent
- * writers to those sustainable by the host. Since each index partition is now a
- * distinct btree, we can write on any number of distinct index partitions
- * concurrently (up to the size of the thread pool). This could be great for a
- * many-core platform. Selecting operations to execute will require a
- * specialized executor service that tends to be fair but never chooses two
- * writes on the same index partition for concurrent execution (ie., the first
- * write for an index partition that is not currently being written on).
  */
 public class UnisolatedBTreePartition extends UnisolatedBTree {
 
@@ -161,6 +143,39 @@ public class UnisolatedBTreePartition extends UnisolatedBTree {
         
         return new PartitionedCounter(pmd.getPartitionId(), super.getCounter());
         
+    }
+    
+    
+    /**
+     * Verify that the key lies within the partition.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @exception RuntimeException
+     *                if the key does not lie within the partition.
+     */
+    public void rangeCheck(byte[] key) {
+
+        if(key==null) throw new IllegalArgumentException();
+
+        final byte[] leftSeparatorKey = pmd.getLeftSeparatorKey();
+
+        final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
+
+        if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
+
+            throw new RuntimeException("KeyBeforePartition");
+
+        }
+
+        if (rightSeparatorKey != null
+                && BytesUtil.compareBytes(key, rightSeparatorKey) >= 0) {
+
+            throw new RuntimeException("KeyAfterPartition");
+
+        }
+            
     }
     
     /**

@@ -132,20 +132,24 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Wait10ResourceTask<R extends Comparable<R>> extends AbstractResourceTask<R> {
+    public static class Wait10ResourceTask implements Callable<Object> {
 
-        Wait10ResourceTask(LockManager<R> db, R[] resource) {
-
-            super(db,resource);
-
-        }
-
-        protected Object run() throws Exception {
+        public Object call() throws Exception {
 
             synchronized (this) {
-                wait(10/* milliseconds */);
-            }
 
+                try {
+                    
+                    wait(10/* milliseconds */);
+                    
+                } catch (InterruptedException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+                
+            }
+            
             return null;
 
         }
@@ -158,15 +162,9 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class DeathResourceTask<R extends Comparable<R>> extends AbstractResourceTask<R> {
+    static class DeathResourceTask implements Callable<Object> {
 
-        DeathResourceTask(LockManager<R> db, R[] resource) {
-
-            super(db,resource);
-
-        }
-
-        protected Object run() throws Exception {
+        public Object call() throws Exception {
 
             throw new HorridTaskDeath();
 
@@ -180,7 +178,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class HorridTaskDeath extends Exception {
+    public static class HorridTaskDeath extends RuntimeException {
 
         /**
          * 
@@ -272,7 +270,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
 
             resources[i] = "resource" + i;
 
-            db.addResource(resources[i]);
+            assertTrue(db.addResource(resources[i]));
             
         }
 
@@ -325,15 +323,15 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
 
             }
 
-            final AbstractResourceTask<String> task;
+            final LockManagerTask<String> task;
             
             if(r.nextDouble()<percentTaskDeath) {
             
-                task = new DeathResourceTask<String>(db, resource);
+                task = new LockManagerTask<String>(db,resource,new DeathResourceTask());
                 
             } else {
                 
-                task = new Wait10ResourceTask<String>(db, resource);
+                task = new LockManagerTask<String>(db,resource,new Wait10ResourceTask());
                 
             }
             

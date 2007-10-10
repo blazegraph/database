@@ -108,6 +108,14 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
         
     }
 
+    public String[] getDirtyResource() {
+        
+        return EMPTY;
+        
+    }
+
+    private static transient final String[] EMPTY = new String[0];
+    
     /**
      * Return a read-only view of the named index with read-committed isolation.
      * 

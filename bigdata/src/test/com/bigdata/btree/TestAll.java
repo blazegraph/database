@@ -159,12 +159,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestCopyOnWrite.class );
         
         /*
-         * test atomic commit
+         * test persistence protocols. 
          */
         // test the commit protocol.
         suite.addTestSuite( TestCommit.class );
-        // verify that a store is restart-safe iff it commits.
-        suite.addTestSuite( TestRestartSafe.class );
+        // test the dirty event protocol.
+        suite.addTestSuite(TestDirtyListener.class);
         // test the close/reopen protocol for releasing index buffers.
         suite.addTestSuite( TestReopen.class );
 

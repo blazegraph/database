@@ -83,6 +83,12 @@ import com.bigdata.scaleup.JournalMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo modify the API to NOT use partitionId. Clients should just form the
+ *       name of the index partition using
+ *       {@link DataService#getIndexPartitionName(String, int)}. That makes all
+ *       of these methods equally useful for partitioned and unpartitioned
+ *       indices without having to worry about whether partitionId == -1.
+ * 
  * @todo add support for triggers. unisolated triggers must be asynchronous if
  *       they will take actions with high latency (such as writing on a
  *       different index partition, which could be remote). Low latency actions
@@ -164,7 +170,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            be used to initialize the index. For a partitioned index, this
      *            will include the partition metadata for that index partition.
      * 
-     * @return The object that would be returned by {@link #getIndex(String)}.
+     * @return <code>true</code> iff the index was created. <code>false</code>
+     *         means that the index was pre-existing, but the metadata specifics
+     *         for the index MAY differ from those specified.
      * 
      * @todo exception if index exists? or modify to validate consistent decl
      *       and exception iff not consistent.
@@ -212,44 +220,6 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-//    /**
-//     * Maps a <em>new</em> index partition onto the data service. This method
-//     * must be invoked before a client will be permitted to access the key range
-//     * for the index partition on the data service.
-//     * 
-//     * @param name
-//     *            The name of the scale-out index.
-//     * @param pmd
-//     *            The partition metadata.
-//     * 
-//     * @see #unmapPartition(String, int)
-//     * 
-//     * @todo When a new partition is created or destroyed that is a sibling of
-//     *       this partition then the data service needs to be notified so that
-//     *       it will update the partition definition.
-//     */
-//    public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
-//            throws IOException, InterruptedException, ExecutionException;
-//    
-//    /**
-//     * Unmaps an index partition from the data service. This method is invoked
-//     * under two circumstances: (1) the index partition is being deleted
-//     * following a join of two index partitions; and (2) the index partition is
-//     * being shed by the data service.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * @param partitionId
-//     *            The partition identifier (must be zero for an unpartitioned
-//     *            index).
-//     * 
-//     * @todo Review state machine for unmapping an index partition for (a) an
-//     *       index partition join; and (b) shedding an index partition (it must
-//     *       be picked up by a different data service).
-//     */
-//    public void unmapPartition(String name, int partitionId)
-//            throws IOException, InterruptedException, ExecutionException;
-    
     /**
      * <p>
      * Used by the client to submit a batch operation on a named B+Tree
@@ -346,7 +316,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * </p>
      * <p>
      * Note: Both the {@link ClientIndexView} (scale-out indicex) and
-     * {@link RangeQuery} (unpartitioned indices) provide iterators that
+     * {@link RangeQueryIterator} (unpartitioned indices) provide iterators that
      * encapsulate this method.
      * </p>
      * 
@@ -467,4 +437,42 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public Object submit(long tx, String name, int partitionId, IProcedure proc) throws InterruptedException,
             ExecutionException, IOException;
 
+//  /**
+//  * Maps a <em>new</em> index partition onto the data service. This method
+//  * must be invoked before a client will be permitted to access the key range
+//  * for the index partition on the data service.
+//  * 
+//  * @param name
+//  *            The name of the scale-out index.
+//  * @param pmd
+//  *            The partition metadata.
+//  * 
+//  * @see #unmapPartition(String, int)
+//  * 
+//  * @todo When a new partition is created or destroyed that is a sibling of
+//  *       this partition then the data service needs to be notified so that
+//  *       it will update the partition definition.
+//  */
+// public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
+//         throws IOException, InterruptedException, ExecutionException;
+// 
+// /**
+//  * Unmaps an index partition from the data service. This method is invoked
+//  * under two circumstances: (1) the index partition is being deleted
+//  * following a join of two index partitions; and (2) the index partition is
+//  * being shed by the data service.
+//  * 
+//  * @param name
+//  *            The index name.
+//  * @param partitionId
+//  *            The partition identifier (must be zero for an unpartitioned
+//  *            index).
+//  * 
+//  * @todo Review state machine for unmapping an index partition for (a) an
+//  *       index partition join; and (b) shedding an index partition (it must
+//  *       be picked up by a different data service).
+//  */
+// public void unmapPartition(String name, int partitionId)
+//         throws IOException, InterruptedException, ExecutionException;
+ 
 }

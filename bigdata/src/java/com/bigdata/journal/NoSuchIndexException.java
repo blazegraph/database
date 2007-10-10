@@ -42,61 +42,23 @@ Modifications:
 
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Oct 10, 2007
  */
 
-package com.bigdata.concurrent.locking;
+package com.bigdata.journal;
 
-import com.bigdata.concurrent.TestConcurrencyControl;
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
-/**
- * Aggregates tests in dependency order.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public class TestAll extends TestCase {
+public class NoSuchIndexException extends IllegalStateException {
 
     /**
      * 
      */
-    public TestAll() {
-    }
+    private static final long serialVersionUID = 6124193775040326194L;
 
     /**
-     * @param arg0
+     * @param message The index name.
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public NoSuchIndexException(String message) {
+        super(message);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite(TestAll.class.getPackage().getName());
-
-        suite.addTestSuite(TestDeadlock.class);
-
-        /*
-         * @todo There is problem running some of these tests. The problem is
-         * likely that Schedule is not compatible with the ResourceQueue class
-         * since it was developed for a different implementation of a resource
-         * queue and has not really been tested in this context.
-         */
-        
-//        suite.addTestSuite(TestSchedules.class);
-        suite.addTestSuite(TestConcurrencyControl.class);
-        
-        return suite;
-        
-    }
-    
 }

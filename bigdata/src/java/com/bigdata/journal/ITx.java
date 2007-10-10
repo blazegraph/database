@@ -217,4 +217,11 @@ public interface ITx extends IIndexStore {
      */
     public IIndex getIndex(String name);
     
+    /**
+     * Return an array of the resource(s) (the named indices) on which the
+     * transaction has written (the isolated index(s) that absorbed the writes
+     * for the transaction).
+     */
+    public String[] getDirtyResource();
+    
 }
