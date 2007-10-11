@@ -59,7 +59,7 @@ import com.bigdata.isolation.UnisolatedBTree;
 /**
  * Test suite for {@link SequenceTask}
  * 
- * @todo test that {@link SequenceTask#newSequence(AbstractIndexTask[])}
+ * @todo test that {@link SequenceTask#newSequence(AbstractTask[])}
  *       produces the expected data and correctly rejects tasks that are
  *       not compatible.
  * 
@@ -106,14 +106,15 @@ public class TestSequenceTask extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
+        final UUID indexUUID = UUID.randomUUID();
+        
         Future<Object> future = journal.submit(SequenceTask.newSequence(
                 
-                new AbstractIndexTask[] {
+                new AbstractTask[] {
 
                 new RegisterIndexTask(journal, resource[0],
-                                        new UnisolatedBTree(journal, UUID
-                                                .randomUUID())),
-                new AbstractIndexTask(journal,
+                                        new UnisolatedBTree(journal, indexUUID)),
+                new AbstractTask(journal,
                         ITx.UNISOLATED, false/*readOnly*/, resource) {
 
                     /**
@@ -134,7 +135,7 @@ public class TestSequenceTask extends ProxyTestCase {
         // the test task returns the resource as its value.
         assertEquals("result", //
                 new Object[] {//
-                Boolean.TRUE,//
+                indexUUID,//
                 resource[0] //
                 },//
                 (Object[]) future.get() //
@@ -181,16 +182,17 @@ public class TestSequenceTask extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
+        final UUID indexUUID = UUID.randomUUID();
+        
         Future<Object> future = journal.submit(SequenceTask.newSequence(
                 
-                new AbstractIndexTask[] {
+                new AbstractTask[] {
 
                 new RegisterIndexTask(journal, resource[0],
-                                        new UnisolatedBTree(journal, UUID
-                                                .randomUUID())),
+                                        new UnisolatedBTree(journal, indexUUID)),
 
 
-                new AbstractIndexTask(journal,
+                new AbstractTask(journal,
                         ITx.UNISOLATED, false/*readOnly*/, resource) {
 
                     /**
@@ -209,7 +211,7 @@ public class TestSequenceTask extends ProxyTestCase {
                 
                 },
                                                 
-                new AbstractIndexTask(journal,
+                new AbstractTask(journal,
                         ITx.UNISOLATED, false/*readOnly*/, resource) {
 
                     /**
@@ -230,7 +232,7 @@ public class TestSequenceTask extends ProxyTestCase {
 
         // the test task returns the resource as its value.
         assertEquals("result", new Object[] {//
-                Boolean.TRUE,//
+                indexUUID,//
                 Integer.valueOf(5),//
                 resource[0] //
                 },//

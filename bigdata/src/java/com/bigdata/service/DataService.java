@@ -67,7 +67,7 @@ import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.AbstractIndexTask;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
@@ -78,7 +78,7 @@ import com.bigdata.scaleup.ResourceState;
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
  * started using the {@link DataServer} class. Operations are submitted using
- * {@link ConcurrentJournal#submit(AbstractIndexTask)} and will run with the
+ * {@link ConcurrentJournal#submit(AbstractTask)} and will run with the
  * appropriate concurrency controls as imposed by that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -715,7 +715,7 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class BatchTask extends AbstractIndexTask {
+    static protected class BatchTask extends AbstractTask {
         
         private final IBatchOperation op;
         
@@ -796,7 +796,7 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class RangeCountTask extends AbstractIndexTask {
+    static protected class RangeCountTask extends AbstractTask {
 
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -825,7 +825,7 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class RangeQueryTask extends AbstractIndexTask {
+    static protected class RangeQueryTask extends AbstractTask {
 
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -866,7 +866,7 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class ProcedureTask extends AbstractIndexTask {
+    static protected class ProcedureTask extends AbstractTask {
         
         protected final IProcedure proc;
         

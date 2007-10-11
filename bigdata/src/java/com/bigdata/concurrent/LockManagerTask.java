@@ -52,7 +52,6 @@ import java.util.concurrent.Callable;
 
 import org.CognitiveWeb.concurrent.locking.DeadlockException;
 import org.CognitiveWeb.concurrent.locking.TimeoutException;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.TestConcurrencyControl.HorridTaskDeath;
@@ -197,11 +196,19 @@ public class LockManagerTask<R extends Comparable<R>> implements
      * @exception TimeoutException
      *                if the locks could not be acquired (last exception
      *                encountered only).
+     * @exception InterruptedException
+     *                if the current thread is interrupted.
      */
     private void acquireLocks() throws Exception {
 
         for (int i = 0; i < maxLockTries; i++) {
 
+            if(Thread.interrupted()) {
+                
+                throw new InterruptedException();
+                
+            }
+            
             try {
 
                 // Request resource lock(s).
@@ -243,6 +250,8 @@ public class LockManagerTask<R extends Comparable<R>> implements
      * 
      * @throws Exception
      *             if something goes wrong.
+     * @throws InterruptedException
+     *             if the current thread is interrupted.
      */
     final public Object call() throws Exception {
 
@@ -304,6 +313,12 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             log.info(toString() + ": run - start");
 
+            if(Thread.interrupted()) {
+                
+                throw new InterruptedException();
+                
+            }
+            
             final Object ret = target.call();
 
             // done "running".
@@ -332,11 +347,11 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             // An unexpected error.
 
-            if(log.getLevel().isGreaterOrEqual(Level.ERROR)) {
+//            if(log.getLevel().isGreaterOrEqual(Level.ERROR)) {
                 
                 log.error("Problem running task: " + this, t);
                 
-            }
+//            }
 
             lockManager.didAbort(this, t, false /* NOT waiting */);
 

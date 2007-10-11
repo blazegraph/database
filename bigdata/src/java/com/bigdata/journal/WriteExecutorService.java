@@ -66,8 +66,8 @@ import com.bigdata.btree.BTree;
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrentJournal} to
  * execute concurrent unisolated write tasks and perform group commits. Tasks
- * extend {@link AbstractIndexTask}. The caller receives a {@link Future} when
- * they submit a task to the write service. That {@link Future} is NOT available
+ * extend {@link AbstractTask}. The caller receives a {@link Future} when they
+ * submit a task to the write service. That {@link Future} is NOT available
  * until the next group commit following the successful execution of the write
  * task.
  * <p>
@@ -100,13 +100,8 @@ import com.bigdata.btree.BTree;
  * since the state of the {@link BTree} has been changed as a side effect in a
  * non-reversable manner.
  * 
- * @todo how can we indicate that the tasks could be retried?
- * 
- * @todo test behavior of tasks when interrupted. make sure that resource locks
- *       are released and that the task exits quickly. this means that we can't
- *       be trapping the InterruptedException anywhere - and also that we need
- *       to test isInterrupted() in the B+Tree operations (especially for
- *       writes) so that the thread will notice that it has been interrupted!
+ * @todo compute and make available the average latency waiting for the
+ *       {@link #allquiet} and for the commit procedure itself.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -269,12 +264,12 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     }
 
     /**
-     * Executed before {@link AbstractIndexTask#doTask()}
+     * Executed before {@link AbstractTask#doTask()}
      * 
      * @param t
      *            The thread in which that task will execute.
      * @param r
-     *            The {@link Runnable} wrapping the {@link AbstractIndexTask} -
+     *            The {@link Runnable} wrapping the {@link AbstractTask} -
      *            this is actually a {@link FutureTask}. See
      *            {@link AbstractExecutorService}
      */
@@ -295,13 +290,13 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     }
     
     /**
-     * This is executed after {@link AbstractIndexTask#doTask()}. If the
+     * This is executed after {@link AbstractTask#doTask()}. If the
      * conditions are satisified for a group commit, then one is executed in the
      * current thread. Otherwise it causes the write task to await the
      * {@link #commit} signal from the next {@link #groupCommit()}.
      * 
      * @param r
-     *            The {@link Callable} wrapping the {@link AbstractIndexTask}.
+     *            The {@link Callable} wrapping the {@link AbstractTask}.
      * @param t
      *            The exception thrown -or- <code>null</code> if the task
      *            completed successfully.
@@ -581,13 +576,11 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
                 
             }
             
-            log.info("Will do group commit");
+            log.info("Will do group commit: nrunning="+nrunning);
             
             // notify the write service that new tasks MAY NOT run.
             pause();
 
-            log.info("nrunning="+nrunning+", nwrites="+nwrites);
-            
             // wait for active tasks to complete.
             
             final long begin = System.currentTimeMillis();
@@ -673,7 +666,8 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
 
             }
 
-            log.info("All quiet");
+            // at this point nwrites is the size of the commit group.
+            log.info("All quiet: commit group size="+nwrites);
             
             // commit the store.
             commit();

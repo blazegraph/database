@@ -53,7 +53,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.journal.AbstractIndexTask;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.scaleup.IPartitionMetadata;
@@ -500,7 +500,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class RegisterMetadataIndexWithPartitionsTask extends AbstractIndexTask {
+    protected class RegisterMetadataIndexWithPartitionsTask extends AbstractTask {
 
         // the name of the index as specified by the caller.
         final private String name; 
@@ -764,7 +764,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class RegisterMetadataIndexTask extends AbstractIndexTask {
+    protected class RegisterMetadataIndexTask extends AbstractTask {
 
         final private String name;
         final private UUID[] dataServiceUUIDs;
@@ -978,7 +978,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class CreateIndexPartitionTask extends AbstractIndexTask {
+    protected class CreateIndexPartitionTask extends AbstractTask {
 
         final private String name;
         

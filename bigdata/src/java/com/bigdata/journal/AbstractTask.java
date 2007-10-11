@@ -52,6 +52,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
@@ -88,35 +90,25 @@ import com.bigdata.isolation.IIsolatedIndex;
  * index(s). When more than one named index is used, the locks are used to infer
  * a partial ordering of the writers allowing as much concurrency as possible.
  * Pre-declaration of locks allows us to avoid deadlocks in the lock system.
- * 
- * FIXME In order to allow concurrent tasks to do work on the same transaction
- * we need to use a per-transaction {@link LockManager} to produce a partial
- * order that governs access to the isolated (vs mutable unisolated) indices
- * accessed by that transaction.
  * <p>
- * Make sure that the {@link TemporaryStore} supports an appropriate level of
- * concurrency to allow concurrent writers on distinct isolated indices that are
- * being buffered on that store for a given transaction.
+ * Note: Use a distinct instance of this task each time you
+ * {@link ConcurrentJournal#submit(AbstractTask)} it!
  * 
- * @todo Should it be possible to start/commit/abort a transaction from within
- *       an {@link AbstractIndexTask}? Only on the local journal? When the
- *       transaction manager is distributed? (I think not, certainly not when
- *       the tx is distributed and there is no need to handle start/stop of a
- *       local tx in this manner since you can just use unisolated reads or
- *       writes instead and have atomicity.)
- * 
- * @todo write a task design to support 1-phase commit (for a transaction that
- *       ran on a single journal) and 2/3-phase commit of transactions (for a
+ * @todo write a task design to support 12/3-phase commit of transactions (for a
  *       transaction whose write sets are distributed across multiple journals).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractIndexTask implements Callable<Object> {
+public abstract class AbstractTask implements Callable<Object> {
 
-    static protected final Logger log = Logger
-            .getLogger(AbstractIndexTask.class);
+    static protected final Logger log = Logger.getLogger(AbstractTask.class);
 
+    /**
+     * Used to protect against re-submission of the same task object.
+     */
+    private final AtomicBoolean submitted = new AtomicBoolean(false);
+    
     /**
      * The journal against which the operation will be carried out.
      */
@@ -189,7 +181,7 @@ public abstract class AbstractIndexTask implements Callable<Object> {
      *            exclusive lock will be requested on the named resource and
      *            the task will NOT run until it has obtained that lock.
      */
-    protected AbstractIndexTask(ConcurrentJournal journal, long startTime,
+    protected AbstractTask(ConcurrentJournal journal, long startTime,
             boolean readOnly, String resource) {
         
         this(journal,startTime,readOnly,new String[]{resource});
@@ -212,7 +204,7 @@ public abstract class AbstractIndexTask implements Callable<Object> {
      *            resource and the task will NOT run until it has obtained those
      *            lock(s).
      */
-    protected AbstractIndexTask(ConcurrentJournal journal, long startTime,
+    protected AbstractTask(ConcurrentJournal journal, long startTime,
             boolean readOnly, String[] resource) {
 
         if (journal == null)
@@ -262,8 +254,8 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
             if (tx.isReadOnly() != readOnly) {
 
-                throw new IllegalArgumentException("tx.readOnly="
-                        + tx.isReadOnly() + ", but task declares readOnly="
+                throw new IllegalArgumentException("Tx readOnly="
+                        + tx.isReadOnly() + ", but task readOnly="
                         + readOnly);
                 
             }
@@ -373,71 +365,6 @@ public abstract class AbstractIndexTask implements Callable<Object> {
     abstract protected Object doTask() throws Exception;
 
     /**
-     * Coordinates with the {@link LockManager} and the
-     * {@link WriteServiceExecutor}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    class InnerCallable implements Callable<Object> {
-
-        InnerCallable() { }
-
-        /**
-         * Note: If there is only a single writer thread then the lock
-         * system essentially does nothing. When there are multiple writer
-         * threads the lock system imposes a partial ordering on the writers
-         * that ensures that writes on a given named index are
-         * single-threaded and that deadlocks do not prevent tasks from
-         * progressing.
-         */
-        public Object call() throws Exception {
-
-            WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
-
-            writeService.beforeTask(Thread.currentThread(), this);
-
-            boolean ran = false;
-
-            try {
-
-                final Object ret = doTask();
-
-                ran = true;
-
-                /*
-                 * Note: I am choosing NOT to flush dirty indices to the store
-                 * in case other tasks in the same commit group want to write on
-                 * the same index.
-                 */
-                
-                writeService.afterTask(this, null);
-
-                return ret;
-
-            } catch (Throwable t) {
-
-                if (!ran) {
-
-                    // Do not re-invoke it afterTask failed above.
-
-                    writeService.afterTask(this, t);
-
-                }
-
-                if (t instanceof Exception)
-                    throw (Exception) t;
-
-                throw new RuntimeException(t);
-
-            }
-
-        }
-
-    }
-
-    /**
      * Delegates the task behavior to {@link #doTask()}.
      * <p>
      * For an unisolated operation, this method provides safe commit iff the
@@ -452,13 +379,31 @@ public abstract class AbstractIndexTask implements Callable<Object> {
      */
     final public Object call() throws Exception {
 
+        if (!submitted.compareAndSet(false, true)) {
+
+            throw new ResubmitException(getClass().getName());
+            
+        }
+        
         try {
             
             if (isolated) {
 
                 log.info("Running isolated operation: tx="+startTime);
                 
-                return doTask();
+                if(tx.isReadOnly()) {
+
+                    return doTask();
+
+                }
+                
+                /*
+                 * Delegate handles handshaking for writable transactions.
+                 */
+
+                Callable<Object> delegate = new InnerTxServiceCallable(tx);
+                
+                return delegate.call();
 
             }
 
@@ -499,7 +444,7 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
                 // delegate will handle lock acquisition.
                 Callable<Object> delegate = new LockManagerTask<String>(
-                        lockManager, resource, new InnerCallable());
+                        lockManager, resource, new InnerWriteServiceCallable());
                 
                 /*
                  * Note: The lock(s) are only held during this call. By the time
@@ -526,7 +471,11 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
                 Object ret = delegate.call();
 
-                /* Note: The WriteServiceExecutor will await a commit signal before the thread is allowed to complete.  This ensures that the caller waits until a commit (or an abort). */ 
+                /*
+                 * Note: The WriteServiceExecutor will await a commit signal
+                 * before the thread is allowed to complete. This ensures that
+                 * the caller waits until a commit (or an abort).
+                 */ 
                 
                 return ret;
                 
@@ -538,6 +487,127 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
         }
         
+    }
+
+    /**
+     * FIXME handles within transaction lock acquisition (for contention on the
+     * same _isolated_ index).
+     * 
+     * FIXME take note of which indices the transaction actually _writes_ on and
+     * then inform the transaction manager which needs to keep track of that
+     * information.
+     * 
+     * FIXME In order to allow concurrent tasks to do work on the same
+     * transaction we need to use a per-transaction {@link LockManager} to
+     * produce a partial order that governs access to the isolated (vs mutable
+     * unisolated) indices accessed by that transaction.
+     * <p>
+     * Make sure that the {@link TemporaryStore} supports an appropriate level
+     * of concurrency to allow concurrent writers on distinct isolated indices
+     * that are being buffered on that store for a given transaction.
+     * 
+     * @todo do we always inform the transaction manager or only after the
+     *       commit when we know that the "writes" took?
+     * 
+     * @todo do we force the abort of a transaction if any task in that
+     *       transaction fails? if we do not abort then we can have partial
+     *       writes on the isolated indices, which is very bad. So we either
+     *       have to checkpoint the isolated indices with the group commit on
+     *       the store so that we can reload from the last metadata address for
+     *       an isolated index on abort or we have to abort the entire tx if any
+     *       task in the tx fails (at least for a writable transaction).
+     */
+    class InnerTxServiceCallable implements Callable<Object> {
+
+        final ITx tx;
+        
+        InnerTxServiceCallable(ITx tx) {
+            
+            if (tx == null)
+                throw new IllegalArgumentException();
+            
+            this.tx = tx;
+            
+        }
+
+        /**
+         * Wraps up the execution of {@link AbstractTask#doTask()}.
+         */
+        public Object call() throws Exception {
+
+            // invoke on the outer class.
+
+            return doTask();
+            
+        }
+        
+    }
+    
+    /**
+     * Coordinates with the {@link LockManager} and the
+     * {@link WriteServiceExecutor}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    class InnerWriteServiceCallable implements Callable<Object> {
+
+        InnerWriteServiceCallable() { }
+
+        /**
+         * Note: If there is only a single writer thread then the lock
+         * system essentially does nothing. When there are multiple writer
+         * threads the lock system imposes a partial ordering on the writers
+         * that ensures that writes on a given named index are
+         * single-threaded and that deadlocks do not prevent tasks from
+         * progressing.
+         */
+        public Object call() throws Exception {
+
+            WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
+
+            writeService.beforeTask(Thread.currentThread(), this);
+
+            boolean ran = false;
+
+            try {
+
+                // invoke on the outer class.
+                
+                final Object ret = doTask();
+
+                ran = true;
+
+                /*
+                 * Note: I am choosing NOT to flush dirty indices to the store
+                 * in case other tasks in the same commit group want to write on
+                 * the same index.
+                 */
+                
+                writeService.afterTask(this, null);
+
+                return ret;
+
+            } catch (Throwable t) {
+
+                if (!ran) {
+
+                    // Do not re-invoke it afterTask failed above.
+
+                    writeService.afterTask(this, t);
+
+                }
+
+                if (t instanceof Exception)
+                    throw (Exception) t;
+
+                throw new RuntimeException(t);
+
+            }
+
+        }
+
     }
 
     /**
@@ -681,4 +751,30 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
     }
 
+    /**
+     * This is thrown if you attempt to reuse (re-submit) the same
+     * {@link AbstractTask} instance.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ResubmitException extends RejectedExecutionException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -8661545948587322943L;
+        
+        public ResubmitException() {
+            super();
+        }
+        
+        public ResubmitException(String msg) {
+            
+            super(msg);
+            
+        }
+
+    }
+    
 }

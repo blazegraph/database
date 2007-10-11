@@ -51,7 +51,7 @@ import java.io.Serializable;
 
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IReadOnlyOperation;
-import com.bigdata.journal.AbstractIndexTask;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.Journal;
 
 /**
@@ -70,7 +70,7 @@ import com.bigdata.journal.Journal;
  * that operation without unreasonable knowledge of the location of index
  * partitions throughout the federation. People requiring those semantics who
  * are operating against an embedded {@link Journal} can trivially realize them
- * by extending {@link AbstractIndexTask}.
+ * by extending {@link AbstractTask}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
