@@ -87,10 +87,10 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @todo create ring buffers to track the serialized size of the last 50 nodes
  *       and leaves so that we can estimate the serialized size of the total
- *       btree based on recent activity.  we could use a moving average and 
- *       persist it as part of the btree metadata.  this could be used when
- *       making a decision to evict a btree vs migrate it onto a new journal
- *       and whether to split or join index segments during a journal overflow
+ *       btree based on recent activity. we could use a moving average and
+ *       persist it as part of the btree metadata. this could be used when
+ *       making a decision to evict a btree vs migrate it onto a new journal and
+ *       whether to split or join index segments during a journal overflow
  *       event.
  * 
  * @todo Modify the values in the tree to be variable length byte[]s. This will
@@ -131,8 +131,7 @@ import com.bigdata.rawstore.IRawStore;
  *       and IO costs of having multiple concurrent transactions running on the
  *       same journal.
  * 
- * @todo drop the jdbm-based btree implementation in favor of this one and test
- *       out a GOM integration. this will also require an extser service /
+ * @todo test a GOM integration. this will also require an extser service /
  *       index. extser support could be handled using an extensible metadata
  *       record for the {@link BTree} or {@link IndexSegment}, at least for an
  *       embedded database scenario. http://xstream.codehaus.org/ is also an
@@ -166,21 +165,8 @@ import com.bigdata.rawstore.IRawStore;
  *       perfect index range segments so that we know how to decompress blocks,
  *       deserialize keys and values, and compare keys.
  * 
- * @todo model out the metadata index design to locate the components of an
- *       index key range. this will include the journal on which writes for the
- *       key range are multiplexed with other key ranges on either the same or
- *       other indices, any frozen snapshot of a journal that is being processed
- *       into index segment files, and those index segment files themselves. if
- *       a key range is always mapped (multiplexed) to a process on a host, then
- *       the historical journal snapshots and index key range files can be
- *       managed by the host rather than showing up in the metadata index
- *       directly.
- * 
- * @todo support column store style indices key := (key, column, timestamp),
- *       locality groups that partition the key space so that we can fully
- *       buffer parts of the index that matter, automated version history
- *       policies that expire old values based on either an external timestamp
- *       or write time on the server.
+ * @todo automated version history policies that expire old values based on
+ *       either an external timestamp or write time on the server.
  * 
  * @todo support key range iterators that allow concurrent structural
  *       modification. structural mutations in a b+tree are relatively limited.
@@ -215,7 +201,10 @@ import com.bigdata.rawstore.IRawStore;
  *       references. <br>
  *       The first step is to start maintaining those references. Also, consider
  *       that it may be useful to maintain them at the node as well as the leaf
- *       level.
+ *       level.<br>
+ *       If this is done, also check {@link Thread#isInterrupted()} and throw an
+ *       exception when true to support fast abort of scans. See
+ *       {@link Node#getChild(int)}.
  * 
  * @todo pre-fetch leaves for range scans? this really does require asynchronous
  *       IO, which is not available for many platforms (it is starting to show
@@ -488,7 +477,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         }
         
     }
-    
+
     /**
      * Load an existing B+Tree from the store.
      * 
@@ -710,73 +699,44 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         return new BTreeMetadata(this);
         
     }
-
-//    /**
-//     * Used to (en|dis)able auto-commit.
-//     * <p>
-//     * Note: If you disabled auto-commit you MUST explicitly invoke
-//     * {@link #write()} in order to update the metadata record before the
-//     * current state of the {@link BTree} can become restart safe using a commit
-//     * protocol built with {@link #handleCommit()}. The primary reason to
-//     * disable auto-commit is to ensure that concurrent writes on distinct
-//     * {@link BTree}s backed by the same store do not result in their becoming
-//     * restart safe if the store performs an atomic commit until each writer has
-//     * explicitly indicated that it has reached a checkpoint by calling
-//     * {@link #write()}.
-//     * 
-//     * @param newValue
-//     *            The new value.
-//     * 
-//     * @return The old value.
-//     * 
-//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
-//     *             support of group commit. If auto-commit is not required for
-//     *             this purpose then it will be removed.
-//     */
-//    public boolean setAutoCommit(boolean newValue) {
-//
-//        boolean tmp = autoCommit;
-//        
-//        autoCommit = newValue;
-//        
-//        log.info("autoCommit="+newValue);
-//        
-//        return tmp;
-//        
-//    }
-//
-//    /**
-//     * Return true iff auto-commit is enabled (default true). When auto-commit
-//     * is disabled {@link #handleCommit()} ALWAYS returns the last written
-//     * metadata record.
-//     * 
-//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
-//     *             support of group commit. If auto-commit is not required for
-//     *             this purpose then it will be removed.
-//     */
-//    public boolean isAutoCommit() {
-//
-//        return autoCommit;
-//        
-//    }
-//    
-//    /**
-//     * @deprecated Auto-commit is a feature whose utility is being evaluated in
-//     *             support of group commit. If auto-commit is not required for
-//     *             this purpose then it will be removed.
-//     */
-//    private boolean autoCommit = true;
-//    
-//    * <li> autocommit is turned off and the btree has not been marked for
-//    * commit </li>
     
     /**
-     * Handle request for a commit by {@link #write()}ing dirty nodes and
-     * leaves onto the store, writing a new metadata record, and returning the
-     * address of that metadata record.
+     * True iff the BTree is dirty.
+     */
+    public boolean isDirty() {
+
+        return root != null && root.dirty;
+
+    }
+    
+    /**
+     * Return true iff the state of this B+Tree has been modified since the
+     * state associated with a given metadata address.
+     * 
+     * @param metadataAddr
+     *            The historical metadata address for this B+Tree.
+     * 
+     * @return true iff the B+Tree has been modified since the identified
+     *         historical version.
+     * 
+     * @see #getMetadata()
+     * @see BTreeMetadata#getMetadataAddr()
+     * 
+     * @todo this test might not work with overflow() handling since the
+     *       metadata addresses would be independent in each store file.
+     */
+    public boolean modifiedSince(long metadataAddr) {
+        
+        return needsWrite() || metadata.getMetadataAddr() != metadataAddr;
+        
+    }
+
+    /**
+     * Return true if the B+Tree needs to be flushed to the backing store using
+     * {@link #write()}.
      * <p>
-     * Note: In order to avoid needless writes the existing metadata record is
-     * always returned if:
+     * Note: In order to avoid needless writes this method will return
+     * <code>false</code> if:
      * <ol>
      * <li> the metadata record is defined (it is not defined when a btree is
      * first created) -AND- </li>
@@ -790,33 +750,51 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * current in this case).</li>
      * </ol>
      * 
+     * @return <code>true</code> true iff changes would be lost unless the
+     *         B+Tree was flushed to the backing store using {@link #write()}.
+     */
+    public boolean needsWrite() {
+
+        boolean nochanges = metadata != null
+                && (root == null || !root.dirty
+                        && metadata.getRootAddr() == root.getIdentity()
+                        && metadata.getCounter() == counter);
+
+        return !nochanges;
+     
+    }
+    
+    /**
+     * Handle request for a commit by {@link #write()}ing dirty nodes and
+     * leaves onto the store, writing a new metadata record, and returning the
+     * address of that metadata record.
+     * <p>
+     * Note: In order to avoid needless writes the existing metadata record is
+     * always returned if {@link #needsWrite()} is <code>false</code>.
+     * 
      * @return The address of a metadata record from which the btree may be
      *         reloaded.
      */
     public long handleCommit() {
 
-        if ( metadata != null
-                && (root == null || !root.dirty
-                        && metadata.getRootAddr() == root.getIdentity()
-                        && metadata.getCounter() == counter
-                    )
-             ) {
+        if (needsWrite()) {
 
             /*
-             * There have not been any writes on this btree or auto-commit is
-             * disabled.
+             * Flush the btree, write its metadata record, and return the
+             * address of that metadata record. The [metadata] reference is also
+             * updated.
              */
-            
-            return metadata.addrMetadata;
-            
+
+            return write();
+
         }
-        
+
         /*
-         * Flush the btree, write its metadata record, and return the address of
-         * that metadata record. The [metadata] reference is also updated.
+         * There have not been any writes on this btree or auto-commit is
+         * disabled.
          */
-        
-        return write();
+
+        return metadata.addrMetadata;
         
     }
     

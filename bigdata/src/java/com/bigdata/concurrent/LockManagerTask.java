@@ -52,6 +52,7 @@ import java.util.concurrent.Callable;
 
 import org.CognitiveWeb.concurrent.locking.DeadlockException;
 import org.CognitiveWeb.concurrent.locking.TimeoutException;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.TestConcurrencyControl.HorridTaskDeath;
@@ -331,8 +332,11 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             // An unexpected error.
 
-            TestConcurrencyControl.log
-                    .error("Problem running task: " + this, t);
+            if(log.getLevel().isGreaterOrEqual(Level.ERROR)) {
+                
+                log.error("Problem running task: " + this, t);
+                
+            }
 
             lockManager.didAbort(this, t, false /* NOT waiting */);
 

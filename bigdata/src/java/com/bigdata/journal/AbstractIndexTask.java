@@ -51,6 +51,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
@@ -259,6 +260,14 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
             }
 
+            if (tx.isReadOnly() != readOnly) {
+
+                throw new IllegalArgumentException("tx.readOnly="
+                        + tx.isReadOnly() + ", but task declares readOnly="
+                        + readOnly);
+                
+            }
+            
         } else {
 
             /*
@@ -334,9 +343,20 @@ public abstract class AbstractIndexTask implements Callable<Object> {
      * Implement the task behavior here.
      * <p>
      * Note: Long-running implementations MUST periodically test
-     * {@link Thread#interrupted()} and throw an {@link InterruptedException} if
-     * they are interrupted. This behavior allows tasks to be cancelled in a
-     * timely manner.
+     * {@link Thread#interrupted()} and MUST throw an exception, such as
+     * {@link InterruptedException}, if they are interrupted. This behavior
+     * allows tasks to be cancelled in a timely manner.
+     * <p>
+     * If you ignore or fail to test {@link Thread#interrupted()} then your task
+     * CAN NOT be aborted. If it is {@link Future#cancel(boolean)} with
+     * <code>false</code> then the task will run to completion even though it
+     * has been cancelled (but the {@link Future} will appear to have been
+     * cancelled).
+     * <p>
+     * If you simply <code>return</code> rather than throwing an exception
+     * then the {@link WriteExecutorService} will assume that your task
+     * completed and your (partial) results will be made restart-safe at the
+     * next commit!
      * 
      * @return The object that will be returned by {@link #call()} iff the
      *         operation succeeds.
@@ -344,6 +364,11 @@ public abstract class AbstractIndexTask implements Callable<Object> {
      * @throws Exception
      *             The exception that will be thrown by {@link #call()} iff the
      *             operation fails.
+     * 
+     * @exception InterruptedException
+     *                This exception SHOULD be thrown if
+     *                {@link Thread#interrupted()} becomes true during
+     *                execution.
      */
     abstract protected Object doTask() throws Exception;
 
@@ -381,6 +406,12 @@ public abstract class AbstractIndexTask implements Callable<Object> {
 
                 ran = true;
 
+                /*
+                 * Note: I am choosing NOT to flush dirty indices to the store
+                 * in case other tasks in the same commit group want to write on
+                 * the same index.
+                 */
+                
                 writeService.afterTask(this, null);
 
                 return ret;

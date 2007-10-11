@@ -101,6 +101,11 @@ import com.sun.jini.tool.ClassServer;
  * -Djava.security.policy=policy.all -Dbigdata.test.port=8082 -Djava.rmi.server.codebase=http://localhost:8082
  * </pre>
  * 
+ * You can enable NIO using:
+ * <pre>
+ * -Dcom.sun.jini.jeri.tcp.useNIO=true
+ * </pre>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -253,6 +258,10 @@ public abstract class AbstractServerTestCase extends TestCase2 {
              * the lib directory (or some other directory below the current
              * working directory, but not ant-build since that gives the ant
              * script fits).
+             * 
+             * I still see a ClassNotFound problem in the Jini console complaining
+             * that it can not find IDataService, but only when I select the 
+             * registrar on which the services are running!
              */
 //            +
 //            "bin"

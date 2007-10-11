@@ -70,7 +70,11 @@ import com.bigdata.rawstore.WormAddressManager;
  * the size of the next leaf so that it can be read out when the current leaf is
  * read out, i.e., as a int field outside of the serialized leaf record. We
  * could also do reverse order by serializing the addr of the prior leaf into
- * the leaf since it is always onhand.
+ * the leaf since it is always on hand.
+ * <p>
+ * If this is done, also check {@link Thread#isInterrupted()} and throw an
+ * exception when true to support fast abort of scans. See
+ * {@link Node#getChild(int)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

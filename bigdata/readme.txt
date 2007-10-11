@@ -45,3 +45,9 @@ JINI
   If you deploy a new version of any JAR, then you SHOULD delete the
   classes directory and redeploy all relevant JARs to make sure that
   old class files are not left lying around.
+
+- You can enable NIO support with JERI using TCP by specifying the
+  following property to the JVM.
+
+	-Dcom.sun.jini.jeri.tcp.useNIO=true
+

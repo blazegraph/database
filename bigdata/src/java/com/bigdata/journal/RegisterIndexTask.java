@@ -22,7 +22,7 @@ public class RegisterIndexTask extends AbstractIndexTask {
      * @param name
      * @param btree
      *            The index object. Use
-     *            <code>new UnisolatedBTree(journal, UUID.randomUUID()</code>
+     *            <code>new UnisolatedBTree(journal, UUID.randomUUID())</code>
      *            to register a new index that supports isolation.
      */
     public RegisterIndexTask(ConcurrentJournal journal, String name, IIndex btree) {

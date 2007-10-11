@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
+import org.apache.log4j.Logger;
+
 /**
  * An abstract base class that encapsulates the run state transitions and
  * constraints for transactions.
@@ -56,6 +58,8 @@ package com.bigdata.journal;
  */
 abstract public class AbstractTx implements ITx {
 
+    protected static final Logger log = Logger.getLogger(AbstractTx.class);
+    
     /*
      * Text for error messages.
      */
@@ -172,7 +176,11 @@ abstract public class AbstractTx implements ITx {
             throw new IllegalStateException();
         case Prepared:
         case Committed:
-            if(commitTime == 0L) throw new AssertionError();
+            /*
+             * Note: A committed tx will have a zero commit time if it was
+             * readOnly, readCommitted, or readWrite but did not write any data.
+             */
+//            if(commitTime == 0L) throw new AssertionError();
             return commitTime;
         }
         
@@ -266,7 +274,17 @@ abstract public class AbstractTx implements ITx {
 
         }
 
-        if (!readOnly) {
+        if (readOnly||isEmptyWriteSet()) {
+            
+            /*
+             * A read-only tx does not have a commit time. Likewise, we do not
+             * assign a commitTime to a readWrite transaction that does not
+             * write any data.
+             */
+
+            assert commitTime == 0L;
+            
+        } else {
 
             try {
 
@@ -300,19 +318,18 @@ abstract public class AbstractTx implements ITx {
 
             }
 
-        } else {
-            
-            // a read-only tx does not have a commit time.
-            assert commitTime == 0L;
-            
         }
-
+        
         journal.prepared(this);
 
         runState = RunState.Prepared;
         
     }
     
+    /**
+     * Note: This does NOT commit the backing store. That is handled by the
+     * {@link WriteExecutorService}.
+     */
     final public long commit() {
 
         if( ! isPrepared() ) {
@@ -353,8 +370,8 @@ abstract public class AbstractTx implements ITx {
 
                 mergeOntoGlobalState();
             
-                // Atomic commit.
-                journal.commitNow(commitTime);
+//                // Atomic commit.
+//                journal.commitNow(commitTime);
                 
             }
             
@@ -385,9 +402,11 @@ abstract public class AbstractTx implements ITx {
              * isolated btrees.
              */
 
-            journal.abort(); 
+//            journal.abort(); 
 
             abort();
+
+            if(t instanceof RuntimeException) throw (RuntimeException)t;
             
             throw new RuntimeException( t );
             

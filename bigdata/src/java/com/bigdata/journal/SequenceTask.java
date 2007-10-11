@@ -109,17 +109,17 @@ public class SequenceTask extends AbstractIndexTask {
     }
     
     /**
-     * Return a {@link List} comprising the individual results.
+     * Return an Object[] comprising the individual results.
      */
     protected Object doTask() throws Exception {
 
-        List<Object> ret = new ArrayList<Object>(tasks.length);
+        Object[] ret = new Object[tasks.length];
         
         for(int i=0; i<tasks.length; i++) {
             
             AbstractIndexTask task = tasks[i];
             
-            ret.add( task.doTask() );
+            ret[i] = task.doTask();
  
             if(Thread.interrupted()) {
                 

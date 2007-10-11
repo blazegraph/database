@@ -422,13 +422,41 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      *       MUST NOT allow concurrent transactions to assign the same object
      *       identifier. If this case is handled then all is well.
      */
-    public boolean validate(UnisolatedBTree globalScope /*current*/) {
+    public boolean validate(UnisolatedBTree groundState /*current*/) {
+
+        if(isEmptyWriteSet()) {
+            
+            // Nothing written on this isolated index.
+            
+            return true;
+            
+        }
+        
+        /*
+         * Do not validate this index unless the groundState has been modified
+         * since the readState for the transaction.
+         */
+        {
+
+            // Note: This is the state from which the transaction read.
+            UnisolatedBTree readState = getUnisolatedBTree();
+
+            if (!groundState.modifiedSince(readState.getMetadata()
+                    .getMetadataAddr())) {
+
+                // No changes to the unisolated index since the readState.
+                
+                return true;
+                
+            }
+
+        }
 
         /*
          * Note: Write-write conflicts can be validated iff a conflict resolver
          * was declared when the Journal object was instantiated.
          */
-        final IConflictResolver conflictResolver = globalScope.getConflictResolver();
+        final IConflictResolver conflictResolver = groundState.getConflictResolver();
 
         /*
          * The versions returned by the conflict resolver must be written on the
@@ -473,7 +501,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
             final byte[] key = (byte[]) itr.getKey();
 
             // Lookup the entry in the global scope.
-            Value baseEntry = (Value) globalScope.getValue(key);
+            Value baseEntry = (Value) groundState.getValue(key);
 
             /*
              * If there is an entry in the global scope, then we MUST compare the

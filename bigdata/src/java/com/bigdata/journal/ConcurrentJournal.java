@@ -52,11 +52,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
-import com.bigdata.service.DataService;
-import com.bigdata.service.RangeQueryIterator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -73,8 +73,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <dd>This is used for the "active" phrase of transaction. Transactions read
  * from historical states of named indices during their active phase and buffer
  * the results on isolated indices. Since transactions never write on the
- * unisolated indices during their "active" phase they may be run with arbitrary
- * concurrency. A transaction that requests a commit is scheduled using the
+ * unisolated indices during their "active" phase distinct transactions may be
+ * run with arbitrary concurrency. However, concurrent tasks for the same
+ * transaction must obtain an exclusive lock on the isolated index that is used
+ * to buffer their writes. A transaction that requests a commit using the
+ * {@link ITransactionManager} results in a task being submitted to the
  * {@link #writeService}. Transactions are selected to commit once they have
  * acquired a lock on the corresponding unisolated indices, thereby enforcing
  * serialization of their write sets both among other transactions and among
@@ -83,135 +86,23 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * <dt>{@link #readService}</dt>
  * <dd>Concurrent unisolated readers running against the <strong>historical</strong>
- * state of a named index.</dd>
+ * state of a named index. No locking is imposed. Concurrency is limited by the
+ * size of the thread pool, but large thread pools can reduce overall
+ * performance..</dd>
  * 
  * <dt>{@link #writeService}</dt>
  * <dd>Concurrent unisolated writers running against the <strong>current</strong>
- * state of (or more more) named index(s). This is also used to serialize the
- * commit phrase of transactions. Writers MUST predeclare their locks, which
- * allows us to avoid deadlocks altogether. </dd>
+ * state of (or more more) named index(s) (the "live" or "mutable" index(s)).
+ * The underlying {@link BTree} is NOT thread-safe. Therefore writers MUST
+ * predeclare their locks, which allows us to avoid deadlocks altogether. This
+ * is also used to schedule the commit phrase of transactions. </dd>
  * 
  * <dt>{@link #commitService}</dt>
  * <dd>Schedules periodic group commits. </dd>
  * 
  * <dt>{@link #statusService}</dt>
- * <dd>Periodically logs counters.</dd>
+ * <dd>Periodically {@link StatusTask#log}s counters.</dd>
  * </dl>
- * 
- * FIXME write more tests!
- * 
- * @todo the problem with running concurrent unisolated operations during a
- *       commit and relying on an "auto-commit" flag to indicate whether or not
- *       the index will participate is two fold. First, previous unisolated
- *       operations on the same index will not get committed if an operation is
- *       currently running, so we could wind up deferring check points of
- *       indices for quite a while. Second, if there is a problem with the
- *       commit and we have to abort, then the ongoing operations will be using
- *       unisolated indices that may include write sets that were discarded -
- *       this would make abort non-atomic.
- *       <P>
- *       The ground state from which an unisolated operation begins needs to
- *       evolve after each unisolated operation that reaches its commit point
- *       successfully. this can be acomplished by holding onto the btree
- *       reference, or even just the address at which the metadata record for
- *       the btree was last written.
- *       <p>
- *       However, if an unisolated write fails for any reason on a given index
- *       then we MUST use the last successful check point for that index.
- *       <p>
- *       Due to the way in which the {@link BTree} class is written, it "steals"
- *       child references when cloning an immutable node or leaf prior to making
- *       modifications. This means that we must reload the btree from a metadata
- *       record if we have to roll back due to an abort of some unisolated
- *       operation.
- *       <P>
- *       The requirement for global serialization of transactions may be relaxed
- *       only when it is known that the transaction writes on a limited set of
- *       data services, indices, or index partitions but it must obtain a lock
- *       on the appropriate resources before it may merge its write set onto the
- *       corresponding unisolated resources. Otherwise unisolated operations
- *       could be interleaved within a transaction commit and it would no longer
- *       be atomic.
- * 
- * @todo Verify proper partial ordering over transaction schedules by modifying
- *       {@link Journal} to extend this class and implement a correct
- *       transaction manager (runs tasks in parallel, then schedules their
- *       commits using a partial order).
- * 
- * @todo write test cases that submit various kinds of operations and verify the
- *       correctness of those individual operations. refactor the services
- *       package to do this, including things such as the
- *       {@link RangeQueryIterator}. this will help to isolate the correctness
- *       of the data service "api", including concurrency of operations, from
- *       the {@link DataService}.
- * 
- * @todo write test cases that attempt operations against a new journal (nothing
- *       committed) and verify that we see {@link NoSuchIndexException}s rather
- *       than something odder.
- * 
- * @todo Verify that you can cancel a submitted task using the returned
- *       {@link Future} when the task is either (a) still in the queue; or (b)
- *       executing.
- * 
- * @todo Verify that operations run with the correct isolation level (including
- *       unisolated operation).
- * 
- * @todo do large #s of runs with a transient store where we test to verify that
- *       a random (small to modest) population of operations may be executed and
- *       the store shutdown without encountering a deadlock problem in the write
- *       service. An alternative to shutdown is to periodically let the write
- *       service become quiesent (by not submitting more tasks) and verify that
- *       the periodic group commit does not cause a deadlock. Another variant is
- *       to periodically invoke group commit from another thread at random
- *       intervals and verify that no entry timings result in deadlocks.
- * 
- * @todo run tests of transaction throughput using a number of models. E.g., a
- *       few large indices with a lot of small transactions vs a lot of small
- *       indices with small transactions vs a few large indices with moderate to
- *       large transactions. Also look out for transactions where the validation
- *       and merge on the unisolated index takes more than one group commit
- *       cycle and see how that effects the application.
- * 
- * @todo verify that unisolated reads are against the last committed state of
- *       the index(s), that they do NOT permit writes, and than concurrent
- *       writers on the same named index(s) do NOT conflict.
- * 
- * @todo explore tests in which we flood the write service and make sure that
- *       group commits are occuring in a timely basis, that we are not starving
- *       the write service thread pool (by running group commit when sufficient
- *       writers are awaiting a commit), and explore whether the write service
- *       should use a blocking queue (fixing a maximum capacity).
- * 
- * @todo Modify the RDFS database to use concurrent operations when writing the
- *       statement indices (sort and batch insert).
- * 
- * @todo add a stress/correctness test that mixes unisolated and isolated
- *       operations. Note that isolated operations (transactions) during commit
- *       simply acquire the corresponding unisolated index(s) (the transaction
- *       commit itself is just an unisolated operation on one or more indices).
- * 
- * @todo verify that lots of concurrent {@link RegisterIndexTask}s and
- *       {@link DropIndexTask}s are not problematic (proper synchronization on
- *       the {@link Name2Addr} instance).
- * 
- * @todo test {@link SequenceTask}, e.g., by creating an index and writing on
- *       it.
- * 
- * @todo test writing on multiple unisolated indices and concurrency control for
- *       that.
- * 
- * @todo test writing on multiple isolated indices in the same transaction and
- *       concurrency control for that.
- * 
- * @todo test writing on multiple isolated indices in the different transactions
- *       and verify that no concurrency limits are imposed across transactions
- *       (only within transactions).
- * 
- * @todo show state-based validation for concurrent transactions on the same
- *       index that result in write-write conflicts.
- * 
- * @todo rewrite the {@link StressTestConcurrent} to use
- *       {@link #submit(AbstractIndexTask)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -269,34 +160,30 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public final static String DEFAULT_WRITE_SERVICE_POOL_SIZE = "20";
 
         /**
-         * <code>groupCommit</code> - A boolean property used to enable or
-         * disable group commit. When <em>enabled</em>, concurrent unisolated
-         * writes are allowed on named indices by a pool of worker threads (both
-         * unisolated data service operations and transaction commit processing
-         * are unisolated). Every {@link #COMMIT_PERIOD} milliseconds the writer
-         * threads synchronize and unisolated writes are committed. When
-         * <em>disabled</em>, only a single thread is available to process
-         * writes on named indices.
-         */
-        public final static String GROUP_COMMIT = "groupCommit";
-
-        /**
-         * The default for {@link #GROUP_COMMIT}.
-         */
-        public final static String DEFAULT_GROUP_COMMIT = "true";
-
-        /**
-         * The #COMMIT_PERIOD determines the maximum latency (in milliseconds)
-         * that a writer will block awaiting the next commit and is used IFF
-         * {@link #GROUP_COMMIT} is enabled.
+         * The maximum latency (in milliseconds) that a writer will block
+         * awaiting the next commit and is used IFF {@link #GROUP_COMMIT} is
+         * enabled.
          */
         public final static String COMMIT_PERIOD = "commitPeriod";
 
         /**
          * The default {@link #COMMIT_PERIOD}.
+         * 
+         * @todo tune this.
          */
-        public final static String DEFAULT_COMMIT_PERIOD = "100";
+        public final static String DEFAULT_COMMIT_PERIOD = "200";
 
+        /**
+         * The period (delay) between scheduled invocations of the
+         * {@link StatusTask}.
+         */
+        public final static String STATUS_PERIOD = "statusPeriod";
+        
+        /**
+         * The default {@link #STATUS_PERIOD}.
+         */
+        public final static String DEFAULT_STATUS_PERIOD = "2000";
+        
     }
 
     /**
@@ -379,6 +266,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         // @todo configuration parameter (ms).
         final long willingToWait = 2000;
+        final TimeUnit unit = TimeUnit.MILLISECONDS;
         
         txService.shutdown();
 
@@ -392,7 +280,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             long elapsed = System.currentTimeMillis() - begin;
             
-            if(!txService.awaitTermination(willingToWait-elapsed, TimeUnit.SECONDS)) {
+            if(!txService.awaitTermination(willingToWait-elapsed, unit)) {
                 
                 log.warn("Transaction service termination: timeout");
                 
@@ -410,7 +298,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
             long elapsed = System.currentTimeMillis() - begin;
             
-            if(!readService.awaitTermination(willingToWait-elapsed, TimeUnit.SECONDS)) {
+            if(!readService.awaitTermination(willingToWait-elapsed, unit)) {
                 
                 log.warn("Read service termination: timeout");
                 
@@ -444,7 +332,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
             log.info("Awaiting write service termination: will wait "+timeout+"ms");
 
-            if(!writeService.awaitTermination(timeout, TimeUnit.SECONDS)) {
+            if(!writeService.awaitTermination(timeout, unit)) {
                 
                 log.warn("Write service termination : timeout");
                 
@@ -521,10 +409,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         final int txServicePoolSize;
         final int readServicePoolSize;
-
         final int writeServicePoolSize;
-        final boolean groupCommit;
-        final long commitPeriod;
 
         // txServicePoolSize
         {
@@ -568,60 +453,19 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         }
 
-        // groupCommit
-        {
-
-            val = properties.getProperty(Options.GROUP_COMMIT,
-                    Options.DEFAULT_GROUP_COMMIT);
-
-            groupCommit = Boolean.parseBoolean(val);
-
-            log.info(Options.GROUP_COMMIT + "=" + groupCommit);
-
-        }
-
-        // commitPeriod
-        {
-
-            val = properties.getProperty(Options.COMMIT_PERIOD,
-                    Options.DEFAULT_COMMIT_PERIOD);
-
-            commitPeriod = Long.parseLong(val);
-
-            if (commitPeriod < 1) {
-
-                throw new RuntimeException("The '" + Options.COMMIT_PERIOD
-                        + "' must be at least one.");
-
-            }
-
-            log.info(Options.COMMIT_PERIOD + "=" + commitPeriod);
-
-        }
-
         // writeServicePoolSize
         {
 
-            if (groupCommit) {
+            val = properties.getProperty(Options.WRITE_SERVICE_POOL_SIZE,
+                    Options.DEFAULT_WRITE_SERVICE_POOL_SIZE);
 
-                val = properties.getProperty(Options.WRITE_SERVICE_POOL_SIZE,
-                        Options.DEFAULT_WRITE_SERVICE_POOL_SIZE);
+            writeServicePoolSize = Integer.parseInt(val);
 
-                writeServicePoolSize = Integer.parseInt(val);
+            if (writeServicePoolSize < 1) {
 
-                if (writeServicePoolSize < 1) {
-
-                    throw new RuntimeException("The '"
-                            + Options.WRITE_SERVICE_POOL_SIZE
-                            + "' must be at least one.");
-
-                }
-
-            } else {
-
-                // only one thread when groupCommit is disabled.
-
-                writeServicePoolSize = 1;
+                throw new RuntimeException("The '"
+                        + Options.WRITE_SERVICE_POOL_SIZE
+                        + "' must be at least one.");
 
             }
 
@@ -638,119 +482,88 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         readService = Executors.newFixedThreadPool(readServicePoolSize,
                 DaemonThreadFactory.defaultThreadFactory());
 
-        /*
-         * Setup thread pool for unisolated write operations.
-         */
+        // setup thread pool for unisolated write operations.
+        writeService = new WriteExecutorService(this, writeServicePoolSize,
+                DaemonThreadFactory.defaultThreadFactory());
 
-//        if (!groupCommit) {
-//
-//            /*
-//             * Note: If groupCommit is disabled, then we always use a single
-//             * threaded ExecutorService -- one that does not allow multiple
-//             * threads to exist at the same time.
-//             */
-//
-//            writeService = Executors
-//                    .newSingleThreadExecutor(DaemonThreadFactory
-//                            .defaultThreadFactory());
-//
-//        } else
+        /*
+         * Schedules a repeatable task that will perform group commit.
+         * 
+         * Note: The delay between commits is estimated based on the #of times
+         * per second (1000ms) that you can sync a backing file to disk.
+         * 
+         * @todo if groupCommit is used with forceOnCommit=No or with
+         * bufferMode=Transient then the delay can be smaller and that will
+         * reduce the latency of commit without any substantial penalty.
+         * 
+         * @todo The first ballpark estimates are (without task concurrency)
+         * 
+         * Transient := 63 operations per second.
+         * 
+         * Disk := 35 operations per second (w/ forceOnCommit).
+         * 
+         * Given those data, the maximum throughput for groupCommit would be
+         * around 60 operations per second (double the performance).
+         * 
+         * Enabling task concurrency could significantly raise the #of upper
+         * bound on the operations per second depending on the available CPU
+         * resources to execute those tasks and the extent to which the tasks
+         * operation on distinct indices and may therefore be parallelized.
+         */
         {
 
-            /*
-             * When groupCommit is enabled we use a custom
-             * ThreadPoolExecutor. This class allows for the synchronization
-             * of worker tasks to support groupCommit by forcing new tasks
-             * to pause if a groupCommit is scheduled.
-             * 
-             * Synchronization is accomplished by forcing threads to pause
-             * before execution if the commitPeriod has been exceeded.
-             * 
-             * Note: Task scheduling could be modified by changing the
-             * natural order of the work queue using a PriorityBlockingQueue
-             * (by ordering by transaction start time and placing start
-             * times of zero at the end of the order (with a secondary
-             * ordering on the time at which the request was queued so that
-             * the queue remains FIFO for unisolated writes). That might be
-             * necessary in order to have transactions commit with dispatch
-             * when there are heavy unisolated writes on the data service.
-             * 
-             * @todo create the class described here and initialize the
-             * writeService using that task. We should not need to otherwise
-             * modify the code in terms of how tasks are submitted to the
-             * write service. Write a test suite, perhaps for the class in
-             * isolation.
-             */
-            writeService = new WriteExecutorService(this,
-                    writeServicePoolSize, DaemonThreadFactory
-                            .defaultThreadFactory());
-//            writeService = Executors.newFixedThreadPool(
-//                    writeServicePoolSize, DaemonThreadFactory
-//                            .defaultThreadFactory());
-        }
-        
-            /*
-             * Schedules a repeatable task that will perform group commit.
-             * 
-             * Note: The delay between commits is estimated based on the #of
-             * times per second (1000ms) that you can sync a backing file to
-             * disk.
-             * 
-             * @todo if groupCommit is used with forceOnCommit=No or with
-             * bufferMode=Transient then the delay can be smaller and that
-             * will reduce the latency of commit without any substantial
-             * penalty.
-             * 
-             * @todo The first ballpark estimates are (without task
-             * concurrency)
-             * 
-             * Transient := 63 operations per second.
-             * 
-             * Disk := 35 operations per second (w/ forceOnCommit).
-             * 
-             * Given those data, the maximum throughput for groupCommit
-             * would be around 60 operations per second (double the
-             * performance).
-             * 
-             * Enabling task concurrency could significantly raise the #of
-             * upper bound on the operations per second depending on the
-             * available CPU resources to execute those tasks and the extent
-             * to which the tasks operation on distinct indices and may
-             * therefore be parallelized.
-             */
+            final long commitPeriod;
+            // commitPeriod
             {
-                final long initialDelay = 100;
-//                final long delay = (long) (1000d / 35);
-                final long delay = 200; // @todo config.
-                final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-                commitService = Executors
-                        .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                                .defaultThreadFactory());
+                val = properties.getProperty(Options.COMMIT_PERIOD,
+                        Options.DEFAULT_COMMIT_PERIOD);
 
-                log.info("Establishing group commit: initialDelay=" + initialDelay
-                    + ", periodic delay=" + delay);
-                
-                commitService.scheduleWithFixedDelay(new GroupCommitRunnable(writeService),
-                        initialDelay, delay, unit);
-                
+                commitPeriod = Long.parseLong(val);
+
+                if (commitPeriod < 1) {
+
+                    throw new RuntimeException("The '" + Options.COMMIT_PERIOD
+                            + "' must be at least one.");
+
+                }
+
+                log.info(Options.COMMIT_PERIOD + "=" + commitPeriod);
+
             }
-            
-//        }
 
-        // schedule runnable for periodic status messages.
-        // @todo status delay as config parameter.
+            final long initialDelay = 100;
+            // final long delay = (long) (1000d / 35);
+            final long delay = commitPeriod;
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            commitService = Executors
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
+
+            log.info("Establishing group commit: initialDelay=" + initialDelay
+                    + ", periodic delay=" + delay);
+
+            commitService.scheduleWithFixedDelay(new GroupCommitRunnable(
+                    writeService), initialDelay, delay, unit);
+
+        }
+
+        // setup scheduled runnable for periodic status messages.
         {
 
             final long initialDelay = 100;
-            final long delay = 2500;
+            
+            final long delay = Long.parseLong(properties.getProperty(
+                    Options.STATUS_PERIOD, Options.DEFAULT_STATUS_PERIOD));
+
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
             statusService = Executors
                     .newSingleThreadScheduledExecutor(DaemonThreadFactory
                             .defaultThreadFactory());
 
-            statusService.scheduleWithFixedDelay(new StatusTask(),
+            statusService.scheduleWithFixedDelay(newStatusTask(),
                     initialDelay, delay, unit);
 
         }
@@ -831,10 +644,16 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     }
     
     /**
+     * Factory allows subclasses to extend the {@link StatusTask}.
+     */
+    protected StatusTask newStatusTask() {
+
+        return new StatusTask();
+        
+    }
+    
+    /**
      * Writes out periodic status information.
-     * 
-     * @todo make extensible? (StatusTaskFactory, but note that this is an
-     *       inner class and requires access to the journal).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -842,25 +661,25 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      */
     protected class StatusTask implements Runnable {
 
+        protected final Logger log = Logger.getLogger(StatusTask.class);
+        
         public void run() {
 
             status();
 
         }
 
-        /*
-         * @todo write out more details on the writeService (#running, elapsed since the last commit, etc.)?
+        /**
+         * Writes out the status on {@link #log}. 
          */
-        public void status() {
+        protected void status() {
 
             final long commitCounter = getCommitRecord().getCommitCounter();
 
-            System.err.println(
+            log.info(
                     "status"
-                    + //
-                    ": commitCounter=" + commitCounter
                     + // txService (#active,#queued,#completed)
-                    ", transactions=("
+                    ": transactions=("
                     + ((ThreadPoolExecutor) txService).getActiveCount() + ","
                     + ((ThreadPoolExecutor) txService).getQueue().size() + ","
                     + ((ThreadPoolExecutor) txService).getCompletedTaskCount()+ ")"
@@ -874,7 +693,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ((ThreadPoolExecutor) writeService).getActiveCount() + ","
                     + ((ThreadPoolExecutor) writeService).getQueue().size() + ","
                     + ((ThreadPoolExecutor) writeService).getCompletedTaskCount() + ")"
-                    
+                    + // commitCounter.
+                    ", commitCounter=" + commitCounter
                     );
 
         }
@@ -1075,13 +895,13 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
         /*
          * A transaction with an empty write set can commit immediately since
-         * validation and commit are basically NOPs (@todo the only difference
-         * from the read-only case is that a commit time is being assigned, but
-         * I am not sure if we need to do that.)
+         * validation and commit are basically NOPs (this is the same as the
+         * read-only case.)
          */
+
         if(tx.isEmptyWriteSet()) {
 
-            tx.prepare(nextTimestamp());
+            tx.prepare(0L);
 
             return tx.commit();
 

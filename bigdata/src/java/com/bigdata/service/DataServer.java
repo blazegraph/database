@@ -52,9 +52,9 @@ import java.rmi.RemoteException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.MDC;
-
 import net.jini.config.Configuration;
+
+import org.apache.log4j.MDC;
 
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
@@ -192,7 +192,26 @@ public class DataServer extends AbstractServer {
             return server.proxy;
             
         }
+        
+        /**
+         * Adds the "hostname" parameter to the {@link MDC}.
+         */
+        protected void setupLoggingContext() {
+            
+            super.setupLoggingContext();
+            
+            MDC.put("hostname",server.getHostName());
+            
+        }
 
+        protected void clearLoggingContext() {
+            
+            MDC.remove("hostname");
+
+            super.clearLoggingContext();
+            
+        }
+        
         /*
          * DestroyAdmin
          */
