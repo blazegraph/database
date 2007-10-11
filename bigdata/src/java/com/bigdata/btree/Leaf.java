@@ -47,13 +47,10 @@ Modifications:
 package com.bigdata.btree;
 
 import java.io.PrintStream;
-import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
-
-import com.bigdata.rawstore.Addr;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;

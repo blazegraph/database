@@ -1420,8 +1420,13 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * used by the store.
      * 
      * @return The root addresses.
+     * 
+     * @todo Synchronization was added to this method since the
+     *       {@link StatusThread} and {@link AbstractIndexTask}s may all invoke
+     *       this concurrently. The synchronization could be removed if we made
+     *       sure that this was never null outside of initialization or commit.
      */
-    public ICommitRecord getCommitRecord() {
+    synchronized public ICommitRecord getCommitRecord() {
 
         if (_commitRecord == null) {
 

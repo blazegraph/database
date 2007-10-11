@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.CognitiveWeb.concurrent.locking.DeadlockException;
 import org.CognitiveWeb.concurrent.locking.TimeoutException;
 import org.CognitiveWeb.concurrent.locking.TxDag;
+import org.apache.log4j.Logger;
 
 import com.bigdata.cache.WeakValueCache;
 
@@ -100,6 +101,8 @@ import com.bigdata.cache.WeakValueCache;
  *       locks.
  */
 public class LockManager</*T,*/R extends Comparable<R>> {
+
+    protected static final Logger log = Logger.getLogger(LockManager.class);
 
     /**
      * Each resource that can be locked has an associated {@link ResourceQueue}.
@@ -515,7 +518,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        TestConcurrencyControl.log.info("Acquiring lock(s): " + resource);
+        log.info("Acquiring lock(s): " + resource);
 
         for (int i = 0; i < resource.length; i++) {
 
@@ -523,7 +526,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        TestConcurrencyControl.log.info("Acquired lock(s): " + resource);
+        log.info("Acquired lock(s): " + resource);
 
     }
 
@@ -600,13 +603,13 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         try {
 
-            TestConcurrencyControl.log.info("Releasing locks");
+            log.info("Releasing locks");
 
             Collection<R> resources = lockedResources.remove(tx);
 
             if (resources == null) {
 
-                TestConcurrencyControl.log.info("No locks: " + tx);
+                log.info("No locks: " + tx);
 
                 return;
 
@@ -620,7 +623,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
              * there are any negative consequences to this.
              */
 
-            TestConcurrencyControl.log
+            log
                     .info("Releasing resource locks: resources=" + resources);
 
             Iterator<R> itr = resources.iterator();
@@ -644,7 +647,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
                 } catch (Throwable t) {
 
-                    TestConcurrencyControl.log
+                    log
                             .warn("Could not release lock", t);
 
                     // Note: release the rest of the locks anyway.
@@ -657,7 +660,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         } catch (Throwable t) {
 
-            TestConcurrencyControl.log
+            log
                     .error("Could not release locks: " + t, t);
 
         } finally {
@@ -692,7 +695,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         nstarted.incrementAndGet();
 
-        TestConcurrencyControl.log.info("Started: nstarted=" + nstarted);
+        log.info("Started: nstarted=" + nstarted);
 
     }
 
@@ -719,12 +722,12 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         } catch (Throwable t) {
 
-            TestConcurrencyControl.log.warn("Problem(s) releasing locks: " + t,
+            log.warn("Problem(s) releasing locks: " + t,
                     t);
 
         }
 
-        TestConcurrencyControl.log.info("Ended: nended=" + nended);
+        log.info("Ended: nended=" + nended);
 
     }
 
@@ -758,12 +761,12 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         } catch (Throwable t2) {
 
-            TestConcurrencyControl.log.warn(
+            log.warn(
                     "Problem(s) releasing locks: " + t2, t2);
 
         }
 
-        TestConcurrencyControl.log.info("Ended: nended=" + nended);
+        log.info("Ended: nended=" + nended);
 
     }
 

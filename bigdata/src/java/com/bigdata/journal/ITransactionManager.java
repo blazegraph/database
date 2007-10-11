@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.service.DataService;
@@ -123,14 +122,6 @@ public interface ITransactionManager extends ITimestampService {
      * present the application with an opportunity to validate write-write
      * conflicts using state-based techniques (i.e., by looking at the records
      * and timestamps and making an informed decision).
-     * <p>
-     * MVCC requires a strategy to release old versions that are no longer
-     * accessible to active transactions. bigdata uses a highly efficient
-     * technique in which writes are multiplexed onto append-only
-     * {@link Journal}s and then evicted on overflow into {@link IndexSegment}s
-     * using a bulk index build mechanism. Old journal and index segment
-     * resources are simply deleted from the file system some time after they
-     * are no longer accessible to active transactions.
      * 
      * @param level
      *            The isolation level. The following isolation levels are

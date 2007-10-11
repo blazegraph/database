@@ -55,6 +55,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Arrays;
@@ -188,6 +190,21 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     protected Remote proxy;
 
+    /**
+     * The name of the host on which the server is running.
+     */
+    private final String hostname;
+    
+    /**
+     * The name of the host on which the server is running (best effort during
+     * startup and unchanging thereafter).
+     */
+    protected String getHostName() {
+        
+        return hostname;
+        
+    }
+    
     private boolean open = false;
 
     /**
@@ -289,6 +306,20 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         setSecurityManager();
 
+        /*
+         * resolve the host name (for informational purposes).
+         */
+        {
+            String hostname;
+            try {
+                // DNS lookup
+                hostname = InetAddress.getLocalHost().getCanonicalHostName();
+            } catch (UnknownHostException ex) {
+                hostname = "<unknown>";
+            }
+            this.hostname = hostname;
+        }
+        
         Entry[] entries = null;
         LookupLocator[] unicastLocators = null;
         String[] groups = null;

@@ -61,16 +61,14 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IReadOnlyOperation;
-import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractIndexTask;
 import com.bigdata.journal.ConcurrentJournal;
-import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -102,17 +100,17 @@ import com.bigdata.scaleup.ResourceState;
  *       the "scaleout" package. The specifics should probably be discarded but
  *       parts of the code may be of use. The handling of overflow events needs
  *       to be coordinated with the {@link IMetadataService}.
+ *       <p>
+ *       MVCC requires a strategy to release old versions that are no longer
+ *       accessible to active transactions. bigdata uses a highly efficient
+ *       technique in which writes are multiplexed onto append-only
+ *       {@link Journal}s and then evicted on overflow into
+ *       {@link IndexSegment}s using a bulk index build mechanism. Old journal
+ *       and index segment resources are simply deleted from the file system
+ *       some time after they are no longer accessible to active transactions.
  * 
  * @todo The data service should redirect clients if an index partition has been
  *       moved (shed) while a client has a lease.
- * 
- * @todo implement NIODataService, RPCDataService(possible), EmbeddedDataService
- *       (uses queue to decouple operations), DataServiceClient (provides
- *       translation from {@link ISimpleBTree} to {@link IBatchBTree}, provides
- *       transparent partitioning of batch operations, handles handshaking and
- *       leases with the metadata index locator service; abstract IO for
- *       different client platforms (e.g., support PHP, C#). Bundle ICU4J with
- *       the client.
  * 
  * @todo Support GOM pre-fetch using a rangeQuery iterator - that will
  *       materialize N records on the client and could minimize trips to the
@@ -139,7 +137,16 @@ import com.bigdata.scaleup.ResourceState;
  *       bidirectional. Can that rate be sustained with a fully connected
  *       bi-directional transfer?
  * 
- * @todo Review JERI options to support non-blocking/fast RMI protocols.
+ * @todo Review JERI options to support non-blocking/fast RMI protocols. See
+ *       <p>
+ *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&P=33490<br>
+ *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0506&L=jini-users&P=9626<br>
+ *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&D=0&P=26542<br>
+ *       http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html<br>
+ *       <p>
+ *       Try net.jini.jeri.tcp endpoints without socket factories and set the
+ *       "com.sun.jini.jeri.tcp.useNIO" to "true". JRMP is evidentally much
+ *       slower since it does not allow for the possibility of NIO.
  * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on
@@ -318,11 +325,14 @@ abstract public class DataService implements IDataService,
     /**
      * Sets up the {@link MDC} logging context. You should do this on every
      * client facing point of entry and then call {@link #clearLoggingContext()}
-     * in a <code>finally</code> clause.
+     * in a <code>finally</code> clause. You can extend this method to add
+     * additional context.
      * <p>
-     * Note: Once the serviceUUID is assigned we add it to the {@link MDC} so
-     * that it can be injected into log messages using %X{serviceUUID} in your
-     * log4j pattern layout.
+     * This implementation add the "serviceUUID" parameter to the {@link MDC}.
+     * The serviceUUID is, in general, assigned asynchronously by the service
+     * registrar. Once the serviceUUID becomes available it will be added to the
+     * {@link MDC}. This datum can be injected into log messages using
+     * %X{serviceUUID} in your log4j pattern layout.
      */
     protected void setupLoggingContext() {
 
@@ -343,7 +353,7 @@ abstract public class DataService implements IDataService,
             // Add to the logging context for the current thread.
             
             MDC.put("serviceUUID", serviceUUID.toString());
-            
+
         } catch(Throwable t) {
             /*
              * Ignore.
@@ -888,8 +898,6 @@ abstract public class DataService implements IDataService,
     }
     
     /**
-     * Inner class permits adding of <code>synchronized</code> keyword to
-     * select methods where there is a possibility for thread contention.
      * 
      * FIXME Either this class or its outer class MUST discover the
      * {@link ITransactionManager} and delegate the methods on that interface to
@@ -898,23 +906,49 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class DataServiceJournal extends Journal {
+    private class DataServiceJournal extends Journal {
 
         /**
          * @param properties
          */
         public DataServiceJournal(Properties properties) {
+            
             super(properties);
+            
         }
         
         /**
-         * Note: Synchronization was added to this method since the
-         * {@link StatusThread} invokes this concurrently with
-         * {@link DataService} operations.
+         * Returns instance of {@link StatusTask}.
          */
-        public synchronized ICommitRecord getCommitRecord() {
+        protected StatusTask newStatusTask() {
+
+            return new StatusTask();
             
-            return super.getCommitRecord();
+        }
+
+        /**
+         * Extended to add the logging context.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        protected class StatusTask extends ConcurrentJournal.StatusTask {
+            
+            protected void status() {
+                
+                setupLoggingContext();
+                
+                try {
+                    
+                    super.status();
+                    
+                } finally {
+                    
+                    clearLoggingContext();
+                    
+                }
+                
+            }
             
         }
         

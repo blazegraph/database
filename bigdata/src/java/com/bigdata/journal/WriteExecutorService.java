@@ -61,6 +61,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
+
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrentJournal} to
  * execute concurrent unisolated write tasks and perform group commits. Tasks
@@ -71,6 +73,32 @@ import org.apache.log4j.Logger;
  * <p>
  * Note: adding the thread name to the log messages for this class can aid
  * debugging. You can do this using the log4j configuration.
+ * <p>
+ * Note: the problem with running concurrent unisolated operations during a
+ * commit and relying on an "auto-commit" flag to indicate whether or not the
+ * index will participate is two fold. First, previous unisolated operations on
+ * the same index will not get committed if an operation is currently running,
+ * so we could wind up deferring check points of indices for quite a while.
+ * Second, if there is a problem with the commit and we have to abort, then any
+ * ongoing operations would still be using unisolated indices that could include
+ * write sets that were discarded - this would make abort non-atomic.
+ * <p>
+ * The ground state from which an unisolated operation begins needs to evolve
+ * after each unisolated operation that reaches its commit point successfully.
+ * This can be acomplished by holding onto the btree reference, or even just the
+ * address at which the metadata record for the btree was last written. We use
+ * {@link AbstractJournal#name2Addr} for this purpose.
+ * <p>
+ * However, if an unisolated write fails for any reason on a given index then we
+ * MUST use the last successful check point for that index. This is handled by
+ * doing an abort.
+ * <p>
+ * Note: Due to the way in which the {@link BTree} class is written, it "steals"
+ * child references when cloning an immutable node or leaf prior to making
+ * modifications. This means that we must reload the btree from a metadata
+ * record if we have to roll back due to an abort of some unisolated operation
+ * since the state of the {@link BTree} has been changed as a side effect in a
+ * non-reversable manner.
  * 
  * @todo how can we indicate that the tasks could be retried?
  * 
@@ -308,6 +336,13 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
                 final int nwrites = this.nwrites.incrementAndGet();
                 
                 assert nwrites > 0;
+
+                /*
+                 * FIXME Move all of this into groupCommit and then modify so
+                 * that the thread awaits the commit unless it triggers the
+                 * commit. More than that, commit can be immediate (or after a
+                 * short interval) once the running tasks complete.
+                 */
                 
                 if (nrunning == 0 && isPaused) {
                 
@@ -399,10 +434,26 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
                  * 
                  * Note: Since the write sets are combined we have to discard
                  * all if anyone fails.
+                 * 
+                 * Interrupts count as failures since we do not know whether or
+                 * not the task has written any data. While we COULD check that,
+                 * the expectation is that writers have already begun to write
+                 * data by the time they get interrupted.
                  */
-                
-                log.error("Task failed");
-                
+
+                if (t instanceof InterruptedException || t.getCause() != null
+                        && t.getCause() instanceof InterruptedException) {
+
+                    log.warn("Task interrupted: task=" + r.getClass().getName()
+                            + " : " + t);
+
+                } else {
+
+                    log.warn("Task failed: task=" + r.getClass().getName()
+                            + " : " + t, t);
+
+                }
+
                 abort();
                 
             }

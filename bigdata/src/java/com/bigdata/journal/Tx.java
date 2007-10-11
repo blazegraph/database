@@ -228,21 +228,23 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
     protected boolean validateWriteSets() {
  
         assert ! readOnly;
-        
-        /*
-         * This compares the current commit counter on the journal with the
-         * commit counter as of the start time for the transaction. If they are
-         * the same, then no intervening commits have occurred on the journal
-         * and there is nothing to validate.
-         */
-        
-        if (commitRecord == null
-                || (journal.getRootBlockView().getCommitCounter() == commitRecord
-                        .getCommitCounter())) {
-            
-            return true;
-            
-        }
+
+//         Note: This is not true now that unisolated writers may be concurrent.
+//        
+//        /*
+//         * This compares the current commit counter on the journal with the
+//         * commit counter as of the start time for the transaction. If they are
+//         * the same, then no intervening commits have occurred on the journal
+//         * and there is nothing to validate.
+//         */
+//        
+//        if (commitRecord == null
+//                || (journal.getRootBlockView().getCommitCounter() == commitRecord
+//                        .getCommitCounter())) {
+//            
+//            return true;
+//            
+//        }
         
         /*
          * for all isolated btrees, if(!validate()) return false;
@@ -259,13 +261,22 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
             
             /*
-             * Note: this is the _current_ committed state for the named index.
-             * We need to validate against the current state, not against some
-             * historical state.
+             * Note: this is the _current_ state for the named index. We need to
+             * validate against the current state, not against some historical
+             * state.
              */
+
             UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
-            
-            if(!isolated.validate(groundState)) return false;
+
+            if (!isolated.validate(groundState)) {
+
+                // Validation failed.
+                
+                log.info("validation failed: "+name);
+                
+                return false;
+
+            }
             
         }
          
@@ -290,10 +301,11 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
             
             /*
-             * Note: this is the _current_ committed state for the named index.
-             * We need to merge down onto the current state, not onto some
+             * Note: this is the live version of the named index. We need to
+             * merge down onto the live version of the index, not onto some
              * historical state.
              */
+            
             UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
 
             /*
@@ -301,6 +313,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
              * corresponding unisolated index, updating version counters, delete
              * markers, and values as necessary in the unisolated index.
              */
+
             isolated.mergeDown(groundState);
             
         }
