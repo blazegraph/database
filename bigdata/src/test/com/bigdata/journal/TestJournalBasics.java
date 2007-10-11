@@ -125,6 +125,8 @@ public class TestJournalBasics extends TestCase {
          * already use the CC mechanisms but are also being tested above.
          */
         
+        // test basics of the concurrent task execution.
+        suite.addTestSuite(TestConcurrentJournal.class);
         // test tasks to add and drop named indices.
         suite.addTestSuite(TestAddDropIndexTask.class);
         // test task running a sequence of tasks.

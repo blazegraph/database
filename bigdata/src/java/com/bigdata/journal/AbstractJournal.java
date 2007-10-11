@@ -1002,6 +1002,18 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         
     }
     
+    /**
+     * Assert that the store is open.
+     * <p>
+     * Note: You can see an {@link IllegalStateException} thrown out of here if
+     * there are tasks running during {@link #shutdown()} and one of the various
+     * task services times out while awaiting termination. Such exceptions are
+     * normal since the store was closed asynchronously while task(s) were still
+     * running.
+     * 
+     * @exception IllegalStateException
+     *                if the store is closed.
+     */
     protected void assertOpen() {
 
         if (!_bufferStrategy.isOpen()) {
@@ -1422,7 +1434,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * @return The root addresses.
      * 
      * @todo Synchronization was added to this method since the
-     *       {@link StatusThread} and {@link AbstractIndexTask}s may all invoke
+     *       {@link StatusThread} and {@link AbstractTask}s may all invoke
      *       this concurrently. The synchronization could be removed if we made
      *       sure that this was never null outside of initialization or commit.
      */

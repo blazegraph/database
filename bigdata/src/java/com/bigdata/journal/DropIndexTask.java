@@ -6,7 +6,7 @@ package com.bigdata.journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DropIndexTask extends AbstractIndexTask {
+public class DropIndexTask extends AbstractTask {
 
     public DropIndexTask(ConcurrentJournal journal,String name) {
 

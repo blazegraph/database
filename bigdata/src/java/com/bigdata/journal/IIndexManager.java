@@ -56,13 +56,13 @@ import com.bigdata.service.IDataService;
  * 
  * FIXME Consider removing this interface for better alignment with the
  * {@link ConcurrentJournal}. Access to indices SHOULD only occur within
- * submitted {@link AbstractIndexTask}s. The presence of this interface on the
+ * submitted {@link AbstractTask}s. The presence of this interface on the
  * {@link ConcurrentJournal} makes it possible to access a named index outside
  * of an executor service. {@link AbstractJournal} SHOULD NOT implement
  * {@link IIndexStore#getIndex(String)} since that returns the
  * <strong>unisolated</strong> (mutable) view of the named index and access to
  * that view MUST be single-threaded, which is enforced by the
- * {@link ConcurrentJournal} only within {@link AbstractIndexTask}s.
+ * {@link ConcurrentJournal} only within {@link AbstractTask}s.
  * <p>
  * Remove these methods from the {@link IJournal} heirarchy of implementations
  * but do retain them for {@link TemporaryStore} since it is (a) single-threaded
@@ -70,12 +70,12 @@ import com.bigdata.service.IDataService;
  * could still go away.
  * <p>
  * Likewise {@link IIndexStore} needs to be available to
- * {@link AbstractIndexTask}s, on the {@link Tx}, and on
+ * {@link AbstractTask}s, on the {@link Tx}, and on
  * {@link TemporaryStore} but MUST NOT be exposed elsewhere.
  * <p>
  * A bunch of test cases will have to be updated and the RDFS database will also
  * have to be updated (to use more concurrency as well as to refactor its index
- * access inside of {@link AbstractIndexTask}s).
+ * access inside of {@link AbstractTask}s).
  * <p>
  * Get rid of {@link NoSuchIndexException} and {@link IndexExistsException} at
  * the same time since they are probably no longer.

@@ -71,7 +71,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
@@ -117,7 +116,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       performance tuning. This can be done by comparing an embedded data
  *       service (no RPC) with a data service connected by JINI (RPC).
  * 
- * @todo This test could be used to get group commit working.
+ * @todo Test w/ group commit and various group sizes.
  * 
  * @todo get the comparison support working. Parameterize the
  *       {@link DataService} configuration from the test suite so that we can

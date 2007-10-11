@@ -77,6 +77,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 /**
  * Stress tests for concurrent processing of operations on named unisolated indices.
  * 
+ * FIXME refactor to use {@link ConcurrentJournal}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

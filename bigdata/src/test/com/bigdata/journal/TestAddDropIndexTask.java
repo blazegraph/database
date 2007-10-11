@@ -89,10 +89,6 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
         Properties properties = getProperties();
         
-//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
-//
-//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-        
         Journal journal = new Journal(properties);
         
         final String name = "abc";
@@ -113,7 +109,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
                 log.info("Resolving future for task.");
                 
-                assertTrue( "Index already exists?", (Boolean)future.get() );
+                assertEquals( "indexUUID", indexUUID, (UUID)future.get() );
 
                 log.info("Resolved future");
                 
@@ -164,7 +160,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractIndexTask(
+            Future<Object> future = journal.submit(new AbstractTask(
                     journal, ITx.UNISOLATED, true/* readOnly */, name) {
 
                 protected Object doTask() throws Exception {
@@ -265,7 +261,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractIndexTask(
+            Future<Object> future = journal.submit(new AbstractTask(
                     journal, ITx.UNISOLATED, true/* readOnly */, name) {
 
                 protected Object doTask() throws Exception {
@@ -346,6 +342,9 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         
         final String name = "abc";
         
+        final UUID indexUUID1 = UUID.randomUUID();
+        final UUID indexUUID2 = UUID.randomUUID();
+        
         /*
          * Run task to register a named index.
          */
@@ -354,12 +353,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
             
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, UUID
-                            .randomUUID())));
+                    journal, name, new UnisolatedBTree(journal, indexUUID1)));
 
             try {
 
-                assertTrue( "Index already exists?", (Boolean)future.get() );
+                assertEquals( "indexUUID", indexUUID1, (UUID)future.get() );
                 
                 /*
                  * This verifies that the write task did not return control to
@@ -390,12 +388,12 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
             
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, UUID
-                            .randomUUID())));
+                    journal, name, new UnisolatedBTree(journal, indexUUID2)));
 
             try {
 
-                assertFalse( "Index does not exist?", (Boolean)future.get() );
+                // Note: the UUID for the pre-existing index is returned.
+                assertEquals( "indexUUID", indexUUID1, (UUID)future.get() );
                 
                 /*
                  * This verifies that no commit was performed since no data was
@@ -493,6 +491,60 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         
         journal.delete();
         
+    }
+
+    /**
+     * Test attempt operations against a new journal (nothing committed) and
+     * verify that we see {@link NoSuchIndexException}s rather than something
+     * odder. This is an edge case since {@link Journal#getCommitRecord()} will
+     * have 0L for all root addresses until the first commit - this means that
+     * the {@link AbstractJournal#name2Addr} can not be loaded from the commit
+     * record!
+     * 
+     * @throws InterruptedException
+     */
+    public void test_NoSuchIndexException() throws InterruptedException {
+        
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+        
+        final String name = "abc";
+
+        Future<Object> future = journal.submit(new AbstractTask(journal,ITx.UNISOLATED,true/*readOnly*/,name){
+
+            protected Object doTask() throws Exception {
+                
+                getIndex(name);
+                
+                return null;
+                
+            }});
+
+        try {
+
+            future.get();
+
+            fail("Expecting wrapped "+NoSuchIndexException.class);
+            
+        } catch(ExecutionException ex) {
+            
+            if(ex.getCause() instanceof NoSuchIndexException ) {
+                
+                System.err.println("Ignoring expected exception: "+ex);
+                
+            } else {
+
+                fail("Expecting wrapped "+NoSuchIndexException.class);
+                
+            }
+
+        }
+        
+        journal.shutdown();
+        
+        journal.delete();
+
     }
     
 }

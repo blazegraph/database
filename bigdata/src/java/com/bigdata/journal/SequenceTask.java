@@ -15,7 +15,7 @@ import java.util.Set;
  * <p>
  * Note: This class facilitates the definition of operations can be readily
  * composed through reuse of pre-defined operations. However, in all cases,
- * a similar effect can be obtained by extended {@link AbstractIndexTask}
+ * a similar effect can be obtained by extended {@link AbstractTask}
  * and coding the behavior directly in {@link #doTask()}.
  * <p>
  * Some possible use cases are:
@@ -39,9 +39,9 @@ import java.util.Set;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SequenceTask extends AbstractIndexTask {
+public class SequenceTask extends AbstractTask {
 
-    private final AbstractIndexTask[] tasks;
+    private final AbstractTask[] tasks;
     
     /**
      * @param journal
@@ -50,7 +50,7 @@ public class SequenceTask extends AbstractIndexTask {
      * @param resource
      */
     protected SequenceTask(ConcurrentJournal journal, long startTime,
-            boolean readOnly, String[] resource, AbstractIndexTask[] tasks) {
+            boolean readOnly, String[] resource, AbstractTask[] tasks) {
 
         super(journal, startTime, readOnly, resource);
 
@@ -69,7 +69,7 @@ public class SequenceTask extends AbstractIndexTask {
      *            
      * @return The {@link SequenceTask}.
      */
-    public static SequenceTask newSequence(AbstractIndexTask[] tasks) {
+    public static SequenceTask newSequence(AbstractTask[] tasks) {
         
         if(tasks==null) throw new NullPointerException();
         
@@ -89,7 +89,7 @@ public class SequenceTask extends AbstractIndexTask {
         
         for(int i=1; i<tasks.length; i++) {
             
-            AbstractIndexTask task = tasks[i];
+            AbstractTask task = tasks[i];
             
             if(task==null) throw new NullPointerException();
             
@@ -117,7 +117,7 @@ public class SequenceTask extends AbstractIndexTask {
         
         for(int i=0; i<tasks.length; i++) {
             
-            AbstractIndexTask task = tasks[i];
+            AbstractTask task = tasks[i];
             
             ret[i] = task.doTask();
  

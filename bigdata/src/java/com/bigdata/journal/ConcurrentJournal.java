@@ -43,6 +43,10 @@ Modifications:
 */
 package com.bigdata.journal;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -732,8 +736,13 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * 
      * @return The {@link Future} that may be used to resolve the outcome of the
      *         task.
+     *         
+     * @exception RejectedExecutionException
+     *                if task cannot be scheduled for execution
+     * @exception NullPointerException
+     *                if task null
      */
-    public Future<Object> submit(AbstractIndexTask task) {
+    public Future<Object> submit(AbstractTask task) {
 
         assertOpen();
         
@@ -759,6 +768,39 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
     }
 
+    /**
+     * Executes the given tasks, returning a list of Futures holding their
+     * status and results when all complete.
+     * 
+     * @param tasks
+     *            The tasks.
+     * 
+     * @return Their {@link Future}s.
+     * 
+     * @exception InterruptedException 
+     *                if interrupted while waiting, in which case unfinished
+     *                tasks are cancelled.
+     * @exception NullPointerException 
+     *                if tasks or any of its elements are null
+     * @exception RejectedExecutionException 
+     *                if any task cannot be scheduled for execution
+     */
+    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks) {
+        
+        Iterator<AbstractTask> itr = tasks.iterator();
+        
+        List<Future<Object>> futures = new LinkedList<Future<Object>>();
+        
+        while(itr.hasNext()) {
+            
+            futures.add( submit(itr.next()) );
+            
+        }
+        
+        return futures;
+        
+    }
+    
     /*
      * various methods that are just submitting tasks.
      */
@@ -876,8 +918,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         ITx tx = getTx(ts);
         
-        if (tx == null)
+        if (tx == null) {
+
             throw new IllegalArgumentException("No such tx: " + ts);
+            
+        }
 
         /*
          * A read-only transaction can commit immediately since validation and
@@ -936,7 +981,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             }
 
             // this is an unexpected error.
-            throw new RuntimeException(cause);
+            throw new RuntimeException(ex);
             
         }
         
@@ -945,17 +990,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     /**
      * Task validates and commits a transaction when it is run by the
      * {@link Journal#writeService}.
-     * <p>
-     * Note: The commit protocol does not permit unisolated writes on the
-     * journal once a transaction begins to prepare until the transaction has
-     * either committed or aborted (if such writes were allowed then we would
-     * have to re-validate any prepared transactions in order to enforce
-     * serializability).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class TxCommitTask extends AbstractIndexTask {
+    private class TxCommitTask extends AbstractTask {
         
         public TxCommitTask(ConcurrentJournal journal,ITx tx) {
             
@@ -972,10 +1011,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             /*
              * The commit time is assigned when we prepare the transaction.
              * 
-             * @todo resolve this against a service in a manner that will
-             * support a distributed database commit protocol.
+             * @todo This will be an RPC when using a distributed database. Try
+             * to refactor so that we do make RPCs during the write task!
              */
-            final long commitTime = ((Tx)tx).journal.nextTimestamp();
+
+            final long commitTime = nextTimestamp();
             
             tx.prepare(commitTime);
             

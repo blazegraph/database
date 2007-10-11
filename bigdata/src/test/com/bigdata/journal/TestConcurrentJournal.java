@@ -47,13 +47,22 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.AbstractTask.ResubmitException;
+import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.service.DataService;
 import com.bigdata.service.RangeQueryIterator;
 
@@ -62,21 +71,12 @@ import com.bigdata.service.RangeQueryIterator;
  * 
  * FIXME write more tests!
  * 
- * @todo Verify proper partial ordering over transaction schedules by modifying
- *       {@link Journal} to extend this class and implement a correct
- *       transaction manager (runs tasks in parallel, then schedules their
- *       commits using a partial order).
- * 
  * @todo write test cases that submit various kinds of operations and verify the
  *       correctness of those individual operations. refactor the services
  *       package to do this, including things such as the
  *       {@link RangeQueryIterator}. this will help to isolate the correctness
  *       of the data service "api", including concurrency of operations, from
  *       the {@link DataService}.
- * 
- * @todo write test cases that attempt operations against a new journal (nothing
- *       committed) and verify that we see {@link NoSuchIndexException}s rather
- *       than something odder.
  * 
  * @todo do large #s of runs with a transient store where we test to verify that
  *       a random (small to modest) population of operations may be executed and
@@ -93,10 +93,6 @@ import com.bigdata.service.RangeQueryIterator;
  *       large transactions. Also look out for transactions where the validation
  *       and merge on the unisolated index takes more than one group commit
  *       cycle and see how that effects the application.
- * 
- * @todo verify that unisolated reads are against the last committed state of
- *       the index(s), that they do NOT permit writes, and than concurrent
- *       writers on the same named index(s) do NOT conflict.
  * 
  * @todo explore tests in which we flood the write service and make sure that
  *       group commits are occuring in a timely basis, that we are not starving
@@ -116,8 +112,13 @@ import com.bigdata.service.RangeQueryIterator;
  *       {@link DropIndexTask}s are not problematic (proper synchronization on
  *       the {@link Name2Addr} instance).
  * 
- * @todo test writing on multiple unisolated indices and concurrency control for
- *       that.
+ * @todo Verify proper partial ordering over transaction schedules (runs tasks
+ *       in parallel, uses exclusive locks for access to the same isolated index
+ *       within the same transaction, and schedules their commits using a
+ *       partial order based on the indices that were actually written on).
+ *       <p>
+ *       Verify that only the indices that were written on are used to establish
+ *       the partial order, not any index from which the tx might have read.
  * 
  * @todo test writing on multiple isolated indices in the same transaction and
  *       concurrency control for that.
@@ -130,7 +131,10 @@ import com.bigdata.service.RangeQueryIterator;
  *       index that result in write-write conflicts.
  * 
  * @todo rewrite the {@link StressTestConcurrent} to use
- *       {@link #submit(AbstractIndexTask)}.
+ *       {@link #submit(AbstractTask)}.
+ * 
+ * @todo revisit the transaction test suites and update them to validate
+ *       behaviors under concurrent operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -190,7 +194,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 ITx.UNISOLATED, true/*readOnly*/, resource) {
 
             /**
@@ -221,15 +225,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
         assertEquals("commit counter changed?",
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
-
-//        Note: This does not always work since the counter is updated asynchronously.
-//        
-//        /*
-//         * Verify that it ran on the read service.
-//         */
-//        assertEquals("completedTaskCount", 1,
-//                ((ThreadPoolExecutor) journal.readService)
-//                        .getCompletedTaskCount());
         
         journal.shutdown();
 
@@ -256,7 +251,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 ITx.UNISOLATED, false/*readOnly*/, resource) {
 
             /**
@@ -326,7 +321,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         assertNotSame(ITx.UNISOLATED,tx);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 tx, true/*readOnly*/, resource) {
 
             /**
@@ -401,7 +396,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         assertNotSame(ITx.UNISOLATED,tx);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 tx, true/*readOnly*/, resource) {
 
             /**
@@ -475,7 +470,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         assertNotSame(ITx.UNISOLATED,tx);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 tx, false/*readOnly*/, resource) {
 
             /**
@@ -550,7 +545,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 ITx.UNISOLATED, false/* readOnly */, resource) {
 
             /**
@@ -666,7 +661,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+        Future<Object> future = journal.submit(new AbstractTask(journal,
                 ITx.UNISOLATED, false/* readOnly */, resource) {
 
             /**
@@ -744,4 +739,454 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
     }
 
+    /**
+     * Verify that an {@link AbstractTask} correctly rejects an attempt to
+     * submit the same instance twice. This is important since the base class
+     * has various items of state that are not thread-safe and are not designed
+     * to be reusable.
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     */
+    public void test_tasksAreNotThreadSafe() throws InterruptedException, ExecutionException {
+        
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+        
+        final String[] resource = new String[]{"foo"};
+        
+        /*
+         * Note: this task is stateless
+         */
+        final AbstractTask task = new AbstractTask(journal,
+                ITx.UNISOLATED, false/* readOnly */, resource) {
+
+            protected Object doTask() throws Exception {
+
+                return null;
+                
+            }
+
+        };
+
+        /*
+         * Note: We have to request the result of the task before re-submitting
+         * the task again since the duplicate instance is being silently dropped
+         * otherwise - I expect that there is a hash set involved somewhere such
+         * that duplicates can not exist in the queue.
+         */
+        journal.submit(task).get();
+
+        /*
+         * Submit the task again - it will fail.
+         */
+        try {
+
+            journal.submit(task).get();
+            
+            fail("Expecting: "+ResubmitException.class);
+
+        } catch(ExecutionException ex) {
+            
+            if(ex.getCause() instanceof ResubmitException) {
+                
+                System.err.println("Ignoring expected exception: "+ex);
+                
+            } else {
+                
+                fail("Expecting: "+ResubmitException.class);
+                
+            }
+            
+        }
+
+        journal.shutdown();
+        
+        journal.delete();
+
+    }
+
+    /**
+     * Correctness test of task retry when another task causes a commit group to
+     * be discarded.
+     * 
+     * @todo Test retry of tasks (read only or read write) when they are part of
+     *       a commit group in which some other task fails so they get
+     *       interrupted and have to abort.
+     * 
+     * @todo also test specifically with isolated tasks to make sure that the
+     *       isolated indices are being rolled back to the last commit when the
+     *       task is aborted.
+     */
+    public void test_retry_readService() {
+
+        fail("write this test");
+        
+    }
+    
+    public void test_retry_writeService() {
+
+        fail("write this test");
+        
+    }
+
+    public void test_retry_txService_readOnly() {
+
+        fail("write this test");
+        
+    }
+
+    /*
+     * note: the difference between readOnly and readCommitted is that the
+     * latter MUST read from whatever the committed state of the index is at the
+     * time that it executes (or re-retries?) while the formed always reads from
+     * the state of the index as of the transaction start time.
+     */
+    public void test_retry_txService_readCommitted() {
+
+        fail("write this test");
+        
+    }
+
+    public void test_retry_txService_readWrite() {
+
+        fail("write this test");
+        
+    }
+
+    /*
+     * @todo tests from here on down are basically stress tests more than
+     * correctness tests and could be refactored into other test suite(s) and
+     * used with the ExperimentDriver to tune the system.
+     */
+    
+    /**
+     * Test that submits a bunch of write tasks to a
+     * {@link WriteExecutorService} of a known capacity and with non-overlapping
+     * lock requirements and verifies that the commit group contains most of
+     * those tasks (some may not make it in due to overhead in starting new
+     * threads and assigning tasks to threads, but most should).
+     * <p>
+     * The tasks each creates a named index. This means that there is some data
+     * to write, but also that some synchronization is required on
+     * {@link AbstractJournal#name2Addr}.
+     * 
+     * @todo another way to do this is to pre-generate all the indices, note the
+     *       current commit counter, and then submit a bunch of simple index
+     *       write tasks.  This can be used to measure the effective index write
+     *       throughput.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_groupCommit() throws InterruptedException {
+
+        Properties properties = getProperties();
+
+        final int ntasks = 100;
+        
+        final int writeServicePoolSize = 20;
+        
+        properties.setProperty(Options.WRITE_SERVICE_POOL_SIZE, ""+writeServicePoolSize);
+        
+        Journal journal = new Journal(properties);
+
+        // pre-start all worker threads to minimize startup costs for this test.
+        journal.writeService.prestartAllCoreThreads();
+
+        // the initial value of the commit counter.
+        final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
+        
+        final AtomicLong nrun = new AtomicLong(0);
+        
+        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+
+        for (int i = 0; i < ntasks; i++) {
+
+            // resource names are non-overlapping.
+            final String resource = ""+i;
+            
+            final UUID indexUUID = UUID.randomUUID();
+            
+            tasks.add( SequenceTask.newSequence(new AbstractTask[]{
+
+                    new RegisterIndexTask(journal, resource,
+                            new UnisolatedBTree(journal, indexUUID)),
+     
+                    new AbstractTask(journal, ITx.UNISOLATED,
+                            false/* readOnly */, resource) {
+
+                        protected Object doTask() throws Exception {
+
+                            nrun.incrementAndGet();
+                            
+                            return null;
+
+                        }
+
+                    }
+            }));
+
+        }
+
+        /*
+         * Submit all tasks.
+         */
+        
+        final long timeout = 5000;
+        
+        final long begin = System.currentTimeMillis();
+        
+//        List<Future<Object>> futures = 
+        journal.invokeAll(tasks);
+
+        // sleep until the tasks are done or the timeout is expired.
+        while(nrun.get()!=ntasks && (timeout - (System.currentTimeMillis()-begin)>0)) {
+        
+            Thread.sleep(100);
+            
+        }
+
+        // the actual run time.
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        // #of tasks run by this moment in time.
+        final long ndone = nrun.get();
+        
+        // the commit counter at this moment in time.
+        final long ncommits = journal.getRootBlockView().getCommitCounter() - beginCommitCounter; 
+        
+        // #of commits per second.
+        final double commitsPerSecond = ncommits * 1000d / elapsed;
+
+        // #of tasks per second.
+        final double tasksPerSecond = ndone * 1000d / elapsed;
+
+        final double tasksPerCommit = ((double)ndone) / ncommits;
+        
+        System.err.println("ntasks="+ntasks+", ndone="+ndone+", ncommits="+ncommits+", timeout="+elapsed+"ms");
+        
+        System.err.println("tasks/sec="+tasksPerSecond);
+        
+        System.err.println("commits/sec="+commitsPerSecond);
+        
+        System.err.println("tasks/commit="+tasksPerCommit);
+        
+        journal.shutdown();
+        
+        journal.delete();
+
+        /*
+         * Note: You SHOULD expect 80%+ of the tasks to participate in each
+         * commit group on average. However, the actual number can be lower due
+         * to various startup costs so sometimes this test will fail - it is
+         * really a stress test and should be done once the store is up and
+         * running already.
+         */
+        
+        assertTrue("average group commit size is too small?",
+                tasksPerCommit > writeServicePoolSize * .5);
+        
+    }
+    
+    /**
+     * Test that no tasks are failed when a large set of <strong>writer</strong>
+     * tasks that attempt to lock the same resource(s) are submitted at once
+     * (write tasks use the lock system to control access to the unisolated
+     * indices).
+     * <p>
+     * Note: Tasks will be serialized since they are contending for the same
+     * resources.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_lockContention() throws InterruptedException {
+
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+        
+        final String[] resource = new String[]{"foo","bar","baz"};
+
+        final int ntasks = 1000;
+        
+        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+
+        for (int i = 0; i < ntasks; i++) {
+
+            tasks.add(new AbstractTask(journal, ITx.UNISOLATED,
+                    false/* readOnly */, resource) {
+
+                protected Object doTask() throws Exception {
+
+                    return null;
+
+                }
+
+            });
+
+        }
+
+        /*
+         * Submit all tasks. Tasks can begin executing right away. If the write
+         * service is using a blocking queue with a limited capacity then some
+         * or all of the tasks may complete before this method returns.
+         */
+        
+        List<Future<Object>> futures = journal.invokeAll(tasks);
+
+        /*
+         * Shutdown the journal, which will cause us to await termination of
+         * those tasks. However, shutdown can timeout so some of the tasks may
+         * wind up cancelled rather than running to completion.
+         * 
+         * Note: It is possible for shutdown() to close the store before all
+         * worker threads have been cancelled, in which case you may see some
+         * strange errors being thrown.
+         */
+
+        journal.shutdown();
+        
+        journal.delete();
+
+        Iterator<Future<Object>> itr = futures.iterator();
+
+        int ncancelled = 0;
+        int ncomplete = 0;
+        int nerror = 0;
+        
+        while(itr.hasNext()) {
+            
+            Future<Object> future = itr.next();
+            
+            if (future.isCancelled()) {
+
+                ncancelled++;
+
+            } else if (future.isDone()) {
+              
+                try {
+                
+                    future.get();
+                    
+                    ncomplete++;
+                    
+                } catch (ExecutionException ex) {
+                    
+                    nerror++;
+                    
+                    log.warn("Not expecting: "+ex, ex);
+                    
+                }
+                
+            }
+            
+        }
+        
+        System.err.println("#tasks=" + ntasks + " : ncancelled=" + ncancelled
+                + ", ncomplete=" + ncomplete + ", nerror=" + nerror);
+        
+        /*
+         * No errors are allowed, but some tasks may never start due to the high
+         * lock contention.
+         */
+        
+        assertEquals("nerror", 0, nerror);
+        
+    }
+    
+//     Note: I can not think of any way to write this test.
+//    
+//    /**
+//     * This test verifies that unisolated reads are against the last committed
+//     * state of the index(s), that they do NOT permit writes, and than
+//     * concurrent writers on the same named index(s) do NOT conflict.
+//     */
+//    public void test_submit_readService_isolation01() throws InterruptedException, ExecutionException {
+//        
+//        Properties properties = getProperties();
+//        
+//        Journal journal = new Journal(properties);
+//        
+//        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+//
+//        final String resource = "foo";
+//        
+//        final AtomicBoolean ran = new AtomicBoolean(false);
+//
+//        final UUID indexUUID = UUID.randomUUID();
+//
+//        // create the index (and commit).
+//        assertEquals("indexUUID", indexUUID, journal.submit(
+//                new RegisterIndexTask(journal, resource, new UnisolatedBTree(
+//                        journal, indexUUID))).get());
+//
+//        // verify commit.
+//        assertEquals("commit counter unchanged?",
+//                commitCounterBefore+1, journal.getRootBlockView()
+//                        .getCommitCounter());
+//
+//        // write some data on the index (and commit).
+//        final long metadataAddr = (Long) journal.submit(
+//                new AbstractIndexTask(journal, ITx.UNISOLATED,
+//                        false/*readOnly*/, resource) {
+//
+//            protected Object doTask() throws Exception {
+//
+//                IIndex ndx = getIndex(getOnlyResource());
+//
+//                // Note: the metadata address before any writes on the index.
+//                final long metadataAddr = ((BTree)ndx).getMetadata().getMetadataAddr();
+//
+//                // write on the index.
+//                ndx.insert(new byte[]{1,2,3},new byte[]{2,2,3});
+//                
+//                return metadataAddr;
+//
+//            }
+//            
+//        }).get();
+//
+//        // verify another commit.
+//        assertEquals("commit counter unchanged?",
+//                commitCounterBefore+2, journal.getRootBlockView()
+//                        .getCommitCounter());
+//
+//        Future<Object> future = journal.submit(new AbstractIndexTask(journal,
+//                ITx.UNISOLATED, true/*readOnly*/, resource) {
+//
+//            /**
+//             * The task just sets a boolean value and returns the name of the
+//             * sole resource. It does not actually read anything.
+//             */
+//            protected Object doTask() throws Exception {
+//
+//                ran.compareAndSet(false, true);
+//
+//                return getOnlyResource();
+//
+//            }
+//        });
+//
+//        // the test task returns the resource as its value.
+//        assertEquals("result",resource,future.get());
+//        
+//        /*
+//         * make sure that the flag was set (not reliably set until we get() the
+//         * future).
+//         */
+//        assertTrue("ran",ran.get());
+//        
+//        /*
+//         * Verify that a commit was NOT performed.
+//         */
+//        assertEquals("commit counter changed?",
+//                commitCounterBefore, journal.getRootBlockView()
+//                        .getCommitCounter());
+//        
+//        journal.shutdown();
+//
+//        journal.delete();
+//
+//    }
+    
 }

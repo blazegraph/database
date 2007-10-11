@@ -76,6 +76,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 /**
  * Stress tests for concurrent transaction processing.
  * 
+ * FIXME refactor to use {@link ConcurrentJournal}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
