@@ -850,6 +850,18 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
 
+    /**
+     * @todo consider wrapping up the properties rather than cloning them.
+     *  
+     * @todo consider making the properties restart safe so that they can be
+     *       read from the journal. This will let some properties be specified
+     *       on initialization while letting others default or be overriden on
+     *       restart. This is trivially accomplished by dedicating a root slot
+     *       to a Properties object, or a flattened Properties object serialized
+     *       as key-value pairs, in which case the data could just be loaded
+     *       into a btree and the btree api could be used to change the
+     *       persistent properties as necessary.
+     */
     final public Properties getProperties() {
 
         return (Properties) properties.clone();
@@ -1763,6 +1775,40 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         
         return registerIndex(name, new UnisolatedBTree(this, UUID.randomUUID()));
         
+    }
+    
+    public IIndex registerIndex(String name, IIndex ndx) {
+
+        assertOpen();
+
+        synchronized (name2Addr) {
+                
+            // add to the persistent name map.
+            name2Addr.registerIndex(name, ndx);
+
+            // report event (the application has access to the named index).
+            ResourceManager.openUnisolatedBTree(name);
+
+        }
+
+        return ndx;
+        
+    }
+
+    public void dropIndex(String name) {
+        
+        assertOpen();
+        
+        synchronized(name2Addr) {
+                
+            // drop from the persistent name map.
+            name2Addr.dropIndex(name);
+
+            // report event.
+            ResourceManager.dropUnisolatedBTree(name);
+
+        }
+
     }
     
     /**

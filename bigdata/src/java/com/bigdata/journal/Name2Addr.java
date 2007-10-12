@@ -448,7 +448,7 @@ public class Name2Addr extends BTree implements IDirtyListener {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-    public void add(String name,IIndex btree) {
+    public void registerIndex(String name,IIndex btree) {
         
         if (name == null)
             throw new IllegalArgumentException();

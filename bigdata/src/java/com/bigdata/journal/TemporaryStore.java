@@ -130,7 +130,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
         synchronized (name2Addr) {
 
             // add to the persistent name map.
-            name2Addr.add(name, btree);
+            name2Addr.registerIndex(name, btree);
 
             return btree;
 

@@ -100,8 +100,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestTemporaryStore.class );
         
         // test the different journal modes.
+        
         suite.addTest( TestTransientJournal.suite() );
+        
         suite.addTest( TestDirectJournal.suite() );
+        
         /*
          * Note: The mapped journal is somewhat problematic and its tests are
          * disabled for the moment since (a) we have to pre-allocate large
@@ -110,7 +113,9 @@ public class TestAll extends TestCase {
          * makes cleanup of the test suites difficult and winds up spewing 200M
          * files all over your temp directory.
          */
+        
 //        suite.addTest( TestMappedJournal.suite() );
+
         suite.addTest( TestDiskJournal.suite() );
 
         return suite;

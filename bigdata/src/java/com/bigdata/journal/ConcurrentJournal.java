@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -59,7 +60,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -801,62 +801,64 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
     }
     
-    /*
-     * various methods that are just submitting tasks.
-     */
-    
-    public IIndex registerIndex(String name, IIndex btree) {
-        
-        try {
-
-            // add the index iff it does not exist.
-            
-            if(!(Boolean) submit(new RegisterIndexTask(this,name,btree)).get()) {
-                
-                throw new IndexExistsException(name);
-                
-            }
-            
-            IIndex ndx = getIndex(name);
-            
-            if(ndx==null) {
-                
-                throw new NoSuchIndexException(name+" was dropped by concurrent task");
-                
-            }
-            
-            return ndx;
-            
-        } catch(InterruptedException ex) {
-
-            throw new RuntimeException(ex);
-
-        } catch (ExecutionException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
-    }
-
-    public void dropIndex(String name) {
-        
-        try {
-
-            submit(new DropIndexTask(this,name)).get();
-            
-        } catch(InterruptedException ex) {
-
-            throw new RuntimeException(ex);
-
-        } catch (ExecutionException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-    
+//    /*
+//     * various methods that are just submitting tasks.
+//     */
+//    
+//    public IIndex registerIndex(String name, IIndex btree) {
+//        
+//        try {
+//
+//            // add the index iff it does not exist.
+//            
+//            UUID indexUUID = (UUID) submit(new RegisterIndexTask(this,name,btree)).get();
+//            
+//            if( indexUUID != btree.getIndexUUID() ) {
+//                
+//                throw new IndexExistsException(name);
+//                
+//            }
+//            
+//            IIndex ndx = getIndex(name);
+//            
+//            if(ndx==null) {
+//                
+//                throw new NoSuchIndexException(name+" was dropped by concurrent task");
+//                
+//            }
+//            
+//            return ndx;
+//            
+//        } catch(InterruptedException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        } catch (ExecutionException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//
+//    }
+//
+//    public void dropIndex(String name) {
+//        
+//        try {
+//
+//            submit(new DropIndexTask(this,name)).get();
+//            
+//        } catch(InterruptedException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        } catch (ExecutionException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//        
+//    }
+//    
     /*
      * transaction support.
      */
