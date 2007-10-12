@@ -52,6 +52,7 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -69,9 +70,11 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
+import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.ResourceState;
 
@@ -89,9 +92,14 @@ import com.bigdata.scaleup.ResourceState;
  * @see NIODataService, which contains some old code that can be refactored for
  *      an NIO interface to the data service.
  * 
- * @todo consider further refactoring of the operations exposed here into the
- *       journal package and examine how to refactor the RDFS database so as to
- *       play nice with the {@link ConcurrentJournal}.
+ * @todo explore the use of a blocking queue to throttle the #of tasks that are
+ *       submitted to the data service. When the queue is full
+ *       {@link RejectedExecutionException} will be thrown, and the client will
+ *       have to handle that. If the queue never blocks then it is possible to
+ *       flood the data service with requests, even through they will be
+ *       processed by no more than
+ *       {@link ConcurrentJournal.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
+ *       threads.
  * 
  * @todo Support overflow. Queued tasks should be migrated from the "old"
  *       journal to the "new" journal while running tasks should complete on the
@@ -275,6 +283,13 @@ abstract public class DataService implements IDataService,
             
         }
 
+        if (partitionId == -1) {
+
+            // Not a partitioned index.
+            return name;
+            
+        }
+        
         return name + "#" + partitionId;
 
     }
@@ -426,9 +441,9 @@ abstract public class DataService implements IDataService,
                 
             }
 
-//        journal.submit(new RegisterIndexTask(journal, name, btree)).get();
+            journal.submit(new RegisterIndexTask(journal, name, btree)).get();
         
-            journal.registerIndex(name, btree);
+//            journal.registerIndex(name, btree);
         
         } finally {
             
@@ -445,9 +460,9 @@ abstract public class DataService implements IDataService,
         
         try {
         
-//      journal.submit(new DropIndexTask(journal, name)).get();
+            journal.submit(new DropIndexTask(journal, name)).get();
 
-            journal.dropIndex(name);
+//            journal.dropIndex(name);
         
         } finally {
             

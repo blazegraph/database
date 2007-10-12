@@ -48,10 +48,13 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -116,6 +119,21 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     /**
      * Options for the {@link ConcurrentJournal}.
      * 
+     * @todo add option for retryCount, timeout (from submission until the group
+     *       commit).
+     * 
+     * @todo consider option for latency that the thread requesting a group
+     *       commit allows for other tasks in the queue to begin running. this
+     *       latency should be disregarded if it would risk a timeout of the
+     *       task itself.
+     * 
+     * @todo add options: (a) to prestart all core threads; (b) set the maximum
+     *       #of threads; and (c) set the maximum queue capacity for the read
+     *       and tx thread pools.
+     * 
+     * @todo Find the sweet spots for all these defaults using various stress
+     *       tests.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -125,68 +143,121 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * <code>txServicePoolSize</code> - The #of threads in the pool
          * handling concurrent transactions.
          * 
-         * @see #DEFAULT_TX_SERVICE_POOL_SIZE
+         * @see #DEFAULT_TX_SERVICE_CORE_POOL_SIZE
          */
-        public static final String TX_SERVICE_POOL_SIZE = "txServicePoolSize";
+        public static final String TX_SERVICE_CORE_POOL_SIZE = "txServiceCorePoolSize";
 
         /**
          * The default #of threads in the transaction service thread pool.
          */
-        public final static String DEFAULT_TX_SERVICE_POOL_SIZE = "100";
+        public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "50";
 
         /**
          * <code>readServicePoolSize</code> - The #of threads in the pool
          * handling concurrent unisolated read requests on named indices.
          * 
-         * @see #DEFAULT_READ_SERVICE_POOL_SIZE
+         * @see #DEFAULT_READ_SERVICE_CORE_POOL_SIZE
          */
-        public static final String READ_SERVICE_POOL_SIZE = "readServicePoolSize";
+        public static final String READ_SERVICE_CORE_POOL_SIZE = "readServiceCorePoolSize";
 
         /**
          * The default #of threads in the read service thread pool.
+         * 
+         * @see #READ_SERVICE_CORE_POOL_SIZE
          */
-        public final static String DEFAULT_READ_SERVICE_POOL_SIZE = "20";
+        public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "50";
 
         /**
-         * The #of threads in the pool handling concurrent unisolated write on
-         * named indices - this is forced to ONE (1) IFF {@link #GROUP_COMMIT}
-         * is disabled.
+         * The target for the #of threads in the pool handling concurrent
+         * unisolated write on named indices.
          * 
-         * @see #DEFAULT_WRITE_SERVICE_POOL_SIZE
-         * @see #GROUP_COMMIT
+         * @see #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE
          */
-        public final static String WRITE_SERVICE_POOL_SIZE = "writeServicePoolSize";
+        public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
 
         /**
          * The default #of threads in the write service thread pool (#of
          * concurrent index writers).
          */
-        public final static String DEFAULT_WRITE_SERVICE_POOL_SIZE = "20";
-
-        /**
-         * The maximum latency (in milliseconds) that a writer will block
-         * awaiting the next commit and is used IFF {@link #GROUP_COMMIT} is
-         * enabled.
-         */
-        public final static String COMMIT_PERIOD = "commitPeriod";
-
-        /**
-         * The default {@link #COMMIT_PERIOD}.
-         * 
-         * @todo tune this.
-         */
-        public final static String DEFAULT_COMMIT_PERIOD = "200";
-
-        /**
-         * The period (delay) between scheduled invocations of the
-         * {@link StatusTask}.
-         */
-        public final static String STATUS_PERIOD = "statusPeriod";
+        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "100";
         
         /**
-         * The default {@link #STATUS_PERIOD}.
+         * The maximum #of threads allowed in the pool handling concurrent
+         * unisolated write on named indices.
+         * 
+         * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
-        public final static String DEFAULT_STATUS_PERIOD = "2000";
+        public final static String WRITE_SERVICE_MAXIMUM_POOL_SIZE = "writeServiceMaximumPoolSize";
+
+        /**
+         * The default for the maximum #of threads in the write service thread
+         * pool.
+         */
+        public final static String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "1000";
+        
+        /**
+         * When true, the write service will be prestart all of its worker
+         * threads (default false).
+         * 
+         * @see #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
+         */
+        public final static String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "writeServicePrestartAllCoreThreads";
+
+        /**
+         * The default for {@link #WRITE_SERVICE_PRESTART_ALL_CORE_THREADS}.
+         */
+        public final static String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
+
+        /**
+         * The maximum depth of the write service queue before newly submitted tasks
+         * will block the caller.
+         * 
+         * @see #WRITE_SERVICE_CORE_POOL_SIZE
+         * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
+         */
+        public static final String WRITE_SERVICE_QUEUE_CAPACITY = "writeServiceQueueCapacity";
+
+        /**
+         * The default maximum depth of the write service queue (100).
+         */
+        public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "100";
+        
+        /**
+         * The delay between scheduled invocations of the {@link StatusTask}.
+         * 
+         * @see #DEFAULT_STATUS_DELAY
+         */
+        public final static String STATUS_DELAY = "statusDelay";
+        
+        /**
+         * The default {@link #STATUS_DELAY}.
+         */
+        public final static String DEFAULT_STATUS_DELAY = "2000";
+
+        /**
+         * The maximum time in milliseconds that
+         * {@link ConcurrentJournal#shutdown()} will wait termination of the
+         * various services -or- ZERO (0) to wait forever (default is to wait
+         * forever).
+         * <p>
+         * Note: The journal will no longer accept begin to execute queued tasks
+         * once shutdown begins so this primarily effects whether or not tasks
+         * that are already executing will be allowed to run until completion.
+         * <p>
+         * Note: You can use {@link ConcurrentJournal#shutdownNow()} to
+         * terminate the journal immediately.
+         * <p>
+         * Note: Abrupt shutdown of the journal is always safe, but changes that
+         * have not been committed will not be there on restart.
+         * 
+         * @see #DEFAULT_SHUTDOWN_TIMEOUT
+         */
+        public final static String SHUTDOWN_TIMEOUT = "shutdownTimeout";
+
+        /**
+         * The default timeout for {@link ConcurrentJournal#shutdown()}.
+         */
+        public final static String DEFAULT_SHUTDOWN_TIMEOUT = "0";
         
     }
 
@@ -233,27 +304,19 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * <p>
      * Serialization of access to unisolated named indices is acomplished by
      * gaining an exclusive lock on the unisolated named index.
-     * 
-     * @todo the {@link #writeService} SHOULD NOT support scheduled tasks and
-     *       MUST NOT run the {@link GroupCommitRunnable} since shutdown of the
-     *       {@link #writeService} will immediately disable scheduled tasks.
-     *       This is especially bad news for the {@link GroupCommitRunnable}
-     *       since that can lead to deadlocks where a task is awaiting a group
-     *       commit but the scheduled {@link GroupCommitRunnable} has already
-     *       been cancelled so the group commit is never triggered.
      */
     final protected WriteExecutorService writeService;
-
-    /**
-     * Runs the periodic {@link GroupCommitRunnable}.
-     */
-    final protected ScheduledExecutorService commitService;
 
     /**
      * Runs a {@link StatusTask} printing out periodic service status
      * information (counters).
      */
     final protected ScheduledExecutorService statusService;
+
+    /**
+     * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
+     */
+    final long shutdownTimeout;
 
     /**
      * Manages 2PL locking for writes on unisolated named indices.
@@ -266,10 +329,17 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
         log.info("");
 
+        // time when shutdown begins.
         final long begin = System.currentTimeMillis();
 
-        // @todo configuration parameter (ms).
-        final long willingToWait = 2000;
+        /*
+         * Note: when the timeout is zero we approximate "forever" using
+         * Long.MAX_VALUE.
+         */
+
+        final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
+                : this.shutdownTimeout;
+        
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         
         txService.shutdown();
@@ -284,7 +354,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             long elapsed = System.currentTimeMillis() - begin;
             
-            if(!txService.awaitTermination(willingToWait-elapsed, unit)) {
+            if(!txService.awaitTermination(shutdownTimeout-elapsed, unit)) {
                 
                 log.warn("Transaction service termination: timeout");
                 
@@ -302,7 +372,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
             long elapsed = System.currentTimeMillis() - begin;
             
-            if(!readService.awaitTermination(willingToWait-elapsed, unit)) {
+            if(!readService.awaitTermination(shutdownTimeout-elapsed, unit)) {
                 
                 log.warn("Read service termination: timeout");
                 
@@ -316,23 +386,9 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         try {
 
-//            /*
-//             * Trigger a group commit to cover the edge case where we shutdown
-//             * the write service (a) after a write task has executed and is
-//             * awaiting the commit signal; and (b) the scheduled group commit
-//             * task has not run yet. In this edge case the sheduled group commit
-//             * task is NOT run since it is shutdown before it can run. Therefore
-//             * we have to explicitly demand a commit before we await termination
-//             * of the write service.
-//             */
-//            
-//            log.info("Requesting final commit");
-//            
-//            writeService.groupCommit();
-
             long elapsed = System.currentTimeMillis() - begin;
             
-            long timeout = willingToWait-elapsed;
+            long timeout = shutdownTimeout-elapsed;
 
             log.info("Awaiting write service termination: will wait "+timeout+"ms");
 
@@ -340,15 +396,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                 
                 log.warn("Write service termination : timeout");
                 
-                /*
-                 * Note: Do NOT request a commit from here. Tasks already on the
-                 * write service must await the next commit before that service
-                 * can terminate. Therefore, except in the degenerate case where
-                 * no tasks are awaiting commit, it is impossible for the write
-                 * service to terminate normally without having performed a
-                 * commit (or abort if something went wrong).
-                 */
-
             }
             
         } catch(InterruptedException ex) {
@@ -357,22 +404,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
         }
 
-        /*
-         * This is no longer required once the write service is properly down.
-         * 
-         * No more writes will be accepted once we issue the shutdown request on
-         * the write service.
-         * 
-         * We awaited termination of the write service above. If there were
-         * running write tasks then normal termination requires that those tasks
-         * complete (in a timely manner) and that a group commit is performed.
-         * It is possible that we will shutdown the store before normal
-         * completion can be achieved, in which case some writes will not be
-         * made restart safe (and their callers will get appropriate
-         * exceptions).
-         */
-        commitService.shutdown();
-        
+        // @todo custom statusService overrides terminate() to always log a final status message.
         statusService.shutdown();
 
         super.shutdown();
@@ -391,8 +423,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         writeService.shutdownNow();
 
-        commitService.shutdownNow();
-        
         statusService.shutdownNow();
 
         super.shutdownNow();
@@ -413,68 +443,65 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         final int txServicePoolSize;
         final int readServicePoolSize;
-        final int writeServicePoolSize;
 
         // txServicePoolSize
         {
 
-            val = properties.getProperty(Options.TX_SERVICE_POOL_SIZE,
-                    Options.DEFAULT_TX_SERVICE_POOL_SIZE);
+            val = properties.getProperty(Options.TX_SERVICE_CORE_POOL_SIZE,
+                    Options.DEFAULT_TX_SERVICE_CORE_POOL_SIZE);
 
             txServicePoolSize = Integer.parseInt(val);
 
             if (txServicePoolSize < 1) {
 
                 throw new RuntimeException("The '"
-                        + Options.TX_SERVICE_POOL_SIZE
+                        + Options.TX_SERVICE_CORE_POOL_SIZE
                         + "' must be at least one.");
 
             }
 
-            log.info(Options.TX_SERVICE_POOL_SIZE + "=" + txServicePoolSize);
+            log.info(Options.TX_SERVICE_CORE_POOL_SIZE + "=" + txServicePoolSize);
 
         }
 
         // readServicePoolSize
         {
 
-            val = properties.getProperty(Options.READ_SERVICE_POOL_SIZE,
-                    Options.DEFAULT_READ_SERVICE_POOL_SIZE);
+            val = properties.getProperty(Options.READ_SERVICE_CORE_POOL_SIZE,
+                    Options.DEFAULT_READ_SERVICE_CORE_POOL_SIZE);
 
             readServicePoolSize = Integer.parseInt(val);
 
             if (readServicePoolSize < 1) {
 
                 throw new RuntimeException("The '"
-                        + Options.READ_SERVICE_POOL_SIZE
+                        + Options.READ_SERVICE_CORE_POOL_SIZE
                         + "' must be at least one.");
 
             }
 
             log
-                    .info(Options.READ_SERVICE_POOL_SIZE + "="
+                    .info(Options.READ_SERVICE_CORE_POOL_SIZE + "="
                             + readServicePoolSize);
 
         }
 
-        // writeServicePoolSize
+        // shutdownTimeout
         {
 
-            val = properties.getProperty(Options.WRITE_SERVICE_POOL_SIZE,
-                    Options.DEFAULT_WRITE_SERVICE_POOL_SIZE);
+            val = properties.getProperty(Options.SHUTDOWN_TIMEOUT,
+                    Options.DEFAULT_SHUTDOWN_TIMEOUT);
 
-            writeServicePoolSize = Integer.parseInt(val);
+            shutdownTimeout = Long.parseLong(val);
 
-            if (writeServicePoolSize < 1) {
+            if (shutdownTimeout < 0) {
 
-                throw new RuntimeException("The '"
-                        + Options.WRITE_SERVICE_POOL_SIZE
-                        + "' must be at least one.");
+                throw new RuntimeException("The '" + Options.SHUTDOWN_TIMEOUT
+                        + "' must be non-negative.");
 
             }
 
-            log.info(Options.WRITE_SERVICE_POOL_SIZE + "="
-                    + writeServicePoolSize);
+            log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
 
         }
 
@@ -487,79 +514,110 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                 DaemonThreadFactory.defaultThreadFactory());
 
         // setup thread pool for unisolated write operations.
-        writeService = new WriteExecutorService(this, writeServicePoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
-
-        /*
-         * Schedules a repeatable task that will perform group commit.
-         * 
-         * Note: The delay between commits is estimated based on the #of times
-         * per second (1000ms) that you can sync a backing file to disk.
-         * 
-         * @todo if groupCommit is used with forceOnCommit=No or with
-         * bufferMode=Transient then the delay can be smaller and that will
-         * reduce the latency of commit without any substantial penalty.
-         * 
-         * @todo The first ballpark estimates are (without task concurrency)
-         * 
-         * Transient := 63 operations per second.
-         * 
-         * Disk := 35 operations per second (w/ forceOnCommit).
-         * 
-         * Given those data, the maximum throughput for groupCommit would be
-         * around 60 operations per second (double the performance).
-         * 
-         * Enabling task concurrency could significantly raise the #of upper
-         * bound on the operations per second depending on the available CPU
-         * resources to execute those tasks and the extent to which the tasks
-         * operation on distinct indices and may therefore be parallelized.
-         */
         {
+            
+            final int writeServiceCorePoolSize;
+            final int writeServiceMaximumPoolSize;
+            final int writeServiceQueueCapacity;
+            final boolean writeServicePrestart;
 
-            final long commitPeriod;
-            // commitPeriod
+            // writeServiceCorePoolSize
             {
 
-                val = properties.getProperty(Options.COMMIT_PERIOD,
-                        Options.DEFAULT_COMMIT_PERIOD);
+                writeServiceCorePoolSize = Integer.parseInt(properties.getProperty(
+                        Options.WRITE_SERVICE_CORE_POOL_SIZE,
+                        Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE));
 
-                commitPeriod = Long.parseLong(val);
+                if (writeServiceCorePoolSize < 1) {
 
-                if (commitPeriod < 1) {
-
-                    throw new RuntimeException("The '" + Options.COMMIT_PERIOD
+                    throw new RuntimeException("The '"
+                            + Options.WRITE_SERVICE_CORE_POOL_SIZE
                             + "' must be at least one.");
 
                 }
 
-                log.info(Options.COMMIT_PERIOD + "=" + commitPeriod);
+                log.info(Options.WRITE_SERVICE_CORE_POOL_SIZE + "="
+                        + writeServiceCorePoolSize);
 
             }
 
-            final long initialDelay = 100;
-            // final long delay = (long) (1000d / 35);
-            final long delay = commitPeriod;
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
+            // writeServiceMaximumPoolSize
+            {
 
-            commitService = Executors
-                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                writeServiceMaximumPoolSize = Integer.parseInt(properties.getProperty(
+                        Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                        Options.DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE));
+
+                if (writeServiceMaximumPoolSize < writeServiceCorePoolSize) {
+
+                    throw new RuntimeException("The '"
+                            + Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE
+                            + "' must be greater than the core pool size.");
+
+                }
+
+                log.info(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE + "="
+                        + writeServiceMaximumPoolSize);
+
+            }
+
+            // writeServiceQueueCapacity
+            {
+
+                writeServiceQueueCapacity = Integer.parseInt(properties.getProperty(
+                        Options.WRITE_SERVICE_QUEUE_CAPACITY,
+                        Options.DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY));
+
+                if (writeServiceQueueCapacity < 0) {
+
+                    throw new RuntimeException("The '"
+                            + Options.WRITE_SERVICE_QUEUE_CAPACITY
+                            + "' must be non-negative.");
+
+                }
+
+                log.info(Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
+                        + writeServiceQueueCapacity);
+
+            }
+
+            // writeServicePrestart
+            {
+                
+                writeServicePrestart = Boolean.parseBoolean(properties.getProperty(
+                        Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS,
+                        Options.DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS));
+                
+                log.info(Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS + "="
+                        + writeServicePrestart);
+
+            }
+            
+            final BlockingQueue<Runnable> queue =
+                ((writeServiceQueueCapacity == 0 || writeServiceQueueCapacity > 5000)
+                        ? new LinkedBlockingQueue<Runnable>()
+                        : new ArrayBlockingQueue<Runnable>(writeServiceQueueCapacity)
+                        );
+            
+            writeService = new WriteExecutorService(this, writeServiceCorePoolSize,
+                    writeServiceMaximumPoolSize, queue, DaemonThreadFactory
                             .defaultThreadFactory());
 
-            log.info("Establishing group commit: initialDelay=" + initialDelay
-                    + ", periodic delay=" + delay);
+            if (writeServicePrestart) {
 
-            commitService.scheduleWithFixedDelay(new GroupCommitRunnable(
-                    writeService), initialDelay, delay, unit);
-
+                writeService.prestartAllCoreThreads();
+                
+            }
+            
         }
-
+        
         // setup scheduled runnable for periodic status messages.
         {
 
             final long initialDelay = 100;
             
             final long delay = Long.parseLong(properties.getProperty(
-                    Options.STATUS_PERIOD, Options.DEFAULT_STATUS_PERIOD));
+                    Options.STATUS_DELAY, Options.DEFAULT_STATUS_DELAY));
 
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
@@ -572,17 +630,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         }
 
-        /*
-         * setup the lock manager.
-         * 
-         * @todo we need to declare the unisolated indices to the lock
-         * manager by name so that it will be willing to provide lock
-         * support for those resources. we can either do that implicitly,
-         * perhaps by modifying the lock manager to use a weak value hash of
-         * the resources and then lazily creating an entry for each resource
-         * as a lock is requested. This helps to manage the resource burden
-         * of the lock manager.
-         */
+        // Setup the lock manager.
         {
 
             /*
@@ -593,60 +641,19 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
             final boolean predeclareLocks = true;
 
-            // create the lock manager.
+            /*
+             * Create the lock manager. The capacity is only used if we need to
+             * detect deadlocks if we are NOT pre-declaring locks. When we
+             * pre-declare locks deadlocks are NOT possible.
+             */
 
-            lockManager = new LockManager<String>(writeServicePoolSize,
-                    predeclareLocks);
+            lockManager = new LockManager<String>(writeService
+                    .getMaximumPoolSize(), predeclareLocks);
 
         }
 
     }
 
-    /**
-     * Run periodically to make sure that a group commit is triggered even if there
-     * are no pending tasks on the write service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class GroupCommitRunnable implements Runnable {
-
-        private final WriteExecutorService writeService;
-        
-        GroupCommitRunnable(WriteExecutorService writeService) {
-         
-            if(writeService==null) throw new NullPointerException();
-            
-            this.writeService = writeService;
-            
-        }
-
-        /*
-         * Note: Do NOT throw an exception out of here or the task will not be
-         * re-scheduled!
-         */
-        public void run() {
-            
-            try {
-
-                log.debug("Requesting periodic group commit");
-                
-                if(writeService.groupCommit()) {
-
-                    log.info("Did periodic group commit");
-                    
-                }
-                
-            } catch(Throwable t) {
-                
-                log.warn("Group commit: "+t, t);
-                
-            }
-            
-        }
-        
-    }
-    
     /**
      * Factory allows subclasses to extend the {@link StatusTask}.
      */
@@ -674,10 +681,16 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         }
 
         /**
-         * Writes out the status on {@link #log}. 
+         * Writes out the status on {@link #log}.
+         * 
+         * @todo measure the maximum latency for a task to begin execution.
+         * @todo measure the #of tasks that are retried.
+         * @todo measure the maximum latency for a task from submit to commit.
+         * @todo report averages also, not just maximums.
          */
         protected void status() {
 
+            // #of commits on the _store_ (not since the write service was started).
             final long commitCounter = getCommitRecord().getCommitCounter();
 
             log.info(
@@ -697,8 +710,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ((ThreadPoolExecutor) writeService).getActiveCount() + ","
                     + ((ThreadPoolExecutor) writeService).getQueue().size() + ","
                     + ((ThreadPoolExecutor) writeService).getCompletedTaskCount() + ")"
-                    + // commitCounter.
-                    ", commitCounter=" + commitCounter
+                    + // commitCounter and related stats.
+                    ", commitCounter=" + commitCounter+
+                    ", ncommits="+writeService.getCommitCount()+
+                    ", naborts="+writeService.getAbortCount()+
+                    ", maxLatencyUntilCommit="+writeService.getMaxLatencyUntilCommit()+
+                    ", maxCommitLatency="+writeService.getMaxCommitLatency()
                     );
 
         }
@@ -716,13 +733,13 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * every write. Group commits are scheduled by the {@link #commitService}.
      * The trigger conditions for group commits may be configured using
      * {@link Options}. If you are using the store in a single threaded context
-     * then you may set {@link Options#WRITE_SERVICE_POOL_SIZE} to ONE (1) which
-     * has the effect of triggering commit immediately after each unisolated
-     * write. However, note that you can not sync a disk more than ~ 30-40 times
-     * per second so your throughput in write operations per second will never
-     * exceed that for a single-threaded application writing on a hard disk.
-     * (Your mileage can vary if you are writing on a transient store or using a
-     * durable medium other than disk).
+     * then you may set {@link Options#WRITE_SERVICE_CORE_POOL_SIZE} to ONE (1)
+     * which has the effect of triggering commit immediately after each
+     * unisolated write. However, note that you can not sync a disk more than ~
+     * 30-40 times per second so your throughput in write operations per second
+     * will never exceed that for a single-threaded application writing on a
+     * hard disk. (Your mileage can vary if you are writing on a transient store
+     * or using a durable medium other than disk).
      * <p>
      * Note: The isolated indices used by a {@link IsolationEnum#ReadWrite}
      * transaction are NOT thread-safe. Therefore a partial order is imposed
@@ -736,9 +753,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * 
      * @return The {@link Future} that may be used to resolve the outcome of the
      *         task.
-     *         
+     * 
      * @exception RejectedExecutionException
-     *                if task cannot be scheduled for execution
+     *                if task cannot be scheduled for execution (typically the
+     *                queue has a limited capacity and is full)
      * @exception NullPointerException
      *                if task null
      */
@@ -801,64 +819,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
     }
     
-//    /*
-//     * various methods that are just submitting tasks.
-//     */
-//    
-//    public IIndex registerIndex(String name, IIndex btree) {
-//        
-//        try {
-//
-//            // add the index iff it does not exist.
-//            
-//            UUID indexUUID = (UUID) submit(new RegisterIndexTask(this,name,btree)).get();
-//            
-//            if( indexUUID != btree.getIndexUUID() ) {
-//                
-//                throw new IndexExistsException(name);
-//                
-//            }
-//            
-//            IIndex ndx = getIndex(name);
-//            
-//            if(ndx==null) {
-//                
-//                throw new NoSuchIndexException(name+" was dropped by concurrent task");
-//                
-//            }
-//            
-//            return ndx;
-//            
-//        } catch(InterruptedException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        } catch (ExecutionException ex) {
-//            
-//            throw new RuntimeException(ex);
-//            
-//        }
-//
-//    }
-//
-//    public void dropIndex(String name) {
-//        
-//        try {
-//
-//            submit(new DropIndexTask(this,name)).get();
-//            
-//        } catch(InterruptedException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        } catch (ExecutionException ex) {
-//            
-//            throw new RuntimeException(ex);
-//            
-//        }
-//        
-//    }
-//    
     /*
      * transaction support.
      */

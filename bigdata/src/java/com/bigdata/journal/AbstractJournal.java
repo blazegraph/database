@@ -55,7 +55,6 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Level;
@@ -73,10 +72,10 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.scaleup.MasterJournal;
 import com.bigdata.scaleup.SlaveJournal;
-import com.bigdata.service.IDataService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -87,6 +86,13 @@ import com.bigdata.util.ChecksumUtility;
  * {@link IJournal} interface that does not implement services that are
  * independent in a scale-out solution (transaction management, partitioned
  * indices, and index metadata management).
+ * <p>
+ * The {@link IIndexManager} implementation on this class is NOT thread-safe.
+ * See {@link ConcurrentJournal#submit(AbstractTask)} for a thread-safe API that
+ * provides suitable concurrency control for both isolated and unisolated
+ * operations on named indices. While the {@link IRawStore} interface on this
+ * class is thread-safe, this is a low-level API that is not used by directly by
+ * most applications.
  * </p>
  * <p>
  * Commit processing. The journal maintains two root blocks. Commit updates the
@@ -100,29 +106,17 @@ import com.bigdata.util.ChecksumUtility;
  * </p>
  * <p>
  * Note: transaction processing MAY occur be concurrent since the write set of a
- * each transaction is written on a distinct {@link TemporaryRawStore}.
- * However, each transaction is NOT thread-safe and MUST NOT be executed by more
- * than one concurrent thread. Typically, a thread pool of some fixed size is
- * created and transctions are assigned to threads when they start on the
- * journal. If and as necessary, the {@link TemporaryRawStore} will spill from
- * memory onto disk allowing scale-up transactions.
+ * each transaction is written on a distinct {@link TemporaryStore}. However,
+ * without additional concurrency controls, each transaction is NOT thread-safe
+ * and MUST NOT be executed by more than one concurrent thread. Again, see
+ * {@link ConcurrentJournal#submit(AbstractTask)} for a high-concurrency API for
+ * both isolated operations (transactions) and unisolated operations. Note that
+ * the {@link TemporaryStore} backing a transaction will spill automatically
+ * from memory onto disk if the write set of the transaction grows too large.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo the following javadoc is being outmoded - remove it once the journal is
- *       thread-safe. Also update the text on transaction processing above - a
- *       {@link BTree} is not thread-safe, but a transaction could (potentially)
- *       decompose its work across multiple threads, each of which read or wrote
- *       on a different named index.
- *       <p>
- *       Note: This class does NOT provide a thread-safe implementation of the
- *       {@link IJournal} API. Writes on the store MUST be serialized.
- *       Transactions that write on the store are automatically serialized by
- *       {@link #commit(long)} using the {@link #writeService}, e.g., via
- *       {@link #serialize(Callable)}. See {@link IDataService} for a
- *       thread-safe store.
  * 
  * FIXME Priority items are:
  * <ol>
@@ -146,7 +140,8 @@ import com.bigdata.util.ChecksumUtility;
  * view to a reader (or the reader could always switch to read from the then
  * current btree after a commit - just like the distinction between an isolated
  * reader and a read-committed reader).</li>
- * <li> Group commit for higher transaction throughput.<br>
+ * <li> Group commit for higher transaction throughput (done, now collecting
+ * performance data).<br>
  * Note: For short transactions, TPS is basically constant for a given
  * combination of the buffer mode and whether or not commits are forced to disk.
  * This means that the #of clients is not a strong influence on performance. The
@@ -154,6 +149,7 @@ import com.bigdata.util.ChecksumUtility;
  * disk. This suggests that the big win for TPS throughput is going to be group
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts. </li>
+ * <li> Minimize (de-)serialization costs for B+Trees since we are not IO bound.</li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration, including: support for primary key (clustered) indices;
  * using queues from GOM to journal/database segment server supporting both
@@ -1777,6 +1773,10 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         
     }
     
+    /**
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
     public IIndex registerIndex(String name, IIndex ndx) {
 
         assertOpen();

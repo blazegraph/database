@@ -52,15 +52,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.service.DataService;
@@ -629,7 +626,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
     /**
      * Submits an unisolated task to the read service. The task just sleeps. We
-     * then verify that we can terimate that task using
+     * then verify that we can termiate that task using
      * {@link Future#cancel(boolean)} with
      * <code>mayInterruptWhileRunning := false</code> and that an appropriate
      * exception is thrown in the main thread.
@@ -645,6 +642,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * files or using a debugger, where you can notice that the thread running
      * the task never terminates (it is a daemon thread so it does not keep the
      * JVM from terminating).
+     * <p>
+     * Note: For this test we explicitly set the
+     * {@link Options#SHUTDOWN_TIMEOUT} so that we do not wait forever for the
+     * uninterruptable task.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -652,6 +653,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
     public void test_submit_interrupt02() throws InterruptedException, ExecutionException {
         
         Properties properties = getProperties();
+        
+        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"1000");
         
         Journal journal = new Journal(properties);
         
@@ -861,134 +864,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     
     /**
-     * Test that submits a bunch of write tasks to a
-     * {@link WriteExecutorService} of a known capacity and with non-overlapping
-     * lock requirements and verifies that the commit group contains most of
-     * those tasks (some may not make it in due to overhead in starting new
-     * threads and assigning tasks to threads, but most should).
-     * <p>
-     * The tasks each creates a named index. This means that there is some data
-     * to write, but also that some synchronization is required on
-     * {@link AbstractJournal#name2Addr}.
-     * 
-     * @todo another way to do this is to pre-generate all the indices, note the
-     *       current commit counter, and then submit a bunch of simple index
-     *       write tasks.  This can be used to measure the effective index write
-     *       throughput.
-     * 
-     * @throws InterruptedException
-     */
-    public void test_groupCommit() throws InterruptedException {
-
-        Properties properties = getProperties();
-
-        final int ntasks = 100;
-        
-        final int writeServicePoolSize = 20;
-        
-        properties.setProperty(Options.WRITE_SERVICE_POOL_SIZE, ""+writeServicePoolSize);
-        
-        Journal journal = new Journal(properties);
-
-        // pre-start all worker threads to minimize startup costs for this test.
-        journal.writeService.prestartAllCoreThreads();
-
-        // the initial value of the commit counter.
-        final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
-        
-        final AtomicLong nrun = new AtomicLong(0);
-        
-        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
-
-        for (int i = 0; i < ntasks; i++) {
-
-            // resource names are non-overlapping.
-            final String resource = ""+i;
-            
-            final UUID indexUUID = UUID.randomUUID();
-            
-            tasks.add( SequenceTask.newSequence(new AbstractTask[]{
-
-                    new RegisterIndexTask(journal, resource,
-                            new UnisolatedBTree(journal, indexUUID)),
-     
-                    new AbstractTask(journal, ITx.UNISOLATED,
-                            false/* readOnly */, resource) {
-
-                        protected Object doTask() throws Exception {
-
-                            nrun.incrementAndGet();
-                            
-                            return null;
-
-                        }
-
-                    }
-            }));
-
-        }
-
-        /*
-         * Submit all tasks.
-         */
-        
-        final long timeout = 5000;
-        
-        final long begin = System.currentTimeMillis();
-        
-//        List<Future<Object>> futures = 
-        journal.invokeAll(tasks);
-
-        // sleep until the tasks are done or the timeout is expired.
-        while(nrun.get()!=ntasks && (timeout - (System.currentTimeMillis()-begin)>0)) {
-        
-            Thread.sleep(100);
-            
-        }
-
-        // the actual run time.
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        // #of tasks run by this moment in time.
-        final long ndone = nrun.get();
-        
-        // the commit counter at this moment in time.
-        final long ncommits = journal.getRootBlockView().getCommitCounter() - beginCommitCounter; 
-        
-        // #of commits per second.
-        final double commitsPerSecond = ncommits * 1000d / elapsed;
-
-        // #of tasks per second.
-        final double tasksPerSecond = ndone * 1000d / elapsed;
-
-        final double tasksPerCommit = ((double)ndone) / ncommits;
-        
-        System.err.println("ntasks="+ntasks+", ndone="+ndone+", ncommits="+ncommits+", timeout="+elapsed+"ms");
-        
-        System.err.println("tasks/sec="+tasksPerSecond);
-        
-        System.err.println("commits/sec="+commitsPerSecond);
-        
-        System.err.println("tasks/commit="+tasksPerCommit);
-        
-        journal.shutdown();
-        
-        journal.delete();
-
-        /*
-         * Note: You SHOULD expect 80%+ of the tasks to participate in each
-         * commit group on average. However, the actual number can be lower due
-         * to various startup costs so sometimes this test will fail - it is
-         * really a stress test and should be done once the store is up and
-         * running already.
-         */
-        
-        assertTrue("average group commit size is too small?",
-                tasksPerCommit > writeServicePoolSize * .5);
-        
-    }
-    
-    /**
      * Test that no tasks are failed when a large set of <strong>writer</strong>
      * tasks that attempt to lock the same resource(s) are submitted at once
      * (write tasks use the lock system to control access to the unisolated
@@ -1002,6 +877,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
     public void test_lockContention() throws InterruptedException {
 
         Properties properties = getProperties();
+        
+        properties.setProperty(Options.SHUTDOWN_TIMEOUT, "3000");
         
         Journal journal = new Journal(properties);
         
@@ -1042,6 +919,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
          * Note: It is possible for shutdown() to close the store before all
          * worker threads have been cancelled, in which case you may see some
          * strange errors being thrown.
+         * 
+         * Note: We explictly set the SHUTDOWN_TIMEOUT above so that we will
+         * not wait for all the tasks to complete.
          */
 
         journal.shutdown();

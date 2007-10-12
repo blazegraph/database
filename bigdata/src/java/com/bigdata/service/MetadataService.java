@@ -658,6 +658,8 @@ abstract public class MetadataService extends DataService implements
 
             /*
              * Register the metadata index with the metadata service.
+             * 
+             * @todo review how the index is registered here.
              */
             journal.registerIndex(metadataName, mdi);
 
@@ -953,6 +955,8 @@ abstract public class MetadataService extends DataService implements
             
             /*
              * Register the metadata index with the metadata service.
+             * 
+             * @todo review how the index is registered here.
              */
             journal.registerIndex(metadataName, mdi);
             
