@@ -701,15 +701,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     }
     
     /**
-     * True iff the BTree is dirty.
-     */
-    public boolean isDirty() {
-
-        return root != null && root.dirty;
-
-    }
-    
-    /**
      * Return true iff the state of this B+Tree has been modified since the
      * state associated with a given metadata address.
      * 
@@ -732,35 +723,45 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     }
 
     /**
-     * Return true if the B+Tree needs to be flushed to the backing store using
-     * {@link #write()}.
+     * Return true iff changes would be lost unless the B+Tree is flushed to the
+     * backing store using {@link #write()}.
      * <p>
      * Note: In order to avoid needless writes this method will return
      * <code>false</code> if:
-     * <ol>
+     * <ul>
      * <li> the metadata record is defined (it is not defined when a btree is
-     * first created) -AND- </li>
-     * <li> the root of the btree is NOT dirty, the persistent address of the
-     * root of the btree is the same as the address record in the metadata
-     * record, and the {@link #counter} value agrees with the counter on the
-     * metadata record -OR- </li>
-     * <li> the root is <code>null</code>, indicating that the index is
-     * closed (flushing the index to disk and updating the metadata record is
+     * first created) -AND-
+     * <ul>
+     * <li> EITHER the root is <code>null</code>, indicating that the index
+     * is closed (flushing the index to disk and updating the metadata record is
      * part of the close protocol so we know that the metadata address is
-     * current in this case).</li>
-     * </ol>
+     * current in this case);</li>
+     * <li> OR the root of the btree is NOT dirty, the persistent address of the
+     * root of the btree is the same as the address record of the root in the
+     * metadata record, and the {@link #counter} value agrees with the counter
+     * on the metadata record.</li>
+     * </ul>
+     * </li>
+     * </ul>
      * 
      * @return <code>true</code> true iff changes would be lost unless the
      *         B+Tree was flushed to the backing store using {@link #write()}.
      */
     public boolean needsWrite() {
 
-        boolean nochanges = metadata != null
-                && (root == null || !root.dirty
-                        && metadata.getRootAddr() == root.getIdentity()
-                        && metadata.getCounter() == counter);
+        if (metadata != null && //
+                (root == null || //
+                        ( !root.dirty //
+                        && metadata.getRootAddr() == root.identity //
+                        && metadata.getCounter() == counter)
+                )
+        ) {
+            
+            return false;
+            
+        }
 
-        return !nochanges;
+        return true;
      
     }
     

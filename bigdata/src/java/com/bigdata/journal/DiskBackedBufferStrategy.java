@@ -59,6 +59,14 @@ import java.nio.channels.FileChannel;
  * @todo write tests of the disk-only mode operations when overflowing an int32
  *       extent.
  * 
+ * @todo consider a read buffer that uses a weak value cache backed by an LRU
+ *       hard reference cache, which in turn evicts buffers back to a pool for
+ *       reuse. The pool would bin buffers by size, keep no more than some #of
+ *       buffers of a given size, and offer a service to allocate buffers of no
+ *       less than a given capacity. This might reduce heap churn by recycling
+ *       buffers in addition to providing minimizing the need to hit the OS disk
+ *       cache, the disk buffers, or the disk platter.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

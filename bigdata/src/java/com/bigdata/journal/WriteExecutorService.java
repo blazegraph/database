@@ -46,11 +46,10 @@ package com.bigdata.journal;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -100,13 +99,10 @@ import com.bigdata.btree.BTree;
  * since the state of the {@link BTree} has been changed as a side effect in a
  * non-reversable manner.
  * 
- * @todo compute and make available the average latency waiting for the
- *       {@link #allquiet} and for the commit procedure itself.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class WriteExecutorService extends ScheduledThreadPoolExecutor {
+public class WriteExecutorService extends ThreadPoolExecutor {
 
     protected static final Logger log = Logger
             .getLogger(WriteExecutorService.class);
@@ -119,39 +115,15 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
 
     }
 
-    public WriteExecutorService(ConcurrentJournal journal, int corePoolSize) {
-
-        super(corePoolSize);
-
-        setJournal(journal);
-
-    }
-
     public WriteExecutorService(ConcurrentJournal journal, int corePoolSize,
-            RejectedExecutionHandler handler) {
+            int maximumPoolSize, BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
 
-        super(corePoolSize, handler);
-
-        setJournal(journal);
-
-    }
-
-    public WriteExecutorService(ConcurrentJournal journal, int corePoolSize,
-            ThreadFactory threadFactory) {
-
-        super(corePoolSize, threadFactory);
+        super( corePoolSize, maximumPoolSize, Integer.MAX_VALUE,
+                TimeUnit.NANOSECONDS,
+                queue, threadFactory);
 
         setJournal(journal);
-
-    }
-
-    public WriteExecutorService(ConcurrentJournal journal, int corePoolSize,
-            ThreadFactory threadFactory, RejectedExecutionHandler handler) {
-
-        super(corePoolSize, threadFactory, handler);
-
-        setJournal(journal);
-
+        
     }
 
     private void setJournal(ConcurrentJournal journal) {
@@ -178,9 +150,9 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     /** signaled when tasks should resume. */
     final private Condition unpaused = lock.newCondition();
 
-    /** signaled when nothing is running. */
-    final private Condition allquiet = lock.newCondition();
-
+    /** signaled when a task will await commit. */
+    final private Condition waiting = lock.newCondition();
+    
     /**
      * Signaled when groupCommit is performed.
      */
@@ -201,23 +173,51 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     /** True iff we are executing a group commit. */
     final private AtomicBoolean groupCommit = new AtomicBoolean(false);
     
-    /**
-     * The {@link System#currentTimeMillis()} when we began the current
-     * commit group and {@link System#currentTimeMillis()} on start up of
-     * the thread pool. This is used to measure how long it has been since
-     * the last commit and thereby decide whether or not a commit should be
-     * initiated.
+    /*
+     * Counters
      */
-    private long beginCommitGroup = System.currentTimeMillis();
+
+    private long maxLatencyUntilCommit = 0;
+    private long maxCommitLatency = 0;
+    private long ncommits = 0;
+    private long naborts = 0;
 
     /**
-     * A group commit will be triggered after this many milliseconds (if
-     * at least one write task has completed).  Note that group commit has
-     * to wait for the active write tasks to join at a barrier.  This means
-     * that is normally an additional delay once group commit is triggered.
+     * The maximum latency from when a task completes successfully until the
+     * next group commit (milliseconds).
      */
-    final private long groupCommitTriggerMillis = 100;
+    public long getMaxLatencyUntilCommit() {
+        return maxLatencyUntilCommit;
+    }
+    
+    /**
+     * The maximum latency of the atomic commit operation (the maximum duration
+     * of {@link AbstractJournal#commit()}) (milliseconds).
+     */
+    public long getMaxCommitLatency() {
+        
+        return maxCommitLatency;
+        
+    }
 
+    /**
+     * The #of commits since the {@link WriteExecutorService} was started.
+     */
+    public long getCommitCount() {
+        
+        return ncommits;
+        
+    }
+    
+    /**
+     * The #of aborts since the {@link WriteExecutorService} was started.
+     */
+    public long getAbortCount() {
+        
+        return naborts;
+        
+    }
+    
     /**
      * Sets the flag indicating that new worker tasks must pause in
      * {@link #beforeExecute(Thread, Runnable)}.
@@ -264,207 +264,6 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     }
 
     /**
-     * Executed before {@link AbstractTask#doTask()}
-     * 
-     * @param t
-     *            The thread in which that task will execute.
-     * @param r
-     *            The {@link Runnable} wrapping the {@link AbstractTask} -
-     *            this is actually a {@link FutureTask}. See
-     *            {@link AbstractExecutorService}
-     */
-    protected void beforeTask(Thread t,Callable r) {
-
-        if (t == null)
-            throw new NullPointerException();
-
-        if (r == null)
-            throw new NullPointerException();
-        
-        // Increment the #of running tasks.
-        nrunning.incrementAndGet();
-
-        // Note the thread running the task.
-        active.add(t);
-    
-    }
-    
-    /**
-     * This is executed after {@link AbstractTask#doTask()}. If the
-     * conditions are satisified for a group commit, then one is executed in the
-     * current thread. Otherwise it causes the write task to await the
-     * {@link #commit} signal from the next {@link #groupCommit()}.
-     * 
-     * @param r
-     *            The {@link Callable} wrapping the {@link AbstractTask}.
-     * @param t
-     *            The exception thrown -or- <code>null</code> if the task
-     *            completed successfully.
-     */
-    protected void afterTask(Callable r, Throwable t) {
-        
-        if (r == null)
-            throw new NullPointerException();
-        
-        lock.lock();
-        
-        try {
-            
-            /*
-             * Whatever else we do, decrement the #of running writer tasks now.
-             */
-            
-            final int nrunning = this.nrunning.decrementAndGet(); // dec. counter.
-            
-            assert nrunning >= 0;
-            
-            if (t == null) {
-                
-                /*
-                 * A write task succeeded.
-                 * 
-                 * Note: if the commit fails, then we need to interrupt all
-                 * write tasks that are awaiting commit. This means that we can
-                 * not remove the threads from [active] until after the commit.
-                 */
-                
-                final int nwrites = this.nwrites.incrementAndGet();
-                
-                assert nwrites > 0;
-
-                /*
-                 * FIXME Move all of this into groupCommit and then modify so
-                 * that the thread awaits the commit unless it triggers the
-                 * commit. More than that, commit can be immediate (or after a
-                 * short interval) once the running tasks complete.  Also, we
-                 * do not need the commitService to retrigger commits on a
-                 * periodic basis.  We just defer the commit a smidge if there
-                 * are operations in the queue but nothing currently running.
-                 */
-                
-                if (nrunning == 0 && isPaused) {
-                
-                    // signal listener on [allquiet].
-                    allquiet.signalAll();
-                    
-                }
-                
-                final long elapsed = System.currentTimeMillis()
-                        - beginCommitGroup;
-                
-                /*
-                 * Run a group commit: (a) if sufficient time has elapsed since
-                 * the last commit; or (b) if we are in danger of starving our
-                 * thread pool.
-                 */
-
-                if (elapsed > groupCommitTriggerMillis || nrunning >= getCorePoolSize()) {
-                    
-                    /*
-                     * Do group commit then signal [commit].
-                     */
-                    
-                    try {
-                    
-                        groupCommit();
-                        
-                    } catch(InterruptedException ex) {
-                        
-                        // continue processing.
-                        
-                        log.warn("Group commit interrupted.", ex);
-                        
-                        return;
-                        
-                    }
-            
-                } else {
-                    
-                    /*
-                     * The conditions for triggering a group commit were not met
-                     * so we await the [commit] signal. This causes the thread
-                     * executing the task to wait until the next commit (or
-                     * abort).
-                     * 
-                     * Note: If an abort was executed instead of a commit then
-                     * the thread will have been interrupted. This is a signal
-                     * to throw an exception back to the caller.
-                     * 
-                     * Note: The base class makes sure that the interrupted
-                     * status is cleared before assigning a new task to a worker
-                     * thread.
-                     */
-                    
-                    try {
-                        
-                        /*
-                         * Await signal indicating that the write set of the
-                         * task was made restart safe.
-                         */
-                        
-                        log.info("Awaiting commit");
-                        
-                        commit.await();
-                        
-                        log.info("Received commit signal.");
-                        
-                    } catch (InterruptedException ex) {
-                        
-                        /*
-                         * The commit was not successful.
-                         * 
-                         * @todo pass back specific exceptions so that we can
-                         * indicate if a task can be retried or if it was a
-                         * problem child, timeout, etc.
-                         */
-                        
-                        throw new RuntimeException(
-                                "Interrupted awaiting commit: " + ex);
-                        
-                    }
-                    
-                }
-
-            } else {
-                
-                /*
-                 * A write task failed - abort the current commit group.
-                 * 
-                 * Note: Since the write sets are combined we have to discard
-                 * all if anyone fails.
-                 * 
-                 * Interrupts count as failures since we do not know whether or
-                 * not the task has written any data. While we COULD check that,
-                 * the expectation is that writers have already begun to write
-                 * data by the time they get interrupted.
-                 */
-
-                if (t instanceof InterruptedException || t.getCause() != null
-                        && t.getCause() instanceof InterruptedException) {
-
-                    log.warn("Task interrupted: task=" + r.getClass().getName()
-                            + " : " + t);
-
-                } else {
-
-                    log.warn("Task failed: task=" + r.getClass().getName()
-                            + " : " + t, t);
-
-                }
-
-                abort();
-                
-            }
-        
-        } finally {
-            
-            lock.unlock();
-            
-        }
-
-    }
-    
-    /**
      * If task execution has been {@link #pause() paused} then
      * {@link Condition#await() awaits} someone to call {@link #resume()}.
      */
@@ -491,24 +290,202 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
         
     }
 
-//    /**
-//     * Decrements a counter of the #of running tasks. If the counter reaches
-//     * zero and task execution is paused then signal {@link #allquiet} so
-//     * that a coordinated task may execute.
-//     */
-//    protected void afterExecute(Runnable r, Throwable t) {
-//        
-//        super.afterExecute(r, t);
-//                
-//    }
+    /**
+     * Executed before {@link AbstractTask#doTask()}
+     * 
+     * @param t
+     *            The thread in which that task will execute.
+     * @param r
+     *            The {@link Runnable} wrapping the {@link AbstractTask} -
+     *            this is actually a {@link FutureTask}. See
+     *            {@link AbstractExecutorService}
+     */
+    protected void beforeTask(Thread t,Callable r) {
 
+        if (t == null)
+            throw new NullPointerException();
+
+        if (r == null)
+            throw new NullPointerException();
+        
+        lock.lock();
+
+        try {
+        
+            // Increment the #of running tasks.
+            nrunning.incrementAndGet();
+
+            // Note the thread running the task.
+            active.add(t);
+        
+        } finally {
+            
+            lock.unlock();
+            
+        }
+    
+    }
+    
+    /**
+     * This is executed after {@link AbstractTask#doTask()}. If the task
+     * completed successfully (no exception thrown and its thread is not
+     * interrupted) then we invoke {@link #groupCommit()}.
+     * 
+     * @param r
+     *            The {@link Callable} wrapping the {@link AbstractTask}.
+     * @param t
+     *            The exception thrown -or- <code>null</code> if the task
+     *            completed successfully.
+     * 
+     * @exception RetryException
+     *                if the task should be retried.
+     * 
+     * @todo we should do automatically re-submit the task rather than throwing
+     *       a {@link RetryException}. Each try should incrementing a counter.
+     *       If ntries exceeds a threashold (e.g., 3), then we should throw a
+     *       "RetryCountExceeded" instead of re-submitting the task.
+     *       <p>
+     *       Test this by intermixing in some tasks that cause the commit group
+     *       to fail with other tasks that should run to completion. Once the
+     *       bad tasks are out of the way the good ones should execute fine.
+     *       <p>
+     *       We could also keep a maximum latency on the task and abort it if
+     *       the latency is exceeded (regardless of the retry count).
+     */
+    protected void afterTask(Callable r, Throwable t) {
+        
+        if (r == null)
+            throw new NullPointerException();
+        
+        lock.lock();
+        
+        try {
+            
+            /*
+             * Whatever else we do, decrement the #of running writer tasks now.
+             */
+            
+            final int nrunning = this.nrunning.decrementAndGet(); // dec. counter.
+            
+            assert nrunning >= 0;
+            
+            /*
+             * No exception and not interrupted?
+             */
+            
+            if (t == null && ! Thread.interrupted()) {
+                
+                /*
+                 * A write task succeeded.
+                 * 
+                 * Note: if the commit fails, then we need to interrupt all
+                 * write tasks that are awaiting commit. This means that we can
+                 * not remove the threads from [active] until after the commit.
+                 */
+                
+                final int nwrites = this.nwrites.incrementAndGet();
+                
+                assert nwrites > 0;
+
+                if (!groupCommit()) {
+
+                    /*
+                     * The task executed fine, but the commit group was aborted.
+                     * This is generally due to a problem with a concurrent task
+                     * causing the entire group to be discarded.
+                     */
+                    
+                    throw new RetryException();
+                    
+                }
+
+            } else {
+                
+                /*
+                 * A write task failed - abort the current commit group.
+                 * 
+                 * Note: Since the write sets are combined we have to discard
+                 * all if anyone fails.
+                 * 
+                 * Interrupts count as failures since we do not know whether or
+                 * not the task has written any data. While we COULD check that,
+                 * the expectation is that writers have already begun to write
+                 * data by the time they get interrupted.
+                 */
+
+                if (t == null ) {
+                    
+                    /*
+                     * This handles the case where the task was interrupted but
+                     * it did not notice the interrupt itself.
+                     */
+                
+                    log.warn("Task interrupted: task="+ r.getClass().getName());
+
+                } else if (t instanceof InterruptedException
+                        || t.getCause() != null
+                        && t.getCause() instanceof InterruptedException) {
+
+                    /*
+                     * This handles the case where the task was interrupted and
+                     * noticed the interrupt. Since the InterruptedException is
+                     * often wrapped as a RuntimeException we also check the
+                     * cause.
+                     */
+                    
+                    log.warn("Task interrupted: task=" + r.getClass().getName()
+                            + " : " + t);
+
+                } else {
+
+                    /*
+                     * The task throw some other kind of exception.
+                     */
+                    
+                    log.warn("Task failed: task=" + r.getClass().getName()
+                            + " : " + t, t);
+
+                }
+
+                // abort the commit group.
+                
+                abort();
+                
+            }
+        
+        } finally {
+            
+            lock.unlock();
+            
+        }
+
+    }
+    
     /**
      * Group commit.
      * <p>
-     * The thread pool is {@link #pause() paused} so that no new write tasks may
-     * begin to execute. Once no tasks are running we commit the store. If there
-     * is a problem during the commit protocol then the write set(s) are
-     * abandoned using {@link #abort()}.
+     * This method is called by {@link #afterTask(Callable, Throwable)} for each
+     * task that completes successfully. In each commit group, the group commit
+     * will be executed in the {@link Thread} of the first task that calls this
+     * method. At that point the thread pool is {@link #pause() paused} so that
+     * no more tasks may begin to execute. Each running task that completes
+     * before a timeout invoke this method in turn, causing it to await the
+     * {@link #commit} signal. Once there are no more running tasks the store
+     * will be committed. The set of tasks that were running when the thread
+     * pool was {@link #pause() paused} will form the "commit group".
+     * <p>
+     * If there is a problem during the commit protocol then the write set(s)
+     * are abandoned using {@link #abort()}. If there is a timeout waiting for
+     * the running tasks to complete, then any {@link #active} tasks are
+     * {@link Thread#interrupt() interrupted}. When they notice that they have
+     * been interrupted they SHOULD throw an exception that will be propagated
+     * back to the caller and made available via their {@link Future}. If the
+     * thread {@link Thread#isInterrupted()} when entering
+     * {@link #afterTask(Callable, Throwable)} then an exception will be thrown
+     * since the task failed to notice the interrupt.
+     * <p> 
+     * Note: This method does NOT throw anything. All exceptions are caught and
+     * handled.
      * 
      * <h4>Pre-conditions </h4>
      * <ul>
@@ -528,164 +505,269 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
      * <li></li>
      * </ul>
      * 
-     * @return true iff a commit was actually performed.
-     * 
-     * @throws InterruptedException
-     *             if the group commit operation was interrupted while awaiting
-     *             the "all quiet".
+     * @return <code>true</code> IFF the commit was successful. Otherwise the
+     *         commit group was aborted and the caller MUST throw a
+     *         {@link RetryException} so that the abort is observable from
+     *         {@link Future#get()}.
      */
-    public boolean groupCommit() throws InterruptedException {
+    private boolean groupCommit(){
 
         log.debug("begin");
 
         lock.lock();
-        
-        if(!groupCommit.compareAndSet(false, true)) {
+
+        /*
+         * Note: This is outside of the try/finally block since the
+         * [groupCommit] flag MUST NOT be cleared if it is already set and we
+         * are doing that in try/finally block below.
+         * 
+         * If you rewrite this make sure that you do NOT cause the [groupCommit]
+         * flag to be cleared except by the thread that successfully sets it on
+         * entry to this method. A deadlock will arise if more than one thread
+         * attempts to execute the group commit.
+         */
+
+        // attempt to atomically set the [groupCommit] flag.
+        if (!groupCommit.compareAndSet(false, true)) {
 
             /*
-             * Note: This test needs to occur outside of the try/finally since
-             * we do NOT want to clear the [groupCommit] flag if it is set and
-             * we are doing that in finally below. If you rewrite this make sure
-             * that you do NOT cause the [groupCommit] flag to be cleared when
-             * it is set on entry to this method. A deadlock will arise if more
-             * than one thread attempts to execute the group commit.
+             * Try/finally block ensures that we release the lock once we leave
+             * this code.
              */
-            
-            log.debug("Already executing in another thread");
-            
-            lock.unlock();
-            
-            return false;
-            
+
+            try {
+        
+                /*
+                 * This thread could not set the flag so some other thread is
+                 * running the group commit and this thread will just await that
+                 * commit.
+                 */
+
+                log.debug("Already executing in another thread");
+
+                /*
+                 * Notify the thread running the group commit that this thread
+                 * will await that commit.
+                 * 
+                 * Note: We avoid the possibility of missing the [commit] signal
+                 * since we currently hold the [lock].
+                 */
+
+                waiting.signal();
+
+                try {
+
+                    // await [commit]; releases [lock] while awaiting signal.
+
+                    commit.await();
+
+                    return true;
+                    
+                } catch (InterruptedException ex) {
+
+                    // The task was aborted.
+
+                    log.warn("Task interrupted awaiting group commit.");
+
+                    return false;
+                    
+                }
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
         }
 
         try {
 
-            if(nwrites.get() == 0) {
-                
-                /*
-                 * Consider also testing the elapsed time since the last group
-                 * commit since we don't want them to come too closely together.
-                 * 
-                 * Note that group commit is requested both from within the
-                 * write service and from a scheduled delay task. The latter
-                 * runs regardless of whether nwrites > 0 or elapsed >
-                 * groupCommitTriggerMillis.
-                 */
-                
-                log.debug("No writer tasks awaiting");
-                
-                return false;
-                
-            }
+            /*
+             * Note: The logic above MUST NOT have released the lock if control was
+             * allowed to flow down to this point.
+             */
             
+            assert lock.isHeldByCurrentThread();
+            
+            // timestamp from which we measure the latency until the commit begins.
+
+            final long beginWait = System.currentTimeMillis();            
+
+            /*
+             * Pause for a moment if there are tasks in the queue and we are not
+             * up to 1/2 of the thread pool in (running+completed) tasks. This
+             * allows new tasks to enter.
+             * 
+             * @todo make this a config option (0 means do not wait).
+             * 
+             * @todo do NOT wait if the current task might exceeds its max
+             * latency from submit.
+             */
+            
+//            while(!getQueue().isEmpty() && (nrunning.get()+nwrites.get()) * 2 < getCorePoolSize() ) {
+//
+//                if(System.currentTimeMillis()-beginWait>250) {
+//                    
+//                    // Don't wait any longer.
+//                    
+//                    break;
+//                    
+//                }
+//                
+//                /*
+//                 * Note: if interrupted during sleep then the group commit will
+//                 * abort.
+//                 */
+//                
+//                Thread.sleep(150/*ms*/);
+//                
+//            }
+
             log.info("Will do group commit: nrunning="+nrunning);
             
             // notify the write service that new tasks MAY NOT run.
+            
             pause();
 
             // wait for active tasks to complete.
-            
-            final long begin = System.currentTimeMillis();
             
             while (nrunning.get() > 0) {
 
                 try {
 
                     /*
-                     * @todo use timeout and cancel long running tasks in the
-                     * write service to guarentee the maximum latency?
-                     * 
-                     * Note that there is no way right now to back out partial
+                     * Note: There is no way right now to back out partial
                      * writes by a task, so if a task is taking to long this
                      * would mean that we just abort the commit rather than
                      * continue to wait.
+                     * 
+                     * However, one could conceivably checkpoint the unisolated
+                     * indices after each task and rollback to the previous
+                     * checkpoint if a task is interrupted. Those check points
+                     * would be maintained in the task metadata since tasks
+                     * might themselves checkpoint incices and we need to know
+                     * the correct checkpoint for the rollback.
+                     * 
+                     * The problem with index checkpoints is that they requiring
+                     * flushing writes on the index to the store. If task
+                     * failures are rare then this could be more expensive than
+                     * the occasional abort of a commit group.
                      */
                     
-                    if(!allquiet.await(250,TimeUnit.MILLISECONDS)) {
-                        
-                        final long elapsed = System.currentTimeMillis() - begin;
-                        
-                        /*
-                         * Note: The commitService uses a delay based schedule
-                         * to issue group commit requests so those request do
-                         * not back up here.
-                         * 
-                         * @todo I had introduced a timeout here since I was
-                         * seeing deadlocks during shutdown. That issue has been
-                         * since resolved using a distinct commitService to
-                         * issue the periodic group commit requests. Therefore I
-                         * have disable the timeout again here.
-                         * 
-                         * If the timeout is re-introduced then add a config
-                         * parameter with option for infinite timeout iff 0L
-                         * (and write tests with that timeout value). Note that
-                         * this timeout would impose an absolute maximum on the
-                         * length of an unisolated write operation.
-                         * 
-                         * Another way to limit the run time of unisolated
-                         * writes is to place a timeout on [commit.await] and
-                         * interrupt all running tasks if the commit times out.
-                         * Regardless we need to make sure that writers actually
-                         * notice if they get interrupted.
-                         */
-//                        if (elapsed > 2000) {
+                    waiting.await();
+
+//                    if(!waiting.await(250,TimeUnit.MILLISECONDS)) {
+//                        
+//                        elapsed = System.currentTimeMillis() - begin;
+//                        
+//                        /*
+//                         * @todo if a timeout is supported here then add a
+//                         * config parameter with option for infinite timeout iff
+//                         * 0L (and write tests with that timeout value). Note
+//                         * that this timeout would impose an absolute maximum on
+//                         * the time that an unisolated write operation will wait
+//                         * for other unisolated operation(s) to complete.
+//                         * 
+//                         * Another way to limit the run time of unisolated
+//                         * writes is to place a timeout on [commit.await] and
+//                         * interrupt all running tasks if the commit times out,
+//                         * i.e., a maximum task latency timeout (measured from
+//                         * the task submit).
+//                         */
+//                        if (elapsed > [timeout]) {
 //                            
 //                            log.warn("Timeout: nrunning=" + nrunning
 //                                    + ", elapsed=" + elapsed);
 //                            
-//                            throw new RuntimeException(
+//                            throw new TimeoutException(
 //                                    "Timeout waiting for running tasks to complet.e");
 //                            
 //                        }
-                        
-                        log.info("Still waiting: nrunning="+nrunning+", elapsed="+elapsed);
-                        
-                    }
+//                        
+//                        log.debug("Still waiting: nrunning="+nrunning+", elapsed="+elapsed);
+//                        
+//                    }
 
                 } catch (InterruptedException ex) {
 
                     /*
-                     * The commit was interrupted.
+                     * The current thread was interrupted waiting for the active
+                     * tasks to complete. At this point:
                      * 
-                     * All write sets are still pending commit.
-                     * 
-                     * All write tasks that are awaiting commit are still
+                     *  - All write sets are still pending commit.
+                     *  - All write tasks that are awaiting commit are still
                      * awaiting commit.
                      * 
-                     * Reset the timeout so that group commit will be deferred
-                     * for another interval.
-                     * 
-                     * Note: if this occurs repeatedly then all worker threads
-                     * will wind up awaiting [commit] and the write service will
-                     * no longer progress.
+                     * We now abort, causing all tasks to be aborted.
                      */
 
-                    beginCommitGroup = System.currentTimeMillis();
+                    log.warn("Interrupted awaiting active tasks - discarding commit group");
+                    
+                    try {
 
-                    throw ex;
+                        abort();
+                        
+                    } catch(Throwable t) {
+                    
+                        log.warn("Problem during abort?: "+t, t);
+                        
+                    }
+
+                    return false;
 
                 }
 
             }
 
             // at this point nwrites is the size of the commit group.
-            log.info("All quiet: commit group size="+nwrites);
+            log.info("Committing store: commit group size="+nwrites);
+
+            final long now = System.currentTimeMillis();
+            
+            final long latencyUntilCommit = now - beginWait;
+            
+            if (latencyUntilCommit > maxLatencyUntilCommit) {
+
+                maxLatencyUntilCommit = latencyUntilCommit;
+                
+            }
+
+            // timestamp used to measure commit latency.
+            final long beginCommit = System.currentTimeMillis();
             
             // commit the store.
-            commit();
+            if (!commit()) {
 
-            log.info("success");
+                return false;
+                
+            }
 
+            // the commit latency.
+            final long commitLatency = System.currentTimeMillis() - beginCommit;
+            
+            if(commitLatency>maxCommitLatency) {
+                
+                maxCommitLatency = commitLatency;
+                
+            }
+            
+            log.info("Commit Ok");
+            
             return true;
+            
+        } catch(Throwable t) {
+            
+            log.error("Problem with groupCommit?", t);
+            
+            abort();
+            
+            return false;
             
         } finally {
 
-            if (!groupCommit.compareAndSet(true, false)) {
-
-                throw new AssertionError();
-                
-            }
+            // atomically clear the [groupCommit] flag.
+            groupCommit.set(false);
             
             // allow new tasks to run.
             resume();
@@ -698,6 +780,9 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
 
     /**
      * Commit the store.
+     * <p> 
+     * Note: This method does NOT throw anything. All exceptions are caught and
+     * handled.
      * 
      * <h4>Pre-conditions</h4>
      * <ul>
@@ -718,55 +803,53 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
      * <li>nrunning, nwrites, active...</li>
      * </ul>
      */
-    private void commit() {
-
-        assert lock.isHeldByCurrentThread();
-//        lock.lock();
-
-        assert nrunning.get() == 0;
-        
-        // @todo scan workers for interrupted thread and abort if found?
+    private boolean commit() {
 
         try {
 
-            /*
-             * Commit the store.
-             */
+            assert lock.isHeldByCurrentThread();
+
+            assert nrunning.get() == 0;
 
             // commit the store.
-            log.info("Commit");
 
             journal.commit();
 
-            log.info("Success");
+            // #of commits that succeeded.
+            
+            ncommits++;
+            
+            return true;
 
         } catch (Throwable t) {
 
             /*
              * Abandon the write sets if something goes wrong.
              * 
-             * Note: We do NOT rethrow the exception since that would
-             * cause the scheduled group commit Runnable to no longer be
-             * executed!
+             * Note: We do NOT rethrow the exception since that would cause the
+             * scheduled group commit Runnable to no longer be executed!
              */
 
             log.error("Commit failed - abandoning write sets: " + t, t);
 
             abort();
 
+            return false;
+
         } finally {
 
             resetState();
-            
-//            lock.unlock();
 
         }
-
+        
     }
 
     /**
      * Abort. Interrupt all running tasks (they could be retried) and abandon
      * the pending write set.
+     * <p> 
+     * Note: This method does NOT throw anything. All exceptions are caught and
+     * handled.
      * 
      * <h4>Pre-conditions</h4>
      * <ul>
@@ -782,13 +865,14 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
      */
     private void abort() {
 
-        log.info("Abandoning write sets.");
-
-        assert lock.isHeldByCurrentThread();
-//        lock.lock();
-
         try {
 
+            assert lock.isHeldByCurrentThread();
+
+            // #of aborts attempted.
+            
+            naborts++;
+            
             // Abandon the write sets.
             
             journal.abort();
@@ -797,8 +881,6 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
              * Interrupt all workers awaiting [commit] - they will throw an
              * exception that will reach the caller.
              */
-
-            log.info("Interrupting tasks awaiting commit.");
             
             Iterator<Thread> itr = active.iterator();
 
@@ -808,11 +890,15 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
 
             }
 
+        } catch(Throwable t) {
+            
+            log.error("Problem with abort?", t);
+            
+            // fall through.
+
         } finally {
 
             resetState();
-            
-//            lock.unlock();
             
         }
         
@@ -821,6 +907,9 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
     /**
      * Private helper resets some internal state to initial conditions following
      * either a successful commit or an abort.
+     * <p>
+     * Note: This method does NOT throw anything. All exceptions are caught and
+     * handled.
      * 
      * <h4>Pre-conditions:</h4>
      * 
@@ -828,20 +917,44 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
      */
     private void resetState() {
 
-        assert lock.isHeldByCurrentThread();
-        
-        // no write tasks are awaiting commit.
-        nwrites.set(0);
-        
-        // clear the set of active tasks.
-        active.clear();
+        try {
 
-        // signal tasks awaiting [commit].
-        commit.signalAll();
+            // no write tasks are awaiting commit.
+            nwrites.set(0);
 
-        // resume execution of new tasks.
-        resume();
+            // clear the set of active tasks.
+            active.clear();
+
+            // signal tasks awaiting [commit].
+            commit.signalAll();
+
+            // resume execution of new tasks.
+            resume();
+            
+        } catch (Throwable t) {
+
+            log.error("Problem witn resetState?", t);
+
+        }
 
     }
 
+    /**
+     * An instance of this exception is thrown if a task successfully completed
+     * but did not commit owing to a problem with some other task executing
+     * concurrently in the {@link WriteExecutorService}. The task MAY be
+     * retried.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class RetryException extends RuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 2129883896957364071L;
+        
+    }
+    
 }

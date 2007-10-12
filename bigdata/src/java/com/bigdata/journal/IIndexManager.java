@@ -49,42 +49,9 @@ package com.bigdata.journal;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.service.IDataService;
 
 /**
  * Interface for managing named indices.
- * 
- * FIXME Consider removing this interface for better alignment with the
- * {@link ConcurrentJournal}. Access to indices SHOULD only occur within
- * submitted {@link AbstractTask}s. The presence of this interface on the
- * {@link ConcurrentJournal} makes it possible to access a named index outside
- * of an executor service. {@link AbstractJournal} SHOULD NOT implement
- * {@link IIndexStore#getIndex(String)} since that returns the
- * <strong>unisolated</strong> (mutable) view of the named index and access to
- * that view MUST be single-threaded, which is enforced by the
- * {@link ConcurrentJournal} only within {@link AbstractTask}s.
- * <p>
- * Remove these methods from the {@link IJournal} heirarchy of implementations
- * but do retain them for {@link TemporaryStore} since it is (a) single-threaded
- * and (b) people need the ability to add/drop indices. The interface itself
- * could still go away.
- * <p>
- * Likewise {@link IIndexStore} needs to be available to
- * {@link AbstractTask}s, on the {@link Tx}, and on
- * {@link TemporaryStore} but MUST NOT be exposed elsewhere.
- * <p>
- * A bunch of test cases will have to be updated and the RDFS database will also
- * have to be updated (to use more concurrency as well as to refactor its index
- * access inside of {@link AbstractTask}s).
- * <p>
- * Get rid of {@link NoSuchIndexException} and {@link IndexExistsException} at
- * the same time since they are probably no longer.
- * <p>
- * Review {@link IDataService} methods for add/drop index.
- * <p>
- * Also drop {@link IAtomicStore#abort()} and {@link IAtomicStore#commit()}
- * since those operations are automatic, not something that can be directly
- * invoked by an application.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
