@@ -84,10 +84,9 @@ public class TestTx extends ProxyTestCase {
     /**
      * Test verifies that a transaction may start when there are (a) no commits
      * on the journal; and (b) no indices have been registered.
-     * 
-     * @todo In the current implementation the transaction will be unable to
-     *       isolate an index if the index has not been registered already by an
-     *       unisolated transaction.
+     * <P>
+     * Note: The transaction will be unable to isolate an index if the index has
+     * not been registered already by an unisolated operation.
      */
     public void test_noIndicesRegistered() {
 
@@ -102,16 +101,16 @@ public class TestTx extends ProxyTestCase {
          */
         
         // commit.
-        assertTrue(journal.commit(tx)!=0L);
+        assertTrue(journal.commit(tx)==0L);
 
         journal.closeAndDelete();
         
     }
 
     /**
-     * Verify that an index is not visible in the tx until the native
-     * transaction in which it is registered has already committed before
-     * the tx starts. 
+     * Verify that an index is not visible in the tx unless the native
+     * transaction in which it is registered has already committed before the tx
+     * starts.
      */
     public void test_indexNotVisibleUnlessCommitted() {
        
@@ -499,7 +498,7 @@ public class TestTx extends ProxyTestCase {
          assertTrue(journal.getIndex(name).contains(id0));
 
          // Prepare and commit tx1 (no writes).
-         assertNotSame(0L,journal.commit(tx1));
+         assertEquals(0L,journal.commit(tx1));
 
          // Still visible in global scope.
          assertTrue(journal.getIndex(name).contains(id0));
@@ -605,7 +604,7 @@ public class TestTx extends ProxyTestCase {
         assertFalse(journal.getIndex(name).contains(id0));
 
         // Prepare and commit tx1 (no writes).
-        assertNotSame(0L,journal.commit(tx1));
+        assertEquals(0L,journal.commit(tx1));
 
         // Still not visible in global scope.
         assertFalse(journal.getIndex(name).contains(id0));
@@ -717,12 +716,14 @@ public class TestTx extends ProxyTestCase {
         Journal journal = new Journal(getProperties());
         
         final String name = "abc";
-        
+        final long commitTime0;
         {
             
             journal.registerIndex(name,new UnisolatedBTree(journal,UUID.randomUUID()));
             
-            journal.commit();
+            commitTime0 = journal.commit();
+            
+            assertNotSame(0L,commitTime0);
             
         }
 
@@ -738,6 +739,10 @@ public class TestTx extends ProxyTestCase {
         // new transaction - commit will not be visible in this scope.
         final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
 
+        assertTrue(commitTime0<tx0);
+        assertTrue(tx0<tx1);
+        assertTrue(tx1<tx2);
+        
         final byte[] id1 = new byte[]{1};
 
         final byte[] v0 = getRandomData().array();
@@ -758,14 +763,17 @@ public class TestTx extends ProxyTestCase {
         assertNull(journal.getIndex(name,tx2).lookup(id1));
 
         // commit.
-        journal.commit(tx1);
+        long tx1CommitTime = journal.commit(tx1);
+        assertNotSame(0L,tx1CommitTime);
 
         // data version now visible in global scope.
         assertEquals(v0, (byte[])journal.getIndex(name).lookup(id1));
 
         // new transaction - commit is visible in this scope.
         final long tx3 = journal.newTx(IsolationEnum.ReadWrite);
-
+        assertTrue(tx2<tx3);
+        assertTrue(tx3>tx1CommitTime);
+        
         // data version still not visible in tx0.
         assertNull(journal.getIndex(name,tx0).lookup(id1));
 

@@ -2,6 +2,12 @@ package com.bigdata.journal;
 
 /**
  * Drop a named index (unisolated write operation).
+ * <p>
+ * Note: the dropped index will continue to be visible to unisolated readers or
+ * {@link IsolationEnum#ReadCommitted} isolated operations (since they read from
+ * the most recent committed state) until the next commit. However, unisolated
+ * writers that execute after the index has been dropped will NOT be able to see
+ * the index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -26,33 +32,25 @@ public class DropIndexTask extends AbstractTask {
     public Object doTask() throws Exception {
 
         journal.assertOpen();
-        
-        String name = getOnlyResource();
-        
-        synchronized(journal.name2Addr) {
-                
-            try {
 
-                // drop from the persistent name map.
-                journal.name2Addr.dropIndex(name);
-                
-            } catch(NoSuchIndexException ex) {
-                
-                /*
-                 * The index does not exist.
-                 */
-                
-                log.info("Index does not exist: "+name);
-                
-                return Boolean.FALSE;
-                
-            }
-                
+        String name = getOnlyResource();
+
+        try {
+
+            journal.dropIndex(name);
+
+        } catch (NoSuchIndexException ex) {
+
+            /*
+             * The index does not exist.
+             */
+
+            log.info("Index does not exist: " + name);
+
+            return Boolean.FALSE;
+
         }
 
-        // report event.
-        ResourceManager.dropUnisolatedBTree(name);
-        
         return Boolean.TRUE;
 
     }

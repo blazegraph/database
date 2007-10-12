@@ -125,9 +125,9 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         final long startTime = journal.nextTimestamp();
 
-        ITx tx0 = new Tx(journal, startTime, false);
+        ITx tx0 = new Tx(journal, startTime, false/*readOnly*/);
         
-        tx0.prepare(journal.nextTimestamp());
+        tx0.prepare(0L/*journal.nextTimestamp()*/);
 
         try {
 

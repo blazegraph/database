@@ -263,7 +263,7 @@ public class SlaveJournal extends Journal {
         mdi.put(new byte[]{}, new PartitionMetadata(0, dataServices ));
         
         // add to the persistent name map.
-        name2MetadataAddr.add(name, mdi);
+        name2MetadataAddr.registerIndex(name, mdi);
 
         /*
          * Now register the view on the super class. The view will delegate

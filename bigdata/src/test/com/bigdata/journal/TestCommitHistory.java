@@ -410,13 +410,24 @@ public class TestCommitHistory extends ProxyTestCase {
         
         Journal journal = new Journal(getProperties());
 
+        assertEquals("commitCounter",0,journal.getCommitRecord().getCommitCounter());
+
         final String name = "abc";
 
-        final BTree liveIndex = (BTree) journal.registerIndex(name);
-        
-        final long commitTime0 = journal.commit();
+        /*
+         * register an index and commit the journal.
+         */
 
-        assertTrue(commitTime0 != 0L);
+        final BTree liveIndex = (BTree) journal.registerIndex(name);
+
+        journal.commit();
+        
+        assertEquals("commitCounter",1,journal.getCommitRecord().getCommitCounter());
+
+        final long commitTime0 = journal.getCommitRecord().getTimestamp();
+        
+        assertNotSame(commitTime0,0L);
+        assertTrue(commitTime0>0L);
         
         /*
          * obtain the commit record for that commit timestamp.
@@ -447,12 +458,20 @@ public class TestCommitHistory extends ProxyTestCase {
         /*
          * write a record on the store, commit the store, and note the commit
          * time.
+         * 
+         * Note: This is a raw write on the store, not a write on an index, so
+         * we have to do an explicit commit.
          */
+
         journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+
+        journal.commit();
         
-        final long commitTime1 = journal.commit();
+        assertEquals("commitCounter",2,journal.getCommitRecord().getCommitCounter());
+
+        final long commitTime1 = journal.getCommitRecord().getTimestamp();
         
-        assertTrue(commitTime1!=0L);
+        assertTrue(commitTime1>commitTime0);
         
         /*
          * we did NOT write on the named index, so its address in the store must
@@ -493,9 +512,16 @@ public class TestCommitHistory extends ProxyTestCase {
         assertTrue(liveIndex == journal.getIndex(name));
         
         liveIndex.insert(new byte[]{1,2}, new byte[]{1,2});
+
+        // do an explicit commit since we are not running a write task.
+        journal.commit();
         
-        final long commitTime2 = journal.commit();
-        
+        assertEquals("commitCounter",3,journal.getCommitRecord().getCommitCounter());
+
+        final long commitTime2 = journal.getCommitRecord().getTimestamp();
+
+        assertTrue(commitTime2>commitTime1);
+
         // obtain the commit record for that commit timestamp.
         ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
 

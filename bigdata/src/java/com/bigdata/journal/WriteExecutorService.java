@@ -336,7 +336,10 @@ class WriteExecutorService extends ScheduledThreadPoolExecutor {
                  * FIXME Move all of this into groupCommit and then modify so
                  * that the thread awaits the commit unless it triggers the
                  * commit. More than that, commit can be immediate (or after a
-                 * short interval) once the running tasks complete.
+                 * short interval) once the running tasks complete.  Also, we
+                 * do not need the commitService to retrigger commits on a
+                 * periodic basis.  We just defer the commit a smidge if there
+                 * are operations in the queue but nothing currently running.
                  */
                 
                 if (nrunning == 0 && isPaused) {

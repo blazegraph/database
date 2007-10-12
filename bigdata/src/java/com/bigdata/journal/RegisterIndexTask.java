@@ -58,34 +58,26 @@ public class RegisterIndexTask extends AbstractTask {
         journal.assertOpen();
 
         String name = getOnlyResource();
-        
-        synchronized (journal.name2Addr) {
 
-            try {
-                
-                // add to the persistent name map.
-                journal.name2Addr.add(name, btree);
+        try {
 
-                log.info("Registered index: name=" + name + ", class="
-                        + btree.getClass() + ", indexUUID="
-                        + btree.getIndexUUID());
-                
-            } catch(IndexExistsException ex) {
-                
-                IIndex ndx = journal.name2Addr.get(name);
-                
-                UUID indexUUID = ndx.getIndexUUID();
-                
-                log.info("Index exists: name="+name+", indexUUID="+indexUUID);
-                
-                return indexUUID;
-                
-            }
+            // register the index.
+            journal.registerIndex(name, btree);
+
+            log.info("Registered index: name=" + name + ", class="
+                    + btree.getClass() + ", indexUUID=" + btree.getIndexUUID());
+
+        } catch (IndexExistsException ex) {
+
+            IIndex ndx = journal.getIndex(name);
+
+            UUID indexUUID = ndx.getIndexUUID();
+
+            log.info("Index exists: name=" + name + ", indexUUID=" + indexUUID);
+
+            return indexUUID;
 
         }
-
-        // report event (the application has access to the named index).
-        ResourceManager.openUnisolatedBTree(name);
 
         return btree.getIndexUUID();
 
