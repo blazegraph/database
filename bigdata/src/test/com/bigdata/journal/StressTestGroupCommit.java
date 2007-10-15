@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
@@ -302,19 +303,21 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
     }
     
     /**
-     * 
+     * Runs a single condition.
+     *  
      * @throws Exception 
-     * @todo refactor and parameterize and then explore the parameter space.
      */
     public void test_groupCommit() throws Exception {
 
+        final int writeServiceCorePoolSize = 100;
+        
         Properties properties = getProperties();
 
+        properties.setProperty(TestOptions.TIMEOUT,"10");
+        
         properties.setProperty(TestOptions.NTASKS,"1000");
 
-        properties.setProperty(TestOptions.TIMEOUT,"10000");
-        
-        properties.setProperty(Options.WRITE_SERVICE_CORE_POOL_SIZE, "100");
+        properties.setProperty(Options.WRITE_SERVICE_CORE_POOL_SIZE, ""+writeServiceCorePoolSize);
 
         properties.setProperty(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE, "1000");
 
@@ -322,20 +325,23 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 
         properties.setProperty(Options.WRITE_SERVICE_QUEUE_CAPACITY, "100");
         
-//        Result result = 
-            doComparisonTest(properties);
+        Result result = doComparisonTest(properties);
+            
+        /*
+         * Note: You SHOULD expect 80%+ of the tasks to participate in each
+         * commit group. However, the actual number can be lower due to various
+         * startup costs so sometimes this test will fail - it is really a
+         * stress test and should be done once the store is up and running
+         * already.
+         */
+
+        final double tasksPerCommit = Double.parseDouble(result.get("tasks/commit"));
         
-//        /*
-//         * Note: You SHOULD expect 80%+ of the tasks to participate in each
-//         * commit group on average. However, the actual number can be lower due
-//         * to various startup costs so sometimes this test will fail - it is
-//         * really a stress test and should be done once the store is up and
-//         * running already.
-//         */
-//        
-//        assertTrue("average group commit size is too small? size="
-//                + tasksPerCommit, tasksPerCommit > journal.writeService
-//                .getCorePoolSize() * .5);
+        assertTrue(
+                "average group commit size is too small? size="
+                        + tasksPerCommit + ", corePoolSize="
+                        + writeServiceCorePoolSize,
+                tasksPerCommit > writeServiceCorePoolSize * .5);
         
     }
 
@@ -348,14 +354,14 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
     public static class TestOptions extends Options {
         
         /**
+         * The timeout for the test (seconds).
+         */
+        public static final String TIMEOUT = "timeout";
+        
+        /**
          * The #of tasks to submit.
          */
         public static final String NTASKS = "ntasks";
-        
-        /**
-         * The timeout for the test (milliseconds).
-         */
-        public static final String TIMEOUT = "timeout";
         
         /**
          * The #of records to insert into the index -or- ZERO (0) to only
@@ -439,7 +445,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         try {
             
-            journal.invokeAll(tasks);
+            journal.invokeAll(tasks,timeout,TimeUnit.SECONDS);
 
         } catch(RejectedExecutionException ex) {
             
@@ -447,14 +453,36 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             
         }
 
-        // sleep until the tasks are done or the timeout is expired.
-        while(nrun.get()!=ntasks && (timeout - (System.currentTimeMillis()-begin)>0)) {
-        
-            Thread.sleep(100);
-            
-        }
+//        System.err.println("timeout="+timeout);
+//        
+//        // sleep until the tasks are done or the timeout is expired.
+//        while(true) {
+//        
+//            if(nrun.get()==ntasks) break;
+//            
+//            final long elapsed = System.currentTimeMillis() - begin;
+//            
+//            if(timeout > elapsed) {
+//                
+//                System.err.println("Timeout exceeded: timeout="+timeout+", elapsed="+elapsed);
+//                
+//                break;
+//                
+//            }
+//            
+//            /*
+//             * Note: Don't wait too long it or throws off the estimate of the elapsed
+//             * time.
+//             */
+//            synchronized(this) {
+//                wait(100);
+//            }
+//            
+//        }
 
-        // the actual run time.
+        /*
+         * the actual run time.
+         */
         final long elapsed = System.currentTimeMillis() - begin;
         
         // #of tasks run by this moment in time.
@@ -472,25 +500,6 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         final double tasksPerSecond = ndone * 1000d / elapsed;
 
         final double tasksPerCommit = ((double)ndone) / ncommits;
-        
-//        System.err.println("ntasks="+ntasks+", ndone="+ndone+", ncommits="+ncommits+", elapsed="+elapsed+"ms");
-//        
-//        System.err.println("tasks/sec="+tasksPerSecond);
-//        
-//        System.err.println("commits/sec="+commitsPerSecond);
-//        
-//        System.err.println("tasks/commit="+tasksPerCommit);
-//
-//        System.err.println("maxRunning="+journal.writeService.getMaxRunning());
-//
-//        // current
-//        System.err.print("poolSize="+journal.writeService.getPoolSize());
-//
-//        // initial
-//        System.err.print(", corePoolSize="+journal.writeService.getCorePoolSize());
-//
-//        // max. allowed.
-//        System.err.println(", maximumPoolSize="+journal.writeService.getMaximumPoolSize());
         
         Result result = new Result();
         
@@ -542,7 +551,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 
         properties.setProperty(TestOptions.NINSERT,"100");
 
-        properties.setProperty(TestOptions.TIMEOUT,"30000");
+        properties.setProperty(TestOptions.TIMEOUT,"5");
         
         properties.setProperty(Options.WRITE_SERVICE_CORE_POOL_SIZE, "200");
 
@@ -604,7 +613,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         public static void main(String[] args) throws Exception {
             
             // this is the test to be run.
-            String className = StressTestConcurrent.class.getName();
+            String className = StressTestGroupCommit.class.getName();
             
             Map<String,String> defaultProperties = new HashMap<String,String>();
 
@@ -618,30 +627,74 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
              * Set defaults for each condition.
              */
             
-            defaultProperties.put(TestOptions.TIMEOUT,"30");
+            defaultProperties.put(TestOptions.TIMEOUT,"5");
 
             defaultProperties.put(TestOptions.NTASKS,"10000");
 
-            defaultProperties.put(TestOptions.NINSERT,"0");
-
             List<Condition>conditions = new ArrayList<Condition>();
+            
+            conditions.add(new Condition(defaultProperties));
 
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
-                            "1") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
-                            "10") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
-                            "100") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
-                            "1000") }));
-
+//            conditions = apply(conditions, new NV[] {
+//                    new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE, "1"),
+//                    new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE, "10"),
+//                    new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE, "100"),
+//                    new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE, "1000")
+//                    });
+//            
+//            conditions = apply(conditions, new NV[] {
+//                    new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY, "1"),
+//                    new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY, "10"),
+//                    new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY, "100"),
+//                    new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY, "1000")
+//                    });
+            
+            // co-vary the core pool size and the queue capacity.
+            conditions = apply(conditions, new NV[][] {
+                    new NV[] {
+                            new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
+                                    "500"),
+                            new NV(TestOptions.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                                    "500"),
+                            new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY,
+                                    "500") },
+                    new NV[] {
+                            new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
+                                    "1000"),
+                            new NV(TestOptions.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                                    "1000"),
+                            new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY,
+                                    "1000") },
+                    new NV[] {
+                            new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
+                                    "1500"),
+                            new NV(TestOptions.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                                    "1500"),
+                            new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY,
+                                    "1500") },
+                    new NV[] {
+                            new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,
+                                    "2000"),
+                            new NV(TestOptions.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                                    "2000"),
+                            new NV(TestOptions.WRITE_SERVICE_QUEUE_CAPACITY,
+                                    "2000") }
+                    });
+            
+//            conditions = apply(conditions, new NV[] {
+//                    new NV(TestOptions.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS, "true"),
+//                    new NV(TestOptions.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS, "false"),
+//                    });
+            
+            conditions = apply(conditions, new NV[][] {
+//                    new NV[]{new NV(TestOptions.BUFFER_MODE, BufferMode.Transient.toString())},
+//                    new NV[]{new NV(TestOptions.BUFFER_MODE, BufferMode.Direct.toString())},
+                    new NV[]{new NV(TestOptions.BUFFER_MODE, BufferMode.Disk.toString())},
+//                    new NV[]{new NV(TestOptions.BUFFER_MODE, BufferMode.Disk.toString()),
+//                                    new NV(TestOptions.FORCE_ON_COMMIT,ForceEnum.No.toString())},
+//                    new NV[]{new NV(TestOptions.BUFFER_MODE, BufferMode.Mapped.toString())},
+                    });
+            
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 
             // copy the output into a file and then you can run it later.
