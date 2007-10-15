@@ -131,6 +131,10 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite(TestAddDropIndexTask.class);
         // test task running a sequence of tasks.
         suite.addTestSuite(TestSequenceTask.class);
+        // test writing on one or more unisolated indices and verify read back after the commit.
+        suite.addTestSuite(TestUnisolatedWriteTasks.class);
+        // group commit throughput tests.
+        suite.addTestSuite(StressTestGroupCommit.class);
         // stress tests of the concurrent journal.
         suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
         

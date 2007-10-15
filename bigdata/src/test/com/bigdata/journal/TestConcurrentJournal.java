@@ -747,8 +747,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * submit the same instance twice. This is important since the base class
      * has various items of state that are not thread-safe and are not designed
      * to be reusable.
-     * @throws ExecutionException 
-     * @throws InterruptedException 
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     public void test_tasksAreNotThreadSafe() throws InterruptedException, ExecutionException {
         

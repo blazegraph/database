@@ -52,6 +52,7 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
@@ -89,16 +90,43 @@ import com.bigdata.scaleup.ResourceState;
  * 
  * @see DataServer, which is used to start this service.
  * 
- * @see NIODataService, which contains some old code that can be refactored for
- *      an NIO interface to the data service.
- * 
- * @todo explore the use of a blocking queue to throttle the #of tasks that are
- *       submitted to the data service. When the queue is full
+ * @todo RPC requests are currently made via RPC using JERI. While you can elect
+ *       to use the TCP/NIO server via configuration options (see
+ *       http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html),
+ *       there will still be a thread allocated per concurrent RPC and no
+ *       throttling will be imposed by JERI.
+ *       <p>
+ *       The present design of the {@link IDataService} API requires that a
+ *       server thread be dedicated to each request against that interface - in
+ *       this way it exactly matches the RPC semantics supported by JERI. The
+ *       underlying reason is that the RPC calls are all translated into
+ *       {@link Future}s when the are submitted via
+ *       {@link ConcurrentJournal#submit(AbstractTask)}. The
+ *       {@link DataService} itself then invokes {@link Future#get()} in order
+ *       to await the completion of the request and return the response (object
+ *       or thrown exception).
+ *       <p>
+ *       A re-design based on an asynchronous response from the server could
+ *       remove this requirement, thereby allowing a handful of server threads
+ *       to handle a large volume of concurrent client requests. The design
+ *       would use asynchronous callback to the client via JERI RPC calls to
+ *       return results, indications that the operation was complete, or
+ *       exception information. A single worker thread on the server could
+ *       monitor the various futures and RPC clients when responses become
+ *       available or on request timeout.
+ *       <p>
+ *       See {@link NIODataService}, which contains some old code that can be
+ *       refactored for an NIO interface to the data service.
+ *       <p>
+ *       Another option to throttle requests is to use a blocking queue to
+ *       throttle the #of tasks that are submitted to the data service. Latency
+ *       should be imposed on threads submitting tasks as the queue grows in
+ *       order to throttle clients. If the queue becomes full
  *       {@link RejectedExecutionException} will be thrown, and the client will
- *       have to handle that. If the queue never blocks then it is possible to
- *       flood the data service with requests, even through they will be
- *       processed by no more than
- *       {@link ConcurrentJournal.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
+ *       have to handle that. In contrast, if the queue never blocks and never
+ *       imposes latency on clients then it is possible to flood the data
+ *       service with requests, even through they will be processed by no more
+ *       than {@link ConcurrentJournal.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
  *       threads.
  * 
  * @todo Support overflow. Queued tasks should be migrated from the "old"
@@ -144,17 +172,6 @@ import com.bigdata.scaleup.ResourceState;
  *       duplex in the network and the protocol, that rate should be
  *       bidirectional. Can that rate be sustained with a fully connected
  *       bi-directional transfer?
- * 
- * @todo Review JERI options to support non-blocking/fast RMI protocols. See
- *       <p>
- *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&P=33490<br>
- *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0506&L=jini-users&P=9626<br>
- *       http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&D=0&P=26542<br>
- *       http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html<br>
- *       <p>
- *       Try net.jini.jeri.tcp endpoints without socket factories and set the
- *       "com.sun.jini.jeri.tcp.useNIO" to "true". JRMP is evidentally much
- *       slower since it does not allow for the possibility of NIO.
  * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on
@@ -931,42 +948,7 @@ abstract public class DataService implements IDataService,
             super(properties);
             
         }
-        
-        /**
-         * Returns instance of {@link StatusTask}.
-         */
-        protected StatusTask newStatusTask() {
-
-            return new StatusTask();
-            
-        }
-
-        /**
-         * Extended to add the logging context.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        protected class StatusTask extends ConcurrentJournal.StatusTask {
-            
-            protected void status() {
                 
-                setupLoggingContext();
-                
-                try {
-                    
-                    super.status();
-                    
-                } finally {
-                    
-                    clearLoggingContext();
-                    
-                }
-                
-            }
-            
-        }
-        
     }
     
 }

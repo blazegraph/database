@@ -47,7 +47,20 @@ JINI
   old class files are not left lying around.
 
 - You can enable NIO support with JERI using TCP by specifying the
-  following property to the JVM.
+  following property to the JVM.  Note that JRMP does NOT allow for
+  the possibility of NIO.
 
 	-Dcom.sun.jini.jeri.tcp.useNIO=true
 
+  More information on JERI and NIO is available using the following links.
+
+   http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&P=33490
+   http://archives.java.sun.com/cgi-bin/wa?A2=ind0506&L=jini-users&P=9626
+   http://archives.java.sun.com/cgi-bin/wa?A2=ind0504&L=jini-users&D=0&P=26542
+   http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html
+
+  Note that one server thread will still be required per concurrent RPC request
+  owing to the semantics of RPC (call and wait for response) and the definition
+  of JERI.
+
+  

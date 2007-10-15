@@ -116,9 +116,6 @@ public class TestAddDropIndexTask extends ProxyTestCase {
                 /*
                  * This verifies that the write task did not return control to
                  * the caller until the write set of that task was committed.
-                 * 
-                 * @todo Since this is vital to the semantics of unisolated
-                 * writes verify this more systematically.
                  */
          
                 assertEquals("commit counter unchanged?",

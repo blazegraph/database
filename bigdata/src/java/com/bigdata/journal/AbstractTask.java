@@ -94,9 +94,6 @@ import com.bigdata.isolation.IIsolatedIndex;
  * Note: Use a distinct instance of this task each time you
  * {@link ConcurrentJournal#submit(AbstractTask)} it!
  * 
- * @todo write a task design to support 12/3-phase commit of transactions (for a
- *       transaction whose write sets are distributed across multiple journals).
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -393,7 +390,17 @@ public abstract class AbstractTask implements Callable<Object> {
                 
                 if(tx.isReadOnly()) {
 
-                    return doTask();
+                    try {
+
+                        return doTask();
+
+                    } finally {
+                        
+                        // release hard references to named read-only indices.
+                        
+                        indexCache.clear();
+                        
+                    }
 
                 }
                 
@@ -401,7 +408,7 @@ public abstract class AbstractTask implements Callable<Object> {
                  * Delegate handles handshaking for writable transactions.
                  */
 
-                Callable<Object> delegate = new InnerTxServiceCallable(tx);
+                Callable<Object> delegate = new InnerReadWriteTxServiceCallable(tx);
                 
                 return delegate.call();
 
@@ -422,7 +429,17 @@ public abstract class AbstractTask implements Callable<Object> {
                         + commitRecord.getCommitCounter() + ", timestamp="
                         + commitRecord.getTimestamp());
                 
-                return doTask();
+                try {
+
+                    return doTask();
+                    
+                } finally {
+                    
+                    // release hard references to the named read-only indices.
+                    
+                    indexCache.clear();
+                    
+                }
 
             } else {
 
@@ -439,7 +456,7 @@ public abstract class AbstractTask implements Callable<Object> {
                 log.info("Unisolated write task: resources="
                         + Arrays.toString(resource));
 
-                // declare resource(s) (will sort as a side-effect).
+                // declare resource(s).
                 lockManager.addResource(resource);
 
                 // delegate will handle lock acquisition.
@@ -470,12 +487,6 @@ public abstract class AbstractTask implements Callable<Object> {
                  */
 
                 Object ret = delegate.call();
-
-                /*
-                 * Note: The WriteServiceExecutor will await a commit signal
-                 * before the thread is allowed to complete. This ensures that
-                 * the caller waits until a commit (or an abort).
-                 */ 
                 
                 return ret;
                 
@@ -490,8 +501,8 @@ public abstract class AbstractTask implements Callable<Object> {
     }
 
     /**
-     * FIXME handles within transaction lock acquisition (for contention on the
-     * same _isolated_ index).
+     * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
+     * {@link IsolationEnum#ReadWrite} transactions.
      * 
      * FIXME take note of which indices the transaction actually _writes_ on and
      * then inform the transaction manager which needs to keep track of that
@@ -517,11 +528,11 @@ public abstract class AbstractTask implements Callable<Object> {
      *       an isolated index on abort or we have to abort the entire tx if any
      *       task in the tx fails (at least for a writable transaction).
      */
-    class InnerTxServiceCallable implements Callable<Object> {
+    class InnerReadWriteTxServiceCallable implements Callable<Object> {
 
         final ITx tx;
         
-        InnerTxServiceCallable(ITx tx) {
+        InnerReadWriteTxServiceCallable(ITx tx) {
             
             if (tx == null)
                 throw new IllegalArgumentException();
@@ -537,7 +548,21 @@ public abstract class AbstractTask implements Callable<Object> {
 
             // invoke on the outer class.
 
-            return doTask();
+            try {
+
+                return doTask();
+                
+            } finally {
+                
+                /*
+                 * Release hard references to the named indices. The backing
+                 * indices are reading from the ground state identified by the
+                 * start time of the ReadWrite transaction.
+                 */
+                
+                indexCache.clear();
+                
+            }
             
         }
         
@@ -573,18 +598,42 @@ public abstract class AbstractTask implements Callable<Object> {
 
             try {
 
-                // invoke on the outer class.
+                final Object ret;
                 
-                final Object ret = doTask();
+                try {
 
-                ran = true;
+                    // invoke on the outer class.
+                    ret = doTask();
 
+                    // set flag.
+                    ran = true;
+                    
+                    /*
+                     * Note: I am choosing NOT to flush dirty indices to the
+                     * store after each task in case other tasks in the same
+                     * commit group want to write on the same index. Flushing an
+                     * index makes its nodes and leaves immutable, and that is
+                     * not desirable if you are going to write on it again soon.
+                     */
+
+                } finally {
+
+                    /*
+                     * Release hard references to named indices. Dirty indices
+                     * will exist on the Name2Addr's commitList until the next
+                     * commit.
+                     */
+
+                    indexCache.clear();
+
+                }
+                
                 /*
-                 * Note: I am choosing NOT to flush dirty indices to the store
-                 * in case other tasks in the same commit group want to write on
-                 * the same index.
-                 */
-                
+                 * Note: The WriteServiceExecutor will await a commit signal
+                 * before the thread is allowed to complete. This ensures that
+                 * the caller waits until a commit (or an abort).
+                 */ 
+
                 writeService.afterTask(this, null);
 
                 return ret;
@@ -609,7 +658,7 @@ public abstract class AbstractTask implements Callable<Object> {
         }
 
     }
-
+    
     /**
      * Return an appropriate view of the named index for the operation.
      * <p>
@@ -647,8 +696,14 @@ public abstract class AbstractTask implements Callable<Object> {
      */
     final public IIndexWithCounter getIndex(String name) {
 
+        if(name==null) {
+
+            throw new NullPointerException();
+            
+        }
+        
         /*
-         * Test the cache first.
+         * Test the named index cache first.
          */
         {
 
@@ -663,16 +718,22 @@ public abstract class AbstractTask implements Callable<Object> {
 
         }
 
+        // validate that this is a declared index.
+        assertResource(name);
+        
         final IIndexWithCounter tmp;
 
         if (isolated) {
 
             /*
-             * isolated operation.
+             * Isolated operation.
+             * 
+             * Note: The backing index is always a historical state of the named
+             * index.
              */
 
             final IIsolatedIndex isolatedIndex = (IIsolatedIndex) tx
-                    .getIndex(assertResource(name));
+                    .getIndex(name);
 
             if (isolatedIndex == null) {
 
@@ -691,15 +752,15 @@ public abstract class AbstractTask implements Callable<Object> {
             if(readOnly) {
             
                 /*
-                 * Read-only unisolated index based on the last committed state
-                 * of the store.
+                 * The read-only unisolated index is based on the last committed
+                 * state of the store.
                  * 
                  * Note: We use this version of the index rather than the "live"
                  * index so that read operations on unisolated indices DO NOT
                  * conflict with write operations on unisolated indices.
                  */
-                
-                if(commitRecord.getCommitCounter()==0) {
+
+                if (commitRecord.getCommitCounter() == 0) {
                     
                     /*
                      * This catches the edge case where nothing has been
@@ -713,14 +774,23 @@ public abstract class AbstractTask implements Callable<Object> {
                     
                 }
                 
+                /*
+                 * This is a historical state for the named index.
+                 */
+                
                 IIndex foo = journal.getIndex(name,commitRecord);
                 
-                if (foo==null) {
+                if (foo == null) {
                     
                     throw new NoSuchIndexException(name);
 
                 }
                 
+                /*
+                 * Wrap the index such that attempts to write on it will cause
+                 * an UnsupportedOperationException to be thrown.
+                 */
+
                 tmp = new ReadOnlyIndex(foo);
             
             } else {
@@ -733,7 +803,7 @@ public abstract class AbstractTask implements Callable<Object> {
                  * task has access to this index at a time.
                  */
                 
-                tmp = (BTree) journal.getIndex(assertResource(name));
+                tmp = (BTree) journal.getIndex(name);
 
                 if (tmp == null) {
 
@@ -744,6 +814,11 @@ public abstract class AbstractTask implements Callable<Object> {
             }
 
         }
+
+        /*
+         * Put the index into a hard reference cache under its name so that we
+         * can hold onto it for the duration of the operation.
+         */
 
         indexCache.put(name,tmp);
 

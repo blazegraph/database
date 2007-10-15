@@ -438,8 +438,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * Note: If you can not obtain the required lock(s) then you MUST use
      * {@link #releaseLocks()} to make sure that you release any locks that
      * you might have obtained.
-     * <p>
-     * Note: This request sorts the caller's resource[] as a side effect.
      * 
      * @param resource
      *            The resource(s) to be locked.
@@ -504,17 +502,16 @@ public class LockManager</*T,*/R extends Comparable<R>> {
             /*
              * Sort the resources in the lock request.
              * 
-             * Note: we always sort the resources since this reduces the
-             * chance of deadlock even when predeclaration is not being
-             * used. Sorting the resources reduces the chance of a deadlock
-             * and excludes it entirely when predeclaration of locks is also
-             * used.
+             * Note: Sorting the resources reduces the chance of a deadlock and
+             * excludes it entirely when predeclaration of locks is also used.
+             * 
+             * Note: We clone the resources to avoid side-effects on the caller.
              * 
              * Note: This will throw an exception if the "resource" does not
              * implement Comparable.
              */
 
-            Arrays.sort(resource);
+            Arrays.sort(resource.clone());
 
         }
 

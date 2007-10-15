@@ -87,12 +87,23 @@ import com.bigdata.util.ChecksumUtility;
  * independent in a scale-out solution (transaction management, partitioned
  * indices, and index metadata management).
  * <p>
- * The {@link IIndexManager} implementation on this class is NOT thread-safe.
+ * The {@link IIndexStore} implementation on this class is NOT thread-safe. The
+ * basic limitation is that the mutable {@link BTree} is NOT thread-safe. The
+ * {@link #getIndex(String)} method exposes this mutable {@link BTree}. If you
+ * use this method to access the mutable {@link BTree} then YOU are responsible
+ * for avoiding concurrent writes on the returned object.
+ * <p>
  * See {@link ConcurrentJournal#submit(AbstractTask)} for a thread-safe API that
  * provides suitable concurrency control for both isolated and unisolated
- * operations on named indices. While the {@link IRawStore} interface on this
- * class is thread-safe, this is a low-level API that is not used by directly by
- * most applications.
+ * operations on named indices. Note that the use of the thread-safe API does
+ * NOT protect against applications that directly access the mutable
+ * {@link BTree} using {@link #getIndex(String)}.
+ * <p>
+ * The {@link IRawStore} interface on this class is thread-safe. However, this
+ * is a low-level API that is not used by directly by most applications.  The
+ * {@link BTree} class uses this low-level API to read and write its nodes and
+ * leaves on the store.  Applications generally use named indices rather than
+ * the {@link IRawStore} interface.
  * </p>
  * <p>
  * Commit processing. The journal maintains two root blocks. Commit updates the
@@ -1781,6 +1792,18 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         assertOpen();
 
+        /*
+         * This is a performance tweak. It flushes the index to the backing
+         * store before we synchronize on [name2addr] in order to afford greater
+         * concurrency. Note that this is wasted effort only in the case where
+         * the index is pre-existing as we would NOT flush it to disk in that
+         * case. In the index to be registered is empty or if indices are not
+         * normally pre-existing then this should be a performance win where a
+         * large #of indices are created concurrently.
+         */
+
+        ((ICommitter)ndx).handleCommit();
+        
         synchronized (name2Addr) {
                 
             // add to the persistent name map.
