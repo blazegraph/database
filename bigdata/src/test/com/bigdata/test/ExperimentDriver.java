@@ -56,6 +56,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -72,6 +73,8 @@ import java.util.Vector;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+
+import junit.framework.TestCase2;
 
 import org.CognitiveWeb.util.PropertyUtil;
 import org.apache.log4j.Logger;
@@ -425,6 +428,58 @@ public class ExperimentDriver {
     }
     
     /**
+     * Returns a list that contains N copies of the original conditions.
+     * 
+     * @param nruns
+     *            The #of copies to make.
+     *            
+     * @return The new set of conditions.
+     */
+    static public Collection<Condition> replicateConditions(int nruns,
+            Collection<Condition> conditions) {
+        
+        List<Condition> ret = new LinkedList<Condition>();
+        
+        for (Condition c : conditions) {
+            
+            for(int i=0; i<nruns; i++) {
+
+                ret.add( c );
+                
+            }
+            
+        }
+        
+        return ret;
+        
+    }
+
+    /**
+     * Randomize the conditions.
+     * 
+     * @param conditions
+     * @return
+     */
+    static public Collection<Condition> randomize(Collection<Condition> conditions) {
+        
+        Condition[] a = conditions.toArray(new Condition[conditions.size()]);
+        
+        int[] order = TestCase2.getRandomOrder(a.length);
+        
+        List<Condition> ret = new ArrayList<Condition>(a.length);
+        
+        // add to result in permutated order.
+        for( int i : order ) {
+            
+            ret.add(a[i]);
+            
+        }
+        
+        return ret;
+        
+    }
+    
+    /**
      * Models an experiment.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -436,7 +491,7 @@ public class ExperimentDriver {
         
         public final Map<String,String> defaultProperties;
         
-        public final Collection<Condition> conditions;
+        public final Collection<Condition> _conditions;
         
         public Experiment(String className,
                 Map<String, String> defaultProperties,
@@ -455,7 +510,7 @@ public class ExperimentDriver {
             
             this.defaultProperties = defaultProperties;
             
-            this.conditions = conditions;
+            this._conditions = conditions;
             
         }
 
@@ -473,7 +528,7 @@ public class ExperimentDriver {
                     " \"" + DTDValidationHelper.SYSTEM_EXPERIMENT_FILENAME_0_1 + "\""+
                     ">\n");
             
-            sb.append("<!-- There are "+conditions.size()+" conditions. -->\n");
+            sb.append("<!-- There are "+_conditions.size()+" conditions. -->\n");
             
             sb.append("<experiment class=\""+className+"\">\n");
 
@@ -495,7 +550,7 @@ public class ExperimentDriver {
                 
             }
 
-            Iterator<Condition> conditr = conditions.iterator();
+            Iterator<Condition> conditr = _conditions.iterator();
             
             while(conditr.hasNext()) {
                 
@@ -560,25 +615,27 @@ public class ExperimentDriver {
 
         /**
          * Run the experiment, writing the results onto a CSV file.
+         * 
+         * @param randomize
+         *            When true, the {@link Condition}s will be executed in a
+         *            random ordering.
+         * @param nruns
+         *            The #of times to execute all of the {@link Condition}s.
          */
-        public void run(int nruns) throws Exception {
+        public void run(boolean randomize,int nruns) throws Exception {
                         
             if (nruns < 1)
                 throw new IllegalArgumentException(
                         "nruns must be at least one, not " + nruns);
 
-            if(nruns>1) {
-                /*
-                 * FIXME refactor to output each run in turn (breaks into
-                 * multiple runs which I do not like) or to collect all results
-                 * so that both the output file and the run summary show all
-                 * data. The run summary should also use the same logic to break
-                 * down the invariants.
-                 * 
-                 * @todo randomize the run orders by default in each pass and
-                 * allow a command line option to take them in sequence.
-                 */
-                throw new UnsupportedOperationException("Not collecting results across all runs");
+            // replicate for multiple runs.
+            Collection<Condition> conditions = replicateConditions(nruns, _conditions);
+            
+            if(randomize) {
+                
+                // randomize across all runs.
+                conditions = randomize(conditions);
+                
             }
             
             File outFile = new File(className+".exp.csv");
@@ -730,17 +787,18 @@ public class ExperimentDriver {
 
                         Condition condition = itr.next();
 
-                        Map<Object,Object> conditions = PropertyUtil.flatten(condition.properties);
+                        Map<Object, Object> conditionProperties = PropertyUtil
+                                .flatten(condition.properties);
                         
                         // collect unique condition columns.
-                        conditionColumns.addAll(conditions.keySet());
+                        conditionColumns.addAll(conditionProperties.keySet());
 
                         // collect unique result columns.
                         resultColumns.addAll(condition.result.keySet());
 
                         if(first) {
                             
-                            invariants.putAll(conditions);
+                            invariants.putAll(conditionProperties);
                             
                             invariants.putAll(condition.result);
                             
@@ -748,7 +806,7 @@ public class ExperimentDriver {
                             
                             // disprove invariants from conditions.
                             {
-                                Iterator<Map.Entry<Object,Object>> itr2 = conditions.entrySet().iterator();
+                                Iterator<Map.Entry<Object,Object>> itr2 = conditionProperties.entrySet().iterator();
                                 
                                 while(itr2.hasNext()) {
                                     
@@ -1241,7 +1299,7 @@ public class ExperimentDriver {
             
         }
         
-        exp.run(nruns);
+        exp.run(true/*randomize*/,nruns);
         
     }
 

@@ -124,8 +124,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * {@link #WRITE_SERVICE_CORE_POOL_SIZE} and
      * {@link #WRITE_SERVICE_QUEUE_CAPACITY}. So far, more is better (at least
      * up to 1000 each) and you always want the queue capacity to be at least as
-     * large as the core pool size. Pre-starting the core pool threads does
-     * offer a minor advantage on startup.
+     * large as the core pool size. Pre-starting the core pool threads appears
+     * to offer a minor advantage on startup. Note that there is also a strong
+     * effect as the JVM performs optimizations on the running code, so
+     * randomize your tests.
      * <p>
      * See {@link StressTestGroupCommit} for performance tuning.
      * 
@@ -178,8 +180,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
 
         /**
-         * The default #of threads in the write service thread pool (#of
-         * concurrent index writers).
+         * The default #of threads in the write service thread pool (1000).
          */
         public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "1000";
         
@@ -221,9 +222,9 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public static final String WRITE_SERVICE_QUEUE_CAPACITY = "writeServiceQueueCapacity";
 
         /**
-         * The default maximum depth of the write service queue (100).
+         * The default maximum depth of the write service queue (1090).
          */
-        public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "100";
+        public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
         
         /**
          * The delay between scheduled invocations of the {@link StatusTask}.
@@ -634,6 +635,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             final long delay = Long.parseLong(properties.getProperty(
                     Options.STATUS_DELAY, Options.DEFAULT_STATUS_DELAY));
 
+            log.info(Options.STATUS_DELAY+"="+delay);
+            
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
             statusService = Executors
@@ -687,20 +690,31 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      *         Thompson</a>
      * @version $Id$
      */
-    protected class StatusTask implements Runnable {
+    public class StatusTask implements Runnable {
 
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
         protected final Logger log = Logger.getLogger(StatusTask.class);
 
         final protected long begin = System.currentTimeMillis();
         
         public StatusTask() {
             
+//            System.err.println("class="+this.getClass().getName());
+            
         }
         
         public void run() {
 
-            log.info(status());
-
+            final String s = status();
+            
+//            System.err.println( s );
+            
+            log.info( s );
+            
         }
 
         /**

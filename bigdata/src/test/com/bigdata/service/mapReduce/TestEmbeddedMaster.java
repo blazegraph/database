@@ -98,14 +98,14 @@ public class TestEmbeddedMaster extends TestCase {
                 .toString());
 
         // Note: Option does not buffer data in RAM.
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         // Note: No disk at all, but consumes more RAM to buffer the data.
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
 
-        // Note: Turn on if testing group commit performance.
-        properties
-                .setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
+//        // Note: option iff using a disk-backed store
+//        properties
+//                .setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
 
         /*
          * #of data services to run in the federation.
@@ -190,8 +190,13 @@ public class TestEmbeddedMaster extends TestCase {
          * also be set by the #of machines that you are going to use to serve
          * the resulting data, e.g., a cluster of 100 machines serving a large
          * text index.
+         * 
+         * Note: With the new ConcurrentJournal I am able to run larger M and N
+         * up to 10 without too much of an impact.  However, the overall performance
+         * numbers are somewhat lower - I need to review this again after a
+         * reboot.
          */
-        MapReduceJob job = new CountKeywordJob(100/* m */, 1/* n */);
+        MapReduceJob job = new CountKeywordJob(100/* m */, 10/* n */);
 //      MapReduceJob job = new CountKeywordJob(1/* m */, 1/* n */);
 
         // non-zero to submit no more than this many map inputs.

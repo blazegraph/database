@@ -270,7 +270,7 @@ public class TestMaster extends AbstractServerTestCase {
 
     public void testCountKeywords() {
         
-        MapReduceJob job = new CountKeywordJob(100/* m */, 2/* n */);
+        MapReduceJob job = new CountKeywordJob(100/* m */, 10/* n */);
 //      MapReduceJob job = new CountKeywordJob(1/* m */, 1/* n */);
 
         // non-zero to submit no more than this many map inputs.
