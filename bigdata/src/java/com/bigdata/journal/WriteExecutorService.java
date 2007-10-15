@@ -150,11 +150,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /** signaled when tasks should resume. */
     final private Condition unpaused = lock.newCondition();
 
-    /** signaled when a task will await commit. */
+    /**
+     * The thread running {@link #groupCommit()} is signaled each time a task
+     * has completed and will await the {@link #commit()} signal.
+     */
     final private Condition waiting = lock.newCondition();
     
     /**
-     * Signaled when groupCommit is performed.
+     * Everyone awaiting this conditions is signaled when groupCommit is
+     * performed.
      */
     final private Condition commit = lock.newCondition();
 
@@ -177,17 +181,29 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Counters
      */
 
+    private long maxRunning = 0;
     private long maxLatencyUntilCommit = 0;
     private long maxCommitLatency = 0;
     private long ncommits = 0;
     private long naborts = 0;
 
     /**
+     * The maximum #of tasks that are concurrently executing.
+     */
+    public long getMaxRunning() {
+        
+        return maxRunning;
+        
+    }
+    
+    /**
      * The maximum latency from when a task completes successfully until the
      * next group commit (milliseconds).
      */
     public long getMaxLatencyUntilCommit() {
+        
         return maxLatencyUntilCommit;
+        
     }
     
     /**
@@ -268,6 +284,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * {@link Condition#await() awaits} someone to call {@link #resume()}.
      */
     protected void beforeExecute(Thread t, Runnable r) {
+
+        // Note: [r] is the FutureTask.
         
         lock.lock();
         
@@ -313,8 +331,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         try {
         
             // Increment the #of running tasks.
-            nrunning.incrementAndGet();
+            final int nrunning = this.nrunning.incrementAndGet();
 
+            // Update max# of tasks concurrently running.
+            maxRunning = (nrunning>maxRunning?nrunning:maxRunning);
+            
             // Note the thread running the task.
             active.add(t);
         
@@ -605,24 +626,36 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * latency from submit.
              */
             
-//            while(!getQueue().isEmpty() && (nrunning.get()+nwrites.get()) * 2 < getCorePoolSize() ) {
-//
-//                if(System.currentTimeMillis()-beginWait>250) {
-//                    
-//                    // Don't wait any longer.
-//                    
-//                    break;
-//                    
-//                }
-//                
-//                /*
-//                 * Note: if interrupted during sleep then the group commit will
-//                 * abort.
-//                 */
-//                
-//                Thread.sleep(150/*ms*/);
-//                
-//            }
+            while(true) {
+
+                final int queueSize = getQueue().size();
+                final int nrunning = this.nrunning.get();
+                final int nwrites = this.nwrites.get();
+                final int corePoolSize = getCorePoolSize();
+                final int poolSize = getPoolSize();
+                final long elapsedWait = System.currentTimeMillis() - beginWait;
+                                
+                if ((elapsedWait>100 && queueSize==0) || elapsedWait > 250) {
+                    
+                    // Don't wait any longer.
+                    
+                    System.err.println("Not waiting any longer: elapsed="
+                            + elapsedWait + "ms, queueSize=" + queueSize
+                            + ", nrunning=" + nrunning + ", nwrites=" + nwrites
+                            + ", corePoolSize=" + corePoolSize+", poolSize="+poolSize);
+                    
+                    break;
+                    
+                }
+                
+                /*
+                 * Note: if interrupted during sleep then the group commit will
+                 * abort.
+                 */
+                
+                waiting.await(50/*ms*/,TimeUnit.MILLISECONDS);
+                
+            }
 
             log.info("Will do group commit: nrunning="+nrunning);
             
@@ -723,9 +756,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // at this point nwrites is the size of the commit group.
             log.info("Committing store: commit group size="+nwrites);
 
-            final long now = System.currentTimeMillis();
+            // timestamp used to measure commit latency.
+            final long beginCommit = System.currentTimeMillis();
             
-            final long latencyUntilCommit = now - beginWait;
+            final long latencyUntilCommit = beginCommit - beginWait;
             
             if (latencyUntilCommit > maxLatencyUntilCommit) {
 
@@ -733,9 +767,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            // timestamp used to measure commit latency.
-            final long beginCommit = System.currentTimeMillis();
-            
             // commit the store.
             if (!commit()) {
 
@@ -746,7 +777,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // the commit latency.
             final long commitLatency = System.currentTimeMillis() - beginCommit;
             
-            if(commitLatency>maxCommitLatency) {
+            if (commitLatency > maxCommitLatency) {
                 
                 maxCommitLatency = commitLatency;
                 
@@ -818,6 +849,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // #of commits that succeeded.
             
             ncommits++;
+            
+            System.err.println("commit: #writes="+nwrites);
             
             return true;
 
@@ -956,5 +989,5 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         private static final long serialVersionUID = 2129883896957364071L;
         
     }
-    
+
 }

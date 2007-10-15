@@ -59,7 +59,7 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IIsolatedIndex;
 
 /**
- * A read-committed transaction provides a read-only view onto the current
+ * A read-committed transaction provides a read-only view onto the more recently
  * committed state of the database. Each time a view of an index is requested
  * using {@link #getIndex(String)} the returned view will provide access to the
  * most recent committed state for that index. Unlike a fully isolated
@@ -130,11 +130,24 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
             
         }
 
-        if (journal.getIndex(name) == null) {
+        ICommitRecord commitRecord = journal.getCommitRecord();
+        
+        if(commitRecord==null) {
+            
+            /*
+             * This happens where there has not yet been a commit on the store.
+             */
+            
+            return null;
+            
+        }
+        
+        if (journal.getIndex(name,commitRecord) == null) {
 
             /*
-             * The named index is not registered at this time.
+             * The named index is not registered as of the last commit.
              */
+
             return null;
             
         }

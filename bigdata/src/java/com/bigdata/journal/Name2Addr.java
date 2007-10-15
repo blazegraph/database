@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.ShortPacker;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
@@ -60,7 +61,6 @@ import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.UnicodeKeyBuilder;
-import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataOutputBuffer;
@@ -84,31 +84,15 @@ import com.bigdata.rawstore.WormAddressManager;
  * a canonicalizing mapping but that current evolving {@link Name2Addr} instance
  * is NOT part of that mapping.
  */
-public class Name2Addr extends BTree implements IDirtyListener {
+public class Name2Addr extends BTree {
 
-    /*
+    protected static final Logger log = Logger.getLogger(Name2Addr.class);
+
+    /**
      * @todo parameterize the {@link Locale} on the Journal and pass through to
      * this class. this will make it easier to configure non-default locales.
      */
     private UnicodeKeyBuilder keyBuilder = new UnicodeKeyBuilder();
-
-//    /**
-//     * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
-//     * "live" {@link Name2Addr} instance. Only the indices found in this cache
-//     * are candidates for the commit protocol. The use of this cache also
-//     * minimizes the use of the {@link #keyBuilder} and therefore minimizes the
-//     * relatively expensive operation of encoding unicode names to byte[] keys.
-//     * 
-//     * FIXME This never lets go of an unisolated index once it has been looked
-//     * up and placed into this cache. Therefore, modify this class to use a
-//     * combination of a weak value cache (so that we can let go of the
-//     * unisolated named indices) and a commit list (so that we have hard
-//     * references to any dirty indices up to the next invocation of
-//     * {@link #handleCommit()}. This will require a protocol by which we notice
-//     * writes on the named index, probably using a listener API so that we do
-//     * not have to wrap up the index as a different kind of object.
-//     */
-//    private Map<String, IIndex> indexCache = new HashMap<String, IIndex>();
 
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
@@ -124,6 +108,11 @@ public class Name2Addr extends BTree implements IDirtyListener {
      * Note: The capacity of the backing hard reference LRU effects how many
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link #commitList}.
+     */
+    private final WeakValueCache<String, IIndex> indexCache;
+
+    /**
+     * The capacity of the inner {@link LRUCache} for the {@link WeakValueCache}.
      * 
      * @todo make the capacity of the backing LRU a configuration option for the
      *       journal. It indirectly effects how many writable indices the
@@ -134,14 +123,18 @@ public class Name2Addr extends BTree implements IDirtyListener {
      *       multiplexed absorbing writes. In this scenario a low capacity could
      *       starve the data service forcing frequent reloading of indices from
      *       the store rather than reuse of the existing mutable index.
+     *       <p>
+     *       Note: This is complicated since we re-load the {@link Name2Addr}
+     *       index from the store using a fixed API unless we persist the size
+     *       of the cache in the index metadata, but really you want to be able
+     *       to change it each time you start the journal.
      */
-    private WeakValueCache<String, IIndex> indexCache = new WeakValueCache<String, IIndex>(
-            new LRUCache<String, IIndex>(10));
-
+    protected final int LRU_CAPACITY = 10;
+    
     /**
-     * Hard references for the dirty indices. This collection prevents dirty
-     * indices from being cleared from the {@link #indexCache}, which would
-     * result in lost updates.
+     * Holds hard references for the dirty indices along with the index name.
+     * This collection prevents dirty indices from being cleared from the
+     * {@link #indexCache}, which would result in lost updates.
      * <p>
      * Note: Operations on unisolated indices always occur on the "current"
      * state of that index. The "current" state is either unchanged (following a
@@ -153,13 +146,61 @@ public class Name2Addr extends BTree implements IDirtyListener {
      * operations writing on indices that should have been rolled back if the
      * commit is not successfull.
      */
-    private Set<IIndex> commitList = new HashSet<IIndex>();
+    private Set<DirtyListener> commitList = new HashSet<DirtyListener>();
+    
+    /**
+     * An instance of this {@link DirtyListener} is registered with each named
+     * index that we administer to listen for events indicating that the index
+     * is dirty. When we get that event we stick the {@link DirtyListener} on
+     * the {@link #commitList}. This makes the commit protocol simpler since
+     * the {@link DirtyListener} has both the name of the index and the
+     * reference to the index and we need both on hand to do the commit.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class DirtyListener implements IDirtyListener {
+        
+        final String name;
+        final IIndex ndx;
+        
+        DirtyListener(String name,IIndex ndx) {
+            
+            assert name!=null;
+            
+            assert ndx!=null;
+            
+            this.name = name;
+            
+            this.ndx = ndx;
+            
+        }
+
+        /**
+         * Add <i>this</i> to the {@link Name2Addr#commitList}.
+         *  
+         * @param btree
+         */
+        public void dirtyEvent(BTree btree) {
+
+            assert btree == this.ndx;
+            
+            log.info("Adding dirty index to commit list: ndx="+name);
+            
+            commitList.add(this);
+            
+        }
+
+    }
     
     public Name2Addr(IRawStore store) {
 
         super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 new ValueSerializer());
-        
+
+        // Note: code shared by both constructors.
+        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
+
     }
 
     /**
@@ -174,58 +215,9 @@ public class Name2Addr extends BTree implements IDirtyListener {
 
         super(store, metadata);
         
-    }
+        // Note: code shared by both constructors.
+        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
 
-    /**
-     * We register ourselves with each index that we administer to listen for
-     * events indicating that the index is dirty.  When we get that event we
-     * stick the index on the {@link #commitList}.
-     * 
-     * @param btree
-     */
-    public void dirtyEvent(BTree btree) {
-        
-        /*
-         * FIXME disable this - it is just a paranoia test. it looks for cases
-         * where we have failed to set the listener on the btree and therefore
-         * are recieving events that should be going to another instance of this
-         * class.
-         */
-
-        if(true) {
-            
-            Iterator<ICacheEntry<String,IIndex>> itr = indexCache.entryIterator();
-
-            String name = null;
-            
-            while(itr.hasNext()) {
-
-                ICacheEntry<String, IIndex> entry = itr.next();
-                
-                if(entry.getObject()==btree) {
-                    
-                    name = entry.getKey();
-                    
-                    break;
-                    
-                }
-                
-            }
-            
-            if(name==null) {
-                
-                throw new AssertionError("Received event for unknown index");
-                
-            }
-            
-            log.info("placing dirty index on commit list: name=" + name);
-            
-        }
-        
-        log.info("Adding dirty index to commit list");
-        
-        commitList.add(btree);
-        
     }
 
     /**
@@ -249,35 +241,18 @@ public class Name2Addr extends BTree implements IDirtyListener {
      */
     public long handleCommit() {
 
-        /*
-         * This iterator that visits only the entries for named btree that have
-         * been touched since the journal was last opened. We can get away with
-         * visiting this rather than all named btrees registered with the
-         * journal since only trees that have been touched can have data for the
-         * current commit.
-         */
-//        Iterator<Map.Entry<String,IIndex>> itr = indexCache.entrySet().iterator();
+        // visit the indices on the commit list.
+        Iterator<DirtyListener> itr = commitList.iterator();
         
-        Iterator<ICacheEntry<String,IIndex>> itr = indexCache.entryIterator();
-
         while(itr.hasNext()) {
             
-//            Map.Entry<String, IIndex> entry = itr.next();
-            ICacheEntry<String,IIndex> entry = itr.next();
+            DirtyListener l = itr.next();
             
-            String name = entry.getKey();
+            String name = l.name;
             
-            IIndex btree = entry.getObject();
+            IIndex btree = l.ndx;
             
-            if(!commitList.contains(btree)) {
-                
-                /*
-                 * Not on the commit list.
-                 */
-                
-                continue;
-                
-            }
+            log.info("Will commit: "+name);
             
             // request commit.
             long addr = ((ICommitter)btree).handleCommit();
@@ -368,7 +343,7 @@ public class Name2Addr extends BTree implements IDirtyListener {
         indexCache.put(name, btree, false/*dirty*/);
 
         // listen for dirty events so that we know when to add this to the commit list.
-        ((BTree)btree).setDirtyListener(this);
+        ((BTree)btree).setDirtyListener(new DirtyListener(name,btree));
         
         // report event (loaded btree).
         ResourceManager.openUnisolatedBTree(name);
@@ -483,16 +458,19 @@ public class Name2Addr extends BTree implements IDirtyListener {
         // add name -> btree mapping to the transient cache.
         indexCache.put(name, btree, true/*dirty*/);
         
+        DirtyListener l = new DirtyListener(name,btree);
+        
         // add to the commit list.
-        commitList.add(btree);
+        commitList.add( l );
 
-        // listen for dirty events so that we know when to add this to the commit list.
-        ((BTree)btree).setDirtyListener(this);
+        // set listener on the btree as well.
+        ((BTree)btree).setDirtyListener( l );
         
     }
 
     /**
-     * Removes the entry for the named index.
+     * Removes the entry for the named index. The named index will no longer
+     * participate in commits.
      * 
      * @param name
      *            The index name.
@@ -501,8 +479,6 @@ public class Name2Addr extends BTree implements IDirtyListener {
      *                if <i>name</i> is <code>null</code>.
      * @exception NoSuchIndexException
      *                if the index does not exist.
-     * 
-     * @todo mark the index as invalid in case anyone holds a reference to it?
      */
     public void dropIndex(String name) {
 

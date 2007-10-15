@@ -371,12 +371,21 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             UnisolatedBTree src = (UnisolatedBTree) journal.getIndex(name,
                     commitRecord);
             
-            // the named index was never registered.
-            if(name==null) return null;
+            if(name==null) {
+                
+                /*
+                 * The named index was not registered as of the transaction
+                 * ground state.
+                 */
+                
+                return null;
+                
+            }
             
             /*
              * Isolate the named btree.
              */
+
             if(readOnly) {
 
                 index = new ReadOnlyIsolatedIndex(src);

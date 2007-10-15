@@ -209,8 +209,9 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public final static String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
 
         /**
-         * The maximum depth of the write service queue before newly submitted tasks
-         * will block the caller.
+         * The maximum depth of the write service queue before newly submitted
+         * tasks will block the caller -or- ZERO (0) to use a queue with an
+         * unlimited capacity.
          * 
          * @see #WRITE_SERVICE_CORE_POOL_SIZE
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
@@ -312,6 +313,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * information (counters).
      */
     final protected ScheduledExecutorService statusService;
+    
+    /**
+     * Used to emit a final status message during shutdown.
+     */
+    final private StatusTask statusTask;
 
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -404,9 +410,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
         }
 
-        // @todo custom statusService overrides terminate() to always log a final status message.
         statusService.shutdown();
 
+        // final status message.
+        statusTask.run();
+        System.err.println(statusTask.status());
+        
         super.shutdown();
 
     }
@@ -424,6 +433,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         writeService.shutdownNow();
 
         statusService.shutdownNow();
+
+        // final status message.
+        statusTask.run();
+        System.err.println(statusTask.status());
 
         super.shutdownNow();
 
@@ -622,11 +635,16 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
             statusService = Executors
-                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                            .defaultThreadFactory());
+            .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                    .defaultThreadFactory());
+            
+            statusTask = newStatusTask();
+            
+            statusService.scheduleWithFixedDelay(statusTask, initialDelay,
+                    delay, unit);
 
-            statusService.scheduleWithFixedDelay(newStatusTask(),
-                    initialDelay, delay, unit);
+//            statusService = new DelegatedExecutorService(new StatusService(delay,
+//                    DaemonThreadFactory.defaultThreadFactory()));
 
         }
 
@@ -654,15 +672,57 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
     }
 
+//    /**
+//     * Class extends {@link #terminated()} to emit a last status message.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public class StatusService extends ScheduledThreadPoolExecutor {
+//        
+//        private final StatusTask statusTask;
+//        
+//        /**
+//         * 
+//         * @param delay
+//         *            The delay between status messages in milliseconds.
+//         * @param threadFactory
+//         */
+//        public StatusService(long delay,ThreadFactory threadFactory) {
+//            
+//            super(1/*corePoolSize*/, threadFactory);
+//            
+//            final long initialDelay = 100;
+//
+//            statusTask = newStatusTask();
+//            
+//            scheduleWithFixedDelay(statusTask, initialDelay,
+//                    delay, TimeUnit.MILLISECONDS);
+//
+//        }
+//
+//        public void terminated() {
+//
+//            System.err.println("Status!");
+//            
+//            // run one last time when terminated.
+//            statusTask.run();
+//            
+//            super.terminated();
+//
+//        }
+//
+//    }
+
     /**
      * Factory allows subclasses to extend the {@link StatusTask}.
      */
     protected StatusTask newStatusTask() {
 
         return new StatusTask();
-        
+
     }
-    
+
     /**
      * Writes out periodic status information.
      * 
@@ -673,10 +733,16 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     protected class StatusTask implements Runnable {
 
         protected final Logger log = Logger.getLogger(StatusTask.class);
+
+        final protected long begin = System.currentTimeMillis();
+        
+        public StatusTask() {
+            
+        }
         
         public void run() {
 
-            status();
+            log.info(status());
 
         }
 
@@ -685,38 +751,60 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * 
          * @todo measure the maximum latency for a task to begin execution.
          * @todo measure the #of tasks that are retried.
-         * @todo measure the maximum latency for a task from submit to commit.
+         * @todo measure the maximum latency for a task from submit to
+         *       commit.
          * @todo report averages also, not just maximums.
          */
-        protected void status() {
+        public String status() {
 
-            // #of commits on the _store_ (not since the write service was started).
+            // #of commits on the _store_ (not since the write service was
+            // started).
             final long commitCounter = getCommitRecord().getCommitCounter();
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            final long nextOffset = getBufferStrategy().getNextOffset();
 
-            log.info(
-                    "status"
+            return "status"
                     + // txService (#active,#queued,#completed)
                     ": transactions=("
-                    + ((ThreadPoolExecutor) txService).getActiveCount() + ","
-                    + ((ThreadPoolExecutor) txService).getQueue().size() + ","
-                    + ((ThreadPoolExecutor) txService).getCompletedTaskCount()+ ")"
+                    + ((ThreadPoolExecutor) txService).getActiveCount()
+                    + ","
+                    + ((ThreadPoolExecutor) txService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) txService)
+                            .getCompletedTaskCount()
+                    + ")"
                     + // readService (#active,#queued,#completed)
                     ", readers=("
-                    + ((ThreadPoolExecutor) readService).getActiveCount() + ","
-                    + ((ThreadPoolExecutor) readService).getQueue().size() + ","
-                    + ((ThreadPoolExecutor) readService).getCompletedTaskCount() + ")"
+                    + ((ThreadPoolExecutor) readService).getActiveCount()
+                    + ","
+                    + ((ThreadPoolExecutor) readService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) readService)
+                            .getCompletedTaskCount()
+                    + ")"
                     + // writeService (#active,#queued,#completed)
                     ", writers=("
-                    + ((ThreadPoolExecutor) writeService).getActiveCount() + ","
-                    + ((ThreadPoolExecutor) writeService).getQueue().size() + ","
-                    + ((ThreadPoolExecutor) writeService).getCompletedTaskCount() + ")"
+                    + ((ThreadPoolExecutor) writeService).getActiveCount()
+                    + ","
+                    + ((ThreadPoolExecutor) writeService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) writeService)
+                            .getCompletedTaskCount()
+                    + ")"
                     + // commitCounter and related stats.
-                    ", commitCounter=" + commitCounter+
-                    ", ncommits="+writeService.getCommitCount()+
-                    ", naborts="+writeService.getAbortCount()+
-                    ", maxLatencyUntilCommit="+writeService.getMaxLatencyUntilCommit()+
-                    ", maxCommitLatency="+writeService.getMaxCommitLatency()
-                    );
+                    ", commitCounter=" + commitCounter + ", ncommits="
+                    + writeService.getCommitCount() + ", naborts="
+                    + writeService.getAbortCount()
+                    + ", maxLatencyUntilCommit="
+                    + writeService.getMaxLatencyUntilCommit()
+                    + ", maxCommitLatency="
+                    + writeService.getMaxCommitLatency() + ", maxRunning="
+                    + writeService.getMaxRunning()
+                    + ", elapsed="+elapsed
+                    + ", nextOffset="+nextOffset
+                    ;
 
         }
 
@@ -759,6 +847,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      *                queue has a limited capacity and is full)
      * @exception NullPointerException
      *                if task null
+     *                
+     * @todo we may need to define our own subclasses for the read and tx
+     *       services as well in order to collect metrics on task latency
+     *       (from submit to completion).
      */
     public Future<Object> submit(AbstractTask task) {
 
@@ -768,22 +860,69 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
             log.info("Submitted to the transaction service");
             
-            return txService.submit(task);
+            return submitWithDynamicLatency(task, txService);
             
         } else if( task.readOnly ) {
 
             log.info("Submitted to the read service");
 
-            return readService.submit(task);
+            return submitWithDynamicLatency(task, readService);
             
         } else {
             
             log.info("Submitted to the write service");
 
-            return writeService.submit(task);
+            return submitWithDynamicLatency(task, writeService);
             
         }
         
+    }
+    
+    /**
+     * Submit a task to a service, dynamically imposing latency on the caller
+     * based on the #of tasks already in the queue for that service.
+     * 
+     * @param task
+     *            The task.
+     * @param service
+     *            The service.
+     *            
+     * @return The {@link Future}.
+     */
+    private Future<Object> submitWithDynamicLatency(AbstractTask task,ExecutorService service) {
+
+        if(service instanceof ThreadPoolExecutor) {
+
+            BlockingQueue<Runnable> queue = ((ThreadPoolExecutor)service).getQueue();
+        
+            final int queueCapacity = queue.remainingCapacity();
+            
+            if (queue.size() + 10 >= queueCapacity) {
+                
+                try {
+                    
+                    /*
+                     * Note: Any delay here what so ever causes the #of tasks in
+                     * a commit group to be governed primarily by the CORE pool
+                     * size.
+                     */
+
+                    System.err.print("z");
+                    
+                    Thread.sleep(10/*ms*/);
+                    
+                } catch (InterruptedException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+                
+            }
+            
+        }
+
+        return service.submit(task);
+
     }
 
     /**
@@ -872,9 +1011,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      *                If the transaction could not be validated. A transaction
      *                that can not be validated is automatically aborted. The
      *                caller MAY re-execute the transaction.
-     * 
-     * @todo support 2-phase or 3-phase commit protocol for transactions whose
-     *       write sets are distributed across more than one data service.
      */
     public long commit(long ts) throws ValidationError {
 
@@ -952,6 +1088,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     /**
      * Task validates and commits a transaction when it is run by the
      * {@link Journal#writeService}.
+     * 
+     * @todo write a task design to support 2/3-phase commit of transactions
+     *       (for a transaction whose write sets are distributed across multiple
+     *       journals).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
