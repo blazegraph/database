@@ -459,36 +459,86 @@ public abstract class AbstractTask implements Callable<Object> {
                 // declare resource(s).
                 lockManager.addResource(resource);
 
-                // delegate will handle lock acquisition.
+                // delegate will handle lock acquisition and invoke doTask().
                 Callable<Object> delegate = new LockManagerTask<String>(
                         lockManager, resource, new InnerWriteServiceCallable());
                 
-                /*
-                 * Note: The lock(s) are only held during this call. By the time
-                 * the call returns any lock(s) have been released.
-                 * 
-                 * If there is only a single write task worker then we can still
-                 * assume that only the write set from this task exists on the
-                 * named index(s) on which the task wrote.
-                 * 
-                 * However, when there are multiple write task workers new tasks
-                 * MAY already be writing on the named index(s) on which this
-                 * task just wrote.
-                 * 
-                 * Therefore when there are multiple write task workers the
-                 * commit protocol forces new writer task workers to pause in
-                 * order to ensure that write tasks are atomic (vs having
-                 * half-completed write task made durable).
-                 * 
-                 * Note: locks MUST be released as soon as the task is done
-                 * writing so that it does NOT hold locks while it is awaiting
-                 * commit. This make it possible for other operations to write
-                 * on the same index in the same commit group.
-                 */
+                WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
 
-                Object ret = delegate.call();
-                
-                return ret;
+                writeService.beforeTask(Thread.currentThread(), this);
+
+                boolean ran = false;
+
+                try {
+
+                    final Object ret;
+                    
+                    try {
+
+                        /*
+                         * Note: The lock(s) are only held during this call. By the time
+                         * the call returns any lock(s) have been released. Locks MUST
+                         * be released as soon as the task is done writing so that it
+                         * does NOT hold locks while it is awaiting commit. This make it
+                         * possible for other operations to write on the same index in
+                         * the same commit group.
+                         */
+
+                        ret = delegate.call();
+
+                        // set flag.
+                        ran = true;
+                        
+                        /*
+                         * Note: I am choosing NOT to flush dirty indices to the
+                         * store after each task in case other tasks in the same
+                         * commit group want to write on the same index. Flushing an
+                         * index makes its nodes and leaves immutable, and that is
+                         * not desirable if you are going to write on it again soon.
+                         */
+
+                    } finally {
+
+                        /*
+                         * Release hard references to named indices. Dirty indices
+                         * will exist on the Name2Addr's commitList until the next
+                         * commit.
+                         */
+
+                        indexCache.clear();
+
+                    }
+                    
+                    /*
+                     * Note: The WriteServiceExecutor will await a commit signal
+                     * before the thread is allowed to complete. This ensures
+                     * that the caller waits until a commit (or an abort).
+                     * 
+                     * Note: Waiting here does NOT prevent other tasks from
+                     * gaining access to the same resources since the locks were
+                     * released above.
+                     */ 
+
+                    writeService.afterTask(this, null);
+
+                    return ret;
+
+                } catch (Throwable t) {
+
+                    if (!ran) {
+
+                        // Do not re-invoke it afterTask failed above.
+
+                        writeService.afterTask(this, t);
+
+                    }
+
+                    if (t instanceof Exception)
+                        throw (Exception) t;
+
+                    throw new RuntimeException(t);
+
+                }
                 
             }
 
@@ -569,92 +619,36 @@ public abstract class AbstractTask implements Callable<Object> {
     }
     
     /**
-     * Coordinates with the {@link LockManager} and the
-     * {@link WriteServiceExecutor}.
+     * An instance of this class is used as the delegate for a
+     * {@link LockManagerTask} in order to coordinate the acquisition of locks
+     * with the {@link LockManager} before the task can execute and to release
+     * locks after the task has completed (whether it succeeds or fails).
+     * <p>
+     * Note: This inner class delegates the execution of the task to
+     * {@link AbstractTask#doTask()} on the outer class.
+     * <p>
+     * Note: If there is only a single writer thread then the lock system
+     * essentially does nothing. When there are multiple writer threads the lock
+     * system imposes a partial ordering on the writers that ensures that writes
+     * on a given named index are single-threaded and that deadlocks do not
+     * prevent tasks from progressing. If there is strong lock contention then
+     * writers will be more or less serialized.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     class InnerWriteServiceCallable implements Callable<Object> {
 
-        InnerWriteServiceCallable() { }
+        InnerWriteServiceCallable() {
+        }
 
         /**
-         * Note: If there is only a single writer thread then the lock
-         * system essentially does nothing. When there are multiple writer
-         * threads the lock system imposes a partial ordering on the writers
-         * that ensures that writes on a given named index are
-         * single-threaded and that deadlocks do not prevent tasks from
-         * progressing.
+         * 
          */
         public Object call() throws Exception {
 
-            WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
-
-            writeService.beforeTask(Thread.currentThread(), this);
-
-            boolean ran = false;
-
-            try {
-
-                final Object ret;
-                
-                try {
-
-                    // invoke on the outer class.
-                    ret = doTask();
-
-                    // set flag.
-                    ran = true;
-                    
-                    /*
-                     * Note: I am choosing NOT to flush dirty indices to the
-                     * store after each task in case other tasks in the same
-                     * commit group want to write on the same index. Flushing an
-                     * index makes its nodes and leaves immutable, and that is
-                     * not desirable if you are going to write on it again soon.
-                     */
-
-                } finally {
-
-                    /*
-                     * Release hard references to named indices. Dirty indices
-                     * will exist on the Name2Addr's commitList until the next
-                     * commit.
-                     */
-
-                    indexCache.clear();
-
-                }
-                
-                /*
-                 * Note: The WriteServiceExecutor will await a commit signal
-                 * before the thread is allowed to complete. This ensures that
-                 * the caller waits until a commit (or an abort).
-                 */ 
-
-                writeService.afterTask(this, null);
-
-                return ret;
-
-            } catch (Throwable t) {
-
-                if (!ran) {
-
-                    // Do not re-invoke it afterTask failed above.
-
-                    writeService.afterTask(this, t);
-
-                }
-
-                if (t instanceof Exception)
-                    throw (Exception) t;
-
-                throw new RuntimeException(t);
-
-            }
-
+            return doTask();
+            
         }
 
     }

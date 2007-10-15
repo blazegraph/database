@@ -816,12 +816,6 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * FIXME write an "apply" method that accepts a list of conditions and an
-     * array of NV[]s and returns a new list of conditions in each original
-     * condition has been expanded into N new conditions, one per element of the
-     * NV[]s array. This can be used to systematically build up hypercubes in
-     * the experimental design that can then be analyzed with a pivot table.
-     * 
      * @todo refactor the tests generated below to use apply() and run each
      *       basic condition with and without lock timeout and with and without
      *       predeclaration of locks (and without sorting when locks are NOT

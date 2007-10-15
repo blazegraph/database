@@ -1,100 +1,235 @@
 <?xml version="1.0" ?>
 <!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
-<experiment class="com.bigdata.journal.StressTestConcurrent">
+<!-- There are 32 conditions. -->
+<experiment class="com.bigdata.journal.StressTestGroupCommit">
  <defaults>
   <property name="maximumExtent">419430400</property>
-  <property name="timeout">30</property>
+  <property name="timeout">5</property>
   <property name="createTempFile">true</property>
   <property name="ntasks">10000</property>
-  <property name="NINSERT">0</property>
  </defaults>
  <condition>
-  <property name="bufferMode">Transient</property>
   <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
  </condition>
  <condition>
-  <property name="bufferMode">Direct</property>
+  <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
  </condition>
  <condition>
-  <property name="bufferMode">Direct</property>
+  <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
  </condition>
  <condition>
+  <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">100</property>
   <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">1</property>
- </condition>
- <condition>
+  <property name="writeServiceQueueCapacity">1000</property>
   <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">1000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">1000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">1000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">true</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
-  <property name="bufferMode">Transient</property>
   <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
-  <property name="bufferMode">Direct</property>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">1</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
-  <property name="bufferMode">Direct</property>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">10</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
+  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServiceQueueCapacity">100</property>
   <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServiceQueueCapacity">100</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
+  <property name="writeServiceCorePoolSize">1</property>
+  <property name="writeServiceQueueCapacity">1000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="forceOnCommit">No</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
+ </condition>
+ <condition>
   <property name="writeServiceCorePoolSize">10</property>
- </condition>
- <condition>
+  <property name="writeServiceQueueCapacity">1000</property>
   <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
-  <property name="writeServiceCorePoolSize">10</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
-  <property name="bufferMode">Transient</property>
   <property name="writeServiceCorePoolSize">100</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
-  <property name="writeServiceCorePoolSize">100</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
-  <property name="writeServiceCorePoolSize">100</property>
- </condition>
- <condition>
-  <property name="bufferMode">Disk</property>
-  <property name="writeServiceCorePoolSize">100</property>
- </condition>
- <condition>
+  <property name="writeServiceQueueCapacity">1000</property>
   <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
-  <property name="writeServiceCorePoolSize">100</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
  <condition>
-  <property name="bufferMode">Transient</property>
   <property name="writeServiceCorePoolSize">1000</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
-  <property name="writeServiceCorePoolSize">1000</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
-  <property name="writeServiceCorePoolSize">1000</property>
- </condition>
- <condition>
-  <property name="bufferMode">Disk</property>
-  <property name="writeServiceCorePoolSize">1000</property>
- </condition>
- <condition>
+  <property name="writeServiceQueueCapacity">1000</property>
   <property name="bufferMode">Disk</property>
   <property name="forceOnCommit">No</property>
-  <property name="writeServiceCorePoolSize">1000</property>
+  <property name="writeServicePrestartAllCoreThreads">false</property>
  </condition>
 </experiment>
-

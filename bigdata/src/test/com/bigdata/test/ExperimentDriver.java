@@ -52,12 +52,16 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -105,16 +109,31 @@ public class ExperimentDriver {
         private static final long serialVersionUID = 5726970069639981728L;
      
         /**
-         * Converts an exception into a result containing a single "Error"
-         * column and having the exception message as its value.
+         * Converts an exception into a result containing an "Error" column
+         * having {@link Throwable#getMessage()} as its value and a "StackTrace"
+         * colukn and having the stack trace (with newlines replaced by ";" and
+         * carrige returns and tabs removed) as its value.
          * 
-         * @param t The exception.
+         * @param t
+         *            The exception.
          */
         public static Result errorFactory(Throwable t) {
+            
+            StringWriter w = new StringWriter();
+            
+            t.printStackTrace(new PrintWriter(w));
+            
+            String trace = w.toString();
+            
+            trace = trace.replace("\n", "; ");
+            trace = trace.replace("\r", "");
+            trace = trace.replace("\t", "");
             
             Result result = new Result();
             
             result.put("Error", t.getMessage() );
+
+            result.put("StackTrace", trace );
             
             return result;
             
@@ -300,47 +319,17 @@ public class ExperimentDriver {
      */
     public static class Condition {
 
-//        public final String name;
-        
         public final Properties properties;
         
         public Result result;
         
-//        static String toName(Properties properties) {
-//            
-//            StringBuilder sb = new StringBuilder();
-//            
-////          sb.append("{");
-//          
-//          for(int i=0; i<entries.length; i++) {
-//
-//              if(i>0) sb.append("; "); // Note: Not a comma since CSV delimited.
-//              
-//              sb.append(entries[i].name+"="+entries[i].value);
-//             
-//              properties.setProperty(entries[i].name,entries[i].value);
-//              
-//          }
-//
-////          sb.append("}");
-//
-//          String name = sb.toString();
-//
-//          return name;
-//          
-//        }
-        
         public Condition(Properties properties) {
-        
-//            this.name = name;
             
-            this.properties = properties;
+            this.properties = PropertyUtil.flatCopy(properties);
             
         }
         
         public Condition(Map<String,String> properties) {
-            
-//            this.name = "";
             
             this.properties = new Properties();
             
@@ -355,9 +344,86 @@ public class ExperimentDriver {
             }
             
         }
-        
+
     }
 
+    /**
+     * Accepts a list of conditions and an array of NV[]s and returns a new list
+     * of conditions in each original condition has been expanded into N new
+     * conditions, one per element of the NV[]s array. This can be used to
+     * systematically build up hypercubes in the experimental design that can
+     * then be analyzed with a pivot table.
+     * 
+     * @param conditions
+     * @param a
+     * @return
+     */
+    public static List<Condition> apply(List<Condition> conditions, NV[]a) {
+        
+        List<Condition> ret = new LinkedList<Condition>();
+        
+        for(int i=0; i<a.length; i++) {
+            
+            Iterator<Condition> itr = conditions.iterator();
+            
+            while(itr.hasNext()) {
+                
+                Condition c = itr.next();
+                
+                Properties properties = new Properties(c.properties);
+                
+                properties.put(a[i].name,a[i].value);
+                
+                ret.add(new Condition(properties));
+                
+            }
+            
+        }
+        
+        System.err.println("There are now "+ret.size()+" conditions");
+        
+        return ret;
+        
+    }
+    
+    /**
+     * Variant that allows multiple factors to vary at a time.
+     * @param conditions
+     * @param a
+     * @return
+     */
+    public static List<Condition> apply(List<Condition> conditions, NV[][]a) {
+        
+        List<Condition> ret = new LinkedList<Condition>();
+        
+        for(int i=0; i<a.length; i++) {
+            
+            Iterator<Condition> itr = conditions.iterator();
+            
+            while(itr.hasNext()) {
+                
+                Condition c = itr.next();
+                
+                Properties properties = new Properties(c.properties);
+        
+                for(int j=0; j<a[i].length; j++) {
+                
+                    properties.put(a[i][j].name,a[i][j].value);
+                    
+                }
+                
+                ret.add(new Condition(properties));
+                
+            }
+            
+        }
+
+        System.err.println("There are now "+ret.size()+" conditions");
+
+        return ret;
+        
+    }
+    
     /**
      * Models an experiment.
      * 
@@ -406,6 +472,8 @@ public class ExperimentDriver {
                     " \"" + DTDValidationHelper.PUBLIC_EXPERIMENT_0_1 + "\""+
                     " \"" + DTDValidationHelper.SYSTEM_EXPERIMENT_FILENAME_0_1 + "\""+
                     ">\n");
+            
+            sb.append("<!-- There are "+conditions.size()+" conditions. -->\n");
             
             sb.append("<experiment class=\""+className+"\">\n");
 
@@ -506,6 +574,9 @@ public class ExperimentDriver {
                  * so that both the output file and the run summary show all
                  * data. The run summary should also use the same logic to break
                  * down the invariants.
+                 * 
+                 * @todo randomize the run orders by default in each pass and
+                 * allow a command line option to take them in sequence.
                  */
                 throw new UnsupportedOperationException("Not collecting results across all runs");
             }

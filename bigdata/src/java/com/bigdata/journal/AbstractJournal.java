@@ -1459,6 +1459,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     synchronized public ICommitRecord getCommitRecord() {
 
+        assertOpen();
+        
         if (_commitRecord == null) {
 
             long commitRecordAddr = _rootBlock.getCommitRecordAddr();

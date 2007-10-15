@@ -64,11 +64,6 @@ import com.bigdata.isolation.UnisolatedBTree;
  * 
  * @todo Verify correct abort after 'prepare'.
  * 
- * @todo Issue warning or throw exception when closing journal with active
- *       transactions? Provide a 'force' and timeout option? This was all
- *       implemented for the DBCache implementation so the code and tests can
- *       just be migrated.  See {@link Journal#shutdown()}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -44,12 +44,12 @@ Modifications:
 package com.bigdata.journal;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,6 +59,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
@@ -118,21 +119,22 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
     /**
      * Options for the {@link ConcurrentJournal}.
+     * <p>
+     * Note: The main factors that influence the throughput of group commit are
+     * {@link #WRITE_SERVICE_CORE_POOL_SIZE} and
+     * {@link #WRITE_SERVICE_QUEUE_CAPACITY}. So far, more is better (at least
+     * up to 1000 each) and you always want the queue capacity to be at least as
+     * large as the core pool size. Pre-starting the core pool threads does
+     * offer a minor advantage on startup.
+     * <p>
+     * See {@link StressTestGroupCommit} for performance tuning.
      * 
      * @todo add option for retryCount, timeout (from submission until the group
      *       commit).
      * 
-     * @todo consider option for latency that the thread requesting a group
-     *       commit allows for other tasks in the queue to begin running. this
-     *       latency should be disregarded if it would risk a timeout of the
-     *       task itself.
-     * 
      * @todo add options: (a) to prestart all core threads; (b) set the maximum
      *       #of threads; and (c) set the maximum queue capacity for the read
      *       and tx thread pools.
-     * 
-     * @todo Find the sweet spots for all these defaults using various stress
-     *       tests.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -179,7 +181,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * The default #of threads in the write service thread pool (#of
          * concurrent index writers).
          */
-        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "100";
+        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "1000";
         
         /**
          * The maximum #of threads allowed in the pool handling concurrent
@@ -643,9 +645,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             statusService.scheduleWithFixedDelay(statusTask, initialDelay,
                     delay, unit);
 
-//            statusService = new DelegatedExecutorService(new StatusService(delay,
-//                    DaemonThreadFactory.defaultThreadFactory()));
-
         }
 
         // Setup the lock manager.
@@ -671,48 +670,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         }
 
     }
-
-//    /**
-//     * Class extends {@link #terminated()} to emit a last status message.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public class StatusService extends ScheduledThreadPoolExecutor {
-//        
-//        private final StatusTask statusTask;
-//        
-//        /**
-//         * 
-//         * @param delay
-//         *            The delay between status messages in milliseconds.
-//         * @param threadFactory
-//         */
-//        public StatusService(long delay,ThreadFactory threadFactory) {
-//            
-//            super(1/*corePoolSize*/, threadFactory);
-//            
-//            final long initialDelay = 100;
-//
-//            statusTask = newStatusTask();
-//            
-//            scheduleWithFixedDelay(statusTask, initialDelay,
-//                    delay, TimeUnit.MILLISECONDS);
-//
-//        }
-//
-//        public void terminated() {
-//
-//            System.err.println("Status!");
-//            
-//            // run one last time when terminated.
-//            statusTask.run();
-//            
-//            super.terminated();
-//
-//        }
-//
-//    }
 
     /**
      * Factory allows subclasses to extend the {@link StatusTask}.
@@ -749,17 +706,28 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         /**
          * Writes out the status on {@link #log}.
          * 
+         * @todo format into a nicer tabular display.
          * @todo measure the maximum latency for a task to begin execution.
          * @todo measure the #of tasks that are retried.
-         * @todo measure the maximum latency for a task from submit to
-         *       commit.
+         * @todo measure the maximum latency for a task from submit to commit.
          * @todo report averages also, not just maximums.
          */
         public String status() {
 
-            // #of commits on the _store_ (not since the write service was
-            // started).
-            final long commitCounter = getCommitRecord().getCommitCounter();
+            /*
+             * The #of commits on the _store_ (vs the #of commits since the
+             * write service was started).
+             * 
+             * Note: if the journal is already closed then this information is
+             * not available.
+             */
+            long commitCounter = -1;
+            try {
+                commitCounter = getCommitRecord().getCommitCounter();
+            } catch (Throwable t) {
+                log.warn("Commit record not available: "+t);
+                /* ignore */
+            }
             
             final long elapsed = System.currentTimeMillis() - begin;
             
@@ -793,18 +761,17 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ((ThreadPoolExecutor) writeService)
                             .getCompletedTaskCount()
                     + ")"
-                    + // commitCounter and related stats.
-                    ", commitCounter=" + commitCounter + ", ncommits="
+                    // commitCounter and related stats.
+                    + (commitCounter == -1 ? "" : ", commitCounter="
+                            + commitCounter)
+                    + ", ncommits="
                     + writeService.getCommitCount() + ", naborts="
-                    + writeService.getAbortCount()
-                    + ", maxLatencyUntilCommit="
+                    + writeService.getAbortCount() + ", maxLatencyUntilCommit="
                     + writeService.getMaxLatencyUntilCommit()
                     + ", maxCommitLatency="
                     + writeService.getMaxCommitLatency() + ", maxRunning="
-                    + writeService.getMaxRunning()
-                    + ", elapsed="+elapsed
-                    + ", nextOffset="+nextOffset
-                    ;
+                    + writeService.getMaxRunning() + ", elapsed=" + elapsed
+                    + ", nextOffset=" + nextOffset;
 
         }
 
@@ -847,10 +814,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      *                queue has a limited capacity and is full)
      * @exception NullPointerException
      *                if task null
-     *                
+     * 
      * @todo we may need to define our own subclasses for the read and tx
-     *       services as well in order to collect metrics on task latency
-     *       (from submit to completion).
+     *       services as well in order to collect metrics on task latency (from
+     *       submit to completion).
      */
     public Future<Object> submit(AbstractTask task) {
 
@@ -907,7 +874,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                      * size.
                      */
 
-                    System.err.print("z");
+                    if(INFO) System.err.print("z");
                     
                     Thread.sleep(10/*ms*/);
                     
@@ -927,34 +894,220 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
     /**
      * Executes the given tasks, returning a list of Futures holding their
-     * status and results when all complete.
+     * status and results when all complete. Note that a completed task could
+     * have terminated either normally or by throwing an exception. The results
+     * of this method are undefined if the given collection is modified while
+     * this operation is in progress.
+     * <p>
+     * Note: Contract is per {@link ExecutorService#invokeAll(Collection)}
      * 
      * @param tasks
      *            The tasks.
      * 
      * @return Their {@link Future}s.
      * 
-     * @exception InterruptedException 
+     * @exception InterruptedException
      *                if interrupted while waiting, in which case unfinished
      *                tasks are cancelled.
-     * @exception NullPointerException 
+     * @exception NullPointerException
      *                if tasks or any of its elements are null
-     * @exception RejectedExecutionException 
+     * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks) {
+    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks)
+            throws InterruptedException {
+
+        List<Future<Object>> futures = new LinkedList<Future<Object>>();
+
+        boolean done = false;
+
+        try {
+
+            // submit all.
+            
+            for (AbstractTask task : tasks) {
+
+                futures.add(submit(task));
+
+            }
+
+            // await all futures.
+            
+            for (Future<Object> f : futures) {
+
+                if (!f.isDone()) {
+
+                    try {
+
+                        f.get();
+
+                    } catch (ExecutionException ex) {
+
+                        // ignore.
+                        
+                    } catch (CancellationException ex) {
+
+                        // ignore.
+
+                    }
+
+                }
+                
+            }
+
+            done = true;
+            
+            return futures;
+            
+        } finally {
+            
+            if (!done) {
+
+                // At least one future did not complete.
+                
+                for (Future<Object> f : futures) {
+
+                    if(!f.isDone()) {
+
+                        f.cancel(true/* mayInterruptIfRunning */);
+                        
+                    }
+                    
+                }
+                
+            }
         
-        Iterator<AbstractTask> itr = tasks.iterator();
+        }
+
+    }
+    
+    /**
+     * Executes the given tasks, returning a list of Futures holding their
+     * status and results when all complete or the timeout expires, whichever
+     * happens first. Note that a completed task could have terminated either
+     * normally or by throwing an exception. The results of this method are
+     * undefined if the given collection is modified while this operation is in
+     * progress.
+     * <p>
+     * Note: Contract is based on
+     * {@link ExecutorService#invokeAll(Collection, long, TimeUnit)} but only
+     * the {@link Future}s of the submitted tasks are returned.
+     * 
+     * @param tasks
+     *            The tasks.
+     * 
+     * @return The {@link Future}s of all tasks that were
+     *         {@link #submit(AbstractTask) submitted} prior to the expiration
+     *         of the timeout.
+     * 
+     * @exception InterruptedException
+     *                if interrupted while waiting, in which case unfinished
+     *                tasks are cancelled.
+     * @exception NullPointerException
+     *                if tasks or any of its elements are null
+     * @exception RejectedExecutionException
+     *                if any task cannot be scheduled for execution
+     */
+    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks,
+            long timeout, TimeUnit unit) throws InterruptedException {
         
         List<Future<Object>> futures = new LinkedList<Future<Object>>();
+
+        boolean done = false;
         
-        while(itr.hasNext()) {
+        long nanos = unit.toNanos(timeout);
+        
+        long lastTime = System.nanoTime();
+        
+        try {
+
+            // submit all.
             
-            futures.add( submit(itr.next()) );
+            for (AbstractTask task : tasks) {
+
+                long now = System.nanoTime();
+                
+                nanos -= now - lastTime;
+                
+                lastTime = now;
+                
+                if (nanos <= 0) {
+
+                    // timeout.
+                    
+                    return futures;
+                    
+                }
+                
+                futures.add(submit(task));
+
+            }
+
+            // await all futures.
             
+            for (Future<Object> f : futures) {
+
+                if (!f.isDone()) {
+
+                    if (nanos <= 0) { 
+                     
+                        // timeout
+                        
+                        return futures;
+                        
+                    }
+                    
+                    try {
+
+                        f.get(nanos, TimeUnit.NANOSECONDS);
+
+                    } catch (TimeoutException ex) {
+
+                        return futures;
+
+                    } catch (ExecutionException ex) {
+
+                        // ignore.
+
+                    } catch (CancellationException ex) {
+
+                        // ignore.
+
+                    }
+
+                    long now = System.nanoTime();
+                    
+                    nanos -= now - lastTime;
+                    
+                    lastTime = now;
+
+                }
+
+            }
+
+            done = true;
+
+            return futures;
+
+        } finally {
+
+            if (!done) {
+
+                // At least one future did not complete.
+
+                for (Future<Object> f : futures) {
+
+                    if (!f.isDone()) {
+
+                        f.cancel(true/* mayInterruptIfRunning */);
+
+                    }
+
+                }
+                
+            }
+        
         }
-        
-        return futures;
         
     }
     

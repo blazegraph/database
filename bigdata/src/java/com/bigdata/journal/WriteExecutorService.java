@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -99,6 +100,13 @@ import com.bigdata.btree.BTree;
  * since the state of the {@link BTree} has been changed as a side effect in a
  * non-reversable manner.
  * 
+ * @todo The thread pool is essentially used as a queue to force tasks which
+ *       have completed to await the commit. Consider placing a limit on the #of
+ *       running threads when the thread pool is very large in case (a) a large
+ *       #of threads would otherwise begin to execute tasks concurrently; and
+ *       (b) the processor allocation strategy causes all threads to perform
+ *       very slowly.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -106,6 +114,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     protected static final Logger log = Logger
             .getLogger(WriteExecutorService.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     private ConcurrentJournal journal;
 
@@ -152,7 +172,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     /**
      * The thread running {@link #groupCommit()} is signaled each time a task
-     * has completed and will await the {@link #commit()} signal.
+     * has completed and will await the {@link #commit} signal.
      */
     final private Condition waiting = lock.newCondition();
     
@@ -416,7 +436,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * causing the entire group to be discarded.
                      */
                     
-                    throw new RetryException();
+                    if(journal.isOpen()) {
+                        throw new RetryException();
+                    } else {
+                        throw new IllegalStateException("Journal is closed");
+                    }
                     
                 }
 
@@ -616,16 +640,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final long beginWait = System.currentTimeMillis();            
 
             /*
-             * Pause for a moment if there are tasks in the queue and we are not
-             * up to 1/2 of the thread pool in (running+completed) tasks. This
-             * allows new tasks to enter.
-             * 
-             * @todo make this a config option (0 means do not wait).
+             * Wait a moment to let other tasks start, but if the queue is empty
+             * then we make that a very small moment to keep down latency for a
+             * single task that is run all by itself without anything else in
+             * the queue.
              * 
              * @todo do NOT wait if the current task might exceeds its max
              * latency from submit.
              */
             
+            int nwaits = 0;
             while(true) {
 
                 final int queueSize = getQueue().size();
@@ -635,14 +659,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 final int poolSize = getPoolSize();
                 final long elapsedWait = System.currentTimeMillis() - beginWait;
                                 
-                if ((elapsedWait>100 && queueSize==0) || elapsedWait > 250) {
+                if ((elapsedWait > 100 && queueSize == 0) || elapsedWait > 250) {
                     
                     // Don't wait any longer.
                     
-                    System.err.println("Not waiting any longer: elapsed="
-                            + elapsedWait + "ms, queueSize=" + queueSize
-                            + ", nrunning=" + nrunning + ", nwrites=" + nwrites
-                            + ", corePoolSize=" + corePoolSize+", poolSize="+poolSize);
+                    if(INFO) System.err.println("Not waiting any longer: nwaits="
+                            + nwaits + ", elapsed=" + elapsedWait
+                            + "ms, queueSize=" + queueSize + ", nrunning="
+                            + nrunning + ", nwrites=" + nwrites
+                            + ", corePoolSize=" + corePoolSize + ", poolSize="
+                            + poolSize);
                     
                     break;
                     
@@ -653,7 +679,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  * abort.
                  */
                 
-                waiting.await(50/*ms*/,TimeUnit.MILLISECONDS);
+                waiting.await(10,TimeUnit.MICROSECONDS);
+                
+                nwaits++;
                 
             }
 
@@ -789,10 +817,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch(Throwable t) {
             
-            log.error("Problem with groupCommit?", t);
+            if(journal.isOpen()) {
+
+                log.error("Problem with groupCommit?", t);
             
-            abort();
-            
+                abort();
+                
+            }
+
             return false;
             
         } finally {
@@ -844,13 +876,26 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             // commit the store.
 
+            /*
+             * Note: if the journal was closed asynchronously then do not
+             * attempt to abort the write set.
+             */
+
+            if(!journal.isOpen()) {
+
+                return false;
+                
+            }
+
+            // commit the write set.
+
             journal.commit();
 
             // #of commits that succeeded.
             
             ncommits++;
             
-            System.err.println("commit: #writes="+nwrites);
+            if(INFO) System.err.println("commit: #writes="+nwrites);
             
             return true;
 
@@ -906,9 +951,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             naborts++;
             
-            // Abandon the write sets.
-            
-            journal.abort();
+            /*
+             * Note: if the journal was closed asynchronously then do not
+             * attempt to abort the write set.
+             */
+
+            if(journal.isOpen()) {
+
+                // Abandon the write sets.
+                
+                journal.abort();
+                
+            }
 
             /*
              * Interrupt all workers awaiting [commit] - they will throw an
@@ -925,9 +979,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         } catch(Throwable t) {
             
-            log.error("Problem with abort?", t);
-            
-            // fall through.
+            if(journal.isOpen()) {
+
+                log.error("Problem with abort?", t);
+                
+            }
 
         } finally {
 

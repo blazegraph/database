@@ -56,6 +56,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.journal.AbstractTask.ResubmitException;
@@ -855,123 +856,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
     public void test_retry_txService_readWrite() {
 
         fail("write this test");
-        
-    }
-
-    /*
-     * @todo tests from here on down are basically stress tests more than
-     * correctness tests and could be refactored into other test suite(s) and
-     * used with the ExperimentDriver to tune the system.
-     */
-    
-    /**
-     * Test that no tasks are failed when a large set of <strong>writer</strong>
-     * tasks that attempt to lock the same resource(s) are submitted at once
-     * (write tasks use the lock system to control access to the unisolated
-     * indices).
-     * <p>
-     * Note: Tasks will be serialized since they are contending for the same
-     * resources.
-     * 
-     * @throws InterruptedException
-     */
-    public void test_lockContention() throws InterruptedException {
-
-        Properties properties = getProperties();
-        
-        properties.setProperty(Options.SHUTDOWN_TIMEOUT, "3000");
-        
-        Journal journal = new Journal(properties);
-        
-        final String[] resource = new String[]{"foo","bar","baz"};
-
-        final int ntasks = 1000;
-        
-        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
-
-        for (int i = 0; i < ntasks; i++) {
-
-            tasks.add(new AbstractTask(journal, ITx.UNISOLATED,
-                    false/* readOnly */, resource) {
-
-                protected Object doTask() throws Exception {
-
-                    return null;
-
-                }
-
-            });
-
-        }
-
-        /*
-         * Submit all tasks. Tasks can begin executing right away. If the write
-         * service is using a blocking queue with a limited capacity then some
-         * or all of the tasks may complete before this method returns.
-         */
-        
-        List<Future<Object>> futures = journal.invokeAll(tasks);
-
-        /*
-         * Shutdown the journal, which will cause us to await termination of
-         * those tasks. However, shutdown can timeout so some of the tasks may
-         * wind up cancelled rather than running to completion.
-         * 
-         * Note: It is possible for shutdown() to close the store before all
-         * worker threads have been cancelled, in which case you may see some
-         * strange errors being thrown.
-         * 
-         * Note: We explictly set the SHUTDOWN_TIMEOUT above so that we will
-         * not wait for all the tasks to complete.
-         */
-
-        journal.shutdown();
-        
-        journal.delete();
-
-        Iterator<Future<Object>> itr = futures.iterator();
-
-        int ncancelled = 0;
-        int ncomplete = 0;
-        int nerror = 0;
-        
-        while(itr.hasNext()) {
-            
-            Future<Object> future = itr.next();
-            
-            if (future.isCancelled()) {
-
-                ncancelled++;
-
-            } else if (future.isDone()) {
-              
-                try {
-                
-                    future.get();
-                    
-                    ncomplete++;
-                    
-                } catch (ExecutionException ex) {
-                    
-                    nerror++;
-                    
-                    log.warn("Not expecting: "+ex, ex);
-                    
-                }
-                
-            }
-            
-        }
-        
-        System.err.println("#tasks=" + ntasks + " : ncancelled=" + ncancelled
-                + ", ncomplete=" + ncomplete + ", nerror=" + nerror);
-        
-        /*
-         * No errors are allowed, but some tasks may never start due to the high
-         * lock contention.
-         */
-        
-        assertEquals("nerror", 0, nerror);
         
     }
     
