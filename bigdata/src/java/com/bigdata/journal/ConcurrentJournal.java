@@ -65,6 +65,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -825,6 +826,28 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * seek to read or write on the same index(s). Full concurrency is allowed
      * when different transactions access the same index(s), but write-write
      * conflicts MAY be detected during commit processing.
+     * <p>
+     * Note: The following exceptions MAY be wrapped by {@link Future#get()} for
+     * tasks submitted via this method:
+     * <dl>
+     * <dt>{@link ValidationError}</dt>
+     * <dd>An unisolated write task was attempting to commit the write set for
+     * a transaction but validation failed. You may retry the entire
+     * transaction.</dd>
+     * <dt>{@link RetryException}</dt>
+     * <dd>An unisolated write task was a member of a commit group in which
+     * some other write task failed. The entire commit group was discarded and
+     * all tasks in the group were interrupted. You MAY retry the task.</dd>
+     * <dt>{@link InterruptedException}</dt>
+     * <dd>A task was interrupted during execution and before the task had
+     * completed normally. You MAY retry the task, but note that this exception
+     * is also generated when tasks are cancelled when the journal is being
+     * {@link #shutdown()} after the timeout has expired or
+     * {@link #shutdownNow()}. In either of these cases the task will not be
+     * accepted by the journal.</dd>
+     * <dt></dt>
+     * <dd></dd>
+     * </dl>
      * 
      * @param task
      *            The task.

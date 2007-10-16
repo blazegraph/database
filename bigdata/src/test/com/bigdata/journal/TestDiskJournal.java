@@ -89,6 +89,9 @@ public class TestDiskJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestDiskJournal.class);
 
+        // test suite for handling asynchronous close of the file channel.
+        suite.addTestSuite( TestClosedByInterruptException.class );
+
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
 

@@ -129,7 +129,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              * optimized by Java and the OS.
              */
 
-            final int count = raf.getChannel().write(buffer,
+            final int count = getChannel().write(buffer,
                     headerSize + offset);
             
             if (count != nbytes) {
@@ -156,7 +156,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         try {
 
             // extend the file.
-            raf.setLength(newExtent);
+            getRandomAccessFile().setLength(newExtent);
             
             /*
              * since we just changed the file length we force the data to disk

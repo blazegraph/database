@@ -81,7 +81,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     /**
      * Interface for random access on the backing file.
      */
-    final RandomAccessFile raf;
+    /*final*/ RandomAccessFile raf;
 
     final public int getHeaderSize() {
         
@@ -101,6 +101,12 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
     
+    final public FileChannel getChannel() {
+
+        return raf.getChannel();
+        
+    }
+    
     final public boolean isStable() {
         
         return true;
@@ -114,7 +120,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
         try {
 
-            raf.getChannel().force( metadata );
+            getChannel().force( metadata );
             
         } catch( IOException ex ) {
             
@@ -175,7 +181,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            FileChannel channel = raf.getChannel();
+            FileChannel channel = getChannel();
 
             final int count = channel.write(rootBlock.asReadOnlyBuffer(),
                     rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
