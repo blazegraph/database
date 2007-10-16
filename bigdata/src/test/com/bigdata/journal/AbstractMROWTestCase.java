@@ -129,7 +129,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
     /**
      * A correctness/stress/performance test with a pool of concurrent clients
      * designed to verify MROW operations. If the store passes these tests, then
-     * {@link StressTestConcurrent} is designed to reveal concurrency problems
+     * {@link StressTestConcurrentTx} is designed to reveal concurrency problems
      * in the higher level data structures (transaction process and especially
      * the indices).
      * 

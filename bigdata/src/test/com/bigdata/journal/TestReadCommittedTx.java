@@ -158,13 +158,14 @@ public class TestReadCommittedTx extends ProxyTestCase {
     }
 
     /**
-     * @todo test that the transaction begins reading from the most recently
-     *       committed state, that unisolated writes without commits are not
-     *       visible, that newly committed state shows up in the next index view
-     *       requested by the tx (so this is either a different index view
-     *       object or a delegation mechanism that indirects to the current
-     *       view), and that the same index view object is returned if there
-     *       have been no intervening commits.
+     * Test that the transaction begins reading from the most recently committed
+     * state, that unisolated writes without commits are not visible, that newly
+     * committed state shows up in the next index view requested by the tx (so
+     * this is either a different index view object or a delegation mechanism
+     * that indirects to the current view).
+     * 
+     * @todo verify that the same index view object is returned if there have
+     *       been no intervening commits.
      */
     public void test_readComittedIsolation() {
 

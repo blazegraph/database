@@ -59,7 +59,7 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IIsolatedIndex;
 
 /**
- * A read-committed transaction provides a read-only view onto the more recently
+ * A read-committed transaction provides a read-only view onto the most recently
  * committed state of the database. Each time a view of an index is requested
  * using {@link #getIndex(String)} the returned view will provide access to the
  * most recent committed state for that index. Unlike a fully isolated

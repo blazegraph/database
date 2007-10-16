@@ -112,7 +112,7 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestTx.class );
         // tests of read-only transactions.
         suite.addTestSuite( TestReadOnlyTx.class );
-        // @todo tests of read-committed transactions.
+        // tests of read-committed transactions.
         suite.addTestSuite( TestReadCommittedTx.class );
         // todo tests of write-write conflict resolution.
         suite.addTestSuite(TestConflictResolution.class);
@@ -120,9 +120,6 @@ public class TestJournalBasics extends TestCase {
         /*
          * Tests of concurrent execution of readers, writers, and transactions
          * and group commit.
-         * 
-         * @todo refactor since concurrency is basic and things like add/drop
-         * already use the CC mechanisms but are also being tested above.
          */
         
         // test basics of the concurrent task execution.
@@ -146,7 +143,7 @@ public class TestJournalBasics extends TestCase {
          * @todo we could add tests based on known transaction processing
          * benchmarks here as well.
          */
-        suite.addTestSuite(StressTestConcurrent.class);
+        suite.addTestSuite(StressTestConcurrentTx.class);
 
         return suite;
         

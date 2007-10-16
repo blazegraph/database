@@ -47,8 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -69,52 +68,77 @@ public class BasicExperimentConditions extends ExperimentDriver {
     static public List<Condition> getBasicConditions(
             Map<String, String> properties, NV[] params) throws Exception {
 
-        properties = new HashMap<String,String>(properties);
+        List<Condition> conditions = new LinkedList<Condition>();
         
-        for(int i=0; i<params.length; i++) {
-            
-            properties.put(params[i].name,params[i].value);
-            
-        }
+        conditions.add(new Condition(properties));
         
-        Condition[] conditions = new Condition[] { //
-                getCondition(properties, new NV[] { //
-                        new NV(Options.BUFFER_MODE, BufferMode.Transient), //
-                        }), //
-//                getCondition(
-//                        properties,
-//                        new NV[] { //
-//                                new NV(Options.BUFFER_MODE,
-//                                        BufferMode.Transient), //
-//                                new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
-//                        }), //
-                getCondition(properties, new NV[] { //
-                        new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-                        }), //
-//                getCondition(
-//                        properties,
-//                        new NV[] { //
-//                                new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-//                                new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
-//                        }), //
-                getCondition(properties, new NV[] { //
-                        new NV(Options.BUFFER_MODE, BufferMode.Direct), //
-                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
-                        }), //
+        conditions = apply(
+                conditions,
+                new NV[][] { //
+                        new NV[] { new NV(Options.BUFFER_MODE,
+                                BufferMode.Transient), }, //
+                        new NV[] { new NV(Options.BUFFER_MODE,
+                                BufferMode.Direct), }, //
+                        new NV[] {
+                                new NV(Options.BUFFER_MODE, BufferMode.Direct),
+                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                        .toString()), }, //
+                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
+                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+                        new NV[] {
+                                new NV(Options.BUFFER_MODE, BufferMode.Disk),
+                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                        .toString()), }, //
+                });
+        
+        return conditions;
+        
+//      properties = new HashMap<String,String>(properties);
+//      
+//      for(int i=0; i<params.length; i++) {
+//          
+//          properties.put(params[i].name,params[i].value);
+//          
+//      }
+
+//        Condition[] conditions = new Condition[] { //
 //                getCondition(properties, new NV[] { //
-//                        new NV(Options.BUFFER_MODE, BufferMode.Mapped), //
-////                        new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
-//                }), //
-                getCondition(properties, new NV[] { //
-                        new NV(Options.BUFFER_MODE, BufferMode.Disk), //
-                        }), //
-                getCondition(properties, new NV[] { //
-                        new NV(Options.BUFFER_MODE, BufferMode.Disk), //
-                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
-                        }), //
-        };
-        
-        return Arrays.asList(conditions);
+//                        new NV(Options.BUFFER_MODE, BufferMode.Transient), //
+//                        }), //
+////                getCondition(
+////                        properties,
+////                        new NV[] { //
+////                                new NV(Options.BUFFER_MODE,
+////                                        BufferMode.Transient), //
+////                                new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
+////                        }), //
+//                getCondition(properties, new NV[] { //
+//                        new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+//                        }), //
+////                getCondition(
+////                        properties,
+////                        new NV[] { //
+////                                new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+////                                new NV(Options.USE_DIRECT_BUFFERS, Boolean.TRUE) //
+////                        }), //
+//                getCondition(properties, new NV[] { //
+//                        new NV(Options.BUFFER_MODE, BufferMode.Direct), //
+//                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
+//                        }), //
+////                getCondition(properties, new NV[] { //
+////                        new NV(Options.BUFFER_MODE, BufferMode.Mapped), //
+//////                        new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
+////                }), //
+//                getCondition(properties, new NV[] { //
+//                        new NV(Options.BUFFER_MODE, BufferMode.Disk), //
+//                        }), //
+//                getCondition(properties, new NV[] { //
+//                        new NV(Options.BUFFER_MODE, BufferMode.Disk), //
+//                                new NV(Options.FORCE_ON_COMMIT, ForceEnum.No) //
+//                        }), //
+//        };
+//        
+//        return Arrays.asList(conditions);
 
     }
     
