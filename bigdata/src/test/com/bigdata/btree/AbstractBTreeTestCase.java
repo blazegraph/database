@@ -944,7 +944,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //            doInsertRandomSparseKeySequenceTest(m, m*m*m*m, trace).getStore().close();
 //            
 //        }
-        
+
     }
 
     /**

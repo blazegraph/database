@@ -53,6 +53,8 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IMRMW;
+import com.bigdata.rawstore.IMROW;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
@@ -71,15 +73,8 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @todo The {@link TemporaryRawStore} would benefit from any caching or AIO
  *       solutions developed for the {@link DiskOnlyStrategy}.
- * 
- * @todo The temporary store does NOT currently support MROW since it does not
- *       lock out readers when converting from a {@link TransientBufferStrategy}
- *       to a {@link DiskOnlyStrategy}. At this time, MROW is not required for
- *       the {@link TemporaryRawStore} since it is used by a single-threaded
- *       process such as a transaction and not by multiple threads (unlike the
- *       Journal which does support MROW).
  */
-public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore {
+public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore, IMROW {
 
     protected final static int DEFAULT_INITIAL_IN_MEMORY_EXTENT = Bytes.megabyte32 * 10;
 
@@ -261,7 +256,18 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
     }
 
-    public long write(ByteBuffer data) {
+    /**
+     * FIXME This method is <code>synchronized</code> so that overflow of the
+     * buffer from memory to disk will be atomic. While this provides both
+     * {@link IMROW} and {@link IMRMW} guarentees for the
+     * {@link TemporaryRawStore} it does so at the expense of serializing calls
+     * to {@link #write(ByteBuffer)}.
+     * <p>
+     * Explore options for greater concurrency here in support of concurrent
+     * tasks executing against the same transaction or map/reduce jobs writing
+     * on a temporary store from multiple map tasks.
+     */
+    synchronized public long write(ByteBuffer data) {
         
         if(!open) throw new IllegalStateException();
         

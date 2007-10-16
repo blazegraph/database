@@ -211,9 +211,11 @@ import com.bigdata.util.ChecksumUtility;
  *       as the right layering is correctly re-established on load of the
  *       persistence data structure.
  * 
- * @todo The UUID of the store file should make it into all error messages and
- *       log messages so that they can be aggregated in a distributed
- *       enviornment.
+ * @todo There are lots of annoying ways in which asynchronously closing the
+ *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
+ *       exceptions to be thrown out of concurrent threads. It would be nice if
+ *       we could throw a single exception that indicated that the journal had
+ *       been asynchronously closed.
  */
 public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
@@ -1798,16 +1800,24 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         assertOpen();
 
         /*
-         * This is a performance tweak. It flushes the index to the backing
-         * store before we synchronize on [name2addr] in order to afford greater
-         * concurrency. Note that this is wasted effort only in the case where
-         * the index is pre-existing as we would NOT flush it to disk in that
-         * case. In the index to be registered is empty or if indices are not
-         * normally pre-existing then this should be a performance win where a
-         * large #of indices are created concurrently.
+         * This is a minor performance tweak. It flushes the index to the
+         * backing store before we synchronize on [name2addr] in order to afford
+         * greater concurrency.
+         * 
+         * Note: this is wasted effort only in the case where the index is
+         * pre-existing as we would NOT flush it to disk in that case. In the
+         * index to be registered is empty or if indices are not normally
+         * pre-existing then this should be a performance win where a large #of
+         * indices are created concurrently.
+         * 
+         * Note: in the case where the index is pre-existing, this will also
+         * force a commit since the caller's index is flushed to the backing
+         * store before we know that the index already exists. For this reason I
+         * recommend against this (and it will break some unit tests in
+         * TestAddDropIndex if you do this).
          */
 
-        ((ICommitter)ndx).handleCommit();
+//        ((ICommitter)ndx).handleCommit();
         
         synchronized (name2Addr) {
                 
@@ -1876,6 +1886,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         if (name == null)
             throw new IllegalArgumentException();
 
+        // Note: NullPointerException can be thrown here if asynchronously closed.
         synchronized (name2Addr) {
 
             return name2Addr.get(name);

@@ -220,7 +220,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            final long commitTime = (tx0.isReadOnly()?0L:journal.nextTimestamp());
+            final long commitTime = (tx0.isReadOnly()||tx0.isEmptyWriteSet()?0L:journal.nextTimestamp());
             tx0.prepare(commitTime);
 
             assertFalse( tx0.isActive() );
@@ -271,7 +271,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            final long commitTime = (tx0.isReadOnly() ? 0L : journal
+            final long commitTime = (tx0.isReadOnly()||tx0.isEmptyWriteSet() ? 0L : journal
                 .nextTimestamp());
             
             tx0.prepare(commitTime);
@@ -384,7 +384,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertTrue(journal.activeTx.containsKey(ts0));
             assertFalse(journal.preparedTx.containsKey(ts0));
             
-            final long commitTime = (tx0.isReadOnly() ? 0L : journal
+            final long commitTime = (tx0.isReadOnly()||tx0.isEmptyWriteSet() ? 0L : journal
                 .nextTimestamp());
             tx0.prepare(commitTime);
 

@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
@@ -93,12 +92,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
              * the journal is closed or the VM exits.
              */
             properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
             properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
-//            // Note: also deletes the file before it is used.
-//            properties.setProperty(Options.FILE, AbstractTestCase
-//                    .getTestJournalFile(getName(), properties));
         }
         
         return properties;
@@ -113,26 +108,26 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
     }
 
-    public void tearDown() throws Exception
-    {
-
-        super.tearDown();
-        
-        if(properties==null) return;
-        
-        String filename = properties.getProperty(Options.FILE);
-        
-        if(filename==null) return;
-        
-        File file = new File(filename);
-        
-        if(file.exists() && !file.delete()) {
-            
-            file.deleteOnExit();
-            
-        }
-        
-    }
+//    public void tearDown() throws Exception
+//    {
+//
+//        super.tearDown();
+//        
+//        if(properties==null) return;
+//        
+//        String filename = properties.getProperty(Options.FILE);
+//        
+//        if(filename==null) return;
+//        
+//        File file = new File(filename);
+//        
+//        if(file.exists() && !file.delete()) {
+//            
+//            file.deleteOnExit();
+//            
+//        }
+//        
+//    }
      
     /**
      * Unit test for {@link AbstractBufferStrategy#overflow(long)}. The test

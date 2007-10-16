@@ -1,140 +1,230 @@
 <?xml version="1.0" ?>
 <!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<!-- There are 48 conditions. -->
 <experiment class="com.bigdata.journal.StressTestConcurrentTx">
  <defaults>
   <property name="maximumExtent">419430400</property>
-  <property name="timeout">5</property>
+  <property name="timeout">30</property>
   <property name="createTempFile">true</property>
-  <property name="nclients">10</property>
   <property name="ntrials">10000</property>
-  <property name="nops">100</property>
   <property name="keyLen">4</property>
+  <property name="bufferMode">Disk</property>
  </defaults>
  <condition>
   <property name="nclients">1</property>
-  <property name="bufferMode">Transient</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="nclients">10</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="nclients">50</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="nclients">100</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="nclients">200</property>
+  <property name="nops">1</property>
  </condition>
  <condition>
   <property name="nclients">1</property>
-  <property name="bufferMode">Direct</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="nclients">10</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="nclients">50</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="nclients">100</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="nclients">200</property>
+  <property name="nops">10</property>
  </condition>
  <condition>
   <property name="nclients">1</property>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="nclients">10</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="nclients">50</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="nclients">100</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="nclients">200</property>
+  <property name="nops">100</property>
  </condition>
  <condition>
   <property name="nclients">1</property>
-  <property name="bufferMode">Disk</property>
+  <property name="nops">1000</property>
  </condition>
  <condition>
+  <property name="nclients">10</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="nclients">20</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="nclients">50</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="nclients">100</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="nclients">200</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">1</property>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
+  <property name="nops">1</property>
  </condition>
  <condition>
-  <property name="nclients">2</property>
-  <property name="bufferMode">Transient</property>
+  <property name="keyLen">8</property>
+  <property name="nclients">10</property>
+  <property name="nops">1</property>
  </condition>
  <condition>
-  <property name="nclients">2</property>
-  <property name="bufferMode">Direct</property>
- </condition>
- <condition>
-  <property name="nclients">2</property>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
-  <property name="nclients">2</property>
-  <property name="bufferMode">Disk</property>
- </condition>
- <condition>
-  <property name="nclients">2</property>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
-  <property name="bufferMode">Transient</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
- </condition>
- <condition>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
-  <property name="bufferMode">Disk</property>
- </condition>
- <condition>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">20</property>
-  <property name="bufferMode">Transient</property>
+  <property name="nops">1</property>
  </condition>
  <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">50</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">100</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">200</property>
+  <property name="nops">1</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">1</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">10</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">20</property>
-  <property name="bufferMode">Direct</property>
+  <property name="nops">10</property>
  </condition>
  <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">50</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">100</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">200</property>
+  <property name="nops">10</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">1</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">10</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">20</property>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
+  <property name="nops">100</property>
  </condition>
  <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">50</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">100</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">200</property>
+  <property name="nops">100</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">1</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
+  <property name="nclients">10</property>
+  <property name="nops">1000</property>
+ </condition>
+ <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">20</property>
-  <property name="bufferMode">Disk</property>
+  <property name="nops">1000</property>
  </condition>
  <condition>
-  <property name="nclients">20</property>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
+  <property name="keyLen">8</property>
+  <property name="nclients">50</property>
+  <property name="nops">1000</property>
  </condition>
  <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">100</property>
-  <property name="bufferMode">Transient</property>
+  <property name="nops">1000</property>
  </condition>
  <condition>
-  <property name="nclients">100</property>
-  <property name="bufferMode">Direct</property>
- </condition>
- <condition>
-  <property name="nclients">100</property>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
-  <property name="nclients">100</property>
-  <property name="bufferMode">Disk</property>
- </condition>
- <condition>
-  <property name="nclients">100</property>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
+  <property name="keyLen">8</property>
   <property name="nclients">200</property>
-  <property name="bufferMode">Transient</property>
- </condition>
- <condition>
-  <property name="nclients">200</property>
-  <property name="bufferMode">Direct</property>
- </condition>
- <condition>
-  <property name="nclients">200</property>
-  <property name="bufferMode">Direct</property>
-  <property name="forceOnCommit">No</property>
- </condition>
- <condition>
-  <property name="nclients">200</property>
-  <property name="bufferMode">Disk</property>
- </condition>
- <condition>
-  <property name="nclients">200</property>
-  <property name="bufferMode">Disk</property>
-  <property name="forceOnCommit">No</property>
+  <property name="nops">1000</property>
  </condition>
 </experiment>
+

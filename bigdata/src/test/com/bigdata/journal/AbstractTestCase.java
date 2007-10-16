@@ -228,6 +228,13 @@ abstract public class AbstractTestCase
         // close the store.
         store.close();
         
+        if(!store.isStable()) {
+            
+            throw new UnsupportedOperationException("The backing store is not stable");
+            
+        }
+        
+        // Note: clone to avoid modifying!!!
         Properties properties = (Properties)getProperties().clone();
         
         // Turn this off now since we want to re-open the same store.

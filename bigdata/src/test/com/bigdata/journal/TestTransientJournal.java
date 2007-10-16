@@ -54,6 +54,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Test suite for {@link BufferMode#Transient} journals.
@@ -214,9 +215,14 @@ public class TestTransientJournal extends AbstractTestCase {
             super(name);
         }
 
-        protected BufferMode getBufferMode() {
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
             
-            return BufferMode.Transient;
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
         
@@ -238,9 +244,14 @@ public class TestTransientJournal extends AbstractTestCase {
             super(name);
         }
 
-        protected BufferMode getBufferMode() {
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
             
-            return BufferMode.Transient;
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
         

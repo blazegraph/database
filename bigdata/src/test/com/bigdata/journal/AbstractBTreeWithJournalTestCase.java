@@ -88,12 +88,7 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
              * Note: Your unit test must close the store for delete to work.
              */
             properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//            properties.setProperty(Options.DELETE_ON_CLOSE,"true");
             properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-//            // Note: also deletes the file before it is used.
-//            properties.setProperty(Options.FILE, AbstractTestCase
-//                    .getTestJournalFile(getName(), properties));
 
         }
 
@@ -102,6 +97,32 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
     }
 
     private Properties properties;
+  
+    private Journal journal;
+    
+    public void setUp() throws Exception {
+
+        super.setUp();
+        
+        journal = new Journal(getProperties());
+
+    }
+
+    public void tearDown() throws Exception {
+        
+        if(journal!=null) {
+            
+            if(journal.isOpen()) {
+                
+                journal.closeAndDelete();
+                
+            }
+            
+        }
+
+        super.tearDown();
+        
+    }
     
     /**
      * Return a btree backed by a journal with the indicated branching factor.
@@ -114,8 +135,6 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
      * @return The btree.
      */
     public BTree getBTree(int branchingFactor) {
-
-        Journal journal = new Journal(getProperties());
 
         BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
                 SimpleEntry.Serializer.INSTANCE);

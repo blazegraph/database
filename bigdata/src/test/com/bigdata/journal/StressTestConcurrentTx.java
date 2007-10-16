@@ -58,7 +58,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -67,6 +66,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -83,10 +84,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * disk. This suggests that the big win for TPS throughput is going to be group
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts.
- * 
- * FIXME refactor to use {@link ConcurrentJournal}, verify that distinct
- * transactions are concurrent, verify that locks are used within a transaction
- * for the same index, andn verify the above observation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -135,12 +132,20 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
         }
 
-        doConcurrentClientTest(journal, 5, 20, 100, 3, 100);
+        doConcurrentClientTest(journal, 5, 20, 100, 3, 100, .10);
         
     }
 
     /**
      * A stress test with a pool of concurrent clients.
+     * <p>
+     * Note: <i>nclients</i> corresponds to a number of external processes that
+     * start transactions, submit {@link AbstractTask}s that operate against
+     * those transactions, and finally choose to either commit or abort the
+     * transactions. The concurrency with which the {@link AbstractTask}s
+     * submitted by the "clients" may run is governed by the
+     * {@link ConcurrentJournal.Options}. However, the concurrency is capped by
+     * the #of clients since each client manages a single transaction at a time.
      * 
      * @param journal
      *            The database.
@@ -167,10 +172,29 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      * @param nops
      *            The #of operations to be performed in each transaction.
      * 
+     * @param abortRate
+     *            The #of clients that choose to abort a transaction rather the
+     *            committing it [0.0:1.0]. Note that the abort point is always
+     *            choosen after the client has submitting at least one write
+     *            task for the transaction.
+     * 
+     * @todo introduce a parameter to govern the #of named resources from which
+     *       transactions choose the indices on which they will write.
+     * 
+     * @todo introduce a parameter to govern the #of named indices on which each
+     *       transaction will write (min/max). together these allow us to
+     *       control the amount of contention among the transactions for access
+     *       to the same unisolated index during commit (validate and
+     *       mergeDown).
+     * 
+     * @todo Introduce a parameter to govern the #of concurrent operations that
+     *       a client will submit against the named resource(s) and the #of
+     *       named resources on which each isolated task may write.
+     * 
      * @todo factor out the operation to be run as a test parameter?
      */
-    static public Result doConcurrentClientTest(Journal journal,
-            long timeout, int nclients, int ntrials, int keyLen, int nops)
+    static public Result doConcurrentClientTest(Journal journal, long timeout,
+            int nclients, int ntrials, int keyLen, int nops, double abortRate)
             throws InterruptedException {
         
         final String name = "abc";
@@ -187,12 +211,10 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                 nclients, DaemonThreadFactory.defaultThreadFactory());
         
         Collection<Callable<Long>> tasks = new HashSet<Callable<Long>>(); 
-
-        ConcurrentHashMap<IIndex, Long> btrees = new ConcurrentHashMap<IIndex, Long>();
         
         for(int i=0; i<ntrials; i++) {
             
-            tasks.add(new Task(journal, name, keyLen, nops, btrees));
+            tasks.add(new Task(journal, name, keyLen, nops, abortRate));
             
         }
 
@@ -208,6 +230,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         Iterator<Future<Long>> itr = results.iterator();
         
+        int nretry = 0; // #of transactions that were part of a commit group that failed but MAY be retried.
         int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
         int naborted = 0; // #of transactions that choose to abort rather than commit.
         int ncommitted = 0; // #of transactions that successfully committed.
@@ -224,12 +247,20 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                 continue;
                 
             }
-
+ 
             try {
 
-                if(future.get()==0L) naborted++;
-                
-                ncommitted++;
+                if (future.get() == 0L) {
+
+                    // Note: Could also be an empty write set.
+                    
+                    naborted++;
+                    
+                } else {
+                    
+                    ncommitted++;
+                    
+                }
                 
             } catch(ExecutionException ex ) {
                 
@@ -239,11 +270,23 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                 
                     nfailed++;
                     
+                } else if(isInnerCause(ex,RetryException.class)){
+
+                    nretry++;
+                    
+                    log.warn(getInnerCause(ex, RetryException.class));
+                    
+//                } else if(isInnerCause(ex,InterruptedException.class)){
+//
+//                    ncancel++;
+//                    
                 } else {
                 
-                    // Other kinds of exceptions are errors.
+                    /*
+                     * Other kinds of exceptions are errors.
+                     */
                     
-                    fail("Not expecting: "+ex, ex);
+                    log.warn("Not expecting: "+ex);
                     
                 }
                 
@@ -252,33 +295,22 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         }
 
         // immediately terminate any tasks that are still running.
+        log.warn("Shutting down now!");
         journal.shutdownNow();
         
         journal.delete();
-//        if(journal.getFile()!=null) {
-// 
-//            journal.getFile().delete();
-//            
-//        }
-                
+        
         Result ret = new Result();
         
-        // Note: these are conditions not results
-//        ret.put("#clients",""+nclients);
-//        ret.put("nops", ""+nops);
-//        ret.put("ntx", ""+ntrials);
-
         // these are the results.
+        ret.put("nretry",""+nretry);
+        ret.put("nfailed",""+nfailed);
+        ret.put("naborted",""+naborted);
+        ret.put("ncommitted",""+ncommitted);
         ret.put("ncommitted",""+ncommitted);
         ret.put("nuncommitted", ""+nuncommitted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("tps", ""+(ncommitted * 1000 / elapsed));
-        
-//        String msg = "#clients="
-//                + nclients + ", nops=" + nops + ", ntx=" + ntrials + ", ncomitted="
-//                + ncommitted + ", naborted=" + naborted + ", nfailed=" + nfailed
-//                + ", nuncommitted=" + nuncommitted + ", " + elapsed + "ms, "
-//                + ncommitted * 1000 / elapsed + " tps";
         
         System.err.println(ret.toString(true/*newline*/));
         
@@ -299,11 +331,11 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         private final String name;
         private final int keyLen;
         private final int nops;
-        private final ConcurrentHashMap<IIndex, Long> btrees;
+        private final double abortRate;
         
         final Random r = new Random();
         
-        public Task(Journal journal,String name, int keyLen, int nops, ConcurrentHashMap<IIndex, Long>btrees) {
+        public Task(Journal journal,String name, int keyLen, int nops, double abortRate) {
 
             this.journal = journal;
 
@@ -312,8 +344,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             this.keyLen = keyLen;
             
             this.nops = nops;
-            
-            this.btrees = btrees;
+
+            this.abortRate = abortRate;
             
         }
 
@@ -327,54 +359,68 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
             final long tx = journal.newTx(IsolationEnum.ReadWrite);
             
-            final IIndex ndx = journal.getIndex(name,tx);
-
-            Long otx = btrees.put(ndx, tx);
-            
-            if(otx != null ) {
-                
-                throw new AssertionError("Index already in use by: "+otx);
-                
-            }
-            
-            // Random operations on the named index(s).
-            
-            for (int i = 0; i < nops; i++) {
-
-                byte[] key = new byte[keyLen];
-
-                r.nextBytes(key);
-
-                if (r.nextInt(100) > 10) {
-
-                    byte[] val = new byte[5];
-
-                    r.nextBytes(val);
-
-                    ndx.insert(key, val);
-
-                } else {
-
-                    ndx.remove(key);
-
-                }
-
-            }
-
             /*
-             * the percentage of transactions that will abort rather than
-             * commit.
-             * 
-             * @todo make parameter to stress test.
+             * Now that the transaction is running, submit tasks that are
+             * isolated by that transaction to the journal and wait for them to
+             * complete.
              */
-            final int abortPercentage = 10;
             
-            if (r.nextInt(100) > abortPercentage) {
+            journal.submit(new AbstractTask(journal, tx, false/* readOnly */,
+                    name) {
+                
+                protected Object doTask() {
+                    // Random operations on the named index(s).
+
+                    final IIndex ndx = getIndex(name);
+
+                    for (int i = 0; i < nops; i++) {
+
+                        byte[] key = new byte[keyLen];
+
+                        r.nextBytes(key);
+
+                        if (r.nextInt(100) > 10) {
+
+                            byte[] val = new byte[5];
+
+                            r.nextBytes(val);
+
+                            ndx.insert(key, val);
+
+                        } else {
+
+                            ndx.remove(key);
+
+                        }
+                    }
+
+                    return null;
+                }
+                
+            }).get();
+            
+            /*
+             * The percentage of transactions that will choose to abort rather
+             * than commit.
+             */
+            
+            if (r.nextInt(100) >= abortRate) {
 
                 // commit.
                 
+                assertFalse("Empty write set?", journal.getTx(tx).isEmptyWriteSet());
+                
                 final long commitTime = journal.commit(tx);
 
+                if(commitTime==0L) {
+                    
+                    /*
+                     * 
+                     */
+                    throw new AssertionError("Expecting non-zero commit time");
+                    
+                }
+                
                 return commitTime;
 
             } else {
@@ -394,10 +440,6 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     /**
      * Runs a single instance of the test as configured in the code.
      * 
-     * @todo try running the test out more than 30 seconds. Note that a larger
-     *       journal maximum extent is required since the journal will otherwise
-     *       overflow.
-     * 
      * @todo compute the bytes/second rate on the journal for this test.
      * 
      * @todo test with more than one named index in use.
@@ -405,14 +447,6 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      * @todo Try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong. Note that the actual execution 
      *       execution order is important for transactions.
-     * 
-     * @todo There may be a memory leak with concurrent transactions. I was able
-     *       to get rid of an {@link OutOfMemoryError} by setting the
-     *       {@link TemporaryRawStore#buf} to null when the store was closed.
-     *       However, there is still going to be something that was causing
-     *       those transactions and their stores to be hanging around -- perhaps
-     *       the writeService in the Journal which might be holding onto
-     *       {@link Future}s?
      * 
      * @see ExperimentDriver, which parameterizes the use of this stress test.
      *      That information should be used to limit the #of transactions
@@ -427,21 +461,21 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         Properties properties = new Properties();
 
-        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
+//        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
         
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
-        properties.setProperty(TestOptions.TIMEOUT,"60");
+        properties.setProperty(TestOptions.TIMEOUT,"10");
 
-        properties.setProperty(TestOptions.NCLIENTS,"10");
+        properties.setProperty(TestOptions.NCLIENTS,"20");
 
         properties.setProperty(TestOptions.NTRIALS,"10000");
 
@@ -476,12 +510,13 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     /**
      * Additional properties understood by this test.
      */
-    public static class TestOptions extends com.bigdata.journal.ConcurrentJournal.Options {
+    public static class TestOptions extends Options {
 
         /**
          * The timeout for the test.
          */
         public static final String TIMEOUT = "timeout";
+        
         /**
          * The #of concurrent clients to run.
          */
@@ -491,6 +526,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
          * The #of trials (aka transactions) to run.
          */
         public static final String NTRIALS = "ntrials";
+        
         /**
          * The length of the keys used in the test. This directly impacts the
          * likelyhood of a write-write conflict. Shorter keys mean more
@@ -498,11 +534,18 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
          * are at least two concurrent clients running.
          */
         public static final String KEYLEN = "keyLen";
+        
         /**
          * The #of operations in each trial.
          */
         public static final String NOPS = "nops";
     
+        /**
+         * The #of clients that choose to abort a transaction rather the
+         * committing it [0.0:1.0].
+         */
+        public static final String ABORT_RATE = "abortRate";
+        
     }
 
     /**
@@ -524,8 +567,10 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         final int nops = Integer.parseInt(properties.getProperty(TestOptions.NOPS));
 
+        final double abortRate = Double.parseDouble(properties.getProperty(TestOptions.ABORT_RATE));
+        
         Result result = doConcurrentClientTest(journal, timeout, nclients, ntrials,
-                keyLen, nops);
+                keyLen, nops, abortRate);
 
         return result;
 
@@ -549,6 +594,10 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             // this is the test to be run.
             String className = StressTestConcurrentTx.class.getName();
             
+            /* 
+             * Set defaults for each condition.
+             */
+            
             Map<String,String> defaultProperties = new HashMap<String,String>();
 
             // force delete of the files on close of the journal under test.
@@ -557,80 +606,65 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             // avoids journal overflow when running out to 60 seconds.
             defaultProperties.put(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);
 
-            /* 
-             * Set defaults for each condition.
-             */
+            defaultProperties.put(Options.BUFFER_MODE,BufferMode.Disk.toString());
             
             defaultProperties.put(TestOptions.TIMEOUT,"30");
 
             defaultProperties.put(TestOptions.NTRIALS,"10000");
 
-//            defaultProperties.put(TestOptions.NCLIENTS,"10");
-
             defaultProperties.put(TestOptions.KEYLEN,"4");
 
-            defaultProperties.put(TestOptions.NOPS,"100");
-
+            /*
+             * Build up the conditions.
+             */
+            
             List<Condition>conditions = new ArrayList<Condition>();
 
             conditions.add(new Condition(defaultProperties));
             
-            /* FIXME set WriteServiceCorePoolSize and WriteServiceQueueCapacity instead
-             * and the just use invokeAll() w/ timeout.
-             */
             conditions = apply(conditions,new NV[]{
                     new NV(TestOptions.NCLIENTS,"1"),
-                    new NV(TestOptions.NCLIENTS,"2"),
                     new NV(TestOptions.NCLIENTS,"10"),
                     new NV(TestOptions.NCLIENTS,"20"),
+                    new NV(TestOptions.NCLIENTS,"50"),
                     new NV(TestOptions.NCLIENTS,"100"),
                     new NV(TestOptions.NCLIENTS,"200"),
-//                    new NV(TestOptions.NCLIENTS,"500"),
             });
             
-            conditions = apply(
-                    conditions,
-                    new NV[][] { //
-                            new NV[] { new NV(Options.BUFFER_MODE,
-                                    BufferMode.Transient), }, //
-                            new NV[] { new NV(Options.BUFFER_MODE,
-                                    BufferMode.Direct), }, //
-                            new NV[] {
-                                    new NV(Options.BUFFER_MODE, BufferMode.Direct),
-                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
-                                            .toString()), }, //
-                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
-                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
-                            new NV[] {
-                                    new NV(Options.BUFFER_MODE, BufferMode.Disk),
-                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
-                                            .toString()), }, //
-                    });
+            conditions = apply(conditions,new NV[]{
+                    new NV(TestOptions.NOPS,"1"),
+                    new NV(TestOptions.NOPS,"10"),
+                    new NV(TestOptions.NOPS,"100"),
+                    new NV(TestOptions.NOPS,"1000"),
+            });
             
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "1") }));
-//
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "2") }));
-//
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "10") }));
-//
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "20") }));
-//
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "100") }));
-//
-//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-//                            "200") }));
+            conditions = apply(conditions,new NV[]{
+                    new NV(TestOptions.KEYLEN,"4"),
+                    new NV(TestOptions.KEYLEN,"8"),
+//                    new NV(TestOptions.KEYLEN,"32"),
+//                    new NV(TestOptions.KEYLEN,"64"),
+//                    new NV(TestOptions.KEYLEN,"128"),
+            });
             
+//            conditions = apply(
+//                    conditions,
+//                    new NV[][] { //
+//                            new NV[] { new NV(Options.BUFFER_MODE,
+//                                    BufferMode.Transient), }, //
+//                            new NV[] { new NV(Options.BUFFER_MODE,
+//                                    BufferMode.Direct), }, //
+//                            new NV[] {
+//                                    new NV(Options.BUFFER_MODE, BufferMode.Direct),
+//                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+//                                            .toString()), }, //
+//                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
+//                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+//                            new NV[] {
+//                                    new NV(Options.BUFFER_MODE, BufferMode.Disk),
+//                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+//                                            .toString()), }, //
+//                    });
+                        
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 
             // copy the output into a file and then you can run it later.

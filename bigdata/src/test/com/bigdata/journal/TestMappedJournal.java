@@ -50,6 +50,8 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+import com.bigdata.rawstore.IRawStore;
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -115,11 +117,11 @@ public class TestMappedJournal extends AbstractTestCase {
 
         Properties properties = super.getProperties();
 
+        properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
-
-//        properties.setProperty(Options.SEGMENT, "0");
-
-//        properties.setProperty(Options.FILE,getTestJournalFile(properties));
 
         return properties;
 
@@ -203,9 +205,18 @@ public class TestMappedJournal extends AbstractTestCase {
             super(name);
         }
 
-        protected BufferMode getBufferMode() {
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
             
-            return BufferMode.Mapped;
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
         
@@ -227,12 +238,21 @@ public class TestMappedJournal extends AbstractTestCase {
             super(name);
         }
 
-        protected BufferMode getBufferMode() {
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
             
-            return BufferMode.Mapped;
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
-        
+
     }
     
     /**

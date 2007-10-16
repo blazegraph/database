@@ -62,6 +62,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.rawstore.AbstractRawStoreTestCase;
+import com.bigdata.rawstore.IMROW;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -79,10 +82,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo Support {@link ExperimentDriver}.
  * 
+ * @see IMROW
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCase {
+abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
 
     /**
      * 
@@ -103,8 +108,8 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
      */
     public void testMROW() throws Exception {
 
-        IBufferStrategy store = ((Journal)getStore()).getBufferStrategy();
-
+        IRawStore store = getStore();
+        
         final long timeout = 5;
         
         final int nclients = 20;
@@ -158,7 +163,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
      * @param nreads
      *            The #of operations to be performed in each transaction.
      */
-    static public void doMROWTest(IBufferStrategy store,
+    static public void doMROWTest(IRawStore store,
             int nwrites, long writeDelayMillis, long timeout, int nclients,
             int ntrials, int reclen, int nreads) 
         throws Exception
@@ -274,10 +279,9 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
             
         }
         
-        System.err.println("mode=" + store.getBufferMode() + ", #clients="
-                + nclients + ", ntrials=" + ntrials + ", nok=" + nok
-                + ", ncancelled=" + ncancelled + ", nerrors=" + nerr + " in "
-                + elapsed + "ms (" + nok * 1000 / elapsed
+        System.err.println("#clients=" + nclients + ", ntrials=" + ntrials
+                + ", nok=" + nok + ", ncancelled=" + ncancelled + ", nerrors="
+                + nerr + " in " + elapsed + "ms (" + nok * 1000 / elapsed
                 + " reads per second); nwritten=" + nwritten);
        
     }
@@ -308,7 +312,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
      */
     public static class WriterTask implements Callable<Integer> {
 
-        private final IBufferStrategy store;
+        private final IRawStore store;
         private final int reclen;
         private final int nwrites;
         private final long writeDelayMillis;
@@ -344,7 +348,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
             
         }
 
-        public WriterTask(IBufferStrategy store, int reclen, int nwrites, long writeDelayMillis) {
+        public WriterTask(IRawStore store, int reclen, int nwrites, long writeDelayMillis) {
 
             this.store = store;
             
@@ -431,7 +435,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
      */
     public static class ReaderTask implements Callable<Long> {
 
-        private final IBufferStrategy store;
+        private final IRawStore store;
         private final WriterTask writer;
         private final int nops;
         
@@ -443,7 +447,7 @@ abstract public class AbstractMROWTestCase extends AbstractBufferStrategyTestCas
          * @param writer
          * @param nwrites #of reads to perform.
          */
-        public ReaderTask(IBufferStrategy store, WriterTask writer, int nops) {
+        public ReaderTask(IRawStore store, WriterTask writer, int nops) {
 
             this.store = store;
             
