@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
@@ -113,11 +114,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * The file.
      */
     private final File file;
-
+    
     /**
-     * The IO interface for the file.
+     * The IO interface for the file - <strong>use
+     * {@link #getRandomAccessFile()} rather than this field</strong>.
      */
-    private final RandomAccessFile raf;
+    /*private*/ /*final*/ RandomAccessFile raf;
 
     /**
      * The size of the journal header, including MAGIC, version, and both root
@@ -229,13 +231,50 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         return file;
         
     }
-    
+
+    /**
+     * Returns the open {@link RandomAccessFile}. If the backing
+     * {@link FileChannel} was closed but the {@link #isOpen()} still returns
+     * true then the file is re-opened.
+     * <p>
+     * Note: group commit will interrupt running threads if a commit group must
+     * be discarded. If a thread was in the middle of an IO operation on the
+     * file then the channel is <strong>closed</strong> by that interrupt.
+     * While the thread(s) that were interrupted will not continue their
+     * interrupted operation, we do need to re-open the channel when it was
+     * closed asynchronously so that other tasks may execute against the store.
+     * 
+     * FIXME this needs some unit tests! Also, modify the MROW and MRMW tests to
+     * explicitly interrupt some tasks as part of their stress test. This also
+     * shows up in concurrent transaction execution since validation errors
+     * cause commit group aborts, which cause threads to be interrupted and if
+     * that happens when they are reading or writing on the channel then the
+     * channel is closed and {@link ClosedByInterruptException} is thrown!
+     * 
+     * @todo Can {@link FileMetadata} be refactored to re-open the file? Note
+     *       that a mapped file needs to be re-mapped. Also note that file locks
+     *       might interfere with re-opening the file, or might add latency to
+     *       that operation.... Mapped files might be impossible to re-open
+     *       since we have no control over when they are unmapped with Java.
+     *       <p>
+     *       Note: we do NOT re-read the commit blocks - that is all handled by
+     *       the commit/abort logic. Basically, they already have what they need
+     *       on hand.
+     * 
+     * @see WriteExecutorService
+     */
     final public RandomAccessFile getRandomAccessFile() {
 
         return raf;
         
     }
 
+    final public FileChannel getChannel() {
+        
+        return raf.getChannel();
+        
+    }
+    
     DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
@@ -319,7 +358,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         try {
 
             // sync the disk.
-            raf.getChannel().force(metadata);
+            getChannel().force(metadata);
 
         } catch (IOException ex) {
 
@@ -494,7 +533,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             try {
 
                 // copy the data into the buffer.
-                final int nread = raf.getChannel().read(dst, pos);
+                final int nread = getChannel().read(dst, pos);
 
                 if (nread != nbytes) {
 
@@ -662,7 +701,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              */
 
             // writes bytes from position to limit on the channel at pos.
-            final int count = raf.getChannel().write(data, pos);
+            final int count = getChannel().write(data, pos);
 
             if (count != nbytes) {
 
@@ -689,7 +728,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         try {
 
-            FileChannel channel = raf.getChannel();
+            FileChannel channel = getChannel();
 
             final int count = channel.write(rootBlock.asReadOnlyBuffer(),
                     rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
@@ -739,7 +778,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         try {
 
             // extend the file.
-            raf.setLength(newExtent);
+            getRandomAccessFile().setLength(newExtent);
             
             /*
              * since we just changed the file length we force the data to disk

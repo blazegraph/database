@@ -123,6 +123,31 @@ import com.bigdata.rawstore.IRawStore;
  *       (b) the processor allocation strategy causes all threads to perform
  *       very slowly.
  * 
+ * FIXME I think that it may be possible for task(s) interrupted when a group
+ * commit is aborted to fail to notice in a timely manner and continue to
+ * read/write on the store even though they MUST be discarded. Maybe
+ * {@link #abort()} needs to wait until all interrupted tasks have arrived at
+ * {@link #afterTask(Callable, Throwable)}, i.e., until #running reaches zero
+ * _before_ executing the abort.
+ * 
+ * FIXME The write service is NOT the only source of reads against the store,
+ * just the only source of reads against the live indices. Make sure that things
+ * like {@link AbstractJournal#abort()} properly synchronize such that readers
+ * can continue to execute without problems. For example, when we have to
+ * re-open the backing file because it was closed when an IO was interrupted
+ * concurrent readers will need the ability to re-open the channel immediately.
+ * Show this with a variant of {@link TestClosedByInterruptException}.
+ * 
+ * FIXME Write a test that runs concurrent unisolated readers, unisolated
+ * writers, and transactions and make sure that everything is Ok. There really
+ * should be a correctness test here. The best way to do that may be to write a
+ * correctness test for each of the three executor services (readers, writers,
+ * and isolated transactions) and then to run all three tests at once against
+ * the same store. As long as they use distinct indices there should be no
+ * conflicts caused by the tests.
+ * 
+ * FIXME Finish tx support in {@link AbstractTask} and work in {@link StressTestConcurrentTx}
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -415,6 +440,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *       <p>
      *       We could also keep a maximum latency on the task and abort it if
      *       the latency is exceeded (regardless of the retry count).
+     *       <p>
+     *       Do NOT resubmit if the write service is being shutdown.
      */
     protected void afterTask(Callable r, Throwable t) {
         
@@ -490,6 +517,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
                     log.warn("Task interrupted: task="+ r.getClass().getName());
 
+                } else if (t instanceof ValidationError
+                        || t.getCause() != null
+                        && t.getCause() instanceof ValidationError) {
+
+                    /*
+                     * This handles the case where the task was interrupted and
+                     * noticed the interrupt. Since the InterruptedException is
+                     * often wrapped as a RuntimeException we also check the
+                     * cause.
+                     */
+                    
+                    log.warn("Validation failed: task=" + r.getClass().getName()
+                            + " : " + t);
+
                 } else if (t instanceof InterruptedException
                         || t.getCause() != null
                         && t.getCause() instanceof InterruptedException) {
@@ -501,7 +542,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * cause.
                      */
                     
-                    log.warn("Task interrupted: task=" + r.getClass().getName()
+                    log.warn("Thread interrupted: task=" + r.getClass().getName()
                             + " : " + t);
 
                 } else {

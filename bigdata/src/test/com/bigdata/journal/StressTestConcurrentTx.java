@@ -230,6 +230,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         Iterator<Future<Long>> itr = results.iterator();
         
+        int ninterrupt = 0; // #of tasks that throw InterruptedException.
         int nretry = 0; // #of transactions that were part of a commit group that failed but MAY be retried.
         int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
         int naborted = 0; // #of transactions that choose to abort rather than commit.
@@ -266,27 +267,31 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                 
                 // Validation errors are allowed and counted as aborted txs.
                 
-                if(ex.getCause() instanceof ValidationError) {
+                if(isInnerCause(ex, ValidationError.class)) {
                 
                     nfailed++;
-                    
+
+                    log.info(getInnerCause(ex, ValidationError.class));
+
                 } else if(isInnerCause(ex,RetryException.class)){
 
                     nretry++;
                     
-                    log.warn(getInnerCause(ex, RetryException.class));
+                    log.info(getInnerCause(ex, RetryException.class));
                     
-//                } else if(isInnerCause(ex,InterruptedException.class)){
-//
-//                    ncancel++;
-//                    
+                } else if(isInnerCause(ex,InterruptedException.class)){
+
+                    ninterrupt++;
+
+                    log.info(getInnerCause(ex, InterruptedException.class));
+
                 } else {
                 
                     /*
                      * Other kinds of exceptions are errors.
                      */
                     
-                    log.warn("Not expecting: "+ex);
+                    log.warn("Not expecting: "+ex, ex);
                     
                 }
                 
@@ -303,6 +308,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         Result ret = new Result();
         
         // these are the results.
+        ret.put("ninterupt",""+ninterrupt);
         ret.put("nretry",""+nretry);
         ret.put("nfailed",""+nfailed);
         ret.put("naborted",""+naborted);
@@ -473,7 +479,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
-        properties.setProperty(TestOptions.TIMEOUT,"10");
+        properties.setProperty(TestOptions.TIMEOUT,"60");
 
         properties.setProperty(TestOptions.NCLIENTS,"20");
 
@@ -482,7 +488,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         properties.setProperty(TestOptions.KEYLEN,"4");
 
         properties.setProperty(TestOptions.NOPS,"4");
-        
+
+        properties.setProperty(TestOptions.ABORT_RATE,".05");
+
         IComparisonTest test = new StressTestConcurrentTx();
         
         test.setUpComparisonTest(properties);
@@ -587,6 +595,10 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         /**
          * Generates an XML file that can be run by {@link ExperimentDriver}.
          * 
+         * FIXME I have seen an out of memory error showing up on the 28th
+         * condition (they were randomized so who knows which condition it was)
+         * when running the generated experiment. Who is holding onto what ?
+         * 
          * @param args
          */
         public static void main(String[] args) throws Exception {
@@ -613,6 +625,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             defaultProperties.put(TestOptions.NTRIALS,"10000");
 
             defaultProperties.put(TestOptions.KEYLEN,"4");
+
+            defaultProperties.put(TestOptions.ABORT_RATE,".05");
 
             /*
              * Build up the conditions.

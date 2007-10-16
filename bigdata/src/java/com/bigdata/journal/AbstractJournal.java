@@ -51,7 +51,10 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
+import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -262,7 +265,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     /**
      * The implementation logic for the current {@link BufferMode}.
      */
-    final protected IBufferStrategy _bufferStrategy;
+    /*final*/ /*package private*/ IBufferStrategy _bufferStrategy;
 
     /**
      * The object used by the journal to compute the checksums of its root
@@ -1149,6 +1152,17 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * which writes will occur on the store and NOT causing persistence capable
      * objects (btrees) used for isolated by concurrent transactions to lose
      * their write sets.
+     * <p>
+     * Note: When a commit group is aborted, the {@link Thread}s for the tasks
+     * in that commit group are interrupted. If a task was in the midst of an IO
+     * operation on a {@link Channel} then the channel will be asynchronously
+     * closed by the JDK. Since some {@link IBufferStrategy}s use a
+     * {@link FileChannel} to access the backing store, this means that we need
+     * to re-open the backing store transparently so that we can continue
+     * operations after the commit group was aborted.
+     * <p>
+     * Note: it is possible that threads can be interrupted for other reasons,
+     * but we do not necessarily notice and support re-opening of the store.
      */
     public void abort() {
 
@@ -1158,6 +1172,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         // clear the array of committers.
         _committers = new ICommitter[_committers.length];
 
+        // reopen the store iff closed asynchronously by interrupted channel IO.
+        reopenAfterInterrupt();
+        
         /*
          * Re-load the commit record index from the address in the current root
          * block.
@@ -1175,6 +1192,96 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         // setup new committers, e.g., by reloading from their last root addr.
         setupCommitters();
+
+    }
+    
+    /**
+     * When the journal is backed by a disk file and the file channel was
+     * asynchronously closed by an interrupt during an IO operation then this
+     * method will re-open the file.
+     * 
+     * FIXME Re-acquire the exclusive lock when we re-open the store.
+     * 
+     * @todo encapsulate this logic better.
+     * 
+     * @todo verify that a mapped store will not let us do this. if it does then
+     *       that is a great way to get the thing un-mapped!
+     */
+    private void reopenAfterInterrupt() {
+        
+        /*
+         * Note: clear the interrupted flag in case it is still set on
+         * this thread.  (It is the thread that is conducting the group
+         * commit that winds up doing the abort.)
+         */
+        Thread.interrupted();
+        
+        if (_bufferStrategy.isStable() && _bufferStrategy.isOpen() ) {
+            
+            switch (_bufferStrategy.getBufferMode()) {
+
+            case Direct: {
+                
+                DirectBufferStrategy bs = (DirectBufferStrategy) _bufferStrategy;
+            
+                if (!bs.getChannel().isOpen()) {
+
+                    try {
+
+                        bs.raf = new RandomAccessFile(fileMetadata.file,
+                                fileMetadata.fileMode);
+
+                        log.warn("Re-opened file closed by asynchronous interrupt");
+
+                    } catch (Throwable t) {
+
+                        throw new RuntimeException("Could not reopen file: "
+                                + fileMetadata.file + " : " + t, t);
+
+                    }
+                    
+                }
+                
+                break;
+                
+            }
+            
+            case Disk: {
+                
+                DiskOnlyStrategy bs = (DiskOnlyStrategy) _bufferStrategy;
+
+                if (!bs.getChannel().isOpen()) {
+
+                    try {
+
+                        bs.raf.close();
+                        
+                        bs.raf = new RandomAccessFile(fileMetadata.file,
+                                fileMetadata.fileMode);
+                        
+                        log.warn("Re-opened file closed by asynchronous interrupt");
+
+                    } catch (Throwable t) {
+
+                        throw new RuntimeException("Could not reopen file: "
+                                + fileMetadata.file + " : " + t, t);
+
+                    }
+                    
+                }
+                
+                break;
+                
+            }
+
+            case Mapped:
+            
+            default:
+                throw new UnsupportedOperationException();
+
+            }
+            
+        }
 
     }
     
@@ -1886,6 +1993,12 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         if (name == null)
             throw new IllegalArgumentException();
 
+        if (Thread.interrupted()) {
+
+            throw new RuntimeException(new InterruptedException());
+            
+        }
+        
         // Note: NullPointerException can be thrown here if asynchronously closed.
         synchronized (name2Addr) {
 

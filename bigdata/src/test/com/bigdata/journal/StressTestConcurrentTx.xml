@@ -5,6 +5,7 @@
  <defaults>
   <property name="maximumExtent">419430400</property>
   <property name="timeout">30</property>
+  <property name="abortRate">.05</property>
   <property name="createTempFile">true</property>
   <property name="ntrials">10000</property>
   <property name="keyLen">4</property>

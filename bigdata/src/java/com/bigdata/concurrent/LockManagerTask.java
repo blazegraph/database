@@ -349,7 +349,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
 //            if(log.getLevel().isGreaterOrEqual(Level.ERROR)) {
                 
-                log.error("Problem running task: " + this, t);
+//                log.error("Problem running task: " + this, t);
                 
 //            }
 

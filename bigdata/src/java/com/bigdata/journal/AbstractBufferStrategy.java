@@ -229,7 +229,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
 
-    final public boolean isOpen() {
+    public boolean isOpen() {
         
         return open;
         

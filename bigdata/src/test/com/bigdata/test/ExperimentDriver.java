@@ -551,10 +551,14 @@ public class ExperimentDriver {
             }
 
             Iterator<Condition> conditr = _conditions.iterator();
+
+            int n = 0;
             
             while(conditr.hasNext()) {
                 
                 Condition cond = conditr.next();
+                
+                sb.append(" <!-- condition#"+(n+1)+" -->\n");
                 
                 sb.append(" <condition>\n");
 
@@ -604,6 +608,8 @@ public class ExperimentDriver {
                 }
 
                 sb.append(" </condition>\n");
+
+                n++;
                 
             }
             

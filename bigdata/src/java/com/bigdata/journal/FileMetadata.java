@@ -86,16 +86,16 @@ public class FileMetadata {
      */
     final int VERSION1 = 0x1;
     
-//    /**
-//     * The unique segment identifier.
-//     */
-//    final int segment;
-    
     /**
      * The file that was opened.
      */
     final File file;
-    
+
+    /**
+     * The mode used to open the file.
+     */
+    final String fileMode;
+
     /**
      * The buffer mode used to open that file.
      */
@@ -285,7 +285,7 @@ public class FileMetadata {
 
         this.offsetBits = offsetBits;
         
-        final String fileMode = (readOnly ?"r" :forceWrites.asFileMode());
+        this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
         this.readOnly = readOnly;
         

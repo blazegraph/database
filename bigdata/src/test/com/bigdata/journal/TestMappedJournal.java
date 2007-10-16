@@ -90,6 +90,13 @@ public class TestMappedJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestMappedJournal.class);
 
+        /*
+         * Note: You can't re-open a mapped file since you have not control over
+         * when it is unmapped under Java.
+         */
+        // test suite for handling asynchronous close of the file channel.
+//        suite.addTestSuite( TestClosedByInterruptException.class );
+
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
 

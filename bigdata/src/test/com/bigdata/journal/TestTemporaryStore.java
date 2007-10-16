@@ -101,6 +101,9 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
 
+        // test suite for handling asynchronous close of the file channel.
+        suite.addTestSuite( TestClosedByInterruptException.class );
+        
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
 
