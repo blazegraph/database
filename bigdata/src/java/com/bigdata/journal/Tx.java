@@ -127,7 +127,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      * transaction. All indices isolated by this transaction are isolated as of
      * the discoverable root address based on this commit record.
      */
-    final private ICommitRecord commitRecord;
+    final protected ICommitRecord commitRecord;
     
     /**
      * A store used to hold write sets for read-write transactions (it is null
@@ -141,6 +141,8 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      * Using smaller branching factors in the isolated index helps significantly
      * to increase the effective utilization of the store since copy-on-write
      * causes fewer bytes to be copied each time it is invoked.
+     * 
+     * @todo defer creation until 1st write?
      */
     final protected TemporaryRawStore tmpStore;
     

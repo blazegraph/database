@@ -47,16 +47,11 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.journal.AbstractTask.ResubmitException;
@@ -67,8 +62,6 @@ import com.bigdata.service.RangeQueryIterator;
 /**
  * Test suite for the {@link ConcurrentJournal}.
  * 
- * FIXME write more tests!
- * 
  * @todo write test cases that submit various kinds of operations and verify the
  *       correctness of those individual operations. refactor the services
  *       package to do this, including things such as the
@@ -76,39 +69,12 @@ import com.bigdata.service.RangeQueryIterator;
  *       of the data service "api", including concurrency of operations, from
  *       the {@link DataService}.
  * 
- * @todo do large #s of runs with a transient store where we test to verify that
- *       a random (small to modest) population of operations may be executed and
- *       the store shutdown without encountering a deadlock problem in the write
- *       service. An alternative to shutdown is to periodically let the write
- *       service become quiesent (by not submitting more tasks) and verify that
- *       the periodic group commit does not cause a deadlock. Another variant is
- *       to periodically invoke group commit from another thread at random
- *       intervals and verify that no entry timings result in deadlocks.
- * 
  * @todo run tests of transaction throughput using a number of models. E.g., a
  *       few large indices with a lot of small transactions vs a lot of small
  *       indices with small transactions vs a few large indices with moderate to
  *       large transactions. Also look out for transactions where the validation
  *       and merge on the unisolated index takes more than one group commit
  *       cycle and see how that effects the application.
- * 
- * @todo explore tests in which we flood the write service and make sure that
- *       group commits are occuring in a timely basis, that we are not starving
- *       the write service thread pool (by running group commit when sufficient
- *       writers are awaiting a commit), and explore whether the write service
- *       should use a blocking queue (fixing a maximum capacity).
- * 
- * @todo Modify the RDFS database to use concurrent operations when writing the
- *       statement indices (sort and batch insert).
- * 
- * @todo add a stress/correctness test that mixes unisolated and isolated
- *       operations. Note that isolated operations (transactions) during commit
- *       simply acquire the corresponding unisolated index(s) (the transaction
- *       commit itself is just an unisolated operation on one or more indices).
- * 
- * @todo verify that lots of concurrent {@link RegisterIndexTask}s and
- *       {@link DropIndexTask}s are not problematic (proper synchronization on
- *       the {@link Name2Addr} instance).
  * 
  * @todo Verify proper partial ordering over transaction schedules (runs tasks
  *       in parallel, uses exclusive locks for access to the same isolated index
@@ -118,9 +84,6 @@ import com.bigdata.service.RangeQueryIterator;
  *       Verify that only the indices that were written on are used to establish
  *       the partial order, not any index from which the tx might have read.
  * 
- * @todo test writing on multiple isolated indices in the same transaction and
- *       concurrency control for that.
- * 
  * @todo test writing on multiple isolated indices in the different transactions
  *       and verify that no concurrency limits are imposed across transactions
  *       (only within transactions).
@@ -128,11 +91,8 @@ import com.bigdata.service.RangeQueryIterator;
  * @todo show state-based validation for concurrent transactions on the same
  *       index that result in write-write conflicts.
  * 
- * @todo rewrite the {@link StressTestConcurrent} to use
+ * @todo rewrite the {@link StressTestConcurrentTx} to use
  *       {@link #submit(AbstractTask)}.
- * 
- * @todo revisit the transaction test suites and update them to validate
- *       behaviors under concurrent operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -525,8 +485,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * {@link Future#cancel(boolean)} with
      * <code>mayInterruptWhileRunning := true</code> and that an appropriate
      * exception is thrown in the main thread.
-     * <p>
-     * Note: In this test the task is terminated and 
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -536,7 +494,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
         Properties properties = getProperties();
         
         Journal journal = new Journal(properties);
-        
+
+        // Note:
+        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"500");
+
         final String[] resource = new String[]{"foo"};
         
         final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
@@ -569,7 +530,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
                         
                     }
 
-                    for(int i=0; i<10000000; i++ ) {}
+                    /*
+                     * Note: this will notice if the Thread is interrupted.
+                     */
+
+                    Thread.sleep(Long.MAX_VALUE);
                     
                 }
 
@@ -655,7 +620,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         Properties properties = getProperties();
         
-        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"1000");
+        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"500");
         
         Journal journal = new Journal(properties);
         
@@ -670,25 +635,19 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             /**
              * The task just sets a boolean value and then runs an infinite
-             * loop.
+             * loop, <strong>ignoring interrupts</strong>.
              */
             protected Object doTask() throws Exception {
 
                 ran.compareAndSet(false, true);
 
-                while (true) {
-
-                    for (int i = 0; i < 10000000; i++) {
-
-                        /*
-                         * Note: This gives us a place where we can put a
-                         * breakpoint.
-                         */
-                        
-                        i++;
-                        
+                while(true) {
+                    try {
+                        Thread.sleep(Long.MAX_VALUE);
+                    } catch(InterruptedException ex) {
+                        /*ignore*/
+                        System.err.println("Ignoring interrupt: "+ex);
                     }
-
                 }
 
             }
@@ -815,6 +774,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * Correctness test of task retry when another task causes a commit group to
      * be discarded.
      * 
+     * @todo implement retry and maxLatencyFromSubmit and move the tests for
+     *       those features into their own test suites.
+     *       
      * @todo Test retry of tasks (read only or read write) when they are part of
      *       a commit group in which some other task fails so they get
      *       interrupted and have to abort.

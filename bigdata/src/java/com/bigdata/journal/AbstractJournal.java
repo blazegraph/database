@@ -65,6 +65,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
@@ -100,10 +101,10 @@ import com.bigdata.util.ChecksumUtility;
  * {@link BTree} using {@link #getIndex(String)}.
  * <p>
  * The {@link IRawStore} interface on this class is thread-safe. However, this
- * is a low-level API that is not used by directly by most applications.  The
+ * is a low-level API that is not used by directly by most applications. The
  * {@link BTree} class uses this low-level API to read and write its nodes and
- * leaves on the store.  Applications generally use named indices rather than
- * the {@link IRawStore} interface.
+ * leaves on the store. Applications generally use named indices rather than the
+ * {@link IRawStore} interface.
  * </p>
  * <p>
  * Commit processing. The journal maintains two root blocks. Commit updates the
@@ -151,16 +152,14 @@ import com.bigdata.util.ChecksumUtility;
  * view to a reader (or the reader could always switch to read from the then
  * current btree after a commit - just like the distinction between an isolated
  * reader and a read-committed reader).</li>
- * <li> Group commit for higher transaction throughput (done, now collecting
- * performance data).<br>
- * Note: For short transactions, TPS is basically constant for a given
- * combination of the buffer mode and whether or not commits are forced to disk.
- * This means that the #of clients is not a strong influence on performance. The
- * big wins are Transient and Force := No since neither conditions syncs to
- * disk. This suggests that the big win for TPS throughput is going to be group
- * commit followed by either the use of SDD for the journal or pipelining writes
- * to secondary journals on failover hosts. </li>
  * <li> Minimize (de-)serialization costs for B+Trees since we are not IO bound.</li>
+ * <li> Reduce heap churn through the use allocation pools for ByteBuffers and
+ * byte[]s. There are several places where we can do this, including:
+ * {@link BTree}, the {@link Tx} backing store, etc. Bin the objects into
+ * buckets within a pool. Each bucket can be a {@link HardReferenceQueue}.
+ * Limit the #of objects retained in a given bucket so that the pool does not
+ * become a memory sink. Profile using the BEA tool to look for sources of
+ * memory allocation and leakage. </li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration, including: support for primary key (clustered) indices;
  * using queues from GOM to journal/database segment server supporting both
@@ -1633,20 +1632,24 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         assertOpen();
 
-        if(name == null) throw new IllegalArgumentException();
+        if (name == null)
+            throw new IllegalArgumentException();
 
-        if(commitRecord == null) throw new IllegalArgumentException();
-        
+        if (commitRecord == null)
+            throw new IllegalArgumentException();
+
         /*
          * The address of an historical Name2Addr mapping used to resolve named
          * indices for the historical state associated with this commit record.
          */
         final long metaAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
-        
+
         if (metaAddr == 0L) {
 
-            throw new RuntimeException(
-                    "No name2addr entry in this commit record: " + commitRecord);
+            log.warn("No name2addr entry in this commit record: "
+                    + commitRecord);
+
+            return null;
             
         }
 

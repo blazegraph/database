@@ -236,7 +236,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         /**
          * The default {@link #STATUS_DELAY}.
          */
-        public final static String DEFAULT_STATUS_DELAY = "2000";
+        public final static String DEFAULT_STATUS_DELAY = "10000";
 
         /**
          * The maximum time in milliseconds that
@@ -1161,7 +1161,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * Commit a transaction (synchronous).
      * <p>
      * Read-only transactions and transactions without write sets are processed
-     * immediately and will have a commit time of zero (0L).
+     * immediately and will have a commit time of ZERO (0L).
      * <p>
      * Transactions with non-empty write sets are placed onto the
      * {@link #writeService} and the caller will block until the transaction
@@ -1172,7 +1172,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * @param ts
      *            The transaction identifier (aka start time).
      * 
-     * @return The transaction commit time.
+     * @return The transaction commit time -or- ZERO (0L) if the transaction was
+     *         read-only or had empty write sets.
      * 
      * @exception ValidationError
      *                If the transaction could not be validated. A transaction
@@ -1253,8 +1254,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     }
     
     /**
-     * Task validates and commits a transaction when it is run by the
-     * {@link Journal#writeService}.
+     * This task is an UNISOLATED operation that validates and commits a
+     * transaction known to have non-empty write sets.
      * 
      * @todo write a task design to support 2/3-phase commit of transactions
      *       (for a transaction whose write sets are distributed across multiple
@@ -1265,9 +1266,16 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      */
     private class TxCommitTask extends AbstractTask {
         
+        /**
+         * The transaction that is being committed.
+         */
+        private final ITx tx;
+        
         public TxCommitTask(ConcurrentJournal journal,ITx tx) {
             
-            super(journal,tx.getStartTimestamp(),tx.isReadOnly(),tx.getDirtyResource());
+            super(journal,ITx.UNISOLATED,false/*readOnly*/,tx.getDirtyResource());
+            
+            this.tx = tx;
             
         }
 

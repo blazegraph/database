@@ -96,7 +96,7 @@ public class TestTx extends ProxyTestCase {
          */
         
         // commit.
-        assertTrue(journal.commit(tx)==0L);
+        assertEquals(0L,journal.commit(tx));
 
         journal.closeAndDelete();
         
@@ -124,7 +124,7 @@ public class TestTx extends ProxyTestCase {
         assertNull(journal.getIndex(name,tx1));
         
         // do unisolated commit.
-        assertTrue(journal.commit()!=0L);
+        assertNotSame(0L,journal.commit());
         
         // start tx2.
         final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
@@ -219,7 +219,7 @@ public class TestTx extends ProxyTestCase {
         
             assertNull(index.insert(k1, v1));
             
-            assert(journal.commit()!=0L);
+            assertNotSame(0L,journal.commit());
             
         }
         
@@ -251,7 +251,7 @@ public class TestTx extends ProxyTestCase {
             
             assertNull(index.insert(k2, v2));
             
-            assertTrue(journal.commit()!=0L);
+            assertNotSame(0L,journal.commit());
             
         }
         
@@ -323,7 +323,7 @@ public class TestTx extends ProxyTestCase {
             journal.registerIndex(name, new UnisolatedBTree(journal,
                     branchingFactor, UUID.randomUUID()));
             
-            assert(journal.commit()!=0L);
+            assertNotSame(0L,journal.commit());
             
         }
 
@@ -364,7 +364,7 @@ public class TestTx extends ProxyTestCase {
              */
             
             // commit tx1.
-            assertTrue(journal.commit(tx1)!=0L);
+            assertNotSame(0L,journal.commit(tx1));
             
             // still not visible in the other tx.
             assertFalse(journal.getIndex(name,tx2).contains(k1));
@@ -717,8 +717,10 @@ public class TestTx extends ProxyTestCase {
             journal.registerIndex(name,new UnisolatedBTree(journal,UUID.randomUUID()));
             
             commitTime0 = journal.commit();
+            System.err.println("commitTime0: "+journal.getCommitRecord());
             
             assertNotSame(0L,commitTime0);
+            assertEquals("commitCounter",1L,journal.getCommitRecord().getCommitCounter());
             
         }
 
@@ -737,6 +739,9 @@ public class TestTx extends ProxyTestCase {
         assertTrue(commitTime0<tx0);
         assertTrue(tx0<tx1);
         assertTrue(tx1<tx2);
+        System.err.println("tx0: startTime="+tx0);
+        System.err.println("tx1: startTime="+tx1);
+        System.err.println("tx2: startTime="+tx2);
         
         final byte[] id1 = new byte[]{1};
 
@@ -758,8 +763,11 @@ public class TestTx extends ProxyTestCase {
         assertNull(journal.getIndex(name,tx2).lookup(id1));
 
         // commit.
-        long tx1CommitTime = journal.commit(tx1);
+        final long tx1CommitTime = journal.commit(tx1);
         assertNotSame(0L,tx1CommitTime);
+        System.err.println("tx1: startTime="+tx1+", commitTime="+tx1CommitTime);
+        System.err.println("tx1: after commit: "+journal.getCommitRecord());
+        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
 
         // data version now visible in global scope.
         assertEquals(v0, (byte[])journal.getIndex(name).lookup(id1));
@@ -768,6 +776,8 @@ public class TestTx extends ProxyTestCase {
         final long tx3 = journal.newTx(IsolationEnum.ReadWrite);
         assertTrue(tx2<tx3);
         assertTrue(tx3>tx1CommitTime);
+        System.err.println("tx3: startTime="+tx3);
+        System.err.println("tx3: ground state: "+((Tx)journal.getTx(tx3)).commitRecord);
         
         // data version still not visible in tx0.
         assertNull(journal.getIndex(name,tx0).lookup(id1));
@@ -775,21 +785,29 @@ public class TestTx extends ProxyTestCase {
         // data version still not visible in tx2.
         assertNull(journal.getIndex(name,tx2).lookup(id1));
 
+        /*
+         * What commit record was written by tx1 and what commit record is being
+         * used by tx3?
+         */
+        
         // data version visible in the new tx (tx3).
         assertEquals(v0, (byte[])journal.getIndex(name,tx3).lookup(id1));
 
         /*
          * commit tx0 - nothing was written, no conflict should result.
          */
-        journal.commit(tx0);
+        assertEquals(0L,journal.commit(tx0));
+        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
 
         /*
          * commit tx1 - nothing was written, no conflict should result.
          */
-        journal.commit(tx2);
+        assertEquals(0L,journal.commit(tx2));
+        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
 
         // commit tx3 - nothing was written, no conflict should result.
-        journal.commit(tx3);
+        assertEquals(0L,journal.commit(tx3));
+        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
 
         // data version in global scope was not changed by any other commit.
         assertEquals(v0, (byte[]) journal.getIndex(name).lookup(

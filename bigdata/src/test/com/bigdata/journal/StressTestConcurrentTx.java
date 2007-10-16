@@ -75,18 +75,28 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Stress tests for concurrent transaction processing.
+ * <p>
+ * Note: For short transactions, TPS is basically constant for a given
+ * combination of the buffer mode and whether or not commits are forced to disk.
+ * This means that the #of clients is not a strong influence on performance. The
+ * big wins are Transient and Force := No since neither conditions syncs to
+ * disk. This suggests that the big win for TPS throughput is going to be group
+ * commit followed by either the use of SDD for the journal or pipelining writes
+ * to secondary journals on failover hosts.
  * 
- * FIXME refactor to use {@link ConcurrentJournal}.
+ * FIXME refactor to use {@link ConcurrentJournal}, verify that distinct
+ * transactions are concurrent, verify that locks are used within a transaction
+ * for the same index, andn verify the above observation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StressTestConcurrent extends ProxyTestCase implements IComparisonTest {
+public class StressTestConcurrentTx extends ProxyTestCase implements IComparisonTest {
 
-    public StressTestConcurrent() {
+    public StressTestConcurrentTx() {
     }
 
-    public StressTestConcurrent(String name) {
+    public StressTestConcurrentTx(String name) {
 
         super(name);
         
@@ -113,7 +123,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         
         Journal journal = new Journal(properties);
 
-        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
+        if(false && journal.getBufferStrategy() instanceof MappedBufferStrategy) {
             
             /*
              * @todo the mapped buffer strategy has become cpu bound w/o
@@ -241,7 +251,8 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
             
         }
 
-        journal.shutdown();
+        // immediately terminate any tasks that are still running.
+        journal.shutdownNow();
         
         journal.delete();
 //        if(journal.getFile()!=null) {
@@ -438,7 +449,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
         properties.setProperty(TestOptions.NOPS,"4");
         
-        IComparisonTest test = new StressTestConcurrent();
+        IComparisonTest test = new StressTestConcurrentTx();
         
         test.setUpComparisonTest(properties);
         
@@ -465,7 +476,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
     /**
      * Additional properties understood by this test.
      */
-    public static class TestOptions extends Options {
+    public static class TestOptions extends com.bigdata.journal.ConcurrentJournal.Options {
 
         /**
          * The timeout for the test.
@@ -536,7 +547,7 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
         public static void main(String[] args) throws Exception {
             
             // this is the test to be run.
-            String className = StressTestConcurrent.class.getName();
+            String className = StressTestConcurrentTx.class.getName();
             
             Map<String,String> defaultProperties = new HashMap<String,String>();
 
@@ -562,29 +573,63 @@ public class StressTestConcurrent extends ProxyTestCase implements IComparisonTe
 
             List<Condition>conditions = new ArrayList<Condition>();
 
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "1") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "2") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "10") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "20") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "100") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "200") }));
+            conditions.add(new Condition(defaultProperties));
+            
+            /* FIXME set WriteServiceCorePoolSize and WriteServiceQueueCapacity instead
+             * and the just use invokeAll() w/ timeout.
+             */
+            conditions = apply(conditions,new NV[]{
+                    new NV(TestOptions.NCLIENTS,"1"),
+                    new NV(TestOptions.NCLIENTS,"2"),
+                    new NV(TestOptions.NCLIENTS,"10"),
+                    new NV(TestOptions.NCLIENTS,"20"),
+                    new NV(TestOptions.NCLIENTS,"100"),
+                    new NV(TestOptions.NCLIENTS,"200"),
+//                    new NV(TestOptions.NCLIENTS,"500"),
+            });
+            
+            conditions = apply(
+                    conditions,
+                    new NV[][] { //
+                            new NV[] { new NV(Options.BUFFER_MODE,
+                                    BufferMode.Transient), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE,
+                                    BufferMode.Direct), }, //
+                            new NV[] {
+                                    new NV(Options.BUFFER_MODE, BufferMode.Direct),
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                            .toString()), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+                            new NV[] {
+                                    new NV(Options.BUFFER_MODE, BufferMode.Disk),
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                            .toString()), }, //
+                    });
+            
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "1") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "2") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "10") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "20") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "100") }));
+//
+//            conditions.addAll(BasicExperimentConditions.getBasicConditions(
+//                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
+//                            "200") }));
             
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 
