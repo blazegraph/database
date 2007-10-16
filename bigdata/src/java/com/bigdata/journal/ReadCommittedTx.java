@@ -124,36 +124,47 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
      */
     public IIndex getIndex(String name) {
 
-        if (!isActive()) {
-            
-            throw new IllegalStateException(NOT_ACTIVE);
-            
+        lock.lock();
+
+        try {
+
+            if (!isActive()) {
+
+                throw new IllegalStateException(NOT_ACTIVE);
+
+            }
+
+            ICommitRecord commitRecord = journal.getCommitRecord();
+
+            if (commitRecord == null) {
+
+                /*
+                 * This happens where there has not yet been a commit on the
+                 * store.
+                 */
+
+                return null;
+
+            }
+
+            if (journal.getIndex(name, commitRecord) == null) {
+
+                /*
+                 * The named index is not registered as of the last commit.
+                 */
+
+                return null;
+
+            }
+
+            return new ReadCommittedIndex(this, name);
+
+        } finally {
+
+            lock.unlock();
+
         }
-
-        ICommitRecord commitRecord = journal.getCommitRecord();
         
-        if(commitRecord==null) {
-            
-            /*
-             * This happens where there has not yet been a commit on the store.
-             */
-            
-            return null;
-            
-        }
-        
-        if (journal.getIndex(name,commitRecord) == null) {
-
-            /*
-             * The named index is not registered as of the last commit.
-             */
-
-            return null;
-            
-        }
-        
-        return new ReadCommittedIndex(this,name);
-
     }
 
     /**
@@ -170,12 +181,6 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo if we add an extensible batch index operation then we need to make
-     *       sure that it is not possible to use that to circumvent the
-     *       read-only contract and write on the unisolated delegate index. For
-     *       the same reason, it makes sense to make this class <em>final</em>
-     *       and to make {@link #getIndex()} private.
      */
     public static class ReadCommittedIndex implements IIndex, IIsolatedIndex {
 
@@ -218,19 +223,24 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
         /**
          * Return the current {@link IIsolatableIndex} view. The read-committed
          * view simply exposes this as a read-only {@link IIsolatedIndex}.
+         * <p>
+         * Note: This is <code>synchronized</code> so that the operation will
+         * be atomic (with respect to the callers) if there are multiple tasks
+         * running for the same read-committed transaction.
          * 
          * @return The current unisolated index on the journal (read-write).
          * 
          * @exception IllegalStateException
          *                if the named index is not registered.
          */
-        protected IIsolatableIndex getIndex() {
+        synchronized protected IIsolatableIndex getIndex() {
             
             /*
              * Obtain the most current {@link ICommitRecord} on the journal. All
              * read operations are against the named index as resolved using
              * this commit record.
              */
+
             ICommitRecord currentCommitRecord = tx.journal.getCommitRecord();
             
             if (commitRecord != null

@@ -50,6 +50,8 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
+import com.bigdata.rawstore.IRawStore;
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -116,9 +118,9 @@ public class TestDiskJournal extends AbstractTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-//        properties.setProperty(Options.SEGMENT, "0");
+        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
 
-//        properties.setProperty(Options.FILE,getTestJournalFile(properties));
+        properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
         return properties;
 
@@ -193,13 +195,22 @@ public class TestDiskJournal extends AbstractTestCase {
         public TestMROW(String name) {
             super(name);
         }
+        
+        protected IRawStore getStore() {
 
-        protected BufferMode getBufferMode() {
+            Properties properties = getProperties();
             
-            return BufferMode.Disk;
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
-        
+
     }
 
     /**
@@ -218,9 +229,18 @@ public class TestDiskJournal extends AbstractTestCase {
             super(name);
         }
 
-        protected BufferMode getBufferMode() {
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
             
-            return BufferMode.Disk;
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
         

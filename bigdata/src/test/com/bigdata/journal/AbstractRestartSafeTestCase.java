@@ -108,6 +108,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         // close the store.
         store.close();
         
+        // Note: Clone to avoid modifying!!!
         Properties properties = (Properties)getProperties().clone();
         
         // Turn this off now since we want to re-open the same store.

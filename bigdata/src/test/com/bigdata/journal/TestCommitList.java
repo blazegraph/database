@@ -47,11 +47,8 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
-import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.SimpleEntry;
@@ -65,7 +62,7 @@ import com.bigdata.btree.SimpleEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCommitList extends AbstractBTreeTestCase {
+public class TestCommitList extends ProxyTestCase {
 
     /**
      * 
@@ -80,61 +77,61 @@ public class TestCommitList extends AbstractBTreeTestCase {
         super(name);
     }
 
-    public Properties getProperties() {
-
-        if (properties == null) {
-
-            properties = super.getProperties();
-
-            // we need to use a persistent mode of the journal (not transient).
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
-                    .toString());
-
-            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-        }
-
-        return properties;
-
-    }
-
-    private Properties properties;
+//    public Properties getProperties() {
+//
+//        if (properties == null) {
+//
+//            properties = super.getProperties();
+//
+//            // we need to use a persistent mode of the journal (not transient).
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
+//                    .toString());
+//
+//            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+//
+//            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+//
+//        }
+//
+//        return properties;
+//
+//    }
+//
+//    private Properties properties;
     
-    /**
-     * Re-open the same backing store.
-     * 
-     * @param store
-     *            the existing store.
-     * 
-     * @return A new store.
-     * 
-     * @exception Throwable
-     *                if the existing store is not closed, e.g., from failure to
-     *                obtain a file lock, etc.
-     */
-    protected Journal reopenStore(Journal store) {
-        
-        // close the store.
-        store.close();
-        
-        Properties properties = (Properties)getProperties().clone();
-        
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        File file = store.getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new Journal( properties );
-        
-    }
+//    /**
+//     * Re-open the same backing store.
+//     * 
+//     * @param store
+//     *            the existing store.
+//     * 
+//     * @return A new store.
+//     * 
+//     * @exception Throwable
+//     *                if the existing store is not closed, e.g., from failure to
+//     *                obtain a file lock, etc.
+//     */
+//    protected Journal reopenStore(Journal store) {
+//        
+//        // close the store.
+//        store.close();
+//        
+//        Properties properties = (Properties)getProperties().clone();
+//        
+//        // Turn this off now since we want to re-open the same store.
+//        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//        
+//        // The backing file that we need to re-open.
+//        File file = store.getFile();
+//        
+//        assertNotNull(file);
+//        
+//        // Set the file property explictly.
+//        properties.setProperty(Options.FILE,file.toString());
+//        
+//        return new Journal( properties );
+//        
+//    }
 
     /**
      * Return a btree backed by a journal with the indicated branching factor.
@@ -172,10 +169,13 @@ public class TestCommitList extends AbstractBTreeTestCase {
         final String name = "abc";
 
         // register index.
-        IIndex ndx = journal.registerIndex(name);
+        BTree ndx = (BTree)journal.registerIndex(name);
+        
+        // verify index was flushed to the backing store.
+        assertFalse(ndx.needsWrite());
         
         // verify a new index is on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
 
         // commit.
         journal.commit();
@@ -184,14 +184,14 @@ public class TestCommitList extends AbstractBTreeTestCase {
         assertEquals(ndx,journal.getIndex(name));
 
         // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
 
         // write an entry on the index - the index becomes dirty and should
         // show up on the commit list.
         ndx.insert(new byte[]{1,2,3}, new byte[]{1,2,3});
         
         // verify on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
         
         // commit.
         journal.commit();
@@ -200,13 +200,13 @@ public class TestCommitList extends AbstractBTreeTestCase {
         assertEquals(ndx,journal.getIndex(name));
         
         // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
         
         // verify entry written by the commit.
         assertEquals(new byte[]{1,2,3},(byte[])ndx.lookup(new byte[]{1,2,3}));
         
         // still not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
         
         journal.closeAndDelete();
         
@@ -227,7 +227,7 @@ public class TestCommitList extends AbstractBTreeTestCase {
         IIndex ndx = journal.registerIndex(name);
         
         // verify a new index is on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
 
         // commit.
         journal.commit();
@@ -241,38 +241,43 @@ public class TestCommitList extends AbstractBTreeTestCase {
         assertNotNull(ndx);
         
         // not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
 
         // write an entry on the index - the index becomes dirty and should
         // show up on the commit list.
         ndx.insert(new byte[]{1,2,3}, new byte[]{1,2,3});
         
         // verify on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
         
         // commit.
         journal.commit();
 
         // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
 
-        // re-open the store.
-        journal = reopenStore(journal);
+        if (journal.isStable()) {
+            
+            // re-open the store.
+            journal = reopenStore(journal);
+
+            // get the index object from the re-opened store..
+            ndx = journal.getIndex(name);
+
+            assertNotNull(ndx);
+
+            // not on the commit list.
+            assertFalse(journal.name2Addr.willCommit(name));
+
+            // verify entry written by the commit.
+            assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
+                    .lookup(new byte[] { 1, 2, 3 }));
+
+            // still not on the commit list.
+            assertFalse(journal.name2Addr.willCommit(name));
         
-        // get the index object from the re-opened store..
-        ndx = journal.getIndex(name);
-
-        assertNotNull(ndx);
-
-        // not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        }
         
-        // verify entry written by the commit.
-        assertEquals(new byte[]{1,2,3},(byte[])ndx.lookup(new byte[]{1,2,3}));
-        
-        // still not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
-
         journal.closeAndDelete();
         
     }
@@ -293,37 +298,42 @@ public class TestCommitList extends AbstractBTreeTestCase {
         IIndex ndx = journal.registerIndex(name);
         
         // verify a new index is on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
 
         // write an entry on the index.
         ndx.insert(new byte[]{1,2,3}, new byte[]{1,2,3});
         
         // verify on the commit list.
-        assertTrue(journal.name2Addr.willCommit(ndx));
+        assertTrue(journal.name2Addr.willCommit(name));
         
         // commit.
         journal.commit();
 
         // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
+        assertFalse(journal.name2Addr.willCommit(name));
 
-        // re-open the store.
-        journal = reopenStore(journal);
+        if (journal.isStable()) {
+
+            // re-open the store.
+            journal = reopenStore(journal);
+
+            // get the index object from the re-opened store..
+            ndx = journal.getIndex(name);
+
+            assertNotNull(ndx);
+
+            // not on the commit list.
+            assertFalse(journal.name2Addr.willCommit(name));
+
+            // verify entry written by the commit.
+            assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
+                    .lookup(new byte[] { 1, 2, 3 }));
+
+            // still not on the commit list.
+            assertFalse(journal.name2Addr.willCommit(name));
+
+        }
         
-        // get the index object from the re-opened store..
-        ndx = journal.getIndex(name);
-
-        assertNotNull(ndx);
-
-        // not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
-        
-        // verify entry written by the commit.
-        assertEquals(new byte[]{1,2,3},(byte[])ndx.lookup(new byte[]{1,2,3}));
-        
-        // still not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(ndx));
-
         journal.closeAndDelete();
 
     }

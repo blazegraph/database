@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -563,9 +564,19 @@ public abstract class AbstractTask implements Callable<Object> {
      * produce a partial order that governs access to the isolated (vs mutable
      * unisolated) indices accessed by that transaction.
      * <p>
-     * Make sure that the {@link TemporaryStore} supports an appropriate level
-     * of concurrency to allow concurrent writers on distinct isolated indices
-     * that are being buffered on that store for a given transaction.
+     * Make sure that the {@link TemporaryRawStore} supports an appropriate
+     * level of concurrency to allow concurrent writers on distinct isolated
+     * indices that are being buffered on that store for a given transaction
+     * (MRMW). It is currently single-threaded only, which does not allow
+     * concurrent operations on the same transaction.
+     * <p>
+     * The {@link Tx} needs to be thread-safe when instantiating the temporary
+     * store and when granting a view of an index (the read-committed and
+     * read-only txs should also be thread safe in this regard).
+     * <p>
+     * If an read-write isolated task is interrupted then we MAY need to re-open
+     * the {@link TemporaryRawStore} since the interrupt MAY have cause the
+     * channel to be closed. See {@link ClosedByInterruptException}.
      * 
      * @todo do we always inform the transaction manager or only after the
      *       commit when we know that the "writes" took?

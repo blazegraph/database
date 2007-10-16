@@ -93,7 +93,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
             properties = super.getProperties();
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");

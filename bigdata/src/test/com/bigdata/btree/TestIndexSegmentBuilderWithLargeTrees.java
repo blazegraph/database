@@ -78,10 +78,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             properties = super.getProperties();
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+            properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
         }
 

@@ -46,11 +46,10 @@ package com.bigdata.journal;
 import java.io.DataInput;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
@@ -146,7 +145,7 @@ public class Name2Addr extends BTree {
      * operations writing on indices that should have been rolled back if the
      * commit is not successfull.
      */
-    private Set<DirtyListener> commitList = new HashSet<DirtyListener>();
+    private ConcurrentHashMap<String, DirtyListener> commitList = new ConcurrentHashMap<String, DirtyListener>();
     
     /**
      * An instance of this {@link DirtyListener} is registered with each named
@@ -187,7 +186,7 @@ public class Name2Addr extends BTree {
             
             log.info("Adding dirty index to commit list: ndx="+name);
             
-            commitList.add(this);
+            commitList.putIfAbsent(name,this);
             
         }
 
@@ -227,9 +226,9 @@ public class Name2Addr extends BTree {
      * 
      * @return
      */
-    boolean willCommit(IIndex btree) {
+    boolean willCommit(String name) {
     
-        return commitList.contains(btree);
+        return commitList.containsKey(name);
         
     }
     
@@ -242,7 +241,7 @@ public class Name2Addr extends BTree {
     public long handleCommit() {
 
         // visit the indices on the commit list.
-        Iterator<DirtyListener> itr = commitList.iterator();
+        Iterator<DirtyListener> itr = commitList.values().iterator();
         
         while(itr.hasNext()) {
             
@@ -461,7 +460,7 @@ public class Name2Addr extends BTree {
         DirtyListener l = new DirtyListener(name,btree);
         
         // add to the commit list.
-        commitList.add( l );
+        commitList.put( name, l );
 
         // set listener on the btree as well.
         ((BTree)btree).setDirtyListener( l );
@@ -505,7 +504,7 @@ public class Name2Addr extends BTree {
              * in the commit list.
              */
             
-            commitList.remove(btree);
+            commitList.remove(name);
             
             // clear our listener.
             ((BTree)btree).setDirtyListener(null);

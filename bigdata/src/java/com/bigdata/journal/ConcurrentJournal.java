@@ -222,7 +222,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public static final String WRITE_SERVICE_QUEUE_CAPACITY = "writeServiceQueueCapacity";
 
         /**
-         * The default maximum depth of the write service queue (1090).
+         * The default maximum depth of the write service queue (1000).
          */
         public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
         
@@ -592,6 +592,15 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
                 }
 
+                if (writeServiceQueueCapacity<writeServiceCorePoolSize) {
+
+                    throw new RuntimeException("The '"
+                            + Options.WRITE_SERVICE_QUEUE_CAPACITY
+                            + "' must be greater than the "
+                            + Options.WRITE_SERVICE_CORE_POOL_SIZE);
+
+                }
+
                 log.info(Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
                         + writeServiceQueueCapacity);
 
@@ -625,6 +634,28 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                 
             }
             
+            // Setup the lock manager used by the write service.
+            {
+
+                /*
+                 * Note: this means that any operation that writes on unisolated
+                 * indices MUST specify in advance those index(s) on which it
+                 * will write.
+                 */
+
+                final boolean predeclareLocks = true;
+
+                /*
+                 * Create the lock manager. The capacity is only used if we need to
+                 * detect deadlocks if we are NOT pre-declaring locks. When we
+                 * pre-declare locks deadlocks are NOT possible.
+                 */
+
+                lockManager = new LockManager<String>(
+                        writeServiceMaximumPoolSize, predeclareLocks);
+
+            }
+            
         }
         
         // setup scheduled runnable for periodic status messages.
@@ -647,28 +678,6 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             statusService.scheduleWithFixedDelay(statusTask, initialDelay,
                     delay, unit);
-
-        }
-
-        // Setup the lock manager.
-        {
-
-            /*
-             * Note: this means that any operation that writes on unisolated
-             * indices MUST specify in advance those index(s) on which it
-             * will write.
-             */
-
-            final boolean predeclareLocks = true;
-
-            /*
-             * Create the lock manager. The capacity is only used if we need to
-             * detect deadlocks if we are NOT pre-declaring locks. When we
-             * pre-declare locks deadlocks are NOT possible.
-             */
-
-            lockManager = new LockManager<String>(writeService
-                    .getMaximumPoolSize(), predeclareLocks);
 
         }
 

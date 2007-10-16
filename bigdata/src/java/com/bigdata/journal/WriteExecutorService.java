@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.journal;
 
+import java.nio.channels.Channel;
+import java.nio.channels.FileChannel;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.concurrent.AbstractExecutorService;
@@ -62,6 +64,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrentJournal} to
@@ -99,6 +102,19 @@ import com.bigdata.btree.BTree;
  * record if we have to roll back due to an abort of some unisolated operation
  * since the state of the {@link BTree} has been changed as a side effect in a
  * non-reversable manner.
+ * <p>
+ * Note: Running {@link Thread}s may be interrupted at arbitrary moments for a
+ * number of reasons by this class. The foremost example is a {@link Thread}
+ * that is executing an {@link AbstractTask} when a concurrent decision is made
+ * to discard the commit group, e.g., because another task in that commit group
+ * failed. Regardless of the reason, if the {@link Thread} is performing an NIO
+ * operation at the moment that the interrupt is notice, then it will close the
+ * channel on which that operation was being performed. If you are using a
+ * disk-based {@link BufferMode} for the journal, then the interrupt just caused
+ * the backing {@link FileChannel} to be closed. In order to permit continued
+ * operations on the journal, the {@link IRawStore} MUST transparently re-open
+ * the channel. (The same problem can arise if you are using NIO for sockets or
+ * anything else that uses the {@link Channel} abstraction.)
  * 
  * @todo The thread pool is essentially used as a queue to force tasks which
  *       have completed to await the commit. Consider placing a limit on the #of
@@ -770,7 +786,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * We now abort, causing all tasks to be aborted.
                      */
 
-                    log.warn("Interrupted awaiting active tasks - discarding commit group");
+                    log.warn("Interrupted - discarding commit group.");
                     
                     try {
 
@@ -975,6 +991,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Interrupt all workers awaiting [commit] - they will throw an
              * exception that will reach the caller.
              */
+            
+            log.warn("Interrupting tasks awaiting commit.");
             
             Iterator<Thread> itr = active.iterator();
 

@@ -51,6 +51,7 @@ import java.util.Properties;
 
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Test;
+import junit.framework.TestCase2;
 
 /**
  * <p>
@@ -179,4 +180,5 @@ public abstract class ProxyTestCase
     public Journal reopenStore(Journal store) {
         return getOurDelegate().reopenStore(store);
     }
+
 }

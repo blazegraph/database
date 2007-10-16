@@ -42,7 +42,8 @@ public class RegisterIndexTask extends AbstractTask {
 
         super(journal, ITx.UNISOLATED, false/*readOnly*/, name);
         
-        if(ndx==null) throw new NullPointerException();
+        if (ndx == null)
+            throw new NullPointerException();
         
         this.btree = ndx;
         

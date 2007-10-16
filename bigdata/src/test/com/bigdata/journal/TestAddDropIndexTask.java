@@ -87,7 +87,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
      */
     public void test_addDropIndex() {
 
-        Properties properties = getProperties();
+        // Note: wrapped since we modify the properties during the test!!!
+        Properties properties = new Properties(getProperties());
         
         Journal journal = new Journal(properties);
         
@@ -326,8 +327,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
      * Test registers an index and then verifies that a second
      * {@link RegisterIndexTask} will return <code>false</code> since the
      * index already exists.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
-    public void test_addDropIndex_twice() {
+    public void test_addDropIndex_twice() throws InterruptedException, ExecutionException {
 
         Properties properties = new Properties();
         
@@ -339,41 +343,32 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         
         final String name = "abc";
         
-        final UUID indexUUID1 = UUID.randomUUID();
-        final UUID indexUUID2 = UUID.randomUUID();
+        final UUID indexUUID = UUID.randomUUID();
         
         /*
          * Run task to register a named index.
          */
         {
-         
-            final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
-            
+
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, indexUUID1)));
+                    journal, name, new UnisolatedBTree(journal, indexUUID)));
 
-            try {
+            assertEquals("indexUUID", indexUUID, (UUID) future.get());
 
-                assertEquals( "indexUUID", indexUUID1, (UUID)future.get() );
-                
-                /*
-                 * This verifies that the write task did not return control to
-                 * the caller until the write set of that task was committed.
-                 */
-         
-                assertEquals("commit counter unchanged?",
-                        commitCounterBefore + 1, journal.getRootBlockView()
-                                .getCommitCounter());
+            /*
+             * This verifies that the write task did not return control to the
+             * caller until the write set of that task was committed.
+             */
 
-            } catch (InterruptedException ex) {
+            assertEquals("commit counter unchanged?", commitCounterBefore + 1,
+                    journal.getRootBlockView().getCommitCounter());
 
-                fail("Not expecting: " + ex, ex);
-
-            } catch (ExecutionException ex) {
-
-                fail("Not expecting: " + ex, ex);
-
-            }
+            // verify access to the index.
+            assertNotNull(journal.getIndex(name));
+            assertEquals(indexUUID,journal.getIndex(name).getIndexUUID());
             
         }
 
@@ -382,35 +377,23 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          */
         {
          
-            final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
-            
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, indexUUID2)));
+                    journal, name, new UnisolatedBTree(journal, indexUUID)));
 
-            try {
+            // Note: the UUID for the pre-existing index is returned.
+            assertEquals("indexUUID", indexUUID, (UUID) future.get());
 
-                // Note: the UUID for the pre-existing index is returned.
-                assertEquals( "indexUUID", indexUUID1, (UUID)future.get() );
-                
-                /*
-                 * This verifies that no commit was performed since no data was
-                 * actually written on the store because the index was
-                 * pre-existing.
-                 */
-         
-                assertEquals("commit counter changed?", commitCounterBefore,
-                        journal.getRootBlockView().getCommitCounter());
+            /*
+             * This verifies that no commit was performed since no data was
+             * actually written on the store because the index was pre-existing.
+             */
 
-            } catch (InterruptedException ex) {
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
 
-                fail("Not expecting: " + ex, ex);
-
-            } catch (ExecutionException ex) {
-
-                fail("Not expecting: " + ex, ex);
-
-            }
-            
         }
 
         /*
@@ -418,76 +401,52 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          */
         {
             
-            final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
-            
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
             Future<Object> future = journal.submit(new DropIndexTask(journal,
                     name));
 
-            try {
+            // should return true if the index was dropped.
+            assertTrue("Index did not exist?", (Boolean) future.get());
 
-                // should return true if the index was dropped.
-                assertTrue( "Index did not exist?", (Boolean)future.get() );
-                
-                /*
-                 * Verify that a commit was performed.
-                 */
-         
-                assertEquals("commit counter unchanged?",
-                        commitCounterBefore + 1, journal.getRootBlockView()
-                                .getCommitCounter());
+            /*
+             * Verify that a commit was performed.
+             */
 
-            } catch (InterruptedException ex) {
+            assertEquals("commit counter unchanged?", commitCounterBefore + 1,
+                    journal.getRootBlockView().getCommitCounter());
 
-                fail("Not expecting: " + ex, ex);
-
-            } catch (ExecutionException ex) {
-
-                fail("Not expecting: " + ex, ex);
-
-            }
-            
         }
-        
+
         /*
          * Now drop the index again.
          */
         {
-            
-            final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
-            
+
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
             Future<Object> future = journal.submit(new DropIndexTask(journal,
                     name));
 
-            try {
+            // should return false since the index does not exist.
+            assertFalse("Index exists?", (Boolean) future.get());
 
-                // should return false since the index does not exist.
-                assertFalse("Index exists?", (Boolean)future.get() );
-                
-                /*
-                 * Verify that a commit was NOT performed since no data was written by
-                 * the task.
-                 */
-         
-                assertEquals("commit counter changed?",
-                        commitCounterBefore, journal.getRootBlockView()
-                                .getCommitCounter());
+            /*
+             * Verify that a commit was NOT performed since no data was written
+             * by the task.
+             */
 
-            } catch (InterruptedException ex) {
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
 
-                fail("Not expecting: " + ex, ex);
-
-            } catch (ExecutionException ex) {
-
-                fail("Not expecting: " + ex, ex);
-
-            }
-            
         }
-        
+
         journal.shutdown();
-        
+
         journal.delete();
-        
+
     }
 
     /**

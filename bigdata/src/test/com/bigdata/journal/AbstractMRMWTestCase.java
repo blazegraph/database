@@ -70,6 +70,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
@@ -98,9 +99,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id$
  */
 abstract public class AbstractMRMWTestCase
-    extends AbstractBufferStrategyTestCase
+    extends AbstractRawStoreTestCase
     implements IComparisonTest
-    {
+{
 
     /**
      * 
@@ -192,18 +193,19 @@ abstract public class AbstractMRMWTestCase
         
         final int nreadsPerTask = Integer.parseInt(properties.getProperty(TestOptions.NREADS));
 
-        Result result = doMRMWTest(journal, timeout, ntrials, nclients,
+        Result result = doMRMWTest(store, timeout, ntrials, nclients,
                 percentReaders, reclen, nwritesPerTask, nreadsPerTask);
 
         return result;
 
     }
 
-    private Journal journal;
+    // @todo rename.
+    private IRawStore store;
     
     public void setUpComparisonTest(Properties properties) throws Exception {
         
-        journal = new Journal(properties);
+        store = new Journal(properties).getBufferStrategy();
 
     }
 
@@ -217,7 +219,7 @@ abstract public class AbstractMRMWTestCase
      */
     public void testMRMW() throws Exception {
 
-        IBufferStrategy store = ((Journal)getStore()).getBufferStrategy();
+        IRawStore store = getStore();
 
         final long timeout = 5;
         
@@ -875,12 +877,12 @@ abstract public class AbstractMRMWTestCase
      */
     public static class StressTestMRMW extends AbstractMRMWTestCase {
 
-        protected BufferMode getBufferMode() {
-        
-            throw new UnsupportedOperationException();
+        protected IRawStore getStore() {
+            
+            return new Journal(getProperties()).getBufferStrategy();
             
         }
-            
+
     }
     
     /**

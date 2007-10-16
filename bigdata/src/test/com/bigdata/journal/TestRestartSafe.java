@@ -47,14 +47,12 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BatchInsert;
@@ -70,7 +68,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRestartSafe extends AbstractBTreeTestCase {
+public class TestRestartSafe extends ProxyTestCase {
 
     /**
      * 
@@ -85,61 +83,61 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         super(name);
     }
 
-    public Properties getProperties() {
-
-        if (properties == null) {
-
-            properties = super.getProperties();
-
-            // we need to use a persistent mode of the journal (not transient).
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
-                    .toString());
-
-            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-        }
-
-        return properties;
-
-    }
-
-    private Properties properties;
+//    public Properties getProperties() {
+//
+//        if (properties == null) {
+//
+//            properties = super.getProperties();
+//
+//            // we need to use a persistent mode of the journal (not transient).
+//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
+//                    .toString());
+//
+//            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+//
+//            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+//
+//        }
+//
+//        return properties;
+//
+//    }
+//
+//    private Properties properties;
     
-    /**
-     * Re-open the same backing store.
-     * 
-     * @param store
-     *            the existing store.
-     * 
-     * @return A new store.
-     * 
-     * @exception Throwable
-     *                if the existing store is not closed, e.g., from failure to
-     *                obtain a file lock, etc.
-     */
-    protected Journal reopenStore(Journal store) {
-        
-        // close the store.
-        store.close();
-        
-        Properties properties = (Properties)getProperties().clone();
-        
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        File file = store.getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new Journal( properties );
-        
-    }
+//    /**
+//     * Re-open the same backing store.
+//     * 
+//     * @param store
+//     *            the existing store.
+//     * 
+//     * @return A new store.
+//     * 
+//     * @exception Throwable
+//     *                if the existing store is not closed, e.g., from failure to
+//     *                obtain a file lock, etc.
+//     */
+//    protected Journal reopenStore(Journal store) {
+//        
+//        // close the store.
+//        store.close();
+//        
+//        Properties properties = (Properties)getProperties().clone();
+//        
+//        // Turn this off now since we want to re-open the same store.
+//        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//        
+//        // The backing file that we need to re-open.
+//        File file = store.getFile();
+//        
+//        assertNotNull(file);
+//        
+//        // Set the file property explictly.
+//        properties.setProperty(Options.FILE,file.toString());
+//        
+//        return new Journal( properties );
+//        
+//    }
 
     /**
      * Return a btree backed by a journal with the indicated branching factor.
@@ -239,7 +237,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         /*
          * restart, re-opening the same file.
          */
-        {
+        if(journal.isStable()){
 
             journal = reopenStore(journal);
             
@@ -248,10 +246,10 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             assertTrue(btree.dump(Level.DEBUG,System.err));
 
             assertSameIterator( new Object[]{}, btree.entryIterator() );
-
-            journal.closeAndDelete();
             
         }
+
+        journal.closeAndDelete();
 
     }
     
@@ -282,7 +280,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         /*
          * restart, re-opening the same file.
          */
-        {
+        if(journal.isStable()){
 
             journal = reopenStore(journal);
             
@@ -290,10 +288,10 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
 
             // verify the counter.
             assertEquals(1,btree.getCounter().get());
-
-            journal.closeAndDelete();
             
         }
+
+        journal.closeAndDelete();
         
     }
 
@@ -345,7 +343,7 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
         /*
          * restart, re-opening the same file.
          */
-        {
+        if(journal.isStable()){
 
             journal = reopenStore(journal);
 
@@ -357,9 +355,9 @@ public class TestRestartSafe extends AbstractBTreeTestCase {
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                     btree.entryIterator());
 
-            journal.closeAndDelete();
-
         }
+
+        journal.closeAndDelete();
 
     }
 

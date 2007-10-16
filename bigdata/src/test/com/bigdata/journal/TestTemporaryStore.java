@@ -51,6 +51,9 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import junit.extensions.proxy.ProxyTestSuite;
+import junit.framework.Test;
+
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -77,12 +80,118 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         super(name);
     }
 
+    public static Test suite() {
+
+        final TestTemporaryStore delegate = new TestTemporaryStore(); // !!!! THIS CLASS !!!!
+
+        /*
+         * Use a proxy test suite and specify the delegate.
+         */
+
+        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+                "Temporary Raw Store Test Suite");
+
+        /*
+         * List any non-proxied tests (typically bootstrapping tests).
+         */
+        
+        // tests defined by this class.
+        suite.addTestSuite(TestTemporaryStore.class);
+
+        // test suite for the IRawStore api.
+        suite.addTestSuite( TestRawStore.class );
+
+        // test suite for MROW correctness.
+        suite.addTestSuite( TestMROW.class );
+
+        // test suite for MRMW correctness.
+        suite.addTestSuite( TestMRMW.class );
+
+        return suite;
+        
+    }
+    
     protected IRawStore getStore() {
 
         return new TemporaryRawStore();
         
     }
 
+    /**
+     * Test suite integration for {@link AbstractRawStoreTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo While the transient store uses root blocks there is no means
+     *       currently defined to re-open a journal based on a transient store
+     *       and hence it is not possible to extend
+     *       {@link AbstractRestartSafeTestCase}.
+     */
+    public static class TestRawStore extends AbstractRawStoreTestCase {
+        
+        public TestRawStore() {
+            super();
+        }
+
+        public TestRawStore(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+            return new TemporaryRawStore();
+        }
+
+    }
+    
+    /**
+     * Test suite integration for {@link AbstractMROWTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestMROW extends AbstractMROWTestCase {
+        
+        public TestMROW() {
+            super();
+        }
+
+        public TestMROW(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            return new TemporaryRawStore();
+            
+        }
+        
+    }
+
+    /**
+     * Test suite integration for {@link AbstractMRMWTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestMRMW extends AbstractMRMWTestCase {
+        
+        public TestMRMW() {
+            super();
+        }
+
+        public TestMRMW(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            return new TemporaryRawStore();
+            
+        }
+
+    }
+    
     /**
      * Unit test for {@link AbstractBufferStrategy#overflow(long)}. The test
      * verifies that the extent and the user extent are correctly updated after

@@ -1,46 +1,46 @@
 /**
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+ The Notice below must appear in each file of the Source Code of any
+ copy you distribute of the Licensed Product.  Contributors to any
+ Modifications may add their own copyright notices to identify their
+ own contributions.
 
-License:
+ License:
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+ The contents of this file are subject to the CognitiveWeb Open Source
+ License Version 1.1 (the License).  You may not copy or use this file,
+ in either source code or executable form, except in compliance with
+ the License.  You may obtain a copy of the License from
 
-  http://www.CognitiveWeb.org/legal/license/
+ http://www.CognitiveWeb.org/legal/license/
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
+ Software distributed under the License is distributed on an AS IS
+ basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+ the License for the specific language governing rights and limitations
+ under the License.
 
-Copyrights:
+ Copyrights:
 
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
+ Portions created by or assigned to CognitiveWeb are Copyright
+ (c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+ information for CognitiveWeb is available at
 
-  http://www.CognitiveWeb.org
+ http://www.CognitiveWeb.org
 
-Portions Copyright (c) 2002-2003 Bryan Thompson.
+ Portions Copyright (c) 2002-2003 Bryan Thompson.
 
-Acknowledgements:
+ Acknowledgements:
 
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
+ Special thanks to the developers of the Jabber Open Source License 1.0
+ (JOSL), from which this License was derived.  This License contains
+ terms that differ from JOSL.
 
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
+ Special thanks to the CognitiveWeb Open Source Contributors for their
+ suggestions and support of the Cognitive Web.
 
-Modifications:
+ Modifications:
 
-*/
+ */
 /*
  * Created on Oct 13, 2006
  */
@@ -51,13 +51,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatedIndex;
 import com.bigdata.isolation.IsolatedBTree;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.scaleup.PartitionedIndexView;
 
 /**
@@ -128,38 +128,22 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      * the discoverable root address based on this commit record.
      */
     final protected ICommitRecord commitRecord;
-    
+
     /**
-     * A store used to hold write sets for read-write transactions (it is null
-     * iff the transaction is read-only). The same store can be used to buffer
-     * resolved write-write conflicts. This uses a {@link TemporaryRawStore} to
-     * avoid issues with maintaining transactions across journal boundaries.
-     * This places a limit on transactions of 2G in their serialized write set.
-     * <p>
-     * Since the indices use a copy-on-write model, the amount of user data can
-     * be significantly less due to multiple versions of the same btree nodes.
-     * Using smaller branching factors in the isolated index helps significantly
-     * to increase the effective utilization of the store since copy-on-write
-     * causes fewer bytes to be copied each time it is invoked.
-     * 
-     * @todo defer creation until 1st write?
+     * A temporary store used to hold write sets for read-write transactions. It
+     * is null if the transaction is read-only and will remain null in any case
+     * until its first use.
      */
-    final protected TemporaryRawStore tmpStore;
-    
+    private IRawStore tmpStore = null;
+
     /**
      * Indices isolated by this transactions.
      * 
-     * @todo Note that this mapping could use weak value map as long as we
-     *       retained the address of the metadata record in a hard reference map
-     *       so that we could reload the index from the {@link #tmpStore}. I am
-     *       not sure that any performance benefit would be realized by closing
-     *       out indices for active transactions. It is possible that this could
-     *       benefit or hurt. Many of the same benefits could be realized by
-     *       having the {@link BTree} class automatically release large
-     *       transient data structures after a period of disuse.
+     * @todo this must be thread-safe to support concurrent operations on the
+     *       same tx.
      */
     private Map<String, IIsolatedIndex> btrees = new HashMap<String, IIsolatedIndex>();
-    
+
     /**
      * Create a transaction reading from the most recent committed state not
      * later than the specified startTime.
@@ -183,21 +167,14 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
 
         super(journal, startTime, readOnly ? IsolationEnum.ReadOnly
                 : IsolationEnum.ReadWrite);
-        
+
         /*
          * The commit record serving as the ground state for the indices
          * isolated by this transaction (MAY be null, in which case the
          * transaction will be unable to isolate any indices).
          */
         this.commitRecord = journal.getCommitRecord(startTime);
-        
-        this.tmpStore = readOnly ? null : new TemporaryRawStore(
-                journal.getOffsetBits(),
-                Bytes.megabyte * 1, // initial in-memory size.
-                Bytes.megabyte * 10, // maximum in-memory size.
-                false // do NOT use direct buffers.
-                );
-        
+
     }
 
     /**
@@ -208,14 +185,14 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
     protected void releaseResources() {
 
         super.releaseResources();
-        
+
         /*
          * Release hard references to any named btrees isolated within this
          * transaction so that the JVM may reclaim the space allocated to them
          * on the heap.
          */
         btrees.clear();
-        
+
         /*
          * Close and delete the TemporaryRawStore.
          */
@@ -224,91 +201,116 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             tmpStore.close();
 
         }
-        
+
+    }
+
+    private IRawStore getTemporaryStore() {
+
+        assert lock.isHeldByCurrentThread();
+
+        if (tmpStore == null) {
+
+            tmpStore = readOnly ? null : new TemporaryRawStore(journal
+                    .getOffsetBits(), Bytes.megabyte * 1, // initial
+                    // in-memory
+                    // size.
+                    Bytes.megabyte * 10, // maximum in-memory size.
+                    false // do NOT use direct buffers.
+                    );
+
+        }
+
+        return tmpStore;
+
     }
     
     protected boolean validateWriteSets() {
- 
-        assert ! readOnly;
 
-//         Note: This is not true now that unisolated writers may be concurrent.
-//        
-//        /*
-//         * This compares the current commit counter on the journal with the
-//         * commit counter as of the start time for the transaction. If they are
-//         * the same, then no intervening commits have occurred on the journal
-//         * and there is nothing to validate.
-//         */
-//        
-//        if (commitRecord == null
-//                || (journal.getRootBlockView().getCommitCounter() == commitRecord
-//                        .getCommitCounter())) {
-//            
-//            return true;
-//            
-//        }
-        
+        assert !readOnly;
+
+        // Note: This is not true now that unisolated writers may be concurrent.
+        //        
+        // /*
+        // * This compares the current commit counter on the journal with the
+        // * commit counter as of the start time for the transaction. If they
+        // are
+        // * the same, then no intervening commits have occurred on the journal
+        // * and there is nothing to validate.
+        // */
+        //        
+        // if (commitRecord == null
+        // || (journal.getRootBlockView().getCommitCounter() == commitRecord
+        // .getCommitCounter())) {
+        //            
+        // return true;
+        //            
+        // }
+
         /*
          * for all isolated btrees, if(!validate()) return false;
          */
 
-        Iterator<Map.Entry<String,IIsolatedIndex>> itr = btrees.entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
+        Iterator<Map.Entry<String, IIsolatedIndex>> itr = btrees.entrySet()
+                .iterator();
+
+        while (itr.hasNext()) {
+
             Map.Entry<String, IIsolatedIndex> entry = itr.next();
-            
+
             String name = entry.getKey();
-            
+
             IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
-            
+
             /*
              * Note: this is the _current_ state for the named index. We need to
              * validate against the current state, not against some historical
              * state.
              */
 
-            UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
+            UnisolatedBTree groundState = (UnisolatedBTree) journal
+                    .getIndex(name);
 
             if (!isolated.validate(groundState)) {
 
                 // Validation failed.
-                
-                log.info("validation failed: "+name);
-                
+
+                log.info("validation failed: " + name);
+
                 return false;
 
             }
-            
+
         }
-         
+
         return true;
 
     }
-    
+
     protected void mergeOntoGlobalState() {
 
-        assert ! readOnly;
+        assert !readOnly;
 
         super.mergeOntoGlobalState();
-        
-        Iterator<Map.Entry<String,IIsolatedIndex>> itr = btrees.entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
+
+        Iterator<Map.Entry<String, IIsolatedIndex>> itr = btrees.entrySet()
+                .iterator();
+
+        while (itr.hasNext()) {
+
             Map.Entry<String, IIsolatedIndex> entry = itr.next();
-            
+
             String name = entry.getKey();
-            
+
             IsolatedBTree isolated = (IsolatedBTree) entry.getValue();
-            
+
             /*
              * Note: this is the live version of the named index. We need to
              * merge down onto the live version of the index, not onto some
              * historical state.
              */
-            
-            UnisolatedBTree groundState = (UnisolatedBTree)journal.getIndex(name);
+
+            UnisolatedBTree groundState = (UnisolatedBTree) journal
+                    .getIndex(name);
 
             /*
              * Copy the validated write set for this index down onto the
@@ -317,7 +319,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
              */
 
             isolated.mergeDown(groundState);
-            
+
         }
 
     }
@@ -341,114 +343,145 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         if (name == null)
             throw new IllegalArgumentException();
 
-        if (!isActive()) {
-            
-            throw new IllegalStateException(NOT_ACTIVE);
-            
-        }
+        lock.lock();
 
-        /*
-         * Store the btrees in hash map so that we can recover the same instance
-         * on each call within the same transaction.
-         */
-        IIsolatedIndex index = btrees.get(name);
-        
-        if(commitRecord==null) {
-            
+        try {
+
+            if (!isActive()) {
+
+                throw new IllegalStateException(NOT_ACTIVE);
+
+            }
+
             /*
-             * This occurs when there are either no commit records or no
-             * commit records before the start time for the transaction.
+             * Store the btrees in hash map so that we can recover the same
+             * instance on each call within the same transaction.
              */
             
-            return null;
-            
-        }
-        
-        if(index == null) {
-            
-            /*
-             * See if the index was registered as of the ground state used by
-             * this transaction to isolated indices.
-             */
-            UnisolatedBTree src = (UnisolatedBTree) journal.getIndex(name,
-                    commitRecord);
-            
-            if(name==null) {
-                
+            IIsolatedIndex index = btrees.get(name);
+
+            if (commitRecord == null) {
+
                 /*
-                 * The named index was not registered as of the transaction
-                 * ground state.
+                 * This occurs when there are either no commit records or no
+                 * commit records before the start time for the transaction.
                  */
-                
+
                 return null;
-                
-            }
-            
-            /*
-             * Isolate the named btree.
-             */
 
-            if(readOnly) {
-
-                index = new ReadOnlyIsolatedIndex(src);
-                
-            } else {
-                
-                // writeable index backed by the temp. store.
-                index = new IsolatedBTree(tmpStore,src);
-
-                // report event.
-                ResourceManager.isolateIndex(startTime, name);
-                
             }
 
-            btrees.put(name, index);
-            
+            if (index == null) {
+
+                /*
+                 * See if the index was registered as of the ground state used
+                 * by this transaction to isolated indices.
+                 */
+                UnisolatedBTree src = (UnisolatedBTree) journal.getIndex(name,
+                        commitRecord);
+
+                if (name == null) {
+
+                    /*
+                     * The named index was not registered as of the transaction
+                     * ground state.
+                     */
+
+                    return null;
+
+                }
+
+                /*
+                 * Isolate the named btree.
+                 */
+
+                if (readOnly) {
+
+                    index = new ReadOnlyIsolatedIndex(src);
+
+                } else {
+
+                    // writeable index backed by the temp. store.
+                    index = new IsolatedBTree(getTemporaryStore(), src);
+
+                    // report event.
+                    ResourceManager.isolateIndex(startTime, name);
+
+                }
+
+                btrees.put(name, index);
+
+            }
+
+            return index;
+
+        } finally {
+
+            lock.unlock();
+
         }
-        
-        return index;
-        
+
     }
 
     final public boolean isEmptyWriteSet() {
-        
-        if(isReadOnly()) {
-            
-            // Read-only transactions always have empty write sets.
-            return true;
-            
-        }
 
-        Iterator<IIsolatedIndex> itr = btrees.values().iterator();
+        lock.lock();
 
-        while(itr.hasNext()) {
-            
-            IsolatedBTree ndx = (IsolatedBTree) itr.next();
-            
-            if(!ndx.isEmptyWriteSet()) {
-                
-                // At least one isolated index was written on.
-                
-                return false;
-                
+        try {
+
+            if (isReadOnly()) {
+
+                // Read-only transactions always have empty write sets.
+                return true;
+
             }
+
+            Iterator<IIsolatedIndex> itr = btrees.values().iterator();
+
+            while (itr.hasNext()) {
+
+                IsolatedBTree ndx = (IsolatedBTree) itr.next();
+
+                if (!ndx.isEmptyWriteSet()) {
+
+                    // At least one isolated index was written on.
+
+                    return false;
+
+                }
+
+            }
+
+            return true;
+
+        } finally {
+
+            lock.unlock();
             
         }
-        
-        return true;
         
     }
 
-    public String[] getDirtyResource() {
+    final public String[] getDirtyResource() {
 
-        if(isReadOnly()) {
+        if (isReadOnly()) {
 
             return EMPTY;
+
+        }
+
+        lock.lock();
+        
+        try {
+        
+            return btrees.keySet().toArray(new String[btrees.size()]);
+            
+        } finally {
+            
+            lock.unlock();
             
         }
-        
-        return btrees.keySet().toArray(new String[btrees.size()]);
-        
+
     }
 
     private static transient final String[] EMPTY = new String[0];

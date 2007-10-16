@@ -97,9 +97,11 @@ public class TestAll extends TestCase {
          * Test a scalable temporary store (uses the transient and disk-only
          * buffer modes).
          */
-        suite.addTestSuite( TestTemporaryStore.class );
+        suite.addTest( TestTemporaryStore.suite() );
         
-        // test the different journal modes.
+        /*
+         * Test the different journal modes.
+         */
         
         suite.addTest( TestTransientJournal.suite() );
         
