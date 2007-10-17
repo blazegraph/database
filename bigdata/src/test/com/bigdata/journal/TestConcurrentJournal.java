@@ -47,23 +47,35 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.FileChannel;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.journal.WriteExecutorService.RetryException;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.RangeQueryIterator;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for the {@link ConcurrentJournal}.
@@ -74,21 +86,6 @@ import com.bigdata.service.RangeQueryIterator;
  *       {@link RangeQueryIterator}. this will help to isolate the correctness
  *       of the data service "api", including concurrency of operations, from
  *       the {@link DataService}.
- * 
- * @todo Verify proper partial ordering over transaction schedules (runs tasks
- *       in parallel, uses exclusive locks for access to the same isolated index
- *       within the same transaction, and schedules their commits using a
- *       partial order based on the indices that were actually written on).
- *       <p>
- *       Verify that only the indices that were written on are used to establish
- *       the partial order, not any index from which the tx might have read.
- * 
- * @todo test writing on multiple isolated indices in the different transactions
- *       and verify that no concurrency limits are imposed across transactions
- *       (only within transactions).
- * 
- * @todo show state-based validation for concurrent transactions on the same
- *       index that result in write-write conflicts.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -652,13 +649,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
     }
 
     /**
-     * Submits an unisolated task to the read service. In an attempt to provoke
-     * a {@link ClosedByInterruptException} the task writes continuously on the
-     * {@link IRawStore}, flushing each write to the backing store, until it is
-     * interrupted. It then ignores the interrupt, sleeps for a bit more, and
-     * attempts to perform additional operation on the store.
-     * 
-     * @todo evolve to test behavior when a task does not join the abort group.
+     * This task verifies that an abort will wait until all running tasks
+     * complete (ie, join the "abort group") before aborting.
+     * <p>
+     * If the abort occurs while task(s) are still running then actions by those
+     * tasks can break the concurrency control mechanisms. For example, writes
+     * on unisolated indices by tasks in the abort group could be made restart
+     * safe with the next commit.  However, the lock system SHOULD still keep
+     * new tasks from writing on resources locked by tasks that have not yet
+     * terminated.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -678,11 +677,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-        /* 0 = not running.
-         * 1 - started 1st loop.
-         * 2 - started 2nd loop.
-         * 3 - waiting a bit before exit.
-         * 4 - done.
+        /* 4 - done.
          */
         final AtomicInteger runState = new AtomicInteger(0);
         
@@ -712,10 +707,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                 // low-level write so there is some data to be committed.
                 journal.write(getRandomData());
-                
-                runState.compareAndSet(1, 2);
-                
-                runState.compareAndSet(2, 3);
 
                 // wait more before exiting.
                 {
@@ -732,7 +723,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                 lock.lock();
                 try {
-                    runState.compareAndSet(3, 4);
+                    runState.compareAndSet(1, 4);
                     log.warn("Done");
                 } finally {
                     lock.unlock();
@@ -747,7 +738,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         // force async abort of the commit group.
         
         Future<Object> f2 = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, new String[] { "bazzar" }) {
+                ITx.UNISOLATED, false/* readOnly */, new String[] { }) {
 
             protected Object doTask() throws Exception {
 
@@ -1049,5 +1040,157 @@ public class TestConcurrentJournal extends ProxyTestCase {
 //        journal.delete();
 //
 //    }
+    
+    /**
+     * A stress test that runs concurrent unisolated readers and writers and
+     * verifies that readers able to transparently continue to read against the
+     * same state of the named indices if the backing {@link FileChannel} is
+     * closed by an interrupt as part of the abort protocol for the commit
+     * group. In order for this test to succeed the backing {@link FileChannel}
+     * must be transparently re-opened in a thread-safe manner if it is closed
+     * asynchronously (i.e., closed while the buffer strategy is still open).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public void test_concurrentReadersAreOk() throws Throwable {
+
+        // Note: clone so that we do not modify!!!
+        Properties properties = new Properties(getProperties());
+
+        // Mostly serialize the readers.
+        properties.setProperty(Options.READ_SERVICE_CORE_POOL_SIZE, "2");
+
+        // Completely serialize the writers.
+        properties.setProperty(Options.WRITE_SERVICE_CORE_POOL_SIZE, "1");
+        properties.setProperty(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE, "1");
+
+        final Journal journal = new Journal(properties);
+
+        // Note: This test requires a journal backed by stable storage.
+
+        if (journal.isStable()) {
+
+            // register and populate the indices and commit.
+            final int NRESOURCES = 10;
+            final int NWRITES = 10000;
+            final String[] resource = new String[NRESOURCES];
+            {
+                KeyBuilder keyBuilder = new KeyBuilder(4);
+                for (int i = 0; i < resource.length; i++) {
+                    resource[i] = "index#" + i;
+                    IIndex ndx = journal.registerIndex(resource[i]);
+                    for (int j = 0; j < NWRITES; j++) {
+                        byte[] val = (resource[i] + "#" + j).getBytes();
+                        ndx.insert(keyBuilder.reset().append(j).getKey(), val);
+                    }
+                }
+                journal.commit();
+            }
+            log.warn("Registered and populated " + resource.length
+                    + " named indices with " + NWRITES + " records each");
+
+            /**
+             * Does an unisolated index scan on a named index using the last
+             * committed state of the named index.
+             * <p>
+             * The read tasks MUST NOT throw any exceptions since we are
+             * expecting transparent re-opening of the store. This means that
+             * the buffer strategy implementation must notice when the store was
+             * closed asynchronously, obtain a lock, re-open the store, and then
+             * re-try the operation.
+             * 
+             * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+             *         Thompson</a>
+             * @version $Id$
+             */
+            class ReadTask extends AbstractTask {
+
+                protected ReadTask(ConcurrentJournal journal, String resource) {
+                    super(journal, ITx.UNISOLATED, true/* readOnly */,
+                            resource);
+                }
+
+                protected Object doTask() throws Exception {
+
+                    IIndex ndx = getIndex(getOnlyResource());
+                    
+                    assertTrue(ndx instanceof ReadOnlyIndex);
+                    
+                    IEntryIterator itr = ndx.rangeIterator(null, null);
+
+                    int n = 0;
+
+                    while (itr.hasNext()) {
+
+                        itr.next();
+
+                        n++;
+
+                    }
+
+                    assertEquals("#entries", n, NWRITES);
+
+                    return null;
+
+                }
+
+            }
+
+            /*
+             * Runs a sequence of write operations that interrupt themselves.
+             */
+            final ExecutorService writerService = Executors
+                    .newSingleThreadExecutor(new DaemonThreadFactory());
+
+            /*
+             * Submit tasks to the single threaded service that will in turn
+             * feed them on by one to the journal's writeService. When run on
+             * the journal's writeService the tasks will interrupt themselves
+             * causing the commit group to be discarded and provoking the JDK to
+             * close the FileChannel backing the journal.
+             */
+            for (int i = 0; i < 10; i++) {
+                final String theResource = resource[i % resource.length];
+                writerService.submit(new Callable<Object>() {
+                    public Object call() throws Exception {
+                        journal.submit(new InterruptMyselfTask(journal,
+                                ITx.UNISOLATED, false/* readOnly */,
+                                theResource));
+                        // pause between submits
+                        Thread.sleep(20);
+                        return null;
+                    }
+                });
+
+            }
+
+            /*
+             * Submit concurrent reader tasks and wait for them to run for a
+             * while.
+             */
+            {
+                Collection<AbstractTask> tasks = new LinkedList<AbstractTask>();
+                for (int i = 0; i < NRESOURCES * 10; i++) {
+                    tasks.add(new ReadTask(journal, resource[i
+                            % resource.length]));
+                }
+                // await futures.
+                List<Future<Object>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
+                for(Future<Object> f : futures) {
+                    if(f.isDone()) {
+                        // all tasks that complete should have done so without error.
+                        f.get();
+                    }
+                }
+            }
+
+            log.warn("End of test");
+
+        }
+
+        journal.closeAndDelete();
+
+    }
     
 }

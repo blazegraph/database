@@ -49,6 +49,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 
 /**
  * An interface for implementations backed by a file on disk.
@@ -72,5 +73,10 @@ public interface IDiskBasedStrategy extends IBufferStrategy {
      * The object used to read and write on that file.
      */
     public RandomAccessFile getRandomAccessFile();
+
+    /**
+     * The channel used to read and write on the file.
+     */
+    public FileChannel getChannel();
     
 }

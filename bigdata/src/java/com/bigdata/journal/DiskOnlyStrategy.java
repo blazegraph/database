@@ -116,6 +116,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     private final File file;
     
     /**
+     * The mode used to open that file.
+     */
+    private final String fileMode;
+    
+    /**
      * The IO interface for the file - <strong>use
      * {@link #getRandomAccessFile()} rather than this field</strong>.
      */
@@ -170,7 +175,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * condition without the write cache as measured by
      * {@link AbstractMRMWTestCase}.
      */
-    final private ByteBuffer writeCache;
+    private ByteBuffer writeCache;
     
     /**
      * An index into the write cache used for read through on the cache. The
@@ -232,37 +237,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-    /**
-     * Returns the open {@link RandomAccessFile}. If the backing
-     * {@link FileChannel} was closed but the {@link #isOpen()} still returns
-     * true then the file is re-opened.
-     * <p>
-     * Note: group commit will interrupt running threads if a commit group must
-     * be discarded. If a thread was in the middle of an IO operation on the
-     * file then the channel is <strong>closed</strong> by that interrupt.
-     * While the thread(s) that were interrupted will not continue their
-     * interrupted operation, we do need to re-open the channel when it was
-     * closed asynchronously so that other tasks may execute against the store.
-     * 
-     * FIXME this needs some unit tests! Also, modify the MROW and MRMW tests to
-     * explicitly interrupt some tasks as part of their stress test. This also
-     * shows up in concurrent transaction execution since validation errors
-     * cause commit group aborts, which cause threads to be interrupted and if
-     * that happens when they are reading or writing on the channel then the
-     * channel is closed and {@link ClosedByInterruptException} is thrown!
-     * 
-     * @todo Can {@link FileMetadata} be refactored to re-open the file? Note
-     *       that a mapped file needs to be re-mapped. Also note that file locks
-     *       might interfere with re-opening the file, or might add latency to
-     *       that operation.... Mapped files might be impossible to re-open
-     *       since we have no control over when they are unmapped with Java.
-     *       <p>
-     *       Note: we do NOT re-read the commit blocks - that is all handled by
-     *       the commit/abort logic. Basically, they already have what they need
-     *       on hand.
-     * 
-     * @see WriteExecutorService
-     */
     final public RandomAccessFile getRandomAccessFile() {
 
         return raf;
@@ -271,17 +245,30 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     final public FileChannel getChannel() {
         
-        return raf.getChannel();
+        return getRandomAccessFile().getChannel();
         
     }
     
-    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
+    /**
+     * 
+     * @param maximumExtent
+     * @param fileMetadata
+     * @param writeCacheCapacity
+     *            The #of bytes that can be buffered by the write cache and also
+     *            the maximum length of a sequential write operation when
+     *            flushing the write cache to disk. Large sequential writes far
+     *            outperform a set of smaller writes since the alliviate the
+     *            need to repeatedly seek on the disk.
+     */
+    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata, int writeCacheCapacity) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, BufferMode.Disk);
 
         this.file = fileMetadata.file;
 
+        this.fileMode = fileMetadata.fileMode;
+        
         this.raf = fileMetadata.raf;
 
         this.extent = fileMetadata.extent;
@@ -290,19 +277,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         this.userExtent = extent - headerSize;
 
-        // @todo make this a configuration option.
-        if (false) {
+        if (writeCacheCapacity > 0) {
 
             // Enable the write cache.
-            
-            /*
-             * The #of bytes that can be buffered by the write cache and also
-             * the maximum length of a sequential write operation when flushing
-             * the write cache to disk. Large sequential writes far outperform a
-             * set of smaller writes since the alliviate the need to repeatedly
-             * seek on the disk.
-             */
-            final int writeCacheCapacity = 10 * Bytes.megabyte32;
+
+            log.info("Enabling writeCache: capacity="+writeCacheCapacity);
 
             /*
              * An estimate of the #of records that might fit within the write
@@ -310,11 +289,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * is 4k. This is used solely to assign the initial capacity to the
              * writeCacheIndex.
              */
-            final int indexDefaultCapacity = writeCacheCapacity / 4
-                    * Bytes.kilobyte32;
+            final int indexDefaultCapacity = writeCacheCapacity / (4
+                    * Bytes.kilobyte32);
 
-            // allocate the write cache.
-            writeCache = ByteBuffer.allocateDirect(writeCacheCapacity);
+            // allocate the write cache : @todo make using a direct buffer an option.
+            this.writeCache = ByteBuffer.allocate(writeCacheCapacity);
 
             // allocate and initialize the write cache index.
             writeCacheIndex = new ConcurrentHashMap<Long, Integer>(indexDefaultCapacity);
@@ -323,7 +302,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             // Disable the write cache.
             
-            writeCache = null;
+            this.writeCache = null;
 
             writeCacheIndex = null;
 
@@ -373,7 +352,15 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     public void close() {
 
+        /*
+         * Note: this clears the [open] flag. It is important to do this first
+         * so that we do not re-open the channel once it has been closed.
+         */
+
         super.close();
+
+        // Release the write cache.
+        writeCache = null;
         
         try {
 
@@ -517,6 +504,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
                 // copy the data into [dst].
                 dst.put(tmp);
+
+                // flip buffer for reading.
+                dst.flip();
                 
                 // return the new buffer.
                 return dst;
@@ -530,21 +520,69 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // the offset into the disk file.
             final long pos = offset + headerSize;
 
-            try {
+            for(int ntries=0; ntries<3; ntries++) {
 
-                // copy the data into the buffer.
-                final int nread = getChannel().read(dst, pos);
+                if(ntries>0) {
 
-                if (nread != nbytes) {
+                    /*
+                     * Note: clear if we are retrying since the buffer may have
+                     * been modified by a partial read.
+                     */ 
 
-                    throw new RuntimeException("Expected to read " + nbytes
-                            + " bytes but read " + nread);
+                    dst.clear();
+                    
+                }
+                
+                try {
+
+                    // copy the data into the buffer.
+                    final int nread = getChannel().read(dst, pos);
+
+                    if (nread != nbytes) {
+
+                        throw new RuntimeException("Expected to read " + nbytes
+                                + " bytes but read " + nread);
+
+                    }
+
+                } catch (ClosedByInterruptException ex) {
+                    
+                    /*
+                     * This indicates that this thread was interrupted. We
+                     * always abort in this case.
+                     */
+                    
+                    throw new RuntimeException(ex);
+
+                } catch (AsynchronousCloseException ex) {
+                    
+                    /*
+                     * The channel was closed asynchronously while blocking
+                     * during the read. If the buffer strategy still thinks that
+                     * it is open then we re-open the channel and re-read.
+                     */
+                    
+                    if(reopenChannel()) continue;
+                    
+                    throw new RuntimeException(ex);
+                    
+                } catch (ClosedChannelException ex) {
+                    
+                    /*
+                     * The channel is closed. If the buffer strategy still
+                     * thinks that it is open then we re-open the channel and
+                     * re-read.
+                     */
+
+                    if(reopenChannel()) continue;
+
+                    throw new RuntimeException(ex);
+                    
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
 
                 }
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
 
             }
 
@@ -558,6 +596,64 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
+    /**
+     * This method transparently re-opens the channel for the backing file.
+     * <p>
+     * Note: This method is synchronized so that concurrent readers do not try
+     * to all open the store at the same time.
+     * <p>
+     * Note: This method is ONLY invoked by readers. This helps to ensure that a
+     * writer that has been interrupted can not regain access to the channel (it
+     * does not prevent it, but re-opening for writers is asking for trouble).
+     * 
+     * @return true iff the channel was re-opened.
+     * 
+     * @throws IllegalStateException
+     *             if the buffer strategy has been closed.
+     *             
+     * @throws RuntimeException
+     *             if the backing file can not be opened (can not be found or
+     *             can not acquire a lock).
+     */
+    synchronized private boolean reopenChannel() {
+        
+        if(raf.getChannel().isOpen()) {
+            
+            /* The channel is still open.  If you are allowing concurrent reads
+             * on the channel, then this could indicate that two readers each 
+             * found the channel closed and that one was able to re-open the
+             * channel before the other such that the channel was open again
+             * by the time the 2nd reader got here.
+             */
+            
+            return true;
+            
+        }
+        
+        if(!isOpen()) {
+
+            // the buffer strategy has been closed.
+            
+            return false;
+            
+        }
+
+        try {
+
+            raf = FileMetadata.openFile(file, fileMode, bufferMode);
+        
+            log.warn("Re-opened file: "+file);
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
+        return true;
+        
+    }
+    
     public long write(ByteBuffer data) {
 
         if (data == null)

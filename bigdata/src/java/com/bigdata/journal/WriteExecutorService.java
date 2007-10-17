@@ -124,18 +124,6 @@ import com.bigdata.rawstore.IRawStore;
  *       (b) the processor allocation strategy causes all threads to perform
  *       very slowly.
  * 
- * FIXME A task that does not declare any resources MUST NOT block in the lock
- * manager. It will, so write a test case for that in the lock manager and in
- * {@link TestConcurrentJournal}.
- * 
- * FIXME The write service is NOT the only source of reads against the store,
- * just the only source of reads against the live indices. Make sure that things
- * like {@link AbstractJournal#abort()} properly synchronize such that readers
- * can continue to execute without problems. For example, when we have to
- * re-open the backing file because it was closed when an IO was interrupted
- * concurrent readers will need the ability to re-open the channel immediately.
- * Show this with a variant of {@link TestClosedByInterruptException}.
- * 
  * FIXME Write a test that runs concurrent unisolated readers, unisolated
  * writers, and transactions and make sure that everything is Ok. There really
  * should be a correctness test here. The best way to do that may be to write a
@@ -143,9 +131,6 @@ import com.bigdata.rawstore.IRawStore;
  * and isolated transactions) and then to run all three tests at once against
  * the same store. As long as they use distinct indices there should be no
  * conflicts caused by the tests.
- * 
- * FIXME Finish tx support in {@link AbstractTask} and work in
- * {@link StressTestConcurrentTx}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -483,7 +468,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * No exception and not interrupted?
              */
             
-            if (t == null && ! Thread.interrupted()) {
+            if (t == null /*&& ! Thread.interrupted()*/) {
                 
                 /*
                  * A write task succeeded.
@@ -527,16 +512,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  * data by the time they get interrupted.
                  */
 
-                if (t == null ) {
+//                if (t == null ) {
+//                    
+//                    /*
+//                     * This handles the case where the task was interrupted but
+//                     * it did not notice the interrupt itself.
+//                     */
+//                
+//                    log.warn("Task interrupted: task="+ r.getClass().getName());
+//
+//                } else
                     
-                    /*
-                     * This handles the case where the task was interrupted but
-                     * it did not notice the interrupt itself.
-                     */
-                
-                    log.warn("Task interrupted: task="+ r.getClass().getName());
-
-                } else if (t instanceof ValidationError
+                if (t instanceof ValidationError
                         || t.getCause() != null
                         && t.getCause() instanceof ValidationError) {
 
@@ -580,6 +567,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 if(abort.get()) {
                     
                     log.info("Abort already in progress");
+
+                    // notify the thread running the abort that we are done.
+                    waiting.signal();
                     
                 } else if(groupCommit.get()) {
 
@@ -1101,6 +1091,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             Iterator<Map.Entry<Thread,AbstractTask>> itr = active.entrySet().iterator();
 
+            int ninterrupted = 0;
+            
             while (itr.hasNext()) {
 
                 Map.Entry<Thread,AbstractTask> entry = itr.next();
@@ -1115,10 +1107,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     
                     entry.getKey().interrupt();
                     
+                    ninterrupted++;
+                    
                 }
 
             }
 
+            log.info("Interrupted "+ninterrupted+" tasks.");
+            
             // wait for active tasks to complete.
 
             log.info("Waiting for running tasks to complete: nrunning="+nrunning);

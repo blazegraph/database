@@ -155,6 +155,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         super.close();
         
+        // release the buffer.
         buffer = null;
 
     }

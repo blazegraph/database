@@ -92,6 +92,18 @@ public class Options {
     public static final String USE_DIRECT_BUFFERS = "useDirectBuffers";
     
     /**
+     * <code>writeCacheCapacity</code> - An integer property whose value
+     * controls the size of the write cache (in bytes) used by the selected
+     * {@link BufferMode} (default <code>10</code>). A value of ZERO (0) will
+     * disable the write cache.
+     * <p>
+     * Note: This value is ignored by some {@link BufferMode}s.
+     * 
+     * @see #DEFAULT_WRITE_CACHE_CAPACITY
+     */
+    public static final String WRITE_CACHE_CAPACITY = "writeCacheCapacity";
+    
+    /**
      * <code>initialExtent</code> - The initial extent of the journal (bytes).
      * When the journal is backed by a file, this is the initial length of that
      * file. The initial user extent is typically slightly smaller as the head
@@ -276,6 +288,11 @@ public class Options {
      * The default for {@link #USE_DIRECT_BUFFERS}.
      */
     public final static boolean DEFAULT_USE_DIRECT_BUFFERS = false;
+
+    /**
+     * The default for {@link #WRITE_CACHE_CAPACITY} (10M).
+     */
+    public final static int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
     
     /**
      * The default initial extent for a new journal.

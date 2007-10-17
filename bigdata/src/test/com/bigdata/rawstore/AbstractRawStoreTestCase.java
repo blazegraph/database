@@ -1014,4 +1014,28 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
     }
 
+    /**
+     * A random number generated - the seed is NOT fixed.
+     */
+    protected Random r = new Random();
+
+    /**
+     * Returns random data that will fit in N bytes. N is choosen randomly in
+     * 1:1024.
+     * 
+     * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
+     *         random length and having random contents.
+     */
+    public ByteBuffer getRandomData() {
+        
+        final int nbytes = r.nextInt(1024) + 1;
+        
+        byte[] bytes = new byte[nbytes];
+        
+        r.nextBytes(bytes);
+        
+        return ByteBuffer.wrap(bytes);
+        
+    }
+    
 }

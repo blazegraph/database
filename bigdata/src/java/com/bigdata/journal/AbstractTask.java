@@ -440,9 +440,9 @@ public abstract class AbstractTask implements Callable<Object> {
 
                 commitRecord = journal.getCommitRecord();
                 
-                log.info("Running against committed state: commitCounter="
-                        + commitRecord.getCommitCounter() + ", timestamp="
-                        + commitRecord.getTimestamp());
+                log.info("Running unisolated reader against committed state: commitCounter="
+                                + commitRecord.getCommitCounter()
+                                + ", timestamp=" + commitRecord.getTimestamp());
                 
                 try {
 
@@ -453,6 +453,8 @@ public abstract class AbstractTask implements Callable<Object> {
                     // release hard references to the named read-only indices.
                     
                     indexCache.clear();
+                
+                    log.info("Unisolated reader is done");
                     
                 }
 
@@ -524,23 +526,34 @@ public abstract class AbstractTask implements Callable<Object> {
 
                 ret = delegate.call();
 
+                if(Thread.interrupted()) {
+                    
+                    throw new InterruptedException();
+                    
+                }
+
                 // set flag.
                 ran = true;
                 
+                log.info("Task Ok: class="+getClass().getName());
+                
                 /*
-                 * Note: I am choosing NOT to flush dirty indices to the
-                 * store after each task in case other tasks in the same
-                 * commit group want to write on the same index. Flushing an
-                 * index makes its nodes and leaves immutable, and that is
-                 * not desirable if you are going to write on it again soon.
+                 * Note: I am choosing NOT to flush dirty indices to the store
+                 * after each task in case other tasks in the same commit group
+                 * want to write on the same index. Flushing an index makes its
+                 * nodes and leaves immutable, and that is not desirable if you
+                 * are going to write on it again soon.
+                 * 
+                 * Note: This trades off against checkpointing the indices after
+                 * each task which might make it possible to discard only part
+                 * of a commit group.
                  */
 
             } finally {
 
                 /*
-                 * Release hard references to named indices. Dirty indices
-                 * will exist on the Name2Addr's commitList until the next
-                 * commit.
+                 * Release hard references to named indices. Dirty indices will
+                 * exist on the Name2Addr's commitList until the next commit.
                  */
 
                 indexCache.clear();
@@ -567,6 +580,8 @@ public abstract class AbstractTask implements Callable<Object> {
 
                 // Do not re-invoke it afterTask failed above.
 
+                log.info("Task failed: class="+getClass().getName()+" : "+t);
+                
                 writeService.afterTask(this, t);
 
             }
@@ -601,8 +616,8 @@ public abstract class AbstractTask implements Callable<Object> {
      * Make sure that the {@link TemporaryRawStore} supports an appropriate
      * level of concurrency to allow concurrent writers on distinct isolated
      * indices that are being buffered on that store for a given transaction
-     * (MRMW). It is currently single-threaded only, which does not allow
-     * concurrent operations on the same transaction.
+     * (MRMW). Reads are writes are currently serialized in order to support
+     * overflow from memory to disk.
      * <p>
      * The {@link Tx} needs to be thread-safe when instantiating the temporary
      * store and when granting a view of an index (the read-committed and
@@ -611,6 +626,14 @@ public abstract class AbstractTask implements Callable<Object> {
      * If an read-write isolated task is interrupted then we MAY need to re-open
      * the {@link TemporaryRawStore} since the interrupt MAY have cause the
      * channel to be closed. See {@link ClosedByInterruptException}.
+     * 
+     * @todo review problems with memory exhaustion when running junit. the
+     *       write cache for the disk-only mode contributes to this, but maybe
+     *       the underlying problem is that junit is holding onto all of the
+     *       tests - either by itself or because of the proxy test case setup.
+     *       <p>
+     *       There are also several tests that are apparently attempting to
+     *       close a store that is already closed.
      * 
      * @todo do we always inform the transaction manager or only after the
      *       commit when we know that the "writes" took?
