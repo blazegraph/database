@@ -47,15 +47,21 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Properties;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.WriteExecutorService.RetryException;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.RangeQueryIterator;
 
@@ -68,13 +74,6 @@ import com.bigdata.service.RangeQueryIterator;
  *       {@link RangeQueryIterator}. this will help to isolate the correctness
  *       of the data service "api", including concurrency of operations, from
  *       the {@link DataService}.
- * 
- * @todo run tests of transaction throughput using a number of models. E.g., a
- *       few large indices with a lot of small transactions vs a lot of small
- *       indices with small transactions vs a few large indices with moderate to
- *       large transactions. Also look out for transactions where the validation
- *       and merge on the unisolated index takes more than one group commit
- *       cycle and see how that effects the application.
  * 
  * @todo Verify proper partial ordering over transaction schedules (runs tasks
  *       in parallel, uses exclusive locks for access to the same isolated index
@@ -90,9 +89,6 @@ import com.bigdata.service.RangeQueryIterator;
  * 
  * @todo show state-based validation for concurrent transactions on the same
  *       index that result in write-write conflicts.
- * 
- * @todo rewrite the {@link StressTestConcurrentTx} to use
- *       {@link #submit(AbstractTask)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -241,15 +237,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 commitCounterBefore+1, journal.getRootBlockView()
                         .getCommitCounter());
 
-//      Note: This does not always work since the counter is updated asynchronously.
-//      
-//        /*
-//         * Verify that it ran on the write service.
-//         */
-//        assertEquals("completedTaskCount", 1,
-//                ((ThreadPoolExecutor) journal.writeService)
-//                        .getCompletedTaskCount());
-
         journal.shutdown();
 
         journal.delete();
@@ -310,15 +297,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
         assertEquals("commit counter changed?",
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
-
-//      Note: This does not always work since the counter is updated asynchronously.
-//      
-//        /*
-//         * Verify that it ran on the transaction service.
-//         */
-//        assertEquals("completedTaskCount", 1,
-//                ((ThreadPoolExecutor) journal.txService)
-//                        .getCompletedTaskCount());
 
         // commit of a read-only tx returns commitTime of ZERO(0L).
         assertEquals(0L,journal.commit(tx));
@@ -386,15 +364,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
 
-//      Note: This does not always work since the counter is updated asynchronously.
-//      
-//        /*
-//         * Verify that it ran on the transaction service.
-//         */
-//        assertEquals("completedTaskCount", 1,
-//                ((ThreadPoolExecutor) journal.txService)
-//                        .getCompletedTaskCount());
-
         // commit of a readCommitted tx returns commitTime of ZERO(0L).
         assertEquals(0L,journal.commit(tx));
         
@@ -459,15 +428,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
         assertEquals("commit counter changed?",
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
-
-//      Note: This does not always work since the counter is updated asynchronously.
-//      
-//        /*
-//         * Verify that it ran on the transaction service.
-//         */
-//        assertEquals("completedTaskCount", 1,
-//                ((ThreadPoolExecutor) journal.txService)
-//                        .getCompletedTaskCount());
 
         // commit of a readWrite tx with an empty result set returns commitTime
         // of ZERO(0L).
@@ -572,12 +532,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
         }
         
         /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
-
-        /*
          * Verify that the commit counter was changed.
          */
         assertEquals("commit counter changed?",
@@ -592,10 +546,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
     /**
      * Submits an unisolated task to the read service. The task just sleeps. We
-     * then verify that we can termiate that task using
+     * then verify that we can terminate that task using
      * {@link Future#cancel(boolean)} with
      * <code>mayInterruptWhileRunning := false</code> and that an appropriate
-     * exception is thrown in the main thread.
+     * exception is thrown in the main thread when we {@link Future#get()} the
+     * result of the task.
      * <p>
      * Note: {@link FutureTask#cancel(boolean)} is able to return control to the
      * caller without being allowed to interrupt the task. However, it does NOT
@@ -684,18 +639,197 @@ public class TestConcurrentJournal extends ProxyTestCase {
         }
         
         /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
-
-        /*
          * Verify that the commit counter was NOT changed.
          */
         assertEquals("commit counter changed?",
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
 
+        journal.shutdown();
+
+        journal.delete();
+
+    }
+
+    /**
+     * Submits an unisolated task to the read service. In an attempt to provoke
+     * a {@link ClosedByInterruptException} the task writes continuously on the
+     * {@link IRawStore}, flushing each write to the backing store, until it is
+     * interrupted. It then ignores the interrupt, sleeps for a bit more, and
+     * attempts to perform additional operation on the store.
+     * 
+     * @todo evolve to test behavior when a task does not join the abort group.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_submit_interrupt03() throws InterruptedException, ExecutionException {
+        
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+        
+        final String[] resource = new String[]{"foo"};
+
+        {
+            journal.registerIndex(resource[0]);
+            journal.commit();
+        }
+        
+        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+
+        /* 0 = not running.
+         * 1 - started 1st loop.
+         * 2 - started 2nd loop.
+         * 3 - waiting a bit before exit.
+         * 4 - done.
+         */
+        final AtomicInteger runState = new AtomicInteger(0);
+        
+        final Lock lock = new ReentrantLock();
+
+        /**
+         * Used to force an abort.
+         */
+        class PrivateException extends RuntimeException {
+
+            private static final long serialVersionUID = 1L;
+
+            PrivateException(String msg) {
+                super(msg);
+            }
+            
+        }
+        
+        Future<Object> f1 = journal.submit(new AbstractTask(journal,
+                ITx.UNISOLATED, false/* readOnly */, resource) {
+
+            /**
+             */
+            protected Object doTask() throws Exception {
+
+                runState.compareAndSet(0, 1);
+
+                // low-level write so there is some data to be committed.
+                journal.write(getRandomData());
+                
+                runState.compareAndSet(1, 2);
+                
+                runState.compareAndSet(2, 3);
+
+                // wait more before exiting.
+                {
+                    final long begin = System.currentTimeMillis();
+                    final long timeout = 5000; // ms
+                    log.warn("Sleeping " + timeout + "ms");
+                    try {
+                        final long elapsed = System.currentTimeMillis() - begin;
+                        Thread.sleep(timeout - elapsed/* ms */);
+                    } catch (InterruptedException ex) {
+                        log.warn(ex);
+                    }
+                }
+
+                lock.lock();
+                try {
+                    runState.compareAndSet(3, 4);
+                    log.warn("Done");
+                } finally {
+                    lock.unlock();
+                }
+                
+                return null;
+                
+            }
+
+        });
+
+        // force async abort of the commit group.
+        
+        Future<Object> f2 = journal.submit(new AbstractTask(journal,
+                ITx.UNISOLATED, false/* readOnly */, new String[] { "bazzar" }) {
+
+            protected Object doTask() throws Exception {
+
+                log.warn("Running task that will force abort of the commit group.");
+                
+                // low-level write.
+                journal.write(getRandomData());
+
+                throw new PrivateException("Forcing abort of the commit group.");
+                
+            }
+            
+        });
+        
+        // Verify that the commit counter was NOT changed.
+        assertEquals("commit counter changed?",
+                commitCounterBefore, journal.getRootBlockView()
+                        .getCommitCounter());
+
+        /*
+         * Verify that the write service waits for the interrupted task to join
+         * the abort group.
+         */
+        log.warn("Waiting for 1st task to finish");
+        while(runState.get()<4) {
+            
+            lock.lock();
+            try {
+                if(runState.get()<4) {
+                    // No abort yet.
+                    assertEquals("Not expecting abort",0,journal.writeService.getAbortCount());
+                }
+            } finally {
+                lock.unlock();
+            }
+            Thread.sleep(20);
+            
+        }
+        log.warn("Reached runState="+runState);
+        
+        // wait for the abort or a timeout.
+        {
+            log.warn("Waiting for the abort.");
+            final long begin = System.currentTimeMillis();
+            while ((begin - System.currentTimeMillis()) < 1000) {
+                if (journal.writeService.getAbortCount() > 0) {
+                    log.warn("Noticed abort");
+                    break;
+                } else {
+                    // Verify that the commit counter was NOT changed.
+                    assertEquals("commit counter changed?",
+                            commitCounterBefore, journal.getRootBlockView()
+                                    .getCommitCounter());
+                }
+            }
+        }
+
+        // verify did abort.
+        assertEquals("Expecting abort",1,journal.writeService.getAbortCount());
+
+        /*
+         * Verify that both futures are complete and that both throw exceptions
+         * since neither task was allowed to commit.
+         * 
+         * Note: f1 completed successfully but the commit group was discarded
+         * when f2 threw an exception. Therefore f1 sees an inner RetryException
+         * while f2 sees the exception that it threw as its inner exception.
+         */
+        {
+            
+            try {f1.get();fail("Expecting exception.");}
+            catch(ExecutionException ex) {
+                assertTrue(isInnerCause(ex, RetryException.class));
+                log.warn("Expected exception: "+ex,ex);
+            }
+            try {f2.get();fail("Expecting exception.");}
+            catch(ExecutionException ex) {
+                log.warn("Expected exception: "+ex,ex);
+                assertTrue(isInnerCause(ex, PrivateException.class));
+            }
+        }
+        
         journal.shutdown();
 
         journal.delete();
@@ -825,7 +959,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 //    
 //    /**
 //     * This test verifies that unisolated reads are against the last committed
-//     * state of the index(s), that they do NOT permit writes, and than
+//     * state of the index(s), that they do NOT permit writes, and that
 //     * concurrent writers on the same named index(s) do NOT conflict.
 //     */
 //    public void test_submit_readService_isolation01() throws InterruptedException, ExecutionException {

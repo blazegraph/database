@@ -45,11 +45,12 @@ package com.bigdata.journal;
 
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadFactory;
@@ -123,12 +124,9 @@ import com.bigdata.rawstore.IRawStore;
  *       (b) the processor allocation strategy causes all threads to perform
  *       very slowly.
  * 
- * FIXME I think that it may be possible for task(s) interrupted when a group
- * commit is aborted to fail to notice in a timely manner and continue to
- * read/write on the store even though they MUST be discarded. Maybe
- * {@link #abort()} needs to wait until all interrupted tasks have arrived at
- * {@link #afterTask(Callable, Throwable)}, i.e., until #running reaches zero
- * _before_ executing the abort.
+ * FIXME A task that does not declare any resources MUST NOT block in the lock
+ * manager. It will, so write a test case for that in the lock manager and in
+ * {@link TestConcurrentJournal}.
  * 
  * FIXME The write service is NOT the only source of reads against the store,
  * just the only source of reads against the live indices. Make sure that things
@@ -146,7 +144,8 @@ import com.bigdata.rawstore.IRawStore;
  * the same store. As long as they use distinct indices there should be no
  * conflicts caused by the tests.
  * 
- * FIXME Finish tx support in {@link AbstractTask} and work in {@link StressTestConcurrentTx}
+ * FIXME Finish tx support in {@link AbstractTask} and work in
+ * {@link StressTestConcurrentTx}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -237,13 +236,22 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * The threads that are running our tasks (so that we can interrupt them
      * if necessary).
      */
-    final private HashSet<Thread> active = new HashSet<Thread>();
+    final private ConcurrentHashMap<Thread,AbstractTask> active = new ConcurrentHashMap<Thread,AbstractTask>();
 
     /** #of write tasks completed since the last commit. */
     final private AtomicInteger nwrites = new AtomicInteger(0);
 
     /** True iff we are executing a group commit. */
     final private AtomicBoolean groupCommit = new AtomicBoolean(false);
+    
+    /** True iff we are executing an abort. */
+    final private AtomicBoolean abort = new AtomicBoolean(false);
+    
+    /**
+     * The {@link Thread} that is executing the group commit and
+     * <code>null</code> if group commit is not being executed.
+     */
+    private Thread groupCommitThread = null;
     
     /*
      * Counters
@@ -350,6 +358,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * If task execution has been {@link #pause() paused} then
      * {@link Condition#await() awaits} someone to call {@link #resume()}.
+     * 
+     * @param t
+     *            The thread that will run the task.
+     * @param r
+     *            The {@link Runnable} wrapping the {@link AbstractTask} - this
+     *            is actually a {@link FutureTask}. See
+     *            {@link AbstractExecutorService}.
      */
     protected void beforeExecute(Thread t, Runnable r) {
 
@@ -382,11 +397,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param t
      *            The thread in which that task will execute.
      * @param r
-     *            The {@link Runnable} wrapping the {@link AbstractTask} -
-     *            this is actually a {@link FutureTask}. See
-     *            {@link AbstractExecutorService}
+     *            The {@link AbstractTask}.
      */
-    protected void beforeTask(Thread t,Callable r) {
+    protected void beforeTask(Thread t,AbstractTask r) {
 
         if (t == null)
             throw new NullPointerException();
@@ -405,8 +418,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             maxRunning = (nrunning>maxRunning?nrunning:maxRunning);
             
             // Note the thread running the task.
-            active.add(t);
+            active.put(t,r);
         
+            log.info("nrunning="+nrunning);
+            
         } finally {
             
             lock.unlock();
@@ -418,7 +433,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * This is executed after {@link AbstractTask#doTask()}. If the task
      * completed successfully (no exception thrown and its thread is not
-     * interrupted) then we invoke {@link #groupCommit()}.
+     * interrupted) then we invoke {@link #groupCommit()}. If there was
+     * a problem and an abort is not already in progress, then we invoke
+     * {@link #abort()}.
      * 
      * @param r
      *            The {@link Callable} wrapping the {@link AbstractTask}.
@@ -443,7 +460,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *       <p>
      *       Do NOT resubmit if the write service is being shutdown.
      */
-    protected void afterTask(Callable r, Throwable t) {
+    protected void afterTask(AbstractTask r, Throwable t) {
         
         if (r == null)
             throw new NullPointerException();
@@ -457,6 +474,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              */
             
             final int nrunning = this.nrunning.decrementAndGet(); // dec. counter.
+
+            log.info("nrunning="+nrunning);
             
             assert nrunning >= 0;
             
@@ -558,7 +577,27 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 // abort the commit group.
                 
-                abort();
+                if(abort.get()) {
+                    
+                    log.info("Abort already in progress");
+                    
+                } else if(groupCommit.get()) {
+
+                    // interrupt the thread running the group commit.
+                    
+                    log.info("Interrupting the thread running group commit: thread="+groupCommitThread.getName());
+                    
+                    groupCommitThread.interrupt();
+                    
+                } else {
+                    
+                    // no one is running group commit, so invoke abort ourselves.
+                    
+                    log.info("Invoking abort directly");
+                    
+                    abort();
+                    
+                }
                 
             }
         
@@ -626,6 +665,29 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         lock.lock();
 
         /*
+         * If an abort is in progress then throw an exception.
+         */
+        if( abort.get() ) {
+
+            try {
+            
+                log.info("Abort in progress.");
+            
+                // abort() will no longer await this task's completion.
+
+                waiting.signal();
+                
+                throw new RetryException("Abort in progress.");
+                
+            } finally {
+                
+                lock.unlock();
+                
+            }
+            
+        }
+        
+        /*
          * Note: This is outside of the try/finally block since the
          * [groupCommit] flag MUST NOT be cleared if it is already set and we
          * are doing that in try/finally block below.
@@ -690,6 +752,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
 
+        log.info("This thread will run group commit");
+        
         try {
 
             /*
@@ -698,6 +762,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              */
             
             assert lock.isHeldByCurrentThread();
+            
+            assert groupCommit.get();
+
+            // save a reference to the thread that is running the group commit.
+            groupCommitThread = Thread.currentThread();
             
             // timestamp from which we measure the latency until the commit begins.
 
@@ -765,9 +834,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * Note: There is no way right now to back out partial
                      * writes by a task, so if a task is taking to long this
                      * would mean that we just abort the commit rather than
-                     * continue to wait.
+                     * continue to wait. However, note that abort() also must
+                     * wait on the task to complete - but it has interrupted()
+                     * the task, which will make polite tasks throw an
+                     * exception.
                      * 
-                     * However, one could conceivably checkpoint the unisolated
+                     * Note: one could conceivably checkpoint the unisolated
                      * indices after each task and rollback to the previous
                      * checkpoint if a task is interrupted. Those check points
                      * would be maintained in the task metadata since tasks
@@ -775,9 +847,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * the correct checkpoint for the rollback.
                      * 
                      * The problem with index checkpoints is that they requiring
-                     * flushing writes on the index to the store. If task
-                     * failures are rare then this could be more expensive than
-                     * the occasional abort of a commit group.
+                     * flushing writes on the index to the store (or at least
+                     * its write buffer), which has the side effect of making
+                     * nodes and leaves in the index immutable. If task failures
+                     * are rare then this could be more expensive than the
+                     * occasional abort of a commit group.
                      */
                     
                     waiting.await();
@@ -881,20 +955,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch(Throwable t) {
             
-            if(journal.isOpen()) {
-
-                log.error("Problem with groupCommit?", t);
+            log.info("Commit problem - will do abort: "+t,t);
             
-                abort();
-                
-            }
-
+            abort();
+            
             return false;
             
         } finally {
 
             // atomically clear the [groupCommit] flag.
             groupCommit.set(false);
+
+            // group commit is not being run.
+            groupCommitThread = null;
             
             // allow new tasks to run.
             resume();
@@ -1007,17 +1080,90 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     private void abort() {
 
+        if(!abort.compareAndSet(false,true)) {
+
+            // It is an error to invoke abort() if it is already in progress.
+            
+            throw new IllegalStateException("Abort already in progress.");
+            
+        }
+        
         try {
 
             assert lock.isHeldByCurrentThread();
 
-            // #of aborts attempted.
+            /*
+             * Interrupt all workers awaiting [commit] - they will throw an
+             * exception that will reach the caller.
+             */
             
-            naborts++;
+            log.info("Interrupting tasks awaiting commit.");
+            
+            Iterator<Map.Entry<Thread,AbstractTask>> itr = active.entrySet().iterator();
+
+            while (itr.hasNext()) {
+
+                Map.Entry<Thread,AbstractTask> entry = itr.next();
+                
+                // set flag to deny access to resources.
+                
+                entry.getValue().aborted = true;
+                
+                // interrupt the thread running the task (do not interrupt this thread).
+                
+                if (Thread.currentThread() != entry.getKey()) {
+                    
+                    entry.getKey().interrupt();
+                    
+                }
+
+            }
+
+            // wait for active tasks to complete.
+
+            log.info("Waiting for running tasks to complete: nrunning="+nrunning);
+
+            while (nrunning.get() > 0) {
+                
+                try {
+
+                    // Note: releases lock so that tasks may complete.
+
+                    waiting.await();
+
+                } catch (InterruptedException ex) {
+
+                    /*
+                     * The current thread was interrupted waiting for the active
+                     * tasks to complete so that we can do the abort. At this
+                     * point:
+                     *  - All write tasks that are awaiting commit have been
+                     * interrupted and will have thrown an exception back to the
+                     * thread that submitted that task.
+                     *  - All write tasks that are still running are being
+                     * impolite and not noticing that they have been
+                     * interrupted.
+                     * 
+                     * There is not a lot that we can do at this point.  For now
+                     * I am just ignoring the interrupt.
+                     */
+
+                    log.warn("Interrupted awaiting running tasks - continuing.");
+                    
+                }
+                
+            }
+            
+            log.info("Doing abort: nrunning="+nrunning);
+            
+            // Nothing is running.
+            assert nrunning.get() == 0;
             
             /*
-             * Note: if the journal was closed asynchronously then do not
-             * attempt to abort the write set.
+             * Note: if the journal was closed asynchronously, e.g., by
+             * shutdownNow(), then do not attempt to abort the write set since
+             * no operations will be permitted on the journal, including an
+             * abort().
              */
 
             if(journal.isOpen()) {
@@ -1028,21 +1174,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            /*
-             * Interrupt all workers awaiting [commit] - they will throw an
-             * exception that will reach the caller.
-             */
+            log.info("Did abort");
             
-            log.warn("Interrupting tasks awaiting commit.");
-            
-            Iterator<Thread> itr = active.iterator();
-
-            while (itr.hasNext()) {
-
-                itr.next().interrupt();
-
-            }
-
         } catch(Throwable t) {
             
             if(journal.isOpen()) {
@@ -1053,6 +1186,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         } finally {
 
+            // increment the #of aborts.
+            
+            naborts++;
+
+            // clear the abort flag.
+            
+            abort.set(false);
+            
             resetState();
             
         }
@@ -1109,6 +1250,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          * 
          */
         private static final long serialVersionUID = 2129883896957364071L;
+
+        public RetryException() {
+            super();
+        }
+
+        public RetryException(String msg) {
+            super(msg);
+        }
         
     }
 

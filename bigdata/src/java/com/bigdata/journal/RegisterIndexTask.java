@@ -56,8 +56,6 @@ public class RegisterIndexTask extends AbstractTask {
      */
     protected Object doTask() throws Exception {
 
-        journal.assertOpen();
-
         String name = getOnlyResource();
 
         try {

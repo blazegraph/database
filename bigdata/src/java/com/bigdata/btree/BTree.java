@@ -620,6 +620,12 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         
         if(l==null) return;
         
+        if(Thread.interrupted()) {
+            
+            throw new RuntimeException(new InterruptedException());
+            
+        }
+        
         l.dirtyEvent(this);
         
         log.info("");
