@@ -85,6 +85,13 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts.
  * 
+ * @todo run tests of transaction throughput using a number of models. E.g., a
+ *       few large indices with a lot of small transactions vs a lot of small
+ *       indices with small transactions vs a few large indices with moderate to
+ *       large transactions. Also look out for transactions where the validation
+ *       and merge on the unisolated index takes more than one group commit
+ *       cycle and see how that effects the application.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

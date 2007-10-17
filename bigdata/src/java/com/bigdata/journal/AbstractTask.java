@@ -109,6 +109,14 @@ public abstract class AbstractTask implements Callable<Object> {
     
     /**
      * The journal against which the operation will be carried out.
+     * <p>
+     * Note: This exposes unconstrained access to the journal that could be used
+     * to violate the concurrency control mechanisms, therefore you SHOULD NOT
+     * use this field unless you have a clear idea what you are about. You
+     * should be able to write all application level tasks in terms of
+     * {@link #getIndex(String)} and operations on the returned index. Using
+     * {@link SequenceTask} you can combine application specific unisolated
+     * write tasks with tasks that add or drop indices into atomic operations.
      */
     protected final ConcurrentJournal journal;
 
@@ -163,6 +171,12 @@ public abstract class AbstractTask implements Callable<Object> {
      */
     final private Map<String,IIndexWithCounter> indexCache;
 
+    /**
+     * Flag is cleared if the task is aborted.  This is used to refuse
+     * access to resources for tasks that ignore interrupts.
+     */
+    boolean aborted = false;
+    
     /**
      * Convenience constructor variant for one named resource.
      * 
@@ -445,101 +459,11 @@ public abstract class AbstractTask implements Callable<Object> {
             } else {
 
                 /*
-                 * Read-write task. We use a delegate to force a schedule on the
-                 * execution tasks that write on unisolated indices.
+                 * Handle unisolated write tasks, which need to coordinate with
+                 * the lock manager for the unisolated indices.
                  */
-                
-                // lock manager.
-                LockManager<String> lockManager = ((ConcurrentJournal) journal).lockManager;
 
-                // resource(s) to lock (exclusive locks are used).
-
-                log.info("Unisolated write task: resources="
-                        + Arrays.toString(resource));
-
-                // declare resource(s).
-                lockManager.addResource(resource);
-
-                // delegate will handle lock acquisition and invoke doTask().
-                Callable<Object> delegate = new LockManagerTask<String>(
-                        lockManager, resource, new InnerWriteServiceCallable());
-                
-                WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
-
-                writeService.beforeTask(Thread.currentThread(), this);
-
-                boolean ran = false;
-
-                try {
-
-                    final Object ret;
-                    
-                    try {
-
-                        /*
-                         * Note: The lock(s) are only held during this call. By the time
-                         * the call returns any lock(s) have been released. Locks MUST
-                         * be released as soon as the task is done writing so that it
-                         * does NOT hold locks while it is awaiting commit. This make it
-                         * possible for other operations to write on the same index in
-                         * the same commit group.
-                         */
-
-                        ret = delegate.call();
-
-                        // set flag.
-                        ran = true;
-                        
-                        /*
-                         * Note: I am choosing NOT to flush dirty indices to the
-                         * store after each task in case other tasks in the same
-                         * commit group want to write on the same index. Flushing an
-                         * index makes its nodes and leaves immutable, and that is
-                         * not desirable if you are going to write on it again soon.
-                         */
-
-                    } finally {
-
-                        /*
-                         * Release hard references to named indices. Dirty indices
-                         * will exist on the Name2Addr's commitList until the next
-                         * commit.
-                         */
-
-                        indexCache.clear();
-
-                    }
-                    
-                    /*
-                     * Note: The WriteServiceExecutor will await a commit signal
-                     * before the thread is allowed to complete. This ensures
-                     * that the caller waits until a commit (or an abort).
-                     * 
-                     * Note: Waiting here does NOT prevent other tasks from
-                     * gaining access to the same resources since the locks were
-                     * released above.
-                     */ 
-
-                    writeService.afterTask(this, null);
-
-                    return ret;
-
-                } catch (Throwable t) {
-
-                    if (!ran) {
-
-                        // Do not re-invoke it afterTask failed above.
-
-                        writeService.afterTask(this, t);
-
-                    }
-
-                    if (t instanceof Exception)
-                        throw (Exception) t;
-
-                    throw new RuntimeException(t);
-
-                }
+                return doReadWriteTask();
                 
             }
 
@@ -549,6 +473,116 @@ public abstract class AbstractTask implements Callable<Object> {
 
         }
         
+    }
+    
+    /**
+     * Call {@link #doTask()} for an unisolated write task.
+     * <p>
+     * Note: This uses a delegate that coordinates with
+     * {@link ConcurrentJournal#lockManager} to force a schedule on tasks that
+     * write on unisolated indices.
+     * 
+     * @throws Exception
+     */
+    private Object doReadWriteTask() throws Exception {
+        
+        // lock manager.
+        LockManager<String> lockManager = ((ConcurrentJournal) journal).lockManager;
+
+        // resource(s) to lock (exclusive locks are used).
+
+        log.info("Unisolated write task: resources="
+                + Arrays.toString(resource));
+
+        // declare resource(s).
+        lockManager.addResource(resource);
+
+        // delegate will handle lock acquisition and invoke doTask().
+        Callable<Object> delegate = new LockManagerTask<String>(
+                lockManager, resource, new InnerWriteServiceCallable());
+        
+        WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
+
+        writeService.beforeTask(Thread.currentThread(), this);
+
+        boolean ran = false;
+
+        try {
+
+            final Object ret;
+            
+            try {
+
+                /*
+                 * Note: The lock(s) are only held during this call. By the time
+                 * the call returns any lock(s) have been released. Locks MUST
+                 * be released as soon as the task is done writing so that it
+                 * does NOT hold locks while it is awaiting commit. This make it
+                 * possible for other operations to write on the same index in
+                 * the same commit group.
+                 */
+
+                ret = delegate.call();
+
+                // set flag.
+                ran = true;
+                
+                /*
+                 * Note: I am choosing NOT to flush dirty indices to the
+                 * store after each task in case other tasks in the same
+                 * commit group want to write on the same index. Flushing an
+                 * index makes its nodes and leaves immutable, and that is
+                 * not desirable if you are going to write on it again soon.
+                 */
+
+            } finally {
+
+                /*
+                 * Release hard references to named indices. Dirty indices
+                 * will exist on the Name2Addr's commitList until the next
+                 * commit.
+                 */
+
+                indexCache.clear();
+
+            }
+            
+            /*
+             * Note: The WriteServiceExecutor will await a commit signal
+             * before the thread is allowed to complete. This ensures
+             * that the caller waits until a commit (or an abort).
+             * 
+             * Note: Waiting here does NOT prevent other tasks from
+             * gaining access to the same resources since the locks were
+             * released above.
+             */ 
+
+            writeService.afterTask(this, null);
+
+            return ret;
+
+        } catch (Throwable t) {
+
+            if (!ran) {
+
+                // Do not re-invoke it afterTask failed above.
+
+                writeService.afterTask(this, t);
+
+            }
+
+            /*
+             * Throw whatever exception was thrown by the task (or by afterTask
+             * if it craps out).
+             */
+            
+            if (t instanceof Exception)
+                throw (Exception) t;
+
+            throw new RuntimeException(t);
+
+        }
+
     }
 
     /**
@@ -704,6 +738,18 @@ public abstract class AbstractTask implements Callable<Object> {
         if(name==null) {
 
             throw new NullPointerException();
+            
+        }
+        
+        if(aborted) {
+            
+            /*
+             * The task has been interrupted by the write service which also
+             * sets the [aborted] flag since the interrupt status may have been
+             * cleared by looking at it.
+             */
+
+            throw new RuntimeException(new InterruptedException());
             
         }
         

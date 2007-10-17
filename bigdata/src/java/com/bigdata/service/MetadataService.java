@@ -56,6 +56,8 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.IndexExistsException;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
 import com.bigdata.scaleup.JournalMetadata;
@@ -627,10 +629,15 @@ abstract public class MetadataService extends DataService implements
             final String metadataName = getMetadataName(name);
             
             // make sure there is no metadata index for that btree.
-            if( journal.getIndex(metadataName) != null ) {
+            try {
                 
-                throw new IllegalStateException("Already registered: name="
-                        + name);
+                getIndex(metadataName);
+                
+                throw new IndexExistsException(metadataName);
+                
+            } catch(NoSuchIndexException ex) {
+
+                // ignore expected exception
                 
             }
 
@@ -831,10 +838,15 @@ abstract public class MetadataService extends DataService implements
             final String metadataName = getMetadataName(name);
             
             // make sure there is no metadata index for that btree.
-            if( journal.getIndex(metadataName) != null ) {
+            try {
+
+                getIndex(metadataName);
                 
-                throw new IllegalStateException("Already registered: name="
-                        + name);
+                throw new IndexExistsException(metadataName);
+                
+            } catch(NoSuchIndexException ex) {
+                
+                // ignore expected exception.
                 
             }
 
@@ -1114,16 +1126,9 @@ abstract public class MetadataService extends DataService implements
             // the name of the metadata index itself.
             final String metadataName = getMetadataName(name);
             
-            // make sure there is no metadata index for that btree.
+            // get the metadata index for that btree.
+            final MetadataIndex mdi = (MetadataIndex) getIndex(metadataName);
             
-            final MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
-            
-            if( mdi == null ) {
-                
-                throw new IllegalStateException("No such index: " + name);
-                
-            }
-
             /*
              * Using the definition of the index partitions _before_ we create
              * the new partition, locate the right separator key of the existing

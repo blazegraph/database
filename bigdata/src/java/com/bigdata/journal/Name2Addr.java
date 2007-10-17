@@ -184,6 +184,38 @@ public class Name2Addr extends BTree {
 
             assert btree == this.ndx;
             
+            {
+                
+                IIndex cached = indexCache.get(name);
+
+                if (cached == null) {
+
+                    /*
+                     * There is no index in the cache for this name. This can
+                     * occur if someone is holding a reference to a mutable
+                     * BTree and they write on it after a commit or abort.
+                     */
+                    
+                    throw new RuntimeException("No index in cache: name="+name);
+
+                }
+
+                if (cached != btree) {
+
+                    /*
+                     * There is a different index in the cache for this name.
+                     * This can occur if someone is holding a reference to a
+                     * mutable BTree and they write on it after a commit or
+                     * abort but the named index has already been re-loaded into
+                     * the cache.
+                     */
+
+                    throw new RuntimeException("Different index in cache: "+name);
+
+                }
+                
+            }
+
             log.info("Adding dirty index to commit list: ndx="+name);
             
             commitList.putIfAbsent(name,this);

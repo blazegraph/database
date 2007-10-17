@@ -138,8 +138,9 @@ public class TestClosedByInterruptException extends ProxyTestCase {
             journal.submit(new InterruptMyselfTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource[0])).get();
             fail("Not expecting success");
         } catch(ExecutionException ex) {
-            log.warn(ex);
-            assertTrue(isInnerCause(ex, ClosedByInterruptException.class));
+            log.warn(ex,ex);
+            assertTrue(isInnerCause(ex, ClosedByInterruptException.class)
+                    || isInnerCause(ex, InterruptedException.class));
         }
 
         /*

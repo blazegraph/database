@@ -31,8 +31,6 @@ public class DropIndexTask extends AbstractTask {
      */
     public Object doTask() throws Exception {
 
-        journal.assertOpen();
-
         String name = getOnlyResource();
 
         try {
