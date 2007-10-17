@@ -54,7 +54,7 @@ import org.CognitiveWeb.concurrent.locking.DeadlockException;
 import org.CognitiveWeb.concurrent.locking.TimeoutException;
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.TestConcurrencyControl.HorridTaskDeath;
+import com.bigdata.concurrent.TestLockManager.HorridTaskDeath;
 
 /**
  * Class encapsulates handshaking with the {@link LockManager} for an operation
@@ -165,8 +165,8 @@ public class LockManagerTask<R extends Comparable<R>> implements
         if (resource == null)
             throw new NullPointerException();
 
-        if (resource.length == 0)
-            throw new IllegalArgumentException();
+//        if (resource.length == 0)
+//            throw new IllegalArgumentException();
         
         for (int i = 0; i < resource.length; i++) {
 

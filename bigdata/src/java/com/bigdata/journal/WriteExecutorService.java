@@ -1060,9 +1060,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
     /**
-     * Abort. Interrupt all running tasks (they could be retried) and abandon
-     * the pending write set.
-     * <p> 
+     * Abort. Interrupt all running tasks (they could be retried), await the
+     * termination of those tasks, and then abandon the pending write set.
+     * <p>
      * Note: This method does NOT throw anything. All exceptions are caught and
      * handled.
      * 
@@ -1070,7 +1070,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * <ul>
      * <li>The caller already owns the {@link #lock} - this ensures that the
      * pre-conditions are atomic since they are under the caller's control.</li>
-     * <li></li>
+     * <li>An abort is not already in progress.</li>
      * </ul>
      * 
      * <h4>Post-conditions</h4>

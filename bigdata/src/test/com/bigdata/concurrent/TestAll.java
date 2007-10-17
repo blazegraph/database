@@ -81,7 +81,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("concurrent");
         
-        suite.addTestSuite(TestConcurrencyControl.class);
+        suite.addTestSuite(TestLockManager.class);
 
         return suite;
         

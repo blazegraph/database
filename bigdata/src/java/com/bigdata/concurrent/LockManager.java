@@ -511,7 +511,9 @@ public class LockManager</*T,*/R extends Comparable<R>> {
              * implement Comparable.
              */
 
-            Arrays.sort(resource.clone());
+            resource = resource.clone();
+            
+            Arrays.sort(resource);
 
         }
 
