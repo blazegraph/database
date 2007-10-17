@@ -78,7 +78,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Suite of stress tests of the concurrency control mechanisms (without the
- * database implementation).
+ * database implementation) - See {@link LockManager}.
  * <p>
  * Goals:
  * <p>
@@ -111,18 +111,18 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestConcurrencyControl extends TestCase implements IComparisonTest {
+public class TestLockManager extends TestCase implements IComparisonTest {
 
-    public static final Logger log = Logger.getLogger(TestConcurrencyControl.class);
+    public static final Logger log = Logger.getLogger(TestLockManager.class);
 
     /**
      * 
      */
-    public TestConcurrencyControl() {
+    public TestLockManager() {
         super();
     }
 
-    public TestConcurrencyControl(String name) {
+    public TestLockManager(String name) {
         super(name);
     }
 
@@ -157,7 +157,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
     }
     
     /**
-     * Dies once it acquires its locks.
+     * Dies once it acquires its locks by throwing {@link HorridTaskDeath}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -437,7 +437,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
     }
 
     /**
-     * Options for {@link TestConcurrencyControl#doComparisonTest(Properties)}.
+     * Options for {@link TestLockManager#doComparisonTest(Properties)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -549,6 +549,28 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         
     }
 
+    public void test_noResourcesDoesNotWait() throws Exception {
+        
+        Properties properties = new Properties();
+        
+        properties.setProperty(TestOptions.NTHREADS,"5");
+        properties.setProperty(TestOptions.NTASKS,"1000");
+        properties.setProperty(TestOptions.NRESOURCES,"10");
+        properties.setProperty(TestOptions.MIN_LOCKS,"0");
+        properties.setProperty(TestOptions.MAX_LOCKS,"0");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"true");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"true");
+        
+        Result result = doComparisonTest(properties);
+        
+        /*
+         * Make sure that the tasks were not single threaded. ideally they will
+         * run with full concurrency (NTHREADS == maxrunning).
+         */
+        assertTrue(Integer.parseInt(result.get("maxrunning"))==5);
+
+    }
+    
     /**
      * Test where each operation locks only a single resource (low concurrency).
      */
@@ -832,7 +854,7 @@ public class TestConcurrencyControl extends TestCase implements IComparisonTest 
         public static void main(String[] args) throws Exception {
             
             // this is the test to be run.
-            String className = TestConcurrencyControl.class.getName();
+            String className = TestLockManager.class.getName();
             
             Map<String,String> defaultProperties = new HashMap<String,String>();
 

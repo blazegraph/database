@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
-<experiment class="com.bigdata.concurrent.TestConcurrencyControl">
+<experiment class="com.bigdata.concurrent.TestLockManager">
  <defaults>
   <property name="ntasks">1000</property>
   <property name="maxLocks">3</property>
