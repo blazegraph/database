@@ -89,11 +89,11 @@ public class TestDiskJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestDiskJournal.class);
 
-        // test suite for handling asynchronous close of the file channel.
-        suite.addTestSuite( TestClosedByInterruptException.class );
-
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
+
+        // test suite for handling asynchronous close of the file channel.
+        suite.addTestSuite( TestInterrupts.class );
 
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
@@ -141,7 +141,7 @@ public class TestDiskJournal extends AbstractTestCase {
 
         Journal journal = new Journal(properties);
 
-        DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal._bufferStrategy;
+        DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal.getBufferStrategy();
 
         assertTrue("isStable", bufferStrategy.isStable());
         assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
@@ -178,6 +178,39 @@ public class TestDiskJournal extends AbstractTestCase {
         protected BufferMode getBufferMode() {
             
             return BufferMode.Disk;
+            
+        }
+
+    }
+    
+    /**
+     * Test suite integration for {@link AbstractInterruptsTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestInterrupts extends AbstractInterruptsTestCase {
+        
+        public TestInterrupts() {
+            super();
+        }
+
+        public TestInterrupts(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
+            
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
             
         }
 

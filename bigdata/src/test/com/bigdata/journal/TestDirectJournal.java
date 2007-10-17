@@ -94,7 +94,7 @@ public class TestDirectJournal extends AbstractTestCase {
         suite.addTestSuite( TestRawStore.class );
         
         // test suite for handling asynchronous close of the file channel.
-        suite.addTestSuite( TestClosedByInterruptException.class );
+        suite.addTestSuite( TestInterrupts.class );
 
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
@@ -142,7 +142,7 @@ public class TestDirectJournal extends AbstractTestCase {
 
         Journal journal = new Journal(properties);
 
-        DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal._bufferStrategy;
+        DirectBufferStrategy bufferStrategy = (DirectBufferStrategy) journal.getBufferStrategy();
 
         assertTrue("isStable", bufferStrategy.isStable());
         assertTrue("isFullyBuffered", bufferStrategy.isFullyBuffered());
@@ -187,6 +187,39 @@ public class TestDirectJournal extends AbstractTestCase {
             
         }
         
+    }
+    
+    /**
+     * Test suite integration for {@link AbstractInterruptsTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestInterrupts extends AbstractInterruptsTestCase {
+        
+        public TestInterrupts() {
+            super();
+        }
+
+        public TestInterrupts(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
+            
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
+            
+        }
+
     }
     
     /**

@@ -90,15 +90,16 @@ public class TestMappedJournal extends AbstractTestCase {
         // tests defined by this class.
         suite.addTestSuite(TestMappedJournal.class);
 
-        /*
-         * Note: You can't re-open a mapped file since you have not control over
-         * when it is unmapped under Java.
-         */
-        // test suite for handling asynchronous close of the file channel.
-//        suite.addTestSuite( TestClosedByInterruptException.class );
-
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
+
+        /*
+         * Note: This suite will doubltless fail since you can't re-open a
+         * mapped file using Java since you have not control over when it is
+         * unmapped.
+         */
+        // test suite for handling asynchronous close of the file channel.
+//        suite.addTestSuite( TestInterrupts.class );
 
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
@@ -146,7 +147,7 @@ public class TestMappedJournal extends AbstractTestCase {
 
         Journal journal = new Journal(properties);
 
-        MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal._bufferStrategy;
+        MappedBufferStrategy bufferStrategy = (MappedBufferStrategy) journal.getBufferStrategy();
 
         assertTrue("isStable", bufferStrategy.isStable());
         assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
@@ -196,6 +197,39 @@ public class TestMappedJournal extends AbstractTestCase {
 
     }
 
+    /**
+     * Test suite integration for {@link AbstractInterruptsTestCase}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestInterrupts extends AbstractInterruptsTestCase {
+        
+        public TestInterrupts() {
+            super();
+        }
+
+        public TestInterrupts(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            Properties properties = getProperties();
+            
+            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+
+            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
+                    .toString());
+            
+            return new Journal(properties).getBufferStrategy();
+            
+        }
+
+    }
+    
     /**
      * Test suite integration for {@link AbstractMROWTestCase}.
      * 

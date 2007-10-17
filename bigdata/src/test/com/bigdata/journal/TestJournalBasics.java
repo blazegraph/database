@@ -134,17 +134,22 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite(StressTestLockContention.class);
         // group commit throughput tests.
         suite.addTestSuite(StressTestGroupCommit.class);
-        // stress tests of the concurrent journal.
+        // @todo review: stress tests of writes on unisolated named indices.
         suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
-        
         /*
          * Stress test of concurrent transactions.
          * 
-         * @todo we could add tests based on known transaction processing
-         * benchmarks here as well.
+         * Note: transactions use unisolated operations on the live indices when
+         * they commit and read against unisolated (but not live) indices so
+         * stress tests written in terms of transactions cover a lot of
+         * territory.
+         * 
+         * @todo add correctness tests here.
+         * 
+         * @todo we add known transaction processing benchmarks here.
          */
         suite.addTestSuite(StressTestConcurrentTx.class);
-
+        
         return suite;
         
     }

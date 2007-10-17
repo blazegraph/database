@@ -325,46 +325,8 @@ public class FileMetadata {
             /*
              * Open/create the file.
              */
-            this.raf = new RandomAccessFile(file, fileMode);
-    
-            if (!readOnly && bufferMode != BufferMode.Mapped) {
-    
-                /*
-                 * Obtain exclusive lock on the file. This is a non-blocking
-                 * request. The lock is released automatically when the channel
-                 * is closed.
-                 * 
-                 * Note: Do not attempt to gain a lock on the file if you are
-                 * going to use a memory-mapped buffer. The JDK cautions that
-                 * these things do not play well together on some platforms.
-                 * 
-                 * Note: tryLock() will fail if the file channel was opened in a
-                 * read-only mode, so we do not attempt to lock files that are
-                 * not being written.
-                 * 
-                 * @todo we should write a semaphore lock file to avoid
-                 * concurrent processes operating on the same journal, including
-                 * the case of a read-only process and a read-write process. The
-                 * JDK tryLock() mechanism is only suited to control access to a
-                 * file from within the same JVM, not across processes. Further,
-                 * tryLock() can not be used when the file channel is read-only.
-                 */
-    
-                final FileLock fileLock = this.raf.getChannel().tryLock();
-    
-                 if (fileLock == null) {
-    
-                    /*
-                     * We were not able to get a lock on the file.
-                     */
-    
-                    throw new RuntimeException("Could not lock file: "
-                            + file.getAbsoluteFile());
-    
-                }
-    
-            }
-            
+            this.raf = openFile(file,fileMode,bufferMode); 
+                
             if (exists) {
     
                 /*
@@ -625,6 +587,7 @@ public class FileMetadata {
                      * Map the file starting from the first byte of the user space
                      * and continuing through the entire user extent.
                      */
+                    log.info("Mapping file="+file);
                     buffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE,
                             headerSize0, userExtent);
                     break;
@@ -645,4 +608,77 @@ public class FileMetadata {
         
     }
     
+    /**
+     * Create/open the file and obtain an exclusive lock where warranted and
+     * supported.
+     * 
+     * @param file
+     *            The file.
+     * @param fileMode
+     *            The file mode for
+     *            {@link RandomAccessFile#RandomAccessFile(File, String)}
+     * @param bufferMode
+     *            The {@link BufferMode} (mapped files do not support exclusive
+     *            locks).
+     * 
+     * @return The {@link RandomAccessFile}
+     * 
+     * @throws IOException
+     *             If the file could not be opened or the lock could not be
+     *             obtained.
+     */
+    public static RandomAccessFile openFile(File file, String fileMode, BufferMode bufferMode) throws IOException {
+        
+        final boolean readOnly = "r".equals(fileMode);
+        
+        RandomAccessFile raf = new RandomAccessFile(file, fileMode);
+        
+        if (!readOnly && bufferMode != BufferMode.Mapped) {
+
+            /*
+             * Obtain exclusive lock on the file. This is a non-blocking
+             * request. The lock is released automatically when the channel
+             * is closed.
+             * 
+             * Note: Do not attempt to gain a lock on the file if you are
+             * going to use a memory-mapped buffer. The JDK cautions that
+             * these things do not play well together on some platforms.
+             * 
+             * Note: tryLock() will fail if the file channel was opened in a
+             * read-only mode, so we do not attempt to lock files that are
+             * not being written.
+             * 
+             * @todo we should write a semaphore lock file to avoid
+             * concurrent processes operating on the same journal, including
+             * the case of a read-only process and a read-write process. The
+             * JDK tryLock() mechanism is only suited to control access to a
+             * file from within the same JVM, not across processes. Further,
+             * tryLock() can not be used when the file channel is read-only.
+             */
+
+            final FileLock fileLock = raf.getChannel().tryLock();
+
+            if (fileLock == null) {
+
+                try {
+                    raf.close();
+                } catch (Throwable t) {
+                    log.warn(t);
+                }
+
+                /*
+                 * We were not able to get a lock on the file.
+                 */
+
+                throw new RuntimeException("Could not lock file: "
+                        + file.getAbsoluteFile());
+
+            }
+
+        }
+
+        return raf;
+
+    }
+
 }

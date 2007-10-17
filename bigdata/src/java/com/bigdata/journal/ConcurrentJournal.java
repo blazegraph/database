@@ -182,6 +182,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         /**
          * The default #of threads in the write service thread pool (1000).
+         * 
+         * @todo This SHOULD automatically increase up to
+         *       {@link #WRITE_SERVICE_MAXIMUM_POOL_SIZE} under demand but I have not
+         *       been observing that.  If it does, then drop the default value down
+         *       to something much smaller, e.g., 10-50.
          */
         public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "1000";
         
@@ -760,27 +765,27 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             return "status"
                     + // txService (#active,#queued,#completed)
                     ": transactions=("
-                    + ((ThreadPoolExecutor) txService).getActiveCount()
-                    + ","
                     + ((ThreadPoolExecutor) txService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) txService).getActiveCount()
                     + ","
                     + ((ThreadPoolExecutor) txService)
                             .getCompletedTaskCount()
                     + ")"
                     + // readService (#active,#queued,#completed)
                     ", readers=("
-                    + ((ThreadPoolExecutor) readService).getActiveCount()
-                    + ","
                     + ((ThreadPoolExecutor) readService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) readService).getActiveCount()
                     + ","
                     + ((ThreadPoolExecutor) readService)
                             .getCompletedTaskCount()
                     + ")"
                     + // writeService (#active,#queued,#completed)
                     ", writers=("
-                    + ((ThreadPoolExecutor) writeService).getActiveCount()
-                    + ","
                     + ((ThreadPoolExecutor) writeService).getQueue().size()
+                    + ","
+                    + ((ThreadPoolExecutor) writeService).getActiveCount()
                     + ","
                     + ((ThreadPoolExecutor) writeService)
                             .getCompletedTaskCount()

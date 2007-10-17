@@ -94,6 +94,9 @@ public class TestTransientJournal extends AbstractTestCase {
         // test suite for the IRawStore api.
         suite.addTestSuite( TestRawStore.class );
 
+        // Note: test suite not used since there is no file channel to be closed by interrupts.
+//        suite.addTestSuite( TestInterrupts.class );
+
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
 
@@ -136,7 +139,7 @@ public class TestTransientJournal extends AbstractTestCase {
 
         Journal journal = new Journal(properties);
 
-        TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal._bufferStrategy;
+        TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal.getBufferStrategy();
 
         assertFalse("isStable",bufferStrategy.isStable());
         assertTrue("isFullyBuffered",bufferStrategy.isFullyBuffered());

@@ -51,7 +51,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -265,7 +264,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     /**
      * The implementation logic for the current {@link BufferMode}.
      */
-    /*final*/ /*package private*/ IBufferStrategy _bufferStrategy;
+    final private IBufferStrategy _bufferStrategy;
 
     /**
      * The object used by the journal to compute the checksums of its root
@@ -372,6 +371,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         int offsetBits = Options.DEFAULT_OFFSET_BITS;
         boolean validateChecksum = true;
         boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
+        int writeCacheCapacity = Options.DEFAULT_WRITE_CACHE_CAPACITY;
         boolean create = Options.DEFAULT_CREATE;
         boolean createTempFile = Options.DEFAULT_CREATE_TEMP_FILE;
         boolean isEmptyFile = false;
@@ -420,6 +420,28 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
             useDirectBuffers = Boolean.parseBoolean(val);
             
             log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
+
+        }
+
+        /*
+         * "writeCache"
+         */
+
+        val = properties.getProperty(Options.WRITE_CACHE_CAPACITY);
+
+        if (val != null) {
+
+            writeCacheCapacity = Integer.parseInt(val);
+
+            if (writeCacheCapacity > 0 && writeCacheCapacity < Bytes.megabyte) {
+
+                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
+                        + " must be ZERO (0) or at least 1M (" + Bytes.megabyte
+                        + ")");
+                
+            }
+            
+            log.info(Options.WRITE_CACHE_CAPACITY+"="+writeCacheCapacity);
 
         }
 
@@ -830,7 +852,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
                     checker);
 
             _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
+                    0L/* soft limit for maximumExtent */, fileMetadata,
+                    writeCacheCapacity);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1166,15 +1189,14 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     public void abort() {
 
+        log.info("start");
+        
         // clear the root addresses - they will be reloaded.
         _commitRecord = null;
 
         // clear the array of committers.
         _committers = new ICommitter[_committers.length];
 
-        // reopen the store iff closed asynchronously by interrupted channel IO.
-        reopenAfterInterrupt();
-        
         /*
          * Re-load the commit record index from the address in the current root
          * block.
@@ -1183,7 +1205,14 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * on this index is a single record during each commit. So, it should be
          * valid to simply catch an error during a commit and discard this index
          * forcing its reload. However, doing this here is definately safer.
+         * 
+         * Note: This reads on the store. If the backing channel for a stable
+         * store was closed by an interrupt, e.g., during an abort of a group
+         * commit, then this will cause the backing channel to be transparent
+         * re-opened.  At that point both readers and writers will be able to
+         * access the channel again.
          */
+        
         _commitRecordIndex = getCommitRecordIndex(_rootBlock
                 .getCommitRecordIndexAddr());
 
@@ -1192,98 +1221,100 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         // setup new committers, e.g., by reloading from their last root addr.
         setupCommitters();
+        
+        log.info("done");
 
     }
     
-    /**
-     * When the journal is backed by a disk file and the file channel was
-     * asynchronously closed by an interrupt during an IO operation then this
-     * method will re-open the file.
-     * 
-     * FIXME Re-acquire the exclusive lock when we re-open the store.
-     * 
-     * @todo encapsulate this logic better.
-     * 
-     * @todo verify that a mapped store will not let us do this. if it does then
-     *       that is a great way to get the thing un-mapped!
-     */
-    private void reopenAfterInterrupt() {
-        
-        /*
-         * Note: clear the interrupted flag in case it is still set on
-         * this thread.  (It is the thread that is conducting the group
-         * commit that winds up doing the abort.)
-         */
-        Thread.interrupted();
-        
-        if (_bufferStrategy.isStable() && _bufferStrategy.isOpen() ) {
-            
-            switch (_bufferStrategy.getBufferMode()) {
-
-            case Direct: {
-                
-                DirectBufferStrategy bs = (DirectBufferStrategy) _bufferStrategy;
-            
-                if (!bs.getChannel().isOpen()) {
-
-                    try {
-
-                        bs.raf = new RandomAccessFile(fileMetadata.file,
-                                fileMetadata.fileMode);
-
-                        log.warn("Re-opened file closed by asynchronous interrupt");
-
-                    } catch (Throwable t) {
-
-                        throw new RuntimeException("Could not reopen file: "
-                                + fileMetadata.file + " : " + t, t);
-
-                    }
-                    
-                }
-                
-                break;
-                
-            }
-            
-            case Disk: {
-                
-                DiskOnlyStrategy bs = (DiskOnlyStrategy) _bufferStrategy;
-
-                if (!bs.getChannel().isOpen()) {
-
-                    try {
-
-                        bs.raf.close();
-                        
-                        bs.raf = new RandomAccessFile(fileMetadata.file,
-                                fileMetadata.fileMode);
-                        
-                        log.warn("Re-opened file closed by asynchronous interrupt");
-
-                    } catch (Throwable t) {
-
-                        throw new RuntimeException("Could not reopen file: "
-                                + fileMetadata.file + " : " + t, t);
-
-                    }
-                    
-                }
-                
-                break;
-                
-            }
-
-            case Mapped:
-            
-            default:
-                throw new UnsupportedOperationException();
-
-            }
-            
-        }
-
-    }
+//    /**
+//     * When the journal is backed by a disk file and the file channel was
+//     * asynchronously closed by an interrupt during an IO operation then this
+//     * method will re-open the file.
+//     * <p>
+//     * Note:we need the filename and the fileMode to re-open the channel.
+//     * 
+//     * @todo encapsulate this logic better.
+//     * 
+//     * @todo verify that a mapped store will not let us do this. if it does then
+//     *       that is a great way to get the thing un-mapped!
+//     */
+//    private void reopenAfterInterrupt() {
+//        
+//        /*
+//         * Note: clear the interrupted flag in case it is still set on
+//         * this thread.  (It is the thread that is conducting the group
+//         * commit that winds up doing the abort.)
+//         */
+//        Thread.interrupted();
+//        
+//        if (_bufferStrategy.isStable() && _bufferStrategy.isOpen() ) {
+//            
+//            switch (_bufferStrategy.getBufferMode()) {
+//
+//            case Direct: {
+//                
+//                DirectBufferStrategy bs = (DirectBufferStrategy) _bufferStrategy;
+//            
+//                if (!bs.getChannel().isOpen()) {
+//
+//                    try {
+//
+//                        bs.raf = new RandomAccessFile(fileMetadata.file,
+//                                fileMetadata.fileMode);
+//
+//                        log.warn("Re-opened file closed by asynchronous interrupt");
+//
+//                    } catch (Throwable t) {
+//
+//                        throw new RuntimeException("Could not reopen file: "
+//                                + fileMetadata.file + " : " + t, t);
+//
+//                    }
+//                    
+//                }
+//                
+//                break;
+//                
+//            }
+//            
+//            case Disk: {
+//                
+//                DiskOnlyStrategy bs = (DiskOnlyStrategy) _bufferStrategy;
+//
+//                if (!bs.getChannel().isOpen()) {
+//
+//                    try {
+//
+//                        bs.raf.close();
+//                        
+//                        bs.raf = new RandomAccessFile(fileMetadata.file,
+//                                fileMetadata.fileMode);
+//                        
+//                        log.warn("Re-opened file closed by asynchronous interrupt");
+//
+//                    } catch (Throwable t) {
+//
+//                        throw new RuntimeException("Could not reopen file: "
+//                                + fileMetadata.file + " : " + t, t);
+//
+//                    }
+//                    
+//                }
+//                
+//                break;
+//                
+//            }
+//
+//            case Mapped:
+//            
+//            default:
+//                throw new UnsupportedOperationException();
+//
+//            }
+//            
+//        }
+//
+//    }
     
     /**
      * Note: This method can not be implemented by the {@link AbstractJournal}
@@ -1675,6 +1706,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     private CommitRecordIndex getCommitRecordIndex(long addr) {
 
+        log.info("");
+        
         CommitRecordIndex ndx;
 
         if (addr == 0L) {

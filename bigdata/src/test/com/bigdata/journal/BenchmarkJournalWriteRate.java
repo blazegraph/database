@@ -369,11 +369,11 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         Journal store = journal;
         
-        System.err.println("Begin: bufferMode="+journal._bufferStrategy.getBufferMode());
+        System.err.println("Begin: bufferMode="+journal.getBufferStrategy().getBufferMode());
 
         final long begin = System.currentTimeMillis();
         
-        final int nwrites = (int) journal._bufferStrategy.getUserExtent()
+        final int nwrites = (int) journal.getBufferStrategy().getUserExtent()
                 / writeSize;
         
         System.err.println("writeSize=" + writeSize + ", nwrites=" + nwrites);
@@ -401,7 +401,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         final double writeRate = (bytesWritten/(double)Bytes.megabyte) / (elapsed / 1000d);
         
         System.err.println("Elapsed: " + elapsed + "(ms), bufferMode="
-                + journal._bufferStrategy.getBufferMode() + ", recordSize="
+                + journal.getBufferStrategy().getBufferMode() + ", recordSize="
                 + cf.format(writeSize) + ", nwrites=" + cf.format(nwrites)
                 + ", writeRate=" + fpf.format(writeRate) + "MB/sec");
 
@@ -452,13 +452,13 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         System.err.println("Begin: index write rate, isolated="
                 + (tx == 0 ? "no" : "yes") + ", isolatable="
                 + (ndx instanceof IIsolatableIndex) + ", bufferMode="
-                + journal._bufferStrategy.getBufferMode());
+                + journal.getBufferStrategy().getBufferMode());
 
         // target percentage full to avoid journal overflow.
         final double percentFull = .90;
 
         // #of entries to insert into the index.
-        final int nwrites = (int) (journal._bufferStrategy.getExtent()
+        final int nwrites = (int) (journal.getBufferStrategy().getExtent()
                 * percentFull / valueSize);
 
         final long begin;
@@ -560,7 +560,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         final double writeRate = (bytesWritten/(double)Bytes.megabyte) / (elapsed / 1000d);
         
         System.err.println("Elapsed: " + elapsed + "(ms), bufferMode="
-                + journal._bufferStrategy.getBufferMode() + ", valueSize="
+                + journal.getBufferStrategy().getBufferMode() + ", valueSize="
                 + cf.format(valueSize) + ", ninserts=" + cf.format(nwrites)
                 + ", nrecordsWritten=" + recordsWritten
                 + ", averageRecordSize=" + fpf.format(averageRecordSize)

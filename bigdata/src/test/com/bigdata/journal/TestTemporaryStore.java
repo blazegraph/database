@@ -102,7 +102,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         suite.addTestSuite( TestRawStore.class );
 
         // test suite for handling asynchronous close of the file channel.
-        suite.addTestSuite( TestClosedByInterruptException.class );
+        suite.addTestSuite( TestInterrupts.class );
         
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
@@ -145,6 +145,44 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
             return new TemporaryRawStore();
         }
 
+    }
+    
+    /**
+     * Test suite integration for {@link TestInterrupts}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestInterrupts extends AbstractInterruptsTestCase {
+        
+        public TestInterrupts() {
+            super();
+        }
+
+        public TestInterrupts(String name) {
+            super(name);
+        }
+
+        protected IRawStore getStore() {
+
+            /*
+             * Note: The TemporaryRawStore transitions from a transient store
+             * (fully buffered, so interrupts can not cause the channel to be
+             * closed) to a disk-only store (already knows how to handle
+             * interrupts).
+             * 
+             * The only place where interrupts could be a problem is during a
+             * transition from transient to disk-only.
+             */
+            return new TemporaryRawStore(
+                    WormAddressManager.DEFAULT_OFFSET_BITS,
+                    0, // DEFAULT_INITIAL_IN_MEMORY_EXTENT,
+                    0, //DEFAULT_MAXIMUM_IN_MEMORY_EXTENT
+                    false // use direct buffers.
+                    );
+            
+        }
+        
     }
     
     /**

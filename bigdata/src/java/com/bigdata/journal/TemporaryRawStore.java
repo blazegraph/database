@@ -51,6 +51,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IMRMW;
@@ -76,6 +78,8 @@ import com.bigdata.util.ChecksumUtility;
  */
 public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore, IMROW {
 
+    protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
+    
     protected final static int DEFAULT_INITIAL_IN_MEMORY_EXTENT = Bytes.megabyte32 * 10;
 
     protected final static int DEFAULT_MAXIMUM_IN_MEMORY_EXTENT = Bytes.megabyte32 * 100;
@@ -248,7 +252,17 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
     }
 
-    public ByteBuffer read(long addr) {
+    /**
+     * FIXME readers and writers are being serialized since in order to ensure
+     * that {@link #overflowToDisk()} is invoked during a time when no reader
+     * and no other writer is trying to access the store. Examine ways to
+     * increase the concurrency here. Both the transient and the disk-only modes
+     * are fully {@link IMRMW}. It is only the transition that requires us to
+     * serialize access.  Also note that the write task can wait when it needs
+     * to {@link #overflowToDisk()} since readers can continue to read against
+     * the transient buffer (as long as the write task eventually runs).
+     */
+    synchronized public ByteBuffer read(long addr) {
 
         if(!open) throw new IllegalStateException();
 
@@ -297,9 +311,22 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
     }
 
-    protected void overflowToDisk() {
+    /**
+     * Spills the in-memory buffer onto the disk and replaces the
+     * {@link TransientBufferStrategy} with a {@link DiskOnlyStrategy}.
+     * <p>
+     * Note: The TemporaryRawStore transitions from a transient store (fully
+     * buffered, so interrupts can not cause the channel to be closed) to a
+     * disk-only store (already knows how to handle interrupts).
+     * <p>
+     * The only place where interrupts could be a problem is during a transition
+     * from transient to disk-only, i.e., in this method. However, we already
+     * force readers and writers to synchronize for an overflow event so there
+     * will only be the one writer running when this method is invoked.
+     */
+    private void overflowToDisk() {
 
-        System.err.println("TemporaryRawStore: overflow to disk; nbytes="
+        log.info("TemporaryRawStore: overflow to disk; nbytes="
                 + buf.getNextOffset());
         
         TransientBufferStrategy tmp = (TransientBufferStrategy)buf;
@@ -351,7 +378,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,
-                fileMetadata);
+                fileMetadata, Bytes.megabyte32 /*writeCacheCapacity*/);
 
         try {
 

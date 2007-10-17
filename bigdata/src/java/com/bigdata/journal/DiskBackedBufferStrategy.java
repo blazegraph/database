@@ -46,6 +46,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 /**
@@ -79,6 +80,11 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     final File file;
 
     /**
+     * The mode used to open the backing file.
+     */
+    final String fileMode;
+    
+    /**
      * Interface for random access on the backing file.
      */
     /*final*/ RandomAccessFile raf;
@@ -103,7 +109,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     
     final public FileChannel getChannel() {
 
-        return raf.getChannel();
+        return getRandomAccessFile().getChannel();
         
     }
     
@@ -134,6 +140,11 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
      * Closes the file.
      */
     public void close() {
+
+        /*
+         * Note: this clears the [open] flag. It is important to do this first
+         * so that we do not re-open the channel once it has been closed.
+         */
 
         super.close();
 
@@ -170,6 +181,8 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
                 fileMetadata.buffer);
 
         this.file = fileMetadata.file;
+        
+        this.fileMode = fileMetadata.fileMode;
         
         this.raf = fileMetadata.raf;
         
@@ -218,4 +231,81 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
+    /**
+     * The backing file is fully buffered so it does not need to be open for a
+     * read to succeed. However, we use this as an opportunity to transparently
+     * re-open the {@link FileChannel} if it has been closed asynchronously or
+     * in response to an interrupt (that is, if we discover that the channel is
+     * closed but {@link #isOpen()} still returns true).
+     */
+    public ByteBuffer read(long addr) {
+        
+        if(isOpen() && !raf.getChannel().isOpen()) {
+            
+            reopenChannel();
+            
+        }
+        
+        return super.read(addr);
+        
+    }
+        
+    /**
+     * This method transparently re-opens the channel for the backing file.
+     * <p>
+     * Note: This method is synchronized so that concurrent readers do not try
+     * to all open the store at the same time.
+     * <p>
+     * Note: This method is ONLY invoked by readers. This helps to ensure that a
+     * writer that has been interrupted can not regain access to the channel (it
+     * does not prevent it, but re-opening for writers is asking for trouble).
+     * 
+     * @return true iff the channel was re-opened.
+     * 
+     * @throws IllegalStateException
+     *             if the buffer strategy has been closed.
+     *             
+     * @throws RuntimeException
+     *             if the backing file can not be opened (can not be found or
+     *             can not acquire a lock).
+     */
+    synchronized private boolean reopenChannel() {
+        
+        if(raf.getChannel().isOpen()) {
+            
+            /* The channel is still open.  If you are allowing concurrent reads
+             * on the channel, then this could indicate that two readers each 
+             * found the channel closed and that one was able to re-open the
+             * channel before the other such that the channel was open again
+             * by the time the 2nd reader got here.
+             */
+            
+            return true;
+            
+        }
+        
+        if(!isOpen()) {
+
+            // the buffer strategy has been closed.
+            
+            return false;
+            
+        }
+
+        try {
+
+            raf = FileMetadata.openFile(file, fileMode, bufferMode);
+        
+            log.warn("Re-opened file: "+file);
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
+        return true;
+        
+    }
+    
 }

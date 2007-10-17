@@ -85,6 +85,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * commit followed by either the use of SDD for the journal or pipelining writes
  * to secondary journals on failover hosts.
  * 
+ * FIXME Finish support for transactions in {@link AbstractTask}.
+ * 
  * @todo run tests of transaction throughput using a number of models. E.g., a
  *       few large indices with a lot of small transactions vs a lot of small
  *       indices with small transactions vs a few large indices with moderate to
@@ -92,6 +94,21 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       and merge on the unisolated index takes more than one group commit
  *       cycle and see how that effects the application.
  * 
+ * @todo Verify proper partial ordering over transaction schedules (runs tasks
+ *       in parallel, uses exclusive locks for access to the same isolated index
+ *       within the same transaction, and schedules their commits using a
+ *       partial order based on the indices that were actually written on).
+ *       <p>
+ *       Verify that only the indices that were written on are used to establish
+ *       the partial order, not any index from which the tx might have read.
+ * 
+ * @todo test writing on multiple isolated indices in the different transactions
+ *       and verify that no concurrency limits are imposed across transactions
+ *       (only within transactions).
+ * 
+ * @todo show state-based validation for concurrent transactions on the same
+ *       index that result in write-write conflicts.
+ *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -314,6 +331,12 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         Result ret = new Result();
         
+        /*
+         * #of bytes written on the backing store (does not count writes on the
+         * temporary stores that back the isolated indices).
+         */
+        final long bytesWritten = journal.getRootBlockView().getNextOffset();
+        
         // these are the results.
         ret.put("ninterupt",""+ninterrupt);
         ret.put("nretry",""+nretry);
@@ -324,6 +347,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         ret.put("nuncommitted", ""+nuncommitted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("tps", ""+(ncommitted * 1000 / elapsed));
+        ret.put("bytesWritten", ""+bytesWritten);
+        ret.put("bytesWritten/sec", ""+(int)(bytesWritten*1000d/elapsed));
         
         System.err.println(ret.toString(true/*newline*/));
         
@@ -452,8 +477,6 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
     /**
      * Runs a single instance of the test as configured in the code.
-     * 
-     * @todo compute the bytes/second rate on the journal for this test.
      * 
      * @todo test with more than one named index in use.
      * 
