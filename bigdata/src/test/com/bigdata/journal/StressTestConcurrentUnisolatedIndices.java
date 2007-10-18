@@ -47,7 +47,9 @@ Modifications:
 
 package com.bigdata.journal;
 
+import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,11 +59,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -72,12 +71,9 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Stress tests for concurrent processing of operations on named unisolated indices.
- * 
- * FIXME refactor to use {@link ConcurrentJournal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -126,25 +122,38 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 //            
 //        }
 
-        doConcurrentClientTest(journal, 5, 20, 100, 3, 100);
+        doConcurrentClientTest(journal,//
+                5,// timeout
+                20,// nresources
+                1, // minLocks
+                3, // maxLocks
+                100, // ntrials
+                3, // keyLen
+                100, // nops
+                0.02d // failureRate
+        );
         
     }
 
     /**
-     * A stress test with a pool of concurrent clients.
+     * A stress test of concurrent writers on one or more named indices.
      * 
      * @param journal
      *            The database.
      * 
-     * @param resource
-     *            The name of the index on which the transactions will
-     *            operation.
-     * 
      * @param timeout
      *            The #of seconds before the test will terminate.
      * 
-     * @param nclients
-     *            The #of concurrent clients.
+     * @param nresources
+     *            The #of named indices that will be used by the tasks.
+     * 
+     * @param minLocks
+     *            The minimum #of resources in which a writer will obtain a lock
+     *            in [<i>0</i>:<i>nresources</i>].
+     * 
+     * @param maxLocks
+     *            The maximum #of resources in which a writer will obtain a lock
+     *            in [<i>minLocks</i>:<i>nresources</i>].
      * 
      * @param ntrials
      *            The #of transactions to execute.
@@ -158,49 +167,106 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      * @param nops
      *            The #of operations to be performed in each transaction.
      * 
+     * @param failureRate
+     *            The percentage of {@link Writer}s that will throw a
+     *            {@link SpuriousException} rather than completing normally.
+     * 
      * @todo factor out the operation to be run as a test parameter?
      */
-    static public Result doConcurrentClientTest(Journal journal,
-            long timeout, int nclients, int ntrials, int keyLen, int nops)
+    static public Result doConcurrentClientTest(Journal journal, long timeout,
+            int nresources, int minLocks, int maxLocks, int ntrials,
+            int keyLen, int nops, double failureRate)
             throws InterruptedException {
         
-        final String name = "abc";
+        if(journal==null) throw new IllegalArgumentException();
         
-        { // Setup the named index and commit the journal.
+        if(timeout<=0) throw new IllegalArgumentException();
+        
+        if(nresources<=0) throw new IllegalArgumentException();
+        
+        if(minLocks<0) throw new IllegalArgumentException();
+        
+        if(maxLocks<minLocks||maxLocks>nresources) throw new IllegalArgumentException();
+        
+        if(ntrials<1) throw new IllegalArgumentException();
+
+        if(keyLen<1) throw new IllegalArgumentException();
+        
+        if(nops<0) throw new IllegalArgumentException();
+
+        if(failureRate<0.0||failureRate>1.0) throw new IllegalArgumentException();
+        
+        Random r = new Random();
+
+        /*
+         * Setup the named resources/indices.
+         */
+        final String[] resources = new String[nresources];
+        {
+         
+            for(int i=0; i<nresources; i++) {
             
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
+                resources[i] = "index#"+i;
+                
+                journal.registerIndex(resources[i], new UnisolatedBTree(journal, UUID.randomUUID()));
+                
+            }
             
             journal.commit();
             
         }
         
-        ExecutorService executorService = Executors.newFixedThreadPool(
-                nclients, DaemonThreadFactory.defaultThreadFactory());
+        System.err.println("Created indices: "+Arrays.toString(resources));
+
+        /*
+         * Setup the tasks that we will submit.
+         */
         
-        Collection<Callable<Object>> tasks = new HashSet<Callable<Object>>(); 
+        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(); 
 
         ConcurrentHashMap<IIndex, Thread> btrees = new ConcurrentHashMap<IIndex, Thread>();
         
         for(int i=0; i<ntrials; i++) {
+
+            // choose nlocks and indices to use.
             
-            tasks.add(new WriteTask(journal, name, keyLen, nops, btrees));
+            int nlocks = r.nextInt(maxLocks-minLocks)+minLocks;
             
+            assert nlocks>=minLocks && nlocks<=maxLocks;
+            
+            Collection<String> tmp = new HashSet<String>(nlocks);
+            
+            while(tmp.size()<nlocks) {
+
+                tmp.add(resources[r.nextInt(nresources)]);
+                
+            }
+            
+            String[] resource = tmp.toArray(new String[nlocks]);
+            
+            tasks.add(new WriteTask(journal, resource, keyLen, nops, failureRate, btrees));
+
         }
 
         /*
-         * Run the M transactions on N clients.
+         * Run all tasks and wait for up to the timeout for them to complete.
          */
+
+        System.err.println("Submitting "+tasks.size()+" tasks");
         
         final long begin = System.currentTimeMillis();
-        
-        List<Future<Object>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+
+        final List<Future<Object>> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
-        
+
+        /*
+         * Examine the futures to see how things went.
+         */
         Iterator<Future<Object>> itr = results.iterator();
         
         int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
-        int naborted = 0; // #of transactions that choose to abort rather than commit.
+//        int naborted = 0; // #of transactions that choose to abort rather than commit.
         int ncommitted = 0; // #of transactions that successfully committed.
         int nuncommitted = 0; // #of transactions that did not complete in time.
         
@@ -244,7 +310,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
         }
 
-        journal.shutdown();
+        journal.shutdownNow();
         
         journal.delete();
                 
@@ -264,7 +330,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         ret.put("nuncommitted", ""+nuncommitted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("bytesWrittenPerSec", ""+bytesWrittenPerSecond);
-        ret.put("ops", ""+(ncommitted * 1000 / elapsed));
+        ret.put("tasks/sec", ""+(ncommitted * 1000 / elapsed));
+        ret.put("maxRunning", ""+journal.writeService.getMaxRunning());
+        ret.put("maxPoolSize", ""+journal.writeService.getMaxPoolSize());
+        ret.put("maxLatencyUntilCommit", ""+journal.writeService.getMaxLatencyUntilCommit());
+        ret.put("maxCommitLatency", ""+journal.writeService.getMaxCommitLatency());
 
         System.err.println(ret.toString(true/*newline*/));
         
@@ -273,31 +343,28 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
     }
     
     /**
-     * A task that writes on a named unisolated index.
-     * <p>
-     * Note: defers creation of the tx until it begins to execute! This provides
-     * a substantial resource savings and lets transactions begin execution
-     * immediately.
+     * A task that writes on named unisolated index(s).
      */
-    public static class WriteTask implements Callable<Object> {
+    public static class WriteTask extends AbstractTask {
 
-        private final Journal journal;
-        private final String name;
         private final int keyLen;
         private final int nops;
+        private final double failureRate;
         private final ConcurrentHashMap<IIndex, Thread> btrees;
         
         final Random r = new Random();
         
-        public WriteTask(Journal journal,String name, int keyLen, int nops, ConcurrentHashMap<IIndex, Thread>btrees) {
+        public WriteTask(ConcurrentJournal journal, String[] resource,
+                int keyLen, int nops, double failureRate,
+                ConcurrentHashMap<IIndex, Thread> btrees) {
 
-            this.journal = journal;
+            super(journal, ITx.UNISOLATED, false/* readOnly */, resource);
 
-            this.name = name;
-            
             this.keyLen = keyLen;
             
             this.nops = nops;
+            
+            this.failureRate = failureRate;
             
             this.btrees = btrees;
             
@@ -308,22 +375,34 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * 
          * @return null
          */
-        public Object call() throws Exception {
+        public Object doTask() throws Exception {
 
-            final IIndex ndx = journal.getIndex(name);
+            // the index names on which the writer holds a lock.
+            final String[] resource = getResource();
+            
+            IIndex[] indices = new IIndex[resource.length];
+            
+            for (int i = 0; i < resource.length; i++) {
 
-            if (btrees.put(ndx, Thread.currentThread()) != null) {
+                indices[i] = journal.getIndex(resource[i]);
 
-                throw new AssertionError("Unisolated index already in use");
+                if (btrees.put(indices[i], Thread.currentThread()) != null) {
+
+                    throw new AssertionError(
+                            "Unisolated index already in use: " + resource[i]);
+
+                }
 
             }
-
+            
             try {
 
                 // Random write operations on the named index(s).
 
                 for (int i = 0; i < nops; i++) {
 
+                    IIndex ndx = indices[i % resource.length];
+                    
                     byte[] key = new byte[keyLen];
 
                     r.nextBytes(key);
@@ -344,14 +423,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
                 }
 
-                /*
-                 * the percentage of operation will throw a suprious error.
-                 * 
-                 * @todo make parameter to stress test.
-                 */
-                final double failureRate = 0.01d;
-
-                if (r.nextDouble() > failureRate) {
+                if (r.nextDouble() < failureRate) {
 
                     throw new SpuriousException();
 
@@ -361,7 +433,13 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                 
             } finally {
 
-                btrees.remove(ndx);
+                for(int i=0; i<resource.length; i++) {
+
+                    IIndex ndx = indices[i];
+                    
+                    if(ndx!=null) btrees.remove(ndx);
+                    
+                }
 
             }
             
@@ -370,6 +448,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
     }
     
     /**
+     * Thrown by a {@link Writer} if it is selected for abort based on the
+     * {@link TestOptions#FAILURE_RATE}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -390,24 +470,19 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      *       journal maximum extent is required since the journal will otherwise
      *       overflow.
      * 
-     * @todo add parameter for the #of named indices in use.
-     * 
-     * @todo provide separate parameters for the #of unisolated readers (from
-     *       the last commit record) and unisolated writers (on the current
-     *       index object).
-     * 
      * @todo can we get to the point of being IO bound with lots of small write
      *       operations on lots of indices using Disk and a 2CPUs? 4CPUs? With
-     *       larger write operations?  With fewer indices?  Is there a point at
-     *       which we need to use a blocking queue for new operations and cause
-     *       the clients to wait?
+     *       larger write operations? With fewer indices?
      * 
-     * @todo vary the #of indices on which a given operation requires a lock.
-     *       this could be done on a gaussian basis (most need one, some need 3
-     *       or 4) or as (minLocks, maxLocks).
+     * @todo How does the size of the thread pool trade off against the queue
+     *       length for a variety of conditions?
      * 
      * @todo Try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong.
+     * 
+     * @todo use the failureRate to vet a strategy where we checkpoint indices
+     *       after each task and rollback to the prior checkpoint iff a task
+     *       fails rather than discarding the entire commit group.
      * 
      * @see ExperimentDriver
      * @see GenerateExperiment
@@ -416,28 +491,37 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         Properties properties = new Properties();
 
-        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
+        // avoids journal overflow when running out to 60 seconds.
+        properties.put(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);
+
+//        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
         
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
 
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
         properties.setProperty(TestOptions.TIMEOUT,"60");
 
-        properties.setProperty(TestOptions.NCLIENTS,"10");
+        properties.setProperty(TestOptions.NRESOURCES,"10");
+
+        properties.setProperty(TestOptions.MIN_LOCKS,"1");
+        
+        properties.setProperty(TestOptions.MAX_LOCKS,"3");
 
         properties.setProperty(TestOptions.NTRIALS,"10000");
 
         properties.setProperty(TestOptions.KEYLEN,"4");
 
         properties.setProperty(TestOptions.NOPS,"4");
-        
+
+        properties.setProperty(TestOptions.FAILURE_RATE,"0.00");
+
         IComparisonTest test = new StressTestConcurrentUnisolatedIndices();
         
         test.setUpComparisonTest(properties);
@@ -468,14 +552,28 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
     public static class TestOptions extends Options {
 
         /**
-         * The timeout for the test.
+         * The timeout for the test (seconds).
          */
         public static final String TIMEOUT = "timeout";
         
         /**
-         * The #of concurrent clients to run.
+         * The #of named resources from which {@link Writer}s may choosen the
+         * indices on which they will write.
          */
-        public static final String NCLIENTS = "nclients";
+        public static final String NRESOURCES = "nresources";
+
+        /**
+         * The minimum #of locks that a writer will obtain (0 or more, but a
+         * writer with zero locks will not write on anything).
+         */
+        public static final String MIN_LOCKS = "minLocks";
+
+        /**
+         * The maximum #of locks that a writer will obtain (LTE
+         * {@link #NRESOURCES}). A writer will write on each resource that it
+         * locks.
+         */
+        public static final String MAX_LOCKS = "maxLocks";
 
         /**
          * The #of trials (aka transactions) to run.
@@ -494,7 +592,13 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * The #of operations in each trial.
          */
         public static final String NOPS = "nops";
-    
+
+        /**
+         * The failure rate [0.0:1.0]. A {@link Writer} aborts by throwing a
+         * {@link SpuriousException}.
+         */
+        public static final String FAILURE_RATE = "failureRate";
+        
     }
 
     /**
@@ -508,7 +612,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         final long timeout = Long.parseLong(properties.getProperty(TestOptions.TIMEOUT));
 
-        final int nclients = Integer.parseInt(properties.getProperty(TestOptions.NCLIENTS));
+        final int nresources = Integer.parseInt(properties.getProperty(TestOptions.NRESOURCES));
+
+        final int minLocks = Integer.parseInt(properties.getProperty(TestOptions.MIN_LOCKS));
+        
+        final int maxLocks = Integer.parseInt(properties.getProperty(TestOptions.MAX_LOCKS));
 
         final int ntrials = Integer.parseInt(properties.getProperty(TestOptions.NTRIALS));
 
@@ -516,8 +624,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         final int nops = Integer.parseInt(properties.getProperty(TestOptions.NOPS));
 
-        Result result = doConcurrentClientTest(journal, timeout, nclients, ntrials,
-                keyLen, nops);
+        final double failureRate = Double.parseDouble(properties.getProperty(TestOptions.FAILURE_RATE));
+
+        Result result = doConcurrentClientTest(journal, timeout, nresources, minLocks, maxLocks, ntrials,
+                keyLen, nops, failureRate );
 
         return result;
 
@@ -557,37 +667,70 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
             defaultProperties.put(TestOptions.NTRIALS,"10000");
 
-//            defaultProperties.put(TestOptions.NCLIENTS,"10");
+            // @todo vary nresources, minLocks, and maxLocks.
+            defaultProperties.put(TestOptions.NRESOURCES,"10");
+
+            defaultProperties.put(TestOptions.MIN_LOCKS,"1");
+            
+            defaultProperties.put(TestOptions.MAX_LOCKS,"3");
 
             defaultProperties.put(TestOptions.KEYLEN,"4");
 
             defaultProperties.put(TestOptions.NOPS,"100");
 
+            defaultProperties.put(TestOptions.FAILURE_RATE,"0.02");
+
+            /*
+             * Build up the conditions.
+             */
+            
             List<Condition>conditions = new ArrayList<Condition>();
 
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "1") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "2") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "10") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "20") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "100") }));
-
-            conditions.addAll(BasicExperimentConditions.getBasicConditions(
-                    defaultProperties, new NV[] { new NV(TestOptions.NCLIENTS,
-                            "200") }));
+            conditions.add(new Condition(defaultProperties));
+            
+            // @todo also vary the maximum pool size.
+            // @todo report the maximum pool size as a result along with maxrunning.
+            conditions = apply(conditions,new NV[][]{
+                    new NV[]{new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,"1"),},
+                    new NV[]{new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,"10"),},
+                    new NV[]{new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,"20"),},
+                    new NV[]{new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,"50"),},
+                    new NV[]{new NV(TestOptions.WRITE_SERVICE_CORE_POOL_SIZE,"100"),},
+            });
+            
+//            conditions = apply(conditions,new NV[]{
+//                    new NV(TestOptions.NOPS,"1"),
+//                    new NV(TestOptions.NOPS,"10"),
+//                    new NV(TestOptions.NOPS,"100"),
+//                    new NV(TestOptions.NOPS,"1000"),
+//            });
+//            
+//            conditions = apply(conditions,new NV[]{
+//                    new NV(TestOptions.KEYLEN,"4"),
+//                    new NV(TestOptions.KEYLEN,"8"),
+////                    new NV(TestOptions.KEYLEN,"32"),
+////                    new NV(TestOptions.KEYLEN,"64"),
+////                    new NV(TestOptions.KEYLEN,"128"),
+//            });
+            
+            conditions = apply(
+                    conditions,
+                    new NV[][] { //
+                            new NV[] { new NV(Options.BUFFER_MODE,
+                                    BufferMode.Transient), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE,
+                                    BufferMode.Direct), }, //
+                            new NV[] {
+                                    new NV(Options.BUFFER_MODE, BufferMode.Direct),
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                            .toString()), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+                            new NV[] {
+                                    new NV(Options.BUFFER_MODE, BufferMode.Disk),
+                                    new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
+                                            .toString()), }, //
+                    });
             
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 

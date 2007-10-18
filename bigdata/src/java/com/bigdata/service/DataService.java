@@ -704,8 +704,9 @@ abstract public class DataService implements IDataService,
      * 
      * @todo if we allow the filter to cause mutations (e.g., deleting matching
      *       entries) then we have to examine the operation to determine whether
-     *       or not we need to use the {@link #txService} or the
-     *       {@link #readService}
+     *       or not we need to use the {@link #txWriteService} or the
+     *       {@link #readService} (consider reading against historical and
+     *       modifying live).
      */
     public ResultSet rangeQuery(long tx, String name, int partitionId,
             byte[] fromKey, byte[] toKey, int capacity, int flags)

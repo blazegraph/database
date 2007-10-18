@@ -130,11 +130,11 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite(TestSequenceTask.class);
         // test writing on one or more unisolated indices and verify read back after the commit.
         suite.addTestSuite(TestUnisolatedWriteTasks.class);
-        // test of throughput when lock contention serializes unisolated writers.
+        // stress test of throughput when lock contention serializes unisolated writers.
         suite.addTestSuite(StressTestLockContention.class);
-        // group commit throughput tests.
+        // stress test of group commit.
         suite.addTestSuite(StressTestGroupCommit.class);
-        // @todo review: stress tests of writes on unisolated named indices.
+        // stress tests of writes on unisolated named indices.
         suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
         /*
          * Stress test of concurrent transactions.
