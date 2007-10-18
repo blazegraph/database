@@ -55,10 +55,18 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -73,6 +81,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -91,6 +100,7 @@ import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 
@@ -183,18 +193,179 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
     }
     
+    ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
+            DaemonThreadFactory.defaultThreadFactory());
+
     /**
      * Adds the statements to each index (batch api).
      * 
      * @param stmts
      *            An array of statements
-     * 
-     * @todo the statements could be inserted into each index in parallel. This
-     *       depends on support for concurrent writes on each index within a
-     *       journal that has not been completed.  Doing this in parallel could
-     *       also swamp a resource starved system.
      */
     final public void addStatements(_Statement[] stmts, int numStmts) {
+        
+        /*
+         * Note: The statements are inserted into each index in parallel. We
+         * clone the statement[] and sort and bulk load each index in parallel
+         * using a thread pool.
+         */
+
+        if( numStmts == 0 ) return;
+
+        long begin = System.currentTimeMillis();
+        final AtomicLong sortTime = new AtomicLong(0); // time to sort terms by assigned byte[] keys.
+        final AtomicLong insertTime = new AtomicLong(0); // time to insert terms into the forward and reverse index.
+
+        /**
+         * Writes on one of the statement indices.
+         * 
+         * @return The elapsed time for the operation.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class IndexWriter implements Callable<Long> {
+
+            private final _Statement[] stmts;
+            private final int numStmts; // @todo not needed - always equals stmts.length
+            private final Comparator<_Statement> comparator;
+            private final IIndex ndx;
+            private final KeyOrder keyOrder;
+            
+            /*
+             * Private key builder for the SPO, POS, and OSP keys.
+             */
+            private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
+            
+            private final byte[][] keys;
+
+            IndexWriter(_Statement[] stmts, int numStmts, Comparator<_Statement> comparator, IIndex ndx, KeyOrder keyOrder) {
+                
+                this.stmts = new _Statement[numStmts];
+                
+                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+
+                this.numStmts = numStmts;
+                
+                this.comparator = comparator;
+                
+                this.ndx = ndx;
+                
+                this.keys = new byte[numStmts][];
+                
+                this.keyOrder = keyOrder;
+                
+            }
+            
+            public Long call() throws Exception {
+
+                final long beginIndex = System.currentTimeMillis();
+
+                { // sort
+
+                    long _begin = System.currentTimeMillis();
+
+                    Arrays.sort(stmts, 0, numStmts, comparator);
+
+                    sortTime.addAndGet(System.currentTimeMillis() - _begin);
+
+                }
+
+                { // load
+
+                    long _begin = System.currentTimeMillis();
+
+                    for (int i = 0; i < numStmts; i++) {
+
+                        final _Statement stmt = stmts[i];
+
+                        switch (keyOrder) {
+                        case SPO:
+                            keys[i] = keyBuilder.statement2Key(stmt.s.termId,
+                                    stmt.p.termId, stmt.o.termId);
+                            break;
+                        case OSP:
+                            keys[i] = keyBuilder.statement2Key(stmt.o.termId,
+                                    stmt.s.termId, stmt.p.termId);
+                            break;
+                        case POS:
+                            keys[i] = keyBuilder.statement2Key(stmt.p.termId,
+                                    stmt.o.termId, stmt.s.termId);
+                            break;
+                        default:
+                            throw new UnsupportedOperationException();
+                        }
+
+                    }
+
+                    /*
+                     * @todo allow client to send null for the values when (a)
+                     * they are inserting [null] values under the keys; and (b)
+                     * they do not need the old values back.
+                     */
+                    BatchInsert op = new BatchInsert(numStmts, keys,
+                            new byte[numStmts][]);
+
+                    ndx.insert(op);
+
+                    insertTime.addAndGet(System.currentTimeMillis() - _begin);
+
+                }
+
+                long elapsed = System.currentTimeMillis() - beginIndex;
+
+                return elapsed;
+
+            }
+            
+        }
+
+        List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
+        
+        tasks.add(new IndexWriter(stmts,numStmts,SPOComparator.INSTANCE,getSPOIndex(),KeyOrder.SPO));
+        tasks.add(new IndexWriter(stmts,numStmts,POSComparator.INSTANCE,getPOSIndex(),KeyOrder.POS));
+        tasks.add(new IndexWriter(stmts,numStmts,OSPComparator.INSTANCE,getOSPIndex(),KeyOrder.OSP));
+
+        System.err.print("Writing " + numStmts + " statements...");
+        
+        final List<Future<Long>> futures;
+        final long elapsed_SPO;
+        final long elapsed_POS;
+        final long elapsed_OSP;
+        
+        try {
+
+            futures = indexWriteService.invokeAll( tasks );
+
+            elapsed_SPO = futures.get(0).get();
+            elapsed_POS = futures.get(1).get();
+            elapsed_OSP = futures.get(2).get();
+
+        } catch(InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        } catch(ExecutionException ex) {
+        
+            throw new RuntimeException(ex);
+        
+        }
+        
+        long elapsed = System.currentTimeMillis() - begin;
+
+        System.err.println("in " + elapsed + "ms; sort=" + sortTime
+                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
+                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
+        
+    }
+
+    /**
+     * Adds the statements to each index (batch api).
+     * 
+     * @param stmts
+     *            An array of statements
+     */
+    final public void addStatements_singleThread(_Statement[] stmts, int numStmts) {
 
         if( numStmts == 0 ) return;
 
@@ -210,7 +381,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
         final byte[][] keys = new byte[numStmts][];
         
         System.err.print("Writing " + numStmts + " statements...");
-
+        
         { // SPO
 
             final long beginIndex = System.currentTimeMillis();
@@ -968,7 +1139,16 @@ abstract public class AbstractTripleStore implements ITripleStore {
     /**
      * @todo Modify to not materalize the statements (since the indices do not
      *       support modification with concurrent traversal the statements are
-     *       materialized before they are deleted).
+     *       materialized before they are deleted). An interim approach is to
+     *       materialize the statements into a {@link TempTripleStore} so that
+     *       they are less likley to overflow RAM. We could also use an iterator
+     *       based on a historical state (unisolated reader) and make the
+     *       changes on the live version (unisolated writer). There might be a
+     *       general mechanisms similar to isolation that could be used to
+     *       support the appearence of traversal with concurrent modification.
+     *       The iterator reads from the committed state of the index (just like
+     *       an isolated transaction) and the modifications are written into the
+     *       live version of the index.
      * 
      * @todo the {@link #keyBuilder} is being used, which means that this is NOT
      *       thread safe.
