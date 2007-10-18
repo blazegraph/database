@@ -242,12 +242,22 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Counters
      */
 
+    private int maxPoolSize = 0;
     private long maxRunning = 0;
     private long maxLatencyUntilCommit = 0;
     private long maxCommitLatency = 0;
     private long ncommits = 0;
     private long naborts = 0;
 
+    /**
+     * The maximum #of threads in the pool.
+     */
+    public int getMaxPoolSize() {
+        
+        return maxPoolSize;
+        
+    }
+    
     /**
      * The maximum #of tasks that are concurrently executing.
      */
@@ -401,6 +411,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             // Update max# of tasks concurrently running.
             maxRunning = (nrunning>maxRunning?nrunning:maxRunning);
+
+            // Update max# of threads in the thread pool.
+            final int poolSize = getPoolSize();
+            
+            maxPoolSize = (poolSize>maxPoolSize?poolSize:maxPoolSize);
             
             // Note the thread running the task.
             active.put(t,r);
@@ -779,6 +794,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 final int nrunning = this.nrunning.get();
                 final int nwrites = this.nwrites.get();
                 final int corePoolSize = getCorePoolSize();
+                final int maxPoolSize = getMaximumPoolSize();
                 final int poolSize = getPoolSize();
                 final long elapsedWait = System.currentTimeMillis() - beginWait;
                                 
@@ -791,7 +807,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                             + "ms, queueSize=" + queueSize + ", nrunning="
                             + nrunning + ", nwrites=" + nwrites
                             + ", corePoolSize=" + corePoolSize + ", poolSize="
-                            + poolSize);
+                            + poolSize+", maxPoolSize="+maxPoolSize);
                     
                     break;
                     

@@ -106,9 +106,13 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       and verify that no concurrency limits are imposed across transactions
  *       (only within transactions).
  * 
+ * @todo test where concurrent operations are executed against the same
+ *       transaction. this provokes contention for access to the mutable
+ *       isolated indices which must be resolved through a lock manager.
+ * 
  * @todo show state-based validation for concurrent transactions on the same
  *       index that result in write-write conflicts.
- *  
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -477,8 +481,6 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
     /**
      * Runs a single instance of the test as configured in the code.
-     * 
-     * @todo test with more than one named index in use.
      * 
      * @todo Try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong. Note that the actual execution 

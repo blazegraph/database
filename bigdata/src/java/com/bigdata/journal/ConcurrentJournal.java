@@ -78,7 +78,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * The journal have several thread pools that facilitate concurrency. They are:
  * <dl>
  * 
- * <dt>{@link #txService}</dt>
+ * <dt>{@link #txWriteService}</dt>
  * <dd>This is used for the "active" phrase of transaction. Transactions read
  * from historical states of named indices during their active phase and buffer
  * the results on isolated indices. Since transactions never write on the
@@ -181,14 +181,23 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
 
         /**
-         * The default #of threads in the write service thread pool (1000).
+         * The default #of threads in the write service thread pool (200).
          * 
          * @todo This SHOULD automatically increase up to
-         *       {@link #WRITE_SERVICE_MAXIMUM_POOL_SIZE} under demand but I have not
-         *       been observing that.  If it does, then drop the default value down
-         *       to something much smaller, e.g., 10-50.
+         *       {@link #WRITE_SERVICE_MAXIMUM_POOL_SIZE} under demand but I
+         *       have not been observing that. If it does, then drop the default
+         *       value down to something much smaller, e.g., 10-50.
+         * 
+         * @todo revisit this value after I modify the
+         *       {@link WriteExecutorService} to checkpoint indices so that it
+         *       does not need to wait for nrunning to reach zero and so that it
+         *       can abort individual tasks rather than discarding entire commit
+         *       groups. Use {@link StressTestConcurrentUnisolatedIndices} to
+         *       examine the behavior for just the writeService, but choose the
+         *       default in terms of a more complete test that loads all three
+         *       queues (read, write, and tx).
          */
-        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "1000";
+        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "200";
         
         /**
          * The maximum #of threads allowed in the pool handling concurrent
@@ -272,19 +281,20 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     }
 
     /**
-     * Pool of threads for handling concurrent transactions on named
-     * indices. Transactions are not inherently limited in their
-     * concurrency. The size of the thread pool for this service governs the
-     * maximum practical concurrency for transactions.
+     * Pool of threads for handling concurrent read/write transactions on named
+     * indices. Distinct transactions are not inherently limited in their
+     * concurrency, but concurrent operations within a single transaction MUST
+     * obtain an exclusive lock on the isolated index(s) on the temporary store.
+     * The size of the thread pool for this service governs the maximum
+     * practical concurrency for transactions.
      * <p>
      * Transactions always read from historical data and buffer their writes
      * until they commit. Transactions that commit MUST acquire unisolated
      * writable indices for each index on which the transaction has written.
-     * Once the transaction has acquired those writable indices it then runs
-     * its commit phrase as an unisolated operation on the
-     * {@link #writeService}.
+     * Once the transaction has acquired those writable indices it then runs its
+     * commit phrase as an unisolated operation on the {@link #writeService}.
      */
-    final protected ExecutorService txService;
+    final protected ExecutorService txWriteService;
 
     /**
      * Pool of threads for handling concurrent unisolated read operations on
@@ -357,7 +367,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         
-        txService.shutdown();
+        txWriteService.shutdown();
 
         readService.shutdown();
 
@@ -369,7 +379,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             long elapsed = System.currentTimeMillis() - begin;
             
-            if(!txService.awaitTermination(shutdownTimeout-elapsed, unit)) {
+            if(!txWriteService.awaitTermination(shutdownTimeout-elapsed, unit)) {
                 
                 log.warn("Transaction service termination: timeout");
                 
@@ -435,7 +445,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
         log.info("");
         
-        txService.shutdownNow();
+        txWriteService.shutdownNow();
 
         readService.shutdownNow();
 
@@ -528,7 +538,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         }
 
         // setup thread pool for concurrent transactions.
-        txService = Executors.newFixedThreadPool(txServicePoolSize,
+        txWriteService = Executors.newFixedThreadPool(txServicePoolSize,
                 DaemonThreadFactory.defaultThreadFactory());
 
         // setup thread pool for unisolated read operations.
@@ -763,16 +773,19 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             final long nextOffset = getBufferStrategy().getNextOffset();
 
             return "status"
-                    + // txService (#active,#queued,#completed)
+                    + // txService (#active,#queued,#completed,poolSize)
                     ": transactions=("
-                    + ((ThreadPoolExecutor) txService).getQueue().size()
+                    + ((ThreadPoolExecutor) txWriteService).getQueue().size()
                     + ","
-                    + ((ThreadPoolExecutor) txService).getActiveCount()
+                    + ((ThreadPoolExecutor) txWriteService).getActiveCount()
                     + ","
-                    + ((ThreadPoolExecutor) txService)
+                    + ((ThreadPoolExecutor) txWriteService)
                             .getCompletedTaskCount()
+                    + ","
+                    + ((ThreadPoolExecutor) txWriteService)
+                            .getPoolSize()
                     + ")"
-                    + // readService (#active,#queued,#completed)
+                    + // readService (#active,#queued,#completed,poolSize)
                     ", readers=("
                     + ((ThreadPoolExecutor) readService).getQueue().size()
                     + ","
@@ -780,8 +793,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ","
                     + ((ThreadPoolExecutor) readService)
                             .getCompletedTaskCount()
+                    + ","
+                    + ((ThreadPoolExecutor) readService)
+                            .getPoolSize()
                     + ")"
-                    + // writeService (#active,#queued,#completed)
+                    + // writeService (#active,#queued,#completed,poolSize)
                     ", writers=("
                     + ((ThreadPoolExecutor) writeService).getQueue().size()
                     + ","
@@ -789,18 +805,22 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ","
                     + ((ThreadPoolExecutor) writeService)
                             .getCompletedTaskCount()
+                    + ","
+                    + ((ThreadPoolExecutor) writeService)
+                            .getPoolSize()
                     + ")"
                     // commitCounter and related stats.
                     + (commitCounter == -1 ? "" : ", commitCounter="
                             + commitCounter)
-                    + ", ncommits="
-                    + writeService.getCommitCount() + ", naborts="
-                    + writeService.getAbortCount() + ", maxLatencyUntilCommit="
-                    + writeService.getMaxLatencyUntilCommit()
-                    + ", maxCommitLatency="
-                    + writeService.getMaxCommitLatency() + ", maxRunning="
-                    + writeService.getMaxRunning() + ", elapsed=" + elapsed
-                    + ", nextOffset=" + nextOffset;
+                    + ", ncommits="+ writeService.getCommitCount()
+                    + ", naborts=" + writeService.getAbortCount()
+                    + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
+                    + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
+                    + ", maxRunning="+ writeService.getMaxRunning()
+                    + ", maxPoolSize="+ writeService.getMaxPoolSize()
+                    + ", elapsed=" + elapsed+
+                    ", nextOffset=" + nextOffset
+                    ;
 
         }
 
@@ -874,24 +894,53 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         assertOpen();
         
-        if(task.isolated) {
+        if( task.readOnly ) {
 
-            log.info("Submitted to the transaction service");
+            /*
+             * Reads against historical data do not require concurrency control.
+             * 
+             * The only distinction between a transaction and an unisolated read
+             * task is the choice of the historical state from which the task
+             * will read. A ReadOnly transaction reads from the state of the
+             * index as of the start time of the transaction. A ReadCommitted
+             * transaction and an unisolated reader both read from the last
+             * committed state of the index.
+             */
             
-            return submitWithDynamicLatency(task, txService);
-            
-        } else if( task.readOnly ) {
-
             log.info("Submitted to the read service");
 
             return submitWithDynamicLatency(task, readService);
             
         } else {
-            
-            log.info("Submitted to the write service");
 
-            return submitWithDynamicLatency(task, writeService);
-            
+            if (task.isolated) {
+
+                /*
+                 * A task that reads from historical data and writes on isolated
+                 * indices backed by a temporary store. Concurrency control is
+                 * required for the isolated indices on the temporary store, but
+                 * not for the reads against the historical data.
+                 */
+                
+                log.info("Submitted to the transaction service");
+
+                return submitWithDynamicLatency(task, txWriteService);
+
+            } else {
+
+                /*
+                 * A task that reads from and writes on "live" indices. The live
+                 * indices are NOT thread-safe. Concurrency control provides a
+                 * partial order over the executing tasks such that there is
+                 * never more than one task with access to a given live index.
+                 */
+                
+                log.info("Submitted to the write service");
+
+                return submitWithDynamicLatency(task, writeService);
+
+            }
+
         }
         
     }
@@ -904,7 +953,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      *            The task.
      * @param service
      *            The service.
-     *            
+     * 
      * @return The {@link Future}.
      */
     private Future<Object> submitWithDynamicLatency(AbstractTask task,ExecutorService service) {
@@ -915,7 +964,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         
             final int queueCapacity = queue.remainingCapacity();
             
-            if (queue.size() + 10 >= queueCapacity) {
+            // @todo what is the right thing to do here from queuing theory for backing off?
+            if (queue.size() * 1.10 >= queueCapacity) {
                 
                 try {
                     
@@ -927,7 +977,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
                     if(INFO) System.err.print("z");
                     
-                    Thread.sleep(10/*ms*/);
+                    Thread.sleep(50/*ms*/);
                     
                 } catch (InterruptedException e) {
                     

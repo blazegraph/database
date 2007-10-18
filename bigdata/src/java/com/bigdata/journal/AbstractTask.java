@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.journal;
 
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -606,45 +605,50 @@ public abstract class AbstractTask implements Callable<Object> {
      * 
      * FIXME take note of which indices the transaction actually _writes_ on and
      * then inform the transaction manager which needs to keep track of that
-     * information.
+     * information. Notify the transaction manager in the post-processing for
+     * each isolated transaction, but only if a new index is introduced into the
+     * write set of the transaction.
      * 
      * FIXME In order to allow concurrent tasks to do work on the same
      * transaction we need to use a per-transaction {@link LockManager} to
      * produce a partial order that governs access to the isolated (vs mutable
-     * unisolated) indices accessed by that transaction.
+     * unisolated) indices accessed by that transaction for the
+     * <strong>txService</strong>.
      * <p>
      * Make sure that the {@link TemporaryRawStore} supports an appropriate
      * level of concurrency to allow concurrent writers on distinct isolated
      * indices that are being buffered on that store for a given transaction
-     * (MRMW). Reads are writes are currently serialized in order to support
+     * (MRMW). Reads and writes are currently serialized in order to support
      * overflow from memory to disk.
      * <p>
      * The {@link Tx} needs to be thread-safe when instantiating the temporary
      * store and when granting a view of an index (the read-committed and
      * read-only txs should also be thread safe in this regard).
      * <p>
-     * If an read-write isolated task is interrupted then we MAY need to re-open
-     * the {@link TemporaryRawStore} since the interrupt MAY have cause the
-     * channel to be closed. See {@link ClosedByInterruptException}.
+     * The txService must be a {@link WriteExecutorService} so that it will
+     * correctly handle aborts and commits of writes on isolated indices.
      * 
-     * @todo review problems with memory exhaustion when running junit. the
-     *       write cache for the disk-only mode contributes to this, but maybe
-     *       the underlying problem is that junit is holding onto all of the
-     *       tests - either by itself or because of the proxy test case setup.
-     *       <p>
-     *       There are also several tests that are apparently attempting to
-     *       close a store that is already closed.
-     * 
-     * @todo do we always inform the transaction manager or only after the
-     *       commit when we know that the "writes" took?
-     * 
-     * @todo do we force the abort of a transaction if any task in that
-     *       transaction fails? if we do not abort then we can have partial
-     *       writes on the isolated indices, which is very bad. So we either
-     *       have to checkpoint the isolated indices with the group commit on
-     *       the store so that we can reload from the last metadata address for
-     *       an isolated index on abort or we have to abort the entire tx if any
-     *       task in the tx fails (at least for a writable transaction).
+     * FIXME Modify the {@link WriteExecutorService} to use checkpoints on named
+     * indices after each task. This will not only allow us to abort individual
+     * tasks that fail (without discarding the commit group), it will also allow
+     * us to commit without waiting for long running tasks to complete (since
+     * they are executing they have an exclusive lock on the named indices so
+     * noone else can write while they are running). The same solution should be
+     * applied to the within transaction contention for isolated indices writing
+     * on the temporary store for the transaction.
+     * <p>
+     * An index checkpoint simply flushes the index (and its metadata record) to
+     * disk. This approach REQUIRES that we do NOT mark the index as requiring
+     * commit until the task has completed successfully, so there MUST be an
+     * explicit signal from the
+     * {@link WriteExecutorService#afterTask(AbstractTask, Throwable)} to
+     * {@link Name2Addr} signaling that the index is (a) dirty, and (b) should
+     * be put onto the commitList. At that point the task waits and it will
+     * participate in the next commit group. Once the index gets onto the
+     * {@link Name2Addr} commitList and is committed, it will automatically be
+     * available for subsequent tasks. If a task fails, then we just re-load the
+     * last committed state of the index using {@link Name2Addr} - this is the
+     * standard behavior in any case.
      */
     class InnerReadWriteTxServiceCallable implements Callable<Object> {
 

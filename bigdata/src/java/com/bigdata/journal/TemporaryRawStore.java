@@ -73,6 +73,11 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo drop the transient buffer strategy and just use the disk-only strategy
+ *       with a write cache and disable {@link Options#FORCE_ON_COMMIT}. the
+ *       performance should be just about the same as the transient mode and we
+ *       also have the benefit of full read/write concurrency.
+ * 
  * @todo The {@link TemporaryRawStore} would benefit from any caching or AIO
  *       solutions developed for the {@link DiskOnlyStrategy}.
  */
