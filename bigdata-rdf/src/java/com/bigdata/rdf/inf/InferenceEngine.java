@@ -46,7 +46,17 @@ package com.bigdata.rdf.inf;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -60,6 +70,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -68,6 +79,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Adds support for RDFS inference.
@@ -440,6 +452,10 @@ public class InferenceEngine implements ITripleStore {
         return tripleStore.isStable();
     }
     
+    public void clear() {
+        tripleStore.clear();
+    }
+    
     public void close() {
         tripleStore.close();
     }
@@ -478,10 +494,6 @@ public class InferenceEngine implements ITripleStore {
      *       the rules). This could have several advantages and an approach like
      *       this is necessary in order to compute entailments at query time
      *       that are not to be inserted back into the kb.
-     * 
-     * @todo can the dependency array among the rules be of use to us when we
-     *       are computing full foward closure as opposed to using magic sets to
-     *       answer a specific query?
      * 
      * @todo The SPO[] buffer might be better off as a more interesting
      *       structure that only accepted the distinct statements. This was a
@@ -635,7 +647,7 @@ public class InferenceEngine implements ITripleStore {
 
             if (DEBUG) {
             StringBuilder debug = new StringBuilder();
-            debug.append( "round #" ).append( round++ ).append( ": " );
+            debug.append( "round #" ).append( round ).append( ": " );
             debug.append( totalStats.numComputed ).append( " computed in " );
             debug.append( totalStats.computeTime ).append( " millis, " );
             debug.append( numInserted ).append( " inserted in " );
@@ -643,6 +655,8 @@ public class InferenceEngine implements ITripleStore {
             log.debug( debug.toString() );
             }
 
+            round++;
+            
         }
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -668,51 +682,320 @@ public class InferenceEngine implements ITripleStore {
         }
 
     }
+
+    /**
+     * Fast forward closure of the store based on <a
+     * href="http://www.cs.iastate.edu/~tukw/waim05.pdf">"An approach to RDF(S)
+     * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
+     * Zhang</a>.
+     * 
+     * @todo can I reuse the rule implementations that we have already defined?
+     * 
+     * @todo Do not run 14 or 15 since they produce rdfs:Resource.
+     * 
+     * @todo If the head is (x, rdf:type, rdfs:Resource) then do not insert into
+     *       the store (filter at the reasoner level only).
+     * 
+     * @todo mark axiom vs explicit vs inferred and reserve a bit for suspended
+     *       for each statement.
+     * 
+     * @todo store the proofs in an index: key := [head][tail]. The rule could
+     *       be the value, or the step in the algorithm could be the value, or
+     *       the value could be null.
+     *       <p>
+     *       Can this approach produce ungrounded justification chains?
+     * 
+     * @todo make entailments for rdfs:domain and rdfs:range optional. we can
+     *       get by with just Rdfs5, Rdfs7, Rdfs9, and Rdfs11.
+     * 
+     * @todo test on alibaba (entity-link data) as well as on ontology heavy
+     *       (nciOncology).
+     * 
+     * @todo run the metrics test suites.
+     * 
+     * @todo owl:sameAs by backward chaining on query.
+     * @todo rdfs:Resource by backward chaining on query.
+     * 
+     * @todo We don’t do owl:equivalentClass and owl:equivalentProperty
+     *       currently. You can simulate those by doing a bi-directional
+     *       subClassOf or subPropertyOf, which has always sufficed for our
+     *       purposes. If you were going to write rules for those two things
+     *       this is how you would do it:
+     * 
+     * <pre>
+     *   equivalentClass:
+     *   
+     *     add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+     *     add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
+     * </pre>
+     * 
+     * It would be analogous for equivalentProperty.
+     * 
+     * @todo can some steps be run in parallel? E.g., [5,6,7]?
+     */
+    public void fastForwardClosure() {
+
+        /*
+         * Note: The steps below are numbered with regard to the paper cited in
+         * the javadoc above.
+         * 
+         * Most steps presume that the computed entailments have been added to
+         * the database (vs the temp store).
+         */
+        
+        /*
+         * The temporary store used to accumulate the entailments.
+         */
+        TempTripleStore tmpStore = new TempTripleStore(getProperties()); 
+
+        // 1. add RDF(S) axioms to the database.
+        addRdfsAxioms(tmpStore); // add to temp store.
+        copyStatements(tmpStore); // copy to database.
+        
+        // 2-4. Calculate the rdfs:subPropertyOf closure, returning D,C,R,T.
+        // doRdfsSubPropertyOfClosure(tmpStore);
+
+        // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
+        
+        // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
+
+        // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
+
+        // 8. Calculate the rdfs:subClassOf closure.
+        
+        // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
+
+        // 10. RuleRdfs02
+        
+        /*
+         * 11. special rule w/ 3-part antecedent.
+         * 
+         * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
+         * (?x, rdf:type, ?b).
+         */
+        
+        // 12. RuleRdfs03
+        
+        /* 13. special rule w/ 3-part antecedent.
+         * 
+         * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b ) ->
+         * (?x, rdf:type, ?b )
+         */
+        
+        /*
+         * 14-15. These steps skipped. They correspond to rdfs4a and rdfs4b and
+         * generate rdfs:Resource assertions.
+         */
+
+        // 16. RuleRdf01
+        
+        // 17. RuleRdfs09
+        
+        // 18. RuleRdfs10
+        
+        // 19. RuleRdfs08. Generates (x?, rdfs:subClassOf, rdfs:Resource).
+
+        // 20. RuleRdfs13.
+        
+        // 21. RuleRdfs06.
+        
+        // 22. RuleRdfs07.
+        
+        // Done.
+    
+    }
+
+    /**
+     * Add the axiomatic RDF(S) triples to the store.
+     * <p>
+     * Note: The termIds are defined with respect to the backing triple store
+     * since the axioms will be copied into the store when the closure is
+     * complete.
+     * 
+     * @param store
+     *            The store to which the axioms will be added.
+     */
+    private void addRdfsAxioms(ITripleStore store) {
+        
+        Axioms axiomModel = RdfsAxioms.INSTANCE;
+
+        /* 
+         * Cache the URI -> termId mapping for the persistent database.
+         * 
+         * @todo do once in the ctor.
+         */
+        Map<String,_URI> uriCache = cacheURIs(axiomModel.getVocabulary());
+        
+        _Statement[] stmts = new _Statement[axiomModel.getAxioms().size()];
+        
+        // add the axioms to the graph
+        
+        int numStmts = 0;
+
+        for (Iterator<Axioms.Triple> itr = axiomModel.getAxioms().iterator(); itr
+                .hasNext();) {
+
+            Axioms.Triple triple = itr.next();
+            
+            _URI s = uriCache.get(triple.getS().getURI());
+            
+            _URI p = uriCache.get(triple.getP().getURI());
+            
+            _URI o = uriCache.get(triple.getO().getURI());
+            
+            _Statement stmt = new _Statement(s, p, o, StatementEnum.Axiom);
+
+            stmts[numStmts++] = stmt;
+            
+        }
+
+        store.addStatements(stmts, numStmts);
+        
+    }
+    
+    /**
+     * Create a vocabulary cache for URIs as defined in the {@link #tripleStore}.
+     * <p>
+     * Note: The URIs are inserted into the {@link #tripleStore} iff they are
+     * not already defined. This ensures that statements generated using the
+     * assigned term identifiers will have the correct term identifiers for the
+     * target {@link ITripleStore}.
+     * 
+     * @param uri
+     *            The uri.
+     * 
+     * @return The URI as defined in the {@link #tripleStore}.
+     * 
+     * @todo use the batch addTerm method.
+     */
+    private Map<String, _URI> cacheURIs(Set<String> uris) {
+
+        HashMap<String, _URI> uriCache = new HashMap<String, _URI>();
+
+        for (Iterator<String> it = uris.iterator(); it.hasNext();) {
+
+            String uri = it.next();
+
+            _URI tmp = uriCache.get(uri);
+
+            if (tmp == null) {
+
+                tmp = new _URI(uri);
+
+                tripleStore.addTerm(tmp);
+
+                uriCache.put(uri, tmp);
+
+            }
+
+        }
+
+        return uriCache;
+        
+    }
     
     /**
      * Copies the statements from the temporary store into the main store.
+     * <p>
+     * Note: The statements in the {@link TempTripleStore} are NOT removed.
      * 
      * @param tmpStore
+     *            The temporary store.
      * 
      * @return The #of statements inserted into the main store (the count only
      *         reports those statements that were not already in the main
      *         store).
      */
-    public int copyStatements( TempTripleStore tmpStore ) {
+    public int copyStatements( final TempTripleStore tmpStore ) {
+
+        List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
         
-        int numInserted = 0;
+        tasks.add( new CopyStatements(tmpStore.getSPOIndex(),getSPOIndex()));
+        tasks.add( new CopyStatements(tmpStore.getPOSIndex(),getPOSIndex()));
+        tasks.add( new CopyStatements(tmpStore.getOSPIndex(),getOSPIndex()));
         
-        IEntryIterator it = tmpStore.getSPOIndex().rangeIterator(null, null);
-        while (it.hasNext()) {
-            it.next();
-            byte[] key = it.getKey();
-            if (!getSPOIndex().contains(key)) {
-                numInserted++;
-                getSPOIndex().insert(key, null);
-            }
+        final long numInserted;
+        
+        try {
+
+            final List<Future<Long>> futures = indexWriteService.invokeAll(tasks);
+
+            final long numInserted1 = futures.get(0).get();
+            
+            final long numInserted2 = futures.get(1).get();
+            
+            final long numInserted3 = futures.get(2).get();
+
+            assert numInserted1 == numInserted2;
+            
+            assert numInserted1 == numInserted3;
+            
+            numInserted = numInserted1;
+        
+        } catch (Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
         }
         
-        it = tmpStore.getPOSIndex().rangeIterator(null, null);
-        while (it.hasNext()) {
-            it.next();
-            byte[] key = it.getKey();
-            if (!getPOSIndex().contains(key)) {
-                getPOSIndex().insert(key, null);
-            }
-        }
-        
-        it = tmpStore.getOSPIndex().rangeIterator(null, null);
-        while (it.hasNext()) {
-            it.next();
-            byte[] key = it.getKey();
-            if (!getOSPIndex().contains(key)) {
-                getOSPIndex().insert(key, null);
-            }
-        }
-        
-        return numInserted;
-        
+        return (int) numInserted;
+
     }
+    
+    /**
+     * Copies statements from one index to another. 
+     */
+    static class CopyStatements implements Callable<Long> {
+
+        private final IIndex src;
+        private final IIndex dst;
+        
+        /**
+         * @param src
+         * @param dst
+         */
+        CopyStatements(IIndex src, IIndex dst) {
+            
+            this.src = src;
+            
+            this.dst = dst;
+            
+        }
+        
+        public Long call() throws Exception {
+            
+            long numInserted = 0;
+            
+            IEntryIterator it = src.rangeIterator(null, null);
+            
+            while (it.hasNext()) {
+
+                it.next();
+                
+                byte[] key = it.getKey();
+                
+                if (!dst.contains(key)) {
+
+                    // @todo copy the statement type.
+                    // @todo upgrade the statement type if necessary (inferred -> explicit).
+                    dst.insert(key, null);
+                    
+                    numInserted++;
+                    
+                }
+                
+            }
+            
+            return numInserted;
+        }
+        
+    };
+    
+    /**
+     * A service used to write on each of the statement indices in parallel.
+     */
+    protected ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
+            DaemonThreadFactory.defaultThreadFactory());
 
     /**
      * Extracts the object ids from a key scan.

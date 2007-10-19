@@ -1,0 +1,25 @@
+1. fast closure.
+
+2. truth maintanence.  store proofs.  if ungrounded justification chains then
+filter during TM.
+
+3. concurrent query against last committed state of store.
+
+4. performance testing: various data loads, lehigh, integrated.
+
+x. large scale tests (1+B triples, 2T+ data).
+
+5. SAIL 1.x features:
+
+	- namespace prefixes
+
+Deferred:
+
+ - concurrent data load
+ 
+ - full transaction support
+ 
+ - scale-out version.
+ 
+ - Sesame 2.x integration.
+ 

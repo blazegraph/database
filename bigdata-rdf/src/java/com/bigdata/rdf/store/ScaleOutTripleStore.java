@@ -160,25 +160,40 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         this.fed = fed;
 
-        // // Register indices.
-        // fed.registerIndex(name_terms);
-        // fed.registerIndex(name_ids);
-        // fed.registerIndex(name_spo);
-        // fed.registerIndex(name_pos);
-        // fed.registerIndex(name_osp);
+        // @todo create indices iff necessary.
+        //
+        // createIndices();
+        
+    }
 
-        // Obtain unisolated views on those indices.
-        terms = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                name_termId);
-        ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                name_idTerm);
-        spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                name_spo);
-        pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                name_pos);
-        osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                name_osp);
+    /**
+     * Register the indices.
+     * 
+     * @todo this should be atomic and iff they do not exist.
+     */
+    final private void createIndices() {
+        
+         fed.registerIndex(name_termId);
+         fed.registerIndex(name_idTerm);
 
+         fed.registerIndex(name_spo);
+         fed.registerIndex(name_pos);
+         fed.registerIndex(name_osp);
+
+    }
+    
+    /** @todo this should be an atomic drop/add. */
+    final public void clear() {
+
+        fed.dropIndex(name_idTerm); ids = null;
+        fed.dropIndex(name_termId); terms = null;
+        
+        fed.dropIndex(name_spo); spo = null;
+        fed.dropIndex(name_pos); pos = null;
+        fed.dropIndex(name_osp); osp = null;
+    
+        createIndices();
+        
     }
     
     /**
@@ -198,11 +213,25 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     final public IIndex getTermIdIndex() {
         
+        if(terms!=null) {
+        
+            terms = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                    name_termId);
+
+        }
+        
         return terms;
         
     }
 
     final public IIndex getIdTermIndex() {
+
+        if(ids!=null) {
+            
+            ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                    name_idTerm);
+
+        }
         
         return ids;
         
@@ -210,17 +239,38 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     final public IIndex getSPOIndex() {
         
+        if(spo!=null) {
+            
+            spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                    name_spo);
+
+        }
+        
         return spo;
         
     }
     
     final public IIndex getPOSIndex() {
         
+        if(pos!=null) {
+            
+            pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                    name_pos);
+
+        }
+        
         return pos;
         
     }
     
     final public IIndex getOSPIndex() {
+
+        if(osp!=null) {
+            
+            osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+                    name_osp);
+
+        }
         
         return osp;
         

@@ -429,6 +429,11 @@ public interface ITripleStore {
     public void commit();
     
     /**
+     * Clear all data.
+     */
+    public void clear();
+    
+    /**
      * Close the client. If the client uses an embedded database, then close the
      * embedded database as well.
      * 

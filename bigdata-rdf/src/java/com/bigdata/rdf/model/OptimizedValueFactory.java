@@ -1169,7 +1169,16 @@ public class OptimizedValueFactory implements ValueFactory {
          * where duplicate keys would violate the B+-Tree unique key constraint.
          */
         public boolean known = false;
+
+        public StatementEnum type;
         
+        /**
+         * Create a {@link StatementEnum#Explicit} statement.
+         * 
+         * @param s
+         * @param p
+         * @param o
+         */
         public _Statement(_Resource s, _URI p, _Value o) {
 
             this.s = s;
@@ -1177,7 +1186,21 @@ public class OptimizedValueFactory implements ValueFactory {
             this.p = p;
 
             this.o = o;
+            
+            this.type = StatementEnum.Explicit;
 
+        }
+
+        public _Statement(_Resource s, _URI p, _Value o, StatementEnum type) {
+
+            this.s = s;
+
+            this.p = p;
+
+            this.o = o;
+
+            this.type = type;
+            
         }
 
         public Value getObject() {

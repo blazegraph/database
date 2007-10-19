@@ -41,22 +41,49 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+/*
+ * Created on Oct 19, 2007
+ */
+
+package com.bigdata.rdf.model;
 
 /**
- * rdfs10:
- * <pre>
- *       triple(?u,rdfs:subClassOf,?u) :-
- *          triple(?u,rdf:type,rdfs:Class). 
- * </pre>
+ * The basic statement types are: axioms, explicit, inferred.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class RuleRdfs10 extends AbstractRuleRdfs_6_8_10_12_13 {
+public enum StatementEnum {
 
-    public RuleRdfs10(InferenceEngine store, Var u, Var v, Var x) {
+    /**
+     * Something that is directly entailed by the appropriate model theory.
+     */
+    Axiom(0),
+    /**
+     * A statement that was inserted into the database explicitly by the
+     * application.
+     */
+    Explicit(1),
+    /**
+     * A statement that was inferred from the explicit statements by the
+     * appropriate model theory.
+     */
+    Inferred(2),
+    /**
+     * A statement that is undergoing truth maintenance.
+     */
+    Suspended(3);
 
-        super(store, new Triple(u, store.rdfsSubClassOf, u), 
-                     new Triple(u, store.rdfType, store.rdfsClass));
+    private final int code;
+    
+    private StatementEnum(int code) {
+        this.code = code;
+    }
 
+    public int code() {
+        
+        return code;
+        
     }
     
 }

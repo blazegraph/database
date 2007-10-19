@@ -98,10 +98,6 @@ import com.bigdata.rdf.rio.LoadStats;
  * 
  * @todo Add output directory parameter?
  * 
- * @todo Run against both CTC and CWEB GOM stores with and without schema
- *       support and with incremental vs all at once closure as a means of
- *       testing rdf-generic on a wider variety of RDF datasets.
- * 
  * @todo Write ontology costs iff proofs are stored and ontology costs are
  *       requested. Raise error if ontology costs are requested without proofs
  *       being stored.
