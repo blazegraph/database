@@ -45,7 +45,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**

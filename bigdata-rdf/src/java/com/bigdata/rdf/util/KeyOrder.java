@@ -47,7 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.util;
 
-import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Represents the key order used by an index.

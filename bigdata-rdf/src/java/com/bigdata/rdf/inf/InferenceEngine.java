@@ -58,14 +58,14 @@ import org.openrdf.vocabulary.RDFS;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -435,9 +435,17 @@ public class InferenceEngine implements ITripleStore {
     public void commit() {
         tripleStore.commit();
     }
+
+    public boolean isStable() {
+        return tripleStore.isStable();
+    }
     
     public void close() {
         tripleStore.close();
+    }
+    
+    public void closeAndDelete() {
+        tripleStore.closeAndDelete();
     }
     
     /**

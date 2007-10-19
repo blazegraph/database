@@ -50,8 +50,8 @@ package com.bigdata.rdf.inf;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.rio.Buffer;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * A buffer for distinct {@link SPO}s.

@@ -45,7 +45,7 @@
  * Created on May 20, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
 import java.io.File;
 import java.io.IOException;
@@ -431,7 +431,22 @@ public interface ITripleStore {
     /**
      * Close the client. If the client uses an embedded database, then close the
      * embedded database as well.
+     * 
+     * @todo change semantics to immediate close/disconnect.  Add shutdown() and
+     * shutdownNow()?
      */
     public void close();
     
+    /**
+     * Close the client. If the client uses an embedded database, then close and
+     * delete the embedded database as well.
+     */
+    public void closeAndDelete();
+    
+    /**
+     * True iff the backing store is stable (exists on disk somewhere and may be
+     * closed and re-opened).
+     */
+    public boolean isStable();
+
 }

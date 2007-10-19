@@ -59,11 +59,9 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.vocabulary.XmlSchema;
 
-import com.bigdata.journal.BufferMode;
-
 /**
- * Test suite for {@link SimpleRdfRepository} that verifies the
- * {@link RdfRepository} implementation (no entailments).
+ * Test suite for {@link BigdataRdfRepository} implementations that verifies
+ * the {@link RdfRepository} implementation (no entailments).
  * <p>
  * Note: This class has a dependency on the openrdf test suite since it extends
  * a test class defined by that project. If you are not trying to run the test
@@ -72,14 +70,14 @@ import com.bigdata.journal.BufferMode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSimpleRdfRepository extends org.openrdf.sesame.sail.RdfRepositoryTest {
+abstract public class TestBigdataRdfRepository extends org.openrdf.sesame.sail.RdfRepositoryTest {
 
-    SimpleRdfRepository repo;
+    protected BigdataRdfRepository repo;
     
     /**
      * @param arg0
      */
-    public TestSimpleRdfRepository(String arg0) {
+    public TestBigdataRdfRepository(String arg0) {
         super(arg0);
     }
 
@@ -153,6 +151,11 @@ public class TestSimpleRdfRepository extends org.openrdf.sesame.sail.RdfReposito
     }
 
     /**
+     * Return the properties used to initialize the {@link BigdataRdfRepository}.
+     */
+    abstract public Properties getProperties();
+    
+    /**
      * Configures the test repository.
      * <p>
      * Note: This test suite requires that the RDFS closure is NOT maintained
@@ -164,18 +167,9 @@ public class TestSimpleRdfRepository extends org.openrdf.sesame.sail.RdfReposito
        throws SailInitializationException
     {
 
-        repo = new SimpleRdfRepository();
+        repo = new BigdataRdfRepository();
         
-        Properties params = new Properties();
-        
-//        if(params.get(Options.BUFFER_MODE)==null) {
-//            
-//            /*
-//             * Use the transient journal by default.
-//             */
-            params.put(Options.BUFFER_MODE, BufferMode.Transient.toString());
-//            
-//        }
+        Properties params = getProperties();
         
         /*
          * Note: This test suite requires that the RDFS closure is NOT

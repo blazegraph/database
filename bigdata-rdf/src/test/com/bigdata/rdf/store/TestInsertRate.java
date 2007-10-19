@@ -41,7 +41,7 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -53,7 +53,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
@@ -114,23 +113,6 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
      * 
      * @param args
      *            unused - just edit the code.
-     * 
-     * FIXME This needs to be worked through until the btrees are smoothly being
-     * evicted onto the journal. Right now it appears to build up too much
-     * overhead, presumably because we are defering all node evictions (only
-     * leaves have an eviction queue).
-     * 
-     * FIXME The journal should smoothly be snapshot and perfect indices built
-     * over time. However, very large RDF loads should probably use a bulk load
-     * mechanism that is somewhat decoupled from the normal transactional
-     * isolation mechanism. E.g., bulk load begins when isolation grows too
-     * large and works by evicting perfect index segments onto the disk. Since
-     * bulk loads can run for a long time, reconciling the bulk transaction to
-     * existing data would be time consuming as well. There are probably a lot
-     * of ways to cheat, including if we are using context we can insist that
-     * bulk loads do not overlap with existing contexts.
-     * 
-     * @todo test with {@link RecordCompression} enabled for the {@link BTree}s.
      */
     public static void main(String[] args) throws Exception {
 
@@ -269,39 +251,34 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
 
     }
 
-        /**
-         * Primary driver for the insert rate test.
-         * 
-         * @param nclass
-         *            The #of distinct classes.
-         * 
-         * @param nproperty
-         *            The #of distinct properties.
-         * 
-         * @param nliteral
-         *            The #of plain literals, the #of literals for each language
-         *            type, and the #of typed literals for each datatype URI.
-         * 
-         * @param litsize
-         *            The average size of a literal. The generated literals use
-         *            a normal distribution with this as their mean length (in
-         *            characters).
-         */
+    /**
+     * Primary driver for the insert rate test.
+     * 
+     * @param nclass
+     *            The #of distinct classes.
+     * 
+     * @param nproperty
+     *            The #of distinct properties.
+     * 
+     * @param nliteral
+     *            The #of plain literals, the #of literals for each language
+     *            type, and the #of typed literals for each datatype URI.
+     * 
+     * @param litsize
+     *            The average size of a literal. The generated literals use a
+     *            normal distribution with this as their mean length (in
+     *            characters).
+     */
+    public void doTest(final int nclass, final int nproperty,
+            final int nliteral, final int litsize) throws IOException {
 
-        public void doTest
-        ( final int nclass,
-          final int nproperty,
-          final int nliteral,
-          final int litsize
-          )
-            throws IOException
-        {
-
-        final URI[] cspace = new URI[ nclass ];
-        final URI[] pspace = new URI[ nproperty ];
+        ITripleStore store = getStore();
+        
+        final URI[] cspace = new URI[nclass];
+        final URI[] pspace = new URI[nproperty];
         final URI[] tspace = new URI[] {
                 // uncomment to get data typed literals.
-//        new URIImpl( XMLSchema.xsInteger ),
+// new URIImpl( XMLSchema.xsInteger ),
 //        new URIImpl( XMLSchema.xsFloat )
         };
         final String[] langSpace = new String[]{
@@ -562,6 +539,8 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
         w.flush();
 
         w.close();
+
+        store.closeAndDelete();
         
         }
 

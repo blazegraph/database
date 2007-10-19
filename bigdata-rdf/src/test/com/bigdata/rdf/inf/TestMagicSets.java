@@ -53,8 +53,8 @@ import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Test suite for inference engine and the magic sets implementation.

@@ -45,46 +45,46 @@ package com.bigdata.rdf.rio;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.journal.BufferMode;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.AbstractTripleStore;
-import com.bigdata.rdf.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A test of the RIO integration.
  * 
  * @todo load a data file that we can include in CVS with some known
- *       characteristics and verify those characteristics after the load.
+ *       characteristics and verify those characteristics after the load so that
+ *       this serves as a correctness test. Right now this class is mainly used
+ *       as a performance test.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  */
 public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
-    /**
-     * 200M
-     */
-    protected long getInitialExtent() {
-        
-        return Bytes.megabyte*200;
-//        return Options.DEFAULT_INITIAL_EXTENT;
-        
-    }
-    
-    protected BufferMode getBufferMode() {
-        
+//    /**
+//     * 200M
+//     */
+//    protected long getInitialExtent() {
+//        
+//        return Bytes.megabyte*200;
+////        return Options.DEFAULT_INITIAL_EXTENT;
+//        
+//    }
+//    
+//    protected BufferMode getBufferMode() {
+//        
 //        return BufferMode.Disk;
-        
-//        return BufferMode.Transient;
-        
-        return BufferMode.Direct;
-        
-    }
+//        
+////        return BufferMode.Transient;
+//        
+////        return BufferMode.Direct;
+//        
+//    }
 
     /**
      * 
@@ -99,6 +99,28 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         super(name);
     }
 
+    protected ITripleStore store;
+    
+    public void setUp() throws Exception {
+        
+        super.setUp();
+        
+        store = getStore();
+        
+    }
+    
+    public void tearDown() throws Exception {
+
+        if(store!=null) {
+            
+            store.closeAndDelete();
+            
+        }
+        
+        super.tearDown();
+
+    }
+    
     /**
      * Test of RIO integration.
      * 
@@ -146,6 +168,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      * @param resources
      *            list of test resources to be parsed and inserted into the
      *            triple store
+     *            
+     * @throws Exception 
      * 
      * @todo modify
      *       {@link AbstractTripleStore#loadData(java.io.File, String, RDFFormat, boolean, boolean)}
@@ -154,7 +178,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
      * 
      * @todo modify to use the {@link LoadStats} helper class.
      */
-    public void doTest( IRioLoader loader, final String[] resources ) throws IOException {
+    public void doTest( IRioLoader loader, final String[] resources ) throws Exception {
 
         long total_stmts = 0;
 
@@ -212,10 +236,6 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
                           ", commit="+elapsedCommit+"ms"
                           );
                 
-            } catch ( Exception ex ) {
-                
-                ex.printStackTrace();
-                
             } finally {
                 
                 reader.close();
@@ -235,7 +255,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
     }
 
-    public void test_loadFile_basicRioLoader() throws IOException {
+    public void test_loadFile_basicRioLoader() throws Exception {
 
         doTest(new BasicRioLoader(), testData);
 
@@ -243,7 +263,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         
     }
     
-    public void test_loadFile_presortRioLoader() throws IOException {
+    public void test_loadFile_presortRioLoader() throws Exception {
 
         doTest(new PresortRioLoader(store), testData);
 
@@ -251,30 +271,31 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         
     }
 
-    public void test_load_file_wikipedia() throws IOException {
-
-        String[] testData = new String[]{"data/wikipedia/enwiki/20060306.rdf"};
-        
-        doTest(new PresortRioLoader(store), testData);
-        
-
-    }
+    // Note: Only for benchmarking.
+//    public void test_load_file_wikipedia() throws IOException {
+//
+//        String[] testData = new String[]{"data/wikipedia/enwiki/20060306.rdf"};
+//        
+//        doTest(new PresortRioLoader(store), testData);
+//        
+//
+//    }
     
-    public void test_loadFile_multiThreadedPresortRioLoader() throws IOException {
-
-        doTest(new MultiThreadedPresortRioLoader( store ), testData);
-
-        assertDataLoaded();
-        
-    }
-    
-    public void test_loadFile_bulkRioLoader() throws IOException {
-
-        doTest(new BulkRioLoader( store ), testData);
-
-        assertDataLoaded();
-        
-    }
+//    public void test_loadFile_multiThreadedPresortRioLoader() throws Exception {
+//
+//        doTest(new MultiThreadedPresortRioLoader( store ), testData);
+//
+//        assertDataLoaded();
+//        
+//    }
+//    
+//    public void test_loadFile_bulkRioLoader() throws Exception {
+//
+//        doTest(new BulkRioLoader( store ), testData);
+//
+//        assertDataLoaded();
+//        
+//    }
     
     protected String[] testData = new String[] {
             "data/nciOncology.owl" // nterms := 289844

@@ -45,7 +45,7 @@ Modifications:
  * Created on May 21, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -83,7 +83,6 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.SPO;
@@ -547,7 +546,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
      *       encapsulates the logic so that the distinct term scan may be
      *       applied when very large #s of terms would be visited. For this case
      *       it is also possible to parallelize the scan IFF the index partition
-     *       boundaries are choosen such that the entried for a term never cross
+     *       boundaries are choosen such that the entries for a term never cross
      *       an index partition bounary.
      */
     final public ArrayList<Long> distinctTermScan(KeyOrder keyOrder) {
@@ -638,41 +637,6 @@ abstract public class AbstractTripleStore implements ITripleStore {
         default:
             throw new IllegalArgumentException("Unknown: " + keyOrder);
         }
-
-    }
-
-    final public _Value getTerm(long id) {
-
-        byte[] data = (byte[]) getIdTermIndex().lookup(keyBuilder.id2key(id));
-
-        if (data == null)
-            return null;
-
-        return _Value.deserialize(data);
-
-    }
-
-    final public long getTermId(Value value) {
-
-        _Value val = (_Value) value;
-        
-        if( val.termId != ITripleStore.NULL ) return val.termId; 
-
-        byte[] tmp = (byte[]) getTermIdIndex().lookup(keyBuilder.value2Key(value));
-        
-        if( tmp == null ) return ITripleStore.NULL;
-        
-        try {
-            
-            val.termId = new DataInputBuffer(tmp).unpackLong();
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
-        return val.termId;
 
     }
 
@@ -1311,13 +1275,9 @@ abstract public class AbstractTripleStore implements ITripleStore {
 
     final public String toString( long termId ) {
         
-        IIndex ndx = getIdTermIndex();
-        
-        byte[] tmp = (byte[]) ndx.lookup(keyBuilder.id2key(termId));
-        
-        if(tmp == null) return TERM_NOT_FOUND;
+        _Value v = getTerm(termId);
 
-        _Value v = _Value.deserialize(tmp);
+        if(v == null) return TERM_NOT_FOUND;
         
         return (v instanceof URI ? abbrev((URI) v) : v.toString());
         

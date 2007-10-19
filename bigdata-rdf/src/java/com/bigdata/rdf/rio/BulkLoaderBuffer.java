@@ -58,7 +58,6 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.RecordCompressor;
-import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -66,6 +65,7 @@ import com.bigdata.rdf.rio.BulkRioLoader.Indices;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**

@@ -70,7 +70,7 @@ import org.openrdf.sesame.sail.StatementIterator;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 public class OptimizedValueFactory implements ValueFactory {

@@ -44,6 +44,8 @@ Modifications:
 package com.bigdata.rdf;
 
 
+import com.bigdata.rdf.store.ITripleStore;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -86,27 +88,14 @@ public class TestAll extends TestCase {
      
         suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
 
-        suite.addTestSuite( TestTripleStore.class );
-        
-        suite.addTestSuite( TestRestartSafe.class );
-        
-        suite.addTestSuite( TestInsertRate.class);
-
-        suite.addTest( com.bigdata.rdf.rio.TestAll.suite() );
-
-        suite.addTest( com.bigdata.rdf.inf.TestAll.suite() );
-
-        /*
-         * Note: This test suite requires access to the Sesame 1.x test suite --
-         * not just the Sesame JARs.
-         */
-//        suite.addTest( com.bigdata.rdf.sail.TestAll.suite() );
+        suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 
         /*
          * Note: This test suite sets up a local bigdata federation for
          * each test.  See the test suite for more information about 
          * required Java properties.
          */
+     
         suite.addTest( com.bigdata.rdf.scaleout.TestAll.suite() );
 
         return suite;

@@ -59,8 +59,8 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Statement handler for the RIO RDF Parser that collects values and statements

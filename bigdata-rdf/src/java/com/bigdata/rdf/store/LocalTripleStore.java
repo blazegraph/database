@@ -45,14 +45,15 @@ Modifications:
  * Created on Jan 3, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
@@ -185,7 +186,9 @@ import com.bigdata.scaleup.MasterJournal;
  */
 public class LocalTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
-    private final /*Master*/Journal store;
+    protected final /*Master*/Journal store;
+    
+    private final boolean isolatableIndices;
     
     /*
      * Note: You MUST NOT retain hard references to these indices across
@@ -202,6 +205,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      * load or query operation but not across commits (more accurately, not
      * across overflow() events).
      */
+    
     final public IIndex getTermIdIndex() {
 
         if(ndx_termId!=null) return ndx_termId;
@@ -210,32 +214,44 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         if(ndx==null) {
             
-            ndx_termId = ndx = store.registerIndex(name_termId);
+            if (isolatableIndices) {
+
+                ndx_termId = ndx = store.registerIndex(name_termId);
+
+            } else {
+
+                ndx_termId = ndx = store.registerIndex(name_termId, new BTree(
+                        store, BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                                .randomUUID(), TermIdSerializer.INSTANCE));
             
-//            ndx_termId = ndx = store.registerIndex(name_termId, new BTree(store,
-//                    BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-//                    TermIdSerializer.INSTANCE));
+            }
             
         }
         
         return ndx;
         
     }
-    
+
     final public IIndex getIdTermIndex() {
 
-        if(ndx_idTerm!=null) return ndx_idTerm;
-        
+        if (ndx_idTerm != null)
+            return ndx_idTerm;
+
         IIndex ndx = store.getIndex(name_idTerm);
 
         if (ndx == null) {
 
-            ndx_idTerm = ndx = store.registerIndex(name_idTerm);
-            
-//            ndx_idTerm = ndx = store.registerIndex(name_idTerm,
-//                    new BTree(store, BTree.DEFAULT_BRANCHING_FACTOR,
-//                            UUID.randomUUID(),
-//                            RdfValueSerializer.INSTANCE));
+            if (isolatableIndices) {
+
+                ndx_idTerm = ndx = store.registerIndex(name_idTerm);
+
+            } else {
+
+                ndx_idTerm = ndx = store.registerIndex(name_idTerm, new BTree(
+                        store, BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                                .randomUUID(), RdfValueSerializer.INSTANCE));
+
+            }
 
         }
 
@@ -249,7 +265,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      * 
      * @param name
      *            The name of the index.
-     *
+     * 
      * @return The index.
      * 
      * @see #name_spo
@@ -262,12 +278,17 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
 
-            ndx = store.registerIndex(name);
+            if (isolatableIndices) {
 
-//            ndx = store.registerIndex(name, new BTree(store,
-//                    BTree.DEFAULT_BRANCHING_FACTOR,
-//                    UUID.randomUUID(),
-//                    StatementSerializer.INSTANCE));
+                ndx = store.registerIndex(name);
+
+            } else {
+
+                ndx = store.registerIndex(name, new BTree(store,
+                        BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                        StatementSerializer.INSTANCE));
+
+            }
 
         }
 
@@ -327,12 +348,35 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
 
-    /**
-     * Polite shutdown of the embedded database.
-     */
+    final public boolean isStable() {
+        
+        return store.isStable();
+        
+    }
+    
     final public void close() {
         
         store.shutdown();
+        
+    }
+    
+    final public void closeAndDelete() {
+        
+        store.closeAndDelete();
+        
+    }
+    
+    public static class Options extends ConcurrentJournal.Options {
+        
+        /**
+         * When true, the terms, ids, and statement indices will be registered
+         * as {@link UnisolatedBTree} and will support transactions. Otherwise
+         * the indices will be registered as {@link BTree} and will NOT support
+         * isolation by transactions.
+         */
+        public static final String ISOLATABLE_INDICES = "isolatableIndices";
+
+        public static final String DEFAULT_ISOLATABLE_INDICES = "false";
         
     }
     
@@ -345,6 +389,11 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         store = new /*Master*/Journal(properties);
 
+        isolatableIndices = Boolean
+                .parseBoolean(properties.getProperty(
+                        Options.ISOLATABLE_INDICES,
+                        Options.DEFAULT_ISOLATABLE_INDICES));
+        
     }
     
     /**

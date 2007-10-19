@@ -52,7 +52,6 @@ import java.util.Iterator;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.rdf.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -61,6 +60,8 @@ import com.bigdata.rdf.rio.Buffer.TermClassIterator;
 import com.bigdata.rdf.rio.Buffer.TermIterator;
 import com.bigdata.rdf.rio.Buffer.UnknownStatementIterator;
 import com.bigdata.rdf.rio.Buffer.UnknownTermIterator;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -88,6 +89,8 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         
         final int capacity = 27;
         
+        ITripleStore store = getStore();
+        
         Buffer buffer = new Buffer(store,capacity,false);
         
         assertEquals(store,buffer.store);
@@ -102,11 +105,15 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertEquals(0,buffer.numBNodes);
         assertEquals(0,buffer.numStmts);
 
+        store.closeAndDelete();
+        
     }
 
     public void test_handleStatement() {
-        
+
         final int capacity = 5;
+        
+        ITripleStore store = getStore();
         
         Buffer buffer = new Buffer(store,capacity,false);
         
@@ -242,6 +249,8 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertSameIterator(new Object[] { s1, s2, p1, p2, o1, o2 },
                 new TermIterator(buffer));
         
+        store.closeAndDelete();
+        
     }
     
     /**
@@ -251,6 +260,8 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
     public void test_handleStatement_distinct() {
         
         final int capacity = 5;
+
+        ITripleStore store = getStore();
         
         Buffer buffer = new Buffer(store,capacity,true);
         
@@ -455,6 +466,8 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1],
                 buffer.stmts[2], buffer.stmts[3] },
                 new UnknownStatementIterator(KeyOrder.SPO, buffer));
+
+        store.closeAndDelete();
         
     }
         

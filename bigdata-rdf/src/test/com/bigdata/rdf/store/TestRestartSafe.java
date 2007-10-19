@@ -45,7 +45,7 @@ Modifications:
  * Created on Feb 5, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -54,7 +54,6 @@ import java.util.UUID;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
@@ -86,17 +85,10 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         
     }
     
-    /**
-     * Note: We must use a stable store for these tests.
-     */
-    protected BufferMode getBufferMode() {
-        
-        return BufferMode.Direct;
-        
-    }
-
     public void test_restartSafe() throws IOException {
 
+        ITripleStore store = getStore();
+        
         /*
          * setup the database.
          */
@@ -211,57 +203,61 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         }
 
         store.commit();
+
+        if (store.isStable()) {
+
+            store = reopenStore(store);
+
+            assertEquals(x_id, store.getTermId(x));
+            assertEquals(y_id, store.getTermId(y));
+            assertEquals(z_id, store.getTermId(z));
+            assertEquals(A_id, store.getTermId(A));
+            assertEquals(B_id, store.getTermId(B));
+            assertEquals(C_id, store.getTermId(C));
+            assertEquals(rdfType_id, store.getTermId(rdfType));
+            assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
+
+            assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(
+                    null, null));
+            assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(
+                    null, null));
+            assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(
+                    null, null));
+            assertTrue(store.containsStatement(x, rdfType, C));
+            assertTrue(store.containsStatement(y, rdfType, B));
+            assertTrue(store.containsStatement(z, rdfType, A));
+            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
+            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+
+            assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
+            assertEquals("#uris", 8, store.getURICount());
+            assertEquals("#lits", 3, store.getLiteralCount());
+            assertEquals("#bnodes", 2, store.getBNodeCount());
+
+            /*
+             * verify the terms can be recovered.
+             */
+            assertEquals(x, store.getTerm(x_id));
+            assertEquals(y, store.getTerm(y_id));
+            assertEquals(z, store.getTerm(z_id));
+            assertEquals(A, store.getTerm(A_id));
+            assertEquals(B, store.getTerm(B_id));
+            assertEquals(C, store.getTerm(C_id));
+
+            assertEquals(rdfType, store.getTerm(rdfType_id));
+            assertEquals(rdfsSubClassOf, store.getTerm(rdfsSubClassOf_id));
+
+            assertEquals(lit1, store.getTerm(lit1_id));
+            assertEquals(lit2, store.getTerm(lit2_id));
+            assertEquals(lit3, store.getTerm(lit3_id));
+
+            assertEquals(bn1, store.getTerm(bn1_id));
+            assertEquals(bn2, store.getTerm(bn2_id));
+
+        }
         
-        store.close();
-
-        store = new LocalTripleStore(properties);
-
-        assertEquals(x_id, store.getTermId(x));
-        assertEquals(y_id, store.getTermId(y));
-        assertEquals(z_id, store.getTermId(z));
-        assertEquals(A_id, store.getTermId(A));
-        assertEquals(B_id, store.getTermId(B));
-        assertEquals(C_id, store.getTermId(C));
-        assertEquals(rdfType_id, store.getTermId(rdfType));
-        assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
-
-        assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,
-                null));
-        assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(null,
-                null));
-        assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(null,
-                null));
-        assertTrue(store.containsStatement(x, rdfType, C));
-        assertTrue(store.containsStatement(y, rdfType, B));
-        assertTrue(store.containsStatement(z, rdfType, A));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-        assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
-
-        assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
-        assertEquals("#uris", 8, store.getURICount());
-        assertEquals("#lits", 3, store.getLiteralCount());
-        assertEquals("#bnodes", 2, store.getBNodeCount());
-
-        /*
-         * verify the terms can be recovered.
-         */
-        assertEquals(x, store.getTerm(x_id));
-        assertEquals(y, store.getTerm(y_id));
-        assertEquals(z, store.getTerm(z_id));
-        assertEquals(A, store.getTerm(A_id));
-        assertEquals(B, store.getTerm(B_id));
-        assertEquals(C, store.getTerm(C_id));
-
-        assertEquals(rdfType, store.getTerm(rdfType_id));
-        assertEquals(rdfsSubClassOf, store.getTerm(rdfsSubClassOf_id));
-
-        assertEquals(lit1, store.getTerm(lit1_id));
-        assertEquals(lit2, store.getTerm(lit2_id));
-        assertEquals(lit3, store.getTerm(lit3_id));
-
-        assertEquals(bn1, store.getTerm(bn1_id));
-        assertEquals(bn2, store.getTerm(bn2_id));
-
+        store.closeAndDelete();
+        
     }
 
 }

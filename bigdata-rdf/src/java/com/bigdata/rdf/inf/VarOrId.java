@@ -45,7 +45,7 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.ITripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A class that models either the identifier for an RDF {@link Value} or a

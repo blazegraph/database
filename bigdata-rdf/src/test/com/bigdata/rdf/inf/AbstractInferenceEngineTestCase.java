@@ -47,12 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import java.util.Properties;
-
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.AbstractTripleStoreTestCase;
-import com.bigdata.scaleup.MasterJournal.Options;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
 /**
  * Base class for test suites for inference engine and the magic sets
@@ -76,53 +71,65 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
         super(name);
     }
 
-    public Properties getProperties() {
+//    public Properties getProperties() {
+//
+//        if (properties == null) {
+//
+//            properties = super.getProperties();
+//
+//            if(properties.getProperty(Options.BUFFER_MODE)==null) {
+//             
+//                // override if not specified.
+//                properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
+//                
+//            }
+//            if(properties.getProperty(Options.FILE)==null) {
+//                properties.setProperty(Options.FILE, getName()+".jnl");
+//            }
+//            if(properties.getProperty(Options.BASENAME)==null) {
+//                properties.setProperty(Options.BASENAME, getName());
+//            }
+//
+//        }
+//
+//        return properties;
+//
+//    }
+//
+//    private Properties properties;
 
-        if (properties == null) {
-
-            properties = super.getProperties();
-
-            if(properties.getProperty(Options.BUFFER_MODE)==null) {
-             
-                // override if not specified.
-                properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
-                
-            }
-            if(properties.getProperty(Options.FILE)==null) {
-                properties.setProperty(Options.FILE, getName()+".jnl");
-            }
-            if(properties.getProperty(Options.BASENAME)==null) {
-                properties.setProperty(Options.BASENAME, getName());
-            }
-
-        }
-
-        return properties;
-
-    }
-
-    private Properties properties;
-
-    /**
-     * Invoked the first time {@link #getProperties()} is called for each test
-     * to set mode in which the {@link Journal} will be opened.
-     * 
-     * @return {@link BufferMode#Transient}
-     * 
-     * @see BufferMode#Transient
-     * @see BufferMode#Direct
-     */
-    protected BufferMode getBufferMode() {
-        
-        return BufferMode.Transient;
-        
-    }
+//    /**
+//     * Invoked the first time {@link #getProperties()} is called for each test
+//     * to set mode in which the {@link Journal} will be opened.
+//     * 
+//     * @return {@link BufferMode#Transient}
+//     * 
+//     * @see BufferMode#Transient
+//     * @see BufferMode#Direct
+//     */
+//    protected BufferMode getBufferMode() {
+//        
+//        return BufferMode.Transient;
+//        
+//    }
     
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         
         super.setUp();
         
-        this.store = new InferenceEngine(super.store);
+        this.store = new InferenceEngine(getStore());
+        
+    }
+    
+    public void tearDown() throws Exception {
+
+        if(this.store!=null) {
+            
+            this.store.closeAndDelete();
+            
+        }
+        
+        super.tearDown();
         
     }
     
