@@ -77,16 +77,12 @@ import com.bigdata.rdf.serializers.TermIdSerializer;
  */
 public class TempTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
-    private final IIndex ndx_termId;
-    private final IIndex ndx_idTerm;
+    private final BTree ndx_termId;
+    private final BTree ndx_idTerm;
 
-    /*
-     * Note: You MUST NOT retain hard references to these indices across
-     * operations since they may be discarded and re-loaded.
-     */
-    private final IIndex ndx_spo;
-    private final IIndex ndx_pos;
-    private final IIndex ndx_osp;
+    private final BTree ndx_spo;
+    private final BTree ndx_pos;
+    private final BTree ndx_osp;
 
     final private TemporaryStore store;
 
@@ -133,6 +129,17 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
     
+    final public void clear() {
+        
+        ndx_termId.removeAll();
+        ndx_idTerm.removeAll();
+
+        ndx_spo.removeAll();
+        ndx_pos.removeAll();
+        ndx_osp.removeAll();
+        
+    }
+    
     final public void close() {
         
         store.close();
@@ -161,23 +168,23 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         store = new TemporaryStore();
         
-        ndx_termId = store.registerIndex(name_termId, new BTree(store,
+        ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 TermIdSerializer.INSTANCE));
 
-        ndx_idTerm = store.registerIndex(name_idTerm, new BTree(store,
+        ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 RdfValueSerializer.INSTANCE));
 
-        ndx_spo = store.registerIndex(name_spo, new BTree(store,
+        ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
-        ndx_pos = store.registerIndex(name_pos, new BTree(store,
+        ndx_pos = (BTree)store.registerIndex(name_pos, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
-        ndx_osp = store.registerIndex(name_osp, new BTree(store,
+        ndx_osp = (BTree)store.registerIndex(name_osp, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         

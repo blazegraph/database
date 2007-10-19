@@ -42,15 +42,40 @@ Modifications:
 
 */
 /*
- * Created on Oct 19, 2007
+ * Created on Mar 30, 2005
  */
+package com.bigdata.rdf.inf;
 
-package com.bigdata.rdf.sail;
+import java.util.Set;
+
+import org.openrdf.model.Statement;
+
+import org.openrdf.model.URI;
 
 /**
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @author personickm
  */
-public class BigdataRdfSchemaRepository {
+public interface Axioms {
+    
+    Set<Triple> getAxioms();
+    
+    Set<String> getVocabulary();
+    
+    boolean isAxiom( Statement stmt );
+    
+    boolean isAxiom( URI s, URI p, URI o );
+    
+    boolean isInVocabulary( URI uri );
 
+    
+    public interface Triple {
+
+        URI getS();
+        
+        URI getP();
+        
+        URI getO();
+        
+    }
+    
 }

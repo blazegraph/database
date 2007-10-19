@@ -192,7 +192,10 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
     }
     
-    ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
+    /**
+     * A service used to write on each of the statement indices in parallel.
+     */
+    protected ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
             DaemonThreadFactory.defaultThreadFactory());
 
     /**
