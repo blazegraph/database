@@ -45,7 +45,7 @@ Modifications:
  * Created on Jan 3, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
 import java.util.Arrays;
 import java.util.Properties;
@@ -53,6 +53,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.OSPComparator;
 import com.bigdata.rdf.inf.POSComparator;
@@ -126,15 +127,33 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
     
+    final public boolean isStable() {
+        
+        return store.isStable();
+        
+    }
+    
     final public void close() {
         
         store.close();
         
     }
     
+    final public void closeAndDelete() {
+        
+        store.closeAndDelete();
+        
+    }
+    
     /**
      * Create a transient {@link ITripleStore} backed by a
      * {@link TemporaryStore}.
+     * <p>
+     * Note: the {@link TempTripleStore} declares its indices as {@link BTree}s
+     * (do not support isolation) rather than {@link UnisolatedBTree} (supports
+     * transactional isolation and purge of historical data). This offers a
+     * significant performance boost when you do not need transactions or the
+     * ability to purge historical data versions from the store as they age.
      */
     public TempTripleStore(Properties properties) {
 

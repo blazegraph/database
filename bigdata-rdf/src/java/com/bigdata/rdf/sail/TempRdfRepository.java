@@ -42,37 +42,34 @@ Modifications:
 
 */
 /*
- * Created on Apr 17, 2007
+ * Created on Oct 19, 2007
  */
 
 package com.bigdata.rdf.sail;
 
-import com.bigdata.rdf.inf.InferenceEngine;
+import java.util.Properties;
+
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
- * Additional parameters understood by the Sesame 1.x SAIL implementation.
+ * Concrete implementation backed by a {@link TempTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Options extends com.bigdata.journal.Options {
+public class TempRdfRepository extends BigdataRdfRepository {
 
     /**
-     * This optional boolean property may be used to specify whether or not RDFS
-     * entailments are maintained by eager closure of the knowledge base
-     * (default false).
+     * 
      */
-    public static final String RDFS_CLOSURE = "rdfsClosure"; 
+    public TempRdfRepository() {
+    }
 
-    /**
-     * The property whose value is the name of the {@link ITripleStore} 
-     * implementation that will be instantiated.  An {@link InferenceEngine} 
-     * will be used to wrap that {@link ITripleStore}.
-     */
-    public static final String STORE_CLASS = "storeClass";
-    
-    public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
-    
+    protected ITripleStore newTripleStore(Properties properties) {
+
+        return new TempTripleStore(properties);
+        
+    }
+
 }

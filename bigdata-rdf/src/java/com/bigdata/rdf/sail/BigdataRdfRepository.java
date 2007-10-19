@@ -48,7 +48,7 @@ Modifications:
 package com.bigdata.rdf.sail;
 
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -96,9 +96,6 @@ import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.LocalTripleStore;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory;
@@ -106,24 +103,21 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
- * A simple Sesame 1.x SAIL integration.
+ * A Sesame 1.x SAIL integration.
  * <p>
- * This is very much a trial balloon. Sesame 1.x coupled the control logic and
- * data structures in such a way that you could not write your own JOIN
- * operators, which makes it very difficult to optimize performance. A very
- * basic and untuned mechanisms is provided to compute the
- * {@link #fullForwardClosure()} of the triple store (there is no truth
- * maintenance and you must re-compute the entire closure if you add more data
- * to the store) - use of this method will let you run high level queries using
- * the SAIL with entailments. Only a simple transaction model is supported (no
- * transactional isolation). The {@link LocalTripleStore} uses an embedded write-only
- * {@link Journal} as its store (it does not support distributed scale-out). The
- * namespace management methods and the methods to clear the repository have not
- * been implemented.
+ * Note: Sesame 1.x coupled the control logic and data structures in such a way
+ * that you could not write your own JOIN operators, which makes it very
+ * difficult to optimize performance.
+ * <p>
+ * Note: Only a simple transaction model is supported. There is no transactional
+ * isolation. Queries run against the "live" indices and therefore CAN NOT be
+ * used concurrently or concurrently with writes on the store.
  * <p>
  * A custom integration is provided for directly loading data into the triple
  * store with throughput of 20,000+ triples per second - see
@@ -137,16 +131,33 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * <p>
  * <em>THIS CLASS IS NOT SAFE FOR TRAVERSAL UNDER CONCURRENT MODIFICATION</em>
  * 
+ * FIXME Queries could run concurrently against the last committed state of the
+ * store. This would require an {@link RdfRepository} wrapper that was
+ * initialized from the last commit record on the store and then was used to
+ * execute queries. In turn, that should probably be built over a read-only
+ * {@link ITripleStore} reading from the last commit record on the store at the
+ * time that the view is created.
+ * 
+ * FIXME Support a better truth maintanence strategy
+ * <p>
+ * A very basic and untuned mechanism is provided to compute the
+ * {@link #fullForwardClosure()} of the triple store (there is no truth
+ * maintenance and you must re-compute the entire closure if you add more data
+ * to the store) - use of this method will let you run high level queries using
+ * the SAIL with entailments.
+ * 
+ * @todo The namespace management methods have not been implemented.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleRdfRepository implements RdfRepository {
+public class BigdataRdfRepository implements RdfRepository {
 
     /**
      * Logger.
      */
     public static final Logger log = Logger.getLogger
-    ( SimpleRdfRepository.class
+    ( BigdataRdfRepository.class
       );
 
     /**
@@ -192,7 +203,7 @@ public class SimpleRdfRepository implements RdfRepository {
      * 
      * @see #initialize(Map)
      */
-    public SimpleRdfRepository() {
+    public BigdataRdfRepository() {
     }
 
     //
@@ -1080,60 +1091,73 @@ public class SimpleRdfRepository implements RdfRepository {
         properties = PropertyUtil.flatCopy(PropertyUtil.convert(configParams));
 
         String val;
-        
-        val = properties.getProperty(Options.RDFS_CLOSURE);
-        
-        if (val != null) {
-            
-            rdfsClosure = Boolean.parseBoolean(val);
-            
-        } else {
-            
-            // No closure by default.
-            rdfsClosure = false;
-            
-        }
 
-        System.err.println(Options.RDFS_CLOSURE+"="+rdfsClosure);
+        // rdfsClosure
+        {
+            val = properties.getProperty(Options.RDFS_CLOSURE);
+
+            if (val != null) {
+
+                rdfsClosure = Boolean.parseBoolean(val);
+
+            } else {
+
+                // No closure by default.
+                rdfsClosure = false;
+
+            }
+
+            log.info(Options.RDFS_CLOSURE + "=" + rdfsClosure);
+        }
         
         valueFactory = new OptimizedValueFactory();
-        
-        tripleStore = new InferenceEngine(new LocalTripleStore(properties));
+
+        // storeClass
+        {
+            
+            final ITripleStore backingStore;
+            
+            val = properties.getProperty(Options.STORE_CLASS,Options.DEFAULT_STORE_CLASS);
+
+            try {
+
+                Class storeClass = Class.forName(val);
+
+                if(!ITripleStore.class.isAssignableFrom(storeClass)) {
+                    
+                    throw new SailInitializationException("Must extend "
+                            + ITripleStore.class.getName() + " : "
+                            + storeClass.getName()); 
+                    
+                }
+                
+                Constructor ctor = storeClass.getConstructor(new Class[]{Properties.class});
+                
+                backingStore = (ITripleStore) ctor.newInstance(new Object[]{properties});
+
+            } catch(SailInitializationException ex) {
+                
+                throw ex;
+                
+            } catch(Throwable t) {
+                
+                throw new SailInitializationException(t);
+                
+            }
+            
+            tripleStore = new InferenceEngine( backingStore );
+            
+        }
         
     }
-
+    
     public void shutDown() {
 
+        // @todo use polite shutdown() and define on ITripleStore.
         tripleStore.close();
         
     }
 
-//    /**
-//     * Uses a fast batch loader to load the data into the store.
-//     * <p>
-//     * This method lies outside of the SAIL and does not rely on the SAIL
-//     * "transaction" mechanisms.
-//     * <p>
-//     * This method does NOT perform RDFS closure - you must explicitly request
-//     * that yourself, e.g., by specifying <code>commit:=false</code> here and
-//     * then invoking {@link #fullForwardClosure()}.
-//     * 
-//     * @param file
-//     *            The file containing the data.
-//     * @param baseURI
-//     *            The base URI (optional).
-//     * @param commit
-//     *            When true, the store will be committed after the data load
-//     *            (you can use false here if you will lots of small files in
-//     *            sequence).
-//     */
-//    public void loadData(File file, String baseURI, boolean commit)
-//            throws IOException {
-//
-//        tripleStore.loadData(file, baseURI, commit);
-//        
-//    }
-    
     /**
      * Computes the closure of the triple store for RDFS entailments.
      * <p>

@@ -44,8 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.TempTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 
 
 /**

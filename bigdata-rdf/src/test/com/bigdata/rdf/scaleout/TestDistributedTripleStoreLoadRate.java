@@ -53,9 +53,9 @@ import java.io.IOException;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.rdf.ScaleOutTripleStore;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.TestRioIntegration;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.

@@ -56,8 +56,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Vector;
 
-import com.bigdata.journal.BufferMode;
-import com.bigdata.rdf.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -78,13 +78,37 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    protected BufferMode getBufferMode() {
+    protected ITripleStore store;
+    
+    public void setUp() throws Exception
+    {
         
-//        return BufferMode.Disk;
+        super.setUp();
         
-        return BufferMode.Direct;
+        store = getStore();
         
     }
+    
+    public void tearDown() throws Exception {
+
+        
+        if(store!=null) {
+            
+            store.closeAndDelete();
+            
+        }
+        
+        super.tearDown();
+        
+    }
+    
+//    protected BufferMode getBufferMode() {
+//        
+////        return BufferMode.Disk;
+//        
+//        return BufferMode.Direct;
+//        
+//    }
     
 //    /**
 //     * Returns the size of the store file.

@@ -615,7 +615,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
     }
     
-    public void tearDown()
+    public void tearDown() throws Exception
     {
         
         super.tearDown();

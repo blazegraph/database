@@ -76,7 +76,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("SAIL");
 
-        suite.addTestSuite( TestSimpleRdfRepository.class );
+        suite.addTestSuite( TestBigdataRdfRepository.class );
      
         return suite;
         

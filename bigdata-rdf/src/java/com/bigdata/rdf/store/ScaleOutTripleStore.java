@@ -45,8 +45,9 @@ Modifications:
  * Created on May 19, 2007
  */
 
-package com.bigdata.rdf;
+package com.bigdata.rdf.store;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -59,6 +60,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.MutableKeyBuffer;
 import com.bigdata.btree.MutableValueBuffer;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -241,6 +243,42 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         return terms[0].termId;
         
+    }
+
+    final public _Value getTerm(long id) {
+
+        byte[] data = (byte[])getIdTermIndex().lookup(keyBuilder.id2key(id));
+
+        if (data == null)
+            return null;
+
+        return _Value.deserialize(data);
+
+    }
+
+    final public long getTermId(Value value) {
+
+        _Value val = (_Value) value;
+        
+        if( val.termId != ITripleStore.NULL ) return val.termId; 
+
+        Object tmp = getTermIdIndex().lookup(keyBuilder.value2Key(value));
+        
+        if (tmp == null)
+            return ITripleStore.NULL;
+
+        try {
+
+            val.termId = new DataInputBuffer((byte[]) tmp).unpackLong();
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return val.termId;
+
     }
 
     /**
@@ -496,9 +534,31 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     }
     
     /**
+     * The federation is considered stable regardless of whether the federation
+     * is on stable storage since clients only disconnect when they use
+     * {@link #close()}.
+     */
+    final public boolean isStable() {
+        
+        return true;
+        
+    }
+    
+    /**
      * Disconnects from the {@link IBigdataFederation}.
      */
     final public void close() {
+        
+        fed.disconnect();
+        
+    }
+
+    /**
+     * Disconnects from the {@link IBigdataFederation}.
+     * 
+     * @todo drop the federation?
+     */
+    final public void closeAndDelete() {
         
         fed.disconnect();
         

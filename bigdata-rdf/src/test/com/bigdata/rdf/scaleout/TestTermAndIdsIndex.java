@@ -58,12 +58,12 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.TestTripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.TestTripleStore;
 
 /**
  * Test suite for use of the terms and ids indices.

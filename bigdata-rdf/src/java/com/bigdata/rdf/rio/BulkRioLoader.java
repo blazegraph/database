@@ -64,8 +64,8 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.ITripleStore;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.scaleup.MasterJournal;
 
 /**

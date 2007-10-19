@@ -54,15 +54,18 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.ScaleOutTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IProcedure;
 
 /**
@@ -164,6 +167,12 @@ public class AddTerms implements IProcedure, Externalizable {
      */
     public Object apply(IIndexWithCounter ndx) throws Exception {
 
+        /*
+         * When true, we serialize the values as byte[]s.  When false, the
+         * btree has a serializer that will accept Long values.
+         */
+        final boolean isUnisolatedBTree = ndx instanceof UnisolatedBTree;
+        
         final int numTerms = keys.getKeyCount();
         
         // used to store the discovered / assigned term identifiers.
@@ -180,8 +189,8 @@ public class AddTerms implements IProcedure, Externalizable {
         }
         
         // used to serialize term identifers.
-        final DataOutputBuffer idbuf = new DataOutputBuffer(
-                Bytes.SIZEOF_LONG);
+        final DataOutputBuffer idbuf = (isUnisolatedBTree ?new DataOutputBuffer(
+                Bytes.SIZEOF_LONG) : null);
         
         for (int i = 0; i < numTerms; i++) {
 
@@ -190,7 +199,7 @@ public class AddTerms implements IProcedure, Externalizable {
             final long termId;
 
             // Lookup in the forward index.
-            byte[] tmp = (byte[]) ndx.lookup(term);
+            Object tmp = ndx.lookup(term);
 
             if (tmp == null) { // not found.
 
@@ -198,10 +207,10 @@ public class AddTerms implements IProcedure, Externalizable {
                 termId = counter.inc();
 
                 // format as packed long integer.
-                idbuf.reset().packLong(termId);
+                if(isUnisolatedBTree) idbuf.reset().packLong(termId);
 
                 // insert into index.
-                if (ndx.insert(term, idbuf.toByteArray()) != null) {
+                if (ndx.insert(term, (isUnisolatedBTree?idbuf.toByteArray():Long.valueOf(termId))) != null) {
 
                     throw new AssertionError();
 
@@ -209,7 +218,15 @@ public class AddTerms implements IProcedure, Externalizable {
 
             } else { // found.
 
-                termId = new DataInputBuffer(tmp).unpackLong();
+                if(isUnisolatedBTree) {
+                                    
+                    termId = new DataInputBuffer((byte[])tmp).unpackLong();
+                   
+                } else {
+                
+                    termId = (Long)tmp;
+
+                }
 
             }
 

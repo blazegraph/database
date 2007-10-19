@@ -42,37 +42,61 @@ Modifications:
 
 */
 /*
- * Created on Apr 17, 2007
+ * Created on Oct 19, 2007
  */
 
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.store;
 
-import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+
 
 /**
- * Additional parameters understood by the Sesame 1.x SAIL implementation.
+ * Runs tests for each {@link ITripleStore} implementation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Options extends com.bigdata.journal.Options {
+public class TestAll extends TestCase {
 
     /**
-     * This optional boolean property may be used to specify whether or not RDFS
-     * entailments are maintained by eager closure of the knowledge base
-     * (default false).
+     * 
      */
-    public static final String RDFS_CLOSURE = "rdfsClosure"; 
+    public TestAll() {
+    }
 
     /**
-     * The property whose value is the name of the {@link ITripleStore} 
-     * implementation that will be instantiated.  An {@link InferenceEngine} 
-     * will be used to wrap that {@link ITripleStore}.
+     * @param arg0
      */
-    public static final String STORE_CLASS = "storeClass";
-    
-    public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
+    public TestAll(String arg0) {
+        super(arg0);
+    }
+
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("RDF Stores");
+
+        /*
+         * Run each of the kinds of triple stores through both their specific
+         * and shared unit tests.
+         * 
+         * @todo the scale out triple store using the proxied test suite.
+         */
+
+        suite.addTest( com.bigdata.rdf.store.TestTempTripleStore.suite() );
+        
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStore.suite() );
+
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );
+
+        return suite;
+        
+    }
     
 }

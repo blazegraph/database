@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.TempTripleStore;
 import com.bigdata.rdf.inf.Rule.Stats;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -66,7 +66,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
     
     protected SPOBuffer buffer;
 
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         
         super.setUp();
         

@@ -48,9 +48,9 @@ Modifications:
 package com.bigdata.rdf.scaleout;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.rdf.ITripleStore;
-import com.bigdata.rdf.ScaleOutTripleStore;
-import com.bigdata.rdf.TempTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.service.BigdataClient;
 import com.bigdata.service.IBigdataFederation;
 
