@@ -82,7 +82,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestRuleRdfs07.class );
         
         suite.addTestSuite( TestRuleRdfs11.class );
-        
+
+        /*
+         * @todo write test for fixPoint().
+         */
         suite.addTestSuite( TestFullForwardClosure.class );
         
         suite.addTestSuite( TestMagicSets.class);

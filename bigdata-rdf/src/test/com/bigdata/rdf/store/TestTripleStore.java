@@ -48,8 +48,10 @@
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.UUID;
 
+import org.openrdf.model.Value;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 import org.openrdf.vocabulary.XmlSchema;
@@ -121,19 +123,21 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         ITripleStore store = getStore();
 
+        doAddTermTest(store, new _Literal("abc"));
+        doAddTermTest(store, new _Literal("abc", new _URI(XmlSchema.DECIMAL)));
+        doAddTermTest(store, new _Literal("abc", "en"));
+
         doAddTermTest(store, new _URI("http://www.bigdata.com"));
         doAddTermTest(store, new _URI(RDF.TYPE));
         doAddTermTest(store, new _URI(RDFS.SUBCLASSOF));
         doAddTermTest(store, new _URI(XmlSchema.DECIMAL));
 
-        doAddTermTest(store, new _Literal("abc"));
-        doAddTermTest(store, new _Literal("abc", new _URI(XmlSchema.DECIMAL)));
-        doAddTermTest(store, new _Literal("abc", "en"));
-
         doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
         doAddTermTest(store, new _BNode("a12"));
 
         store.commit();
+
+        dumpTerms(store);
 
         store.closeAndDelete();
 
@@ -164,106 +168,70 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         store.insertTerms(terms, terms.length, false/* haveKeys */, false/* sorted */);
 
+        store.commit();
+        
         for (int i = 0; i < terms.length; i++) {
 
+            // verify set by side-effect on batch insert.
+            assertNotSame(NULL,terms[i].termId);
+            assertTrue(terms[i].known);
+            
+            // save & clear
+            final long termId = terms[i].termId;
+            terms[i].termId = NULL;
+            terms[i].known = false;
+            if(i%2==0) terms[i].key = null;
+            
             // check the forward mapping (term -> id)
-            assertEquals("forward mapping", terms[i], store
-                    .getTerm(terms[i].termId));
+            assertEquals("forward mapping", termId, store.getTermId(terms[i]));
+
+            // verify set by side effect.
+            assertEquals(termId,terms[i].termId);
+            assertTrue(terms[i].known);
+            assertNotNull(terms[i].key);
 
             // check the reverse mapping (id -> term)
-            assertEquals("reverse mapping", terms[i].termId, store
-                    .getTermId(terms[i]));
-
-            /*
-             * check flag set iff term was successfully asserted against both
-             * the forward and reverse mappings.
-             */
-            assertTrue("known", terms[i].known);
+            assertEquals("reverse mapping", terms[i], store.getTerm(termId));
 
         }
 
-        /**
-         * Dumps the forward mapping.
-         */
-        {
-
-            System.err.println("terms index (forward mapping).");
-
-            IIndex ndx = store.getTermIdIndex();
-
-            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
-
-            IEntryIterator itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                // the term identifier.
-                Object val = itr.next();
-
-                /*
-                 * The sort key for the term. This is not readily decodable. See
-                 * RdfKeyBuilder for specifics.
-                 */
-                byte[] key = itr.getKey();
-
-                /*
-                 * deserialize the term identifier (packed long integer).
-                 */
-                final long id;
-                try {
-
-                    id = (isolatableIndex ? new DataInputBuffer((byte[]) val)
-                            .unpackLong() : (Long) val);
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                System.err.println(BytesUtil.toString(key) + ":" + id);
-
-            }
-
-        }
-
-        /**
-         * Dumps the reverse mapping.
-         */
-        {
-
-            System.err.println("ids index (reverse mapping).");
-
-            IIndex ndx = store.getIdTermIndex();
-
-            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
-
-            IEntryIterator itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                // the serialized term.
-                Object val = itr.next();
-
-                // the sort key for the term identifier.
-                byte[] key = itr.getKey();
-
-                // decode the term identifier from the sort key.
-                final long id = KeyBuilder.decodeLong(key, 0);
-
-                _Value term = (isolatableIndex ? _Value
-                        .deserialize((byte[]) val) : (_Value) val);
-
-                System.err.println(id + ":" + term);
-
-            }
-
-        }
+        dumpTerms(store);
 
         store.closeAndDelete();
 
     }
 
+    public void test_insertTermsWithDuplicates() {
+        
+        ITripleStore store = getStore();
+
+        _Value[] terms = new _Value[] {//
+
+                new _URI("http://www.bigdata.com"),//
+                new _URI("http://www.bigdata.com"),//
+
+//                new _URI(RDF.TYPE),//
+//                new _URI(RDFS.SUBCLASSOF),//
+//                new _URI(XmlSchema.DECIMAL),//
+//
+//                new _Literal("abc"),//
+//                new _Literal("abc", new _URI(XmlSchema.DECIMAL)),//
+//                new _Literal("abc", "en"),//
+//
+//                new _BNode(UUID.randomUUID().toString()),//
+//                new _BNode("a12") //
+        };
+
+        store.insertTerms(terms, terms.length, false/* haveKeys */, false/* sorted */);
+
+        store.commit();
+        
+        dumpTerms(store);
+
+        store.closeAndDelete();
+
+    }
+    
     /**
      * Test of
      * {@link ITripleStore#addStatement(org.openrdf.model.Resource, org.openrdf.model.URI, org.openrdf.model.Value)}
@@ -393,4 +361,117 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
     }
 
+    void dumpTerms(ITripleStore store) {
+
+        // Same #of terms in the forward and reverse indices.
+        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
+                store.getTermIdIndex().rangeCount(null, null));
+        
+        /**
+         * Dumps the forward mapping.
+         */
+        {
+
+            System.err.println("terms index (forward mapping).");
+
+            IIndex ndx = store.getTermIdIndex();
+
+            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+            IEntryIterator itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                // the term identifier.
+                Object val = itr.next();
+
+                /*
+                 * The sort key for the term. This is not readily decodable. See
+                 * RdfKeyBuilder for specifics.
+                 */
+                byte[] key = itr.getKey();
+
+                /*
+                 * deserialize the term identifier (packed long integer).
+                 */
+                final long id;
+                try {
+
+                    id = (isolatableIndex ? new DataInputBuffer((byte[]) val)
+                            .unpackLong() : (Long) val);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                System.err.println(BytesUtil.toString(key) + ":" + id);
+
+            }
+
+        }
+
+        /**
+         * Dumps the reverse mapping.
+         */
+        {
+
+            System.err.println("ids index (reverse mapping).");
+
+            IIndex ndx = store.getIdTermIndex();
+
+            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+            IEntryIterator itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                // the serialized term.
+                Object val = itr.next();
+
+                // the sort key for the term identifier.
+                byte[] key = itr.getKey();
+
+                // decode the term identifier from the sort key.
+                final long id = KeyBuilder.decodeLong(key, 0);
+
+                _Value term = (isolatableIndex ? _Value
+                        .deserialize((byte[]) val) : (_Value) val);
+
+                System.err.println(id + ":" + term);
+
+            }
+
+        }
+        
+        /**
+         * Dumps the term:id index.
+         */
+        for( Iterator<Long> itr = ((AbstractTripleStore)store).termIdIndexScan(); itr.hasNext(); ) {
+            
+            System.err.println("term->id : "+itr.next());
+            
+        }
+
+        /**
+         * Dumps the id:term index.
+         */
+        for( Iterator<Value> itr = ((AbstractTripleStore)store).idTermIndexScan(); itr.hasNext(); ) {
+            
+            System.err.println("id->term : "+itr.next());
+            
+        }
+
+        /**
+         * Dumps the terms in term order.
+         */
+        for( Iterator<Value> itr = ((AbstractTripleStore)store).termIterator(); itr.hasNext(); ) {
+            
+            System.err.println("termOrder : "+itr.next());
+            
+        }
+
+    }
+    
 }

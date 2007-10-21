@@ -46,6 +46,8 @@ package com.bigdata.rdf.inf;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -114,7 +116,7 @@ public class RuleRdf01 extends AbstractRuleRdf {
              */
             
             // find the distinct predicates in the KB.
-            ArrayList<Long> ids = store.distinctTermScan(KeyOrder.POS);
+            ArrayList<Long> ids = db.distinctTermScan(KeyOrder.POS);
 
             Iterator<Long> itr = ids.iterator();
 

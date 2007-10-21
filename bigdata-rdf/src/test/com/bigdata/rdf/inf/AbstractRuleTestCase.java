@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.inf.Rule.Stats;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -128,7 +129,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
          * transfer the entailments from the temporary store to the primary
          * store.
          */
-        final int actualCopied = store.copyStatements(tmpStore);
+        final int actualCopied = InferenceEngine.copyStatements(tmpStore,
+                store);
         
         assertEquals("#copied",expectedCopied,actualCopied);
 

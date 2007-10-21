@@ -44,6 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -63,7 +65,7 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
         
-        final RdfKeyBuilder keyBuilder = store.getKeyBuilder();
+        final RdfKeyBuilder keyBuilder = db.getKeyBuilder();
         
         byte[] startKey = keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id, NULL
@@ -73,7 +75,7 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
             ( body[0].p.id, body[0].o.id+1, NULL
               );
         
-        IEntryIterator it = store.getPOSIndex().rangeIterator(startKey, endKey); 
+        IEntryIterator it = db.getPOSIndex().rangeIterator(startKey, endKey); 
         
         while ( it.hasNext() ) {
             

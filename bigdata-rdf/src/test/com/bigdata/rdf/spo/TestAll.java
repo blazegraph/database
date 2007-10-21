@@ -41,44 +41,50 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
-import java.util.Comparator;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Imposes o:s:p ordering based on termIds.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OSPComparator implements Comparator<SPO> {
+public class TestAll extends TestCase {
 
-    public static final transient Comparator<SPO> INSTANCE = new OSPComparator();
+    /**
+     * 
+     */
+    public TestAll() {
+    }
 
-    public int compare(SPO stmt1, SPO stmt2) {
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+        super(arg0);
+    }
 
-        /*
-         * Note: logic avoids possible overflow of [long] by not computing the
-         * difference between two longs.
+    /**
+     * Returns a test that will run test suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("SPO");
+     
+        /* FIXME write tests.
+         * 
+         * @todo comparator orderings.
+         * 
+         * @todo ???  
          */
-        int ret;
         
-        ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
-        
-        if( ret == 0 ) {
-        
-            ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
-            
-            if( ret == 0 ) {
-                
-                ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
-                
-            }
-            
-        }
-
-        return ret;
+        return suite;
         
     }
-       
+    
 }

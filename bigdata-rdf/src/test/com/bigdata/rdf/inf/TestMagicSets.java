@@ -54,6 +54,7 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -216,12 +217,13 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
          */
 
         // query :- triple(?s,rdf:type,A).
-        Triple query = new Triple(store.nextVar(), store.rdfType, new Id(store
-                .addTerm(new _URI("http://www.foo.org/A"))));
+        Triple query = new Triple(inferenceEngine.nextVar(),
+                inferenceEngine.rdfType, new Id(store.addTerm(new _URI(
+                        "http://www.foo.org/A"))));
 
         // Run the queryy.
-        ITripleStore answerSet = store.query(query, new Rule[] { store.rdfs9,
-                store.rdfs11 });
+        ITripleStore answerSet = inferenceEngine.query(query, new Rule[] {
+                inferenceEngine.rdfs9, inferenceEngine.rdfs11 });
 
         /*
          * @todo verify the answer set: ?s := {x,y,z}.

@@ -153,7 +153,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      */
     public PresortRioLoader( ITripleStore store, RDFFormat rdfFormat, boolean verifyData ) {
     
-        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true);
+        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true/*distinct*/);
         
     }
 
@@ -171,6 +171,9 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param distinct
      *            Whether or not terms and statements are made distinct in the
      *            buffer.
+     *            <p>
+     *            Note: performance is generally substantially better with
+     *            <code>distinct := true</code>.
      */
     public PresortRioLoader(ITripleStore store, RDFFormat rdfFormat,
             boolean verifyData, int capacity, boolean distinct) {

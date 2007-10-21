@@ -41,36 +41,44 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
-import com.bigdata.rdf.spo.SPO;
+import java.util.Comparator;
 
 /**
- * rdfs3:
- * 
- * <pre>
- * triple(v rdf:type x) :-
- *    triple(a rdfs:range x),
- *    triple(u a v).
- * </pre>
+ * Imposes s:p:o ordering based on termIds.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleRdfs03 extends AbstractRuleRdfs_2_3_7_9 {
+public class SPOComparator implements Comparator<SPO> {
 
-    public RuleRdfs03( InferenceEngine store, Var a, Var x, Var u, Var v ) {
+    public static final transient Comparator<SPO> INSTANCE = new SPOComparator();
+    
+    public int compare(SPO stmt1, SPO stmt2) {
 
-        super(store, new Triple(v, store.rdfType, x),
-                new Pred[] {
-                new Triple(a, store.rdfsRange, x),
-                new Triple(u, a, v)
-                });
+        /*
+         * Note: logic avoids possible overflow of [long] by not computing the
+         * difference between two longs.
+         */
+        int ret;
+        
+        ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
+        
+        if( ret == 0 ) {
+        
+            ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
+            
+            if( ret == 0 ) {
+                
+                ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
+                
+            }
+            
+        }
 
+        return ret;
+        
     }
     
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        return new SPO( stmt2.o, store.rdfType.id, stmt1.o );
-    }
-
 }

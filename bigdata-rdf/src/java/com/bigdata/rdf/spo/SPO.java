@@ -41,8 +41,9 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -64,6 +65,7 @@ public class SPO {
     public final long s;
     public final long p;
     public final long o;
+    public final StatementEnum type;
     
     /**
      * Construct a triple from term identifiers.
@@ -71,12 +73,16 @@ public class SPO {
      * @param s
      * @param p
      * @param o
+     * 
+     * FIXME review all use of this constructor since it generates an explicit
+     * statement.
      */
     public SPO(long s, long p, long o) {
         this.code = RdfKeyBuilder.CODE_STMT;
         this.s = s;
         this.p = p;
         this.o = o;
+        this.type = StatementEnum.Explicit;
     }
     
     /**
@@ -93,6 +99,13 @@ public class SPO {
      *            The key.
      * 
      * @see RdfKeyBuilder#key2Statement(byte[], long[])
+     * 
+     * FIXME Review all use of this constructor since it does not take the value
+     * for the key into account and assumes that statements are
+     * {@link StatementEnum#Explicit}.  Consider making the {@link StatementEnum} 
+     * the last byte of the key so that we do not have any values associated with
+     * the index, but note that this complicates index management if we want to
+     * keep only the distinct stmts.
      */
     public SPO(KeyOrder keyOrder, RdfKeyBuilder keyBuilder, byte[] key) {
         
@@ -127,6 +140,8 @@ public class SPO {
 
         }
 
+        type = StatementEnum.Explicit;
+        
     }
 
     /**
@@ -159,6 +174,15 @@ public class SPO {
     
     /**
      * Imposes s:p:o ordering based on termIds.
+     * 
+     * @todo This does not differentiate between statements with the different
+     *       {@link StatementEnum} values. Should it? I think that the indices,
+     *       etc. should always ensure that the statements are distinct based on
+     *       the key so there should never be duplicates to be concerned about.
+     *       <p>
+     *       The {@link SPOBuffer}) DOES/CAN allow duplicates in, so there we
+     *       have to be careful an ensure that we always accept the statement
+     *       types in the following priority: Axiom > Explicit > Inferred.
      */
     public int compareTo(Object other) {
 
@@ -226,6 +250,21 @@ public class SPO {
     public String toString() {
         
         return (""+s+","+p+","+o);
+        
+    }
+
+    /**
+     * Resolves the term identifiers to terms against the store and returns a
+     * representation of the statement using
+     * {@link ITripleStore#toString(long, long, long)}.
+     * 
+     * @param store The store.
+     * 
+     * @return The externalized representation of the statement. 
+     */
+    public String toString(ITripleStore store) {
+        
+        return store.toString(s,p,o);
         
     }
     

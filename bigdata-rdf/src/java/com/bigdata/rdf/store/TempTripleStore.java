@@ -55,10 +55,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.inf.OSPComparator;
-import com.bigdata.rdf.inf.POSComparator;
-import com.bigdata.rdf.inf.SPO;
-import com.bigdata.rdf.inf.SPOComparator;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
@@ -190,54 +186,4 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
 
-    /**
-     * Used to efficiently add entailments from the array into the
-     * {@link TempTripleStore}.
-     * 
-     * @param stmts
-     *            The source statements.
-     * 
-     * @param n
-     *            The #of statements in the buffer.
-     */
-    public void addStatements(SPO[] stmts, int n ) {
-        
-        // deal with the SPO index
-        IIndex spo = getSPOIndex();
-        Arrays.sort(stmts,0,n,SPOComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = keyBuilder.statement2Key
-                ( stmts[i].s, stmts[i].p, stmts[i].o
-                  );
-            if ( !spo.contains(key) ) {
-                spo.insert(key, null);
-            }
-        }
-
-        // deal with the POS index
-        IIndex pos = getPOSIndex();
-        Arrays.sort(stmts,0,n,POSComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = keyBuilder.statement2Key
-                ( stmts[i].p, stmts[i].o, stmts[i].s
-                  );
-            if ( !pos.contains(key) ) {
-                pos.insert(key, null);
-            }
-        }
-
-        // deal with the OSP index
-        IIndex osp = getOSPIndex();
-        Arrays.sort(stmts,0,n,OSPComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            byte[] key = keyBuilder.statement2Key
-                ( stmts[i].o, stmts[i].s, stmts[i].p
-                  );
-            if ( !osp.contains(key) ) {
-                osp.insert(key, null);
-            }
-        }
-        
-    }
-    
 }

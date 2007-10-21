@@ -45,6 +45,9 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -86,10 +89,10 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
         final long p = head.p.id;
         
         // the key for that predicate.
-        final byte[] pkey = store.getKeyBuilder().statement2Key(p, NULL, NULL);
+        final byte[] pkey = db.getKeyBuilder().statement2Key(p, NULL, NULL);
 
         // the successor of that key.
-        final byte[] pkey1 = store.getKeyBuilder().statement2Key(p + 1, NULL,
+        final byte[] pkey1 = db.getKeyBuilder().statement2Key(p + 1, NULL,
                 NULL);
 
         /*
@@ -104,7 +107,7 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
          */
 
         // in POS order.
-        final SPO[] stmts1 = store.getStatements(store.getPOSIndex(),
+        final SPO[] stmts1 = db.getStatements(db.getPOSIndex(),
                 KeyOrder.POS, pkey, pkey1);
 
         stats.stmts1 += stmts1.length;

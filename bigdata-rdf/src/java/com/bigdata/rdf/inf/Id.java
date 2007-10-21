@@ -52,11 +52,14 @@ import org.openrdf.model.Value;
  * @version $Id$
  */
 final public class Id extends VarOrId {
-    public boolean isVar() {
+    
+    final public boolean isVar() {
         return false;
     }
+
     public Id(long id) {
         super(id);
         assert id>0;
     }
+    
 }

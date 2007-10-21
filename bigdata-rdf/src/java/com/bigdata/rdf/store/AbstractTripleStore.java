@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -83,9 +84,10 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -97,11 +99,15 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
@@ -110,7 +116,7 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractTripleStore implements ITripleStore {
+abstract public class AbstractTripleStore implements ITripleStore, IRawTripleStore {
 
     /**
      * Used to generate the compressed sort keys for the
@@ -195,7 +201,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
     /**
      * A service used to write on each of the statement indices in parallel.
      */
-    protected ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
+    public ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
             DaemonThreadFactory.defaultThreadFactory());
 
     /**
@@ -712,9 +718,12 @@ abstract public class AbstractTripleStore implements ITripleStore {
         LoadStats stats = new LoadStats();
         
         log.debug( "loading: " + file.getAbsolutePath() );
-        
+
+        /*
+         * Note: distinct := true has substantially better performance.
+         */
         IRioLoader loader = new PresortRioLoader(this, rdfFormat, verifyData,
-                getDataLoadBufferCapacity(), false /* distinct */);
+                getDataLoadBufferCapacity(), true /* distinct */);
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             
@@ -1195,7 +1204,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
                 IIndex ndx = getSPOIndex();
 
                 // Place statements in SPO order.
-                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.SPOComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.spo.SPOComparator.INSTANCE);
 
                 // remove statements from SPO index.
                 for (int i = 0; i < nremoved; i++) {
@@ -1212,7 +1221,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
                 IIndex ndx = getPOSIndex();
                 
                 // Place statements in POS order.
-                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.POSComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.spo.POSComparator.INSTANCE);
 
                 // Remove statements from POS index.
                 for (int i = 0; i < nremoved; i++) {
@@ -1230,7 +1239,7 @@ abstract public class AbstractTripleStore implements ITripleStore {
                 IIndex ndx = getOSPIndex();
 
                 // Place statements in OSP order.
-                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.inf.OSPComparator.INSTANCE);
+                Arrays.sort(stmts, 0, nremoved, com.bigdata.rdf.spo.OSPComparator.INSTANCE);
 
                 // Remove statements from OSP index.
                 for (int i = 0; i < nremoved; i++) {
@@ -1280,7 +1289,8 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
         _Value v = getTerm(termId);
 
-        if(v == null) return TERM_NOT_FOUND;
+//        if(v == null) return TERM_NOT_FOUND;
+        if(v == null) return "<NOT_FOUND#"+termId+">";
         
         return (v instanceof URI ? abbrev((URI) v) : v.toString());
         
@@ -1337,6 +1347,130 @@ abstract public class AbstractTripleStore implements ITripleStore {
     }
     
     /**
+     * Iterator visits all terms in order by their assigned <strong>term
+     * identifiers</strong> (efficient index scan, but the terms are not in
+     * term order).
+     * 
+     * @see #termIdIndexScan()
+     * 
+     * @see #termIterator()
+     */
+    public Iterator<Value> idTermIndexScan() {
+
+        final IIndex ndx = getIdTermIndex();
+
+        // @todo this test does not work for the scale-out indices - see ClientIndexView.
+        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+        return new Striterator(ndx.rangeIterator(null, null))
+                .addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 1L;
+
+            /**
+             * @param val
+             *            the serialized term.
+             */
+            protected Object resolve(Object val) {
+                
+                _Value term = (isolatableIndex ? _Value
+                        .deserialize((byte[]) val) : (_Value) val);
+
+                return term;
+                
+            }
+            
+        });
+
+    }
+
+    /**
+     * Iterator visits all term identifiers in order by the <em>term</em> key
+     * (efficient index scan).
+     */
+    public Iterator<Long> termIdIndexScan() {
+
+        IIndex ndx = getTermIdIndex();
+
+        // @todo this test does not work for the scale-out indices - see ClientIndexView.
+        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+        return new Striterator(ndx.rangeIterator(null, null))
+        .addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 1L;
+
+            /**
+             * Deserialize the term identifier (packed long integer).
+             * 
+             * @param val The serialized term identifier.
+             */
+            protected Object resolve(Object val) {
+
+                final long id;
+                
+                try {
+
+                    id = (isolatableIndex ? new DataInputBuffer((byte[]) val)
+                            .unpackLong() : (Long) val);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+                
+                return id;
+                
+            }
+            
+        });
+        
+    }
+
+    /**
+     * Visits all terms in <strong>term key</strong> order (random index
+     * operation).
+     * <p>
+     * Note: While this operation visits the terms in their index order it is
+     * significantly less efficient than {@link #idTermIndexScan()}. This is
+     * because the keys in the term:id index are formed using an un-reversable
+     * technique such that it is not possible to re-materialize the term from
+     * the key. Therefore visiting the terms in term order requires traversal of
+     * the term:id index (so that you are in term order) plus term-by-term
+     * resolution against the id:term index (to decode the term). Since the two
+     * indices are not mutually ordered, that resolution will result in random
+     * hits on the id:term index.
+     */
+    public Iterator<Value> termIterator() {
+
+        // visit term identifiers in term order.
+        Iterator<Long> itr = termIdIndexScan();
+
+        // resolve term identifiers to terms.
+        return new Striterator(itr).addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 1L;
+
+            /**
+             * @param val
+             *            the term identifer (Long).
+             */
+            protected Object resolve(Object val) {
+
+                // the term identifier.
+                long termId = (Long) val;
+
+                // resolve against the id:term index (random lookup).
+                return getTerm(termId);
+
+            }
+
+        });
+
+    }
+    
+    /**
      * Writes out some usage details on System.err.
      */
     final public void usage() {
@@ -1389,4 +1523,80 @@ abstract public class AbstractTripleStore implements ITripleStore {
         
     }
 
+    /*
+     * IRawTripleStore
+     */
+    
+    /**
+     * FIXME rewrite to choose the index given the keyOrder.
+     */
+    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
+
+        final RdfKeyBuilder keyBuilder = getKeyBuilder();
+        
+        final int n = ndx.rangeCount(fromKey, toKey);
+
+        // buffer for storing the extracted s:p:o data.
+        SPO[] ids = new SPO[n];
+
+        IEntryIterator itr1 = ndx.rangeIterator(fromKey, toKey);
+
+        int i = 0;
+
+        while (itr1.hasNext()) {
+
+            itr1.next();
+            ids[i++] = new SPO(keyOrder,keyBuilder,itr1.getKey());
+
+        }
+
+        assert i == n;
+
+        return ids;
+
+    }
+
+    /**
+     * FIXME write on the indices in parallel.
+     */
+    public void addStatements(SPO[] stmts, int n ) {
+        
+        // deal with the SPO index
+        IIndex spo = getSPOIndex();
+        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.SPOComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = keyBuilder.statement2Key
+                ( stmts[i].s, stmts[i].p, stmts[i].o
+                  );
+            if ( !spo.contains(key) ) {
+                spo.insert(key, null);
+            }
+        }
+
+        // deal with the POS index
+        IIndex pos = getPOSIndex();
+        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.POSComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = keyBuilder.statement2Key
+                ( stmts[i].p, stmts[i].o, stmts[i].s
+                  );
+            if ( !pos.contains(key) ) {
+                pos.insert(key, null);
+            }
+        }
+
+        // deal with the OSP index
+        IIndex osp = getOSPIndex();
+        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.OSPComparator.INSTANCE);
+        for ( int i = 0; i < n; i++ ) {
+            byte[] key = keyBuilder.statement2Key
+                ( stmts[i].o, stmts[i].s, stmts[i].p
+                  );
+            if ( !osp.contains(key) ) {
+                osp.insert(key, null);
+            }
+        }
+        
+    }
+    
 }

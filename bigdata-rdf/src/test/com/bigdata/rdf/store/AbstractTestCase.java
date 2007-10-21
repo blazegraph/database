@@ -91,6 +91,8 @@ abstract public class AbstractTestCase
      */
     public void setUp(ProxyTestCase testCase) throws Exception {
 
+        begin = System.currentTimeMillis();
+        
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
@@ -101,10 +103,14 @@ abstract public class AbstractTestCase
      */
     public void tearDown(ProxyTestCase testCase) throws Exception {
 
+        long elapsed = System.currentTimeMillis() - begin;
+        
         log.info("\n================:END:" + testCase.getName()
-                + ":END:====================\n");
+                + " ("+elapsed+"ms):END:====================\n");
 
     }
+    
+    private long begin;
     
     public void tearDown() throws Exception {
         

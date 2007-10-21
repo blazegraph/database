@@ -49,11 +49,32 @@ package com.bigdata.rdf.inf;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 
+import org.openrdf.model.URI;
 import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.vocabulary.RDFS;
+
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for full forward closure.
+ * 
+ * @todo compute the difference in the entailments generated for the same
+ *       datasets between {@link InferenceEngine#fullForwardClosure()} and
+ *       {@link InferenceEngine#fastForwardClosure()}
+ * 
+ * @todo query the database after closure for (?x rdf:type rdfs:Resource). We
+ *       don't want it in there unless it was explicitly asserted.
+ * 
+ * @todo verify that we correctly distinguish Axioms, Explicit, and Inferred
+ *       statements. Axioms are checked against those defined by
+ *       {@link RdfsAxioms}. Explicit statements are checked against the
+ *       dataset w/o closure. The rest of the statements should be marked as
+ *       Inferred. Note that an Axiom can be marked as Explicit when loading
+ *       data, but that TM needs to convert the statement back to an Axiom if it
+ *       is deleted.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -128,8 +149,85 @@ RuleRdfs13  0   0   0
 //        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "",
 //                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
         
-        store.fullForwardClosure();
+        inferenceEngine.fullForwardClosure();
+        
+        store.commit();
         
     }
+
+    /**
+     * Test of fast forward closure.
+     * 
+     * @throws IOException
+     */
+    public void testFastForwardClosure01() throws IOException {
+
+        store.loadData(new File("data/alibaba_v41.rdf"), "", RDFFormat.RDFXML,
+                false/* verifyData */, false/* commit */);
+
+//        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+//                false/* verifyData */, false/*commit*/);
+
+//        store.dumpStore();
         
+        /*
+         * Wordnet schema + nouns (two source files).
+         */
+//        store.loadData(new File("data/wordnet-20000620.rdfs"), "",
+//                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
+//        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "",
+//                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
+        
+        inferenceEngine.fastForwardClosure();
+        
+        store.commit();
+
+    }
+
+    /**
+     * Unit test for
+     * {@link InferenceEngine#getSubProperties(com.bigdata.rdf.store.AbstractTripleStore)}
+     * 
+     */
+    public void test_getSubProperties() {
+       
+        URI A = new _URI("http://www.foo.org/A");
+        URI B = new _URI("http://www.foo.org/B");
+        URI C = new _URI("http://www.foo.org/C");
+
+        URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+
+        AbstractTripleStore database = store;
+
+//        store.addRdfsAxioms(database);
+        
+        database.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
+        database.addStatement(B, rdfsSubPropertyOf, A);
+
+        assertTrue(database.containsStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
+        assertTrue(database.containsStatement(B, rdfsSubPropertyOf, A));
+
+        Set<Long> subProperties = inferenceEngine.getSubProperties(database);
+        
+        assertTrue(subProperties.contains(database.getTermId(rdfsSubPropertyOf)));
+        assertTrue(subProperties.contains(database.getTermId(A)));
+        assertTrue(subProperties.contains(database.getTermId(B)));
+
+        assertEquals(3,subProperties.size());
+
+        database.addStatement(C, A, A);
+        
+        assertTrue(database.containsStatement(C, A, A));
+
+        subProperties = inferenceEngine.getSubProperties(database);
+        
+        assertTrue(subProperties.contains(database.getTermId(rdfsSubPropertyOf)));
+        assertTrue(subProperties.contains(database.getTermId(A)));
+        assertTrue(subProperties.contains(database.getTermId(B)));
+        assertTrue(subProperties.contains(database.getTermId(C)));
+
+        assertEquals(4,subProperties.size());
+
+    }
+    
 }

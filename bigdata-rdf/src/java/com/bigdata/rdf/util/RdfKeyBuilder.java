@@ -384,11 +384,26 @@ public class RdfKeyBuilder {
      *            The term identifier.
      * 
      * @return The id expressed as an unsigned byte[] key of length 8.
+     * 
+     * @see #key2Id()
      */
     public byte[] id2key(long id) {
         
         return keyBuilder.reset().append(id).getKey();
         
+    }
+    
+    /**
+     * Decodes the term identifier key to a term identifier.
+     * 
+     * @param key The key for an entry in the id:term index.
+     * 
+     * @return The term identifier.
+     */
+    public long key2Id(byte[]key) {
+        
+        return KeyBuilder.decodeLong(key, 0);
+
     }
     
     /**

@@ -41,44 +41,44 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+/*
+ * Created on Oct 20, 2007
+ */
 
-import java.util.Comparator;
+package com.bigdata.rdf.store;
+
+import com.bigdata.btree.IIndex;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * Imposes p:o:s ordering based on termIds.
+ * Low-level API directly using long term identifiers rather than an RDF Value
+ * object model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class POSComparator implements Comparator<SPO> {
+public interface IRawTripleStore {
 
-    public static final transient Comparator<SPO> INSTANCE = new POSComparator();
-
-    public int compare(SPO stmt1, SPO stmt2) {
-
-        /*
-         * Note: logic avoids possible overflow of [long] by not computing the
-         * difference between two longs.
-         */
-        int ret;
-        
-        ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
-        
-        if( ret == 0 ) {
-        
-            ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
-            
-            if( ret == 0 ) {
-                
-                ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
-                
-            }
-            
-        }
-
-        return ret;
-        
-    }
+    /**
+     * Extracts the statement ids from a key scan.
+     * 
+     * @param itr
+     *            The key scan iterator.
+     * 
+     * @return The statements visited by that iterator.
+     */
+    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey);
+    
+    /**
+     * Add statements from the array into the database.
+     * 
+     * @param stmts
+     *            The source statements.
+     * 
+     * @param n
+     *            The #of statements in the buffer.
+     */
+    public void addStatements(SPO[] stmts, int n );
     
 }

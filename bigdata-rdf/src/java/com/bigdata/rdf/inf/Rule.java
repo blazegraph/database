@@ -44,6 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
@@ -70,6 +72,11 @@ import com.bigdata.rdf.store.TempTripleStore;
  */
 abstract public class Rule {
 
+    /**
+     * The database against which queries are performed.
+     */
+    final public AbstractTripleStore db;
+    
     /**
      * The inference engine.
      */
@@ -100,6 +107,8 @@ abstract public class Rule {
         
         assert head != null;
 
+        this.db = store.database;
+        
         this.store = store;
         
         this.head = head;
@@ -109,8 +118,8 @@ abstract public class Rule {
     }
     
     /**
-     * Apply the rule, creating entailments that are inserted into the temporary
-     * store.
+     * Apply the rule, creating entailments that are inserted into a
+     * {@link TempTripleStore}.
      * <p>
      * Note: the {@link BTree} class is NOT safe for concurrent modification
      * under traversal so implementations of this method need to buffer the
@@ -128,10 +137,7 @@ abstract public class Rule {
      * @todo support conditional insert in the btree so that we do not have to
      *       do a lookup/insert combination.
      * 
-     * @todo we could store proofs in the value for a statement or in a proofs
-     *       index. doing that efficiently would require a concatenation
-     *       operation variant for insert.
-     * 
+     * @todo store proofs.
      */
     public abstract Stats apply( final Stats stats, final SPOBuffer buffer );
     

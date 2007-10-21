@@ -84,13 +84,21 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF");
 
+        // test utility classes.
         suite.addTest( com.bigdata.rdf.util.TestAll.suite() );
      
+        // test RDF Value and Statement object model (Sesame compliant).
         suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
 
+        // test low-level statement model using long term identifiers.
+        suite.addTest( com.bigdata.rdf.spo.TestAll.suite() );
+
+        // test various RDF database implementations.
         suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 
         /*
+         * Test scale-out RDF database.
+         * 
          * Note: This test suite sets up a local bigdata federation for
          * each test.  See the test suite for more information about 
          * required Java properties.
