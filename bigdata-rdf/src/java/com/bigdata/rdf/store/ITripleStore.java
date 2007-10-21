@@ -81,10 +81,6 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  */
 public interface ITripleStore {
 
-    /**
-     * The logger for the {@link ITripleStore} (shadows the logger for the
-     * journal).
-     */
     final public Logger log = Logger.getLogger(ITripleStore.class);
 
     /**
@@ -346,9 +342,9 @@ public interface ITripleStore {
 
     /**
      * Return the RDF {@link Value} given a term identifier (non-batch api).
-     *
-     * @return the RDF value or <code>null</code> if there is no term with that
-     * identifier in the index. 
+     * 
+     * @return the RDF value or <code>null</code> if there is no term with
+     *         that identifier in the index.
      */
     public _Value getTerm(long id);
 

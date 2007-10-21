@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
 /**
@@ -71,53 +72,13 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
         super(name);
     }
 
-//    public Properties getProperties() {
-//
-//        if (properties == null) {
-//
-//            properties = super.getProperties();
-//
-//            if(properties.getProperty(Options.BUFFER_MODE)==null) {
-//             
-//                // override if not specified.
-//                properties.setProperty(Options.BUFFER_MODE, getBufferMode().toString());
-//                
-//            }
-//            if(properties.getProperty(Options.FILE)==null) {
-//                properties.setProperty(Options.FILE, getName()+".jnl");
-//            }
-//            if(properties.getProperty(Options.BASENAME)==null) {
-//                properties.setProperty(Options.BASENAME, getName());
-//            }
-//
-//        }
-//
-//        return properties;
-//
-//    }
-//
-//    private Properties properties;
-
-//    /**
-//     * Invoked the first time {@link #getProperties()} is called for each test
-//     * to set mode in which the {@link Journal} will be opened.
-//     * 
-//     * @return {@link BufferMode#Transient}
-//     * 
-//     * @see BufferMode#Transient
-//     * @see BufferMode#Direct
-//     */
-//    protected BufferMode getBufferMode() {
-//        
-//        return BufferMode.Transient;
-//        
-//    }
-    
     public void setUp() throws Exception {
         
         super.setUp();
         
-        this.store = new InferenceEngine(getStore());
+        this.store = (AbstractTripleStore)getStore();
+        
+        this.inferenceEngine = new InferenceEngine(store);
         
     }
     
@@ -133,6 +94,7 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
         
     }
     
-    protected InferenceEngine store;
+    protected AbstractTripleStore store;
+    protected InferenceEngine inferenceEngine;
     
 }

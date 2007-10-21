@@ -41,20 +41,20 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
 import java.util.Comparator;
 
 /**
- * Imposes s:p:o ordering based on termIds.
+ * Imposes o:s:p ordering based on termIds.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOComparator implements Comparator<SPO> {
+public class OSPComparator implements Comparator<SPO> {
 
-    public static final transient Comparator<SPO> INSTANCE = new SPOComparator();
-    
+    public static final transient Comparator<SPO> INSTANCE = new OSPComparator();
+
     public int compare(SPO stmt1, SPO stmt2) {
 
         /*
@@ -63,15 +63,15 @@ public class SPOComparator implements Comparator<SPO> {
          */
         int ret;
         
-        ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
+        ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
         
         if( ret == 0 ) {
         
-            ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
+            ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
             
             if( ret == 0 ) {
                 
-                ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
+                ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
                 
             }
             
@@ -80,5 +80,5 @@ public class SPOComparator implements Comparator<SPO> {
         return ret;
         
     }
-    
+       
 }

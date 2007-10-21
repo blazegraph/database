@@ -45,16 +45,19 @@ Modifications:
  * Created on Apr 13, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import com.bigdata.rdf.rio.Buffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
- * A buffer for distinct {@link SPO}s.
+ * A buffer for {@link SPO}s that are flushed on overflow into a backing
+ * {@link TempTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -80,7 +83,7 @@ public class SPOBuffer {
      * The backing store into which the statements are added when the buffer
      * overflows.
      */
-    protected final TempTripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * The buffer capacity -or- <code>-1</code> if the {@link Buffer} object
@@ -107,7 +110,7 @@ public class SPOBuffer {
      *            When true only distinct terms and statements are stored in the
      *            buffer.
      */
-    public SPOBuffer(TempTripleStore store, int capacity, boolean distinct) {
+    public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
     
         assert store != null;
         
@@ -270,7 +273,7 @@ public class SPOBuffer {
      * @param store
      *            The terms in the statements are resolved against this store.
      */
-    public void dump(InferenceEngine store) {
+    public void dump(ITripleStore store) {
         
         System.err.println("capacity="+capacity);
         

@@ -43,10 +43,10 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,14 +54,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
@@ -73,13 +69,12 @@ import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Adds support for RDFS inference.
@@ -96,7 +91,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *      pred :- pred*.
+ *        pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -131,17 +126,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *       triple(?v,rdf:type,?x) :-
- *          triple(?u,rdfs:subClassOf,?x),
- *          triple(?v,rdf:type,?u). 
+ *         triple(?v,rdf:type,?x) :-
+ *            triple(?u,rdfs:subClassOf,?x),
+ *            triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?x) :-
- *          triple(?u,rdfs:subClassOf,?v),
- *          triple(?v,rdf:subClassOf,?x). 
+ *         triple(?u,rdfs:subClassOf,?x) :-
+ *            triple(?u,rdfs:subClassOf,?v),
+ *            triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -155,27 +150,42 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo experiment with use of a bloom filter
  * 
  * @todo provide fixed point transitive closure for "chain" rules (subClassOf)
- * 
- * @todo examine ways to prune the search space and avoid re-triggering rules or
- *       being more selective with rule triple patterns as a consequence of new
- *       entailments (avoid re-computing all entailments already proven in each
- *       pass).
  */
-public class InferenceEngine implements ITripleStore {
+public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
+
+    final public Logger log = Logger.getLogger(InferenceEngine.class);
 
     /**
-     * The delegate.
+     * True iff the {@link #log} level is INFO or less.
      */
-    final protected ITripleStore tripleStore;
-    
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
     /**
-     * The delegate {@link ITripleStore}.
+     * True iff the {@link #log} level is DEBUG or less.
      */
-    public ITripleStore getTripleStore() {
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
+     * Value used for a "NULL" term identifier.
+     */
+    public static final long NULL = ITripleStore.NULL;
+
+    /**
+     * The database that is the authority for the defined terms and term
+     * identifiers.
+     */
+    final protected AbstractTripleStore database;
     
-        return tripleStore;
-        
-    }
+//    /**
+//     * The persistent database (vs the temporary store).
+//     */
+//    public AbstractTripleStore getDatabase() {
+//    
+//        return database;
+//        
+//    }
     
     /**
      * Used to assign unique variable identifiers.
@@ -234,9 +244,10 @@ public class InferenceEngine implements ITripleStore {
      */
     public InferenceEngine(ITripleStore tripleStore) {
 
-        if(tripleStore==null) throw new IllegalArgumentException();
-        
-        this.tripleStore = tripleStore;
+        if (tripleStore == null)
+            throw new IllegalArgumentException();
+
+        this.database = (AbstractTripleStore) tripleStore;
 
         setup();
 
@@ -259,43 +270,57 @@ public class InferenceEngine implements ITripleStore {
      * @see #rdfType and friends which are initialized by this method.
      * 
      * @todo make this into a batch operation.
+     * 
+     * @todo reconcile with {@link #addRdfsAxioms(ITripleStore)} and
+     *       {@link #cacheURIs(Set)}.
      */
     protected void setupIds() {
 
-        rdfType = new Id(addTerm(new _URI(RDF.TYPE)));
+        rdfType = new Id(database.addTerm(new _URI(RDF.TYPE)));
 
-        rdfProperty = new Id(addTerm(new _URI(RDF.PROPERTY)));
+        rdfProperty = new Id(database.addTerm(new _URI(RDF.PROPERTY)));
 
-        rdfsSubClassOf = new Id(addTerm(new _URI(RDFS.SUBCLASSOF)));
+        rdfsSubClassOf = new Id(database.addTerm(new _URI(RDFS.SUBCLASSOF)));
 
-        rdfsSubPropertyOf = new Id(addTerm(new _URI(RDFS.SUBPROPERTYOF)));
+        rdfsSubPropertyOf = new Id(database.addTerm(new _URI(RDFS.SUBPROPERTYOF)));
 
-        rdfsDomain = new Id(addTerm(new _URI(RDFS.DOMAIN)));
+        rdfsDomain = new Id(database.addTerm(new _URI(RDFS.DOMAIN)));
 
-        rdfsRange = new Id(addTerm(new _URI(RDFS.RANGE)));
+        rdfsRange = new Id(database.addTerm(new _URI(RDFS.RANGE)));
 
-        rdfsClass = new Id(addTerm(new _URI(RDFS.CLASS)));
+        rdfsClass = new Id(database.addTerm(new _URI(RDFS.CLASS)));
         
-        rdfsResource = new Id(addTerm(new _URI(RDFS.RESOURCE)));
+        rdfsResource = new Id(database.addTerm(new _URI(RDFS.RESOURCE)));
         
-        rdfsCMP = new Id(addTerm(new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY)));
+        rdfsCMP = new Id(database.addTerm(new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY)));
         
-        rdfsDatatype = new Id(addTerm(new _URI(RDFS.DATATYPE)));
+        rdfsDatatype = new Id(database.addTerm(new _URI(RDFS.DATATYPE)));
         
-        rdfsMember = new Id(addTerm(new _URI(RDFS.MEMBER)));
+        rdfsMember = new Id(database.addTerm(new _URI(RDFS.MEMBER)));
         
-        rdfsLiteral = new Id(addTerm(new _URI(RDFS.LITERAL)));
+        rdfsLiteral = new Id(database.addTerm(new _URI(RDFS.LITERAL)));
     
     }
 
     public void setupRules() {
 
         rdf1 = new RuleRdf01(this,nextVar(),nextVar(),nextVar());
+
+        /*
+         * Note: skipping rdf2: (?u ?a ?l) -> ( _:n rdf:type rdf:XMLLiteral),
+         * where ?l is a well-typed XML Literal.
+         */
         
         rdfs2 = new RuleRdfs02(this,nextVar(),nextVar(),nextVar(),nextVar());
 
         rdfs3 = new RuleRdfs03(this,nextVar(),nextVar(),nextVar(),nextVar());
 
+        /*
+         * Note: skipping rdfs4a (?u ?a ?x) -> (?u rdf:type rdfs:Resource)
+         * 
+         * Note: skipping rdfs4b (?u ?a ?v) -> (?v rdf:type rdfs:Resource)
+         */
+        
         rdfs5 = new RuleRdfs05(this,nextVar(),nextVar(),nextVar());
 
         rdfs6 = new RuleRdfs06(this,nextVar(),nextVar(),nextVar());
@@ -314,154 +339,13 @@ public class InferenceEngine implements ITripleStore {
 
         rdfs13 = new RuleRdfs13(this,nextVar(),nextVar(),nextVar());
 
-        // rules = new Rule[] { rdfs9, rdfs11 };
+        /*
+         * Note: The datatype entailment rules are being skipped.
+         */
         
-        rules = new Rule[] { rdf1, rdfs2, rdfs3, rdfs5, rdfs6, rdfs7, rdfs8, rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 };
+        rules = new Rule[] { rdf1, rdfs2, rdfs3, rdfs5, rdfs6, rdfs7, rdfs8,
+                rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 };
 
-    }
-
-    public void addStatement(Resource s, URI p, Value o) {
-        tripleStore.addStatement(s, p, o);
-    }
-
-    public void addStatements(_Statement[] stmts, int numStmts) {
-        tripleStore.addStatements(stmts, numStmts);
-    }
-
-    public long addTerm(Value value) {
-        return tripleStore.addTerm(value);
-    }
-
-    public boolean containsStatement(Resource s, URI p, Value o) {
-        return tripleStore.containsStatement(s, p, o);
-    }
-
-    public ArrayList<Long> distinctTermScan(KeyOrder keyOrder) {
-        return tripleStore.distinctTermScan(keyOrder);
-    }
-
-    public void generateSortKeys(RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
-        tripleStore.generateSortKeys(keyBuilder, terms, numTerms);
-    }
-
-    public int getBNodeCount() {
-        return tripleStore.getBNodeCount();
-    }
-
-    public IIndex getIdTermIndex() {
-        return tripleStore.getIdTermIndex();
-    }
-
-    public RdfKeyBuilder getKeyBuilder() {
-        return tripleStore.getKeyBuilder();
-    }
-
-    public int getLiteralCount() {
-        return tripleStore.getLiteralCount();
-    }
-
-    public IIndex getOSPIndex() {
-        return tripleStore.getOSPIndex();
-    }
-
-    public IIndex getPOSIndex() {
-        return tripleStore.getPOSIndex();
-    }
-
-    public Properties getProperties() {
-        return tripleStore.getProperties();
-    }
-
-    public IIndex getSPOIndex() {
-        return tripleStore.getSPOIndex();
-    }
-
-    public int getStatementCount() {
-        return tripleStore.getStatementCount();
-    }
-
-    public IIndex getStatementIndex(KeyOrder keyOrder) {
-        return tripleStore.getStatementIndex(keyOrder);
-    }
-
-    public _Value getTerm(long id) {
-        return tripleStore.getTerm(id);
-    }
-
-    public int getTermCount() {
-        return tripleStore.getTermCount();
-    }
-
-    public long getTermId(Value value) {
-        return tripleStore.getTermId(value);
-    }
-
-    public IIndex getTermIdIndex() {
-        return tripleStore.getTermIdIndex();
-    }
-
-    public int getURICount() {
-        return tripleStore.getURICount();
-    }
-
-    public void insertTerms(_Value[] terms, int numTerms, boolean haveKeys, boolean sorted) {
-        tripleStore.insertTerms(terms, numTerms, haveKeys, sorted);
-    }
-
-    public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat, boolean verifyData, boolean commit) throws IOException {
-        return tripleStore.loadData(file, baseURI, rdfFormat, verifyData, commit);
-    }
-
-    public int rangeCount(long s, long p, long o) {
-        return tripleStore.rangeCount(s, p, o);
-    }
-
-    public IEntryIterator rangeQuery(long s, long p, long o) {
-        return tripleStore.rangeQuery(s, p, o);
-    }
-
-    public int removeStatements(long _s, long _p, long _o) {
-        return tripleStore.removeStatements(_s, _p, _o);
-    }
-
-    public int removeStatements(Resource s, URI p, Value o) {
-        return tripleStore.removeStatements(s, p, o);
-    }
-
-    public String toString(long s, long p, long o) {
-        return tripleStore.toString(s, p, o);
-    }
-
-    public String toString(long termId) {
-        return tripleStore.toString(termId);
-    }
-    
-    public void usage() {
-        tripleStore.usage();
-    }
-    
-    public void dumpStore() {
-        tripleStore.dumpStore();
-    }
-
-    public void commit() {
-        tripleStore.commit();
-    }
-
-    public boolean isStable() {
-        return tripleStore.isStable();
-    }
-    
-    public void clear() {
-        tripleStore.clear();
-    }
-    
-    public void close() {
-        tripleStore.close();
-    }
-    
-    public void closeAndDelete() {
-        tripleStore.closeAndDelete();
     }
     
     /**
@@ -481,7 +365,9 @@ public class InferenceEngine implements ITripleStore {
      * 
      * @todo Rules can be computed in parallel using a pool of worker threads.
      *       The round ends when the queue of rules to process is empty and all
-     *       workers are done.
+     *       workers are done. Note that statement must be copied into the
+     *       database only at the end of the round with this approach to avoid
+     *       concurrent modification.
      * 
      * @todo The entailments computed in each round are inserted back into the
      *       primary triple store at the end of the round. The purpose of this
@@ -495,16 +381,40 @@ public class InferenceEngine implements ITripleStore {
      *       this is necessary in order to compute entailments at query time
      *       that are not to be inserted back into the kb.
      * 
-     * @todo The SPO[] buffer might be better off as a more interesting
-     *       structure that only accepted the distinct statements. This was a
-     *       big win for the batch oriented parser and would probably eliminate
-     *       even more duplicates in the context of the inference engine.
-     * 
      * @todo support closure of a document against an ontology and then bulk
      *       load the result into the store.
      */
     public void fullForwardClosure() {
 
+        // add RDF(S) axioms to the database.
+        addRdfsAxioms(database);
+
+        // do the full forward closure of the database.
+        fixedPoint(database, rules);
+        
+    }
+    
+    /**
+     * Computes the fixed point for the {@link #database}.
+     * 
+     * @param database
+     *            The database whose entailments will be computed. The
+     *            {@link Rule}s will match against statements in this database
+     *            and the resulting entailments will be added to the database.
+     * 
+     * @param rules
+     *            The rules to be executed.
+     * 
+     * @return Some statistics about the fixed point computation.
+     */
+    public Stats fixedPoint(AbstractTripleStore database, Rule[] rules) {
+        
+        /*
+         * Entailments are built up in a temporary store and then transferred
+         * enmass to the database.
+         */
+        TempTripleStore tmpStore = new TempTripleStore(new Properties());
+        
         /*
          * @todo configuration paramater.
          * 
@@ -520,7 +430,20 @@ public class InferenceEngine implements ITripleStore {
          */
         final boolean distinct = false;
 
-        final Rule[] rules = this.rules;
+        /*
+         * This is a buffer that is used to hold entailments so that we can
+         * insert them into the indices of the <i>tmpStore</i> using ordered
+         * insert operations (much faster than random inserts). The buffer is
+         * reused by each rule. The rule assumes that the buffer is empty and
+         * just keeps a local counter of the #of entailments that it has
+         * inserted into the buffer. When the buffer overflows, those
+         * entailments are transfered enmass into the tmp store. The buffer is
+         * always flushed after each rule and therefore will have been flushed
+         * when this method returns.
+         */ 
+        final SPOBuffer buffer = new SPOBuffer(tmpStore, BUFFER_SIZE, distinct);
+        
+        Stats totalStats = new Stats();
 
         final long[] timePerRule = new long[rules.length];
         
@@ -528,7 +451,7 @@ public class InferenceEngine implements ITripleStore {
         
         final int nrules = rules.length;
 
-        final int firstStatementCount = getStatementCount();
+        final int firstStatementCount = database.getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
@@ -537,24 +460,6 @@ public class InferenceEngine implements ITripleStore {
 
         int round = 0;
 
-        /*
-         * The temporary store used to accumulate the entailments.
-         */
-        TempTripleStore tmpStore = new TempTripleStore(getProperties()); 
-
-        /*
-         * This is a buffer that is used to hold entailments so that we can
-         * insert them into the indices using ordered insert operations (much
-         * faster than random inserts). The buffer is reused by each rule. The
-         * rule assumes that the buffer is empty and just keeps a local counter
-         * of the #of entailments that it has inserted into the buffer. When the
-         * buffer overflows, those entailments are transfered enmass into the
-         * tmp store.
-         */
-        final SPOBuffer buffer = new SPOBuffer(tmpStore, BUFFER_SIZE, distinct);
-        
-        Stats totalStats = new Stats();
-        
         while (true) {
 
             final int numEntailmentsBefore = tmpStore.getStatementCount();
@@ -641,7 +546,7 @@ public class InferenceEngine implements ITripleStore {
              */
             final long insertStart = System.currentTimeMillis();
 
-            final int numInserted = copyStatements(tmpStore);
+            final int numInserted = copyStatements(tmpStore,database);
 
             final long insertTime = System.currentTimeMillis() - insertStart;
 
@@ -661,13 +566,13 @@ public class InferenceEngine implements ITripleStore {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        final int lastStatementCount = getStatementCount();
+        final int lastStatementCount = database.getStatementCount();
 
         if (INFO) {
         
             final int inferenceCount = lastStatementCount - firstStatementCount;
             
-            log.info("Computed closure of store in "
+            log.info("Computed closure of "+rules.length+" rules in "
                             + round + " rounds and "
                             + elapsed
                             + "ms yeilding "
@@ -681,6 +586,8 @@ public class InferenceEngine implements ITripleStore {
 
         }
 
+        return totalStats;
+
     }
 
     /**
@@ -689,32 +596,42 @@ public class InferenceEngine implements ITripleStore {
      * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
      * Zhang</a>.
      * 
-     * @todo can I reuse the rule implementations that we have already defined?
-     * 
-     * @todo Do not run 14 or 15 since they produce rdfs:Resource.
-     * 
      * @todo If the head is (x, rdf:type, rdfs:Resource) then do not insert into
-     *       the store (filter at the reasoner level only).
+     *       the store (filter at the reasoner level only). This might be done
+     *       with an option to {@link SPOBuffer}.
      * 
      * @todo mark axiom vs explicit vs inferred and reserve a bit for suspended
-     *       for each statement.
+     *       for each statement. This needs to be driven into the statement
+     *       indices and throughout the code. Both {@link _Statement} and
+     *       {@link SPO} need to track this information and impose a priority on
+     *       the statement type: Explicit > Axiom > Inferred. This implies that
+     *       you need to test whether or not an explicit statement is an axiom
+     *       during TM so that you downgrade to Axiom and not Inferred.
      * 
      * @todo store the proofs in an index: key := [head][tail]. The rule could
      *       be the value, or the step in the algorithm could be the value, or
-     *       the value could be null.
+     *       the value could be null. The tail can be one, two or three triples.
      *       <p>
-     *       Can this approach produce ungrounded justification chains?
+     *       Can this approach produce ungrounded justification chains? If so,
+     *       then we have to filter out ungrounded justifications during TM. If
+     *       not, then great.
      * 
      * @todo make entailments for rdfs:domain and rdfs:range optional. we can
      *       get by with just Rdfs5, Rdfs7, Rdfs9, and Rdfs11.
      * 
      * @todo test on alibaba (entity-link data) as well as on ontology heavy
-     *       (nciOncology).
+     *       (nciOncology, cyc).
      * 
-     * @todo run the metrics test suites.
+     * @todo run the metrics test suites (it is setup as a proxy test suite
+     *       which makes it hard to run from main()).
      * 
      * @todo owl:sameAs by backward chaining on query.
+     * 
      * @todo rdfs:Resource by backward chaining on query.
+     * 
+     * @todo verify correct closure on various datasets and compare output and
+     *       time with {@link #fullForwardClosure()}.  Does W3C now have some
+     *       correctness tests for RDF(S) entailments?
      * 
      * @todo We don’t do owl:equivalentClass and owl:equivalentProperty
      *       currently. You can simulate those by doing a bi-directional
@@ -723,15 +640,16 @@ public class InferenceEngine implements ITripleStore {
      *       this is how you would do it:
      * 
      * <pre>
-     *   equivalentClass:
-     *   
-     *     add an axiom to the KB: equivalentClass subPropertyOf subClassOf
-     *     add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
+     *           equivalentClass:
+     *           
+     *             add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+     *             add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
      * </pre>
      * 
      * It would be analogous for equivalentProperty.
      * 
-     * @todo can some steps be run in parallel? E.g., [5,6,7]?
+     * @todo aggregate stats from each rule - write a helper method on Stats for
+     *       this.
      */
     public void fastForwardClosure() {
 
@@ -742,30 +660,85 @@ public class InferenceEngine implements ITripleStore {
          * Most steps presume that the computed entailments have been added to
          * the database (vs the temp store).
          */
+
+        final int firstStatementCount = database.getStatementCount();
+
+        final long begin = System.currentTimeMillis();
+
+        log.debug("Closing kb with " + firstStatementCount
+                + " statements");
         
         /*
          * The temporary store used to accumulate the entailments.
+         * 
+         * @todo try w/ and w/o and note when to copyStatements to db. In
+         * particular, this program is a series of steps that build up the
+         * closure in the db, so the buffer needs to be flushed to the db before
+         * each step in order to satisify the pre-conditions. If we flush the
+         * buffer into a temporary store, then the temporary store needs to be
+         * copied into the db -or- we need to read from a fused view of the
+         * temporary store and the db.
          */
-        TempTripleStore tmpStore = new TempTripleStore(getProperties()); 
+//        TempTripleStore tmpStore = new TempTripleStore(new Properties()); 
+
+        /*
+         * @todo configuration paramater.
+         * 
+         * There is a factor of 2 performance difference for a sample data set
+         * from a buffer size of one (unordered inserts) to a buffer size of
+         * 10k.
+         */
+        final int BUFFER_SIZE = 100 * Bytes.kilobyte32;
+        
+        /*
+         * Note: Unlike the parser buffer, making statements distinct appears
+         * to slow things down significantly (2x slower!).
+         * 
+         * @todo retest with fastForwardClosure() vs fullForwardClosure.
+         */
+        final boolean distinct = false;
+
+        /*
+         * Entailment buffer.
+         */
+        final SPOBuffer buffer = new SPOBuffer(database, BUFFER_SIZE, distinct);
 
         // 1. add RDF(S) axioms to the database.
-        addRdfsAxioms(tmpStore); // add to temp store.
-        copyStatements(tmpStore); // copy to database.
+        addRdfsAxioms(database); // add to the database.
         
-        // 2-4. Calculate the rdfs:subPropertyOf closure, returning D,C,R,T.
-        // doRdfsSubPropertyOfClosure(tmpStore);
+        // 2. Compute P (the set of possible sub properties).
+        final Set<Long> P = getSubProperties(database);
+
+        // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
+        foo(database,buffer,P,rdfsSubPropertyOf.id);
+        
+        // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
+        fixedPoint(database, new Rule[]{rdfs5});
+
+        // 4a. Obtain: D,R,C,T.
+        final Set<Long> D = getSubPropertiesOf(database,rdfsDomain.id);
+        final Set<Long> R = getSubPropertiesOf(database,rdfsRange.id);
+        final Set<Long> C = getSubPropertiesOf(database,rdfsSubClassOf.id);
+        final Set<Long> T = getSubPropertiesOf(database,rdfType.id);
 
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
+        foo(database,buffer,D,rdfsDomain.id);
         
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
+        foo(database,buffer,R,rdfsRange.id);
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
+        foo(database,buffer,C,rdfsSubClassOf.id);
 
-        // 8. Calculate the rdfs:subClassOf closure.
+        // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
+        fixedPoint(database, new Rule[]{rdfs11});
         
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
+        foo(database,buffer,T,rdfType.id);
 
         // 10. RuleRdfs02
+        System.err.println(rdfs2.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         /*
          * 11. special rule w/ 3-part antecedent.
@@ -775,6 +748,8 @@ public class InferenceEngine implements ITripleStore {
          */
         
         // 12. RuleRdfs03
+        System.err.println(rdfs3.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         /* 13. special rule w/ 3-part antecedent.
          * 
@@ -788,23 +763,329 @@ public class InferenceEngine implements ITripleStore {
          */
 
         // 16. RuleRdf01
+        System.err.println(rdf1.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         // 17. RuleRdfs09
+        System.err.println(rdfs9.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         // 18. RuleRdfs10
+        System.err.println(rdfs10.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
-        // 19. RuleRdfs08. Generates (x?, rdfs:subClassOf, rdfs:Resource).
+        // 19. RuleRdfs08.
+        System.err.println(rdfs8.apply(new Stats(), buffer).toString());
+        buffer.flush();
 
         // 20. RuleRdfs13.
+        System.err.println(rdfs13.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         // 21. RuleRdfs06.
+        System.err.println(rdfs6.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
         // 22. RuleRdfs07.
+        System.err.println(rdfs7.apply(new Stats(), buffer).toString());
+        buffer.flush();
         
-        // Done.
+        /*
+         * Done.
+         */
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        final int lastStatementCount = database.getStatementCount();
+
+        final int inferenceCount = lastStatementCount - firstStatementCount;
+        
+        if(INFO) {
+
+            log.info("Computed closure in "
+                            + elapsed
+                            + "ms yeilding "
+                            + lastStatementCount
+                            + " statements total, "
+                            + (inferenceCount)
+                            + " inferences"
+                            + ", entailmentsPerSec="
+                            + ((long) (((double) inferenceCount)
+                                    / ((double) elapsed) * 1000d)));
+
+        }
+
+    }
     
+    /**
+     * Convert a {@link Set} of term identifiers into a sorted array of term
+     * identifiers.
+     * <P>
+     * Note: When issuing multiple queries against the database, it is generally
+     * faster to issue those queries in key order.
+     * 
+     * @return The sorted term identifiers.
+     */
+    public long[] getSortedArray(Set<Long> ids) {
+        
+        int n = ids.size();
+        
+        long[] a = new long[n];
+        
+        int i = 0;
+        
+        for(Long id : ids) {
+            
+            a[i++] = id;
+            
+        }
+        
+        Arrays.sort(a);
+        
+        return a;
+        
     }
 
+    /**
+     * Computes the set of possible sub properties of rdfs:subPropertyOf (<code>P</code>).
+     * This is used by steps 2-4 in {@link #fastForwardClosure()}.
+     * 
+     * @param database
+     *            The database to be queried.
+     * 
+     * @return A set containing the term identifiers for the members of P.
+     */
+    public Set<Long> getSubProperties(AbstractTripleStore database) {
+
+        final Set<Long> P = new HashSet<Long>();
+        
+        P.add(rdfsSubPropertyOf.id);
+
+        /*
+         * query := (?x, P, P), adding new members to P until P reaches fix
+         * point.
+         */
+        {
+
+            int nbefore;
+            int nafter = 0;
+            int nrounds = 0;
+
+            Set<Long> tmp = new HashSet<Long>();
+
+            do {
+
+                nbefore = P.size();
+
+                tmp.clear();
+
+                /*
+                 * query := (?x, p, ?y ) for each p in P, filter ?y element of
+                 * P.
+                 */
+
+                for (Long p : P) {
+
+                    byte[] fromKey = database.getKeyBuilder().statement2Key(p,
+                            NULL, NULL);
+
+                    byte[] toKey = database.getKeyBuilder().statement2Key(
+                            p + 1, NULL, NULL);
+
+                    SPO[] stmts = database.getStatements(
+                            database.getPOSIndex(), KeyOrder.POS, fromKey,
+                            toKey);
+
+                    for (int i = 0; i < stmts.length; i++) {
+
+                        if (P.contains(stmts[i].o)) {
+
+                            tmp.add(stmts[i].s);
+
+                        }
+
+                    }
+
+                }
+
+                P.addAll(tmp);
+
+                nafter = P.size();
+
+                nrounds++;
+
+            } while (nafter > nbefore);
+
+        }
+        
+        if(DEBUG){
+            
+            Set<String> terms = new HashSet<String>();
+            
+            for( Long id : P ) {
+                
+                terms.add(database.getTerm(id).term);
+                
+            }
+            
+            log.debug("P: "+terms);
+        
+        }
+        
+        return P;
+
+    }
+    
+    /**
+     * Query the <i>database</i> for the sub properties of a given property.
+     * <p>
+     * Pre-condition: The closure of <code>rdfs:subPropertyOf</code> has been
+     * asserted on the database.
+     * 
+     * @param database
+     *            The database to be queried.
+     * @param p
+     *            The term identifier for the property whose sub-properties will
+     *            be obtain.
+     * 
+     * @return A set containing the term identifiers for the sub properties of
+     *         <i>p</i>. 
+     */
+    public Set<Long> getSubPropertiesOf(AbstractTripleStore database, final long p) {
+
+        if(DEBUG) {
+            
+            log.debug("p="+database.getTerm(p).term);
+            
+        }
+        
+        final Set<Long> tmp = new HashSet<Long>();
+
+        /*
+         * query := (?x, rdfs:subPropertyOf, p).
+         * 
+         * Distinct ?x are gathered in [tmp].
+         * 
+         * Note: This query is two-bound on the POS index.
+         */
+
+        byte[] fromKey = database.getKeyBuilder().statement2Key(p,
+                rdfsSubPropertyOf.id, NULL);
+
+        byte[] toKey = database.getKeyBuilder().statement2Key(p,
+                rdfsSubPropertyOf.id+1, NULL);
+
+        SPO[] stmts = database.getStatements(database.getPOSIndex(),
+                KeyOrder.POS, fromKey, toKey);
+
+        for( SPO spo : stmts ) {
+            
+            boolean added = tmp.add(spo.s);
+            
+            if(DEBUG) {
+                
+                log.debug(spo.toString(database) + ", added subject="+added);
+                
+            }
+            
+        }
+
+        if(DEBUG){
+        
+            Set<String> terms = new HashSet<String>();
+            
+            for( Long id : tmp ) {
+                
+                terms.add(database.getTerm(id).term);
+                
+            }
+            
+            log.debug("sub properties: "+terms);
+        
+        }
+        
+        return tmp;
+
+    }
+
+    /**
+     * <code>(?x, P, ?y) -> (?x, propertyId, ?y)</code>
+     * 
+     * @param database
+     *            The database.
+     * @param buffer
+     *            A buffer used to accumulate entailments. The buffer is flushed
+     *            to the database if this method returns normally.
+     * @param P
+     *            A set of term identifiers.
+     * @param propertyId
+     *            The propertyId to be used in the assertions.
+     * 
+     * @todo verify that we do not need to assert stmts where P is [propertyId]
+     *       itself.
+     * 
+     * @todo mark the statements as {@link StatementEnum#Inferred}
+     */
+    protected void foo(AbstractTripleStore database, SPOBuffer buffer,
+            Set<Long> P, long propertyId) {
+
+        /*
+         * The #of assertions placed into the buffer.
+         * 
+         * Note: This is NOT a count of the #of asserted statements that were
+         * added to the database. In order to get that the SPOBuffer would have
+         * to track whether or not statements were pre-existing during overflow.
+         * With that, we could easily return the #of statements that were added
+         * by this method.
+         */
+
+        int counter = 0;
+        
+        final long[] a = getSortedArray(P);
+
+        for (long p : a) {
+
+            // if(p==propertyId) continue;
+
+            byte[] fromKey = database.getKeyBuilder().statement2Key(p, NULL,
+                    NULL);
+
+            byte[] toKey = database.getKeyBuilder().statement2Key(p + 1, NULL,
+                    NULL);
+
+            SPO[] stmts = database.getStatements(database.getPOSIndex(),
+                    KeyOrder.POS, fromKey, toKey);
+
+            for (SPO spo : stmts) {
+
+                /*
+                 * Note: since P includes rdfs:subPropertyOf (as well as all of
+                 * the sub properties of rdfs:subPropertyOf) there are going to
+                 * be some axioms in here that we really do not need to reassert
+                 * and generally some explicit statements as well.
+                 */
+
+                SPO newSPO = new SPO(spo.s, rdfsSubPropertyOf.id, spo.o); // @todo
+                                                                            // StatementEnum.Inferred));
+
+                buffer.add(newSPO);
+
+                if (DEBUG) {
+
+                    log.debug("add " + newSPO.toString(database));
+
+                }
+
+                counter++;
+                
+            }
+
+        }
+
+        buffer.flush();
+        
+    }
+    
     /**
      * Add the axiomatic RDF(S) triples to the store.
      * <p>
@@ -812,10 +1093,10 @@ public class InferenceEngine implements ITripleStore {
      * since the axioms will be copied into the store when the closure is
      * complete.
      * 
-     * @param store
+     * @param database
      *            The store to which the axioms will be added.
      */
-    private void addRdfsAxioms(ITripleStore store) {
+    public void addRdfsAxioms(ITripleStore database) {
         
         Axioms axiomModel = RdfsAxioms.INSTANCE;
 
@@ -824,7 +1105,7 @@ public class InferenceEngine implements ITripleStore {
          * 
          * @todo do once in the ctor.
          */
-        Map<String,_URI> uriCache = cacheURIs(axiomModel.getVocabulary());
+        Map<String,_URI> uriCache = cacheURIs(database, axiomModel.getVocabulary());
         
         _Statement[] stmts = new _Statement[axiomModel.getAxioms().size()];
         
@@ -849,14 +1130,15 @@ public class InferenceEngine implements ITripleStore {
             
         }
 
-        store.addStatements(stmts, numStmts);
+        // batch insert axoims.
+        database.addStatements(stmts, numStmts);
         
     }
     
     /**
-     * Create a vocabulary cache for URIs as defined in the {@link #tripleStore}.
+     * Create a vocabulary cache for URIs as defined in the {@link #database}.
      * <p>
-     * Note: The URIs are inserted into the {@link #tripleStore} iff they are
+     * Note: The URIs are inserted into the {@link #database} iff they are
      * not already defined. This ensures that statements generated using the
      * assigned term identifiers will have the correct term identifiers for the
      * target {@link ITripleStore}.
@@ -864,11 +1146,11 @@ public class InferenceEngine implements ITripleStore {
      * @param uri
      *            The uri.
      * 
-     * @return The URI as defined in the {@link #tripleStore}.
+     * @return The URI as defined in the {@link #database}.
      * 
      * @todo use the batch addTerm method.
      */
-    private Map<String, _URI> cacheURIs(Set<String> uris) {
+    public Map<String, _URI> cacheURIs(ITripleStore database, Set<String> uris) {
 
         HashMap<String, _URI> uriCache = new HashMap<String, _URI>();
 
@@ -882,7 +1164,7 @@ public class InferenceEngine implements ITripleStore {
 
                 tmp = new _URI(uri);
 
-                tripleStore.addTerm(tmp);
+                database.addTerm(tmp);
 
                 uriCache.put(uri, tmp);
 
@@ -895,30 +1177,39 @@ public class InferenceEngine implements ITripleStore {
     }
     
     /**
-     * Copies the statements from the temporary store into the main store.
+     * Copies the statements from the temporary store into the main store using
+     * the <strong>same term identifiers</strong>. This method MUST NOT be used
+     * unless it is known in advance that the statements in the source are using
+     * term identifiers that are consistent with those in the destination.
      * <p>
-     * Note: The statements in the {@link TempTripleStore} are NOT removed.
+     * Note: The statements in the source are NOT removed.
      * 
-     * @param tmpStore
-     *            The temporary store.
+     * @param src
+     *            The temporary store (source).
+     * 
+     * @param dst
+     *            The persistent database (destination).
      * 
      * @return The #of statements inserted into the main store (the count only
      *         reports those statements that were not already in the main
      *         store).
+     * 
+     * @todo refactor onto AbstractTripleStore or TempTripleStore as
+     *       copyStatementsTo(ITripleStore)?
      */
-    public int copyStatements( final TempTripleStore tmpStore ) {
+    static public int copyStatements( final TempTripleStore src, final AbstractTripleStore dst ) {
 
         List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
         
-        tasks.add( new CopyStatements(tmpStore.getSPOIndex(),getSPOIndex()));
-        tasks.add( new CopyStatements(tmpStore.getPOSIndex(),getPOSIndex()));
-        tasks.add( new CopyStatements(tmpStore.getOSPIndex(),getOSPIndex()));
+        tasks.add( new CopyStatements(src.getSPOIndex(),dst.getSPOIndex()));
+        tasks.add( new CopyStatements(src.getPOSIndex(),dst.getPOSIndex()));
+        tasks.add( new CopyStatements(src.getOSPIndex(),dst.getOSPIndex()));
         
         final long numInserted;
         
         try {
 
-            final List<Future<Long>> futures = indexWriteService.invokeAll(tasks);
+            final List<Future<Long>> futures = dst.indexWriteService.invokeAll(tasks);
 
             final long numInserted1 = futures.get(0).get();
             
@@ -990,46 +1281,6 @@ public class InferenceEngine implements ITripleStore {
         }
         
     };
-    
-    /**
-     * A service used to write on each of the statement indices in parallel.
-     */
-    protected ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
-            DaemonThreadFactory.defaultThreadFactory());
-
-    /**
-     * Extracts the object ids from a key scan.
-     * 
-     * @param itr
-     *            The key scan iterator.
-     * 
-     * @return The objects visited by that iterator.
-     */
-    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
-
-        final RdfKeyBuilder keyBuilder = getKeyBuilder();
-        
-        final int n = ndx.rangeCount(fromKey, toKey);
-
-        // buffer for storing the extracted s:p:o data.
-        SPO[] ids = new SPO[n];
-
-        IEntryIterator itr1 = ndx.rangeIterator(fromKey, toKey);
-
-        int i = 0;
-
-        while (itr1.hasNext()) {
-
-            itr1.next();
-            ids[i++] = new SPO(keyOrder,keyBuilder,itr1.getKey());
-
-        }
-
-        assert i == n;
-
-        return ids;
-
-    }
 
     /**
      * Accepts a triple pattern and returns the closure over that triple pattern
@@ -1094,9 +1345,9 @@ public class InferenceEngine implements ITripleStore {
          * then we need to spill over to disk.
          */
         
-        ITripleStore answerSet = new TempTripleStore(getProperties());
+        ITripleStore answerSet = new TempTripleStore(new Properties());
         
-        int lastStatementCount = getStatementCount();
+        int lastStatementCount = database.getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
@@ -1115,7 +1366,7 @@ public class InferenceEngine implements ITripleStore {
 
             }
 
-            int statementCount = getStatementCount();
+            int statementCount = database.getStatementCount();
 
             // testing the #of statement is less prone to error.
             if (lastStatementCount == statementCount) {

@@ -58,29 +58,29 @@ public enum StatementEnum {
     /**
      * Something that is directly entailed by the appropriate model theory.
      */
-    Axiom(0),
+    Axiom((byte)0),
     /**
      * A statement that was inserted into the database explicitly by the
      * application.
      */
-    Explicit(1),
+    Explicit((byte)1),
     /**
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred(2),
+    Inferred((byte)2),
     /**
      * A statement that is undergoing truth maintenance.
      */
-    Suspended(3);
+    Suspended((byte)3);
 
-    private final int code;
+    private final byte code;
     
-    private StatementEnum(int code) {
+    private StatementEnum(byte code) {
         this.code = code;
     }
 
-    public int code() {
+    public byte code() {
         
         return code;
         

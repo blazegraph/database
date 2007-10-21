@@ -97,12 +97,13 @@ import org.openrdf.sesame.sail.util.SingleStatementIterator;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.inf.SPO;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
@@ -166,7 +167,11 @@ public class BigdataRdfRepository implements RdfRepository {
     protected static final long NULL = ITripleStore.NULL;
     
     protected OptimizedValueFactory valueFactory;
-    protected InferenceEngine tripleStore;
+
+    protected InferenceEngine inferenceEngine;
+    
+    protected AbstractTripleStore database;
+    
     protected Properties properties;
     
     /**
@@ -192,9 +197,9 @@ public class BigdataRdfRepository implements RdfRepository {
     /**
      * The implementation object.
      */
-    public InferenceEngine getTripleStore() {
+    public AbstractTripleStore getDatabase() {
         
-        return tripleStore;
+        return database;
         
     }
     
@@ -308,7 +313,7 @@ public class BigdataRdfRepository implements RdfRepository {
 
         o = (Value) valueFactory.toNativeValue(o);
         
-        tripleStore.addStatement(s, p, o);
+        database.addStatement(s, p, o);
         
         m_stmtAdded = true;
         
@@ -341,11 +346,13 @@ public class BigdataRdfRepository implements RdfRepository {
 
         assertTransactionStarted();
 
-        ((BTree)tripleStore.getTermIdIndex()).removeAll();
-        ((BTree)tripleStore.getIdTermIndex()).removeAll();
-        ((BTree)tripleStore.getSPOIndex()).removeAll();
-        ((BTree)tripleStore.getPOSIndex()).removeAll();
-        ((BTree)tripleStore.getOSPIndex()).removeAll();
+//        ((BTree)database.getTermIdIndex()).removeAll();
+//        ((BTree)database.getIdTermIndex()).removeAll();
+//        ((BTree)database.getSPOIndex()).removeAll();
+//        ((BTree)database.getPOSIndex()).removeAll();
+//        ((BTree)database.getOSPIndex()).removeAll();
+
+        database.clear();
         
         m_stmtRemoved = true;
         
@@ -373,7 +380,7 @@ public class BigdataRdfRepository implements RdfRepository {
         if (o != null)
             o = (Value) valueFactory.toNativeValue(o);
         
-        int n = tripleStore.removeStatements(s, p, o);
+        int n = database.removeStatements(s, p, o);
         
         if (n > 0) {
             
@@ -427,13 +434,13 @@ public class BigdataRdfRepository implements RdfRepository {
          */
         if (rdfsClosure) {
 
-            tripleStore.fullForwardClosure();
+            inferenceEngine.fullForwardClosure();
             
         }
         
-        tripleStore.commit();
+        database.commit();
         
-        if(true) tripleStore.getTripleStore().dumpStore();
+        if(true) database.dumpStore();
         
         transactionStarted = false;
         
@@ -470,9 +477,9 @@ public class BigdataRdfRepository implements RdfRepository {
          */
         long _s, _p, _o;
 
-        _s = (s == null ? NULL : tripleStore.getTermId(s));
-        _p = (p == null ? NULL : tripleStore.getTermId(p));
-        _o = (o == null ? NULL : tripleStore.getTermId(o));
+        _s = (s == null ? NULL : database.getTermId(s));
+        _p = (p == null ? NULL : database.getTermId(p));
+        _o = (o == null ? NULL : database.getTermId(o));
 
         /*
          * If a value was specified and it is not in the terms index then the
@@ -501,8 +508,8 @@ public class BigdataRdfRepository implements RdfRepository {
          */
         if (_s != NULL && _p != NULL && _o != NULL) {
 
-            if (tripleStore.getSPOIndex().contains(
-                    tripleStore.getKeyBuilder().statement2Key(_s, _p, _o))) {
+            if (database.getSPOIndex().contains(
+                    database.getKeyBuilder().statement2Key(_s, _p, _o))) {
                 
                 return new SingleStatementIterator(s,p,o);
                 
@@ -519,7 +526,7 @@ public class BigdataRdfRepository implements RdfRepository {
          * as a sesame statement iterator.
          */
         return new MyStatementIterator(KeyOrder.getKeyOrder(_s, _p, _o),
-                tripleStore.rangeQuery(_s, _p, _o));
+                database.rangeQuery(_s, _p, _o));
         
     }
     
@@ -546,7 +553,7 @@ public class BigdataRdfRepository implements RdfRepository {
             
             this.src = src;
 
-            this.keyBuilder = tripleStore.getKeyBuilder();
+            this.keyBuilder = database.getKeyBuilder();
             
         }
         
@@ -565,8 +572,8 @@ public class BigdataRdfRepository implements RdfRepository {
             SPO spo = new SPO(keyOrder, keyBuilder, src.getKey());
             
             // resolves the term identifiers to the terms.
-            return new _Statement((_Resource) tripleStore.getTerm(spo.s),
-                    (_URI) tripleStore.getTerm(spo.p), (_Value) tripleStore
+            return new _Statement((_Resource) database.getTerm(spo.s),
+                    (_URI) database.getTerm(spo.p), (_Value) database
                             .getTerm(spo.o));
             
         }
@@ -594,7 +601,7 @@ public class BigdataRdfRepository implements RdfRepository {
         if (o != null)
             o = (Value) valueFactory.toNativeValue(o);
         
-        return tripleStore.containsStatement(s, p, o);
+        return database.containsStatement(s, p, o);
         
     }
 
@@ -931,9 +938,9 @@ public class BigdataRdfRepository implements RdfRepository {
          */
         long _s, _p, _o;
 
-        _s = (s == null ? NULL : tripleStore.getTermId(s));
-        _p = (p == null ? NULL : tripleStore.getTermId(p));
-        _o = (o == null ? NULL : tripleStore.getTermId(o));
+        _s = (s == null ? NULL : database.getTermId(s));
+        _p = (p == null ? NULL : database.getTermId(p));
+        _o = (o == null ? NULL : database.getTermId(o));
 
         /*
          * If a value was specified and it is not in the terms index then the
@@ -957,7 +964,7 @@ public class BigdataRdfRepository implements RdfRepository {
             
         }
         
-        return tripleStore.rangeCount(_s, _p, _o);
+        return database.rangeCount(_s, _p, _o);
 
     }
     
@@ -1115,7 +1122,7 @@ public class BigdataRdfRepository implements RdfRepository {
         // storeClass
         {
             
-            final ITripleStore backingStore;
+            final AbstractTripleStore database;
             
             val = properties.getProperty(Options.STORE_CLASS,Options.DEFAULT_STORE_CLASS);
 
@@ -1133,7 +1140,7 @@ public class BigdataRdfRepository implements RdfRepository {
                 
                 Constructor ctor = storeClass.getConstructor(new Class[]{Properties.class});
                 
-                backingStore = (ITripleStore) ctor.newInstance(new Object[]{properties});
+                database = (AbstractTripleStore) ctor.newInstance(new Object[]{properties});
 
             } catch(SailInitializationException ex) {
                 
@@ -1145,7 +1152,9 @@ public class BigdataRdfRepository implements RdfRepository {
                 
             }
             
-            tripleStore = new InferenceEngine( backingStore );
+            this.database = database;
+            
+            this.inferenceEngine = new InferenceEngine( database );
             
         }
         
@@ -1154,7 +1163,7 @@ public class BigdataRdfRepository implements RdfRepository {
     public void shutDown() {
 
         // @todo use polite shutdown() and define on ITripleStore.
-        tripleStore.close();
+        database.close();
         
     }
 
@@ -1172,9 +1181,9 @@ public class BigdataRdfRepository implements RdfRepository {
      */
     public void fullForwardClosure() {
         
-        tripleStore.fullForwardClosure();
+        inferenceEngine.fullForwardClosure();
         
-        tripleStore.commit();
+        database.commit();
                 
     }
     

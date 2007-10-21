@@ -225,7 +225,10 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
     }
 
     /**
-     * Handles both unisolatable and isolatable indices.
+     * Note: Handles both unisolatable and isolatable indices.
+     * <P>
+     * Note: Sets {@link _Value#termId} and {@link _Value#known} as
+     * side-effects.
      */
     final public _Value getTerm(long id) {
 
@@ -235,29 +238,63 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         Object data = ndx.lookup(keyBuilder.id2key(id));
 
-        if (data == null)
-            return null;
+        if (data == null) {
 
-        return (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
+            return null;
+            
+        }
+
+        _Value value = (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
+        
+        // @todo modify unit test to verify that these fields are being set.
+
+        value.termId = id;
+        
+        value.known = true;
+        
+        return value;
 
     }
 
     /**
-     * Handles both unisolatable and isolatable indices.
+     * Note: Handles both unisolatable and isolatable indices.
+     * <p>
+     * Note: If {@link _Value#key} is set, then that key is used. Otherwise the
+     * key is computed and set as a side effect.
+     * <p>
+     * Note: If {@link _Value#termId} is set, then returns that value
+     * immediately. Otherwise looks up the termId in the index and sets
+     * {@link _Value#termId} as a side-effect.
      */
     final public long getTermId(Value value) {
 
         _Value val = (_Value) value;
         
-        if( val.termId != ITripleStore.NULL ) return val.termId; 
+        if (val.termId != ITripleStore.NULL) {
+
+            return val.termId;
+            
+        }
 
         IIndex ndx = getTermIdIndex();
         
         final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+        if (val.key == null) {
+
+            // generate key iff not on hand.
+            val.key = keyBuilder.value2Key(val);
+            
+        }
         
-        Object tmp = ndx.lookup(keyBuilder.value2Key(value));
+        // lookup in the forward index.
+        Object tmp = ndx.lookup(val.key);
         
-        if( tmp == null ) return ITripleStore.NULL;
+        if (tmp == null) {
+
+            return ITripleStore.NULL;
+            
+        }
         
         if (isolatableIndex) {
             
@@ -277,28 +314,16 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         }
 
+        // was found in the reverse mapping.
+        val.known = true;
+        
         return val.termId;
 
     }
 
     /**
-     * Batch insert of terms into the database.
-     * 
-     * @param terms
-     *            An array whose elements [0:nterms-1] will be inserted.
-     * @param numTerms
-     *            The #of terms to insert.
-     * @param haveKeys
-     *            True if the terms already have their sort keys.
-     * @param sorted
-     *            True if the terms are already sorted by their sort keys (in
-     *            the correct order for a batch insert).
-     * 
-     * @exception IllegalArgumentException
-     *                if <code>!haveKeys && sorted</code>.
-     * 
-     * @todo refactor until we can share code for this method with the
-     *       client-federation version.
+     * FIXME There is a bug when there are duplicates in [terms] that results in
+     * term identifiers not being assigned to all terms.
      */
     final public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
 
@@ -320,7 +345,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             /*
              * First make sure that each term has an assigned sort key.
              */
-            if(!haveKeys) {
+            if (!haveKeys) {
 
                 long _begin = System.currentTimeMillis();
                 
@@ -376,9 +401,19 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                     _Value term = terms[i];
 
+                    if (term.termId!=NULL) {
+                        /*
+                         * The termId is already assigned.
+                         * 
+                         * Note: among other things, this happens when there are
+                         * duplicate references in the terms[].
+                         */
+                        continue;
+                    }
+                    
                     if (!term.known) {
 
-                        //assert term.termId==0L; FIXME uncomment this and figure out why this assertion is failing.
+                        assert term.termId==0L;
                         assert term.key != null;
 
                         // Lookup in the forward index.
@@ -445,11 +480,12 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                                 
                             }
 
+                            // the term was found in the forward index.
                             term.known = true;
                         
                         }
                         
-                    } else assert term.termId != 0L;
+                    } else assert term.termId != NULL;
                     
                 }
 
@@ -500,13 +536,17 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                 _Value term = terms[i];
                 
-                assert term.termId != 0L;
+                assert term.termId != NULL;
                 
                 if (!term.known) {
                     
                     /*
                      * Insert into the reverse mapping from the term identifier
                      * to serialized term.
+                     * 
+                     * Note: if there are duplicate references in terms[] then
+                     * [term.known] gets set for the first reference and the
+                     * remaining references get skipped.
                      */
 
                     // form the key from the term identifier.

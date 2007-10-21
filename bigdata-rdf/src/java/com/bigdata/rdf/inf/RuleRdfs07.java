@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.spo.SPO;
+
 /**
  * rdfs7:
  * <pre>
