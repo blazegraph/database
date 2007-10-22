@@ -100,6 +100,7 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
@@ -1577,7 +1578,32 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /**
-     * FIXME write on the indices in parallel.
+     * Writes the statements onto the indices (batch).
+     * 
+     * @param stmts
+     *            The statements.
+     * 
+     * @param numStmts
+     *            The #of entries in <i>stmts</i> that are valid.
+     */ 
+    public void addStatements(SPO[] stmts, int numStmts ) {
+       
+        addStatements(stmts, numStmts, null );
+        
+    }
+    
+    /**
+     * Writes the statements onto the indices (batch, parallel).
+     * 
+     * @param stmts
+     *            The statements.
+     * 
+     * @param numStmts
+     *            The #of entries in <i>stmts</i> that are valid.
+     * 
+     * @param filter
+     *            Optional statement filter. Statements matching the filter are
+     *            NOT added to the database.
      * 
      * @todo modify to return the #of new statements actually added to the
      *       database and then use that value, e.g., in
@@ -1587,7 +1613,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       such as (?x rdf:type rdfs:Resource) do not make it into the store
      *       when they are {@link StatementEnum#Inferred}.
      */
-    public void addStatements(SPO[] stmts, int numStmts ) {
+    public void addStatements(SPO[] stmts, int numStmts, ISPOFilter filter ) {
      
         /*
          * Note: The statements are inserted into each index in parallel. We
@@ -1598,8 +1624,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if( numStmts == 0 ) return;
 
         long begin = System.currentTimeMillis();
-        final AtomicLong sortTime = new AtomicLong(0); // time to sort terms by assigned byte[] keys.
-        final AtomicLong insertTime = new AtomicLong(0); // time to insert terms into the forward and reverse index.
+        final AtomicLong sortTime = new AtomicLong(0); // time to sort statements.
+        final AtomicLong insertTime = new AtomicLong(0); // time to load statements into indices.
 
         /**
          * Writes on one of the statement indices.
@@ -1616,6 +1642,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             private final Comparator<SPO> comparator;
             private final IIndex ndx;
             private final KeyOrder keyOrder;
+            private final ISPOFilter filter;
             
             /*
              * Private key builder for the SPO, POS, and OSP keys.
@@ -1624,7 +1651,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             private final byte[][] keys;
 
-            IndexWriter(SPO[] stmts, int numStmts, Comparator<SPO> comparator, IIndex ndx, KeyOrder keyOrder) {
+            IndexWriter(SPO[] stmts, int numStmts, Comparator<SPO> comparator,
+                    IIndex ndx, KeyOrder keyOrder, ISPOFilter filter) {
                 
                 this.stmts = new SPO[numStmts];
                 
@@ -1639,6 +1667,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 this.keys = new byte[numStmts][];
                 
                 this.keyOrder = keyOrder;
+            
+                this.filter = filter;
                 
             }
 
@@ -1673,10 +1703,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     long _begin = System.currentTimeMillis();
 
+                    int numToAdd = 0;
+                    
                     for (int i = 0; i < numStmts; i++) {
 
                         final SPO stmt = stmts[i];
 
+                        if(filter!=null && filter.isMatch(stmt)) continue;
+                        
+                        numToAdd++;
+                        
                         switch (keyOrder) {
                         case SPO:
                             keys[i] = keyBuilder.statement2Key(stmt.s, stmt.p,
@@ -1713,8 +1749,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                          * FIXME modify to write the StatementEnum flags.
                          */
                         
-                        BatchInsert op = new BatchInsert(numStmts, keys,
-                                new byte[numStmts][]);
+                        BatchInsert op = new BatchInsert(numToAdd, keys,
+                                new byte[numToAdd][]);
 
                         ndx.insert(op);
                     
@@ -1726,7 +1762,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                          * working correctly.
                          */
                         
-                        for ( int i = 0; i < numStmts; i++ ) {
+                        for ( int i = 0; i < numToAdd; i++ ) {
 
                             if (!ndx.contains(keys[i])) {
                              
@@ -1754,15 +1790,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         tasks.add(new IndexWriter(stmts, numStmts,
                 com.bigdata.rdf.spo.SPOComparator.INSTANCE, getSPOIndex(),
-                KeyOrder.SPO));
+                KeyOrder.SPO, filter));
         
         tasks.add(new IndexWriter(stmts, numStmts,
                 com.bigdata.rdf.spo.POSComparator.INSTANCE, getPOSIndex(),
-                KeyOrder.POS));
+                KeyOrder.POS, filter));
 
         tasks.add(new IndexWriter(stmts, numStmts,
                 com.bigdata.rdf.spo.OSPComparator.INSTANCE, getOSPIndex(),
-                KeyOrder.OSP));
+                KeyOrder.OSP, filter));
 
         System.err.print("Writing " + numStmts + " statements...");
         
@@ -1797,14 +1833,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    public void addStatements_singleThreaded(SPO[] stmts, int n ) {
+    public void addStatements_singleThreaded(SPO[] stmts, int n, ISPOFilter filter ) {
         
         // deal with the SPO index
         IIndex spo = getSPOIndex();
         Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.SPOComparator.INSTANCE);
         for ( int i = 0; i < n; i++ ) {
+            SPO stmt = stmts[i];
+            if(filter!=null && filter.isMatch(stmt)) continue;
             byte[] key = keyBuilder.statement2Key
-                ( stmts[i].s, stmts[i].p, stmts[i].o
+                ( stmt.s, stmt.p, stmt.o
                   );
             if ( !spo.contains(key) ) {
                 spo.insert(key, null);
@@ -1815,8 +1853,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         IIndex pos = getPOSIndex();
         Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.POSComparator.INSTANCE);
         for ( int i = 0; i < n; i++ ) {
+            SPO stmt = stmts[i];
+            if(filter!=null && filter.isMatch(stmt)) continue;
             byte[] key = keyBuilder.statement2Key
-                ( stmts[i].p, stmts[i].o, stmts[i].s
+                ( stmt.p, stmt.o, stmt.s
                   );
             if ( !pos.contains(key) ) {
                 pos.insert(key, null);
@@ -1827,8 +1867,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         IIndex osp = getOSPIndex();
         Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.OSPComparator.INSTANCE);
         for ( int i = 0; i < n; i++ ) {
+            SPO stmt = stmts[i];
+            if(filter!=null && filter.isMatch(stmt)) continue;
             byte[] key = keyBuilder.statement2Key
-                ( stmts[i].o, stmts[i].s, stmts[i].p
+                ( stmt.o, stmt.s, stmt.p
                   );
             if ( !osp.contains(key) ) {
                 osp.insert(key, null);
