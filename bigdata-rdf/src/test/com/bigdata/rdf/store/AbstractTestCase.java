@@ -54,6 +54,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * <p>
@@ -200,8 +201,18 @@ abstract public class AbstractTestCase
 
     protected final long NULL = ITripleStore.NULL;
     
-    abstract protected ITripleStore getStore();
+    abstract protected AbstractTripleStore getStore();
     
-    abstract protected ITripleStore reopenStore(ITripleStore store);
+    abstract protected AbstractTripleStore reopenStore(AbstractTripleStore store);
 
+    public void assertEquals(SPO expected, SPO actual) {
+        
+        if(!expected.equals(actual)) {
+            
+            fail("Expecting: "+expected+" not "+actual);
+            
+        }
+        
+    }
+    
 }

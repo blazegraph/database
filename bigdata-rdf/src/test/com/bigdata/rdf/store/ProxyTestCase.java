@@ -177,11 +177,11 @@ public abstract class ProxyTestCase
         return getOurDelegate().getProperties();
     }
 
-    protected ITripleStore getStore() {
+    protected AbstractTripleStore getStore() {
         return getOurDelegate().getStore();
     }
     
-    protected ITripleStore reopenStore(ITripleStore store) {
+    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
         return getOurDelegate().reopenStore(store);
     }
 

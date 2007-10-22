@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
 /**
@@ -71,30 +70,5 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
     public AbstractInferenceEngineTestCase(String name) {
         super(name);
     }
-
-    public void setUp() throws Exception {
-        
-        super.setUp();
-        
-        this.store = (AbstractTripleStore)getStore();
-        
-        this.inferenceEngine = new InferenceEngine(store);
-        
-    }
-    
-    public void tearDown() throws Exception {
-
-        if(this.store!=null) {
-            
-            this.store.closeAndDelete();
-            
-        }
-        
-        super.tearDown();
-        
-    }
-    
-    protected AbstractTripleStore store;
-    protected InferenceEngine inferenceEngine;
     
 }

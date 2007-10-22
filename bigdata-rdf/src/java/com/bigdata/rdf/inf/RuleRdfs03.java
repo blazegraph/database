@@ -59,18 +59,20 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class RuleRdfs03 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs03( InferenceEngine store, Var a, Var x, Var u, Var v ) {
+    public RuleRdfs03( InferenceEngine inf, Var a, Var x, Var u, Var v ) {
 
-        super(store, new Triple(v, store.rdfType, x),
+        super(inf, new Triple(v, inf.rdfType, x),
                 new Pred[] {
-                new Triple(a, store.rdfsRange, x),
+                new Triple(a, inf.rdfsRange, x),
                 new Triple(u, a, v)
                 });
 
     }
     
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        return new SPO( stmt2.o, store.rdfType.id, stmt1.o );
+        
+        return new SPO( stmt2.o, inf.rdfType.id, stmt1.o );
+        
     }
 
 }

@@ -55,6 +55,8 @@ import com.bigdata.rdf.store.ITripleStore;
  */
 public class VarOrId {
 
+    static protected final transient long NULL = ITripleStore.NULL;
+    
     public long id;
 
     public boolean isVar() {
@@ -65,7 +67,7 @@ public class VarOrId {
 
     public VarOrId(long id) {
  
-        assert id != 0L;
+        assert id != NULL;
         
         this.id = id;
         

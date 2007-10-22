@@ -50,6 +50,9 @@ package com.bigdata.rdf.spo;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.rio.Buffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -64,6 +67,20 @@ import com.bigdata.rdf.store.TempTripleStore;
  */
 public class SPOBuffer {
 
+    final public Logger log = Logger.getLogger(SPOBuffer.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * The array in which the statements are stored.
      */
@@ -74,6 +91,30 @@ public class SPOBuffer {
      */
     private int numStmts;
 
+    /**
+     * The #of statements currently in the buffer (if duplicates are not being
+     * filtered then this count will include any duplicate statements).
+     */
+    public int size() {
+        
+        return numStmts;
+        
+    }
+    
+    /**
+     * The {@link SPO} at the given index.
+     * @param i
+     * @return
+     */
+    public SPO get(int i) {
+        
+        if (i > numStmts)
+            throw new IndexOutOfBoundsException();
+        
+        return stmts[i];
+        
+    }
+    
     /**
      * Map used to filter out duplicate statements. 
      */
@@ -113,34 +154,23 @@ public class SPOBuffer {
     public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
     
         assert store != null;
+        assert capacity > 0;
         
         this.store = store;
         
         this.capacity = capacity;
-    
+
         this.distinct = distinct;
 
-        if (capacity == -1) {
+        stmts = new SPO[capacity];
 
-            stmts = null;
+        if (distinct) {
 
-            distinctStmtMap = null;
-
-            return;
+            distinctStmtMap = new HashMap<SPO, SPO>(capacity);
 
         } else {
 
-            stmts = new SPO[capacity];
-
-            if (distinct) {
-
-                distinctStmtMap = new HashMap<SPO, SPO>(capacity);
-
-            } else {
-
-                distinctStmtMap = null;
-
-            }
+            distinctStmtMap = null;
 
         }
 
@@ -204,30 +234,29 @@ public class SPOBuffer {
      * Flush any buffer statements to the backing store.
      */
     public void flush() {
-        
-        if (numStmts > 0)
-            overflow();
-        
-    }
-    
-    private void overflow() {
-        
-        /*
-         * batch insert statements into the store.
-         */
-        store.addStatements(stmts, numStmts);
-        
-        /*
-         * reset the buffer.
-         */
-        
-        numStmts = 0;
-        
-        if(distinctStmtMap!=null) {
-            
-            distinctStmtMap.clear();
-            
-        }        
+
+        if (numStmts > 0) {
+
+            log.info("numStmts=" + numStmts);
+
+            /*
+             * batch insert statements into the store.
+             */
+            store.addStatements(stmts, numStmts);
+
+            /*
+             * reset the buffer.
+             */
+
+            numStmts = 0;
+
+            if (distinctStmtMap != null) {
+
+                distinctStmtMap.clear();
+
+            }
+
+        }
 
     }
     
@@ -243,9 +272,21 @@ public class SPOBuffer {
      */
     public void add( SPO stmt ) {
 
+        if (DEBUG) {
+       
+            /*
+             * @todo If [store] is a TempTripleStore then this probably will NOT
+             * be able to resolve the terms from the ids (since the lexicon is
+             * only in the database).  In that case we should just write out the
+             * term identifiers.
+             */
+            log.debug("add " + stmt.toString(store));
+        
+        }
+
         if(nearCapacity()) {
 
-            overflow();
+            flush();
             
         }
         

@@ -152,7 +152,7 @@ public class TestTempTripleStore extends AbstractTestCase {
 
     }
     
-    protected ITripleStore getStore() {
+    protected AbstractTripleStore getStore() {
         
         return new TempTripleStore( getProperties() );
         
@@ -169,7 +169,7 @@ public class TestTempTripleStore extends AbstractTestCase {
      * @exception UnsupportedOperationException
      *                The {@link TempTripleStore} can not be re-opened.
      */
-    protected ITripleStore reopenStore(ITripleStore store) {
+    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
         throw new UnsupportedOperationException(TempTripleStore.class.getName()
                 + " can not be re-opened.");

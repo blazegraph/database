@@ -55,6 +55,7 @@ import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -159,7 +160,7 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /**
          * Applies the base rule iff the {@link Magic} is matched.
          */
-        public Rule.Stats apply( Stats stats, SPOBuffer buffer) {
+        public RuleStats apply( RuleStats stats, SPOBuffer buffer) {
 
             if(match()) { 
             
@@ -183,6 +184,8 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
      */
     public void testQueryAnswering01() throws IOException {
 
+        AbstractTripleStore store = getStore();
+        
         /*
          * setup the database.
          */
@@ -216,14 +219,16 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
          * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
          */
 
+        InferenceEngine inf = new InferenceEngine(store);
+        
         // query :- triple(?s,rdf:type,A).
-        Triple query = new Triple(inferenceEngine.nextVar(),
-                inferenceEngine.rdfType, new Id(store.addTerm(new _URI(
+        Triple query = new Triple(inf.nextVar(),
+                inf.rdfType, new Id(store.addTerm(new _URI(
                         "http://www.foo.org/A"))));
 
         // Run the queryy.
-        ITripleStore answerSet = inferenceEngine.query(query, new Rule[] {
-                inferenceEngine.rdfs9, inferenceEngine.rdfs11 });
+        ITripleStore answerSet = inf.query(query, new Rule[] {
+                inf.rdfs9, inf.rdfs11 });
 
         /*
          * @todo verify the answer set: ?s := {x,y,z}.
@@ -232,6 +237,8 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         assertTrue(answerSet.containsStatement(x, rdfType, A));
         assertTrue(answerSet.containsStatement(y, rdfType, A));
         assertTrue(answerSet.containsStatement(z, rdfType, A));
+        
+        store.closeAndDelete();
         
     }
     

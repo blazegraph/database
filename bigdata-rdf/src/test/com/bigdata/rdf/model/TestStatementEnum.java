@@ -42,34 +42,48 @@ Modifications:
 
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Oct 22, 2007
  */
 
-package com.bigdata.rdf.store;
+package com.bigdata.rdf.model;
 
+import junit.framework.TestCase;
 
 /**
- * Base class for test suites for inference engine and the magic sets
- * implementation.
+ * Test suite for {@link StatementEnum}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo This currently adds nothing and could be removed.
  */
-abstract public class AbstractTripleStoreTestCase extends ProxyTestCase {
+public class TestStatementEnum extends TestCase {
 
     /**
      * 
      */
-    public AbstractTripleStoreTestCase() {
+    public TestStatementEnum() {
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public AbstractTripleStoreTestCase(String name) {
-        super(name);
+    public TestStatementEnum(String arg0) {
+        super(arg0);
     }
 
+    public void test_max() {
+        
+        assertEquals(StatementEnum.Explicit, StatementEnum.max(
+                StatementEnum.Axiom, StatementEnum.Explicit));
+
+        assertEquals(StatementEnum.Explicit, StatementEnum.max(
+                StatementEnum.Inferred, StatementEnum.Explicit));
+
+        assertEquals(StatementEnum.Axiom, StatementEnum.max(
+                StatementEnum.Inferred, StatementEnum.Axiom));
+
+        assertEquals(StatementEnum.Inferred, StatementEnum.max(
+                StatementEnum.Inferred, StatementEnum.Inferred));
+        
+    }
+    
 }

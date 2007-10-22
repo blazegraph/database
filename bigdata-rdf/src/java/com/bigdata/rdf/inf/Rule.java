@@ -49,7 +49,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
-
 /**
  * 
  * @todo Since a variable is just a negative long integer, it is possible to
@@ -75,23 +74,23 @@ abstract public class Rule {
     /**
      * The database against which queries are performed.
      */
-    final public AbstractTripleStore db;
+    final protected AbstractTripleStore db;
     
     /**
      * The inference engine.
      */
-    final public InferenceEngine store;
+    final protected InferenceEngine inf;
     
     /**
      * The head of the rule.
      */
-    final public Pred head;
+    final protected Pred head;
 
     /**
      * The body of the rule -or- <code>null</code> if the body of the rule
      * is empty.
      */
-    final public Pred[] body;
+    final protected Pred[] body;
 
     /**
      * The 64-bit long integer that represents an unassigned term identifier
@@ -99,17 +98,17 @@ abstract public class Rule {
      * @todo use this throughout rather than "0" since the value should really
      *       be an <em>unsigned long</em>.
      */
-    final public long NULL = ITripleStore.NULL;
+    final protected long NULL = ITripleStore.NULL;
     
-    public Rule(InferenceEngine store, Pred head, Pred[] body) {
+    public Rule(InferenceEngine inf, Pred head, Pred[] body) {
 
-        assert store != null;
+        assert inf != null;
         
         assert head != null;
 
-        this.db = store.database;
+        this.db = inf.database;
         
-        this.store = store;
+        this.inf = inf;
         
         this.head = head;
 
@@ -139,57 +138,6 @@ abstract public class Rule {
      * 
      * @todo store proofs.
      */
-    public abstract Stats apply( final Stats stats, final SPOBuffer buffer );
-    
-    /**
-     * Statistics about what the Rule did during {@link Rule#apply()}.
-     * 
-     * @author mikep
-     */
-    public static class Stats {
-
-        /**
-         * #of matches for the triple pattern for the first antecedent of the rule.
-         */
-        public int stmts1;
-
-        /**
-         * #of matches for the triple pattern for the second antecedent of the
-         * rule (if there are two).
-         */
-        public int stmts2;
-        
-        /**
-         * If the rule performs a JOIN, this is the #of distinct queries that
-         * are made for the 2nd triple pattern.  For some rules, we can reorder
-         * the results from the first triple pattern in order to reduce the #of
-         * subqueries.
-         */
-        public int numSubqueries;
-        
-        /**
-         * #of statements considered.
-         */
-        public int numConsidered;
-        
-        /**
-         * #of entailments computed.
-         */
-        public int numComputed;
-        
-        /**
-         * Time to compute the entailments and store them within the
-         * {@link TempTripleStore} in milliseconds.
-         */
-        long computeTime;
-        
-        public String toString() {
-            
-            return ", #stmts1=" + stmts1 + ", #stmts2=" + stmts2
-                    + ", #subqueries=" + numSubqueries + ", numConsidered+"
-                    + numConsidered + ", computeTime=" + computeTime;
-        }
-
-    }
+    public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
 
 }

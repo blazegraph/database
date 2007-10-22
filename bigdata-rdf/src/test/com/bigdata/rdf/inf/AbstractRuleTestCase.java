@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -59,21 +59,41 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
     protected TempTripleStore tmpStore;
     
-    final protected Stats stats = new Stats();
+    final protected RuleStats stats = new RuleStats();
     
     final protected int capacity = 10;
     
     final protected boolean distinct = false;
-    
+
     protected SPOBuffer buffer;
 
+    protected AbstractTripleStore store;
+
+    protected InferenceEngine inferenceEngine;
+
     public void setUp() throws Exception {
-        
+
         super.setUp();
-        
+
+        store = getStore();
+      
+        inferenceEngine = new InferenceEngine(store);
+
         tmpStore = new TempTripleStore(store.getProperties());
     
         buffer = new SPOBuffer(tmpStore,capacity,distinct);
+        
+    }
+    
+    public void tearDown() throws Exception {
+
+        if(this.store!=null) {
+            
+            this.store.closeAndDelete();
+            
+        }
+        
+        super.tearDown();
         
     }
     

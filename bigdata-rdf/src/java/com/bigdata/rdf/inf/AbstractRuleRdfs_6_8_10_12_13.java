@@ -52,16 +52,16 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
 public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
 
     public AbstractRuleRdfs_6_8_10_12_13
-        ( InferenceEngine store, 
+        ( InferenceEngine inf, 
           Triple head, 
           Triple body
           ) {
 
-        super(store, head, new Pred[] { body });
+        super(inf, head, new Pred[] { body });
 
     }
     
-    public Stats apply( final Stats stats, final SPOBuffer buffer) {
+    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
